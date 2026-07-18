@@ -8,6 +8,11 @@ const ORACLE_V7_REQUEST_SHA256: &str =
     "40e7d167e4b5e43dfcf9b44ae6ae2b8bbe84cc30c322ca5562877e6292352a7b";
 const ORACLE_V7_COMPLETION_SHA256: &str =
     "3332a64e1bc92474004d10dbbd63efd206df3ed699c8d988435c9c3ba41a1abb";
+const ORACLE_V7_STATISTICAL_CASE_ID: &str = "cq-evidence-blocker-0e6bd405bb42f3d5";
+const ORACLE_V7_STATISTICAL_REQUEST_SHA256: &str =
+    "f97f854356b6715939e3093bd6253dcc3f6637b766b649d2ecded97d94bd74d8";
+const ORACLE_V7_STATISTICAL_COMPLETION_SHA256: &str =
+    "7b917cf6015c0c947ec1940aafa8d69d7a2e0242e9eaab1f7fe6d29ae5e88d7a";
 const ORACLE_V7_FIXTURE_FILES: [(&str, &[u8]); 5] = [
     (
         "request.json",
@@ -32,12 +37,35 @@ const ORACLE_V7_FIXTURE_FILES: [(&str, &[u8]); 5] = [
         ),
     ),
 ];
+const ORACLE_V7_STATISTICAL_FIXTURE_FILES: [(&str, &[u8]); 5] = [
+    (
+        "request.json",
+        include_bytes!("../../../../fixtures/correctness-schema-v7-statistical/request.json"),
+    ),
+    (
+        "report.json",
+        include_bytes!("../../../../fixtures/correctness-schema-v7-statistical/report.json"),
+    ),
+    (
+        "completion.json",
+        include_bytes!("../../../../fixtures/correctness-schema-v7-statistical/completion.json"),
+    ),
+    (
+        "preflight.json",
+        include_bytes!("../../../../fixtures/correctness-schema-v7-statistical/preflight.json"),
+    ),
+    (
+        "cases/cq-evidence-blocker-0e6bd405bb42f3d5/execution-receipt.json",
+        include_bytes!(
+            "../../../../fixtures/correctness-schema-v7-statistical/cases/cq-evidence-blocker-0e6bd405bb42f3d5/execution-receipt.json"
+        ),
+    ),
+];
 
 #[derive(Clone, Copy)]
 enum FixtureMutation {
     None,
     LegacySchema,
-    MatchingStatisticalAttempt,
     MismatchedReceiptSchema,
     MismatchedPreflightSchema,
     ResolvedSelectorDigest,
@@ -56,6 +84,17 @@ enum OraclePassingMutation {
     MultipleCargoTests,
     UnreportedStatisticalAttempt,
     MissingReceiptStatisticalAttempt,
+}
+
+#[derive(Clone, Copy)]
+enum OracleStatisticalMutation {
+    OrphanAttempt,
+    DuplicateAttempt,
+    NonStatisticalOwnership,
+    ShotAggregateDrift,
+    SeedAggregateDrift,
+    IncompleteSeedPanel,
+    ZeroCompletedWork,
 }
 
 #[test]
@@ -129,6 +168,25 @@ fn oracle_produced_schema_v7_artifacts_reconstruct() {
 }
 
 #[test]
+fn oracle_produced_schema_v7_statistical_artifacts_reconstruct() {
+    let fixture = oracle_v7_statistical_fixture();
+    let evidence = validate(
+        &fixture.root,
+        CorrectnessRequirement::Required {
+            output: &fixture.relative,
+            case_ids: &[ORACLE_V7_STATISTICAL_CASE_ID.to_string()],
+            expected_manifest_sha256: ORACLE_V7_MANIFEST_SHA256,
+            expected_stab_commit: ORACLE_V7_STAB_COMMIT,
+            expected_request_sha256: ORACLE_V7_STATISTICAL_REQUEST_SHA256,
+            expected_completion_sha256: ORACLE_V7_STATISTICAL_COMPLETION_SHA256,
+        },
+    )
+    .expect("current Oracle statistical artifacts should satisfy performance preflight");
+
+    assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
+}
+
+#[test]
 fn rehashed_non_oracle_passing_families_fail_closed() {
     for mutation in [
         OraclePassingMutation::MissingStdout,
@@ -158,14 +216,36 @@ fn rehashed_non_oracle_passing_families_fail_closed() {
 }
 
 #[test]
-fn historical_schema_family_remains_replayable() {
-    let fixture = fixture(FixtureMutation::LegacySchema);
-    assert_fixture_accepted(&fixture);
+fn rehashed_invalid_statistical_ledgers_fail_closed() {
+    for mutation in [
+        OracleStatisticalMutation::OrphanAttempt,
+        OracleStatisticalMutation::DuplicateAttempt,
+        OracleStatisticalMutation::NonStatisticalOwnership,
+        OracleStatisticalMutation::ShotAggregateDrift,
+        OracleStatisticalMutation::SeedAggregateDrift,
+        OracleStatisticalMutation::IncompleteSeedPanel,
+        OracleStatisticalMutation::ZeroCompletedWork,
+    ] {
+        let fixture = oracle_v7_statistical_fixture();
+        let completion_sha256 = mutate_oracle_statistical_fixture(&fixture, mutation);
+        let result = validate(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &[ORACLE_V7_STATISTICAL_CASE_ID.to_string()],
+                expected_manifest_sha256: ORACLE_V7_MANIFEST_SHA256,
+                expected_stab_commit: ORACLE_V7_STAB_COMMIT,
+                expected_request_sha256: ORACLE_V7_STATISTICAL_REQUEST_SHA256,
+                expected_completion_sha256: &completion_sha256,
+            },
+        );
+        assert!(result.is_err());
+    }
 }
 
 #[test]
-fn matching_statistical_attempts_reconstruct() {
-    let fixture = fixture(FixtureMutation::MatchingStatisticalAttempt);
+fn historical_schema_family_remains_replayable() {
+    let fixture = fixture(FixtureMutation::LegacySchema);
     assert_fixture_accepted(&fixture);
 }
 
@@ -232,6 +312,24 @@ fn oracle_v7_fixture() -> OracleFixture {
         std::fs::create_dir_all(destination.parent().expect("fixture parent"))
             .expect("create fixture parent");
         std::fs::write(destination, bytes).expect("write Oracle fixture");
+    }
+    OracleFixture {
+        _repository: repository,
+        root,
+        relative,
+    }
+}
+
+fn oracle_v7_statistical_fixture() -> OracleFixture {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let relative = PathBuf::from("target/qualification/oracle-schema-v7-statistical");
+    let output = repository.path().join(&relative);
+    for (path, bytes) in ORACLE_V7_STATISTICAL_FIXTURE_FILES {
+        let destination = output.join(path);
+        std::fs::create_dir_all(destination.parent().expect("fixture parent"))
+            .expect("create fixture parent");
+        std::fs::write(destination, bytes).expect("write Oracle statistical fixture");
     }
     OracleFixture {
         _repository: repository,
@@ -349,6 +447,148 @@ fn mutate_oracle_fixture(fixture: &OracleFixture, mutation: OraclePassingMutatio
     preflight_case.stderr_sha256 = stderr_sha256;
     std::fs::write(output.join("preflight.json"), canonical(&preflight))
         .expect("rewrite preflight");
+
+    completion_sha256
+}
+
+fn mutate_oracle_statistical_fixture(
+    fixture: &OracleFixture,
+    mutation: OracleStatisticalMutation,
+) -> String {
+    let output = fixture.root.path.join(&fixture.relative);
+    let receipt_path = output
+        .join("cases")
+        .join(ORACLE_V7_STATISTICAL_CASE_ID)
+        .join("execution-receipt.json");
+    let mut receipt: ExecutionReceipt = read_fixture(&receipt_path);
+    let mut report: CorrectnessReport = read_fixture(&output.join("report.json"));
+    let mut completion: RunCompletion = read_fixture(&output.join("completion.json"));
+    let mut preflight: CorrectnessPreflight = read_fixture(&output.join("preflight.json"));
+
+    match mutation {
+        OracleStatisticalMutation::OrphanAttempt => {
+            let mut attempt = report
+                .statistical_attempts
+                .first()
+                .expect("Oracle statistical attempt")
+                .clone();
+            attempt.case_id = "cq-orphan".to_string();
+            report.statistical_attempts.push(attempt);
+        }
+        OracleStatisticalMutation::DuplicateAttempt => {
+            report.statistical_attempts.push(
+                report
+                    .statistical_attempts
+                    .first()
+                    .expect("Oracle statistical attempt")
+                    .clone(),
+            );
+            receipt.statistical_attempts.push(
+                receipt
+                    .statistical_attempts
+                    .first()
+                    .expect("Oracle statistical receipt attempt")
+                    .clone(),
+            );
+        }
+        OracleStatisticalMutation::NonStatisticalOwnership => {
+            only_result_mut(&mut report).comparator = "exact-value".to_string();
+        }
+        OracleStatisticalMutation::ShotAggregateDrift => {
+            report.statistical_planned_shots += 1;
+            report.statistical_shots += 1;
+        }
+        OracleStatisticalMutation::SeedAggregateDrift => {
+            let seeds = vec![12648439];
+            report
+                .statistical_planned_seeds
+                .insert(ORACLE_V7_STATISTICAL_CASE_ID.to_string(), seeds.clone());
+            report
+                .statistical_seeds
+                .insert(ORACLE_V7_STATISTICAL_CASE_ID.to_string(), seeds);
+        }
+        OracleStatisticalMutation::IncompleteSeedPanel => {
+            report
+                .statistical_planned_seeds
+                .get_mut(ORACLE_V7_STATISTICAL_CASE_ID)
+                .expect("Oracle planned statistical seeds")
+                .push(12648439);
+        }
+        OracleStatisticalMutation::ZeroCompletedWork => {
+            let attempt = report
+                .statistical_attempts
+                .first_mut()
+                .expect("Oracle statistical attempt");
+            attempt.completed_shots = 0;
+            attempt.completed_comparisons = 0;
+            attempt.completed_batches = 0;
+            let receipt_attempt = receipt
+                .statistical_attempts
+                .first_mut()
+                .expect("Oracle statistical receipt attempt");
+            receipt_attempt.completed_shots = 0;
+            receipt_attempt.completed_comparisons = 0;
+            receipt_attempt.completed_batches = 0;
+            report.statistical_planned_shots = 0;
+            report.statistical_shots = 0;
+        }
+    }
+
+    rewrite_oracle_fixture(
+        &output,
+        &receipt_path,
+        ORACLE_V7_STATISTICAL_CASE_ID,
+        receipt,
+        report,
+        &mut completion,
+        &mut preflight,
+    )
+}
+
+fn rewrite_oracle_fixture(
+    output: &Path,
+    receipt_path: &Path,
+    case_id: &str,
+    receipt: ExecutionReceipt,
+    mut report: CorrectnessReport,
+    completion: &mut RunCompletion,
+    preflight: &mut CorrectnessPreflight,
+) -> String {
+    let receipt_bytes = canonical(&receipt);
+    let receipt_sha256 = super::super::run::sha256_hex(&receipt_bytes);
+    std::fs::write(receipt_path, receipt_bytes).expect("rewrite execution receipt");
+
+    only_result_mut(&mut report).execution_receipt_sha256 = receipt_sha256.clone();
+    let report_bytes = canonical(&report);
+    let report_sha256 = super::super::run::sha256_hex(&report_bytes);
+    std::fs::write(output.join("report.json"), report_bytes).expect("rewrite report");
+
+    completion.report_sha256 = report_sha256.clone();
+    completion
+        .cases
+        .iter_mut()
+        .find(|case| case.case_id == case_id)
+        .expect("Oracle fixture completion case")
+        .execution_receipt_sha256 = receipt_sha256.clone();
+    let completion_bytes = canonical(completion);
+    let completion_sha256 = super::super::run::sha256_hex(&completion_bytes);
+    std::fs::write(output.join("completion.json"), completion_bytes).expect("rewrite completion");
+
+    preflight.report_sha256 = report_sha256;
+    preflight.completion_sha256 = completion_sha256.clone();
+    let result = only_result(&report);
+    let preflight_case = preflight
+        .cases
+        .get_mut(case_id)
+        .expect("Oracle fixture preflight case");
+    preflight_case.execution_receipt_sha256 = receipt_sha256;
+    preflight_case
+        .stdout_sha256
+        .clone_from(&result.stdout_sha256);
+    preflight_case
+        .stderr_sha256
+        .clone_from(&result.stderr_sha256);
+    std::fs::write(output.join("preflight.json"), canonical(preflight)).expect("rewrite preflight");
 
     completion_sha256
 }
@@ -471,17 +711,6 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     let request_sha256 = super::super::run::sha256_hex(&request_bytes);
     std::fs::write(output.join("request.json"), &request_bytes).expect("write request");
 
-    let statistical_receipts = if matches!(mutation, FixtureMutation::MatchingStatisticalAttempt) {
-        vec![StatisticalAttemptReceipt {
-            seed: 5,
-            verdict: "passed".to_string(),
-            completed_shots: 100,
-            completed_comparisons: 2,
-            completed_batches: 1,
-        }]
-    } else {
-        Vec::new()
-    };
     let receipt = ExecutionReceipt {
         schema_version: if matches!(mutation, FixtureMutation::MismatchedReceiptSchema) {
             CorrectnessSchemaFamily::V6.execution_receipt_version()
@@ -506,7 +735,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
             sha256: "1".repeat(64),
             complete: true,
         }),
-        statistical_attempts: statistical_receipts,
+        statistical_attempts: Vec::new(),
         auxiliary_outputs: Vec::new(),
     };
     let receipt_bytes = canonical(&receipt);
@@ -550,18 +779,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         statistical_planned_seeds: BTreeMap::new(),
         statistical_shots: 0,
         statistical_seeds: BTreeMap::new(),
-        statistical_attempts: if matches!(mutation, FixtureMutation::MatchingStatisticalAttempt) {
-            vec![StatisticalAttempt {
-                case_id: "cq-case".to_string(),
-                seed: 5,
-                completed_shots: 100,
-                completed_comparisons: 2,
-                completed_batches: 1,
-                outcome: "passed".to_string(),
-            }]
-        } else {
-            Vec::new()
-        },
+        statistical_attempts: Vec::new(),
         property_corpus_ids: Vec::new(),
         resource_case_count: 0,
         upstream_dispositions: Vec::new(),

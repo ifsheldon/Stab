@@ -1,0 +1,117 @@
+{
+  "schema_version": 4,
+  "run_request_sha256": "f97f854356b6715939e3093bd6253dcc3f6637b766b649d2ecded97d94bd74d8",
+  "case_id": "cq-evidence-blocker-0e6bd405bb42f3d5",
+  "selector_sha256": "781d14ff91bb2f9a5c13caf7b01e9cab5a5f7405dc67aefa94e3697cd4dbbd21",
+  "executables": [
+    {
+      "role": "cargo",
+      "bytes": 41509560,
+      "sha256": "8efb8316b814d9d2f09e92cc55ac94e7661b17eb4fd6aeb1a006ad966599196c"
+    },
+    {
+      "role": "cc",
+      "bytes": 990040,
+      "sha256": "a20520ee21543f243d40636a9181a142c45ecd989de31ab86b99a8ea5ada870d"
+    },
+    {
+      "role": "cmake",
+      "bytes": 10489912,
+      "sha256": "05e8a03ddf5a5075139760bcf4fc5bb73112246c5cd796dc85854589cfa502cb"
+    },
+    {
+      "role": "compiler-assembler",
+      "bytes": 464304,
+      "sha256": "1ffda50efb6d91b6b05ef933aced099595c36577594c0296c91161f2d13db374"
+    },
+    {
+      "role": "compiler-cc1",
+      "bytes": 26761448,
+      "sha256": "64edfe466dd55c4216c006e9fa237af012e4974281dd4d11640aacfc3b3693af"
+    },
+    {
+      "role": "compiler-cc1plus",
+      "bytes": 28862568,
+      "sha256": "110b837d05f403bcd21a63eb1f2341338d613aaf3d977d7db6d2c1661c8afa7d"
+    },
+    {
+      "role": "compiler-collect2",
+      "bytes": 331800,
+      "sha256": "f116dad8aa42ff4feff154ccfb2db9ecc79edcccb5c2e34244aff80ad123ab19"
+    },
+    {
+      "role": "compiler-linker",
+      "bytes": 1710520,
+      "sha256": "1e4d3369b76845fa8e099b83513bf28f6f722e046f9b2cde1378c9e27f96d19c"
+    },
+    {
+      "role": "compiler-lto-wrapper",
+      "bytes": 856192,
+      "sha256": "89d1464ba0563ec659bd9995ed567b4a147e2310018b89d8b72830df1a8f5011"
+    },
+    {
+      "role": "cxx",
+      "bytes": 990040,
+      "sha256": "fc02363794280f404c6ca6f5da1c8fe469be902e9de140d35d8573bb3393f53b"
+    },
+    {
+      "role": "git",
+      "bytes": 4920880,
+      "sha256": "9747fa28f47df354471540cb08a0afe21afbd02018ed18944e825bdd77e172e9"
+    },
+    {
+      "role": "make",
+      "bytes": 267672,
+      "sha256": "abbecc214fcadef6530d1cc137bde7ceb74cae3f6b992c7d10a8669a7314c7e0"
+    },
+    {
+      "role": "qualification-worker",
+      "bytes": 116049090,
+      "sha256": "fda4a47a1384a2f81841e3128fdaefd403cd5e09b338a95cc6f043ae57b59ddd"
+    },
+    {
+      "role": "rustc",
+      "bytes": 2329792,
+      "sha256": "fccda1234b67cdf51579e5fb2ee28ebcc29c6f1ca6ab09ed7e736cca96f3c6f9"
+    },
+    {
+      "role": "rustup",
+      "bytes": 19502880,
+      "sha256": "9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792"
+    },
+    {
+      "role": "stab",
+      "bytes": 2908928,
+      "sha256": "e111065696f2f545f782b382ff4d7063dc12e80b578444364aa47ca50a729d5a"
+    },
+    {
+      "role": "stim",
+      "bytes": 2876944,
+      "sha256": "b38a4fd71334dcbedbcaa6506679d2e2222961d612d85db2bd32cf3160a4c26d"
+    }
+  ],
+  "execution_environment_sha256": "0b68a01d8060289c81063b3db6686238d959587dd6328205ea516342cee0222d",
+  "verdict": "accepted",
+  "exit_status": 0,
+  "exact_test_count": 1,
+  "stdout": {
+    "bytes": 9482,
+    "sha256": "87a5f285f0bc89418eb067f10e18870d7149ba68af9cd25ff4019b1a6b1cd807",
+    "complete": true
+  },
+  "stderr": {
+    "bytes": 534,
+    "sha256": "84aaabb1218fa2416f486e2c22a6f36e826d1584a6366f54c29fd65de3bb244a",
+    "complete": true
+  },
+  "statistical_attempts": [
+    {
+      "seed": 12648438,
+      "verdict": "passed",
+      "completed_shots": 100000,
+      "completed_comparisons": 1,
+      "completed_batches": 1
+    }
+  ],
+  "auxiliary_outputs": []
+}

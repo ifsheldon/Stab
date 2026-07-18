@@ -177,6 +177,7 @@ fn validate_required(
 
     let requested = validate_request(&request, expected_manifest_sha256, expected_stab_commit)?;
     let (schema_family, results) = validate_report(&report, &request, &request_sha256, &requested)?;
+    let statistical_attempts = validate_statistical_ledger(&report, &results)?;
     validate_completion(&completion, &request_sha256, &report_sha256, &results)?;
     validate_execution_receipts(
         root,
@@ -184,7 +185,7 @@ fn validate_required(
         &request,
         &request_sha256,
         schema_family,
-        &report.statistical_attempts,
+        &statistical_attempts,
         &results,
     )?;
     validate_preflight(
@@ -230,6 +231,7 @@ fn validate_request<'a>(
         || request.stim_commit != STIM_COMMIT
         || !matches!(request.tier.as_str(), "full" | "soak")
         || request.allow_deferred
+        || !request.planned_case_ids.is_empty()
         || !request.deferred_case_ids.is_empty()
         || !valid_sha256(&request.execution_environment_sha256)
         || request.executables.is_empty()
@@ -318,6 +320,92 @@ fn validate_report<'a>(
     Ok((schema_family, results))
 }
 
+fn validate_statistical_ledger<'a>(
+    report: &'a CorrectnessReport,
+    results: &BTreeMap<&str, &CaseResult>,
+) -> Result<BTreeMap<&'a str, Vec<&'a StatisticalAttempt>>, CorrectnessError> {
+    let statistical_case_ids = results
+        .values()
+        .filter(|result| result.comparator == "statistical")
+        .map(|result| result.case_id.as_str())
+        .collect::<BTreeSet<_>>();
+    if !valid_seed_panels(&report.statistical_planned_seeds, &statistical_case_ids)
+        || !valid_seed_panels(&report.statistical_seeds, &statistical_case_ids)
+        || report.statistical_planned_seeds != report.statistical_seeds
+        || report.statistical_planned_shots != report.statistical_shots
+    {
+        return Err(CorrectnessError::ReportContract);
+    }
+
+    let Some(declared_bound) = canonical_probability_bound(&report.statistical_declared_budget)
+    else {
+        return Err(CorrectnessError::ReportContract);
+    };
+    let Some(consumed_bound) = canonical_probability_bound(&report.statistical_consumed_bound)
+    else {
+        return Err(CorrectnessError::ReportContract);
+    };
+    if consumed_bound > declared_bound {
+        return Err(CorrectnessError::ReportContract);
+    }
+
+    let mut attempts_by_case = BTreeMap::<&str, Vec<&StatisticalAttempt>>::new();
+    let mut attempted_seeds = BTreeMap::<String, Vec<u64>>::new();
+    let mut attempted_shots = 0_u64;
+    let mut attempt_keys = BTreeSet::new();
+    for attempt in &report.statistical_attempts {
+        let Some(result) = results.get(attempt.case_id.as_str()) else {
+            return Err(CorrectnessError::ReportContract);
+        };
+        if result.comparator != "statistical"
+            || attempt.outcome != "passed"
+            || attempt.completed_shots == 0
+            || attempt.completed_comparisons == 0
+            || attempt.completed_batches == 0
+            || !attempt_keys.insert((attempt.case_id.as_str(), attempt.seed))
+        {
+            return Err(CorrectnessError::ReportContract);
+        }
+        attempted_shots = attempted_shots
+            .checked_add(attempt.completed_shots)
+            .ok_or(CorrectnessError::ReportContract)?;
+        attempted_seeds
+            .entry(attempt.case_id.clone())
+            .or_default()
+            .push(attempt.seed);
+        attempts_by_case
+            .entry(attempt.case_id.as_str())
+            .or_default()
+            .push(attempt);
+    }
+    if attempted_shots != report.statistical_shots || attempted_seeds != report.statistical_seeds {
+        return Err(CorrectnessError::ReportContract);
+    }
+    Ok(attempts_by_case)
+}
+
+fn valid_seed_panels(
+    panels: &BTreeMap<String, Vec<u64>>,
+    statistical_case_ids: &BTreeSet<&str>,
+) -> bool {
+    panels.keys().map(String::as_str).collect::<BTreeSet<_>>() == *statistical_case_ids
+        && panels.values().all(|seeds| {
+            !seeds.is_empty() && seeds.iter().collect::<BTreeSet<_>>().len() == seeds.len()
+        })
+}
+
+fn canonical_probability_bound(value: &str) -> Option<f64> {
+    if value.len() > 32 {
+        return None;
+    }
+    let parsed = value.parse::<f64>().ok()?;
+    (parsed.is_finite()
+        && !parsed.is_sign_negative()
+        && parsed <= 1e-4
+        && format!("{parsed:.17e}") == value)
+        .then_some(parsed)
+}
+
 fn selector_digest_matches_contract(result: &CaseResult, selector_bytes: &[u8]) -> bool {
     match result.selector.kind.as_str() {
         "cargo-test" | "property-target" => {
@@ -374,7 +462,7 @@ fn validate_execution_receipts(
     request: &RunRequest,
     request_sha256: &str,
     schema_family: CorrectnessSchemaFamily,
-    report_attempts: &[StatisticalAttempt],
+    report_attempts: &BTreeMap<&str, Vec<&StatisticalAttempt>>,
     results: &BTreeMap<&str, &CaseResult>,
 ) -> Result<(), CorrectnessError> {
     for result in results.values() {
@@ -423,16 +511,14 @@ fn complete_stream(stream: Option<&StreamReceipt>) -> bool {
 
 fn statistical_attempts_match(
     case_id: &str,
-    report_attempts: &[StatisticalAttempt],
+    report_attempts: &BTreeMap<&str, Vec<&StatisticalAttempt>>,
     receipt_attempts: &[StatisticalAttemptReceipt],
 ) -> bool {
-    let mut expected = report_attempts
-        .iter()
-        .filter(|attempt| attempt.case_id == case_id);
-    for receipt in receipt_attempts {
-        let Some(report) = expected.next() else {
-            return false;
-        };
+    let expected = report_attempts.get(case_id).map_or(&[][..], Vec::as_slice);
+    if expected.len() != receipt_attempts.len() {
+        return false;
+    }
+    for (report, receipt) in expected.iter().zip(receipt_attempts) {
         if report.outcome != "passed"
             || receipt.verdict != "passed"
             || receipt.seed != report.seed
@@ -443,7 +529,7 @@ fn statistical_attempts_match(
             return false;
         }
     }
-    expected.next().is_none()
+    true
 }
 
 fn validate_preflight(
