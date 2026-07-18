@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
-  "semantic_digest": "10bc811a2e1e66cb6e765745cd7c8c7b61d8ef259bd02c0ce33020edf863b06c",
+  "semantic_digest": "868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2259,7 +2259,7 @@
     {
       "id": "PERFC-5f2145ca0e3328b5",
       "source_line": 225,
-      "anchor_digest": "f356122751635e7cf565453948eeca125c1a1b91d1343cafbb03805d1335fe01",
+      "anchor_digest": "a5e666130cc41a62e03eb00df8c3d1461b7b230ae9cc711653859232255a9063",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
       "raw_status": "Done for current implemented surfaces and CQ1 harness acceptance",
