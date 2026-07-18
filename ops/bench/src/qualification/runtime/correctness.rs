@@ -184,6 +184,7 @@ fn validate_required(
         &request,
         &request_sha256,
         schema_family,
+        &report.statistical_attempts,
         &results,
     )?;
     validate_preflight(
@@ -303,12 +304,9 @@ fn validate_report<'a>(
             || result.selector_sha256 != expected.selector_sha256
             || !selector_digest_matches_contract(result, &selector_bytes)
             || !valid_sha256(&result.execution_receipt_sha256)
-            || !optional_sha256(&result.stdout_sha256)
-            || !optional_sha256(&result.stderr_sha256)
-            || result
-                .artifacts
-                .iter()
-                .any(|artifact| !valid_report_artifact(artifact))
+            || !result.stdout_sha256.as_deref().is_some_and(valid_sha256)
+            || !result.stderr_sha256.as_deref().is_some_and(valid_sha256)
+            || !result.artifacts.is_empty()
             || results.insert(result.case_id.as_str(), result).is_some()
         {
             return Err(CorrectnessError::ReportContract);
@@ -376,6 +374,7 @@ fn validate_execution_receipts(
     request: &RunRequest,
     request_sha256: &str,
     schema_family: CorrectnessSchemaFamily,
+    report_attempts: &[StatisticalAttempt],
     results: &BTreeMap<&str, &CaseResult>,
 ) -> Result<(), CorrectnessError> {
     for result in results.values() {
@@ -397,24 +396,54 @@ fn validate_execution_receipts(
             || receipt.executables != request.executables
             || receipt.execution_environment_sha256 != request.execution_environment_sha256
             || receipt.verdict != "accepted"
+            || receipt.exit_status.is_none()
             || receipt.exact_test_count != result.exact_test_count
+            || (result.selector.kind == "cargo-test" && receipt.exact_test_count != Some(1))
             || stdout_sha256 != result.stdout_sha256.as_deref()
             || stderr_sha256 != result.stderr_sha256.as_deref()
             || receipt.auxiliary_outputs != result.artifacts
-            || receipt
-                .stdout
-                .iter()
-                .chain(&receipt.stderr)
-                .any(|stream| !stream.complete || !valid_sha256(&stream.sha256))
-            || receipt
-                .statistical_attempts
-                .iter()
-                .any(|attempt| attempt.verdict != "passed")
+            || !receipt.auxiliary_outputs.is_empty()
+            || !complete_stream(receipt.stdout.as_ref())
+            || !complete_stream(receipt.stderr.as_ref())
+            || !statistical_attempts_match(
+                &result.case_id,
+                report_attempts,
+                &receipt.statistical_attempts,
+            )
         {
             return Err(CorrectnessError::ExecutionReceipt(result.case_id.clone()));
         }
     }
     Ok(())
+}
+
+fn complete_stream(stream: Option<&StreamReceipt>) -> bool {
+    stream.is_some_and(|stream| stream.complete && valid_sha256(&stream.sha256))
+}
+
+fn statistical_attempts_match(
+    case_id: &str,
+    report_attempts: &[StatisticalAttempt],
+    receipt_attempts: &[StatisticalAttemptReceipt],
+) -> bool {
+    let mut expected = report_attempts
+        .iter()
+        .filter(|attempt| attempt.case_id == case_id);
+    for receipt in receipt_attempts {
+        let Some(report) = expected.next() else {
+            return false;
+        };
+        if report.outcome != "passed"
+            || receipt.verdict != "passed"
+            || receipt.seed != report.seed
+            || receipt.completed_shots != report.completed_shots
+            || receipt.completed_comparisons != report.completed_comparisons
+            || receipt.completed_batches != report.completed_batches
+        {
+            return false;
+        }
+    }
+    expected.next().is_none()
 }
 
 fn validate_preflight(
@@ -517,10 +546,6 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn optional_sha256(value: &Option<String>) -> bool {
-    value.as_deref().is_none_or(valid_sha256)
-}
-
 fn valid_git_commit(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -539,16 +564,6 @@ fn valid_case_id(value: &str) -> bool {
 fn unique_valid_case_ids(values: &[String]) -> bool {
     values.iter().all(|value| valid_case_id(value))
         && values.iter().collect::<BTreeSet<_>>().len() == values.len()
-}
-
-fn valid_report_artifact(artifact: &ReportArtifact) -> bool {
-    !artifact.path.as_os_str().is_empty()
-        && !artifact.path.is_absolute()
-        && artifact
-            .path
-            .components()
-            .all(|component| matches!(component, Component::Normal(_)))
-        && valid_sha256(&artifact.sha256)
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

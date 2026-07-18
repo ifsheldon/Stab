@@ -1,6 +1,13 @@
 use super::*;
 
 const ORACLE_V7_CASE_ID: &str = "cq-evidence-blocker-083f1e2d245c4b57";
+const ORACLE_V7_MANIFEST_SHA256: &str =
+    "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87";
+const ORACLE_V7_STAB_COMMIT: &str = "3f2f382627c8421de0a668819d467a9f252de20f";
+const ORACLE_V7_REQUEST_SHA256: &str =
+    "40e7d167e4b5e43dfcf9b44ae6ae2b8bbe84cc30c322ca5562877e6292352a7b";
+const ORACLE_V7_COMPLETION_SHA256: &str =
+    "3332a64e1bc92474004d10dbbd63efd206df3ed699c8d988435c9c3ba41a1abb";
 const ORACLE_V7_FIXTURE_FILES: [(&str, &[u8]); 5] = [
     (
         "request.json",
@@ -30,12 +37,25 @@ const ORACLE_V7_FIXTURE_FILES: [(&str, &[u8]); 5] = [
 enum FixtureMutation {
     None,
     LegacySchema,
+    MatchingStatisticalAttempt,
     MismatchedReceiptSchema,
     MismatchedPreflightSchema,
     ResolvedSelectorDigest,
     FabricatedPreflightPass,
     FailedReport,
     MismatchedCompletion,
+}
+
+#[derive(Clone, Copy)]
+enum OraclePassingMutation {
+    MissingStdout,
+    MissingStderr,
+    IncompleteStdout,
+    RetainedArtifact,
+    MissingExitStatus,
+    MultipleCargoTests,
+    UnreportedStatisticalAttempt,
+    MissingReceiptStatisticalAttempt,
 }
 
 #[test]
@@ -91,29 +111,16 @@ fn required_preflight_reconstructs_canonical_cq_artifacts() {
 
 #[test]
 fn oracle_produced_schema_v7_artifacts_reconstruct() {
-    let repository = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-    let relative = PathBuf::from("target/qualification/oracle-schema-v7");
-    let output = repository.path().join(&relative);
-    for (path, bytes) in ORACLE_V7_FIXTURE_FILES {
-        let destination = output.join(path);
-        std::fs::create_dir_all(destination.parent().expect("fixture parent"))
-            .expect("create fixture parent");
-        std::fs::write(destination, bytes).expect("write Oracle fixture");
-    }
-
+    let fixture = oracle_v7_fixture();
     let evidence = validate(
-        &root,
+        &fixture.root,
         CorrectnessRequirement::Required {
-            output: &relative,
+            output: &fixture.relative,
             case_ids: &[ORACLE_V7_CASE_ID.to_string()],
-            expected_manifest_sha256:
-                "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
-            expected_stab_commit: "3f2f382627c8421de0a668819d467a9f252de20f",
-            expected_request_sha256:
-                "40e7d167e4b5e43dfcf9b44ae6ae2b8bbe84cc30c322ca5562877e6292352a7b",
-            expected_completion_sha256:
-                "3332a64e1bc92474004d10dbbd63efd206df3ed699c8d988435c9c3ba41a1abb",
+            expected_manifest_sha256: ORACLE_V7_MANIFEST_SHA256,
+            expected_stab_commit: ORACLE_V7_STAB_COMMIT,
+            expected_request_sha256: ORACLE_V7_REQUEST_SHA256,
+            expected_completion_sha256: ORACLE_V7_COMPLETION_SHA256,
         },
     )
     .expect("current Oracle artifacts should satisfy performance preflight");
@@ -122,8 +129,43 @@ fn oracle_produced_schema_v7_artifacts_reconstruct() {
 }
 
 #[test]
+fn rehashed_non_oracle_passing_families_fail_closed() {
+    for mutation in [
+        OraclePassingMutation::MissingStdout,
+        OraclePassingMutation::MissingStderr,
+        OraclePassingMutation::IncompleteStdout,
+        OraclePassingMutation::RetainedArtifact,
+        OraclePassingMutation::MissingExitStatus,
+        OraclePassingMutation::MultipleCargoTests,
+        OraclePassingMutation::UnreportedStatisticalAttempt,
+        OraclePassingMutation::MissingReceiptStatisticalAttempt,
+    ] {
+        let fixture = oracle_v7_fixture();
+        let completion_sha256 = mutate_oracle_fixture(&fixture, mutation);
+        let result = validate(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &[ORACLE_V7_CASE_ID.to_string()],
+                expected_manifest_sha256: ORACLE_V7_MANIFEST_SHA256,
+                expected_stab_commit: ORACLE_V7_STAB_COMMIT,
+                expected_request_sha256: ORACLE_V7_REQUEST_SHA256,
+                expected_completion_sha256: &completion_sha256,
+            },
+        );
+        assert!(result.is_err());
+    }
+}
+
+#[test]
 fn historical_schema_family_remains_replayable() {
     let fixture = fixture(FixtureMutation::LegacySchema);
+    assert_fixture_accepted(&fixture);
+}
+
+#[test]
+fn matching_statistical_attempts_reconstruct() {
+    let fixture = fixture(FixtureMutation::MatchingStatisticalAttempt);
     assert_fixture_accepted(&fixture);
 }
 
@@ -172,6 +214,157 @@ fn failed_report_is_rejected_even_when_dependent_hashes_are_refreshed() {
 fn completion_must_exactly_reconstruct_report_results() {
     let fixture = fixture(FixtureMutation::MismatchedCompletion);
     assert_fixture_rejected(&fixture);
+}
+
+struct OracleFixture {
+    _repository: tempfile::TempDir,
+    root: RepoRoot,
+    relative: PathBuf,
+}
+
+fn oracle_v7_fixture() -> OracleFixture {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let relative = PathBuf::from("target/qualification/oracle-schema-v7");
+    let output = repository.path().join(&relative);
+    for (path, bytes) in ORACLE_V7_FIXTURE_FILES {
+        let destination = output.join(path);
+        std::fs::create_dir_all(destination.parent().expect("fixture parent"))
+            .expect("create fixture parent");
+        std::fs::write(destination, bytes).expect("write Oracle fixture");
+    }
+    OracleFixture {
+        _repository: repository,
+        root,
+        relative,
+    }
+}
+
+fn mutate_oracle_fixture(fixture: &OracleFixture, mutation: OraclePassingMutation) -> String {
+    let output = fixture.root.path.join(&fixture.relative);
+    let receipt_path = output
+        .join("cases")
+        .join(ORACLE_V7_CASE_ID)
+        .join("execution-receipt.json");
+    let mut receipt: ExecutionReceipt = read_fixture(&receipt_path);
+    let mut report: CorrectnessReport = read_fixture(&output.join("report.json"));
+    let mut completion: RunCompletion = read_fixture(&output.join("completion.json"));
+    let mut preflight: CorrectnessPreflight = read_fixture(&output.join("preflight.json"));
+
+    match mutation {
+        OraclePassingMutation::MissingStdout => {
+            receipt.stdout = None;
+            only_result_mut(&mut report).stdout_sha256 = None;
+            preflight
+                .cases
+                .get_mut(ORACLE_V7_CASE_ID)
+                .expect("Oracle fixture preflight case")
+                .stdout_sha256 = None;
+        }
+        OraclePassingMutation::MissingStderr => {
+            receipt.stderr = None;
+            only_result_mut(&mut report).stderr_sha256 = None;
+            preflight
+                .cases
+                .get_mut(ORACLE_V7_CASE_ID)
+                .expect("Oracle fixture preflight case")
+                .stderr_sha256 = None;
+        }
+        OraclePassingMutation::IncompleteStdout => {
+            receipt
+                .stdout
+                .as_mut()
+                .expect("Oracle fixture stdout receipt")
+                .complete = false;
+        }
+        OraclePassingMutation::RetainedArtifact => {
+            let bytes = b"retained failure artifact";
+            let path = PathBuf::from(format!("cases/{ORACLE_V7_CASE_ID}/failure.txt"));
+            std::fs::write(output.join(&path), bytes).expect("write retained artifact");
+            let artifact = ReportArtifact {
+                path,
+                bytes: bytes.len(),
+                sha256: super::super::run::sha256_hex(bytes),
+            };
+            receipt.auxiliary_outputs.push(artifact.clone());
+            only_result_mut(&mut report).artifacts.push(artifact);
+        }
+        OraclePassingMutation::MissingExitStatus => receipt.exit_status = None,
+        OraclePassingMutation::MultipleCargoTests => {
+            receipt.exact_test_count = Some(2);
+            only_result_mut(&mut report).exact_test_count = Some(2);
+        }
+        OraclePassingMutation::UnreportedStatisticalAttempt => {
+            receipt
+                .statistical_attempts
+                .push(StatisticalAttemptReceipt {
+                    seed: 7,
+                    verdict: "passed".to_string(),
+                    completed_shots: 1,
+                    completed_comparisons: 1,
+                    completed_batches: 1,
+                });
+        }
+        OraclePassingMutation::MissingReceiptStatisticalAttempt => {
+            report.statistical_attempts.push(StatisticalAttempt {
+                case_id: ORACLE_V7_CASE_ID.to_string(),
+                seed: 11,
+                completed_shots: 1,
+                completed_comparisons: 1,
+                completed_batches: 1,
+                outcome: "passed".to_string(),
+            });
+        }
+    }
+
+    let receipt_bytes = canonical(&receipt);
+    let receipt_sha256 = super::super::run::sha256_hex(&receipt_bytes);
+    std::fs::write(&receipt_path, receipt_bytes).expect("rewrite execution receipt");
+
+    only_result_mut(&mut report).execution_receipt_sha256 = receipt_sha256.clone();
+    let report_bytes = canonical(&report);
+    let report_sha256 = super::super::run::sha256_hex(&report_bytes);
+    std::fs::write(output.join("report.json"), report_bytes).expect("rewrite report");
+
+    completion.report_sha256 = report_sha256.clone();
+    completion
+        .cases
+        .first_mut()
+        .expect("Oracle fixture completion case")
+        .execution_receipt_sha256 = receipt_sha256.clone();
+    let completion_bytes = canonical(&completion);
+    let completion_sha256 = super::super::run::sha256_hex(&completion_bytes);
+    std::fs::write(output.join("completion.json"), completion_bytes).expect("rewrite completion");
+
+    preflight.report_sha256 = report_sha256;
+    preflight.completion_sha256 = completion_sha256.clone();
+    let stdout_sha256 = only_result(&report).stdout_sha256.clone();
+    let stderr_sha256 = only_result(&report).stderr_sha256.clone();
+    let preflight_case = preflight
+        .cases
+        .get_mut(ORACLE_V7_CASE_ID)
+        .expect("Oracle fixture preflight case");
+    preflight_case.execution_receipt_sha256 = receipt_sha256;
+    preflight_case.stdout_sha256 = stdout_sha256;
+    preflight_case.stderr_sha256 = stderr_sha256;
+    std::fs::write(output.join("preflight.json"), canonical(&preflight))
+        .expect("rewrite preflight");
+
+    completion_sha256
+}
+
+fn read_fixture<T: serde::de::DeserializeOwned>(path: &Path) -> T {
+    serde_json::from_slice(&std::fs::read(path).expect("read fixture")).expect("parse fixture")
+}
+
+fn only_result(report: &CorrectnessReport) -> &CaseResult {
+    assert_eq!(report.results.len(), 1, "Oracle fixture result count");
+    report.results.first().expect("Oracle fixture result")
+}
+
+fn only_result_mut(report: &mut CorrectnessReport) -> &mut CaseResult {
+    assert_eq!(report.results.len(), 1, "Oracle fixture result count");
+    report.results.first_mut().expect("Oracle fixture result")
 }
 
 struct Fixture {
@@ -278,6 +471,17 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     let request_sha256 = super::super::run::sha256_hex(&request_bytes);
     std::fs::write(output.join("request.json"), &request_bytes).expect("write request");
 
+    let statistical_receipts = if matches!(mutation, FixtureMutation::MatchingStatisticalAttempt) {
+        vec![StatisticalAttemptReceipt {
+            seed: 5,
+            verdict: "passed".to_string(),
+            completed_shots: 100,
+            completed_comparisons: 2,
+            completed_batches: 1,
+        }]
+    } else {
+        Vec::new()
+    };
     let receipt = ExecutionReceipt {
         schema_version: if matches!(mutation, FixtureMutation::MismatchedReceiptSchema) {
             CorrectnessSchemaFamily::V6.execution_receipt_version()
@@ -297,8 +501,12 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
             sha256: "f".repeat(64),
             complete: true,
         }),
-        stderr: None,
-        statistical_attempts: Vec::new(),
+        stderr: Some(StreamReceipt {
+            bytes: 0,
+            sha256: "1".repeat(64),
+            complete: true,
+        }),
+        statistical_attempts: statistical_receipts,
         auxiliary_outputs: Vec::new(),
     };
     let receipt_bytes = canonical(&receipt);
@@ -342,7 +550,18 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         statistical_planned_seeds: BTreeMap::new(),
         statistical_shots: 0,
         statistical_seeds: BTreeMap::new(),
-        statistical_attempts: Vec::new(),
+        statistical_attempts: if matches!(mutation, FixtureMutation::MatchingStatisticalAttempt) {
+            vec![StatisticalAttempt {
+                case_id: "cq-case".to_string(),
+                seed: 5,
+                completed_shots: 100,
+                completed_comparisons: 2,
+                completed_batches: 1,
+                outcome: "passed".to_string(),
+            }]
+        } else {
+            Vec::new()
+        },
         property_corpus_ids: Vec::new(),
         resource_case_count: 0,
         upstream_dispositions: Vec::new(),
@@ -359,7 +578,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
             outcome: outcome.to_string(),
             exact_test_count: Some(1),
             stdout_sha256: Some("f".repeat(64)),
-            stderr_sha256: None,
+            stderr_sha256: Some("1".repeat(64)),
             artifacts: Vec::new(),
         }],
     };
@@ -415,7 +634,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
                 selector_sha256: result.selector_sha256.clone(),
                 execution_receipt_sha256: result.execution_receipt_sha256.clone(),
                 stdout_sha256: result.stdout_sha256.clone(),
-                stderr_sha256: None,
+                stderr_sha256: result.stderr_sha256.clone(),
             },
         )]),
     };
