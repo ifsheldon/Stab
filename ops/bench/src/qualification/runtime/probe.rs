@@ -18,6 +18,7 @@ use super::worker;
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
+mod clifford_string;
 mod pauli_iter;
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
@@ -48,6 +49,7 @@ const DEFAULT_TRANSPOSE_WORK_ITEMS: u64 = 65_536;
 const DEFAULT_PAULI_WORK_ITEMS: u64 = 10_000;
 const DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS: u64 = 232;
 const DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS: u64 = 3_000;
+const DEFAULT_CLIFFORD_WORK_ITEMS: u64 = 10_000;
 const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
@@ -66,8 +68,6 @@ const TRANSPOSE_MAX_DIMENSION: u64 = 16_384;
 const TRANSPOSE_DIMENSION_ALIGNMENT: u64 = 256;
 const PAULI_MIN_QUBITS: u64 = 1;
 const PAULI_MAX_QUBITS: u64 = 1_048_576;
-const PAULI_ITER_RANGE_OUTPUT_CAP: u64 = 1_000_000;
-const PAULI_ITER_SINGLETON_OUTPUT_CAP: u64 = PAULI_MAX_QUBITS * 3;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -123,6 +123,10 @@ enum ProbeGroup {
     PauliStringIterRangeAdapter,
     #[value(name = "pq2-pauli-iter-singleton-adapter-smoke")]
     PauliStringIterSingletonAdapter,
+    #[value(name = "pq2-clifford-string-identity-adapter-smoke")]
+    CliffordStringIdentityAdapter,
+    #[value(name = "pq2-clifford-string-non-identity-adapter-smoke")]
+    CliffordStringNonIdentityAdapter,
 }
 
 impl ProbeGroup {
@@ -153,6 +157,10 @@ impl ProbeGroup {
             Self::PauliStringIterSingletonAdapter => {
                 Some(PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID)
             }
+            Self::CliffordStringIdentityAdapter => Some(clifford_string::IDENTITY_RUNTIME_GROUP_ID),
+            Self::CliffordStringNonIdentityAdapter => {
+                Some(clifford_string::NON_IDENTITY_RUNTIME_GROUP_ID)
+            }
         }
     }
 
@@ -181,6 +189,10 @@ impl ProbeGroup {
             PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID => Some(Self::PauliStringIterRangeAdapter),
             PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID => {
                 Some(Self::PauliStringIterSingletonAdapter)
+            }
+            clifford_string::IDENTITY_RUNTIME_GROUP_ID => Some(Self::CliffordStringIdentityAdapter),
+            clifford_string::NON_IDENTITY_RUNTIME_GROUP_ID => {
+                Some(Self::CliffordStringNonIdentityAdapter)
             }
             _ => None,
         }
@@ -268,7 +280,9 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::BitMatrixTransposeAllocatingAdapter
         | ProbeGroup::PauliStringMultiplyAdapter
         | ProbeGroup::PauliStringIterRangeAdapter
-        | ProbeGroup::PauliStringIterSingletonAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::PauliStringIterSingletonAdapter
+        | ProbeGroup::CliffordStringIdentityAdapter
+        | ProbeGroup::CliffordStringNonIdentityAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -409,6 +423,12 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
             "pauli-string-iter-singleton",
             "construct-and-iterate-borrowed",
         ),
+        ProbeGroup::CliffordStringIdentityAdapter
+        | ProbeGroup::CliffordStringNonIdentityAdapter => {
+            clifford_string::probe_contract(args.group).ok_or_else(|| {
+                ProbeError::Contract("missing Clifford probe contract".to_string())
+            })?
+        }
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -419,7 +439,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
     let adapter = prepare_adapter(root, &repository.commit)?;
     let worker_identity = worker::current_identity()?;
     let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
-    let common_arguments = vec![
+    let mut common_arguments = vec![
         OsString::from("--workload"),
         OsString::from(workload),
         OsString::from("--measurement-id"),
@@ -431,6 +451,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         OsString::from("--evidence-mode"),
         OsString::from(args.evidence_mode.as_str()),
     ];
+    clifford_string::append_descriptor_arguments(
+        args.group,
+        probe_work_items(&args),
+        &mut common_arguments,
+    )?;
     let adapter_request = ProcessRequest {
         program: adapter.path.clone(),
         args: common_arguments.clone(),
@@ -506,6 +531,13 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
     }
     .validate(&stab_rows)?;
     pauli_iter::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
+    clifford_string::validate_boundaries(
+        root,
+        args.group,
+        &adapter,
+        &current_exe,
+        &worker_identity,
+    )?;
 
     if args.evidence_mode == ProbeEvidenceMode::Timing {
         let pairs = pair_measurements(0, PairOrder::StimThenStab, &stim_rows, &stab_rows)?;
@@ -612,6 +644,8 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::PauliStringMultiplyAdapter => DEFAULT_PAULI_WORK_ITEMS,
             ProbeGroup::PauliStringIterRangeAdapter => DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS,
             ProbeGroup::PauliStringIterSingletonAdapter => DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
+            ProbeGroup::CliffordStringIdentityAdapter
+            | ProbeGroup::CliffordStringNonIdentityAdapter => DEFAULT_CLIFFORD_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -622,6 +656,8 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
 }
 
 fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), ProbeError> {
+    clifford_string::validate_work_items(group, work_items)?;
+    pauli_iter::validate_work_items(group, work_items)?;
     if group == ProbeGroup::GateNameHashAdapter && !work_items.is_multiple_of(GATE_HASH_NAME_COUNT)
     {
         return Err(ProbeError::Contract(format!(
@@ -702,46 +738,7 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
             "Pauli multiplication probe width {work_items} is outside {PAULI_MIN_QUBITS}..={PAULI_MAX_QUBITS} qubits"
         )));
     }
-    if group == ProbeGroup::PauliStringIterRangeAdapter
-        && !valid_pauli_iter_range_work_items(work_items)
-    {
-        return Err(ProbeError::Contract(format!(
-            "Pauli iterator range probe work count {work_items} is not a complete source-owned traversal through {PAULI_ITER_RANGE_OUTPUT_CAP} outputs"
-        )));
-    }
-    if group == ProbeGroup::PauliStringIterSingletonAdapter
-        && (work_items == 0
-            || work_items > PAULI_ITER_SINGLETON_OUTPUT_CAP
-            || !work_items.is_multiple_of(3))
-    {
-        return Err(ProbeError::Contract(format!(
-            "Pauli iterator singleton probe work count {work_items} is not a positive complete callback through {PAULI_ITER_SINGLETON_OUTPUT_CAP} outputs"
-        )));
-    }
     Ok(())
-}
-
-fn valid_pauli_iter_range_work_items(work_items: u64) -> bool {
-    (2..=22).any(|width| pauli_iter_range_output_count(width) == Some(work_items))
-}
-
-fn pauli_iter_range_output_count(width: u64) -> Option<u64> {
-    let mut outputs = 0_u64;
-    for weight in 2..=5_u64.min(width) {
-        let basis_products = 1_u64.checked_shl(u32::try_from(weight).ok()?)?;
-        outputs =
-            outputs.checked_add(checked_choose(width, weight)?.checked_mul(basis_products)?)?;
-    }
-    Some(outputs)
-}
-
-fn checked_choose(n: u64, k: u64) -> Option<u64> {
-    let k = k.min(n.checked_sub(k)?);
-    let mut result = 1_u64;
-    for step in 1..=k {
-        result = result.checked_mul(n - k + step)?.checked_div(step)?;
-    }
-    Some(result)
 }
 
 const fn is_transpose_probe(group: ProbeGroup) -> bool {
@@ -1113,7 +1110,7 @@ mod tests {
                     .is_ok()
             );
         }
-        for work_items in [0, 233, PAULI_ITER_RANGE_OUTPUT_CAP, 1_233_628] {
+        for work_items in [0, 233, pauli_iter::RANGE_OUTPUT_CAP, 1_233_628] {
             assert!(
                 validate_probe_work_items(ProbeGroup::PauliStringIterRangeAdapter, work_items)
                     .is_err()
@@ -1123,14 +1120,14 @@ mod tests {
             DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
             96_000,
             3_000_000,
-            PAULI_ITER_SINGLETON_OUTPUT_CAP,
+            pauli_iter::SINGLETON_OUTPUT_CAP,
         ] {
             assert!(
                 validate_probe_work_items(ProbeGroup::PauliStringIterSingletonAdapter, work_items)
                     .is_ok()
             );
         }
-        for work_items in [0, 3_001, PAULI_ITER_SINGLETON_OUTPUT_CAP + 3] {
+        for work_items in [0, 3_001, pauli_iter::SINGLETON_OUTPUT_CAP + 3] {
             assert!(
                 validate_probe_work_items(ProbeGroup::PauliStringIterSingletonAdapter, work_items)
                     .is_err()

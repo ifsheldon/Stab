@@ -23,7 +23,7 @@ pub(crate) use runtime::{
 };
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90";
+    "adb7f822ff892b3d85b362130f048d7fe76f6e314349e5f42e71f54389a771d7";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -32,6 +32,15 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
 
 pub(crate) fn probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), BenchError> {
     runtime::run_probe(root, args).map_err(BenchError::Qualification)
+}
+
+pub(crate) fn regenerate_clifford_vectors(root: &RepoRoot, check: bool) -> Result<(), BenchError> {
+    runtime::regenerate_clifford_vectors(root, check).map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] {} Clifford qualification vectors",
+        if check { "validated" } else { "regenerated" }
+    );
+    Ok(())
 }
 
 pub(crate) fn worker_reproducibility(

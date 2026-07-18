@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 
+use super::clifford_string::CliffordWorkloadKind;
 use super::not_zero::NotZeroPattern;
 use super::pauli_iter::PauliIterKind;
 use super::sparse_xor::SparseXorKind;
@@ -23,6 +24,8 @@ pub(crate) enum WorkerWorkload {
     PauliStringRightMultiply,
     PauliStringIterRange,
     PauliStringIterSingleton,
+    CliffordStringRightMultiplyIdentity,
+    CliffordStringRightMultiplyNonIdentity,
 }
 
 impl WorkerWorkload {
@@ -44,6 +47,10 @@ impl WorkerWorkload {
             Self::PauliStringRightMultiply => "pauli-string-right-multiply",
             Self::PauliStringIterRange => "pauli-string-iter-range",
             Self::PauliStringIterSingleton => "pauli-string-iter-singleton",
+            Self::CliffordStringRightMultiplyIdentity => CliffordWorkloadKind::Identity.workload(),
+            Self::CliffordStringRightMultiplyNonIdentity => {
+                CliffordWorkloadKind::NonIdentity.workload()
+            }
         }
     }
 
@@ -65,6 +72,12 @@ impl WorkerWorkload {
             Self::PauliStringRightMultiply => "right-multiply-in-place",
             Self::PauliStringIterRange | Self::PauliStringIterSingleton => {
                 "construct-and-iterate-borrowed"
+            }
+            Self::CliffordStringRightMultiplyIdentity => {
+                CliffordWorkloadKind::Identity.measurement()
+            }
+            Self::CliffordStringRightMultiplyNonIdentity => {
+                CliffordWorkloadKind::NonIdentity.measurement()
             }
         }
     }
@@ -98,6 +111,14 @@ impl WorkerWorkload {
         match self {
             Self::PauliStringIterRange => Some(PauliIterKind::Range),
             Self::PauliStringIterSingleton => Some(PauliIterKind::Singleton),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn clifford_kind(self) -> Option<CliffordWorkloadKind> {
+        match self {
+            Self::CliffordStringRightMultiplyIdentity => Some(CliffordWorkloadKind::Identity),
+            Self::CliffordStringRightMultiplyNonIdentity => Some(CliffordWorkloadKind::NonIdentity),
             _ => None,
         }
     }

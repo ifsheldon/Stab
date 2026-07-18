@@ -753,6 +753,16 @@ mod tests {
                 "pauli-string-iter-singleton",
                 3_000,
             ),
+            test_contracts::clifford_contract(
+                super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID,
+                "clifford-string-right-multiply-identity",
+                "right-multiply-identity",
+            ),
+            test_contracts::clifford_contract(
+                super::super::invocation::CLIFFORD_NON_IDENTITY_GROUP_ID,
+                "clifford-string-right-multiply-non-identity",
+                "right-multiply-non-identity",
+            ),
         ]);
         GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,

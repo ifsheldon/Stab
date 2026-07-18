@@ -1,6 +1,7 @@
 mod adapter;
 mod artifact;
 mod calibration;
+mod clifford_vectors;
 mod completion;
 mod contract;
 mod correctness;
@@ -36,6 +37,13 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), String> {
 
 pub(crate) fn run_probe(root: &crate::root::RepoRoot, args: ProbeArgs) -> Result<(), String> {
     probe::run(root, args).map_err(|error| error.to_string())
+}
+
+pub(crate) fn regenerate_clifford_vectors(
+    root: &crate::root::RepoRoot,
+    check: bool,
+) -> Result<(), String> {
+    clifford_vectors::regenerate(root, check).map_err(|error| error.to_string())
 }
 
 pub(crate) fn verify_worker_reproducibility(

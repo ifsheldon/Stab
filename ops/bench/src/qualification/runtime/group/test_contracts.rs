@@ -73,3 +73,37 @@ pub(super) fn pauli_iter_contract(
             .collect(),
     }
 }
+
+pub(super) fn clifford_contract(
+    group_id: &str,
+    workload_id: &str,
+    measurement_id: &str,
+) -> GroupContract {
+    GroupContract {
+        id: ProtocolId::try_new(group_id).expect("group id"),
+        claim_class: ClaimClass::PromotablePerformance,
+        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
+        measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
+        scales: vec![ScaleContract {
+            id: ProtocolId::try_new("small").expect("scale id"),
+            work_items: NonZeroU64::new(10_000).expect("positive work"),
+            input_bytes: 64,
+            input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
+        }],
+        correctness_case_ids: vec![
+            "cq-evidence-qualification-40e5ad2f2f4c4fd4".to_string(),
+            "cq-evidence-qualification-510e746ec36e7d1c".to_string(),
+            "cq-evidence-qualification-ae9390dd6a207cb6".to_string(),
+        ],
+        owner: ProtocolId::try_new("stab-core/stabilizers").expect("owner"),
+        profiler_note: None,
+        comparator_sources: comparators::CLIFFORD_STRING
+            .iter()
+            .map(|path| ComparatorSourceContract {
+                path: ComparatorSourcePath::try_new((*path).to_string()).expect("comparator path"),
+                sha256: Sha256Digest::try_new("f".repeat(64)).expect("comparator digest"),
+            })
+            .collect(),
+    }
+}

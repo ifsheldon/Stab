@@ -23,6 +23,8 @@ const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRAN
 const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 const PAULI_STRING_ITER_RANGE_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
 const PAULI_STRING_ITER_SINGLETON_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
+const CLIFFORD_STRING_IDENTITY_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING";
+const CLIFFORD_STRING_NON_IDENTITY_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
@@ -36,6 +38,9 @@ const PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_multiply_contract.h";
 const PAULI_STRING_ITER_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_iter_contract.h";
+const CLIFFORD_STRING_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/clifford_string_contract.h";
+const CLIFFORD_VECTOR_PATH: &str = "benchmarks/fixtures/pq2-clifford-string-vectors.json";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -68,6 +73,11 @@ const PAULI_STRING_ITER_CORRECTNESS_CASES: [&str; 3] = [
     "cq-evidence-qualification-489e6445120743c2",
     "cq-evidence-qualification-5331280b58fd49c7",
 ];
+const CLIFFORD_STRING_CORRECTNESS_CASES: [&str; 3] = [
+    "cq-evidence-qualification-40e5ad2f2f4c4fd4",
+    "cq-evidence-qualification-510e746ec36e7d1c",
+    "cq-evidence-qualification-ae9390dd6a207cb6",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 struct NotZeroGroupSpec {
@@ -95,9 +105,108 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         PAULI_STRING_MULTIPLY_GROUP_ID => apply_pauli_string_multiply(root, group)?,
         PAULI_STRING_ITER_RANGE_GROUP_ID => apply_pauli_string_iter(root, group, false)?,
         PAULI_STRING_ITER_SINGLETON_GROUP_ID => apply_pauli_string_iter(root, group, true)?,
+        CLIFFORD_STRING_IDENTITY_GROUP_ID => apply_clifford_string(root, group, false)?,
+        CLIFFORD_STRING_NON_IDENTITY_GROUP_ID => apply_clifford_string(root, group, true)?,
         _ => {}
     }
     Ok(())
+}
+
+fn apply_clifford_string(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+    non_identity: bool,
+) -> Result<(), BenchError> {
+    group.phase = Phase::Execute;
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = CLIFFORD_STRING_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = clifford_string_workload_family(root, non_identity)?;
+    group.work_unit = "single-qubit products".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "SHA-256 over exactly sixteen little-endian u64 fields binding iteration count, checked semantic work, width, workload marker, observed left and right non-identity counts, successful public callback count, result-derived execution witness, four final-left gate-sequence digest lanes, and four unchanged-right digest lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers construct equal-width operands and an independent Tableau-derived scalar expectation before the barrier, reset callback and witness state immediately before it, time only the public in-place operation behind matching sequentially consistent compiler fences and optimizer-opaque references, derive the successful-call witness from the mutated left operand, retain the final left operand, and validate every left and right gate plus both SHA-256 sequence digests outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, CLIFFORD_STRING_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "Two equal-width Clifford strings and the untimed scalar expectation remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for the direct public callback at small, medium, large, and accepted-maximum widths for both workload contracts; Stim allocation counts remain unclaimed and PQ6 owns cross-scale RSS acceptance.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/stabilizers".to_string();
+    group.reason = if non_identity {
+        "Implemented paired pinned-Stim and Rust public in-place Clifford-string multiplication over the complete deterministic 24-by-23 non-identity composition cycle with exact CQ2, immutable-right, output, zero-allocation, hostile-input, scale, timing, and receipt contracts."
+    } else {
+        "Implemented the exact pinned identity-by-identity CliffordString benchmark as an independent public in-place workload with exact CQ2, immutable-right, result-witness, zero-allocation, scale, timing, and bounded-worker contracts."
+    }
+    .to_string();
+    group.status = QualificationStatus::Implemented;
+    if !non_identity {
+        group.public_api_items.clear();
+    }
+    Ok(())
+}
+
+fn clifford_string_workload_family(
+    root: &RepoRoot,
+    non_identity: bool,
+) -> Result<WorkloadFamily, BenchError> {
+    let fixture_source =
+        super::read_repo_text_bounded(root, &root.path.join(Path::new(CLIFFORD_VECTOR_PATH)))?;
+    let (marker, cycle, span, input_digests) = if non_identity {
+        (
+            3_551_455_952_266_415_171_u64,
+            23,
+            552,
+            [
+                "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+                "0427b1f905f1fce379ca809029cbc6f90aae1a56f7fbb3acdeeb96bfee576b44",
+                "e47454166c98afb2c2bc19b2701b346c097bd9ea04481e250361b2e15faf1ce6",
+            ],
+        )
+    } else {
+        (
+            3_550_043_079_824_723_011_u64,
+            0,
+            0,
+            [
+                "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+                "5fc473c86b0d3bb66e1994ecff910a324cb705666c4b032b74bace09fdf2e90a",
+                "cfc386ccbfc3a9220c49b2b17fab281350c2b26c669893e6e3a0beba1b6675aa",
+            ],
+        )
+    };
+    Ok(WorkloadFamily {
+        fixture: FixtureLocator::RepositoryFile {
+            path: CLIFFORD_VECTOR_PATH.to_string(),
+            sha256: super::sha256_hex(fixture_source.as_bytes()),
+        },
+        source: "src/stim/stabilizers/clifford_string.perf.cc".to_string(),
+        deterministic_seed: "none; descriptor-schema=1; canonical-gate-order=stim-v1.16.0"
+            .to_string(),
+        scales: [("small", 10_000_u64), ("medium", 100_000), ("large", 1_000_000)]
+            .into_iter()
+            .zip(input_digests)
+            .map(|((id, width), input_digest)| ScalePoint {
+                id: id.to_string(),
+                parameters: format!(
+                    "generator=pq2-clifford-string-vectors-v1; width={width}; marker={marker}; canonical_gates=24; right_cycle={cycle}; complete_span={span}; public_cap=1048576"
+                ),
+                input_bytes: InputByteCount::Exact { bytes: 64 },
+                semantic_work: Some(width),
+                input_digest: Some(input_digest.to_string()),
+            })
+            .collect(),
+    })
 }
 
 fn apply_pauli_string_iter(

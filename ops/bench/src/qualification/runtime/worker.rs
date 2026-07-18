@@ -15,6 +15,7 @@ use clap::{Args, ValueEnum};
 use sha2::{Digest as _, Sha256};
 
 mod bits;
+pub(super) mod clifford_string;
 mod error;
 mod not_zero;
 mod pauli;
@@ -33,6 +34,7 @@ use bits::{
     POPCOUNT_TOGGLE_BIT, dense_xor, dense_xor_fixture, dense_xor_output_digest, popcount_fixture,
     popcount_output_digest, simd_word_popcount,
 };
+use clifford_string::{CliffordDescriptor, CliffordStringFixture};
 use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use pauli::PauliMultiplyFixture;
 use pauli_iter::PauliIterFixture;
@@ -40,9 +42,13 @@ use sparse_xor::SparseXorFixture;
 use transpose::TransposeFixture;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 9] = [
+const WORKER_SOURCES: [(&str, &[u8]); 11] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
+    (
+        "worker/clifford_string.rs",
+        include_bytes!("worker/clifford_string.rs"),
+    ),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
     ("worker/pauli.rs", include_bytes!("worker/pauli.rs")),
     (
@@ -56,6 +62,13 @@ const WORKER_SOURCES: [(&str, &[u8]); 9] = [
     ("worker/transpose.rs", include_bytes!("worker/transpose.rs")),
     ("worker/workload.rs", include_bytes!("worker/workload.rs")),
     ("worker/error.rs", include_bytes!("worker/error.rs")),
+    (
+        "benchmarks/fixtures/pq2-clifford-string-vectors.json",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../benchmarks/fixtures/pq2-clifford-string-vectors.json"
+        )),
+    ),
 ];
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -109,6 +122,10 @@ pub(crate) struct WorkerArgs {
     #[arg(long)]
     work_items: NonZeroU64,
 
+    /// Canonical 64-byte Clifford workload descriptor encoded as hexadecimal.
+    #[arg(long)]
+    input_descriptor_hex: Option<CliffordDescriptor>,
+
     /// Whether this invocation produces timing or separately instrumented memory evidence.
     #[arg(long, value_enum, default_value = "timing")]
     evidence_mode: WorkerEvidenceMode,
@@ -153,7 +170,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -174,7 +193,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
     };
     let mut dense_xor_fixture = match args.workload {
         WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
@@ -192,7 +213,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
     };
     let not_zero_fixture = args
         .workload
@@ -220,28 +243,69 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .pauli_iter_kind()
         .map(|kind| PauliIterFixture::prepare(kind, args.work_items.get(), work_count))
         .transpose()?;
-    let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+    let mut clifford_fixture = if let Some(kind) = args.workload.clifford_kind() {
+        let descriptor = args
+            .input_descriptor_hex
+            .ok_or(WorkerError::MissingCliffordDescriptor)?;
+        Some(CliffordStringFixture::prepare(
+            kind,
+            descriptor,
+            args.work_items.get(),
+            args.iterations.get(),
+        )?)
+    } else {
+        if args.input_descriptor_hex.is_some() {
+            return Err(WorkerError::UnexpectedCliffordDescriptor);
+        }
+        None
+    };
+    let (input_bytes, input_digest) = if let Some(fixture) = &popcount_fixture {
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &dense_xor_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &not_zero_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &sparse_xor_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &transpose_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &pauli_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
     } else if let Some(fixture) = &pauli_iter_fixture {
-        (fixture.input_bytes, fixture.input_digest)
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
+        )
+    } else if let Some(fixture) = &clifford_fixture {
+        (
+            fixture.input_bytes,
+            InputDigest::try_new(fixture.input_digest.clone())?,
+        )
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
         (
             u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?,
-            byte_digest(input),
+            InputDigest::try_new(semantic_digest(byte_digest(input)))?,
         )
     };
-    let input_digest = InputDigest::try_new(semantic_digest(input_digest_state))?;
     let mut popcount_toggle_state = if let Some(fixture) = &popcount_fixture {
         Some(
             fixture
@@ -272,7 +336,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
@@ -290,7 +356,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
@@ -308,12 +376,17 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::BitMatrixTransposeAllocating
         | WorkerWorkload::PauliStringRightMultiply
         | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton => None,
+        | WorkerWorkload::PauliStringIterSingleton
+        | WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
         .map(gate_table_digest)
         .transpose()?;
+    if let Some(fixture) = &mut clifford_fixture {
+        fixture.reset_execution_state();
+    }
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
@@ -439,6 +512,16 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 Ok(TimedWorkloadOutput::PauliIterComplete)
             })?
         }
+        WorkerWorkload::CliffordStringRightMultiplyIdentity
+        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => {
+            let fixture = clifford_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingCliffordFixture)?;
+            measure_workload(|| {
+                fixture.execute(args.iterations.get())?;
+                Ok(TimedWorkloadOutput::CliffordStringComplete)
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -506,6 +589,12 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 .as_ref()
                 .ok_or(WorkerError::MissingPauliIterFixture)?;
             semantic_digest(fixture.output_digest(args.iterations.get(), work_count)?)
+        }
+        TimedWorkloadOutput::CliffordStringComplete => {
+            let fixture = clifford_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingCliffordFixture)?;
+            fixture.output_digest(args.iterations.get(), work_count)?
         }
     };
     let row = WorkerMeasurement {
@@ -604,6 +693,7 @@ enum TimedWorkloadOutput {
     TransposeComplete,
     PauliMultiplyComplete,
     PauliIterComplete,
+    CliffordStringComplete,
 }
 
 impl WorkloadOutput {

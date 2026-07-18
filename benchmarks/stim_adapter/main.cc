@@ -25,6 +25,7 @@
 #include "stim/mem/simd_bits.h"
 
 #include "bit_matrix_transpose_contract.h"
+#include "clifford_string_contract.h"
 #include "pauli_string_iter_contract.h"
 #include "pauli_string_multiply_contract.h"
 #include "simd_bits_not_zero_contract.h"
@@ -52,6 +53,7 @@ struct Arguments {
     std::string evidence_mode;
     bool start_barrier = false;
     std::optional<uint32_t> expected_cpu;
+    std::optional<std::string> input_descriptor_hex;
 };
 
 enum class NotZeroPattern {
@@ -134,6 +136,8 @@ Arguments parse_arguments(int argc, const char **argv) {
                 throw std::invalid_argument("expected-cpu exceeds the supported affinity mask");
             }
             result.expected_cpu = static_cast<uint32_t>(cpu);
+        } else if (name == "--input-descriptor-hex") {
+            result.input_descriptor_hex = std::string(value);
         } else {
             throw std::invalid_argument("unknown adapter option " + std::string(name));
         }
@@ -167,9 +171,14 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool pauli_string_iter =
         stab_qualification::pauli_iter_kind(result.workload).has_value() &&
         result.measurement_id == "construct-and-iterate-borrowed";
+    const auto clifford_kind = stab_qualification::clifford_workload_kind(result.workload);
+    const bool clifford_string =
+        clifford_kind.has_value() &&
+        result.measurement_id == stab_qualification::clifford_measurement(clifford_kind.value());
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
         !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor &&
-        !bit_matrix_transpose && !pauli_string_multiply && !pauli_string_iter) {
+        !bit_matrix_transpose && !pauli_string_multiply && !pauli_string_iter &&
+        !clifford_string) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -806,6 +815,26 @@ int main(int argc, const char **argv) {
         }
         const uint64_t work_count = arguments.iterations * arguments.work_items;
 
+        const auto prepared_clifford_kind =
+            stab_qualification::clifford_workload_kind(arguments.workload);
+        std::optional<stab_qualification::CliffordStringFixture> clifford_string;
+        if (prepared_clifford_kind.has_value()) {
+            if (!arguments.input_descriptor_hex.has_value()) {
+                throw std::invalid_argument(
+                    "Clifford-string workload requires --input-descriptor-hex");
+            }
+            const auto descriptor = stab_qualification::parse_clifford_descriptor(
+                arguments.input_descriptor_hex.value());
+            clifford_string.emplace(stab_qualification::clifford_string_fixture(
+                prepared_clifford_kind.value(),
+                descriptor,
+                arguments.work_items,
+                arguments.iterations));
+        } else if (arguments.input_descriptor_hex.has_value()) {
+            throw std::invalid_argument(
+                "--input-descriptor-hex is only valid for Clifford-string workloads");
+        }
+
         // Linking and constructing a pinned Stim type ensures this is an adapter build, not a
         // free-standing synthetic comparator.
         const stim::Circuit linked_stim("H 0\nM 0\n");
@@ -888,6 +917,8 @@ int main(int argc, const char **argv) {
                                          ? pauli_multiply->input_bytes
                                      : pauli_iter.has_value()
                                          ? pauli_iter->input_bytes
+                                     : clifford_string.has_value()
+                                         ? stab_qualification::CLIFFORD_DESCRIPTOR_BYTES
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -904,7 +935,13 @@ int main(int argc, const char **argv) {
                                   : pauli_iter.has_value()
                                       ? pauli_iter->input_digest
                                       : byte_digest(circuit_fixture);
+        const std::string input_digest_text = clifford_string.has_value()
+                                                  ? clifford_string->input_digest
+                                                  : semantic_digest(input_digest);
 
+        if (clifford_string.has_value()) {
+            stab_qualification::clifford_reset_execution_state(clifford_string.value());
+        }
         if (arguments.start_barrier) {
             wait_for_start_barrier();
         }
@@ -992,6 +1029,12 @@ int main(int argc, const char **argv) {
                 stab_qualification::pauli_iter_contract(
                     arguments.iterations, prepared_pauli_iter);
             });
+        } else if (clifford_string.has_value()) {
+            auto &prepared_clifford = clifford_string.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::clifford_string_contract(
+                    arguments.iterations, prepared_clifford);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -1029,6 +1072,12 @@ int main(int argc, const char **argv) {
             digest_state = stab_qualification::pauli_iter_output_digest(
                 pauli_iter.value(), arguments.iterations, work_count);
         }
+        const std::string output_digest_text = clifford_string.has_value()
+                                                   ? stab_qualification::clifford_output_digest(
+                                                         clifford_string.value(),
+                                                         arguments.iterations,
+                                                         work_count)
+                                                   : semantic_digest(digest_state);
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");
         }
@@ -1043,8 +1092,8 @@ int main(int argc, const char **argv) {
                   << "\"elapsed_seconds\":" << elapsed_seconds << ','
                   << "\"work_count\":" << work_count << ','
                   << "\"input_bytes\":" << input_bytes << ','
-                  << "\"input_digest\":\"" << semantic_digest(input_digest) << "\","
-                  << "\"output_digest\":\"" << semantic_digest(digest_state) << "\","
+                  << "\"input_digest\":\"" << input_digest_text << "\","
+                  << "\"output_digest\":\"" << output_digest_text << "\","
                   << "\"setup_rss_bytes\":" << setup_rss << ','
                   << "\"peak_rss_bytes\":" << peak_rss << ','
                   << "\"affinity_cpu\":";

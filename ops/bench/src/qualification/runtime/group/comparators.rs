@@ -22,6 +22,8 @@ pub(super) const PAULI_STRING_MULTIPLY: [&str; 2] = [
 ];
 pub(super) const PAULI_STRING_ITER: [&str; 2] =
     [MAIN, "benchmarks/stim_adapter/pauli_string_iter_contract.h"];
+pub(super) const CLIFFORD_STRING: [&str; 2] =
+    [MAIN, "benchmarks/stim_adapter/clifford_string_contract.h"];
 
 pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
     match group_id {
@@ -36,6 +38,9 @@ pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
         invocation::PAULI_STRING_MULTIPLY_GROUP_ID => &PAULI_STRING_MULTIPLY,
         invocation::PAULI_STRING_ITER_RANGE_GROUP_ID
         | invocation::PAULI_STRING_ITER_SINGLETON_GROUP_ID => &PAULI_STRING_ITER,
+        invocation::CLIFFORD_IDENTITY_GROUP_ID | invocation::CLIFFORD_NON_IDENTITY_GROUP_ID => {
+            &CLIFFORD_STRING
+        }
         _ => &[],
     }
 }

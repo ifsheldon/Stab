@@ -26,7 +26,9 @@ const PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_multiply_contract.h";
 const PAULI_STRING_ITER_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_iter_contract.h";
-const COMPARATOR_SOURCES: [&str; 7] = [
+const CLIFFORD_STRING_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/clifford_string_contract.h";
+const COMPARATOR_SOURCES: [&str; 8] = [
     SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
     SIMD_BITS_XOR_COMPARATOR_SOURCE,
     SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE,
@@ -34,8 +36,9 @@ const COMPARATOR_SOURCES: [&str; 7] = [
     BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE,
     PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE,
     PAULI_STRING_ITER_COMPARATOR_SOURCE,
+    CLIFFORD_STRING_COMPARATOR_SOURCE,
 ];
-const RECEIPT_SCHEMA_VERSION: u32 = 10;
+const RECEIPT_SCHEMA_VERSION: u32 = 11;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
@@ -1114,6 +1117,7 @@ mod tests {
         let transpose_source = runtime.path().join("bit_matrix_transpose_contract.h");
         let pauli_source = runtime.path().join("pauli_string_multiply_contract.h");
         let pauli_iter_source = runtime.path().join("pauli_string_iter_contract.h");
+        let clifford_source = runtime.path().join("clifford_string_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
@@ -1124,6 +1128,7 @@ mod tests {
         std::fs::write(&transpose_source, b"source").expect("write transpose source");
         std::fs::write(&pauli_source, b"source").expect("write Pauli source");
         std::fs::write(&pauli_iter_source, b"source").expect("write Pauli iterator source");
+        std::fs::write(&clifford_source, b"source").expect("write Clifford source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -1152,6 +1157,7 @@ mod tests {
                 transpose_source.clone(),
                 pauli_source.clone(),
                 pauli_iter_source.clone(),
+                clifford_source.clone(),
             ],
             library_path: library,
         };

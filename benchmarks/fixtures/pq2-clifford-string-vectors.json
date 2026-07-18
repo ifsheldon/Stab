@@ -1,0 +1,743 @@
+{
+  "schema_version": 1,
+  "markers": {
+    "identity": 3550043079824723011,
+    "non_identity": 3551455952266415171
+  },
+  "gate_order": [
+    {
+      "code": 0,
+      "name": "I"
+    },
+    {
+      "code": 1,
+      "name": "X"
+    },
+    {
+      "code": 2,
+      "name": "Y"
+    },
+    {
+      "code": 3,
+      "name": "Z"
+    },
+    {
+      "code": 4,
+      "name": "H_XY"
+    },
+    {
+      "code": 5,
+      "name": "S"
+    },
+    {
+      "code": 6,
+      "name": "S_DAG"
+    },
+    {
+      "code": 7,
+      "name": "H_NXY"
+    },
+    {
+      "code": 8,
+      "name": "H"
+    },
+    {
+      "code": 9,
+      "name": "SQRT_Y_DAG"
+    },
+    {
+      "code": 10,
+      "name": "H_NXZ"
+    },
+    {
+      "code": 11,
+      "name": "SQRT_Y"
+    },
+    {
+      "code": 12,
+      "name": "H_YZ"
+    },
+    {
+      "code": 13,
+      "name": "H_NYZ"
+    },
+    {
+      "code": 14,
+      "name": "SQRT_X"
+    },
+    {
+      "code": 15,
+      "name": "SQRT_X_DAG"
+    },
+    {
+      "code": 16,
+      "name": "C_XYZ"
+    },
+    {
+      "code": 17,
+      "name": "C_XYNZ"
+    },
+    {
+      "code": 18,
+      "name": "C_NXYZ"
+    },
+    {
+      "code": 19,
+      "name": "C_XNYZ"
+    },
+    {
+      "code": 20,
+      "name": "C_ZYX"
+    },
+    {
+      "code": 21,
+      "name": "C_ZNYX"
+    },
+    {
+      "code": 22,
+      "name": "C_NZYX"
+    },
+    {
+      "code": 23,
+      "name": "C_ZYNX"
+    }
+  ],
+  "descriptors": [
+    {
+      "id": "identity-small",
+      "workload": "clifford-string-right-multiply-identity",
+      "width": 10000,
+      "raw_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329"
+    },
+    {
+      "id": "identity-medium",
+      "workload": "clifford-string-right-multiply-identity",
+      "width": 100000,
+      "raw_hex": "a086010000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "sha256": "5fc473c86b0d3bb66e1994ecff910a324cb705666c4b032b74bace09fdf2e90a"
+    },
+    {
+      "id": "identity-large",
+      "workload": "clifford-string-right-multiply-identity",
+      "width": 1000000,
+      "raw_hex": "40420f0000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "sha256": "cfc386ccbfc3a9220c49b2b17fab281350c2b26c669893e6e3a0beba1b6675aa"
+    },
+    {
+      "id": "identity-maximum",
+      "workload": "clifford-string-right-multiply-identity",
+      "width": 1048576,
+      "raw_hex": "0000100000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "sha256": "59e57710127c67543bb256e46caee060076ddf6ee8d74c7ab4a9f1aac91c53ca"
+    },
+    {
+      "id": "nonidentity-small",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "width": 10000,
+      "raw_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d"
+    },
+    {
+      "id": "nonidentity-medium",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "width": 100000,
+      "raw_hex": "a086010000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "sha256": "0427b1f905f1fce379ca809029cbc6f90aae1a56f7fbb3acdeeb96bfee576b44"
+    },
+    {
+      "id": "nonidentity-large",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "width": 1000000,
+      "raw_hex": "40420f0000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "sha256": "e47454166c98afb2c2bc19b2701b346c097bd9ea04481e250361b2e15faf1ce6"
+    },
+    {
+      "id": "nonidentity-maximum",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "width": 1048576,
+      "raw_hex": "0000100000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "sha256": "8c3b6881e64e7037803511a97bca4f2268b416666a26439e9501b9ce697f501c"
+    }
+  ],
+  "tails": [
+    {
+      "width": 10000,
+      "tail_length": 64,
+      "final_left_code": 15,
+      "final_right_code": 3
+    },
+    {
+      "width": 100000,
+      "tail_length": 88,
+      "final_left_code": 15,
+      "final_right_code": 4
+    },
+    {
+      "width": 1000000,
+      "tail_length": 328,
+      "final_left_code": 15,
+      "final_right_code": 14
+    },
+    {
+      "width": 1048576,
+      "tail_length": 328,
+      "final_left_code": 15,
+      "final_right_code": 14
+    }
+  ],
+  "requests": [
+    {
+      "id": "identity-small-odd",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "output_fields": [
+        1,
+        10000,
+        10000,
+        3550043079824723011,
+        0,
+        0,
+        1,
+        11400714819323198486,
+        11294417264251775221,
+        5094559766297304767,
+        16500485816324184576,
+        17768036532758631901,
+        11294417264251775221,
+        5094559766297304767,
+        16500485816324184576,
+        17768036532758631901
+      ],
+      "output_sha256": "b3ab771d9e8377613b69ae986966503ad7c315e813eed2cc4693bd9e201a95bd",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "identity-small-even",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 2,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "output_fields": [
+        2,
+        20000,
+        10000,
+        3550043079824723011,
+        0,
+        0,
+        2,
+        10191269523505369053,
+        11294417264251775221,
+        5094559766297304767,
+        16500485816324184576,
+        17768036532758631901,
+        11294417264251775221,
+        5094559766297304767,
+        16500485816324184576,
+        17768036532758631901
+      ],
+      "output_sha256": "1017944549d45f314488e4adbaf9dca2ae1e9e4c47c4846d64692762b2b3e8b3",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "identity-medium",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 100000,
+      "descriptor_hex": "a086010000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "5fc473c86b0d3bb66e1994ecff910a324cb705666c4b032b74bace09fdf2e90a",
+      "output_fields": [
+        1,
+        100000,
+        100000,
+        3550043079824723011,
+        0,
+        0,
+        1,
+        11400714819323198486,
+        6885329190597537073,
+        13762525247525712845,
+        15000697302097178358,
+        3439731773332248870,
+        6885329190597537073,
+        13762525247525712845,
+        15000697302097178358,
+        3439731773332248870
+      ],
+      "output_sha256": "608724fdf5009f6661f7f35c404705189810d55141a356bddfecd78a371d08e5",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "identity-large",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 1000000,
+      "descriptor_hex": "40420f0000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "cfc386ccbfc3a9220c49b2b17fab281350c2b26c669893e6e3a0beba1b6675aa",
+      "output_fields": [
+        1,
+        1000000,
+        1000000,
+        3550043079824723011,
+        0,
+        0,
+        1,
+        11400714819323198486,
+        7054713944320412878,
+        3223534380266408600,
+        15478769376532430321,
+        17147041938547101850,
+        7054713944320412878,
+        3223534380266408600,
+        15478769376532430321,
+        17147041938547101850
+      ],
+      "output_sha256": "7584768cb3becd6330e34d9996778197f00d70d1d5b3ecb26782c3884bac91ee",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "identity-maximum",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 1048576,
+      "descriptor_hex": "0000100000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "59e57710127c67543bb256e46caee060076ddf6ee8d74c7ab4a9f1aac91c53ca",
+      "output_fields": [
+        1,
+        1048576,
+        1048576,
+        3550043079824723011,
+        0,
+        0,
+        1,
+        11400714819323198486,
+        17236042517079099020,
+        11079465647221461143,
+        17017175790953515556,
+        14603524147637624902,
+        17236042517079099020,
+        11079465647221461143,
+        17017175790953515556,
+        14603524147637624902
+      ],
+      "output_sha256": "b1572d4bdd4fbc81185d1ad15d69e94dfbee875325dc1364b73972e6afac4ee7",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "nonidentity-small-odd",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "output_fields": [
+        1,
+        10000,
+        10000,
+        3551455952266415171,
+        9583,
+        10000,
+        1,
+        11400714819323206678,
+        17887028366964074593,
+        15686196415256122172,
+        13171882908549377001,
+        5158249915678436565,
+        17308707633401694295,
+        9232784454170177390,
+        6811484599053748103,
+        8967606565023028231
+      ],
+      "output_sha256": "1393d15015b934a6dd10b7137c53097a099cfd8ad897cffd98bf075ae6f4e82f",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "nonidentity-small-even",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 2,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "output_fields": [
+        2,
+        20000,
+        10000,
+        3551455952266415171,
+        9583,
+        10000,
+        2,
+        10191269523572486109,
+        1454710874501663998,
+        14919254414851132324,
+        16780703903246094410,
+        5928719630548633363,
+        17308707633401694295,
+        9232784454170177390,
+        6811484599053748103,
+        8967606565023028231
+      ],
+      "output_sha256": "3dacf8713ae74fb78751a96ee005b1dab3fe878fda51d259d891d6e2afe1cc07",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "nonidentity-medium",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 100000,
+      "descriptor_hex": "a086010000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "0427b1f905f1fce379ca809029cbc6f90aae1a56f7fbb3acdeeb96bfee576b44",
+      "output_fields": [
+        1,
+        100000,
+        100000,
+        3551455952266415171,
+        95833,
+        100000,
+        1,
+        11400714819323206678,
+        139304099755199467,
+        3148022710187015456,
+        4817777459475116434,
+        15705011211334981762,
+        12214318656907117235,
+        18000752330832261482,
+        5624574889515139687,
+        15074519560414248853
+      ],
+      "output_sha256": "ea48f6b16a145780cd8e1d854ba4930e728812424dfac55f05cfbe0a1a1c6342",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "nonidentity-large",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 1000000,
+      "descriptor_hex": "40420f0000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "e47454166c98afb2c2bc19b2701b346c097bd9ea04481e250361b2e15faf1ce6",
+      "output_fields": [
+        1,
+        1000000,
+        1000000,
+        3551455952266415171,
+        958333,
+        1000000,
+        1,
+        11400714819323206678,
+        13966639861074523838,
+        14429235463193533013,
+        1859676230595529860,
+        16127910417721417176,
+        115224379873831141,
+        7611369963617670125,
+        3750787372314421696,
+        8571031882896229293
+      ],
+      "output_sha256": "f80cb593beca2ff72be9ea0bee262bd10a02bc3e253a13b3bb57689de22204a8",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "nonidentity-maximum",
+      "result": "accepted",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 1048576,
+      "descriptor_hex": "0000100000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "8c3b6881e64e7037803511a97bca4f2268b416666a26439e9501b9ce697f501c",
+      "output_fields": [
+        1,
+        1048576,
+        1048576,
+        3551455952266415171,
+        1004885,
+        1048576,
+        1,
+        11400714819323206678,
+        10198832162720902878,
+        17619065192350606034,
+        11703379538200224425,
+        2517209354575191093,
+        3937925624172355442,
+        788250976420637429,
+        1582825714441608715,
+        9528159559314871038
+      ],
+      "output_sha256": "db7109c006abb143aa5d15ca0bf6d800a37312a78e0cfe25c17776b4a475b4e7",
+      "start_barrier_consumed": true
+    },
+    {
+      "id": "identity-first-over-cap",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "0100100000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "82031a3782893ea59f6cea9515005c08baa1cd2de3e1806320d705ae8db27c01",
+      "expected_rejection_class": "width-limit",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-first-over-cap",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "0100100000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "c9f56296f99a69bbcebb5907ea03a88a6486049fe4a7fc817e2f15f4f43dbf43",
+      "expected_rejection_class": "width-limit",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-zero-width",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "0000000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "542ebeadba30e0bfb589459ba38b96dbce2381801d24c14a660990ae3e077c76",
+      "expected_rejection_class": "zero-width",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-zero-width",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "0000000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "2118888ff9234996d88c83f45a21fb311ecb33263249f686aa34e6e351494c5f",
+      "expected_rejection_class": "zero-width",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "unknown-marker",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000ffffffffffffffff010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "09e494c9a3756555767490bd1fc47ef00923bbb53d5d514a96dccba0d4211798",
+      "expected_rejection_class": "unknown-marker",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-wrong-measurement",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "expected_rejection_class": "wrong-measurement",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-wrong-measurement",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "expected_rejection_class": "wrong-measurement",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-bad-fixture-schema",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431020000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8f893d2095d38363666fad0004e450f11edfac869f6913fb4aa413c204eef08c",
+      "expected_rejection_class": "fixture-schema",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-bad-fixture-schema",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931020000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "9b6a4e6496ee44115bb18a72b96b00b7f8fed3f286ddd332f99292a34f88ae2e",
+      "expected_rejection_class": "fixture-schema",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-bad-gate-count",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000017000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "13677ca2d387644a3f8740517c3baeab978097f19b2a1f448c344a6dd11a0f42",
+      "expected_rejection_class": "gate-count",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-bad-gate-count",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000017000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "a3dcc97548d60e36cfbad5de2ca732ae78fdfb766e5298fc474677453bdb41dc",
+      "expected_rejection_class": "gate-count",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-bad-cycle-count",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000100000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "9c58aee8a213f9bd0534c17eafa70568b35e3788495646043a9a776dac901e6e",
+      "expected_rejection_class": "cycle-count",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-bad-cycle-count",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001600000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "2afc13733b9299bbd4e8555527c6246a6cc1434cd70fffe2c018066646fefddc",
+      "expected_rejection_class": "cycle-count",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-bad-cross-product-span",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "2fae3e78707045812385c1cc384b54536a785f9640486d8c1e2229f54d315f54",
+      "expected_rejection_class": "cross-product-span",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-bad-cross-product-span",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000270200000000000000001000000000000000000000000000",
+      "input_sha256": "342a549367ed78b30fafafbd63b91a4437681ff4b7510a24676cd43d465deb49",
+      "expected_rejection_class": "cross-product-span",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-bad-cap",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4944310100000000000000180000000000000000000000000000000000000000000000ffff0f00000000000000000000000000",
+      "input_sha256": "7209dc241331db19c6989de41431ee659a768f09a8e8ad0b9378750dd0321ebd",
+      "expected_rejection_class": "public-cap",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-bad-cap",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e49310100000000000000180000000000000017000000000000002802000000000000ffff0f00000000000000000000000000",
+      "input_sha256": "05bc1e4787519dfd9989afe42310542fea8992790ee20ae6e30dfad0e7fcf157",
+      "expected_rejection_class": "public-cap",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-reserved",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000100000000000000",
+      "input_sha256": "772587ae8a1bd57fac2bbb26b0fc07669c3c379c80bce55f7f3714a973d15e1a",
+      "expected_rejection_class": "reserved",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-reserved",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000100000000000000",
+      "input_sha256": "5bd4c4115d76a905104f25dea169cd6e04e70be58053edaa370ee326cd3e0182",
+      "expected_rejection_class": "reserved",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-work-overflow",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1844674407370956,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "expected_rejection_class": "work-overflow",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-work-overflow",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1844674407370956,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "expected_rejection_class": "work-overflow",
+      "start_barrier_consumed": false
+    }
+  ]
+}

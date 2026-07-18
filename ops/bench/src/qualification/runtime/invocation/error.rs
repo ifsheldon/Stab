@@ -46,6 +46,8 @@ pub(crate) enum InvocationError {
     MissingContractPreflight,
     #[error("the source-owned worker contract preflight digest is stale")]
     ContractPreflightDefinition,
+    #[error("Clifford qualification vector contract is invalid: {0}")]
+    CliffordVectorContract(String),
     #[error("qualification parent semantic work count overflows u64")]
     WorkOverflow,
     #[error(
@@ -164,6 +166,16 @@ pub(crate) enum InvocationError {
         implementation: Implementation,
         workload: &'static str,
         class: &'static str,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject Clifford request {case_id} before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    CliffordWorkRejection {
+        implementation: Implementation,
+        case_id: String,
         status: Option<i32>,
         stdout: String,
         stderr: String,

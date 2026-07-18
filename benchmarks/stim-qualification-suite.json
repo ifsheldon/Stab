@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
-  "semantic_digest": "868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90",
+  "semantic_digest": "adb7f822ff892b3d85b362130f048d7fe76f6e314349e5f42e71f54389a771d7",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -283,6 +283,7 @@
         "PERFQ-CHECKLIST-d2d203c23e3ef634-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-ec64113cdae0cd99-STABILIZER-ALGEBRA",
         "PERFQ-M6-CLIFFORD-STRING",
+        "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
         "PERFQ-M6-PAULI-ITER",
         "PERFQ-M6-PAULI-ITER-SINGLETON",
         "PERFQ-M6-PAULI-STRING",
@@ -8998,7 +8999,7 @@
       "correctness_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4c6c508aaa4dd93b"
+        "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26311,7 +26312,7 @@
       "correctness_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-283e561ab0a7e864"
+        "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -32470,7 +32471,6 @@
         "stab_core::stabilizers::CliffordString::random",
         "stab_core::stabilizers::CliffordString::randomize",
         "stab_core::stabilizers::CliffordString::repeat",
-        "stab_core::stabilizers::CliffordString::right_multiply_in_place",
         "stab_core::stabilizers::CliffordString::set_gate_at"
       ],
       "disposition": "measured",
@@ -36126,7 +36126,6 @@
         "stab_core::CliffordString::random",
         "stab_core::CliffordString::randomize",
         "stab_core::CliffordString::repeat",
-        "stab_core::CliffordString::right_multiply_in_place",
         "stab_core::CliffordString::set_gate_at"
       ],
       "disposition": "measured",
@@ -62381,7 +62380,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62480,7 +62479,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62634,7 +62633,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62730,7 +62729,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62826,7 +62825,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62922,7 +62921,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63019,7 +63018,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63114,7 +63113,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63209,7 +63208,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63250,32 +63249,70 @@
       "public_api_items": [],
       "disposition": "measured",
       "phase": "execute",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M6-CLIFFORD-STRING",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-40e5ad2f2f4c4fd4",
+        "cq-evidence-qualification-510e746ec36e7d1c",
+        "cq-evidence-qualification-ae9390dd6a207cb6"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m6-clifford-string"
+          "kind": "repository-file",
+          "path": "benchmarks/fixtures/pq2-clifford-string-vectors.json",
+          "sha256": "0af8e53952580831ee76bc2d9c9d357f5eef73601943222a6d1921ed64e19f04"
         },
         "source": "src/stim/stabilizers/clifford_string.perf.cc",
-        "deterministic_seed": "source-owned-inline:m6-clifford-string",
+        "deterministic_seed": "none; descriptor-schema=1; canonical-gate-order=stim-v1.16.0",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "Clifford string multiplication workload",
+            "id": "small",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=10000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 10000,
+            "input_digest": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=100000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 100000,
+            "input_digest": "5fc473c86b0d3bb66e1994ecff910a324cb705666c4b032b74bace09fdf2e90a"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=1000000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 1000000,
+            "input_digest": "cfc386ccbfc3a9220c49b2b17fab281350c2b26c669893e6e3a0beba1b6675aa"
           }
         ]
       },
-      "work_unit": "qubits",
+      "work_unit": "single-qubit products",
       "output_contract": {
-        "expected_shape": "clifford-string output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "SHA-256 over exactly sixteen little-endian u64 fields binding iteration count, checked semantic work, width, workload marker, observed left and right non-identity counts, successful public callback count, result-derived execution witness, four final-left gate-sequence digest lanes, and four unchanged-right digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers construct equal-width operands and an independent Tableau-derived scalar expectation before the barrier, reset callback and witness state immediately before it, time only the public in-place operation behind matching sequentially consistent compiler fences and optimizer-opaque references, derive the successful-call witness from the mutated left operand, retain the final left operand, and validate every left and right gate plus both SHA-256 sequence digests outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+          },
+          {
+            "path": "benchmarks/stim_adapter/clifford_string_contract.h",
+            "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -63287,16 +63324,119 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Two equal-width Clifford strings and the untimed scalar expectation remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for the direct public callback at small, medium, large, and accepted-maximum widths for both workload contracts; Stim allocation counts remain unclaimed and PQ6 owns cross-scale RSS acceptance."
       },
       "threshold_policy": "primary-1.25",
-      "reason": "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification.",
-      "owner": "stab-core",
-      "status": "planned"
+      "reason": "Implemented the exact pinned identity-by-identity CliffordString benchmark as an independent public in-place workload with exact CQ2, immutable-right, result-witness, zero-allocation, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/stabilizers",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
+      "manifest_row": "perfq-m6-clifford-string-non-identity",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::CliffordString::right_multiply_in_place",
+        "stab_core::stabilizers::CliffordString::right_multiply_in_place"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-40e5ad2f2f4c4fd4",
+        "cq-evidence-qualification-510e746ec36e7d1c",
+        "cq-evidence-qualification-ae9390dd6a207cb6"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "repository-file",
+          "path": "benchmarks/fixtures/pq2-clifford-string-vectors.json",
+          "sha256": "0af8e53952580831ee76bc2d9c9d357f5eef73601943222a6d1921ed64e19f04"
+        },
+        "source": "src/stim/stabilizers/clifford_string.perf.cc",
+        "deterministic_seed": "none; descriptor-schema=1; canonical-gate-order=stim-v1.16.0",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=10000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 10000,
+            "input_digest": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=100000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 100000,
+            "input_digest": "0427b1f905f1fce379ca809029cbc6f90aae1a56f7fbb3acdeeb96bfee576b44"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=pq2-clifford-string-vectors-v1; width=1000000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 1000000,
+            "input_digest": "e47454166c98afb2c2bc19b2701b346c097bd9ea04481e250361b2e15faf1ce6"
+          }
+        ]
+      },
+      "work_unit": "single-qubit products",
+      "output_contract": {
+        "expected_shape": "SHA-256 over exactly sixteen little-endian u64 fields binding iteration count, checked semantic work, width, workload marker, observed left and right non-identity counts, successful public callback count, result-derived execution witness, four final-left gate-sequence digest lanes, and four unchanged-right digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers construct equal-width operands and an independent Tableau-derived scalar expectation before the barrier, reset callback and witness state immediately before it, time only the public in-place operation behind matching sequentially consistent compiler fences and optimizer-opaque references, derive the successful-call witness from the mutated left operand, retain the final left operand, and validate every left and right gate plus both SHA-256 sequence digests outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+          },
+          {
+            "path": "benchmarks/stim_adapter/clifford_string_contract.h",
+            "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "Two equal-width Clifford strings and the untimed scalar expectation remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for the direct public callback at small, medium, large, and accepted-maximum widths for both workload contracts; Stim allocation counts remain unclaimed and PQ6 owns cross-scale RSS acceptance."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust public in-place Clifford-string multiplication over the complete deterministic 24-by-23 non-identity composition cycle with exact CQ2, immutable-right, output, zero-allocation, hostile-input, scale, timing, and receipt contracts.",
+      "owner": "stab-core/stabilizers",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M6-PAULI-ITER",
@@ -63371,7 +63511,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -63468,7 +63608,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -63567,7 +63707,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",

@@ -15,6 +15,8 @@ pub(super) const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
 pub(super) const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 pub(super) const PAULI_STRING_ITER_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
+pub(super) const CLIFFORD_STRING_NON_IDENTITY_GROUP_ID: &str =
+    "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY";
 
 pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     let performance_feature = item
@@ -72,6 +74,15 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> S
             }
             _ => {}
         }
+    }
+    if performance_feature == "PERF-STABILIZER-ALGEBRA"
+        && matches!(
+            item.path.as_str(),
+            "stab_core::CliffordString::right_multiply_in_place"
+                | "stab_core::stabilizers::CliffordString::right_multiply_in_place"
+        )
+    {
+        return CLIFFORD_STRING_NON_IDENTITY_GROUP_ID.to_string();
     }
     if performance_feature == "PERF-STABILIZER-ALGEBRA"
         && matches!(

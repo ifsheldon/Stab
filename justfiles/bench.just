@@ -23,6 +23,11 @@ qualification-list *args:
 qualification-regenerate *args:
     cargo run -q -p stab-bench -- qualification-regenerate {{args}}
 
+# Regenerate or verify the frozen cross-language Clifford qualification vectors.
+[working-directory: '..']
+qualification-clifford-vectors *args:
+    cargo run -q -p stab-bench -- qualification-clifford-vectors {{args}}
+
 # Reproduce one bounded paired-runner or product-adapter qualification probe.
 [working-directory: '..']
 qualification-probe *args:

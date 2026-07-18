@@ -179,7 +179,7 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
     if actual_scale_ids != expected_scale_ids
         || !valid_parameters
         || is_placeholder(&group.workload_family.deterministic_seed)
-        || !matches!(&group.workload_family.fixture, FixtureLocator::Generated { id } if !id.is_empty())
+        || !valid_graduated_fixture(&group.workload_family.fixture)
         || group.runner_fidelity != RunnerFidelity::AdapterLibrary
         || group.correctness_binding != CorrectnessBinding::ExactCases
         || group.correctness_cases.is_empty()
@@ -201,6 +201,16 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
             "graduated planned-origin group {} lacks an exact executable workload contract",
             group.id
         ));
+    }
+}
+
+fn valid_graduated_fixture(fixture: &FixtureLocator) -> bool {
+    match fixture {
+        FixtureLocator::Generated { id } => !id.is_empty(),
+        FixtureLocator::RepositoryFile { path, sha256 } => {
+            !path.is_empty() && super::values::is_digest(sha256)
+        }
+        FixtureLocator::Inline { .. } => false,
     }
 }
 

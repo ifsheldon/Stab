@@ -9,6 +9,7 @@ use super::super::process::ProcessResult;
 use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
+use super::clifford_string::expected_clifford_probes;
 use super::pauli::{
     PAULI_EVEN_CASE_ID, PAULI_EVEN_OUTPUT_DIGEST, PAULI_MAX_CASE_ID, PAULI_MAX_INPUT_BYTES,
     PAULI_MAX_INPUT_DIGEST, PAULI_MAX_OUTPUT_DIGEST, PAULI_MAX_WORK_ITEMS, PAULI_ODD_CASE_ID,
@@ -189,7 +190,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(140);
+    let mut probes = Vec::with_capacity(202);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -603,13 +604,14 @@ pub(super) fn expected_contract_preflight_probes()
             }
         }
     }
+    probes.extend(expected_clifford_probes()?);
     Ok(probes)
 }
 
 type RejectionExpectation = fn(Implementation) -> (i32, &'static str);
 
-fn expected_accepted_probe(
-    case_id: &'static str,
+pub(super) fn expected_accepted_probe(
+    case_id: &str,
     implementation: Implementation,
     iteration_count: u64,
     work_count: u64,
@@ -628,11 +630,11 @@ fn expected_accepted_probe(
     })
 }
 
-fn expected_rejected_probe(
-    case_id: &'static str,
+pub(super) fn expected_rejected_probe(
+    case_id: &str,
     implementation: Implementation,
     exit_status: i32,
-    stderr: &'static str,
+    stderr: &str,
 ) -> Result<WorkerContractProbeEvidence, InvocationError> {
     Ok(WorkerContractProbeEvidence::Rejected {
         case_id: ProtocolId::try_new(case_id)?,
@@ -644,7 +646,7 @@ fn expected_rejected_probe(
 }
 
 pub(super) fn accepted_probe(
-    case_id: &'static str,
+    case_id: &str,
     row: &WorkerMeasurement,
 ) -> Result<WorkerContractProbeEvidence, InvocationError> {
     Ok(WorkerContractProbeEvidence::Accepted {
@@ -659,7 +661,7 @@ pub(super) fn accepted_probe(
 }
 
 pub(super) fn rejected_probe(
-    case_id: &'static str,
+    case_id: &str,
     implementation: Implementation,
     output: &ProcessResult,
 ) -> Result<WorkerContractProbeEvidence, InvocationError> {

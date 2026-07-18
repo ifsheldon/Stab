@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90",
+  "performance_inventory_sha256": "adb7f822ff892b3d85b362130f048d7fe76f6e314349e5f42e71f54389a771d7",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -167,6 +167,28 @@
       "measurements": [
         {
           "measurement_id": "construct-and-iterate-borrowed",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-CLIFFORD-STRING",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-identity",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-non-identity",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

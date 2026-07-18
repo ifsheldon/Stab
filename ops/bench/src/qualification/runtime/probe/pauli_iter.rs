@@ -18,6 +18,45 @@ use super::super::protocol::{
 use super::super::worker::WorkerIdentity;
 use crate::config::STIM_COMMIT;
 
+pub(super) const RANGE_OUTPUT_CAP: u64 = 1_000_000;
+pub(super) const SINGLETON_OUTPUT_CAP: u64 = 1_048_576 * 3;
+
+pub(super) fn validate_work_items(group: ProbeGroup, work_items: u64) -> Result<(), ProbeError> {
+    if group == ProbeGroup::PauliStringIterRangeAdapter
+        && !(2..=22).any(|width| range_output_count(width) == Some(work_items))
+    {
+        return Err(ProbeError::Contract(format!(
+            "Pauli iterator range probe work count {work_items} is not a complete source-owned traversal through {RANGE_OUTPUT_CAP} outputs"
+        )));
+    }
+    if group == ProbeGroup::PauliStringIterSingletonAdapter
+        && (work_items == 0 || work_items > SINGLETON_OUTPUT_CAP || !work_items.is_multiple_of(3))
+    {
+        return Err(ProbeError::Contract(format!(
+            "Pauli iterator singleton probe work count {work_items} is not a positive complete callback through {SINGLETON_OUTPUT_CAP} outputs"
+        )));
+    }
+    Ok(())
+}
+
+fn range_output_count(width: u64) -> Option<u64> {
+    let mut outputs = 0_u64;
+    for weight in 2..=5_u64.min(width) {
+        let basis_products = 1_u64.checked_shl(u32::try_from(weight).ok()?)?;
+        outputs = outputs.checked_add(choose(width, weight)?.checked_mul(basis_products)?)?;
+    }
+    Some(outputs)
+}
+
+fn choose(n: u64, k: u64) -> Option<u64> {
+    let k = k.min(n.checked_sub(k)?);
+    let mut result = 1_u64;
+    for step in 1..=k {
+        result = result.checked_mul(n - k + step)?.checked_div(step)?;
+    }
+    Some(result)
+}
+
 pub(super) fn validate_boundaries(
     root: &RepoRoot,
     group: ProbeGroup,

@@ -192,6 +192,61 @@ pub(crate) enum WorkerError {
     },
     #[error("Pauli iterator workload was invoked without its prepared fixture")]
     MissingPauliIterFixture,
+    #[error("Clifford-string workload requires --input-descriptor-hex")]
+    MissingCliffordDescriptor,
+    #[error("--input-descriptor-hex is only valid for Clifford-string workloads")]
+    UnexpectedCliffordDescriptor,
+    #[error("Clifford-string width must be positive")]
+    CliffordWidthZero,
+    #[error("Clifford-string width {actual} exceeds maximum {maximum}")]
+    CliffordWidthLimit { actual: u64, maximum: u64 },
+    #[error("Clifford-string width {0} cannot be represented on this host")]
+    CliffordWidthRange(u64),
+    #[error("Clifford-string descriptor width {width} differs from work-items {work_items}")]
+    CliffordWidthWorkMismatch { width: u64, work_items: u64 },
+    #[error("Clifford-string descriptor has unknown workload marker {0}")]
+    CliffordUnknownMarker(u64),
+    #[error("{workload} does not accept Clifford-string workload marker {marker}")]
+    CliffordWorkloadMarkerMismatch { workload: &'static str, marker: u64 },
+    #[error("Clifford-string descriptor {name} is {actual}, expected {expected}")]
+    CliffordDescriptorField {
+        name: &'static str,
+        actual: u64,
+        expected: u64,
+    },
+    #[error("Clifford-string workload was invoked without its prepared fixture")]
+    MissingCliffordFixture,
+    #[error("Clifford-string execution state was not reset before the start barrier")]
+    CliffordExecutionNotArmed,
+    #[error("Clifford-string successful callback count overflowed u64")]
+    CliffordCallbackOverflow,
+    #[error("Clifford-string gate is missing at index {0}")]
+    CliffordGateMissing(usize),
+    #[error("Clifford-string gate code {0} is outside the canonical 24-gate table")]
+    CliffordGateCodeRange(usize),
+    #[error("independent Clifford product {left} by {right} was absent from the canonical table")]
+    CliffordProductMissing { left: usize, right: usize },
+    #[error("Clifford-string {name} sequence has length {actual}, expected {expected}")]
+    CliffordSequenceLength {
+        name: &'static str,
+        actual: usize,
+        expected: usize,
+    },
+    #[error(
+        "Clifford-string {name} sequence differs at index {index}: code {actual}, expected {expected}"
+    )]
+    CliffordSequenceMismatch {
+        name: &'static str,
+        index: usize,
+        actual: u8,
+        expected: u8,
+    },
+    #[error("Clifford-string count cannot be represented as u64")]
+    CliffordCountRange,
+    #[error("Clifford-string callback count is {actual}, expected {expected}")]
+    CliffordCallbackCount { actual: u64, expected: u64 },
+    #[error("Clifford-string execution witness is {actual:#018x}, expected {expected:#018x}")]
+    CliffordWitness { actual: u64, expected: u64 },
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
