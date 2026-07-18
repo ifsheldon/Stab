@@ -336,8 +336,12 @@ fn write_artifact(
     relative: &Path,
     bytes: &[u8],
 ) -> Result<ArtifactRecord, RunError> {
+    let path =
+        super::super::artifact_locator::ReportRootRelativePath::try_new(relative.to_path_buf())
+            .map_err(|reason| RunError::ReportContract(reason.into_boxed_str()))?;
+    output.write(path.as_path(), bytes)?;
     Ok(ArtifactRecord {
-        path: output.write(relative, bytes)?,
+        path,
         bytes: bytes.len(),
         sha256: sha256(bytes),
     })

@@ -673,6 +673,18 @@ fn failed_case_artifacts_preserve_raw_streams_and_bind_their_digests() {
     assert_eq!(result.stdout_sha256, Some(super::sha256(&stdout)));
     assert_eq!(result.stderr_sha256, Some(super::sha256(&stderr)));
     assert_eq!(
+        result
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.path.as_path())
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("cases/raw-failure/failure.txt"),
+            Path::new("cases/raw-failure/stdout.bin"),
+            Path::new("cases/raw-failure/stderr.bin"),
+        ]
+    );
+    assert_eq!(
         output
             .read(Path::new("cases/raw-failure/stdout.bin"), stdout.len())
             .expect("read raw stdout"),

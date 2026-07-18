@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::artifact::MAX_REPORT_BYTES;
 use super::artifact::QualificationOutputDir;
+use super::artifact_locator::ReportRootRelativePath;
 use super::model::{
     Comparator, DeferredProduct, EvidenceSelector, ExecutionTier, FeatureId, SelectorKind,
     UpstreamDisposition,
@@ -20,8 +21,8 @@ mod support;
 use support::{canonical_json, completed_cases, expected_case_counts, is_sha256, sha256};
 pub(super) use support::{regenerate, selector_sha256, validate_preflight};
 
-const REPORT_SCHEMA_VERSION: u32 = 6;
-const PREFLIGHT_SCHEMA_VERSION: u32 = 6;
+const REPORT_SCHEMA_VERSION: u32 = 7;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 7;
 const MAX_CASE_RESULTS: usize = 8_192;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -110,7 +111,7 @@ pub(super) struct StatisticalAttempt {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ArtifactRecord {
-    pub(super) path: PathBuf,
+    pub(super) path: ReportRootRelativePath,
     pub(super) bytes: usize,
     pub(super) sha256: String,
 }
@@ -536,19 +537,9 @@ impl QualificationReport {
                 .map(|expected| expected.artifact_limit_bytes)
                 .unwrap_or(0);
             let mut artifact_paths = BTreeSet::new();
-            let case_artifact_root = output
-                .relative()
-                .join("cases")
-                .join(result.case_id.as_str());
+            let case_artifact_root = Path::new("cases").join(result.case_id.as_str());
             for artifact in &result.artifacts {
-                if artifact.path.is_absolute()
-                    || !artifact.path.starts_with(output.relative())
-                    || !artifact.path.starts_with(&case_artifact_root)
-                    || artifact
-                        .path
-                        .components()
-                        .any(|component| !matches!(component, std::path::Component::Normal(_)))
-                {
+                if !artifact.path.as_path().starts_with(&case_artifact_root) {
                     violations.push(format!(
                         "case {:?} has unsafe artifact path {:?}",
                         result.case_id, artifact.path
@@ -586,10 +577,7 @@ impl QualificationReport {
                 };
                 artifact_bytes = next_total;
                 remaining_artifact_bytes -= artifact.bytes;
-                let Some(relative) = artifact.path.strip_prefix(output.relative()).ok() else {
-                    continue;
-                };
-                match output.read(relative, artifact.bytes) {
+                match output.read(artifact.path.as_path(), artifact.bytes) {
                     Ok(bytes)
                         if bytes.len() == artifact.bytes && sha256(&bytes) == artifact.sha256 => {}
                     Ok(_) => violations.push(format!(

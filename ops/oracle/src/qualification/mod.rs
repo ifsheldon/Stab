@@ -9,6 +9,7 @@ use crate::RepoRoot;
 use crate::blocker_ledger::selector::{CargoTestSelector, test_listing_match_count};
 
 pub(crate) mod artifact;
+mod artifact_locator;
 mod classification;
 mod comparator;
 pub(crate) mod executables;

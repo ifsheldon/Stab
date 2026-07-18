@@ -7,6 +7,7 @@ use super::{
 };
 use crate::RepoRoot;
 use crate::qualification::artifact::QualificationOutputDir;
+use crate::qualification::artifact_locator::ReportRootRelativePath;
 use crate::qualification::model::{
     Comparator, EvidenceSelector, EvidenceState, ExecutionTier, FeatureId, SelectorKind,
 };
@@ -28,6 +29,11 @@ fn publish_execution_receipt(
         Some(1)
     };
     publish_execution_receipt_with_status(output, report, verdict, exit_status);
+}
+
+fn artifact_path(path: &str) -> ReportRootRelativePath {
+    ReportRootRelativePath::try_new(PathBuf::from(path))
+        .expect("report-root-relative artifact path")
 }
 
 fn publish_execution_receipt_with_status(
@@ -410,14 +416,60 @@ fn report_round_trip_is_reproducible_and_preserves_dirty_metadata() {
 }
 
 #[test]
-fn report_rejects_partial_and_traversing_artifacts() {
+fn report_with_failure_artifacts_replays_after_directory_relocation() {
+    let (temporary, output, mut report) = report();
+    let artifact_path = artifact_path("cases/case-a/failure.txt");
+    output
+        .write(artifact_path.as_path(), b"retained failure")
+        .expect("write failure artifact");
+    let result = report.results.first_mut().expect("case result");
+    result.outcome = CaseOutcome::Failed;
+    result.artifacts.push(ArtifactRecord {
+        path: artifact_path,
+        bytes: 16,
+        sha256: super::sha256(b"retained failure"),
+    });
+    let count = report.case_counts.first_mut().expect("case count");
+    count.passed = 0;
+    count.failed = 1;
+    report.finish();
+    publish_execution_receipt(&output, &mut report, ExecutionVerdict::Rejected);
+    let mut expectation = report_expectation(&report);
+    expectation
+        .selected_cases
+        .get_mut("case-a")
+        .expect("expected case")
+        .expected_exit_status = 1;
+    report
+        .publish(&output, &expectation)
+        .expect("publish report");
+
+    let original = temporary.path().join(output.relative());
+    let relocated_relative = Path::new("target/qualification/correctness/relocated");
+    let relocated_absolute = temporary.path().join(relocated_relative);
+    std::fs::create_dir_all(relocated_absolute.parent().expect("relocated parent"))
+        .expect("create relocated parent");
+    std::fs::rename(original, &relocated_absolute).expect("relocate report tree");
+    let relocated = QualificationOutputDir::parse(
+        &RepoRoot {
+            path: temporary.path().to_path_buf(),
+        },
+        relocated_relative,
+    )
+    .expect("relocated output");
+    let replayed = QualificationReport::read(&relocated).expect("read relocated report");
+
+    replayed
+        .validate(&relocated, &expectation)
+        .expect("replay relocated report with retained failure");
+    super::regenerate(&relocated, &expectation)
+        .expect("regenerate relocated report with retained failure");
+}
+
+#[test]
+fn report_rejects_partial_selection() {
     let (_temporary, output, mut report) = report();
     report.selection_complete = false;
-    report.results.first_mut().expect("case result").artifacts = vec![ArtifactRecord {
-        path: PathBuf::from("target/qualification/../escape"),
-        bytes: 3,
-        sha256: super::sha256(b"bad"),
-    }];
 
     assert!(
         report
@@ -540,8 +592,9 @@ fn report_rejects_artifact_content_changed_after_publication() {
     result.outcome = CaseOutcome::Failed;
     result.stdout_sha256 = Some(super::sha256(b"stdout"));
     result.stderr_sha256 = Some(super::sha256(b"stderr"));
-    let path = output
-        .write(Path::new("cases/case-a/failure.txt"), b"first")
+    let path = artifact_path("cases/case-a/failure.txt");
+    output
+        .write(path.as_path(), b"first")
         .expect("write failure artifact");
     result.artifacts.push(ArtifactRecord {
         path,
@@ -576,9 +629,7 @@ fn report_rejects_artifact_size_claims_before_reading_files() {
         let result = report.results.first_mut().expect("case result");
         result.outcome = CaseOutcome::Failed;
         result.artifacts.push(ArtifactRecord {
-            path: output
-                .relative()
-                .join("cases/case-a/untrusted-artifact.bin"),
+            path: artifact_path("cases/case-a/untrusted-artifact.bin"),
             bytes: claimed,
             sha256: super::sha256(b"untrusted"),
         });
@@ -607,7 +658,7 @@ fn report_rejects_a_large_sparse_artifact_through_the_manifest_cap() {
     let result = report.results.first_mut().expect("case result");
     result.outcome = CaseOutcome::Failed;
     result.artifacts.push(ArtifactRecord {
-        path: output.relative().join(relative),
+        path: ReportRootRelativePath::try_new(relative).expect("artifact path"),
         bytes: 4_096,
         sha256: super::sha256(b"not-the-sparse-file"),
     });

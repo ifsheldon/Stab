@@ -5,10 +5,11 @@ use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
 use super::artifact::QualificationOutputDir;
+use super::artifact_locator::ReportRootRelativePath;
 use super::model::{ExecutionTier, FeatureId};
 
 const RUN_REQUEST_SCHEMA_VERSION: u32 = 3;
-const EXECUTION_RECEIPT_SCHEMA_VERSION: u32 = 3;
+const EXECUTION_RECEIPT_SCHEMA_VERSION: u32 = 4;
 const RUN_COMPLETION_SCHEMA_VERSION: u32 = 1;
 const MAX_RUN_REQUEST_BYTES: usize = 4 << 20;
 const MAX_RUN_COMPLETION_BYTES: usize = 4 << 20;
@@ -137,7 +138,7 @@ pub(super) struct StreamReceipt {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ReceiptArtifact {
-    pub(super) path: PathBuf,
+    pub(super) path: ReportRootRelativePath,
     pub(super) bytes: usize,
     pub(super) sha256: String,
 }
