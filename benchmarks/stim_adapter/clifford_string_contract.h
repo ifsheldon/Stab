@@ -369,6 +369,35 @@ inline std::array<std::array<uint8_t, 24>, 24> clifford_scalar_table() {
     return products;
 }
 
+inline uint8_t clifford_scalar_product(
+    uint8_t left,
+    uint8_t right,
+    const std::array<std::array<uint8_t, 24>, 24> &table) {
+    if (left >= table.size() || right >= table[left].size()) {
+        throw std::runtime_error("Clifford scalar product code is outside the canonical table");
+    }
+    return table[left][right];
+}
+
+inline uint8_t clifford_scalar_right_power(
+    uint8_t initial,
+    uint8_t right,
+    uint64_t exponent,
+    const std::array<std::array<uint8_t, 24>, 24> &table) {
+    uint8_t accumulated = 0;
+    uint8_t factor = right;
+    while (exponent != 0) {
+        if ((exponent & 1) != 0) {
+            accumulated = clifford_scalar_product(accumulated, factor, table);
+        }
+        exponent >>= 1;
+        if (exponent != 0) {
+            factor = clifford_scalar_product(factor, factor, table);
+        }
+    }
+    return clifford_scalar_product(initial, accumulated, table);
+}
+
 inline std::vector<uint8_t> clifford_initial_left_codes(
     CliffordWorkloadKind kind,
     size_t width) {
@@ -403,18 +432,36 @@ inline CliffordScalarExpected clifford_scalar_expected(
     CliffordWorkloadKind kind,
     size_t width,
     uint64_t iterations) {
-    auto left = clifford_initial_left_codes(kind, width);
+    const auto initial_left = clifford_initial_left_codes(kind, width);
     auto right = clifford_right_codes(kind, width);
+    auto left = initial_left;
     const auto table = clifford_scalar_table();
-    uint64_t callback_count = 0;
-    uint64_t witness = 0;
-    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
+    if (kind == CliffordWorkloadKind::NON_IDENTITY) {
         for (size_t index = 0; index < width; ++index) {
-            left[index] = table[left[index]][right[index]];
+            left[index] = clifford_scalar_right_power(
+                initial_left[index], right[index], iterations, table);
         }
-        ++callback_count;
-        const uint8_t code = left[static_cast<size_t>((callback_count - 1) % width)];
-        witness = std::rotl(witness ^ code, 13) + CLIFFORD_WITNESS_INCREMENT + callback_count;
+    }
+    uint64_t witness = 0;
+    if (kind == CliffordWorkloadKind::IDENTITY) {
+        for (uint64_t callback_count = 1; callback_count <= iterations; ++callback_count) {
+            witness = std::rotl(witness, 13) + CLIFFORD_WITNESS_INCREMENT + callback_count;
+        }
+    } else {
+        auto observed_codes = initial_left;
+        auto stride_codes = right;
+        for (size_t index = 0; index < width; ++index) {
+            observed_codes[index] = clifford_scalar_right_power(
+                initial_left[index], right[index], static_cast<uint64_t>(index) + 1, table);
+            stride_codes[index] = clifford_scalar_right_power(
+                0, right[index], static_cast<uint64_t>(width), table);
+        }
+        for (uint64_t callback_count = 1; callback_count <= iterations; ++callback_count) {
+            const size_t index = static_cast<size_t>((callback_count - 1) % width);
+            const uint8_t code = observed_codes[index];
+            observed_codes[index] = clifford_scalar_product(code, stride_codes[index], table);
+            witness = std::rotl(witness ^ code, 13) + CLIFFORD_WITNESS_INCREMENT + callback_count;
+        }
     }
     return CliffordScalarExpected{std::move(left), std::move(right), witness};
 }

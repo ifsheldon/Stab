@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0",
+  "performance_inventory_sha256": "18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -678,7 +678,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "38c86979c6de0a2a04ffdf989515147bca7102718c8921fcfee5f8fe13108b7e"
+        "sha256": "3c92488328180092f2a8f6a671e64870a1ff935f294fc2b579bfa4d16d237dca"
       },
       "comparator_sources": [
         {
@@ -687,7 +687,7 @@
         },
         {
           "path": "benchmarks/stim_adapter/clifford_string_contract.h",
-          "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+          "sha256": "95d628eabf8db5795fd3391c97f4f6a0ab118e62e7cce91652458af40f7f6bf8"
         }
       ]
     },
@@ -725,7 +725,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "38c86979c6de0a2a04ffdf989515147bca7102718c8921fcfee5f8fe13108b7e"
+        "sha256": "3c92488328180092f2a8f6a671e64870a1ff935f294fc2b579bfa4d16d237dca"
       },
       "comparator_sources": [
         {
@@ -734,7 +734,7 @@
         },
         {
           "path": "benchmarks/stim_adapter/clifford_string_contract.h",
-          "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+          "sha256": "95d628eabf8db5795fd3391c97f4f6a0ab118e62e7cce91652458af40f7f6bf8"
         }
       ]
     }

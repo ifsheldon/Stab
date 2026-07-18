@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after the packed Clifford-string implementation: schema-version-3 CQ0 semantic digest `c50f27fd097ac870c987d1f91c44d9e6a75510ed4d51ec44853dbc328f0b1fa7`.
+Current correctness dependency after the packed Clifford-string review fixes: schema-version-3 CQ0 semantic digest `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f`.
 
-Current performance inventory digest after binding both Clifford-string groups to the optimization profiler note and refreshed correctness dependency: `f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0`. It preserves the independent `1.25x` gates, comparator sources, frozen workload vectors, and exact correctness parents introduced for the two Clifford groups, and it inherits no timing result from preceding digest `adb7f822ff892b3d85b362130f048d7fe76f6e314349e5f42e71f54389a771d7`.
+Current performance inventory digest after binding both Clifford-string groups to the reviewed scalable oracles, exact legacy identity/small replacement, optimization profiler note, and refreshed correctness dependency: `18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4`. It preserves the independent `1.25x` gates, comparator sources, frozen workload vectors, and exact correctness parents introduced for the two Clifford groups, and it inherits no timing result from preceding digest `f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0`.
 
 Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -44,7 +44,7 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Done checklist rows | 74 |
 | Partial checklist rows with explicit selected and deferred children | 7 |
 | Deferred checklist rows | 46 |
-| Default-feature public Rust API items | 1,972 |
+| Default-feature public Rust API items | 1,974 |
 | Public API items covered by a measured parent | 1,021 |
 | Public API items classified as not independently performance relevant | 951 |
 | Qualification groups | 548 |

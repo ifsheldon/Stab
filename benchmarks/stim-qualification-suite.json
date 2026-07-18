@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "c50f27fd097ac870c987d1f91c44d9e6a75510ed4d51ec44853dbc328f0b1fa7",
-  "semantic_digest": "f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0",
+  "correctness_digest": "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f",
+  "semantic_digest": "18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -3726,7 +3726,7 @@
     {
       "id": "PERFC-c6e68a57b705e397",
       "source_line": 130,
-      "anchor_digest": "2f7e587f777002623057e0931ab78814b1ddd3ce7867764b1a04f993934221cb",
+      "anchor_digest": "4c26a2b93cc7d12be35ae35d2358dcead0cef18469f15149c7f614ee1f8a64ae",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Clifford strings",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -19927,6 +19927,17 @@
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
     },
     {
+      "id": "cq-api-item-c20be46ea17d2171",
+      "path": "stab_core::StabilizerError::InconsistentCliffordStringMetadata",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c4e09d6f3c686785",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
       "id": "cq-api-item-f70f7b723b50bc28",
       "path": "stab_core::StabilizerError::InconsistentStabilizer",
       "kind": "variant",
@@ -28728,6 +28739,17 @@
       "id": "cq-api-item-51b9b60e17daf09b",
       "path": "stab_core::stabilizers::StabilizerError::ImaginaryProduct::phase",
       "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c4e09d6f3c686785",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-046b7b5518557012",
+      "path": "stab_core::stabilizers::StabilizerError::InconsistentCliffordStringMetadata",
+      "kind": "variant",
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-c4e09d6f3c686785",
@@ -63310,7 +63332,7 @@
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
-            "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+            "sha256": "95d628eabf8db5795fd3391c97f4f6a0ab118e62e7cce91652458af40f7f6bf8"
           }
         ]
       },
@@ -63411,7 +63433,7 @@
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
-            "sha256": "3fd02730b716802bbb750013f100f8ba94d401c050532c51bff5edda96a61a52"
+            "sha256": "95d628eabf8db5795fd3391c97f4f6a0ab118e62e7cce91652458af40f7f6bf8"
           }
         ]
       },
@@ -72331,7 +72353,7 @@
       "id": "m6-clifford-string",
       "primary_group_id": "PERFQ-M6-CLIFFORD-STRING",
       "supporting_performance_features": [],
-      "decision": "retained",
+      "decision": "reworked",
       "classifications": [
         "faithful",
         "missing-scale",
@@ -72346,8 +72368,23 @@
       "threshold_refs": [
         "benchmarks/m12-primary-thresholds.json"
       ],
-      "threshold_max_relative_ratio": "1.25",
-      "threshold_measurement_pairs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [
+        {
+          "stim_name": "CliffordString_multiplication_10K",
+          "stab_name": "stab_clifford_string_multiplication_10K",
+          "max_relative_ratio": "1.25"
+        }
+      ],
+      "replacement_contracts": [
+        {
+          "legacy_stim_name": "CliffordString_multiplication_10K",
+          "legacy_stab_name": "stab_clifford_string_multiplication_10K",
+          "runtime_group_id": "PERFQ-M6-CLIFFORD-STRING",
+          "runtime_measurement_id": "right-multiply-identity",
+          "runtime_scale_id": "small"
+        }
+      ],
       "waiver_refs": []
     },
     {

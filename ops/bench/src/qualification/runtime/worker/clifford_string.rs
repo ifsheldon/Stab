@@ -441,40 +441,106 @@ fn scalar_expected(
     iterations: u64,
     table: &[[u8; 24]; 24],
 ) -> Result<ScalarExpected, WorkerError> {
-    let mut left = initial_left_codes(kind, width)?;
+    let initial_left = initial_left_codes(kind, width)?;
     let right = right_codes(kind, width)?;
-    let mut callback_count = 0_u64;
-    let mut execution_witness = 0_u64;
-    for _ in 0..iterations {
-        for (left_code, right_code) in left.iter_mut().zip(&right) {
-            *left_code = table
-                .get(usize::from(*left_code))
-                .and_then(|row| row.get(usize::from(*right_code)))
-                .copied()
-                .ok_or(WorkerError::CliffordProductMissing {
-                    left: usize::from(*left_code),
-                    right: usize::from(*right_code),
-                })?;
+    let final_left_codes = match kind {
+        CliffordWorkloadKind::Identity => initial_left.clone(),
+        CliffordWorkloadKind::NonIdentity => initial_left
+            .iter()
+            .copied()
+            .zip(right.iter().copied())
+            .map(|(left, right)| scalar_right_power(left, right, iterations, table))
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    let width_u64 = u64::try_from(width).map_err(|_| WorkerError::CliffordCountRange)?;
+    let execution_witness = match kind {
+        CliffordWorkloadKind::Identity => {
+            let mut witness = 0_u64;
+            for callback_count in 1..=iterations {
+                witness = witness
+                    .rotate_left(13)
+                    .wrapping_add(WITNESS_INCREMENT)
+                    .wrapping_add(callback_count);
+            }
+            witness
         }
-        callback_count = callback_count
-            .checked_add(1)
-            .ok_or(WorkerError::CliffordCallbackOverflow)?;
-        let width_u64 = u64::try_from(width).map_err(|_| WorkerError::CliffordCountRange)?;
-        let index = usize::try_from((callback_count - 1) % width_u64)
-            .map_err(|_| WorkerError::CliffordWidthRange(width_u64))?;
-        let code = *left
-            .get(index)
-            .ok_or(WorkerError::CliffordGateMissing(index))?;
-        execution_witness = (execution_witness ^ u64::from(code))
-            .rotate_left(13)
-            .wrapping_add(WITNESS_INCREMENT)
-            .wrapping_add(callback_count);
-    }
+        CliffordWorkloadKind::NonIdentity => {
+            let mut observed_codes = initial_left
+                .iter()
+                .copied()
+                .zip(right.iter().copied())
+                .enumerate()
+                .map(|(index, (left, right))| {
+                    let first_exponent = u64::try_from(index)
+                        .map_err(|_| WorkerError::CliffordCountRange)?
+                        .checked_add(1)
+                        .ok_or(WorkerError::CliffordCallbackOverflow)?;
+                    scalar_right_power(left, right, first_exponent, table)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let stride_codes = right
+                .iter()
+                .copied()
+                .map(|right| scalar_right_power(0, right, width_u64, table))
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut witness = 0_u64;
+            for callback_count in 1..=iterations {
+                let index = usize::try_from((callback_count - 1) % width_u64)
+                    .map_err(|_| WorkerError::CliffordWidthRange(width_u64))?;
+                let code = *observed_codes
+                    .get(index)
+                    .ok_or(WorkerError::CliffordGateMissing(index))?;
+                let stride = *stride_codes
+                    .get(index)
+                    .ok_or(WorkerError::CliffordGateMissing(index))?;
+                let next_code = scalar_product_code(code, stride, table)?;
+                *observed_codes
+                    .get_mut(index)
+                    .ok_or(WorkerError::CliffordGateMissing(index))? = next_code;
+                witness = (witness ^ u64::from(code))
+                    .rotate_left(13)
+                    .wrapping_add(WITNESS_INCREMENT)
+                    .wrapping_add(callback_count);
+            }
+            witness
+        }
+    };
     Ok(ScalarExpected {
-        final_left_codes: left,
+        final_left_codes,
         right_codes: right,
         execution_witness,
     })
+}
+
+fn scalar_right_power(
+    initial: u8,
+    right: u8,
+    mut exponent: u64,
+    table: &[[u8; 24]; 24],
+) -> Result<u8, WorkerError> {
+    let mut accumulated = 0_u8;
+    let mut factor = right;
+    while exponent != 0 {
+        if exponent & 1 != 0 {
+            accumulated = scalar_product_code(accumulated, factor, table)?;
+        }
+        exponent >>= 1;
+        if exponent != 0 {
+            factor = scalar_product_code(factor, factor, table)?;
+        }
+    }
+    scalar_product_code(initial, accumulated, table)
+}
+
+fn scalar_product_code(left: u8, right: u8, table: &[[u8; 24]; 24]) -> Result<u8, WorkerError> {
+    table
+        .get(usize::from(left))
+        .and_then(|row| row.get(usize::from(right)))
+        .copied()
+        .ok_or(WorkerError::CliffordProductMissing {
+            left: usize::from(left),
+            right: usize::from(right),
+        })
 }
 
 fn scalar_multiplication_table() -> Result<[[u8; 24]; 24], WorkerError> {
@@ -657,6 +723,79 @@ mod tests {
     }
 
     #[test]
+    fn scalar_power_matches_literal_composition_and_handles_maximum_exponent() {
+        let table = scalar_multiplication_table().expect("independent Clifford table");
+        for initial in 0_u8..24 {
+            for right in 0_u8..24 {
+                let mut literal = initial;
+                for exponent in 0_u64..=24 {
+                    assert_eq!(
+                        scalar_right_power(initial, right, exponent, &table)
+                            .expect("powered product"),
+                        literal,
+                        "initial={initial} right={right} exponent={exponent}"
+                    );
+                    literal = scalar_product_code(literal, right, &table).expect("literal product");
+                }
+
+                let before_max = scalar_right_power(initial, right, u64::MAX - 1, &table)
+                    .expect("pre-maximum power");
+                let at_max =
+                    scalar_right_power(initial, right, u64::MAX, &table).expect("maximum power");
+                assert_eq!(
+                    at_max,
+                    scalar_product_code(before_max, right, &table).expect("maximum successor")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn scalar_reference_matches_literal_callback_evolution() {
+        let table = scalar_multiplication_table().expect("independent Clifford table");
+        for kind in [
+            CliffordWorkloadKind::Identity,
+            CliffordWorkloadKind::NonIdentity,
+        ] {
+            for width in [1_usize, 2, 23, 24, 25, 552, 553] {
+                for iterations in [0_u64, 1, 2, 25, 553, 1_105] {
+                    let powered = scalar_expected(kind, width, iterations, &table)
+                        .expect("powered reference");
+                    let mut literal_left = initial_left_codes(kind, width).expect("literal left");
+                    let literal_right = right_codes(kind, width).expect("literal right");
+                    let mut literal_witness = 0_u64;
+                    for callback_count in 1..=iterations {
+                        for (left, &right) in literal_left.iter_mut().zip(&literal_right) {
+                            *left =
+                                scalar_product_code(*left, right, &table).expect("literal product");
+                        }
+                        let index = usize::try_from((callback_count - 1) % width as u64)
+                            .expect("literal index");
+                        let code = *literal_left.get(index).expect("literal code");
+                        literal_witness = (literal_witness ^ u64::from(code))
+                            .rotate_left(13)
+                            .wrapping_add(WITNESS_INCREMENT)
+                            .wrapping_add(callback_count);
+                    }
+                    assert_eq!(powered.final_left_codes, literal_left);
+                    assert_eq!(powered.right_codes, literal_right);
+                    assert_eq!(powered.execution_witness, literal_witness);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn identity_scalar_reference_handles_large_iteration_counts_without_width_work() {
+        let table = scalar_multiplication_table().expect("independent Clifford table");
+        let expected = scalar_expected(CliffordWorkloadKind::Identity, 10_000, 100_000, &table)
+            .expect("large identity reference");
+        assert!(expected.final_left_codes.iter().all(|&code| code == 0));
+        assert!(expected.right_codes.iter().all(|&code| code == 0));
+        assert_ne!(expected.execution_witness, 0);
+    }
+
+    #[test]
     fn callback_witness_is_result_derived_and_resets_between_fixtures() {
         let descriptor = CliffordDescriptor::canonical(CliffordWorkloadKind::Identity, 10_000);
         let mut odd =
@@ -720,6 +859,7 @@ mod tests {
             2
         );
         assert!(rust_callback.contains("left.right_multiply_in_place(right)?;"));
+        assert!(rust_callback.contains("scalar_right_power("));
         assert!(rust_callback.contains("self.execution_witness ="));
         assert!(rust_callback.contains("black_box(self.execution_witness);"));
         let rust_reset = rust_worker
@@ -737,6 +877,7 @@ mod tests {
             2
         );
         assert!(cpp_callback.contains("clifford_optimizer_opaque_mutable(fixture.left) *="));
+        assert!(cpp_callback.contains("clifford_scalar_right_power("));
         assert!(cpp_callback.contains("fixture.execution_witness ="));
         assert!(
             cpp_callback.contains("clifford_optimizer_opaque_const(fixture.execution_witness);")

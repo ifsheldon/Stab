@@ -116,4 +116,21 @@ pub(super) fn validate(
             row.id
         ));
     }
+    if row.id == "m6-clifford-string"
+        && !matches!(
+            row.replacement_contracts.as_slice(),
+            [replacement]
+                if replacement.legacy_stim_name == "CliffordString_multiplication_10K"
+                    && replacement.legacy_stab_name
+                        == "stab_clifford_string_multiplication_10K"
+                    && replacement.runtime_group_id == "PERFQ-M6-CLIFFORD-STRING"
+                    && replacement.runtime_measurement_id == "right-multiply-identity"
+                    && replacement.runtime_scale_id.as_deref() == Some("small")
+        )
+    {
+        issues.push(
+            "manifest row m6-clifford-string must map its exact legacy pair only to PERFQ-M6-CLIFFORD-STRING/right-multiply-identity/small"
+                .to_string(),
+        );
+    }
 }

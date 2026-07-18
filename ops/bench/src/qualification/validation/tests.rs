@@ -229,6 +229,50 @@ fn replacement_target_uniqueness_includes_an_optional_scale() {
 }
 
 #[test]
+fn clifford_replacement_rejects_the_non_identity_runtime_group() {
+    let (mut suite, manifest, references) = fixture();
+    suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m6-clifford-string")
+        .expect("Clifford legacy row")
+        .replacement_contracts
+        .first_mut()
+        .expect("Clifford replacement")
+        .runtime_group_id = "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY".to_string();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("non-identity cannot replace the identity-only legacy pair");
+    assert!(
+        error
+            .to_string()
+            .contains("must map its exact legacy pair only")
+    );
+}
+
+#[test]
+fn clifford_replacement_rejects_a_non_small_runtime_scale() {
+    let (mut suite, manifest, references) = fixture();
+    suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m6-clifford-string")
+        .expect("Clifford legacy row")
+        .replacement_contracts
+        .first_mut()
+        .expect("Clifford replacement")
+        .runtime_scale_id = Some("medium".to_string());
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("only the exact 10K small scale can replace the legacy pair");
+    assert!(
+        error
+            .to_string()
+            .contains("must map its exact legacy pair only")
+    );
+}
+
+#[test]
 fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
     let (suite, manifest, references) = fixture();
     let row = suite

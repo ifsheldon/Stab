@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Iterator Qualification Progress Report
 
-> Historical-inventory note, 2026-07-18: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later Clifford contracts and their profiler-note binding produced source-current digest `f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0` without relabeling the iterator evidence. The measurements below remain historical.
+> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced source-current digest `18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4` without relabeling the iterator evidence. The measurements below remain historical.
 
 ## Status
 
@@ -26,7 +26,7 @@ It does not qualify restart timing, owned `Iterator::next`, clone, formatting, c
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current correctness inventory contains 2,886 upstream records, 1,972 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
+The source-current correctness inventory contains 2,886 upstream records, 1,974 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
 The current performance inventory contains 548 groups and exactly fifteen executable product groups plus one diagnostic protocol group, with 21 exact threshold pairs; the frozen evidence inventory had the same group and threshold contracts.
 The inherited `m6-pauli-iter` row is superseded for timing, while its memory baseline remains guarded until PQ6 supplies equal or stronger evidence.
 

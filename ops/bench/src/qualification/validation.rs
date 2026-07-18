@@ -23,9 +23,9 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "c50f27fd097ac870c987d1f91c44d9e6a75510ed4d51ec44853dbc328f0b1fa7";
+const CORRECTNESS_DIGEST: &str = "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_PUBLIC_API_ITEMS: usize = 1_972;
+const EXPECTED_PUBLIC_API_ITEMS: usize = 1_974;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
@@ -518,7 +518,7 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
         ("struct", 83),
         ("trait-impl", 708),
         ("type-alias", 7),
-        ("variant", 254),
+        ("variant", 256),
     ]);
     if kinds != expected {
         issues.push(format!("public API kind counts are stale: {kinds:?}"));
@@ -1149,8 +1149,8 @@ fn validate_rows(
             "manifest primary performance ownership is stale: {primary_owners:?}"
         ));
     }
-    validate_decision_count(suite, RowDecision::Retained, 10, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 135, issues);
+    validate_decision_count(suite, RowDecision::Retained, 9, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 10, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);

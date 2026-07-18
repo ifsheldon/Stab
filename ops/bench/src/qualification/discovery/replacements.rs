@@ -10,6 +10,13 @@ pub(super) fn contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
             "xor-complete-vector",
             None,
         )],
+        "m6-clifford-string" => vec![replacement(
+            "CliffordString_multiplication_10K",
+            "stab_clifford_string_multiplication_10K",
+            "PERFQ-M6-CLIFFORD-STRING",
+            "right-multiply-identity",
+            Some("small"),
+        )],
         _ => Vec::new(),
     }
 }
@@ -59,5 +66,26 @@ mod tests {
         assert_eq!(replacements.len(), 1);
         let replacement = replacements.first().expect("one replacement");
         assert_eq!(replacement.runtime_scale_id, None);
+    }
+
+    #[test]
+    fn clifford_replacement_names_only_the_exact_identity_small_contract() {
+        let replacements = contracts(&row("m6-clifford-string"));
+        assert_eq!(replacements.len(), 1);
+        let replacement = replacements.first().expect("one Clifford replacement");
+        assert_eq!(
+            replacement.legacy_stim_name,
+            "CliffordString_multiplication_10K"
+        );
+        assert_eq!(
+            replacement.legacy_stab_name,
+            "stab_clifford_string_multiplication_10K"
+        );
+        assert_eq!(replacement.runtime_group_id, "PERFQ-M6-CLIFFORD-STRING");
+        assert_eq!(
+            replacement.runtime_measurement_id,
+            "right-multiply-identity"
+        );
+        assert_eq!(replacement.runtime_scale_id.as_deref(), Some("small"));
     }
 }
