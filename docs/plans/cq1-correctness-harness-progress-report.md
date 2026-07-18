@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the dedicated Pauli iterator owner sets the source-current correctness digest to `4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. Core revision `8503f458eac09fe94dba54cf8d6e16e88e195df4` provides the exact iterator corpus, while its source-current focused publication and the complete 271-parent CQ2 run remain pending. Earlier broad and focused reports remain historical under their recorded digests. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-18: this report records CQ1 harness completion and historical evidence. Strengthening the dedicated Pauli iterator owner sets the source-current correctness digest to `4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. Core revision `8503f458eac09fe94dba54cf8d6e16e88e195df4` provides the exact iterator corpus, and clean evidence revision `afaf0bf7f236b9f6ae6f72c19bbbdfea94d26632` publishes its source-current focused three-case evidence after complete accepted-maximum traversal strengthening. The complete 271-parent CQ2 run remains pending. Earlier broad and focused reports remain historical under their recorded digests. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
