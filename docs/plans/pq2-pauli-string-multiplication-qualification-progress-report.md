@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Multiplication Qualification Progress Report
 
-> Historical-inventory note, 2026-07-18: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator contracts produced post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current digest `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. The results below are not relabeled as simultaneous current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator contracts produced post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; later Clifford contracts and their profiler-note binding produced source-current digest `f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0`. The results below are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 

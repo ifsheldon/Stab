@@ -1,6 +1,6 @@
 # PQ2 SIMD-Word Popcount Qualification Progress Report
 
-> Historical-inventory note, 2026-07-18: this report remains valid passing AArch64 evidence for its frozen performance inventory `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`. Later product groups and migrations produced post-migration digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current digest `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. This report is not current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains valid passing AArch64 evidence for its frozen performance inventory `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`. Later product groups, migrations, and the Clifford profiler-note binding produced source-current digest `f60aab6b68859a1aeb5a12e90122459ba70a404d94f3d95d7ad0c47b114286b0`. This report is not current-inventory evidence.
 
 ## Status
 
