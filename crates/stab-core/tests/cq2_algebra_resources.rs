@@ -91,8 +91,30 @@ fn cq2_algebra_pauli_materialization_has_a_typed_first_rejection() {
 }
 
 #[test]
+#[allow(
+    clippy::expect_used,
+    reason = "the Clifford resource regression needs concrete maximum-sized accepted operands"
+)]
 fn cq2_algebra_clifford_growth_rejects_limits_and_overflow() {
     let resource = StabilizerResource::CliffordQubits;
+
+    let mut maximum_left = CliffordString::identity(resource.limit()).expect("maximum left");
+    let mut maximum_right = CliffordString::identity(resource.limit()).expect("maximum right");
+    maximum_right
+        .set_gate_at(resource.limit() - 1, SingleQubitClifford::X)
+        .expect("set maximum right tail");
+    let maximum_right_before = maximum_right.clone();
+    maximum_left
+        .right_multiply_in_place(&maximum_right)
+        .expect("maximum equal-width multiplication");
+    assert_eq!(maximum_left.len(), resource.limit());
+    assert_eq!(maximum_left.gate_at(0), Some(SingleQubitClifford::I));
+    assert_eq!(
+        maximum_left.gate_at(resource.limit() - 1),
+        Some(SingleQubitClifford::X)
+    );
+    assert_eq!(maximum_right, maximum_right_before);
+
     assert_resource_limit(
         CliffordString::identity(resource.limit() + 1),
         resource,

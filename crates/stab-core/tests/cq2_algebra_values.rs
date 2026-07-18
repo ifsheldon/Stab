@@ -15,6 +15,33 @@ use stab_core::{
     StabilizerResult,
 };
 
+const STIM_ALL_CLIFFORDS_ORDER: [SingleQubitClifford; 24] = [
+    SingleQubitClifford::I,
+    SingleQubitClifford::X,
+    SingleQubitClifford::Y,
+    SingleQubitClifford::Z,
+    SingleQubitClifford::Hxy,
+    SingleQubitClifford::S,
+    SingleQubitClifford::SDag,
+    SingleQubitClifford::Hnxy,
+    SingleQubitClifford::H,
+    SingleQubitClifford::SqrtYDag,
+    SingleQubitClifford::Hnxz,
+    SingleQubitClifford::SqrtY,
+    SingleQubitClifford::Hyz,
+    SingleQubitClifford::Hnyz,
+    SingleQubitClifford::SqrtX,
+    SingleQubitClifford::SqrtXDag,
+    SingleQubitClifford::Cxyz,
+    SingleQubitClifford::Cxynz,
+    SingleQubitClifford::Cnxyz,
+    SingleQubitClifford::Cxnyz,
+    SingleQubitClifford::Czyx,
+    SingleQubitClifford::Cznyx,
+    SingleQubitClifford::Cnzyx,
+    SingleQubitClifford::Czynx,
+];
+
 #[test]
 fn cq2_algebra_pauli_value_types_have_complete_scalar_contract() {
     for (sign, negative, text) in [(PauliSign::Plus, false, "+"), (PauliSign::Minus, true, "-")] {
@@ -306,6 +333,48 @@ fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
         .expect("in-place multiply");
     assert_eq!(product, in_place);
     assert_eq!(product.to_string(), "_I SI");
+
+    let identity_width = 552;
+    let mut identity_left = CliffordString::from_gates(
+        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[index % 24]),
+    )
+    .expect("equal-width identity left operand");
+    let identity_left_before = identity_left.clone();
+    let identity_right = CliffordString::identity(identity_width).expect("identity right operand");
+    let identity_right_before = identity_right.clone();
+    identity_left
+        .right_multiply_in_place(&identity_right)
+        .expect("equal-width identity multiplication");
+    assert_eq!(identity_left, identity_left_before);
+    assert_eq!(identity_right, identity_right_before);
+
+    let mut cycle_left = stab_core::stabilizers::CliffordString::from_gates(
+        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[index % 24]),
+    )
+    .expect("complete non-identity cycle left operand");
+    let cycle_right = CliffordString::from_gates(
+        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[1 + (index / 24) % 23]),
+    )
+    .expect("complete non-identity cycle right operand");
+    let cycle_right_before = cycle_right.clone();
+    let expected_cycle = (0..identity_width)
+        .map(|index| {
+            STIM_ALL_CLIFFORDS_ORDER[index % 24]
+                .multiply(STIM_ALL_CLIFFORDS_ORDER[1 + (index / 24) % 23])
+                .expect("single-qubit Clifford product")
+        })
+        .collect::<Vec<_>>();
+    cycle_left
+        .right_multiply_in_place(&cycle_right)
+        .expect("complete non-identity cycle multiplication");
+    for (index, expected) in expected_cycle.into_iter().enumerate() {
+        assert_eq!(
+            cycle_left.gate_at(index),
+            Some(expected),
+            "cycle position {index}"
+        );
+    }
+    assert_eq!(cycle_right, cycle_right_before);
 
     let mut first_rng = SmallRng::seed_from_u64(0x0051_ab1e);
     let mut second_rng = SmallRng::seed_from_u64(0x0051_ab1e);
