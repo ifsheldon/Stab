@@ -127,7 +127,7 @@ pub(super) fn apply(
     let mut qualification_cases = Vec::with_capacity(ledger.cases.len());
 
     for spec in ledger.cases {
-        validate_case_shape(&spec)?;
+        let upstream_owners = validate_case_shape(&spec)?;
         if !source_ids.insert(spec.id.clone()) {
             return invalid(format!(
                 "qualification case source id {:?} is duplicated",
@@ -140,11 +140,6 @@ pub(super) fn apply(
         }
 
         let mut owner_count = 0usize;
-        let upstream_owners = expand_upstream_owners(
-            &spec.id,
-            &spec.upstream_owners,
-            &spec.upstream_word_size_families,
-        )?;
         for owner in &upstream_owners {
             validate_text("upstream symbol", &owner.symbol)?;
             if let Some(subcase) = &owner.subcase {
@@ -381,15 +376,21 @@ fn validate_header(
     Ok(())
 }
 
-fn validate_case_shape(spec: &QualificationCaseSpec) -> Result<(), InventoryError> {
+fn validate_case_shape(
+    spec: &QualificationCaseSpec,
+) -> Result<Vec<UpstreamOwnerSpec>, InventoryError> {
     CaseId::try_new(spec.id.clone()).map_err(|reason| {
         InventoryError::InvalidQualificationCases(format!(
             "qualification case source id {:?} is invalid: {reason}",
             spec.id
         ))
     })?;
-    let owner_count = spec
-        .upstream_owners
+    let upstream_owners = expand_upstream_owners(
+        &spec.id,
+        &spec.upstream_owners,
+        &spec.upstream_word_size_families,
+    )?;
+    let owner_count = upstream_owners
         .len()
         .saturating_add(spec.public_api_owners.len())
         .saturating_add(spec.oracle_fixture_owners.len());
@@ -458,7 +459,7 @@ fn validate_case_shape(spec: &QualificationCaseSpec) -> Result<(), InventoryErro
             spec.id
         ));
     }
-    Ok(())
+    Ok(upstream_owners)
 }
 
 fn validate_existing_parent_mapping_shape(
@@ -1143,6 +1144,25 @@ mod tests {
             word_sizes: vec![64, 64],
         }];
         assert!(expand_upstream_owners("cq2-word-size-family", &[], &duplicate).is_err());
+    }
+
+    #[test]
+    fn expanded_word_size_families_count_toward_case_owner_limit() {
+        let mut spec = test_spec();
+        let path =
+            RelativeSourcePath::try_new("src/stim/simulators/frame_simulator.test.cc".into())
+                .expect("path");
+        spec.upstream_word_size_families = (0..=MAX_OWNERS_PER_CASE / 3)
+            .map(|index| UpstreamWordSizeFamilySpec {
+                path: path.clone(),
+                symbol_base: format!("FrameSimulator.family_{index}"),
+                word_sizes: vec![64, 128, 256],
+            })
+            .collect();
+        assert!(matches!(
+            validate_case_shape(&spec),
+            Err(InventoryError::InvalidQualificationCases(message)) if message.contains("has 2049 owners")
+        ));
     }
 
     fn test_spec() -> QualificationCaseSpec {
