@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-18 - PQ2: Pauli Iterator Accepted-Maximum State Coverage
+
+Status: Resolved
+Revealed by: GPT-5.6/max follow-up review of the tenth PQ2 Pauli-string iterator slice.
+Current text: the tenth slice required an independent exact-order owner over three singleton runtime widths and separately required exercise of the 1,048,576-qubit accepted constructor boundary.
+Gap: `accepted constructor boundary` permitted the exact owner to construct the maximum-width iterator without traversing its 3,145,728 yielded states. Complete state validation at the 1,000,000-qubit large runtime scale therefore did not cover defects confined to the final 48,576 accepted positions.
+Proposed amendment: require complete all-output traversal at 1,048,576 qubits, compare both complete yielded bit planes against independently advanced expected planes at every output, freeze the exact count and sparse sequence digest, and retain typed first rejection at 1,048,577 qubits.
+Resolution: the tenth-slice task now states the full accepted-maximum traversal requirement explicitly. `cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference` includes the accepted maximum in its frozen singleton corpus, validates every X/Y/Z yielded state across all 3,145,728 outputs, and retains the typed first-rejection assertion.
+
 ## 2026-07-16 - PQ1/PQ2: Wide-Ratio Common Calibration Batches
 
 Status: Resolved

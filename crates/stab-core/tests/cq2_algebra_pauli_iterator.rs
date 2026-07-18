@@ -14,10 +14,11 @@ const RANGE_SPECS: [IteratorSpec; 3] = [
     IteratorSpec::xz_range(11),
     IteratorSpec::xz_range(22),
 ];
-const SINGLETON_SPECS: [IteratorSpec; 3] = [
+const SINGLETON_SPECS: [IteratorSpec; 4] = [
     IteratorSpec::xyz_singleton(1_000),
     IteratorSpec::xyz_singleton(32_000),
     IteratorSpec::xyz_singleton(1_000_000),
+    IteratorSpec::xyz_singleton(1_048_576),
 ];
 const WORD_BOUNDARIES: [usize; 6] = [63, 64, 65, 255, 256, 257];
 const RANGE_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
@@ -40,7 +41,7 @@ const RANGE_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
         15_103_561_035_003_883_458,
     ],
 ];
-const SINGLETON_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
+const SINGLETON_SEQUENCE_DIGESTS: [[u64; 4]; 4] = [
     [
         10_062_400_317_628_243_932,
         8_094_961_272_711_778_612,
@@ -58,6 +59,12 @@ const SINGLETON_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
         12_377_616_979_003_074_289,
         3_252_611_672_401_433_999,
         16_537_992_152_957_202_582,
+    ],
+    [
+        1_637_993_770_188_739_569,
+        13_096_955_638_727_425_545,
+        16_374_653_791_609_582_907,
+        13_595_365_256_107_573_455,
     ],
 ];
 const WORD_BOUNDARY_SEQUENCE_DIGESTS: [[u64; 4]; 6] = [
@@ -126,7 +133,7 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
         assert_frozen_range_summary(&actual, spec, expected_digest)?;
     }
 
-    let expected_singleton_counts = [3_000, 96_000, 3_000_000];
+    let expected_singleton_counts = [3_000, 96_000, 3_000_000, 3_145_728];
     for ((spec, expected_count), expected_digest) in SINGLETON_SPECS
         .into_iter()
         .zip(expected_singleton_counts)
