@@ -361,7 +361,7 @@ pub struct CliffordString {
     x2z: BitVec,
     z2x: BitVec,
     inv_z2z: BitVec,
-    has_non_identity: bool,
+    non_identity_count: usize,
 }
 
 impl CliffordString {
@@ -380,7 +380,7 @@ impl CliffordString {
             x2z: BitVec::zeros(num_qubits),
             z2x: BitVec::zeros(num_qubits),
             inv_z2z: BitVec::zeros(num_qubits),
-            has_non_identity: false,
+            non_identity_count: 0,
         }
     }
 
@@ -421,7 +421,7 @@ impl CliffordString {
             x2z: plane(1 << 3),
             z2x: plane(1 << 4),
             inv_z2z: plane(1 << 5),
-            has_non_identity: table_indices.iter().any(|code| *code != 0),
+            non_identity_count: table_indices.iter().filter(|code| **code != 0).count(),
         }
     }
 
@@ -464,12 +464,19 @@ impl CliffordString {
         let old_gate = self
             .gate_at(index)
             .ok_or(StabilizerError::CliffordIndexOutOfRange { index, len })?;
+        let non_identity_count = match (
+            old_gate == SingleQubitClifford::I,
+            gate == SingleQubitClifford::I,
+        ) {
+            (true, false) => self.non_identity_count + 1,
+            (false, true) => self
+                .non_identity_count
+                .checked_sub(1)
+                .ok_or(StabilizerError::InconsistentCliffordStringMetadata)?,
+            _ => self.non_identity_count,
+        };
         self.write_gate_bits(index, gate)?;
-        if gate != SingleQubitClifford::I {
-            self.has_non_identity = true;
-        } else if old_gate != SingleQubitClifford::I {
-            self.has_non_identity = self.planes_have_terms();
-        }
+        self.non_identity_count = non_identity_count;
         Ok(())
     }
 
@@ -478,10 +485,36 @@ impl CliffordString {
     where
         R: Rng + ?Sized,
     {
-        let gates = (0..self.len())
-            .map(|_| SingleQubitClifford::random(rng))
-            .collect::<Vec<_>>();
-        *self = Self::from_gates_within_limit(gates);
+        let mut non_identity_count = 0_usize;
+        let mut remaining = self.len();
+        let words = self
+            .z_signs
+            .words_mut()
+            .iter_mut()
+            .zip(self.x_signs.words_mut())
+            .zip(self.inv_x2x.words_mut())
+            .zip(self.x2z.words_mut())
+            .zip(self.z2x.words_mut())
+            .zip(self.inv_z2z.words_mut());
+        for (((((z_signs, x_signs), inv_x2x), x2z), z2x), inv_z2z) in words {
+            let chunk_len = remaining.min(u64::BITS as usize);
+            let mut packed = [0_u64; 6];
+            for bit_index in 0..chunk_len {
+                let code = SingleQubitClifford::random(rng).table_index();
+                non_identity_count += usize::from(code != 0);
+                let mask = 1_u64 << bit_index;
+                packed[0] |= mask * u64::from(code & (1 << 0) != 0);
+                packed[1] |= mask * u64::from(code & (1 << 1) != 0);
+                packed[2] |= mask * u64::from(code & (1 << 2) != 0);
+                packed[3] |= mask * u64::from(code & (1 << 3) != 0);
+                packed[4] |= mask * u64::from(code & (1 << 4) != 0);
+                packed[5] |= mask * u64::from(code & (1 << 5) != 0);
+            }
+            [*z_signs, *x_signs, *inv_x2x, *x2z, *z2x, *inv_z2z] = packed;
+            remaining -= chunk_len;
+        }
+        debug_assert_eq!(remaining, 0);
+        self.non_identity_count = non_identity_count;
     }
 
     pub fn concat(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -536,11 +569,11 @@ impl CliffordString {
     #[inline]
     pub fn right_multiply_in_place(&mut self, rhs: &Self) -> StabilizerResult<()> {
         self.ensure_len(rhs.len())?;
-        if !rhs.has_non_identity {
+        if rhs.non_identity_count == 0 {
             return Ok(());
         }
         let word_count = rhs.z_signs.word_count();
-        let tail_has_non_identity = self.tail_has_non_identity(word_count)?;
+        let tail_non_identity_count = self.tail_non_identity_count(word_count)?;
         let left = CliffordPlanesMut {
             z_signs: prefix_mut(self.z_signs.words_mut(), word_count)?,
             x_signs: prefix_mut(self.x_signs.words_mut(), word_count)?,
@@ -557,7 +590,9 @@ impl CliffordString {
             z2x: rhs.z2x.words(),
             inv_z2z: rhs.inv_z2z.words(),
         };
-        self.has_non_identity = clifford_right_multiply_words(left, right) || tail_has_non_identity;
+        self.non_identity_count = clifford_right_multiply_words(left, right)
+            .checked_add(tail_non_identity_count)
+            .ok_or(StabilizerError::InconsistentCliffordStringMetadata)?;
         Ok(())
     }
 
@@ -595,36 +630,28 @@ impl CliffordString {
             .collect()
     }
 
-    fn planes_have_terms(&self) -> bool {
-        self.z_signs.not_zero()
-            || self.x_signs.not_zero()
-            || self.inv_x2x.not_zero()
-            || self.x2z.not_zero()
-            || self.z2x.not_zero()
-            || self.inv_z2z.not_zero()
-    }
-
-    fn tail_has_non_identity(&self, word_start: usize) -> StabilizerResult<bool> {
-        for plane in [
-            &self.z_signs,
-            &self.x_signs,
-            &self.inv_x2x,
-            &self.x2z,
-            &self.z2x,
-            &self.inv_z2z,
-        ] {
-            let tail = plane
-                .words()
-                .get(word_start..)
-                .ok_or(BitError::LengthMismatch {
-                    left: word_start * u64::BITS as usize,
-                    right: plane.len(),
+    fn tail_non_identity_count(&self, word_start: usize) -> StabilizerResult<usize> {
+        let planes = [
+            self.z_signs.words(),
+            self.x_signs.words(),
+            self.inv_x2x.words(),
+            self.x2z.words(),
+            self.z2x.words(),
+            self.inv_z2z.words(),
+        ];
+        let word_count = self.z_signs.word_count();
+        let mut count = 0_usize;
+        for word_index in word_start..word_count {
+            let mut combined = 0_u64;
+            for plane in planes {
+                combined |= *plane.get(word_index).ok_or(BitError::LengthMismatch {
+                    left: word_index * u64::BITS as usize,
+                    right: plane.len() * u64::BITS as usize,
                 })?;
-            if tail.iter().any(|word| *word != 0) {
-                return Ok(true);
             }
+            count += combined.count_ones() as usize;
         }
-        Ok(false)
+        Ok(count)
     }
 }
 
@@ -671,6 +698,8 @@ mod tests {
     )]
 
     use super::*;
+    use rand::SeedableRng as _;
+    use rand::rngs::SmallRng;
 
     #[test]
     fn right_multiply_in_place_matches_per_gate_products() {
@@ -750,7 +779,7 @@ mod tests {
                 Some(SingleQubitClifford::S),
                 "left_len={left_len}"
             );
-            assert!(left.has_non_identity, "left_len={left_len}");
+            assert_ne!(left.non_identity_count, 0, "left_len={left_len}");
         }
     }
 
@@ -758,10 +787,10 @@ mod tests {
     fn clearing_last_gate_restores_identity_metadata() {
         let mut right = CliffordString::identity_unchecked(257);
         right.set_gate_at(256, SingleQubitClifford::SqrtY).unwrap();
-        assert!(right.has_non_identity);
+        assert_eq!(right.non_identity_count, 1);
 
         right.set_gate_at(256, SingleQubitClifford::I).unwrap();
-        assert!(!right.has_non_identity);
+        assert_eq!(right.non_identity_count, 0);
 
         let mut left = CliffordString::from_gates((0..257).map(|index| {
             if index % 2 == 0 {
@@ -774,5 +803,35 @@ mod tests {
         let expected = left.clone();
         left.right_multiply_in_place(&right).unwrap();
         assert_eq!(left, expected);
+    }
+
+    #[test]
+    fn clearing_many_gates_updates_non_identity_metadata_in_constant_time() {
+        let width = 16_384;
+        let mut value =
+            CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::H, width)).unwrap();
+        assert_eq!(value.non_identity_count, width);
+
+        for index in 0..width {
+            value.set_gate_at(index, SingleQubitClifford::I).unwrap();
+            assert_eq!(value.non_identity_count, width - index - 1);
+        }
+        assert_eq!(value, CliffordString::identity_unchecked(width));
+    }
+
+    #[test]
+    fn randomize_reuses_packed_plane_storage_without_allocating() {
+        let width = 65_537;
+        let mut value = CliffordString::identity_unchecked(width);
+        let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
+
+        let allocations = allocation_counter::measure(|| value.randomize(&mut rng));
+
+        assert_eq!(allocations.count_total, 0);
+        assert_eq!(allocations.bytes_total, 0);
+        let observed_count = (0..width)
+            .filter(|&index| value.gate_at(index) != Some(SingleQubitClifford::I))
+            .count();
+        assert_eq!(value.non_identity_count, observed_count);
     }
 }

@@ -664,6 +664,7 @@ fn error_variant(error: &StabilizerError) -> &'static str {
         StabilizerError::InvalidSingleQubitCliffordGate { .. } => "InvalidSingleQubitCliffordGate",
         StabilizerError::CliffordIndexOutOfRange { .. } => "CliffordIndexOutOfRange",
         StabilizerError::InvalidSingleQubitCliffordProduct => "InvalidSingleQubitCliffordProduct",
+        StabilizerError::InconsistentCliffordStringMetadata => "InconsistentCliffordStringMetadata",
         StabilizerError::TableauIndexOutOfRange { .. } => "TableauIndexOutOfRange",
         StabilizerError::DuplicateTableauTarget { .. } => "DuplicateTableauTarget",
         StabilizerError::InvalidCommutingPauliIteratorQubitCount { .. } => {

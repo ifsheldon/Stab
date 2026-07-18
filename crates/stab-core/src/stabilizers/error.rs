@@ -47,6 +47,9 @@ pub enum StabilizerError {
     #[error("invalid single-qubit Clifford product")]
     InvalidSingleQubitCliffordProduct,
 
+    #[error("Clifford string non-identity metadata is inconsistent")]
+    InconsistentCliffordStringMetadata,
+
     #[error("Tableau index {index} is outside length {len}")]
     TableauIndexOutOfRange { index: usize, len: usize },
 
