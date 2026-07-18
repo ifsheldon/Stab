@@ -1,0 +1,250 @@
+{
+  "schema_version": 7,
+  "qualification_manifest_digest": "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
+  "run_request_sha256": "40e7d167e4b5e43dfcf9b44ae6ae2b8bbe84cc30c322ca5562877e6292352a7b",
+  "stab_commit": "3f2f382627c8421de0a668819d467a9f252de20f",
+  "local_modifications": false,
+  "stim_tag": "v1.16.0",
+  "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
+  "rust_toolchain": "1.98.0-nightly",
+  "target_triple": "aarch64-unknown-linux-gnu",
+  "operating_system": "linux",
+  "architecture": "aarch64",
+  "tier": "full",
+  "feature_filters": [],
+  "case_filters": [
+    "cq-evidence-blocker-083f1e2d245c4b57"
+  ],
+  "allow_deferred": false,
+  "selected_count": 1,
+  "planned_count": 0,
+  "deferred_count": 0,
+  "passed_count": 1,
+  "failed_count": 0,
+  "selection_complete": true,
+  "statistical_declared_budget": "0.00000000000000000e0",
+  "statistical_consumed_bound": "0.00000000000000000e0",
+  "statistical_planned_shots": 0,
+  "statistical_planned_seeds": {},
+  "statistical_shots": 0,
+  "statistical_seeds": {},
+  "statistical_attempts": [],
+  "property_corpus_ids": [],
+  "resource_case_count": 0,
+  "upstream_dispositions": [
+    {
+      "feature_id": "CQ-STIM-FORMAT",
+      "disposition": "ported-rust",
+      "count": 1
+    },
+    {
+      "feature_id": "CQ-STIM-FORMAT",
+      "disposition": "semantic-mining",
+      "count": 45
+    },
+    {
+      "feature_id": "CQ-STIM-FORMAT",
+      "disposition": "deferred-product",
+      "count": 11
+    },
+    {
+      "feature_id": "CQ-DEM-FORMAT",
+      "disposition": "ported-rust",
+      "count": 3
+    },
+    {
+      "feature_id": "CQ-DEM-FORMAT",
+      "disposition": "semantic-mining",
+      "count": 40
+    },
+    {
+      "feature_id": "CQ-DEM-FORMAT",
+      "disposition": "deferred-product",
+      "count": 28
+    },
+    {
+      "feature_id": "CQ-RESULT-FORMATS",
+      "disposition": "semantic-mining",
+      "count": 156
+    },
+    {
+      "feature_id": "CQ-GATE-CONTRACT",
+      "disposition": "ported-rust",
+      "count": 328
+    },
+    {
+      "feature_id": "CQ-GATE-CONTRACT",
+      "disposition": "semantic-mining",
+      "count": 12
+    },
+    {
+      "feature_id": "CQ-GATE-CONTRACT",
+      "disposition": "deferred-product",
+      "count": 200
+    },
+    {
+      "feature_id": "CQ-BIT-KERNELS",
+      "disposition": "semantic-mining",
+      "count": 82
+    },
+    {
+      "feature_id": "CQ-CIRCUIT-API",
+      "disposition": "ported-rust",
+      "count": 9
+    },
+    {
+      "feature_id": "CQ-CIRCUIT-API",
+      "disposition": "semantic-mining",
+      "count": 40
+    },
+    {
+      "feature_id": "CQ-CIRCUIT-API",
+      "disposition": "deferred-product",
+      "count": 60
+    },
+    {
+      "feature_id": "CQ-GENERATION",
+      "disposition": "semantic-mining",
+      "count": 14
+    },
+    {
+      "feature_id": "CQ-GENERATION",
+      "disposition": "deferred-product",
+      "count": 1
+    },
+    {
+      "feature_id": "CQ-ALGEBRA",
+      "disposition": "ported-rust",
+      "count": 12
+    },
+    {
+      "feature_id": "CQ-ALGEBRA",
+      "disposition": "semantic-mining",
+      "count": 197
+    },
+    {
+      "feature_id": "CQ-ALGEBRA",
+      "disposition": "deferred-product",
+      "count": 138
+    },
+    {
+      "feature_id": "CQ-SAMPLING",
+      "disposition": "ported-rust",
+      "count": 228
+    },
+    {
+      "feature_id": "CQ-SAMPLING",
+      "disposition": "semantic-mining",
+      "count": 104
+    },
+    {
+      "feature_id": "CQ-SAMPLING",
+      "disposition": "deferred-product",
+      "count": 172
+    },
+    {
+      "feature_id": "CQ-DETECTION",
+      "disposition": "semantic-mining",
+      "count": 115
+    },
+    {
+      "feature_id": "CQ-DETECTION",
+      "disposition": "deferred-product",
+      "count": 1
+    },
+    {
+      "feature_id": "CQ-DEM-SAMPLING",
+      "disposition": "ported-rust",
+      "count": 1
+    },
+    {
+      "feature_id": "CQ-DEM-SAMPLING",
+      "disposition": "semantic-mining",
+      "count": 14
+    },
+    {
+      "feature_id": "CQ-ANALYZER",
+      "disposition": "ported-rust",
+      "count": 49
+    },
+    {
+      "feature_id": "CQ-ANALYZER",
+      "disposition": "semantic-mining",
+      "count": 69
+    },
+    {
+      "feature_id": "CQ-ANALYZER",
+      "disposition": "deferred-product",
+      "count": 3
+    },
+    {
+      "feature_id": "CQ-SEARCH",
+      "disposition": "ported-rust",
+      "count": 36
+    },
+    {
+      "feature_id": "CQ-SEARCH",
+      "disposition": "semantic-mining",
+      "count": 68
+    },
+    {
+      "feature_id": "CQ-FLOW-UTILS",
+      "disposition": "ported-rust",
+      "count": 70
+    },
+    {
+      "feature_id": "CQ-FLOW-UTILS",
+      "disposition": "semantic-mining",
+      "count": 211
+    },
+    {
+      "feature_id": "CQ-CLI",
+      "disposition": "semantic-mining",
+      "count": 54
+    },
+    {
+      "feature_id": "CQ-CLI",
+      "disposition": "deferred-product",
+      "count": 7
+    }
+  ],
+  "deferred_products": {},
+  "case_counts": [
+    {
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "semantic-invariant",
+      "passed": 1,
+      "failed": 0,
+      "planned": 0,
+      "deferred": 0
+    }
+  ],
+  "resource_contracts": [],
+  "results": [
+    {
+      "case_id": "cq-evidence-blocker-083f1e2d245c4b57",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "semantic-invariant",
+      "selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "selector_sha256": "39e18dfd204a4684a374cfe19fa8681e4169795df8519562579c89dfe7468d42",
+      "execution_receipt_sha256": "aa5ee20b773dabbd0dcc3f8c770efaad608ad6abb1fd9548e172f51d377605bb",
+      "outcome": "passed",
+      "exact_test_count": 1,
+      "stdout_sha256": "c4e967056e08d93323fe53055150cdaf21808cc2ab620b2cc9b61598dffe14b9",
+      "stderr_sha256": "84aaabb1218fa2416f486e2c22a6f36e826d1584a6366f54c29fd65de3bb244a",
+      "artifacts": []
+    }
+  ]
+}
