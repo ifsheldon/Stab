@@ -14,8 +14,9 @@ use super::run::{
     ClaimClass, PairExecution, QualificationReport, QualificationTier, REPORT_SCHEMA_VERSION,
     TimingAttempt, sha256_hex,
 };
-use super::statistics::{GateOutcome, PairOrder, PairedSample, pair_measurements};
+use super::statistics::{GateOutcome, PairOrder, PairedSample, pair_measurements_with_policy};
 use crate::config::{STIM_COMMIT, STIM_TAG};
+use crate::qualification::model::TimingBatchPolicy;
 
 mod markdown;
 mod published;
@@ -136,6 +137,7 @@ pub(super) fn validate_report(
         || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
         || report.owner != resolved_group.contract.owner.to_string()
         || report.profiler_note != resolved_group.contract.profiler_note
+        || report.calibration.batch_policy != resolved_group.contract.timing_batch_policy
     {
         return Err(ReportError::GroupEvidence);
     }
@@ -241,8 +243,12 @@ pub(super) fn validate_report(
     report.host.validate_against_policy(root)?;
     validate_all_worker_receipts(report, &resolved_group.contract)?;
     validate_correctness_evidence(root, report, &resolved_group.contract)?;
-    validate_pair_execution(&report.semantic_preflight, EvidenceMode::Timing)?;
-    validate_calibration(report)?;
+    validate_pair_execution(
+        &report.semantic_preflight,
+        EvidenceMode::Timing,
+        TimingBatchPolicy::CommonIterations,
+    )?;
+    validate_calibration(&report.calibration)?;
     timing::validate(report)?;
     validate_failure_evidence(report)?;
     validate_memory(report)?;
@@ -385,7 +391,12 @@ fn validate_all_worker_receipts(
         measurement_id,
         output_digest: Some(expected_output_digest),
     };
-    validate_pair_receipts(&identity, &report.semantic_preflight, &common_timing)?;
+    validate_pair_receipts(
+        &identity,
+        &report.semantic_preflight,
+        &common_timing,
+        &common_timing,
+    )?;
     for probe in &report.calibration.stim.probes {
         let phase = PhaseExpectation {
             evidence_mode: EvidenceMode::Timing,
@@ -410,21 +421,66 @@ fn validate_all_worker_receipts(
         &identity,
         &report.calibration.common_validation,
         &common_timing,
+        &common_timing,
+    )?;
+    let stim_timing = timing_phase(
+        report.calibration.batch_policy,
+        &common_timing,
+        &report.calibration.stim,
+    )?;
+    let stab_timing = timing_phase(
+        report.calibration.batch_policy,
+        &common_timing,
+        &report.calibration.stab,
     )?;
     for attempt in &report.timing_attempts {
         for pair in &attempt.warmups {
-            validate_pair_receipts(&identity, pair, &common_timing)?;
+            validate_pair_receipts(&identity, pair, &stim_timing, &stab_timing)?;
         }
         for pair in &attempt.samples {
-            validate_pair_receipts(&identity, pair, &common_timing)?;
+            validate_pair_receipts(&identity, pair, &stim_timing, &stab_timing)?;
         }
     }
     let common_memory = PhaseExpectation {
         evidence_mode: EvidenceMode::Memory,
         ..common_timing
     };
-    validate_pair_receipts(&identity, &report.memory.execution, &common_memory)?;
+    validate_pair_receipts(
+        &identity,
+        &report.memory.execution,
+        &common_memory,
+        &common_memory,
+    )?;
     Ok(())
+}
+
+fn timing_phase<'a>(
+    policy: TimingBatchPolicy,
+    common: &PhaseExpectation<'a>,
+    calibration: &'a super::run::ImplementationCalibration,
+) -> Result<PhaseExpectation<'a>, ReportError> {
+    let selected = calibration.probes.last().ok_or(ReportError::Calibration)?;
+    let row = only_row(&selected.invocation.rows)?;
+    if selected.iterations != calibration.selected_iterations
+        || common.output_digest.is_some_and(|common_digest| {
+            !super::run::selected_output_matches_common(
+                common.iterations,
+                calibration.selected_iterations,
+                common_digest,
+                &row.output_digest,
+            )
+        })
+    {
+        return Err(ReportError::Calibration);
+    }
+    if policy == TimingBatchPolicy::CommonIterations {
+        return Ok(*common);
+    }
+    Ok(PhaseExpectation {
+        iterations: calibration.selected_iterations,
+        output_digest: Some(&row.output_digest),
+        ..*common
+    })
 }
 
 struct ReceiptIdentity<'a> {
@@ -480,10 +536,11 @@ struct PhaseExpectation<'a> {
 fn validate_pair_receipts(
     identity: &ReceiptIdentity<'_>,
     pair: &PairExecution,
-    phase: &PhaseExpectation<'_>,
+    stim_phase: &PhaseExpectation<'_>,
+    stab_phase: &PhaseExpectation<'_>,
 ) -> Result<(), ReportError> {
-    validate_invocation_receipt(identity, &pair.stim, Implementation::Stim, phase)?;
-    validate_invocation_receipt(identity, &pair.stab, Implementation::Stab, phase)
+    validate_invocation_receipt(identity, &pair.stim, Implementation::Stim, stim_phase)?;
+    validate_invocation_receipt(identity, &pair.stab, Implementation::Stab, stab_phase)
 }
 
 fn validate_invocation_receipt(
@@ -528,8 +585,7 @@ fn validate_invocation_receipt(
     Ok(())
 }
 
-fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError> {
-    let calibration = &report.calibration;
+fn validate_calibration(calibration: &super::run::CalibrationEvidence) -> Result<(), ReportError> {
     if calibration.acceptance_minimum_seconds != 0.25
         || calibration.target_minimum_seconds != 0.35
         || calibration.target_minimum_seconds <= calibration.acceptance_minimum_seconds
@@ -551,15 +607,24 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         }
         replay_calibration(implementation)?;
     }
-    if calibration.common_iterations
-        != calibration
+    let expected_common_iterations = match calibration.batch_policy {
+        TimingBatchPolicy::CommonIterations => calibration
             .stim
             .selected_iterations
-            .max(calibration.stab.selected_iterations)
-    {
+            .max(calibration.stab.selected_iterations),
+        TimingBatchPolicy::IndependentThroughput => calibration
+            .stim
+            .selected_iterations
+            .min(calibration.stab.selected_iterations),
+    };
+    if calibration.common_iterations != expected_common_iterations {
         return Err(ReportError::Calibration);
     }
-    validate_pair_execution(&calibration.common_validation, EvidenceMode::Timing)?;
+    validate_pair_execution(
+        &calibration.common_validation,
+        EvidenceMode::Timing,
+        TimingBatchPolicy::CommonIterations,
+    )?;
     validate_common_batch_mode(calibration)?;
     Ok(())
 }
@@ -568,6 +633,7 @@ fn validate_common_batch_mode(
     calibration: &super::run::CalibrationEvidence,
 ) -> Result<(), ReportError> {
     let common_batch_mode = super::run::classify_common_calibration(
+        calibration.batch_policy,
         calibration.stim.selected_iterations,
         calibration.stab.selected_iterations,
         calibration.common_validation.stim.measured_duration()?,
@@ -730,16 +796,18 @@ pub(super) fn promotion_eligibility(evidence: PromotionEvidence) -> bool {
 fn validate_pair_execution(
     execution: &PairExecution,
     mode: EvidenceMode,
+    batch_policy: TimingBatchPolicy,
 ) -> Result<Vec<PairedSample>, ReportError> {
     validate_pair_shape(execution, mode)?;
     if mode != EvidenceMode::Timing {
         return Err(ReportError::MemoryUsedAsTiming);
     }
-    Ok(pair_measurements(
+    Ok(pair_measurements_with_policy(
         execution.pair_index,
         execution.order,
         &execution.stim.rows,
         &execution.stab.rows,
+        batch_policy,
     )?)
 }
 

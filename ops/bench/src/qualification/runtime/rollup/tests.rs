@@ -20,6 +20,7 @@ fn contract() -> GroupContract {
         id: ProtocolId::try_new("product-group").expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
         baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new("workload").expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
         scales: [("small", 1), ("medium", 2), ("large", 3)]

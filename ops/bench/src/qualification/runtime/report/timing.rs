@@ -11,9 +11,21 @@ use super::{
 const EXPECTED_THRESHOLD: f64 = 1.25;
 
 pub(super) fn validate(report: &QualificationReport) -> Result<(), ReportError> {
-    validate_attempt_policy(&report.timing_attempts)?;
-    for attempt in &report.timing_attempts {
-        validate_attempt(report, attempt)?;
+    validate_evidence(
+        report.tier,
+        report.calibration.batch_policy,
+        &report.timing_attempts,
+    )
+}
+
+pub(super) fn validate_evidence(
+    tier: super::super::run::QualificationTier,
+    batch_policy: crate::qualification::model::TimingBatchPolicy,
+    attempts: &[TimingAttempt],
+) -> Result<(), ReportError> {
+    validate_attempt_policy(attempts)?;
+    for attempt in attempts {
+        validate_attempt(tier, batch_policy, attempt)?;
     }
     Ok(())
 }
@@ -38,7 +50,8 @@ pub(super) fn validate_attempt_policy(attempts: &[TimingAttempt]) -> Result<(), 
 }
 
 fn validate_attempt(
-    report: &QualificationReport,
+    tier: super::super::run::QualificationTier,
+    batch_policy: crate::qualification::model::TimingBatchPolicy,
     attempt: &TimingAttempt,
 ) -> Result<(), ReportError> {
     if attempt.warmups.len() != EXPECTED_WARMUPS {
@@ -48,9 +61,9 @@ fn validate_attempt(
         if warmup.pair_index != index {
             return Err(ReportError::PairIndex);
         }
-        validate_pair_execution(warmup, EvidenceMode::Timing)?;
+        validate_pair_execution(warmup, EvidenceMode::Timing, batch_policy)?;
     }
-    if attempt.samples.len() != expected_pair_count(report.tier) {
+    if attempt.samples.len() != expected_pair_count(tier) {
         return Err(ReportError::SampleCount(attempt.samples.len()));
     }
     let mut reconstructed = Vec::new();
@@ -58,7 +71,11 @@ fn validate_attempt(
         if sample.pair_index != index {
             return Err(ReportError::PairIndex);
         }
-        reconstructed.extend(validate_pair_execution(sample, EvidenceMode::Timing)?);
+        reconstructed.extend(validate_pair_execution(
+            sample,
+            EvidenceMode::Timing,
+            batch_policy,
+        )?);
     }
     if !paired_samples_equivalent(&reconstructed, &attempt.paired_samples) {
         return Err(ReportError::PairedSamples);
@@ -104,7 +121,8 @@ fn paired_samples_equivalent(expected: &[PairedSample], actual: &[PairedSample])
             expected.pair_index == actual.pair_index
                 && expected.order == actual.order
                 && expected.measurement_id == actual.measurement_id
-                && expected.work_count == actual.work_count
+                && expected.stim_work_count == actual.stim_work_count
+                && expected.stab_work_count == actual.stab_work_count
                 && approximately_equal(expected.stim_elapsed_seconds, actual.stim_elapsed_seconds)
                 && approximately_equal(expected.stab_elapsed_seconds, actual.stab_elapsed_seconds)
                 && approximately_equal(expected.stim_work_per_second, actual.stim_work_per_second)

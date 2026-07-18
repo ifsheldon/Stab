@@ -547,7 +547,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         println!(
             "[stab-bench] probe={} mode=timing work={} stim_seconds={:.9} stab_seconds={:.9} diagnostic_ratio={:.6} stim_parent_peak_rss={} stab_parent_peak_rss={}",
             probe_id,
-            pair.work_count,
+            pair.stim_work_count,
             pair.stim_elapsed_seconds,
             pair.stab_elapsed_seconds,
             pair.ratio,

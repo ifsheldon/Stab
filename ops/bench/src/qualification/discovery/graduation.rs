@@ -3,7 +3,7 @@ use std::path::Path;
 use super::super::model::{
     ComparatorSource, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
     MemoryMethod, MemoryPolicy, OutputContract, Phase, QualificationGroup, QualificationStatus,
-    RunnerFidelity, ScalePoint, ThresholdPolicy, WorkloadFamily,
+    RunnerFidelity, ScalePoint, ThresholdPolicy, TimingBatchPolicy, WorkloadFamily,
 };
 use crate::error::BenchError;
 use crate::root::RepoRoot;
@@ -142,6 +142,11 @@ fn apply_clifford_string(
         "Two equal-width Clifford strings and the untimed scalar expectation remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for the direct public callback at small, medium, large, and accepted-maximum widths for both workload contracts; Stim allocation counts remain unclaimed and PQ6 owns cross-scale RSS acceptance.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.timing_policy.batch_policy = if non_identity {
+        TimingBatchPolicy::CommonIterations
+    } else {
+        TimingBatchPolicy::IndependentThroughput
+    };
     group.owner = "stab-core/stabilizers".to_string();
     group.reason = if non_identity {
         "Implemented paired pinned-Stim and Rust public in-place Clifford-string multiplication over the complete deterministic 24-by-23 non-identity composition cycle with exact CQ2, immutable-right, output, zero-allocation, hostile-input, scale, timing, and receipt contracts."

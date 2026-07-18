@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(super) const SCHEMA_VERSION: u32 = 1;
+pub(super) const SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -217,6 +217,7 @@ pub(super) enum EvidenceState {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct TimingPolicy {
+    pub(super) batch_policy: TimingBatchPolicy,
     pub(super) calibration_min_ms: u32,
     pub(super) calibration_max_ms: u32,
     pub(super) common_wide_ratio_max_ms: u32,
@@ -224,6 +225,22 @@ pub(super) struct TimingPolicy {
     pub(super) full_pairs: u8,
     pub(super) timeout_seconds: u32,
     pub(super) gate_statistic: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum TimingBatchPolicy {
+    CommonIterations,
+    IndependentThroughput,
+}
+
+impl TimingBatchPolicy {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::CommonIterations => "common-iterations",
+            Self::IndependentThroughput => "independent-throughput",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -4,7 +4,7 @@ use super::Issues;
 use crate::qualification::discovery::SourceReferences;
 use crate::qualification::model::{
     CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, QualificationGroup,
-    QualificationStatus, RunnerFidelity, ScalePoint, ThresholdPolicy,
+    QualificationStatus, RunnerFidelity, ScalePoint, ThresholdPolicy, TimingBatchPolicy,
 };
 
 pub(super) fn validate_planned_workload(
@@ -144,6 +144,7 @@ pub(super) fn validate_planned_workload(
         }
     }
     if group.output_contract.digest_state != EvidenceState::Planned
+        || group.timing_policy.batch_policy != TimingBatchPolicy::CommonIterations
         || group.timing_policy.calibration_min_ms != 250
         || group.timing_policy.calibration_max_ms != 2_000
         || group.timing_policy.common_wide_ratio_max_ms != 20_000
@@ -151,7 +152,7 @@ pub(super) fn validate_planned_workload(
         || group.timing_policy.full_pairs != 9
         || group.timing_policy.timeout_seconds != 600
         || group.timing_policy.gate_statistic
-            != "median paired ratio and fixed-seed bootstrap 95% upper bound"
+            != "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
         || group.memory_policy.scale_ids != expected_scale_ids
         || group.threshold_policy != ThresholdPolicy::ReportOnly
     {
@@ -163,6 +164,11 @@ pub(super) fn validate_planned_workload(
 }
 
 fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) {
+    let expected_batch_policy = if group.id == "PERFQ-M6-CLIFFORD-STRING" {
+        TimingBatchPolicy::IndependentThroughput
+    } else {
+        TimingBatchPolicy::CommonIterations
+    };
     let expected_scale_ids = ["small", "medium", "large"];
     let actual_scale_ids = group
         .workload_family
@@ -186,6 +192,7 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
         || group.planned_correctness_case_id.is_some()
         || group.output_contract.digest_state != EvidenceState::Existing
         || group.output_contract.comparator_sources.is_empty()
+        || group.timing_policy.batch_policy != expected_batch_policy
         || group.timing_policy.calibration_min_ms != 250
         || group.timing_policy.calibration_max_ms != 2_000
         || group.timing_policy.common_wide_ratio_max_ms != 20_000
@@ -193,7 +200,7 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
         || group.timing_policy.full_pairs != 9
         || group.timing_policy.timeout_seconds != 600
         || group.timing_policy.gate_statistic
-            != "median paired ratio and fixed-seed bootstrap 95% upper bound"
+            != "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
         || group.memory_policy.scale_ids != expected_scale_ids
         || group.threshold_policy != ThresholdPolicy::Primary1_25
     {

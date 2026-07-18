@@ -16,12 +16,14 @@ use super::invocation::{
 };
 use super::protocol::{EvidenceMode, Implementation, SemanticDigest, WorkerMeasurement};
 use super::statistics::{
-    GateOutcome, PairOrder, PairedSample, StatisticsSummary, pair_measurements, summarize,
+    GateOutcome, PairOrder, PairedSample, StatisticsSummary, pair_measurements_with_policy,
+    summarize,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
+use crate::qualification::model::TimingBatchPolicy;
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 29;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 30;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -190,6 +192,7 @@ pub(super) struct CalibrationEvidence {
     pub(super) target_minimum_seconds: f64,
     pub(super) maximum_seconds: f64,
     pub(super) wide_ratio_maximum_seconds: f64,
+    pub(super) batch_policy: TimingBatchPolicy,
     pub(super) common_batch_mode: CommonBatchMode,
     pub(super) stim: ImplementationCalibration,
     pub(super) stab: ImplementationCalibration,
@@ -202,6 +205,7 @@ pub(super) struct CalibrationEvidence {
 pub(super) enum CommonBatchMode {
     Standard,
     WideRatio,
+    IndependentThroughput,
 }
 
 impl CommonBatchMode {
@@ -209,6 +213,7 @@ impl CommonBatchMode {
         match self {
             Self::Standard => "standard",
             Self::WideRatio => "wide-ratio",
+            Self::IndependentThroughput => "independent-throughput",
         }
     }
 }
@@ -298,20 +303,25 @@ pub(super) fn run(
         scale,
         policy,
     )?;
-    let common_iterations = stim_decision.iterations.max(stab_decision.iterations);
-    let batch = WorkloadBatch {
-        iterations: common_iterations,
-        scale,
+    let batch_policy = resolved_group.contract.timing_batch_policy;
+    let common_iterations = match batch_policy {
+        TimingBatchPolicy::CommonIterations => {
+            stim_decision.iterations.max(stab_decision.iterations)
+        }
+        TimingBatchPolicy::IndependentThroughput => {
+            stim_decision.iterations.min(stab_decision.iterations)
+        }
     };
+    let common_batch = WorkloadBatch::common(common_iterations, scale);
     let semantic_preflight = execute_pair(
         &workers,
         &resolved_group.contract,
         0,
-        batch,
+        common_batch,
         EvidenceMode::Timing,
         None,
     )?;
-    pair_execution(&semantic_preflight)?;
+    pair_execution(&semantic_preflight, TimingBatchPolicy::CommonIterations)?;
     let expected_output_digest = only_row(&semantic_preflight.stim.rows)?
         .output_digest
         .clone();
@@ -319,21 +329,73 @@ pub(super) fn run(
         &workers,
         &resolved_group.contract,
         0,
-        batch,
+        common_batch,
         EvidenceMode::Timing,
-        Some(&expected_output_digest),
+        Some(ExpectedOutputDigests::same(&expected_output_digest)),
     )?;
-    pair_execution(&common_validation)?;
+    pair_execution(&common_validation, TimingBatchPolicy::CommonIterations)?;
     let common_batch_mode = validate_common_calibration(
+        batch_policy,
         &common_validation,
         stim_decision.iterations.get(),
         stab_decision.iterations.get(),
     )?;
+    let stim_selected_iterations = stim_decision.iterations;
+    let stab_selected_iterations = stab_decision.iterations;
+    let timing_batch = match batch_policy {
+        TimingBatchPolicy::CommonIterations => common_batch,
+        TimingBatchPolicy::IndependentThroughput => WorkloadBatch {
+            stim_iterations: stim_selected_iterations,
+            stab_iterations: stab_selected_iterations,
+            scale,
+        },
+    };
+    let stim_selected_digest =
+        selected_calibration_output_digest(&stim_probes, stim_selected_iterations)?;
+    let stab_selected_digest =
+        selected_calibration_output_digest(&stab_probes, stab_selected_iterations)?;
+    for (implementation, selected_iterations, selected_digest) in [
+        (
+            Implementation::Stim,
+            stim_selected_iterations.get(),
+            &stim_selected_digest,
+        ),
+        (
+            Implementation::Stab,
+            stab_selected_iterations.get(),
+            &stab_selected_digest,
+        ),
+    ] {
+        if !selected_output_matches_common(
+            common_iterations.get(),
+            selected_iterations,
+            &expected_output_digest,
+            selected_digest,
+        ) {
+            return Err(RunError::SelectedCalibrationSemanticMismatch(
+                implementation,
+            ));
+        }
+    }
+    let timing_output_digests = match batch_policy {
+        TimingBatchPolicy::CommonIterations => ExpectedOutputDigests::same(&expected_output_digest),
+        TimingBatchPolicy::IndependentThroughput => ExpectedOutputDigests {
+            stim: &stim_selected_digest,
+            stab: &stab_selected_digest,
+        },
+    };
+    let timing_plan = TimingAttemptPlan {
+        tier: args.tier,
+        batch: timing_batch,
+        expected_output_digests: timing_output_digests,
+        batch_policy,
+    };
     let calibration = CalibrationEvidence {
         acceptance_minimum_seconds: CALIBRATION_ACCEPTANCE_MINIMUM.as_secs_f64(),
         target_minimum_seconds: CALIBRATION_TARGET_MINIMUM.as_secs_f64(),
         maximum_seconds: CALIBRATION_MAXIMUM.as_secs_f64(),
         wide_ratio_maximum_seconds: CALIBRATION_WIDE_RATIO_MAXIMUM.as_secs_f64(),
+        batch_policy,
         common_batch_mode,
         stim: calibration_evidence(Implementation::Stim, stim_decision, stim_probes),
         stab: calibration_evidence(Implementation::Stab, stab_decision, stab_probes),
@@ -346,9 +408,7 @@ pub(super) fn run(
         &resolved_group.contract,
         0,
         TimingAttemptKind::Initial,
-        args.tier,
-        batch,
-        &expected_output_digest,
+        timing_plan,
     )?];
     if timing_attempts
         .first()
@@ -359,9 +419,7 @@ pub(super) fn run(
             &resolved_group.contract,
             1,
             TimingAttemptKind::PairedRatioNoiseRerun,
-            args.tier,
-            batch,
-            &expected_output_digest,
+            timing_plan,
         )?);
     }
 
@@ -369,11 +427,11 @@ pub(super) fn run(
         &workers,
         &resolved_group.contract,
         0,
-        batch,
+        common_batch,
         EvidenceMode::Memory,
-        Some(&expected_output_digest),
+        Some(ExpectedOutputDigests::same(&expected_output_digest)),
     )?;
-    let memory = memory_evidence(memory_execution, batch.iterations)?;
+    let memory = memory_evidence(memory_execution, common_iterations)?;
     workers.verify()?;
     let host = host_guard.finish()?;
     let repository_after = super::git::repository_state(root)?;
@@ -564,8 +622,76 @@ fn calibration_evidence(
 
 #[derive(Clone, Copy)]
 struct WorkloadBatch<'a> {
-    iterations: NonZeroU64,
+    stim_iterations: NonZeroU64,
+    stab_iterations: NonZeroU64,
     scale: &'a super::group::ScaleContract,
+}
+
+impl<'a> WorkloadBatch<'a> {
+    const fn common(iterations: NonZeroU64, scale: &'a super::group::ScaleContract) -> Self {
+        Self {
+            stim_iterations: iterations,
+            stab_iterations: iterations,
+            scale,
+        }
+    }
+
+    const fn iterations(self, implementation: Implementation) -> NonZeroU64 {
+        match implementation {
+            Implementation::Stim => self.stim_iterations,
+            Implementation::Stab => self.stab_iterations,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ExpectedOutputDigests<'a> {
+    stim: &'a SemanticDigest,
+    stab: &'a SemanticDigest,
+}
+
+impl<'a> ExpectedOutputDigests<'a> {
+    const fn same(digest: &'a SemanticDigest) -> Self {
+        Self {
+            stim: digest,
+            stab: digest,
+        }
+    }
+
+    const fn for_implementation(self, implementation: Implementation) -> &'a SemanticDigest {
+        match implementation {
+            Implementation::Stim => self.stim,
+            Implementation::Stab => self.stab,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct TimingAttemptPlan<'a> {
+    tier: QualificationTier,
+    batch: WorkloadBatch<'a>,
+    expected_output_digests: ExpectedOutputDigests<'a>,
+    batch_policy: TimingBatchPolicy,
+}
+
+fn selected_calibration_output_digest(
+    probes: &[CalibrationProbeEvidence],
+    selected_iterations: NonZeroU64,
+) -> Result<SemanticDigest, RunError> {
+    let probe = probes.last().ok_or(RunError::MissingCalibrationProbe)?;
+    if probe.iterations != selected_iterations.get() {
+        return Err(RunError::MissingCalibrationProbe);
+    }
+    Ok(only_row(&probe.invocation.rows)?.output_digest.clone())
+}
+
+pub(super) fn selected_output_matches_common(
+    common_iterations: u64,
+    selected_iterations: u64,
+    common_digest: &SemanticDigest,
+    selected_digest: &SemanticDigest,
+) -> bool {
+    selected_iterations != common_iterations || selected_digest == common_digest
 }
 
 fn execute_timing_attempt(
@@ -573,9 +699,7 @@ fn execute_timing_attempt(
     group: &super::group::GroupContract,
     attempt_index: usize,
     kind: TimingAttemptKind,
-    tier: QualificationTier,
-    batch: WorkloadBatch<'_>,
-    expected_output_digest: &SemanticDigest,
+    plan: TimingAttemptPlan<'_>,
 ) -> Result<TimingAttempt, RunError> {
     let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
     for pair_index in 0..WARMUP_BATCHES {
@@ -583,26 +707,26 @@ fn execute_timing_attempt(
             workers,
             group,
             pair_index,
-            batch,
+            plan.batch,
             EvidenceMode::Timing,
-            Some(expected_output_digest),
+            Some(plan.expected_output_digests),
         )?;
-        pair_execution(&execution)?;
+        pair_execution(&execution, plan.batch_policy)?;
         warmups.push(execution);
     }
 
-    let mut samples = Vec::with_capacity(tier.pair_count());
-    let mut paired_samples = Vec::with_capacity(tier.pair_count());
-    for pair_index in 0..tier.pair_count() {
+    let mut samples = Vec::with_capacity(plan.tier.pair_count());
+    let mut paired_samples = Vec::with_capacity(plan.tier.pair_count());
+    for pair_index in 0..plan.tier.pair_count() {
         let execution = execute_pair(
             workers,
             group,
             pair_index,
-            batch,
+            plan.batch,
             EvidenceMode::Timing,
-            Some(expected_output_digest),
+            Some(plan.expected_output_digests),
         )?;
-        paired_samples.extend(pair_execution(&execution)?);
+        paired_samples.extend(pair_execution(&execution, plan.batch_policy)?);
         samples.push(execution);
     }
     let measurement_id = group.single_measurement()?.clone();
@@ -633,7 +757,7 @@ fn execute_pair(
     pair_index: usize,
     batch: WorkloadBatch<'_>,
     evidence_mode: EvidenceMode,
-    expected_output_digest: Option<&SemanticDigest>,
+    expected_output_digests: Option<ExpectedOutputDigests<'_>>,
 ) -> Result<PairExecution, RunError> {
     let order = PairOrder::for_pair(pair_index);
     let invoke = |implementation| {
@@ -641,9 +765,10 @@ fn execute_pair(
             group,
             implementation,
             evidence_mode,
-            iterations: batch.iterations,
+            iterations: batch.iterations(implementation),
             scale: batch.scale,
-            expected_output_digest,
+            expected_output_digest: expected_output_digests
+                .map(|digests| digests.for_implementation(implementation)),
             timeout: INVOCATION_TIMEOUT,
         })
     };
@@ -667,21 +792,27 @@ fn execute_pair(
     })
 }
 
-fn pair_execution(execution: &PairExecution) -> Result<Vec<PairedSample>, RunError> {
-    Ok(pair_measurements(
+fn pair_execution(
+    execution: &PairExecution,
+    batch_policy: TimingBatchPolicy,
+) -> Result<Vec<PairedSample>, RunError> {
+    Ok(pair_measurements_with_policy(
         execution.pair_index,
         execution.order,
         &execution.stim.rows,
         &execution.stab.rows,
+        batch_policy,
     )?)
 }
 
 fn validate_common_calibration(
+    batch_policy: TimingBatchPolicy,
     execution: &PairExecution,
     stim_selected_iterations: u64,
     stab_selected_iterations: u64,
 ) -> Result<CommonBatchMode, RunError> {
     classify_common_calibration(
+        batch_policy,
         stim_selected_iterations,
         stab_selected_iterations,
         execution.stim.measured_duration()?,
@@ -690,11 +821,26 @@ fn validate_common_calibration(
 }
 
 pub(super) fn classify_common_calibration(
+    batch_policy: TimingBatchPolicy,
     stim_selected_iterations: u64,
     stab_selected_iterations: u64,
     stim_measured: Duration,
     stab_measured: Duration,
 ) -> Result<CommonBatchMode, RunError> {
+    if batch_policy == TimingBatchPolicy::IndependentThroughput {
+        for (implementation, measured) in [
+            (Implementation::Stim, stim_measured),
+            (Implementation::Stab, stab_measured),
+        ] {
+            if measured.is_zero() || measured > CALIBRATION_MAXIMUM {
+                return Err(RunError::CommonCalibrationOutOfBounds {
+                    implementation,
+                    measured,
+                });
+            }
+        }
+        return Ok(CommonBatchMode::IndependentThroughput);
+    }
     for (implementation, measured) in [
         (Implementation::Stim, stim_measured),
         (Implementation::Stab, stab_measured),
@@ -841,6 +987,12 @@ pub(super) enum RunError {
     },
     #[error("qualification produced no measurement statistics")]
     MissingStatistics,
+    #[error("qualification calibration evidence has no selected output receipt")]
+    MissingCalibrationProbe,
+    #[error(
+        "{0:?} selected calibration output differs from the exact common semantic output at the same iteration count"
+    )]
+    SelectedCalibrationSemanticMismatch(Implementation),
     #[error("memory evidence differs in mode, semantic work, digest, or iteration count")]
     MemorySemanticMismatch,
     #[error("memory evidence omits setup or peak RSS")]
@@ -856,130 +1008,5 @@ pub(super) enum RunError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use clap::Parser;
-
-    #[derive(Debug, Parser)]
-    struct RunCli {
-        #[command(flatten)]
-        args: RunArgs,
-    }
-
-    #[test]
-    fn tiers_have_source_owned_pair_counts() {
-        assert_eq!(QualificationTier::Pr.pair_count(), 3);
-        assert_eq!(QualificationTier::Full.pair_count(), 9);
-        assert_eq!(QualificationTier::Soak.pair_count(), 15);
-    }
-
-    #[test]
-    fn diagnostic_claim_cannot_be_promotable() {
-        assert_ne!(
-            ClaimClass::DiagnosticInfrastructure,
-            ClaimClass::PromotablePerformance
-        );
-    }
-
-    #[test]
-    fn calibration_guard_band_and_wide_ratio_mode_preserve_source_bounds() {
-        let policy = calibration_policy().expect("calibration policy");
-        assert_eq!(policy.minimum, Duration::from_millis(350));
-        assert_eq!(CALIBRATION_ACCEPTANCE_MINIMUM, Duration::from_millis(250));
-        assert_eq!(CALIBRATION_MAXIMUM, Duration::from_secs(2));
-        assert_eq!(CALIBRATION_WIDE_RATIO_MAXIMUM, Duration::from_secs(20));
-        assert!(policy.minimum > CALIBRATION_ACCEPTANCE_MINIMUM);
-
-        assert_eq!(
-            classify_common_calibration(
-                100,
-                100,
-                Duration::from_millis(250),
-                Duration::from_secs(2),
-            )
-            .expect("standard endpoints are accepted"),
-            CommonBatchMode::Standard
-        );
-        assert_eq!(
-            classify_common_calibration(
-                100,
-                1_000,
-                Duration::from_secs(20),
-                Duration::from_millis(350),
-            )
-            .expect("Stim may exceed the standard cap at Stab's selected batch"),
-            CommonBatchMode::WideRatio
-        );
-        assert_eq!(
-            classify_common_calibration(
-                1_000,
-                100,
-                Duration::from_millis(350),
-                Duration::from_secs(5),
-            )
-            .expect("Stab may exceed the standard cap at Stim's selected batch"),
-            CommonBatchMode::WideRatio
-        );
-    }
-
-    #[test]
-    fn wide_ratio_mode_rejects_floor_cap_and_iteration_owner_violations() {
-        for result in [
-            classify_common_calibration(
-                100,
-                1_000,
-                Duration::from_millis(249),
-                Duration::from_millis(350),
-            ),
-            classify_common_calibration(
-                100,
-                1_000,
-                Duration::from_millis(20_001),
-                Duration::from_millis(350),
-            ),
-            classify_common_calibration(
-                100,
-                1_000,
-                Duration::from_millis(350),
-                Duration::from_millis(2_001),
-            ),
-            classify_common_calibration(
-                1_000,
-                1_000,
-                Duration::from_secs(3),
-                Duration::from_millis(350),
-            ),
-            classify_common_calibration(100, 1_000, Duration::from_secs(3), Duration::from_secs(3)),
-        ] {
-            assert!(matches!(
-                result,
-                Err(RunError::CommonCalibrationOutOfBounds { .. })
-            ));
-        }
-    }
-
-    #[test]
-    fn run_cli_selects_source_owned_group_and_scale_without_free_work() {
-        let defaults = RunCli::try_parse_from(["qualification-run", "--tier", "pr"])
-            .expect("default diagnostic run");
-        assert_eq!(defaults.args.group, super::super::invocation::PQ1_GROUP_ID);
-        assert_eq!(defaults.args.scale, "default");
-
-        let product = RunCli::try_parse_from([
-            "qualification-run",
-            "--tier",
-            "full",
-            "--group",
-            super::super::invocation::CIRCUIT_PARSE_GROUP_ID,
-            "--scale",
-            "large",
-        ])
-        .expect("product group and scale");
-        assert_eq!(product.args.scale, "large");
-
-        assert!(
-            RunCli::try_parse_from(["qualification-run", "--tier", "pr", "--work-items", "1",])
-                .is_err()
-        );
-    }
-}
+#[path = "run/tests.rs"]
+mod tests;

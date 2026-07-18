@@ -13,6 +13,7 @@ pub(super) fn pauli_contract() -> GroupContract {
             .expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
         baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new("pauli-string-right-multiply").expect("workload id"),
         measurement_ids: vec![
             ProtocolId::try_new("right-multiply-in-place").expect("measurement id"),
@@ -51,6 +52,7 @@ pub(super) fn pauli_iter_contract(
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
         baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![
             ProtocolId::try_new("construct-and-iterate-borrowed").expect("measurement id"),
@@ -83,6 +85,11 @@ pub(super) fn clifford_contract(
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
         baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: if group_id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID {
+            crate::qualification::model::TimingBatchPolicy::IndependentThroughput
+        } else {
+            crate::qualification::model::TimingBatchPolicy::CommonIterations
+        },
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
         scales: vec![ScaleContract {
@@ -106,4 +113,70 @@ pub(super) fn clifford_contract(
             })
             .collect(),
     }
+}
+
+#[test]
+fn runtime_contract_requires_an_explicit_timing_policy() {
+    let value = serde_json::json!({
+        "id": "group",
+        "claim_class": "promotable-performance",
+        "baseline_eligibility": "threshold-eligible",
+        "workload_id": "workload",
+        "measurement_ids": ["main"],
+        "scales": [{
+            "id": "small",
+            "work_items": 1,
+            "input_bytes": 64,
+            "input_digest": "a".repeat(64)
+        }],
+        "correctness_case_ids": ["case"],
+        "owner": "owner",
+        "profiler_note": null,
+        "comparator_sources": []
+    });
+    assert!(serde_json::from_value::<GroupContract>(value).is_err());
+}
+
+#[test]
+fn runtime_contract_binds_clifford_identity_timing_policy() {
+    use crate::qualification::model::TimingBatchPolicy;
+
+    let root = crate::root::RepoRoot::resolve(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
+    )
+    .expect("repository root");
+    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+    let mut suite = super::super::super::discovery::generate(&root, &manifest)
+        .expect("generated performance inventory");
+    let (mut file, _) = super::load(&root, &suite.semantic_digest).expect("runtime contract");
+    super::validate_inventory_contracts(&file, &suite).expect("matching ledgers");
+
+    let identity_group = suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID)
+        .expect("Clifford identity group");
+    assert_eq!(
+        identity_group.timing_policy.batch_policy,
+        TimingBatchPolicy::IndependentThroughput
+    );
+    identity_group.timing_policy.batch_policy = TimingBatchPolicy::CommonIterations;
+    assert!(matches!(
+        super::validate_inventory_contracts(&file, &suite),
+        Err(super::GroupError::InventoryContract(group))
+            if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
+    ));
+
+    let suite = super::super::super::discovery::generate(&root, &manifest)
+        .expect("generated performance inventory");
+    file.groups
+        .iter_mut()
+        .find(|group| group.id.to_string() == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID)
+        .expect("runtime Clifford identity group")
+        .timing_batch_policy = TimingBatchPolicy::CommonIterations;
+    assert!(matches!(
+        super::validate_inventory_contracts(&file, &suite),
+        Err(super::GroupError::InventoryContract(group))
+            if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
+    ));
 }

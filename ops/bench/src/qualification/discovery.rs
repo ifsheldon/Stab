@@ -503,13 +503,16 @@ pub(super) fn semantic_digest(suite: &QualificationSuite) -> Result<String, Benc
 
 fn default_timing_policy() -> TimingPolicy {
     TimingPolicy {
+        batch_policy: super::model::TimingBatchPolicy::CommonIterations,
         calibration_min_ms: 250,
         calibration_max_ms: 2_000,
         common_wide_ratio_max_ms: 20_000,
         warmup_batches: 3,
         full_pairs: 9,
         timeout_seconds: 600,
-        gate_statistic: "median paired ratio and fixed-seed bootstrap 95% upper bound".to_string(),
+        gate_statistic:
+            "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+                .to_string(),
     }
 }
 

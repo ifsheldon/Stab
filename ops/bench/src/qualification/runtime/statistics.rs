@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::protocol::{EvidenceMode, Implementation, ProtocolId, WorkerMeasurement};
+use crate::qualification::model::TimingBatchPolicy;
 
 pub(crate) const BOOTSTRAP_RESAMPLES: usize = 10_000;
 const BOOTSTRAP_SEED: u64 = 0x5354_4142_5051_3031;
@@ -37,7 +38,8 @@ pub(crate) struct PairedSample {
     pub(super) measurement_id: ProtocolId,
     pub(super) stim_elapsed_seconds: f64,
     pub(super) stab_elapsed_seconds: f64,
-    pub(super) work_count: u64,
+    pub(super) stim_work_count: u64,
+    pub(super) stab_work_count: u64,
     pub(super) stim_work_per_second: f64,
     pub(super) stab_work_per_second: f64,
     pub(super) ratio: f64,
@@ -72,6 +74,22 @@ pub(crate) fn pair_measurements(
     stim: &[WorkerMeasurement],
     stab: &[WorkerMeasurement],
 ) -> Result<Vec<PairedSample>, StatisticsError> {
+    pair_measurements_with_policy(
+        pair_index,
+        order,
+        stim,
+        stab,
+        TimingBatchPolicy::CommonIterations,
+    )
+}
+
+pub(crate) fn pair_measurements_with_policy(
+    pair_index: usize,
+    order: PairOrder,
+    stim: &[WorkerMeasurement],
+    stab: &[WorkerMeasurement],
+    batch_policy: TimingBatchPolicy,
+) -> Result<Vec<PairedSample>, StatisticsError> {
     let stim = by_measurement(Implementation::Stim, stim)?;
     let stab = by_measurement(Implementation::Stab, stab)?;
     if stim.keys().collect::<BTreeSet<_>>() != stab.keys().collect::<BTreeSet<_>>() {
@@ -88,24 +106,36 @@ pub(crate) fn pair_measurements(
                 measurement: measurement_id.clone(),
             });
         }
-        if stim.workload_id != stab.workload_id
-            || stim.iteration_count != stab.iteration_count
-            || stim.work_count != stab.work_count
-            || stim.output_digest != stab.output_digest
-            || stim.stim_commit != stab.stim_commit
+        let shared_identity_matches =
+            stim.workload_id == stab.workload_id && stim.stim_commit == stab.stim_commit;
+        let common_semantics_match = stim.iteration_count == stab.iteration_count
+            && stim.work_count == stab.work_count
+            && stim.output_digest == stab.output_digest;
+        let independent_work_units_match = stim.iteration_count > 0
+            && stab.iteration_count > 0
+            && u128::from(stim.work_count) * u128::from(stab.iteration_count)
+                == u128::from(stab.work_count) * u128::from(stim.iteration_count)
+            && (stim.iteration_count != stab.iteration_count
+                || stim.output_digest == stab.output_digest);
+        if !shared_identity_matches
+            || match batch_policy {
+                TimingBatchPolicy::CommonIterations => !common_semantics_match,
+                TimingBatchPolicy::IndependentThroughput => !independent_work_units_match,
+            }
         {
             return Err(StatisticsError::SemanticMismatch {
                 measurement: measurement_id.clone(),
             });
         }
-        if stim.work_count == 0 {
+        if stim.work_count == 0 || stab.work_count == 0 {
             return Err(StatisticsError::MissingWork {
                 measurement: measurement_id.clone(),
             });
         }
         let stim_work_per_second = stim.work_count as f64 / stim.elapsed_seconds;
         let stab_work_per_second = stab.work_count as f64 / stab.elapsed_seconds;
-        let ratio = stab.elapsed_seconds / stim.elapsed_seconds;
+        let ratio = (stab.elapsed_seconds / stab.work_count as f64)
+            / (stim.elapsed_seconds / stim.work_count as f64);
         if [stim_work_per_second, stab_work_per_second, ratio]
             .into_iter()
             .any(|value| !value.is_finite() || value <= 0.0)
@@ -120,7 +150,8 @@ pub(crate) fn pair_measurements(
             measurement_id: measurement_id.clone(),
             stim_elapsed_seconds: stim.elapsed_seconds,
             stab_elapsed_seconds: stab.elapsed_seconds,
-            work_count: stim.work_count,
+            stim_work_count: stim.work_count,
+            stab_work_count: stab.work_count,
             stim_work_per_second,
             stab_work_per_second,
             ratio,
@@ -175,11 +206,11 @@ pub(crate) fn summarize(
     }
     let stim = samples
         .iter()
-        .map(|sample| sample.stim_elapsed_seconds / sample.work_count as f64)
+        .map(|sample| sample.stim_elapsed_seconds / sample.stim_work_count as f64)
         .collect::<Vec<_>>();
     let stab = samples
         .iter()
-        .map(|sample| sample.stab_elapsed_seconds / sample.work_count as f64)
+        .map(|sample| sample.stab_elapsed_seconds / sample.stab_work_count as f64)
         .collect::<Vec<_>>();
     let ratios = samples
         .iter()
@@ -440,6 +471,70 @@ mod tests {
         let mut stab = row(Implementation::Stab, 1.0);
         stab.evidence_mode = EvidenceMode::Memory;
         assert!(pair_measurements(0, PairOrder::StimThenStab, &[stim], &[stab]).is_err());
+    }
+
+    #[test]
+    fn independent_throughput_normalizes_unequal_iteration_counts() {
+        let stim = row(Implementation::Stim, 1.0);
+        let mut stab = row(Implementation::Stab, 5.0);
+        stab.iteration_count = 10;
+        stab.work_count = 1_000;
+        stab.output_digest =
+            SemanticDigest::try_new("d".repeat(64)).expect("count-specific output digest");
+
+        assert!(
+            pair_measurements(
+                0,
+                PairOrder::StimThenStab,
+                std::slice::from_ref(&stim),
+                std::slice::from_ref(&stab),
+            )
+            .is_err(),
+            "common-iteration comparisons must reject unequal work"
+        );
+        let [pair] = pair_measurements_with_policy(
+            0,
+            PairOrder::StimThenStab,
+            std::slice::from_ref(&stim),
+            std::slice::from_ref(&stab),
+            TimingBatchPolicy::IndependentThroughput,
+        )
+        .expect("independent throughput comparison")
+        .try_into()
+        .expect("one measurement");
+        assert_eq!(pair.stim_work_count, 100);
+        assert_eq!(pair.stab_work_count, 1_000);
+        assert_eq!(pair.stim_work_per_second, 100.0);
+        assert_eq!(pair.stab_work_per_second, 200.0);
+        assert_eq!(pair.ratio, 0.5);
+
+        let mut wrong_unit = stab.clone();
+        wrong_unit.work_count = 999;
+        assert!(
+            pair_measurements_with_policy(
+                0,
+                PairOrder::StimThenStab,
+                std::slice::from_ref(&stim),
+                &[wrong_unit],
+                TimingBatchPolicy::IndependentThroughput,
+            )
+            .is_err()
+        );
+
+        let mut same_count_wrong_output = stab;
+        same_count_wrong_output.iteration_count = 1;
+        same_count_wrong_output.work_count = 100;
+        assert!(
+            pair_measurements_with_policy(
+                0,
+                PairOrder::StimThenStab,
+                &[stim],
+                &[same_count_wrong_output],
+                TimingBatchPolicy::IndependentThroughput,
+            )
+            .is_err(),
+            "equal-count independent samples still require exact output equality"
+        );
     }
 
     #[test]

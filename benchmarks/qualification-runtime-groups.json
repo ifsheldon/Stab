@@ -1,11 +1,12 @@
 {
-  "schema_version": 4,
-  "performance_inventory_sha256": "18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4",
+  "schema_version": 5,
+  "performance_inventory_sha256": "0ee3639389860799298164c94c647fcab45b03c9d67b941b1aad12c6e5e06df5",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
       "claim_class": "diagnostic-infrastructure",
       "baseline_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "protocol-smoke",
       "measurement_ids": ["main"],
       "scales": [
@@ -24,6 +25,7 @@
       "id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "circuit-canonical-print",
       "measurement_ids": ["serialize"],
       "scales": [
@@ -57,6 +59,7 @@
       "id": "PERFQ-M4-CIRCUIT-PARSE",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "circuit-parse",
       "measurement_ids": ["parse"],
       "scales": [
@@ -93,6 +96,7 @@
       "id": "PERFQ-M4-GATE-LOOKUP",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "gate-name-hash",
       "measurement_ids": ["hash-all-names"],
       "scales": [
@@ -123,6 +127,7 @@
       "id": "PERFQ-M5-SIMD-BITS",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-xor",
       "measurement_ids": [
         "xor-complete-vector"
@@ -168,6 +173,7 @@
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-zero",
       "measurement_ids": ["not-zero"],
       "scales": [
@@ -211,6 +217,7 @@
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-early",
       "measurement_ids": ["not-zero"],
       "scales": [
@@ -254,6 +261,7 @@
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-late",
       "measurement_ids": ["not-zero"],
       "scales": [
@@ -297,6 +305,7 @@
       "id": "PERFQ-M5-SIMD-WORD",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "simd-word-popcount",
       "measurement_ids": [
         "toggle-popcount"
@@ -343,6 +352,7 @@
       "id": "PERFQ-M5-SPARSE-XOR",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "sparse-xor-row",
       "measurement_ids": [
         "row-xor"
@@ -387,6 +397,7 @@
       "id": "PERFQ-M5-SPARSE-XOR-ITEM",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "sparse-xor-item",
       "measurement_ids": [
         "xor-item"
@@ -431,6 +442,7 @@
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "bit-matrix-transpose-in-place",
       "measurement_ids": ["in-place-transpose"],
       "scales": [
@@ -474,6 +486,7 @@
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "bit-matrix-transpose-allocating",
       "measurement_ids": ["allocating-transpose"],
       "scales": [
@@ -517,6 +530,7 @@
       "id": "PERFQ-M6-PAULI-STRING",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-right-multiply",
       "measurement_ids": ["right-multiply-in-place"],
       "scales": [
@@ -560,6 +574,7 @@
       "id": "PERFQ-M6-PAULI-ITER",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-iter-range",
       "measurement_ids": ["construct-and-iterate-borrowed"],
       "scales": [
@@ -604,6 +619,7 @@
       "id": "PERFQ-M6-PAULI-ITER-SINGLETON",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-iter-singleton",
       "measurement_ids": ["construct-and-iterate-borrowed"],
       "scales": [
@@ -648,6 +664,7 @@
       "id": "PERFQ-M6-CLIFFORD-STRING",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "independent-throughput",
       "workload_id": "clifford-string-right-multiply-identity",
       "measurement_ids": ["right-multiply-identity"],
       "scales": [
@@ -678,7 +695,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "3c92488328180092f2a8f6a671e64870a1ff935f294fc2b579bfa4d16d237dca"
+        "sha256": "7f67a510a90c3670a904e7ea2c9f992e48949c597d3ff5040016177ebf06deea"
       },
       "comparator_sources": [
         {
@@ -695,6 +712,7 @@
       "id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
+      "timing_batch_policy": "common-iterations",
       "workload_id": "clifford-string-right-multiply-non-identity",
       "measurement_ids": ["right-multiply-non-identity"],
       "scales": [
@@ -725,7 +743,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "3c92488328180092f2a8f6a671e64870a1ff935f294fc2b579bfa4d16d237dca"
+        "sha256": "7f67a510a90c3670a904e7ea2c9f992e48949c597d3ff5040016177ebf06deea"
       },
       "comparator_sources": [
         {

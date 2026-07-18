@@ -244,6 +244,7 @@ fn group_contract() -> GroupContract {
         id: ProtocolId::try_new("PERFQ-TEST").expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
         baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new("test-workload").expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
         scales: vec![ScaleContract {

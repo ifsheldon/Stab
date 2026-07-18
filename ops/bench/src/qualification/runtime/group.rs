@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use super::protocol::{InputDigest, ProtocolId, Sha256Digest};
 use super::run::ClaimClass;
+use crate::qualification::model::TimingBatchPolicy;
 use crate::root::RepoRoot;
 
 mod comparators;
@@ -13,7 +14,7 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 4;
+const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 5;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
@@ -39,6 +40,7 @@ pub(super) struct GroupContract {
     pub(super) id: ProtocolId,
     pub(super) claim_class: ClaimClass,
     pub(super) baseline_eligibility: BaselineEligibility,
+    pub(super) timing_batch_policy: TimingBatchPolicy,
     pub(super) workload_id: ProtocolId,
     pub(super) measurement_ids: Vec<ProtocolId>,
     pub(super) scales: Vec<ScaleContract>,
@@ -310,6 +312,7 @@ fn validate_inventory_contracts(
             || group.planned_correctness_case_id.is_some()
             || group.output_contract.digest_state != EvidenceState::Existing
             || group.threshold_policy != ThresholdPolicy::Primary1_25
+            || group.timing_policy.batch_policy != contract.timing_batch_policy
             || group.status == QualificationStatus::Planned
             || inventory_scale_ids != contract_scale_ids
             || group.memory_policy.scale_ids != contract_scale_ids
@@ -571,6 +574,7 @@ mod tests {
                 id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
                 claim_class: ClaimClass::DiagnosticInfrastructure,
                 baseline_eligibility: BaselineEligibility::ReportOnly,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
                 measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
                 scales: vec![ScaleContract {
@@ -592,6 +596,7 @@ mod tests {
                     .expect("group id"),
                 claim_class: ClaimClass::PromotablePerformance,
                 baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("circuit-canonical-print").expect("workload id"),
                 measurement_ids: vec![ProtocolId::try_new("serialize").expect("measurement id")],
                 scales: vec![ScaleContract {
@@ -610,6 +615,7 @@ mod tests {
                     .expect("group id"),
                 claim_class: ClaimClass::PromotablePerformance,
                 baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("circuit-parse").expect("workload id"),
                 measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
                 scales: vec![ScaleContract {
@@ -634,6 +640,7 @@ mod tests {
                     .expect("group id"),
                 claim_class: ClaimClass::PromotablePerformance,
                 baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("gate-name-hash").expect("workload id"),
                 measurement_ids: vec![
                     ProtocolId::try_new("hash-all-names").expect("measurement id"),
@@ -657,6 +664,7 @@ mod tests {
                     .expect("group id"),
                 claim_class: ClaimClass::PromotablePerformance,
                 baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("simd-bits-xor").expect("workload id"),
                 measurement_ids: vec![
                     ProtocolId::try_new("xor-complete-vector").expect("measurement id"),
@@ -684,6 +692,7 @@ mod tests {
                     .expect("group id"),
                 claim_class: ClaimClass::PromotablePerformance,
                 baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
                 workload_id: ProtocolId::try_new("simd-word-popcount").expect("workload id"),
                 measurement_ids: vec![
                     ProtocolId::try_new("toggle-popcount").expect("measurement id"),
@@ -776,6 +785,7 @@ mod tests {
             id: ProtocolId::try_new(group_id).expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
             baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("not-zero").expect("measurement id")],
             scales: vec![ScaleContract {
@@ -808,6 +818,7 @@ mod tests {
             id: ProtocolId::try_new(group_id).expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
             baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
             scales: vec![ScaleContract {
@@ -839,6 +850,7 @@ mod tests {
             id: ProtocolId::try_new(group_id).expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
             baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
             scales: vec![ScaleContract {

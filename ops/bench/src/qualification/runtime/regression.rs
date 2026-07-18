@@ -352,6 +352,7 @@ mod tests {
             id: ProtocolId::try_new("group").expect("group id"),
             claim_class: ClaimClass::DiagnosticInfrastructure,
             baseline_eligibility: BaselineEligibility::ReportOnly,
+            timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("workload").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
             scales: vec![super::super::group::ScaleContract {
