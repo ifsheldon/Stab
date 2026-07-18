@@ -121,7 +121,7 @@ The GPT-5.6/max closure review reported no remaining correctness or acceptance f
 2. Select and implement the next finite dependency-ordered PQ2 runtime group with the same exact evidence discipline.
 3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a popcount memory claim.
 
-The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
+The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
 
 ## Verification
 

@@ -112,7 +112,7 @@ A final evidence audit then found that the PQ2 section-level status still descri
 2. Preserve the completed clean `PERFQ-M5-SIMD-WORD` evidence and select the next finite PQ2 runtime group with the same exact evidence discipline.
 3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a gate-hash memory claim.
 
-The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
+The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
 
 ## Verification
 

@@ -14,7 +14,7 @@ Median Stab-to-Stim elapsed-time ratios range from `0.025664x` to `0.568566x`, c
 The worst bootstrap confidence-interval upper bound is `0.570628x`, below the exact `1.25x` gate.
 
 This accepted report closes only the two pinned borrowed-iterator workload shapes on Linux AArch64.
-It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b`, is historical after qualification-controller hardening, and is recorded in `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f` and is recorded in `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Frozen Evidence
 
@@ -46,7 +46,7 @@ The clean correctness report at `target/qualification/pq2-pauli-iter-full-afaf0b
 | Preflight | `a06417d24a8f446f4974e4cd7de8b179ae2218e42560d776633ab304000fe5f1` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, execution receipts, and exact three-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run. Its latest complete execution at `6351fe0a529462efd9f18a88bd59c08cfec9f81b` is historical after qualification-controller hardening, and a clean source-current refresh is pending.
+The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run. Its source-current PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller.
 
 ## Correctness Oracle
 

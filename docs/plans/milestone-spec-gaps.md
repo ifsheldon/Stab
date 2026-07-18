@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-18 - CQ2/PQ2: Source-Current Evidence Versus Checkout Replay
+
+Status: Resolved
+Revealed by: final milestone audit of the hardened all-domain CQ2 evidence and its performance handoff.
+Current text: the execution contract said that a correctness-runner or inventory change makes the all-domain refresh historical, without defining what source-current means after an unrelated commit.
+Gap: the milestone did not distinguish scientific acceptance at the artifact's recorded clean producer revision from machine replay in the current checkout. The controller correctly rejects a dirty checkout or different `HEAD`, so the old wording could lead a later performance milestone to reuse broad `3f2f382` receipts directly instead of producing focused exact CQ prerequisites at the same clean revision as its workers. It also did not state whether a documentation-only commit that leaves both inventories and the producer contract unchanged changes the checkpoint's scientific status.
+Proposed amendment: define source-current as accepted for the producer and inventory contract at the recorded clean revision, define current-checkout replay as requiring that exact clean `HEAD`, state that documentation-only changes may preserve scientific acceptance while still preventing direct replay, and require every promotable performance run to generate and consume focused exact CQ evidence from its own clean worker revision.
+Resolution: `docs/plans/GOAL.md`, `docs/plans/comprehensive-correctness-qualification-plan.md`, and `docs/plans/comprehensive-stim-performance-qualification-plan.md` now define both meanings and the same-revision handoff rule. `docs/plans/cq2-deterministic-qualification-progress-report.md` records a clean schema-7/4 CQ-to-product-performance handoff probe at revision `7d0c07eb62bd455d826714c0c572a586a7e2c548` after schema, passing-receipt, and global statistical-ledger consumer hardening.
+
 ## 2026-07-18 - CQ2: Expanded Owner Admission Before Allocation
 
 Status: Resolved

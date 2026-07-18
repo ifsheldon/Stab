@@ -12,7 +12,7 @@ These are small Stab slowdowns of approximately 0.2% through 3.2%, not speedups,
 The faithful scalar public path already passes, so this slice did not add portable SIMD merely to improve an already accepted ratio.
 
 This report closes `PERFQ-M6-PAULI-STRING/right-multiply-in-place` on Linux AArch64 only.
-It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint later passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
+It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
 
 ## Frozen Evidence
 
@@ -44,7 +44,7 @@ The clean correctness report at `target/qualification/pq2-m6-pauli-full-cd1e33e`
 | Preflight | `6377ba3310afb3e605487325ec1a3eea2043c5ffa4777da5b0de46d963763116` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, both execution receipts, and exact two-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its latest complete historical PR, full, and soak execution passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b`.
+The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its source-current PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller.
 
 ## Workload Contract
 

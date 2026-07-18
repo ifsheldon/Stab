@@ -202,4 +202,4 @@ Before committing this closure report, rerun workspace formatting, Clippy with w
 2. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a memory qualification claim.
 3. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed slice.
 
-The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` without relabeling earlier reports and is itself historical after qualification-controller hardening.
+The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f` without relabeling earlier performance reports.
