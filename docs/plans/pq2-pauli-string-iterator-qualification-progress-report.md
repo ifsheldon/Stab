@@ -1,5 +1,7 @@
 # PQ2 Pauli-String Iterator Qualification Progress Report
 
+> Historical-inventory note, 2026-07-18: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Synchronizing the CQ2 evidence-status checklist anchor produced current inventory `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90` without changing any runtime group, threshold, workload, scale, comparator, or correctness binding. The measurements below are not relabeled as current-inventory evidence.
+
 ## Status
 
 The tenth PQ2 executable slice passes its independent `1.25x` timing gates for public borrowed Pauli-string iterator construction and complete traversal on the controlled Linux AArch64 host as of 2026-07-18.
@@ -7,12 +9,12 @@ The tenth PQ2 executable slice passes its independent `1.25x` timing gates for p
 `PERFQ-M6-PAULI-ITER` qualifies X/Z enumeration over weights 2 through 5, while `PERFQ-M6-PAULI-ITER-SINGLETON` separately qualifies X/Y/Z enumeration at weight 1.
 Both measurements are named `construct-and-iterate-borrowed`, but their timing, confidence intervals, allocation contracts, rollups, and completion receipts remain independent.
 
-All 12 source-current measurements passed on their first attempt without a noise rerun, waiver, report-only outcome, profiler note, or threshold relaxation.
+All 12 measurements under the frozen evidence inventory passed on their first attempt without a noise rerun, waiver, report-only outcome, profiler note, or threshold relaxation.
 Median Stab-to-Stim elapsed-time ratios range from `0.025664x` to `0.568566x`, corresponding to median speedups of approximately `1.76x` through `38.97x`.
 The worst bootstrap confidence-interval upper bound is `0.570628x`, below the exact `1.25x` gate.
 
 This accepted report closes only the two pinned borrowed-iterator workload shapes on Linux AArch64.
-It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, the complete source-current 271-parent CQ2 execution, or the remaining Algebra surface.
+It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b`, is historical after qualification-controller hardening, and is recorded in `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Frozen Evidence
 
@@ -25,7 +27,7 @@ It does not qualify restart timing, owned `Iterator::next`, clone, formatting, c
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
 The source-current correctness inventory contains 2,886 upstream records, 1,972 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
-The source-current performance inventory contains 548 groups and exactly fifteen executable product groups plus one diagnostic protocol group, with 21 exact threshold pairs.
+The current performance inventory contains 548 groups and exactly fifteen executable product groups plus one diagnostic protocol group, with 21 exact threshold pairs; the frozen evidence inventory had the same group and threshold contracts.
 The inherited `m6-pauli-iter` row is superseded for timing, while its memory baseline remains guarded until PQ6 supplies equal or stronger evidence.
 
 ## Correctness Preflight
@@ -176,7 +178,7 @@ Those receipts authorized retirement of only the bundled `m6-pauli-iter` timing 
 
 Migration commit `d706634eeaa536b2ce48d3dc9431b4feb513317f` made that focused change, marked the inherited timing row superseded, and preserved the memory baseline.
 Audit and review strengthening then changed the exact correctness source, so intermediate post-migration evidence at `d706634e` and `72d34f3f` remains historical rather than being relabeled as final.
-The complete source-current post-migration chain recorded here was regenerated and replayed from clean revision `afaf0bf7f236b9f6ae6f72c19bbbdfea94d26632`.
+The complete frozen post-migration chain recorded here was regenerated and replayed from clean revision `afaf0bf7f236b9f6ae6f72c19bbbdfea94d26632`.
 
 ## Milestone Audit
 
@@ -220,6 +222,5 @@ just maintenance::pre-commit
 
 1. Run both clean full and soak families, rollups, and completion receipts on a controlled native Linux x86-64 host before making an x86-64 conclusion.
 2. Define and validate explicit cross-scale RSS and allocation-growth rules in PQ6 before making a memory qualification claim or retiring the legacy memory baseline.
-3. Rerun the complete 271-parent CQ2 family before citing all-domain correctness execution as source-current.
-4. Qualify restart, owned iteration, clone, formatting, comparison, arbitrary weight and axis shapes, commuting iteration, Tableau iteration, and the remaining Algebra surfaces only through their own exact public API groups.
-5. Select the next finite dependency-ordered PQ2 runtime group without reopening this accepted AArch64 slice merely to produce a newer aggregate digest.
+3. Qualify restart, owned iteration, clone, formatting, comparison, arbitrary weight and axis shapes, commuting iteration, Tableau iteration, and the remaining Algebra surfaces only through their own exact public API groups.
+4. Select the next finite dependency-ordered PQ2 runtime group without reopening this accepted AArch64 slice merely to produce a newer aggregate digest.

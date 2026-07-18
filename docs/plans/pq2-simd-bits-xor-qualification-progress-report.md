@@ -1,6 +1,6 @@
 # PQ2 SIMD-Bits XOR Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains valid passing AArch64 evidence at performance inventory `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. Later product groups, evidence-authorized migrations, and exact-CQ strengthening produced pre-migration inventory `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb` and then source-current post-migration inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. The measured dense-XOR implementation and outcome below are not relabeled as current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains valid passing AArch64 evidence at performance inventory `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. Later product groups and evidence-authorized migrations produced post-migration inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current inventory `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. The measured dense-XOR implementation and outcome below are not relabeled as current-inventory evidence.
 
 ## Status
 
@@ -163,17 +163,16 @@ The audit also exposed two genuine under-specifications: the plan did not requir
 
 The independent GPT-5.6/max full code review found no implementation, Stim-comparator, SIMD, hostile-input, resource-boundary, receipt, report or rollup, M12, or timing-gate defect. It found three documentation defects: older progress reports still called the preceding inventory and popcount evidence current, this report mislabeled the custom four-lane fixture digest as SHA-256, and it assigned allocation-free XOR evidence to the storage-and-access CQ owner instead of the complete-vector XOR owner. The PQ0, PQ1, CQ2, gate-hash, and popcount evidence notes now distinguish current dense-XOR evidence from historical inventories; the workload table now says `Input digest`; and the CQ bullets name the correct owners.
 
-The review retained four residual risks without converting them into findings: the two logged under-specifications, the broad `Reworked` validation exemption for any future heterogeneous replacement, three qualification modules within 13 lines of the 1,200-line source threshold, and the explicitly unclaimed x86-64 and simultaneous-current CQ2 evidence. Subsequent source-current work resolved the first three risks by defining the allocation and completion-receipt contracts, adding structured exact replacement mappings, and splitting the large modules by invariant ownership. Native x86-64 and simultaneous-current CQ2 evidence remain unclaimed.
+The review retained four residual risks without converting them into findings: the two logged under-specifications, the broad `Reworked` validation exemption for any future heterogeneous replacement, three qualification modules within 13 lines of the 1,200-line source threshold, and the explicitly unclaimed x86-64 and simultaneous-current CQ2 evidence. Subsequent source work resolved the first three risks by defining the allocation and completion-receipt contracts, adding structured exact replacement mappings, and splitting the large modules by invariant ownership. Native x86-64 remains unclaimed; the separate CQ2 checkpoint later passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
 
 A narrow follow-up milestone re-audit verified the command record, synchronized current and historical evidence notes, full-review resolutions, explicit claim boundary, and retained deferrals. It reported no remaining blocker or finding and marked the AArch64 fifth slice closure-complete.
 
 ## Remaining Work
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed here.
-2. Rerun the complete 271-parent CQ2 family before claiming simultaneous current-digest all-domain correctness execution.
-3. Select and implement the next finite dependency-ordered PQ2 runtime group with the same exact evidence discipline.
-4. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a dense-XOR memory claim.
-5. Qualify `not_zero` and the other excluded bit-kernel phases separately before retiring their historical M12 guards.
+2. Select and implement the next finite dependency-ordered PQ2 runtime group with the same exact evidence discipline.
+3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a dense-XOR memory claim.
+4. Qualify the remaining excluded bit-kernel phases separately before retiring their historical M12 guards; `not_zero` now has its own accepted PQ2 slice.
 
 ## Verification
 

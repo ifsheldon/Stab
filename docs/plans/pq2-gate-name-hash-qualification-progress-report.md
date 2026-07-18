@@ -1,6 +1,6 @@
 # PQ2 Gate Name Hash Qualification Progress Report
 
-> Historical-evidence note, 2026-07-17: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups, migrations, and exact-CQ strengthening produced pre-migration performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb` and then source-current post-migration digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
+> Historical-evidence note, 2026-07-18: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups, migrations, and exact-CQ strengthening produced post-migration digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current digest `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 
@@ -110,8 +110,9 @@ A final evidence audit then found that the PQ2 section-level status still descri
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed.
 2. Preserve the completed clean `PERFQ-M5-SIMD-WORD` evidence and select the next finite PQ2 runtime group with the same exact evidence discipline.
-3. Rerun the complete 271-parent CQ2 family before claiming current-digest all-domain correctness execution.
-4. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a gate-hash memory claim.
+3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a gate-hash memory claim.
+
+The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
 
 ## Verification
 

@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-18 - CQ1/CQ2: Correctness Artifact Relocation Contract
+
+Status: Resolved
+Revealed by: milestone audit of the source-current 271-parent CQ2 report replay and exact preflight.
+Current text: the correctness plan required repository-anchored publication and said preflight validates output bindings, but it did not distinguish semantic child-output identity from the report directory's filesystem name.
+Gap: documentation could imply that request, report, completion, or preflight bytes bind one canonical `target/qualification/` directory even though a byte-identical artifact can be relocated to another allowed directory and replayed with unchanged digests.
+Proposed amendment: define correctness artifact identity as content-addressed and path-independent within the allowed qualification root, keep atomic repository-anchored publication as a write-safety contract, and use `output binding` only for semantic child output and retained artifact content rather than directory provenance.
+Resolution: the correctness plan now states that byte-identical report trees are intentionally relocatable beneath `target/qualification/`, that repository-anchored publication protects the destination without making it provenance, and that preflight acceptance binds semantic output and result identity. The source-current CQ2 progress report no longer claims output-directory binding.
+
 ## 2026-07-18 - PQ2: Pauli Iterator Accepted-Maximum State Coverage
 
 Status: Resolved

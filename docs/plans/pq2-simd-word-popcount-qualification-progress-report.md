@@ -1,6 +1,6 @@
 # PQ2 SIMD-Word Popcount Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains valid passing AArch64 evidence for its frozen performance inventory `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`, but it is not current-inventory evidence after later product groups, migrations, and exact-CQ strengthening produced pre-migration performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb` and then source-current post-migration digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`.
+> Historical-inventory note, 2026-07-18: this report remains valid passing AArch64 evidence for its frozen performance inventory `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`. Later product groups and migrations produced post-migration digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current digest `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. This report is not current-inventory evidence.
 
 ## Status
 
@@ -118,9 +118,10 @@ The GPT-5.6/max closure review reported no remaining correctness or acceptance f
 ## Remaining Work
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host, including proof that the adapter inherits CMake's resolved machine flags. No x86-64 timing conclusion is claimed here.
-2. Rerun the complete 271-parent CQ2 family before claiming simultaneous current-digest all-domain correctness execution.
-3. Select and implement the next finite dependency-ordered PQ2 runtime group with the same exact evidence discipline.
-4. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a popcount memory claim.
+2. Select and implement the next finite dependency-ordered PQ2 runtime group with the same exact evidence discipline.
+3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a popcount memory claim.
+
+The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
 
 ## Verification
 

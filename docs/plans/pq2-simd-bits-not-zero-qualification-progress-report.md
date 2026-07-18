@@ -1,6 +1,6 @@
 # PQ2 SIMD-Bits `not_zero` Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. Later product groups, evidence-authorized migrations, and exact-CQ strengthening produced pre-migration inventory `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb` and then source-current post-migration inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. Later product groups and evidence-authorized migrations produced post-migration inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current inventory `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
 
 ## Status
 
@@ -199,6 +199,7 @@ Before committing this closure report, rerun workspace formatting, Clippy with w
 ## Remaining Work
 
 1. Run the same clean full and soak families, rollups, and completion receipts on a controlled native Linux x86-64 host before making an x86-64 conclusion.
-2. Rerun the complete 271-parent CQ2 family at the next simultaneous-current program checkpoint instead of relabeling historical all-domain reports.
-3. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a memory qualification claim.
-4. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed slice.
+2. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a memory qualification claim.
+3. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed slice.
+
+The separate 271-parent CQ2 checkpoint passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` without relabeling earlier reports and is itself historical after qualification-controller hardening.

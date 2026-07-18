@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Multiplication Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding the split Pauli iterator contracts produced correctness digest `4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87` and pre-migration performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb`; the evidence-authorized iterator migration then produced source-current post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. The results below are not relabeled as simultaneous current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator contracts produced post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; synchronizing the CQ2 checklist evidence-status anchor then produced current digest `868eb831a034042b43573fed612af14db225421a2733bbf10e4a5eb2b515ec90`. The results below are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 
@@ -12,7 +12,7 @@ These are small Stab slowdowns of approximately 0.2% through 3.2%, not speedups,
 The faithful scalar public path already passes, so this slice did not add portable SIMD merely to improve an already accepted ratio.
 
 This report closes `PERFQ-M6-PAULI-STRING/right-multiply-in-place` on Linux AArch64 only.
-It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, the complete 271-parent CQ2 execution, or the remaining Algebra surface.
+It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint later passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
 
 ## Frozen Evidence
 
@@ -44,7 +44,7 @@ The clean correctness report at `target/qualification/pq2-m6-pauli-full-cd1e33e`
 | Preflight | `6377ba3310afb3e605487325ec1a3eea2043c5ffa4777da5b0de46d963763116` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, both execution receipts, and exact two-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate source-current checkpoint and is not claimed by this focused prerequisite run.
+The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its latest complete historical PR, full, and soak execution passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b`.
 
 ## Workload Contract
 
@@ -136,7 +136,7 @@ Clean pre-migration revision `3a0fcd814f8d1a9441420ab85edf3d757572ba93` passed a
 Its six median ratios ranged from `1.002254x` to `1.031540x`, with worst upper bound `1.031846x`, and authorized retirement of only the identity-only `m6-pauli-string` timing threshold, its three exact pair thresholds, and temporary scale mappings.
 Migration commit `42c132f2c49538364649cd90962166223c72b4c6` made that focused change while preserving the memory baseline.
 Strengthening the exact correctness owner then changed both source inventories, so the historical first chain was not relabeled as current.
-The complete source-current post-migration chain recorded here was regenerated and replayed from reviewed clean revision `cd1e33e10f45995ccaca498547ff5aa88bfe51bb`.
+The complete frozen post-migration chain recorded here was regenerated and replayed from reviewed clean revision `cd1e33e10f45995ccaca498547ff5aa88bfe51bb`.
 
 ## Milestone Audit
 
@@ -178,6 +178,5 @@ just maintenance::pre-commit
 
 1. Run the same clean full and soak families, rollups, and completion receipt on a controlled native Linux x86-64 host before making an x86-64 conclusion.
 2. Define and validate explicit cross-scale RSS and allocation-growth rules in PQ6 before making a memory qualification claim or retiring the legacy memory baseline.
-3. Rerun the complete 271-parent CQ2 family before citing all-domain correctness execution as source-current.
-4. Qualify allocating multiplication, unequal-width growth, identity-fast-path timing, commutation, randomization, Clifford operations, Tableau operations, and the remaining Algebra surfaces only through their own exact public API groups.
-5. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed AArch64 slice.
+3. Qualify allocating multiplication, unequal-width growth, identity-fast-path timing, commutation, randomization, Clifford operations, Tableau operations, and the remaining Algebra surfaces only through their own exact public API groups.
+4. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed AArch64 slice.

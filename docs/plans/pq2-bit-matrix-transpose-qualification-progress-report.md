@@ -1,6 +1,6 @@
 # PQ2 BitMatrix Transpose Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains accepted passing Linux AArch64 evidence at performance inventory `1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d` and correctness inventory `5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b`. The source-current Pauli inventories are different, so the transpose outcomes below are not relabeled as simultaneous current-inventory evidence.
+> Historical-inventory note, 2026-07-18: this report remains accepted passing Linux AArch64 evidence at performance inventory `1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d` and correctness inventory `5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b`. Later Pauli and checklist-refreshed inventories are different, so the transpose outcomes below are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 
@@ -48,7 +48,7 @@ The clean correctness report at `target/qualification/pq2-m5-transpose-review-fi
 | Preflight | `15b6d704b2807bc07f55532c2c9abb79b5ae67a3239e65f7bbfa92585a6c0596` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, both execution receipts, and two-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate source-current checkpoint and is not claimed by this focused prerequisite run.
+The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its latest complete historical execution passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b`.
 
 ## Workload Contracts
 
@@ -168,7 +168,7 @@ No milestone under-specification was revealed, so `docs/plans/milestone-spec-gap
 The final independent GPT-5.6/max follow-up review reported no P0, P1, P2, or P3 findings and no actionable defect at `f912cc3af1f13cc9fab798d69937c155d37d83a0`.
 It independently confirmed the critical-edge first-result oracle, pre-setup and pre-barrier semantic-work overflow rejection, 90-receipt worker preflight, schema-version-26 replay bindings, equal public lifecycles and work counts, canonical input and output digests, exact allocation contracts at dimensions 256, 2,048, and 16,384, ordered source fingerprints, and the narrow legacy timing migration.
 The reviewer also verified all 12 clean first-attempt reports, report replays, regressions, four rollup bindings, and two completion receipts against the immutable evidence revision without rerunning timing.
-Its residual observations match this report's unclaimed scope: native x86-64 performance, PQ6 cross-scale memory growth, Stim allocator-count instrumentation, the full 271-parent simultaneous-current CQ2 run, and broader BitMatrix operations remain future work rather than defects in this slice.
+Its residual observations match this report's unclaimed scope: native x86-64 performance, PQ6 cross-scale memory growth, Stim allocator-count instrumentation, and broader BitMatrix operations remain future work rather than defects in this slice. The separate full 271-parent CQ2 run later passed at clean revision `6351fe0a529462efd9f18a88bd59c08cfec9f81b` and is historical after qualification-controller hardening.
 
 ## Verification Record
 
@@ -192,5 +192,4 @@ Before committing closure documentation, rerun formatting, Clippy, workspace tes
 1. Run the same clean full and soak families, rollups, and completion receipts on a controlled native Linux x86-64 host before making an x86-64 conclusion.
 2. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a memory qualification claim or retiring the legacy memory baseline.
 3. Qualify the remaining BitMatrix methods only through their own exact public API groups without folding them into transpose evidence.
-4. Rerun the complete 271-parent CQ2 family before citing all-domain correctness execution as source-current.
-5. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed AArch64 slice.
+4. Select the next finite dependency-ordered PQ2 runtime group without reopening this completed AArch64 slice.
