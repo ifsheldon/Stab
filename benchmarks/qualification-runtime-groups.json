@@ -1,6 +1,6 @@
 {
   "schema_version": 5,
-  "performance_inventory_sha256": "0ee3639389860799298164c94c647fcab45b03c9d67b941b1aad12c6e5e06df5",
+  "performance_inventory_sha256": "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -695,7 +695,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "7f67a510a90c3670a904e7ea2c9f992e48949c597d3ff5040016177ebf06deea"
+        "sha256": "a4e6d03e13dbb75abe6ae182b83c1fd36ed2e49d17ae6fd87f6a653b9e307fab"
       },
       "comparator_sources": [
         {
@@ -743,7 +743,7 @@
       "owner": "stab-core/stabilizers",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "7f67a510a90c3670a904e7ea2c9f992e48949c597d3ff5040016177ebf06deea"
+        "sha256": "a4e6d03e13dbb75abe6ae182b83c1fd36ed2e49d17ae6fd87f6a653b9e307fab"
       },
       "comparator_sources": [
         {

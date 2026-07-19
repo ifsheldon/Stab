@@ -454,6 +454,13 @@ mod tests {
             baseline
                 .rows
                 .iter()
+                .any(|row| row.id == "m6-clifford-string"),
+            "Clifford timing migration must preserve the legacy memory baseline until PQ6"
+        );
+        assert!(
+            baseline
+                .rows
+                .iter()
                 .all(|row| row.stab_allocation_bytes_max.is_some()
                     && row.stab_resident_bytes_max.is_some()
                     && row.stab_resident_delta_bytes_max.is_some())

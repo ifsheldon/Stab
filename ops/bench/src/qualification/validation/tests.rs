@@ -229,50 +229,6 @@ fn replacement_target_uniqueness_includes_an_optional_scale() {
 }
 
 #[test]
-fn clifford_replacement_rejects_the_non_identity_runtime_group() {
-    let (mut suite, manifest, references) = fixture();
-    suite
-        .manifest_rows
-        .iter_mut()
-        .find(|row| row.id == "m6-clifford-string")
-        .expect("Clifford legacy row")
-        .replacement_contracts
-        .first_mut()
-        .expect("Clifford replacement")
-        .runtime_group_id = "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY".to_string();
-
-    let error = validate(&suite, &manifest, &references, "UNFROZEN")
-        .expect_err("non-identity cannot replace the identity-only legacy pair");
-    assert!(
-        error
-            .to_string()
-            .contains("must map its exact legacy pair only")
-    );
-}
-
-#[test]
-fn clifford_replacement_rejects_a_non_small_runtime_scale() {
-    let (mut suite, manifest, references) = fixture();
-    suite
-        .manifest_rows
-        .iter_mut()
-        .find(|row| row.id == "m6-clifford-string")
-        .expect("Clifford legacy row")
-        .replacement_contracts
-        .first_mut()
-        .expect("Clifford replacement")
-        .runtime_scale_id = Some("medium".to_string());
-
-    let error = validate(&suite, &manifest, &references, "UNFROZEN")
-        .expect_err("only the exact 10K small scale can replace the legacy pair");
-    assert!(
-        error
-            .to_string()
-            .contains("must map its exact legacy pair only")
-    );
-}
-
-#[test]
 fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
     let (suite, manifest, references) = fixture();
     let row = suite
@@ -290,6 +246,38 @@ fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
     );
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("superseded provenance does not own the replacement threshold");
+}
+
+#[test]
+fn superseded_clifford_row_retires_identity_only_timing_pair() {
+    let (suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter()
+        .find(|row| row.id == "m6-clifford-string")
+        .expect("superseded Clifford row");
+    assert_eq!(row.decision, RowDecision::Superseded);
+    assert!(row.threshold_refs.is_empty());
+    assert!(row.threshold_max_relative_ratio.is_none());
+    assert!(row.threshold_measurement_pairs.is_empty());
+    assert!(row.replacement_contracts.is_empty());
+    assert!(row.classifications.contains(&RowClassification::Duplicate));
+
+    for group_id in [
+        "PERFQ-M6-CLIFFORD-STRING",
+        "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
+    ] {
+        let group = suite
+            .qualification_groups
+            .iter()
+            .find(|group| group.id == group_id)
+            .expect("exact Clifford group");
+        assert_eq!(group.status, QualificationStatus::Implemented);
+        assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+    }
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("superseded identity-only provenance owns no timing threshold");
 }
 
 #[test]

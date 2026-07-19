@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f",
-  "semantic_digest": "0ee3639389860799298164c94c647fcab45b03c9d67b941b1aad12c6e5e06df5",
+  "semantic_digest": "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -72902,9 +72902,10 @@
       "id": "m6-clifford-string",
       "primary_group_id": "PERFQ-M6-CLIFFORD-STRING",
       "supporting_performance_features": [],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "faithful",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest"
@@ -72914,26 +72915,9 @@
         "source": "src/stim/stabilizers/clifford_string.perf.cc",
         "filter": "CliffordString_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
+      "threshold_refs": [],
       "threshold_max_relative_ratio": null,
-      "threshold_measurement_pairs": [
-        {
-          "stim_name": "CliffordString_multiplication_10K",
-          "stab_name": "stab_clifford_string_multiplication_10K",
-          "max_relative_ratio": "1.25"
-        }
-      ],
-      "replacement_contracts": [
-        {
-          "legacy_stim_name": "CliffordString_multiplication_10K",
-          "legacy_stab_name": "stab_clifford_string_multiplication_10K",
-          "runtime_group_id": "PERFQ-M6-CLIFFORD-STRING",
-          "runtime_measurement_id": "right-multiply-identity",
-          "runtime_scale_id": "small"
-        }
-      ],
+      "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
     {
