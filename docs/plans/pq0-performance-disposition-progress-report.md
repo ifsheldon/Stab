@@ -8,7 +8,7 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Current correctness dependency after the packed Clifford-string review fixes: schema-version-3 CQ0 semantic digest `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f`.
 
-Current schema-version-2 performance inventory digest after binding both Clifford-string groups to the reviewed scalable oracles, retired legacy identity/small timing provenance, refreshed correctness dependency, normalized statistic, and source-owned independent-throughput timing only for the identity group: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`. Runtime-group schema version 5 separately binds the shared optimization profiler note. Together the checked contracts preserve the independent `1.25x` gates, comparator sources, frozen workload vectors, and exact correctness parents introduced for the two Clifford groups, and they inherit no timing result from preceding common-iteration digest `18f2b401f386ec3fb459a2d26497a96b881f03d70ca9089665323b1efb61eff4`.
+Current schema-version-2 performance inventory digest after binding both Clifford-string groups to the reviewed scalable oracles, completed hostile-request matrix, retired legacy identity/small timing provenance, refreshed correctness dependency, normalized statistic, and source-owned independent-throughput timing only for the identity group: `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`. Runtime-group schema version 5 separately binds the shared optimization profiler note, and `benchmarks/qualification-threshold-migrations.json` machine-binds the reviewed legacy retirement authorization. Together the checked contracts preserve the independent `1.25x` gates, comparator sources, frozen workload vectors, and exact correctness parents introduced for the two Clifford groups, and they inherit no timing result from preceding inventories.
 
 Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -19,7 +19,7 @@ CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked
 The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate.
 The current inventory has 549 qualification groups and exactly seventeen implemented product runtime contracts: `PERFQ-M4-CIRCUIT-PARSE`, `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`, `PERFQ-M4-GATE-LOOKUP`, `PERFQ-M5-SIMD-WORD`, `PERFQ-M5-SIMD-BITS`, three position-specific `not_zero` groups, `PERFQ-M5-SPARSE-XOR`, `PERFQ-M5-SPARSE-XOR-ITEM`, `PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING`, `PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE`, `PERFQ-M6-PAULI-STRING`, `PERFQ-M6-PAULI-ITER`, `PERFQ-M6-PAULI-ITER-SINGLETON`, `PERFQ-M6-CLIFFORD-STRING`, and `PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY`.
 The transpose groups own only their two rustdoc aliases apiece and remain independent. Clean pre-migration revision `e660c91cff142b611f52a0a28a36e0a3d15670ed` passed both exact correctness prerequisites, worker reproducibility, both probes, all 12 first-attempt full and soak reports, all report replays and regressions, four rollups, and both completion receipt replays under the preceding inventory. Its in-place median ratios range from `0.370154x` to `0.695896x`, with worst confidence-interval upper bound `0.696808x`; its allocating medians range from `0.398336x` to `0.673927x`, with worst upper bound `0.679028x`. Those method-specific results authorized the narrow timing migration without becoming post-migration evidence. Clean post-migration revision `1264d885087761b19b37beded47811cc0c117e4d` also completed the full chain, but independent review then changed the exact edge oracle and fingerprinted worker contract, so that evidence remains historical. Clean reviewed revision `f912cc3af1f13cc9fab798d69937c155d37d83a0` closes its frozen reviewed chain: in-place medians range from `0.366307x` to `0.684489x` with worst upper bound `0.686065x`, and allocating medians range from `0.397088x` to `0.657658x` with worst upper bound `0.660876x`; all 12 reports, regressions, four method-specific rollups, and two method-specific completion receipts pass and replay.
-All seventeen executable product groups retain independent exact `1.25x` rules. Clean revision `3a0fcd814f8d1a9441420ab85edf3d757572ba93` completed and replayed the pre-migration Pauli multiplication chain under performance digest `84d5ab682acda2a847972a74c5d58443fde8d2c820e62e46b634562e7c918e46`, authorizing migration commit `42c132f2c49538364649cd90962166223c72b4c6`. Clean revision `cd1e33e10f45995ccaca498547ff5aa88bfe51bb` completed and replayed the accepted historical post-migration Pauli multiplication chain at performance digest `e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237`, with six first-attempt passing reports, six regressions, two rollups, and one completion receipt. Clean revision `f2388dccc01abb7ef89e5f56d9062c6656837470` completed and replayed the pre-migration Pauli iterator chain at performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb`, with 12 first-attempt passing reports, 12 regressions, four rollups, and two completion receipts. Those receipts authorized retirement of only the bundled iterator timing threshold and its two mappings. Migration commit `d706634eeaa536b2ce48d3dc9431b4feb513317f` made that focused change, and clean evidence revision `afaf0bf7f236b9f6ae6f72c19bbbdfea94d26632` closes the accepted historical post-migration iterator machine chain with 12 first-attempt passing reports and regressions, four replayed rollups, and two replayed completion receipts after complete accepted-maximum traversal strengthening. Its median ratios range from `0.025664x` to `0.568566x`, with worst upper bound `0.570628x`, and the iterator memory baseline remains guarded for PQ6. The two Clifford groups are source-owned and executable but remain unqualified until current-inventory clean full and soak evidence, regressions, rollups, completion receipts, audit, and review are complete.
+All seventeen executable product groups retain independent exact `1.25x` rules. Clean revision `3a0fcd814f8d1a9441420ab85edf3d757572ba93` completed and replayed the pre-migration Pauli multiplication chain under performance digest `84d5ab682acda2a847972a74c5d58443fde8d2c820e62e46b634562e7c918e46`, authorizing migration commit `42c132f2c49538364649cd90962166223c72b4c6`. Clean revision `cd1e33e10f45995ccaca498547ff5aa88bfe51bb` completed and replayed the accepted historical post-migration Pauli multiplication chain at performance digest `e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237`, with six first-attempt passing reports, six regressions, two rollups, and one completion receipt. Clean revision `f2388dccc01abb7ef89e5f56d9062c6656837470` completed and replayed the pre-migration Pauli iterator chain at performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb`, with 12 first-attempt passing reports, 12 regressions, four rollups, and two completion receipts. Those receipts authorized retirement of only the bundled iterator timing threshold and its two mappings. Migration commit `d706634eeaa536b2ce48d3dc9431b4feb513317f` made that focused change, and clean evidence revision `afaf0bf7f236b9f6ae6f72c19bbbdfea94d26632` closes the accepted historical post-migration iterator machine chain with 12 first-attempt passing reports and regressions, four replayed rollups, and two replayed completion receipts after complete accepted-maximum traversal strengthening. Its median ratios range from `0.025664x` to `0.568566x`, with worst upper bound `0.570628x`, and the iterator memory baseline remains guarded for PQ6. Clean pre-migration Clifford revision `127d6661a9e00872fc4aa4c0b0d27171e005afa5` authorized the focused legacy timing retirement, and clean post-migration revision `91f62d0a78659da2e8e264a6968b3c6cd32456de` closes the historical schema-version-30 Clifford contracts with 12 first-attempt passing reports and regressions, four replayed rollups, and two replayed completion receipts. Identity medians range from `0.000145x` to `0.014381x`, non-identity medians range from `0.742952x` to `0.766078x`, the worst upper bound is `0.766206x`, and the Clifford memory baseline remains guarded for PQ6. Current shared worker, hostile-vector, publication, migration-ledger, and receipt contracts require a fresh schema-version-31 chain before either Clifford ratio is source-current.
 Clean revisions `ba70a52025fdd4122ac97cec263725b2ec56e431`, `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`, `56dfe7569c6da48ffe76bde18f21ff43095f029b`, `5d226c94ece70f96d0b771f9c8cde7464ccd261b`, `60b732c77f1828058fbd65ec6c5c4ad582467fd1`, and `7b43b46d1c08f669264d009b8d3872ce86838f0e` supply accepted historical AArch64 evidence under their recorded inventories.
 The legacy canonical-print, heterogeneous sparse-XOR, and heterogeneous BitMatrix rows are superseded and retain only non-primary provenance or memory history.
 The inherited `m5-simd-word` and heterogeneous `m5-simd-bits` rows remain reworked; the legacy XOR pair remains mapped and active, while completed evidence authorized retirement of the duplicate `not_zero` and sparse-XOR timing pairs.
@@ -30,6 +30,7 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 ## Delivered Artifacts
 
 - `benchmarks/stim-qualification-suite.json` is the checked deterministic overlay on `benchmarks/manifest.csv`.
+- `benchmarks/qualification-threshold-migrations.json` is the checked authorization ledger for retired legacy timing contracts and retained memory baselines.
 - `ops/bench/src/qualification/` owns checklist extraction, source discovery, schema types, validation, deterministic regeneration, bounded regular-file reads, atomic writes, listing, and summary reporting.
 - `just bench::qualification-list` lists all coverage or one exact `PERF-*` domain.
 - `just bench::qualification-check` validates the checked inventory, validates all source references, regenerates it, and byte-compares the result.
@@ -46,28 +47,28 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Deferred checklist rows | 46 |
 | Default-feature public Rust API items | 1,974 |
 | Public API items covered by a measured parent | 1,021 |
-| Public API items classified as not independently performance relevant | 951 |
-| Qualification groups | 548 |
-| Measured or planned measured groups | 546 |
+| Public API items classified as not independently performance relevant | 953 |
+| Qualification groups | 549 |
+| Measured or planned measured groups | 547 |
 | Non-performance metadata groups | 2 |
 | Inherited benchmark rows | 161 |
 | Upstream perf files | 23 |
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows | 4 |
 | Groups bound to exact CQ0 API owners | 246 |
-| Groups with stable planned CQ preflight ids | 287 |
-| Groups with implemented exact CQ case bindings | 15 |
+| Groups with stable planned CQ preflight ids | 286 |
+| Groups with implemented exact CQ case bindings | 17 |
 | Exact inherited threshold measurement pairs | 21 |
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
 | Partial-row child ownership entries | 50 |
 | Typed generated fixture families | 395 |
-| Typed repository fixture families with SHA-256 | 35 |
-| Typed inline fixture families | 118 |
-| Scale points with exact input byte counts | 167 |
-| Scale points explicitly not byte-sized | 1,171 |
+| Typed repository fixture families with SHA-256 | 37 |
+| Typed inline fixture families | 117 |
+| Scale points with exact input byte counts | 173 |
+| Scale points explicitly not byte-sized | 1,170 |
 
-The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 654 stabilizer-algebra items.
+The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 656 stabilizer-algebra items.
 Declaration-only kinds and marker or diagnostic trait implementations do not receive independent runtime claims.
 Each function, method, and behavioral trait implementation is assigned to one or more of 246 planned measured API parents grouped only by canonical owner, phase, and performance domain, with every exact API path and CQ0 `owner_case_id` listed as required evidence, three concrete scale ids, a work unit, and a no-aggregation output contract; the validator rejects absent, non-measured, cross-domain, path-omitting, or owner-omitting parents.
 All 460 multi-domain API items preserve their secondary performance domains instead of silently retaining only the first CQ0 domain.
@@ -76,20 +77,20 @@ The seven partial rows carry explicit stable selected and deferred child ids plu
 The broad `.stim`, `.dem`, and result-format row, for example, assigns only the result-format child to `PERF-CONVERT-CLI`; gate, DEM, flow, and analysis children remain with their own domains.
 
 Every workload fixture is a typed generated, repository-file, or inline locator.
-The 35 repository fixtures use bounded nonsymlink reads and store SHA-256 corpus digests, so same-length content drift changes the semantic digest.
+The 37 repository fixtures use bounded nonsymlink reads and store SHA-256 corpus digests, so same-length content drift changes the semantic digest.
 Every scale point stores either an exact input-byte count or an explicit not-applicable state; generated workloads also use a registered group-kind generator, an exact seed, and exact `small`, `medium`, and `large` parameters.
 
 ## Inherited Row Decisions
 
 | Decision | Count | Meaning |
 | --- | ---: | --- |
-| Retained | 10 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
+| Retained | 9 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
 | Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
-| Superseded | 10 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
+| Superseded | 11 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
 
-The ten superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m6-pauli-iter`, `m6-pauli-string`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
+The eleven superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m6-clifford-string`, `m6-pauli-iter`, `m6-pauli-string`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
 The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical`, `m7-convert-01-to-ptb64`, and `pf3-gate-semantic-wide`.
 
 ## Unresolved Work Frozen For Later Milestones
@@ -98,7 +99,7 @@ The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical
 | --- | ---: | --- |
 | Proxy workload | 10 | PQ2 through PQ5 exact workload replacement |
 | Stale metadata row | 2 | PQ1 manifest migration |
-| Duplicate workload | 10 | PQ1 manifest migration |
+| Duplicate workload | 11 | PQ1 manifest migration |
 | Missing scale family | 123 | PQ2 through PQ6 |
 | Missing qualification correctness preflight | 158 | PQ1 plus dependent CQ milestones |
 | Missing semantic output digest | 158 | PQ1 |

@@ -766,7 +766,7 @@ fn completion_final_publication_rejects_replay_target_replacement() {
 }
 
 #[test]
-fn completion_final_publication_survives_old_tree_cleanup_failure() {
+fn completion_replay_publication_survives_old_tree_cleanup_failure() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("repository root");
     let output_path = Path::new("target/benchmarks/qualification/completion-cleanup");
@@ -789,8 +789,8 @@ fn completion_final_publication_survives_old_tree_cleanup_failure() {
         report_json: b"new report\n",
         preflight_json: b"new preflight\n",
         markdown: "new markdown\n",
-        existing_report_json: None,
-        existing_preflight_json: None,
+        existing_report_json: Some(b"old report\n"),
+        existing_preflight_json: Some(b"old preflight\n"),
     }
     .publish_with(
         || Ok(()),

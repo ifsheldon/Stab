@@ -20,6 +20,7 @@ mod error;
 mod not_zero;
 mod pauli;
 mod pauli_iter;
+mod prepared;
 mod sparse_xor;
 mod transpose;
 mod workload;
@@ -34,15 +35,12 @@ use bits::{
     POPCOUNT_TOGGLE_BIT, dense_xor, dense_xor_fixture, dense_xor_output_digest, popcount_fixture,
     popcount_output_digest, simd_word_popcount,
 };
-use clifford_string::{CliffordDescriptor, CliffordStringFixture};
+use clifford_string::CliffordDescriptor;
 use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
-use pauli::PauliMultiplyFixture;
-use pauli_iter::PauliIterFixture;
-use sparse_xor::SparseXorFixture;
-use transpose::TransposeFixture;
+use prepared::PreparedWorkload;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 11] = [
+const WORKER_SOURCES: [(&str, &[u8]); 12] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     (
@@ -55,6 +53,7 @@ const WORKER_SOURCES: [(&str, &[u8]); 11] = [
         "worker/pauli_iter.rs",
         include_bytes!("worker/pauli_iter.rs"),
     ),
+    ("worker/prepared.rs", include_bytes!("worker/prepared.rs")),
     (
         "worker/sparse_xor.rs",
         include_bytes!("worker/sparse_xor.rs"),
@@ -156,447 +155,33 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .checked_mul(args.work_items.get())
         .ok_or(WorkerError::WorkOverflow)?;
     let identity = current_identity()?;
-    let circuit_fixture = match args.workload {
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-        WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
-            Some(circuit_parse_fixture(args.work_items.get())?)
-        }
-    };
-    let mut popcount_fixture = match args.workload {
-        WorkerWorkload::SimdWordPopcount => Some(popcount_fixture(args.work_items.get())?),
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdBitsXor
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-    };
-    let mut dense_xor_fixture = match args.workload {
-        WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-    };
-    let not_zero_fixture = args
-        .workload
-        .not_zero_pattern()
-        .map(|pattern| not_zero_fixture(args.work_items.get(), pattern))
-        .transpose()?;
-    let mut sparse_xor_fixture = args
-        .workload
-        .sparse_xor_kind()
-        .map(|kind| SparseXorFixture::prepare(kind, args.work_items.get()))
-        .transpose()?;
-    let mut transpose_fixture = args
-        .workload
-        .transpose_kind()
-        .map(|kind| TransposeFixture::prepare(kind, args.work_items.get()))
-        .transpose()?;
-    let mut pauli_fixture = match args.workload {
-        WorkerWorkload::PauliStringRightMultiply => {
-            Some(PauliMultiplyFixture::prepare(args.work_items.get())?)
-        }
-        _ => None,
-    };
-    let mut pauli_iter_fixture = args
-        .workload
-        .pauli_iter_kind()
-        .map(|kind| PauliIterFixture::prepare(kind, args.work_items.get(), work_count))
-        .transpose()?;
-    let mut clifford_fixture = if let Some(kind) = args.workload.clifford_kind() {
-        let descriptor = args
-            .input_descriptor_hex
-            .ok_or(WorkerError::MissingCliffordDescriptor)?;
-        Some(CliffordStringFixture::prepare(
-            kind,
-            descriptor,
-            args.work_items.get(),
-            args.iterations.get(),
-        )?)
-    } else {
-        if args.input_descriptor_hex.is_some() {
-            return Err(WorkerError::UnexpectedCliffordDescriptor);
-        }
-        None
-    };
-    let (input_bytes, input_digest) = if let Some(fixture) = &popcount_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &dense_xor_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &not_zero_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &sparse_xor_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &transpose_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &pauli_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &pauli_iter_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(semantic_digest(fixture.input_digest))?,
-        )
-    } else if let Some(fixture) = &clifford_fixture {
-        (
-            fixture.input_bytes,
-            InputDigest::try_new(fixture.input_digest.clone())?,
-        )
-    } else {
-        let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
-        (
-            u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?,
-            InputDigest::try_new(semantic_digest(byte_digest(input)))?,
-        )
-    };
-    let mut popcount_toggle_state = if let Some(fixture) = &popcount_fixture {
-        Some(
-            fixture
-                .bits
-                .get(POPCOUNT_TOGGLE_BIT)
-                .ok_or(WorkerError::MissingPopcountToggleBit)?,
-        )
-    } else {
-        None
-    };
-    let canonical_print_circuit = match args.workload {
-        WorkerWorkload::CircuitCanonicalPrint => Some(stab_core::Circuit::from_stim_str(
-            circuit_fixture
-                .as_deref()
-                .ok_or(WorkerError::MissingCircuitFixture)?,
-        )?),
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::CircuitParse
-        | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-    };
-    let gate_hash_names = match args.workload {
-        WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-    };
-    let gate_hash_sweeps = match args.workload {
-        WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
-        WorkerWorkload::ProtocolSmoke
-        | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor
-        | WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate
-        | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem
-        | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating
-        | WorkerWorkload::PauliStringRightMultiply
-        | WorkerWorkload::PauliStringIterRange
-        | WorkerWorkload::PauliStringIterSingleton
-        | WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => None,
-    };
-    let gate_hash_table_digest = gate_hash_names
-        .as_deref()
-        .map(gate_table_digest)
-        .transpose()?;
-    if let Some(fixture) = &mut clifford_fixture {
-        fixture.reset_execution_state();
-    }
+    let mut prepared = PreparedWorkload::prepare(
+        args.workload,
+        args.input_descriptor_hex,
+        args.iterations.get(),
+        args.work_items.get(),
+        work_count,
+    )?;
+    let (input_bytes, input_digest) = prepared.input_evidence();
+    prepared.arm();
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
     verify_affinity(args.expected_cpu)?;
     let setup_rss_bytes = current_rss_bytes()?;
 
-    let (output, elapsed_seconds) = match args.workload {
-        WorkerWorkload::ProtocolSmoke => measure_workload(|| {
-            Ok(TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(
-                protocol_smoke(args.iterations.get(), args.work_items.get()),
-            )))
-        })?,
-        WorkerWorkload::CircuitParse => {
-            let fixture = circuit_fixture
-                .as_deref()
-                .ok_or(WorkerError::MissingCircuitFixture)?;
-            measure_workload(|| {
-                circuit_parse(args.iterations.get(), fixture)
-                    .map(WorkloadOutput::Circuit)
-                    .map(TimedWorkloadOutput::Complete)
-            })?
-        }
-        WorkerWorkload::CircuitCanonicalPrint => {
-            let circuit = canonical_print_circuit
-                .as_ref()
-                .ok_or(WorkerError::MissingCanonicalPrintCircuit)?;
-            measure_workload(|| {
-                Ok(TimedWorkloadOutput::Complete(
-                    WorkloadOutput::CanonicalCircuitText(circuit_canonical_print(
-                        args.iterations.get(),
-                        circuit,
-                    )),
-                ))
-            })?
-        }
-        WorkerWorkload::GateNameHash => {
-            let sweeps = gate_hash_sweeps.ok_or(WorkerError::MissingGateHashSweeps)?;
-            let names = gate_hash_names
-                .as_deref()
-                .ok_or(WorkerError::MissingGateHashNames)?;
-            let table_digest =
-                gate_hash_table_digest.ok_or(WorkerError::MissingGateHashTableDigest)?;
-            measure_workload(|| {
-                Ok(TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(
-                    gate_name_hash(
-                        args.iterations.get(),
-                        args.work_items.get(),
-                        sweeps,
-                        names,
-                        table_digest,
-                    ),
-                )))
-            })?
-        }
-        WorkerWorkload::SimdWordPopcount => {
-            let fixture = popcount_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingPopcountFixture)?;
-            let toggle_state = popcount_toggle_state
-                .as_mut()
-                .ok_or(WorkerError::MissingPopcountToggleBit)?;
-            measure_workload(|| {
-                simd_word_popcount(args.iterations.get(), fixture, toggle_state)
-                    .map(TimedWorkloadOutput::PopcountChecksum)
-            })?
-        }
-        WorkerWorkload::SimdBitsXor => {
-            let fixture = dense_xor_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingDenseXorFixture)?;
-            measure_workload(|| {
-                dense_xor(args.iterations.get(), fixture)
-                    .map(|()| TimedWorkloadOutput::DenseXorComplete)
-            })?
-        }
-        WorkerWorkload::SimdBitsNotZeroEarly
-        | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => {
-            let fixture = not_zero_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingNotZeroFixture)?;
-            measure_workload(|| {
-                Ok(TimedWorkloadOutput::NotZeroChecksum(simd_bits_not_zero(
-                    args.iterations.get(),
-                    fixture,
-                )))
-            })?
-        }
-        WorkerWorkload::SparseXorRow | WorkerWorkload::SparseXorItem => {
-            let fixture = sparse_xor_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingSparseXorFixture)?;
-            measure_workload(|| {
-                fixture.execute(args.iterations.get());
-                Ok(TimedWorkloadOutput::SparseXorComplete)
-            })?
-        }
-        WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => {
-            let fixture = transpose_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingTransposeFixture)?;
-            measure_workload(|| {
-                fixture.execute(args.iterations.get())?;
-                Ok(TimedWorkloadOutput::TransposeComplete)
-            })?
-        }
-        WorkerWorkload::PauliStringRightMultiply => {
-            let fixture = pauli_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingPauliFixture)?;
-            measure_workload(|| {
-                fixture.execute(args.iterations.get())?;
-                Ok(TimedWorkloadOutput::PauliMultiplyComplete)
-            })?
-        }
-        WorkerWorkload::PauliStringIterRange | WorkerWorkload::PauliStringIterSingleton => {
-            let fixture = pauli_iter_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingPauliIterFixture)?;
-            measure_workload(|| {
-                fixture.execute(args.iterations.get())?;
-                Ok(TimedWorkloadOutput::PauliIterComplete)
-            })?
-        }
-        WorkerWorkload::CliffordStringRightMultiplyIdentity
-        | WorkerWorkload::CliffordStringRightMultiplyNonIdentity => {
-            let fixture = clifford_fixture
-                .as_mut()
-                .ok_or(WorkerError::MissingCliffordFixture)?;
-            measure_workload(|| {
-                fixture.execute(args.iterations.get())?;
-                Ok(TimedWorkloadOutput::CliffordStringComplete)
-            })?
-        }
-    };
+    let (output, elapsed_seconds) =
+        measure_workload(|| prepared.execute(args.iterations.get(), args.work_items.get()))?;
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
     }
     let peak_rss_bytes = peak_rss_bytes()?.max(current_rss_bytes()?);
-    let digest = match output {
-        TimedWorkloadOutput::Complete(output) => output.semantic_digest(),
-        TimedWorkloadOutput::PopcountChecksum(checksum) => {
-            let fixture = popcount_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingPopcountFixture)?;
-            let final_bit = fixture
-                .bits
-                .get(POPCOUNT_TOGGLE_BIT)
-                .ok_or(WorkerError::MissingPopcountToggleBit)?;
-            semantic_digest(popcount_output_digest(
-                checksum,
-                args.iterations.get(),
-                args.work_items.get(),
-                fixture.input_digest,
-                final_bit,
-            ))
-        }
-        TimedWorkloadOutput::DenseXorComplete => {
-            let fixture = dense_xor_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingDenseXorFixture)?;
-            semantic_digest(dense_xor_output_digest(
-                fixture,
-                args.iterations.get(),
-                args.work_items.get(),
-            ))
-        }
-        TimedWorkloadOutput::NotZeroChecksum(checksum) => {
-            let fixture = not_zero_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingNotZeroFixture)?;
-            semantic_digest(not_zero_output_digest(
-                checksum,
-                args.iterations.get(),
-                args.work_items.get(),
-                fixture,
-            ))
-        }
-        TimedWorkloadOutput::SparseXorComplete => {
-            let fixture = sparse_xor_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingSparseXorFixture)?;
-            semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
-        }
-        TimedWorkloadOutput::TransposeComplete => {
-            let fixture = transpose_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingTransposeFixture)?;
-            semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
-        }
-        TimedWorkloadOutput::PauliMultiplyComplete => {
-            let fixture = pauli_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingPauliFixture)?;
-            semantic_digest(fixture.output_digest(args.iterations.get(), work_count)?)
-        }
-        TimedWorkloadOutput::PauliIterComplete => {
-            let fixture = pauli_iter_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingPauliIterFixture)?;
-            semantic_digest(fixture.output_digest(args.iterations.get(), work_count)?)
-        }
-        TimedWorkloadOutput::CliffordStringComplete => {
-            let fixture = clifford_fixture
-                .as_ref()
-                .ok_or(WorkerError::MissingCliffordFixture)?;
-            fixture.output_digest(args.iterations.get(), work_count)?
-        }
-    };
+    let digest = prepared.output_digest(
+        output,
+        args.iterations.get(),
+        args.work_items.get(),
+        work_count,
+    )?;
     let row = WorkerMeasurement {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
@@ -868,7 +453,7 @@ fn semantic_digest(state: [u64; 4]) -> String {
     )
 }
 
-fn hex_bytes(bytes: &[u8]) -> Result<String, WorkerError> {
+pub(super) fn hex_bytes(bytes: &[u8]) -> Result<String, WorkerError> {
     let mut output = String::with_capacity(bytes.len().saturating_mul(2));
     for byte in bytes {
         write!(&mut output, "{byte:02x}").map_err(|_| WorkerError::DigestEncoding)?;

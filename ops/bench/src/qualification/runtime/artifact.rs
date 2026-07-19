@@ -69,6 +69,29 @@ pub(crate) struct QualificationOutput {
 }
 
 impl QualificationOutput {
+    pub(crate) fn require_absent(root: &RepoRoot, relative: &Path) -> Result<(), ArtifactError> {
+        ensure_linux()?;
+        let components = validate_output(relative)?;
+        let (target_name, parent_components) = components
+            .split_last()
+            .ok_or_else(|| ArtifactError::InvalidOutput(relative.to_path_buf()))?;
+        let repository = open_directory(&root.path)?;
+        let parent = open_or_create_directories(&repository, parent_components)?;
+        let lock = rustix::fs::openat(
+            &parent,
+            PUBLICATION_LOCK,
+            rustix::fs::OFlags::RDWR
+                | rustix::fs::OFlags::CLOEXEC
+                | rustix::fs::OFlags::CREATE
+                | rustix::fs::OFlags::NOFOLLOW,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )
+        .map_err(ArtifactError::Io)?;
+        rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)
+            .map_err(ArtifactError::Io)?;
+        require_missing_target(&parent, target_name, relative)
+    }
+
     pub(crate) fn begin(root: &RepoRoot, relative: &Path) -> Result<Self, ArtifactError> {
         ensure_linux()?;
         let components = validate_output(relative)?;
@@ -112,6 +135,12 @@ impl QualificationOutput {
         })
     }
 
+    pub(crate) fn begin_new(root: &RepoRoot, relative: &Path) -> Result<Self, ArtifactError> {
+        let output = Self::begin(root, relative)?;
+        require_missing_target(&output.parent, &output.target_name, relative)?;
+        Ok(output)
+    }
+
     pub(crate) fn write(&self, name: &'static str, bytes: &[u8]) -> Result<(), ArtifactError> {
         if !ARTIFACT_NAMES.contains(&name) {
             return Err(ArtifactError::InvalidArtifactName(name));
@@ -146,7 +175,22 @@ impl QualificationOutput {
         self.commit_with_cleanup(remove_known_output)
     }
 
-    pub(super) fn commit_with_cleanup<F>(mut self, cleanup: F) -> Result<(), ArtifactError>
+    pub(crate) fn commit_new(self) -> Result<(), ArtifactError> {
+        self.commit_with_cleanup_mode(false, remove_known_output)
+    }
+
+    pub(super) fn commit_with_cleanup<F>(self, cleanup: F) -> Result<(), ArtifactError>
+    where
+        F: FnOnce(&OwnedFd, &OwnedFd, &OsStr, &BTreeSet<OsString>) -> Result<(), ArtifactError>,
+    {
+        self.commit_with_cleanup_mode(true, cleanup)
+    }
+
+    fn commit_with_cleanup_mode<F>(
+        mut self,
+        replace_existing: bool,
+        cleanup: F,
+    ) -> Result<(), ArtifactError>
     where
         F: FnOnce(&OwnedFd, &OwnedFd, &OsStr, &BTreeSet<OsString>) -> Result<(), ArtifactError>,
     {
@@ -182,6 +226,9 @@ impl QualificationOutput {
                 Err(source) => return Err(ArtifactError::Io(source)),
             }
         };
+        if previous.is_some() && !replace_existing {
+            return Err(ArtifactError::OutputAlreadyExists(self.relative.clone()));
+        }
         if let Some((previous_directory, _)) = &previous {
             rustix::fs::renameat_with(
                 &self.parent,
@@ -476,6 +523,20 @@ fn open_directory_at(parent: &OwnedFd, name: &OsStr) -> Result<OwnedFd, rustix::
     )
 }
 
+fn require_missing_target(
+    parent: &OwnedFd,
+    name: &OsStr,
+    relative: &Path,
+) -> Result<(), ArtifactError> {
+    match open_directory_at(parent, name) {
+        Ok(_) | Err(rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+            Err(ArtifactError::OutputAlreadyExists(relative.to_path_buf()))
+        }
+        Err(rustix::io::Errno::NOENT) => Ok(()),
+        Err(source) => Err(ArtifactError::Io(source)),
+    }
+}
+
 fn open_or_create_directories(
     root: &OwnedFd,
     components: &[&OsStr],
@@ -691,6 +752,8 @@ pub(crate) enum ArtifactError {
     UnexpectedExistingArtifacts(BTreeSet<OsString>),
     #[error("qualification output contains too many existing artifacts")]
     TooManyExistingArtifacts,
+    #[error("qualification producer output already exists and cannot be replaced: {0}")]
+    OutputAlreadyExists(PathBuf),
     #[error("failed to reserve a unique qualification staging directory")]
     NoStagingName,
     #[error("qualification artifact filesystem operation failed: {0}")]
@@ -770,6 +833,54 @@ mod tests {
             .filter_map(Result::ok)
             .any(|entry| entry.file_name().to_string_lossy().ends_with(".staging"));
         assert!(!staging, "successful replacement left a staging directory");
+    }
+
+    #[test]
+    fn producer_publication_refuses_to_replace_existing_evidence() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/append-only-run");
+
+        let first = QualificationOutput::begin(&root, output).expect("begin first publication");
+        first
+            .write("report.json", b"first\n")
+            .expect("write first report");
+        first.commit_new().expect("publish first report");
+
+        let second = QualificationOutput::begin(&root, output).expect("begin second publication");
+        second
+            .write("report.json", b"second\n")
+            .expect("write second report");
+        assert!(matches!(
+            second.commit_new(),
+            Err(ArtifactError::OutputAlreadyExists(path)) if path == output
+        ));
+        assert_eq!(
+            read_artifact(&root, output, "report.json").expect("read retained report"),
+            b"first\n"
+        );
+    }
+
+    #[test]
+    fn producer_begin_rejects_an_existing_output_before_work() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/append-only-preflight");
+
+        let first = QualificationOutput::begin_new(&root, output).expect("begin first producer");
+        first
+            .write("report.json", b"retained\n")
+            .expect("write retained report");
+        first.commit_new().expect("publish retained report");
+
+        assert!(matches!(
+            QualificationOutput::begin_new(&root, output),
+            Err(ArtifactError::OutputAlreadyExists(path)) if path == output
+        ));
+        assert_eq!(
+            read_artifact(&root, output, "report.json").expect("read retained report"),
+            b"retained\n"
+        );
     }
 
     #[test]

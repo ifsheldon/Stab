@@ -45,7 +45,7 @@ pub(super) fn runtime_descriptor(
 pub(super) fn expected_clifford_probes() -> Result<Vec<WorkerContractProbeEvidence>, InvocationError>
 {
     let file = checked_file().map_err(InvocationError::CliffordVectorContract)?;
-    let mut probes = Vec::with_capacity(62);
+    let mut probes = Vec::with_capacity(72);
     for implementation in [Implementation::Stab, Implementation::Stim] {
         for request in &file.requests {
             match request.result {
@@ -89,7 +89,7 @@ impl PreparedWorkers {
         &self,
     ) -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
         let file = checked_file().map_err(InvocationError::CliffordVectorContract)?;
-        let mut probes = Vec::with_capacity(62);
+        let mut probes = Vec::with_capacity(72);
         for implementation in [Implementation::Stab, Implementation::Stim] {
             for request in &file.requests {
                 probes.push(match request.result {
@@ -102,9 +102,9 @@ impl PreparedWorkers {
                 });
             }
         }
-        if probes.len() != 62 {
+        if probes.len() != 72 {
             return Err(InvocationError::CliffordVectorContract(format!(
-                "Clifford preflight produced {} receipts, expected 62",
+                "Clifford preflight produced {} receipts, expected 72",
                 probes.len()
             )));
         }
@@ -267,6 +267,22 @@ pub(super) fn clifford_rejection_expectation(
             request.id
         ))
     })?;
+    if class == "malformed-descriptor-hex" {
+        return Ok(match implementation {
+            Implementation::Stim => (
+                2,
+                "stim qualification adapter: Clifford descriptor contains a non-hexadecimal character\n"
+                    .to_string(),
+            ),
+            Implementation::Stab => (
+                2,
+                format!(
+                    "error: invalid value '{}' for '--input-descriptor-hex <INPUT_DESCRIPTOR_HEX>': Clifford descriptor contains a non-hexadecimal character\n\nFor more information, try '--help'.\n",
+                    request.descriptor_hex
+                ),
+            ),
+        });
+    }
     let kind = kind_from_workload(&request.workload)?;
     let descriptor = request
         .descriptor_hex
@@ -327,6 +343,19 @@ pub(super) fn clifford_rejection_expectation(
                 "qualification worker semantic work count overflows u64".to_string()
             }
         },
+        "workload-marker-mismatch" => match implementation {
+            Implementation::Stim => {
+                "Clifford-string descriptor workload marker mismatch".to_string()
+            }
+            Implementation::Stab => format!(
+                "{} does not accept Clifford-string workload marker {marker}",
+                kind.workload()
+            ),
+        },
+        "width-work-mismatch" => format!(
+            "Clifford-string descriptor width {width} differs from work-items {}",
+            request.work_items
+        ),
         _ => {
             return Err(InvocationError::CliffordVectorContract(format!(
                 "unknown Clifford rejection class {class}"
@@ -395,7 +424,10 @@ mod tests {
                     clifford_rejection_expectation(implementation, request).expect("expectation");
                 assert_eq!(
                     status,
-                    if implementation == Implementation::Stab {
+                    if implementation == Implementation::Stab
+                        && request.expected_rejection_class.as_deref()
+                            != Some("malformed-descriptor-hex")
+                    {
                         1
                     } else {
                         2

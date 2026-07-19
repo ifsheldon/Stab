@@ -24,16 +24,6 @@ pub(crate) enum WorkerError {
     CircuitFixtureOverflow,
     #[error("qualification input byte count cannot be represented as u64")]
     InputSizeRange,
-    #[error("circuit-parse workload was invoked without its prepared fixture")]
-    MissingCircuitFixture,
-    #[error("circuit-canonical-print workload was invoked without its prepared circuit")]
-    MissingCanonicalPrintCircuit,
-    #[error("gate-name-hash workload was invoked without its prepared name table")]
-    MissingGateHashNames,
-    #[error("gate-name-hash workload was invoked without its validated sweep count")]
-    MissingGateHashSweeps,
-    #[error("gate-name-hash workload was invoked without its prepared table digest")]
-    MissingGateHashTableDigest,
     #[error("gate-name-hash registry has {actual} names, expected {expected}")]
     GateHashNameCount { actual: usize, expected: u64 },
     #[error("gate-name-hash value {actual} for {name:?} cannot be represented as u16")]
@@ -54,8 +44,6 @@ pub(crate) enum WorkerError {
     PopcountFixtureAllocation(std::collections::TryReserveError),
     #[error("simd-word-popcount fixture does not contain its toggle bit")]
     MissingPopcountToggleBit,
-    #[error("simd-word-popcount workload was invoked without its prepared fixture")]
-    MissingPopcountFixture,
     #[error("simd-word-popcount result cannot be represented as u64")]
     PopcountResultRange,
     #[error("simd-bits-xor width {actual} bits is below the minimum {minimum}")]
@@ -70,8 +58,6 @@ pub(crate) enum WorkerError {
     DenseXorWordIndexRange,
     #[error("simd-bits-xor fixture allocation failed: {0}")]
     DenseXorFixtureAllocation(std::collections::TryReserveError),
-    #[error("simd-bits-xor workload was invoked without its prepared fixture")]
-    MissingDenseXorFixture,
     #[error("simd-bits-not-zero width {actual} bits is below the minimum {minimum}")]
     NotZeroWidthMinimum { actual: u64, minimum: u64 },
     #[error("simd-bits-not-zero width {actual} bits exceeds the maximum {maximum}")]
@@ -82,8 +68,6 @@ pub(crate) enum WorkerError {
     NotZeroFixtureAllocation(std::collections::TryReserveError),
     #[error("simd-bits-not-zero hit index {index} is outside bit width {bit_count}")]
     NotZeroHitIndex { index: usize, bit_count: usize },
-    #[error("simd-bits-not-zero workload was invoked without its prepared fixture")]
-    MissingNotZeroFixture,
     #[error("{workload} work count {actual} is not a positive multiple of {base}")]
     SparseXorWorkShape {
         workload: &'static str,
@@ -106,8 +90,6 @@ pub(crate) enum WorkerError {
     SparseXorEncodingAllocation(std::collections::TryReserveError),
     #[error("{0} capacity priming did not restore the canonical sparse XOR state")]
     SparseXorPrimingState(&'static str),
-    #[error("sparse XOR workload was invoked without its prepared fixture")]
-    MissingSparseXorFixture,
     #[error("bit-matrix transpose work count {0} is not a perfect square")]
     TransposeWorkNotSquare(u64),
     #[error("bit-matrix transpose dimension {actual} is below the minimum {minimum}")]
@@ -124,8 +106,6 @@ pub(crate) enum WorkerError {
     TransposeAffineOverflow,
     #[error("{0} warmup did not restore the canonical bit-matrix state")]
     TransposePrimingState(&'static str),
-    #[error("bit-matrix transpose workload was invoked without its prepared fixture")]
-    MissingTransposeFixture,
     #[error("allocating bit-matrix transpose produced no retained result")]
     MissingTransposeResult,
     #[error("allocating bit-matrix transpose modified its source matrix")]
@@ -144,8 +124,6 @@ pub(crate) enum WorkerError {
     PauliPrimingState,
     #[error("Pauli multiplication modified its right operand")]
     PauliRightChanged,
-    #[error("Pauli multiplication workload was invoked without its prepared fixture")]
-    MissingPauliFixture,
     #[error("{workload} work count {actual} is not a complete source-owned iterator traversal")]
     PauliIterWorkShape { workload: &'static str, actual: u64 },
     #[error("{workload} output count {actual} exceeds maximum {maximum}")]
@@ -190,8 +168,6 @@ pub(crate) enum WorkerError {
         expected_width_checksum: u64,
         actual_width_checksum: u64,
     },
-    #[error("Pauli iterator workload was invoked without its prepared fixture")]
-    MissingPauliIterFixture,
     #[error("Clifford-string workload requires --input-descriptor-hex")]
     MissingCliffordDescriptor,
     #[error("--input-descriptor-hex is only valid for Clifford-string workloads")]
@@ -214,8 +190,10 @@ pub(crate) enum WorkerError {
         actual: u64,
         expected: u64,
     },
-    #[error("Clifford-string workload was invoked without its prepared fixture")]
-    MissingCliffordFixture,
+    #[error("qualification workload {0} has no matching prepared lifecycle")]
+    PreparedWorkloadKind(&'static str),
+    #[error("prepared qualification workload returned an incompatible output")]
+    PreparedWorkloadOutput,
     #[error("Clifford-string execution state was not reset before the start barrier")]
     CliffordExecutionNotArmed,
     #[error("Clifford-string successful callback count overflowed u64")]

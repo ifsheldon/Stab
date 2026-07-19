@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f",
-  "semantic_digest": "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025",
+  "semantic_digest": "c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -63690,7 +63690,7 @@
         "fixture": {
           "kind": "repository-file",
           "path": "benchmarks/fixtures/pq2-clifford-string-vectors.json",
-          "sha256": "0af8e53952580831ee76bc2d9c9d357f5eef73601943222a6d1921ed64e19f04"
+          "sha256": "e61cd02dd29eb006892444eddd30693031e39746add588a8f538888499a29d85"
         },
         "source": "src/stim/stabilizers/clifford_string.perf.cc",
         "deterministic_seed": "none; descriptor-schema=1; canonical-gate-order=stim-v1.16.0",
@@ -63792,7 +63792,7 @@
         "fixture": {
           "kind": "repository-file",
           "path": "benchmarks/fixtures/pq2-clifford-string-vectors.json",
-          "sha256": "0af8e53952580831ee76bc2d9c9d357f5eef73601943222a6d1921ed64e19f04"
+          "sha256": "e61cd02dd29eb006892444eddd30693031e39746add588a8f538888499a29d85"
         },
         "source": "src/stim/stabilizers/clifford_string.perf.cc",
         "deterministic_seed": "none; descriptor-schema=1; canonical-gate-order=stim-v1.16.0",

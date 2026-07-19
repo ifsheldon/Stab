@@ -840,6 +840,7 @@ mod tests {
     fn source_shape_freezes_symmetric_public_timing_and_result_witnesses() {
         let rust_callback = include_str!("clifford_string.rs");
         let rust_worker = include_str!("../worker.rs");
+        let rust_prepared = include_str!("prepared.rs");
         let cpp_callback = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../benchmarks/stim_adapter/clifford_string_contract.h"
@@ -862,13 +863,18 @@ mod tests {
         assert!(rust_callback.contains("scalar_right_power("));
         assert!(rust_callback.contains("self.execution_witness ="));
         assert!(rust_callback.contains("black_box(self.execution_witness);"));
-        let rust_reset = rust_worker
-            .find("fixture.reset_execution_state();")
-            .expect("Rust reset source");
+        assert!(
+            rust_prepared
+                .find("fixture.reset_execution_state();")
+                .is_some()
+        );
+        let rust_arm = rust_worker
+            .find("prepared.arm();")
+            .expect("Rust arm source");
         let rust_barrier = rust_worker
             .find("if args.start_barrier {")
             .expect("Rust barrier source");
-        assert!(rust_reset < rust_barrier);
+        assert!(rust_arm < rust_barrier);
 
         assert_eq!(
             cpp_callback

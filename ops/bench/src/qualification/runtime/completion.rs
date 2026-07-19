@@ -100,12 +100,20 @@ impl CompletionPublication<'_> {
         repository_before: &super::git::RepositoryState,
     ) -> Result<(), CompletionError> {
         let root = self.root;
+        let replay = self.existing_report_json.is_some();
         self.publish_with(
             || {
                 let repository_at_publication = super::git::repository_state(root)?;
                 require_same_clean_repository(repository_before, &repository_at_publication)
             },
-            |output| output.commit().map_err(CompletionError::Artifact),
+            |output| {
+                if replay {
+                    output.commit()
+                } else {
+                    output.commit_new()
+                }
+                .map_err(CompletionError::Artifact)
+            },
         )
     }
 
@@ -118,7 +126,11 @@ impl CompletionPublication<'_> {
         BeforeCommit: FnOnce() -> Result<(), CompletionError>,
         Commit: FnOnce(QualificationOutput) -> Result<(), CompletionError>,
     {
-        let mut output = QualificationOutput::begin(self.root, self.output_path.as_path())?;
+        let mut output = if self.existing_report_json.is_some() {
+            QualificationOutput::begin(self.root, self.output_path.as_path())?
+        } else {
+            QualificationOutput::begin_new(self.root, self.output_path.as_path())?
+        };
         if let Some(existing) = self.existing_report_json {
             output.require_current_artifact("report.json", existing)?;
         }
@@ -214,6 +226,9 @@ fn execute(
     let repository_before = super::git::repository_state(root)?;
     require_clean_repository(&repository_before)?;
     let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
+    if options.existing_report_json.is_none() {
+        QualificationOutput::require_absent(root, output_path.as_path())?;
+    }
     let resolved =
         super::group::load_group(root, expected_performance_inventory_sha256, &args.group)?;
     require_completion_group(&resolved.contract)?;

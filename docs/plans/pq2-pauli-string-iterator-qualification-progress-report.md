@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Iterator Qualification Progress Report
 
-> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced source-current digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025` without relabeling the iterator evidence. The measurements below remain historical.
+> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176` without relabeling the iterator evidence. The measurements below remain historical.
 
 ## Status
 

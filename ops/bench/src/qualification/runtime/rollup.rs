@@ -267,6 +267,7 @@ pub(super) fn run(
     require_clean_repository(&repository_before)?;
     let tier = QualificationTier::from(args.tier);
     let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
+    QualificationOutput::require_absent(root, output_path.as_path())?;
     let resolved =
         super::group::load_group(root, expected_performance_inventory_sha256, &args.group)?;
     if resolved.contract.scales.len() > MAX_SCALE_REPORTS
@@ -309,13 +310,13 @@ pub(super) fn run(
     let preflight_json = render_json(&preflight)?;
     let markdown = render_markdown(&report, &sha256_hex(&report_json));
 
-    let mut output = QualificationOutput::begin(root, output_path.as_path())?;
+    let mut output = QualificationOutput::begin_new(root, output_path.as_path())?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     require_current_sources(&mut output, &loaded)?;
     require_current_producer(root, &report.producer_repository)?;
-    output.commit()?;
+    output.commit_new()?;
     Ok(output_path.into_path_buf())
 }
 

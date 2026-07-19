@@ -23,7 +23,7 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::TimingBatchPolicy;
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 30;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 31;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -266,6 +266,7 @@ pub(super) fn run(
     correctness_inventory_sha256: &str,
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
+    QualificationOutput::require_absent(root, &args.out)?;
     let repository_before = super::git::repository_state(root)?;
     let resolved_group = super::group::load_group(root, performance_inventory_sha256, &args.group)?;
     let scale = resolved_group.contract.scale(&args.scale)?;
@@ -513,12 +514,12 @@ pub(super) fn run(
     let preflight = super::report::preflight_artifact(&report, &report_json)?;
     let preflight_json = render_json(&preflight)?;
     let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json))?;
-    let output = QualificationOutput::begin(root, &args.out)?;
+    let output = QualificationOutput::begin_new(root, &args.out)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     let relative = output.relative().to_path_buf();
-    output.commit()?;
+    output.commit_new()?;
     Ok(relative)
 }
 

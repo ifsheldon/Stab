@@ -13,6 +13,7 @@ use crate::root::RepoRoot;
 mod checklist;
 mod discovery;
 mod io;
+mod migration;
 mod model;
 mod runtime;
 mod validation;
@@ -23,7 +24,7 @@ pub(crate) use runtime::{
 };
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025";
+    "c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -215,6 +216,7 @@ pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(),
     if checked_bytes != render(&generated)? {
         return Err(BenchError::QualificationDrift);
     }
+    migration::check(root, &checked)?;
     runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST, &checked)
         .map_err(BenchError::Qualification)?;
     print_summary(&checked, None);
@@ -258,6 +260,7 @@ pub(crate) fn regenerate(
             "UNFROZEN"
         },
     )?;
+    migration::check(root, &generated)?;
     let bytes = render(&generated)?;
     if check {
         ensure_frozen()?;

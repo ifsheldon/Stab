@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "migrations": [
+    {
+      "id": "m6-clifford-string-identity-small",
+      "legacy_row_id": "m6-clifford-string",
+      "legacy_stim_measurement": "CliffordString_multiplication_10K",
+      "legacy_stab_measurement": "stab_clifford_string_multiplication_10K",
+      "replacement_group_id": "PERFQ-M6-CLIFFORD-STRING",
+      "replacement_measurement_id": "right-multiply-identity",
+      "replacement_scale_id": "small",
+      "authorization_revision": "127d6661a9e00872fc4aa4c0b0d27171e005afa5",
+      "authorization_performance_inventory_sha256": "0ee3639389860799298164c94c647fcab45b03c9d67b941b1aad12c6e5e06df5",
+      "authorization_completion_path": "target/benchmarks/qualification/pq2-clifford-pre-migration-127d6661-identity-completion",
+      "authorization_completion_report_sha256": "78fc10ca29e432641f3d978ed871c4b96d1ba344d714c20bf726f574239d2126",
+      "authorization_completion_preflight_sha256": "1acb62cf0606a6abc705bc9ac83068b80099a39585b67732de5aa6443e66d1a0",
+      "migration_revision": "91f62d0a78659da2e8e264a6968b3c6cd32456de",
+      "migration_performance_inventory_sha256": "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025",
+      "retained_memory_baseline_id": "m6-clifford-string"
+    }
+  ]
+}

@@ -738,6 +738,66 @@
       "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
       "expected_rejection_class": "work-overflow",
       "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-opposite-workload-marker",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "expected_rejection_class": "workload-marker-mismatch",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-opposite-workload-marker",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "expected_rejection_class": "workload-marker-mismatch",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-width-work-mismatch",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10001,
+      "descriptor_hex": "1027000000000000434c49465f494431010000000000000018000000000000000000000000000000000000000000000000001000000000000000000000000000",
+      "input_sha256": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329",
+      "expected_rejection_class": "width-work-mismatch",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "nonidentity-width-work-mismatch",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-non-identity",
+      "measurement_id": "right-multiply-non-identity",
+      "iterations": 1,
+      "work_items": 10001,
+      "descriptor_hex": "1027000000000000434c49465f4e4931010000000000000018000000000000001700000000000000280200000000000000001000000000000000000000000000",
+      "input_sha256": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d",
+      "expected_rejection_class": "width-work-mismatch",
+      "start_barrier_consumed": false
+    },
+    {
+      "id": "identity-malformed-descriptor-hex",
+      "result": "rejected",
+      "workload": "clifford-string-right-multiply-identity",
+      "measurement_id": "right-multiply-identity",
+      "iterations": 1,
+      "work_items": 10000,
+      "descriptor_hex": "1027000000000000434c49465f49443101000000000000001800000000000000000000000000000000000000000000000000100000000000000000000000000g",
+      "input_sha256": "dc643c13fa162c93918aca5736c669d5d33ed09d8e64e5630a4ffeb88cb1627e",
+      "expected_rejection_class": "malformed-descriptor-hex",
+      "start_barrier_consumed": false
     }
   ]
 }

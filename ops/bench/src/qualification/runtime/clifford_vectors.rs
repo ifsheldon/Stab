@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use std::sync::OnceLock;
 
 use super::worker::WorkerError;
@@ -177,7 +178,7 @@ fn generated_file() -> Result<CliffordVectorFile, WorkerError> {
     .map(|(kind, id, width)| descriptor_vector(kind, id, width))
     .collect::<Result<Vec<_>, _>>()?;
 
-    let mut requests = Vec::with_capacity(31);
+    let mut requests = Vec::with_capacity(36);
     for (kind, id, width, iterations) in [
         (
             CliffordWorkloadKind::Identity,
@@ -418,6 +419,54 @@ fn generated_file() -> Result<CliffordVectorFile, WorkerError> {
             u64::MAX / SMALL_WIDTH + 1,
             "work-overflow",
         )?,
+        rejected_request(
+            CliffordWorkloadKind::Identity,
+            "identity-opposite-workload-marker",
+            non_identity,
+            CliffordWorkloadKind::Identity.measurement(),
+            1,
+            "workload-marker-mismatch",
+        )?,
+        rejected_request(
+            CliffordWorkloadKind::NonIdentity,
+            "nonidentity-opposite-workload-marker",
+            identity,
+            CliffordWorkloadKind::NonIdentity.measurement(),
+            1,
+            "workload-marker-mismatch",
+        )?,
+        rejected_request_with_work_items(
+            CliffordWorkloadKind::Identity,
+            "identity-width-work-mismatch",
+            identity,
+            CliffordWorkloadKind::Identity.measurement(),
+            1,
+            SMALL_WIDTH + 1,
+            "width-work-mismatch",
+        )?,
+        rejected_request_with_work_items(
+            CliffordWorkloadKind::NonIdentity,
+            "nonidentity-width-work-mismatch",
+            non_identity,
+            CliffordWorkloadKind::NonIdentity.measurement(),
+            1,
+            SMALL_WIDTH + 1,
+            "width-work-mismatch",
+        )?,
+        rejected_raw_request(
+            CliffordWorkloadKind::Identity,
+            "identity-malformed-descriptor-hex",
+            identity
+                .to_string()
+                .chars()
+                .take(127)
+                .chain(std::iter::once('g'))
+                .collect(),
+            CliffordWorkloadKind::Identity.measurement(),
+            1,
+            SMALL_WIDTH,
+            "malformed-descriptor-hex",
+        )?,
     ]);
 
     Ok(CliffordVectorFile {
@@ -500,15 +549,61 @@ fn rejected_request(
     iterations: u64,
     class: &str,
 ) -> Result<CliffordRequestVector, WorkerError> {
+    rejected_request_with_work_items(
+        kind,
+        id,
+        descriptor,
+        measurement,
+        iterations,
+        SMALL_WIDTH,
+        class,
+    )
+}
+
+fn rejected_request_with_work_items(
+    kind: CliffordWorkloadKind,
+    id: &str,
+    descriptor: CliffordDescriptor,
+    measurement: &str,
+    iterations: u64,
+    work_items: u64,
+    class: &str,
+) -> Result<CliffordRequestVector, WorkerError> {
     Ok(CliffordRequestVector {
         id: id.to_string(),
         result: CliffordRequestResult::Rejected,
         workload: kind.workload().to_string(),
         measurement_id: measurement.to_string(),
         iterations,
-        work_items: SMALL_WIDTH,
+        work_items,
         descriptor_hex: descriptor.to_string(),
         input_sha256: descriptor.input_digest()?,
+        output_fields: None,
+        output_sha256: None,
+        expected_rejection_class: Some(class.to_string()),
+        start_barrier_consumed: false,
+    })
+}
+
+fn rejected_raw_request(
+    kind: CliffordWorkloadKind,
+    id: &str,
+    descriptor_hex: String,
+    measurement: &str,
+    iterations: u64,
+    work_items: u64,
+    class: &str,
+) -> Result<CliffordRequestVector, WorkerError> {
+    let input_sha256 = super::worker::hex_bytes(&Sha256::digest(descriptor_hex.as_bytes()))?;
+    Ok(CliffordRequestVector {
+        id: id.to_string(),
+        result: CliffordRequestResult::Rejected,
+        workload: kind.workload().to_string(),
+        measurement_id: measurement.to_string(),
+        iterations,
+        work_items,
+        descriptor_hex,
+        input_sha256,
         output_fields: None,
         output_sha256: None,
         expected_rejection_class: Some(class.to_string()),
@@ -608,7 +703,7 @@ mod tests {
         assert_eq!(file.gate_order.len(), 24);
         assert_eq!(file.descriptors.len(), 8);
         assert_eq!(file.tails.len(), 4);
-        assert_eq!(file.requests.len(), 31);
+        assert_eq!(file.requests.len(), 36);
         assert_eq!(
             file.requests
                 .iter()
@@ -621,7 +716,7 @@ mod tests {
                 .iter()
                 .filter(|request| request.result == CliffordRequestResult::Rejected)
                 .count(),
-            21
+            26
         );
         assert!(file.requests.iter().take(10).all(|request| {
             request.result == CliffordRequestResult::Accepted
