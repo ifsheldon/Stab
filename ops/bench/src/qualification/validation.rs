@@ -23,7 +23,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f";
+const CORRECTNESS_DIGEST: &str = "648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
 const EXPECTED_PUBLIC_API_ITEMS: usize = 1_974;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
@@ -1154,9 +1154,9 @@ fn validate_rows(
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 11, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
-    validate_classification_count(suite, RowClassification::Faithful, 15, issues);
+    validate_classification_count(suite, RowClassification::Faithful, 14, issues);
     validate_classification_count(suite, RowClassification::Diagnostic, 134, issues);
-    validate_classification_count(suite, RowClassification::Proxy, 10, issues);
+    validate_classification_count(suite, RowClassification::Proxy, 11, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 11, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 123, issues);

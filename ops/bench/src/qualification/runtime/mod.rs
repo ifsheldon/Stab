@@ -36,7 +36,9 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), String> {
 }
 
 pub(crate) fn run_probe(root: &crate::root::RepoRoot, args: ProbeArgs) -> Result<(), String> {
-    probe::run(root, args).map_err(|error| error.to_string())
+    with_descriptor_root(root, |source_root| {
+        probe::run(source_root, args).map_err(|error| error.to_string())
+    })
 }
 
 pub(crate) fn regenerate_clifford_vectors(
@@ -49,9 +51,26 @@ pub(crate) fn regenerate_clifford_vectors(
 pub(crate) fn verify_worker_reproducibility(
     root: &crate::root::RepoRoot,
 ) -> Result<(String, String), String> {
-    let identity = invocation::verify_private_worker_reproducibility(root)
+    with_descriptor_root(root, |source_root| {
+        let identity = invocation::verify_private_worker_reproducibility(source_root)
+            .map_err(|error| error.to_string())?;
+        Ok((identity.stim_binary_sha256, identity.stab_binary_sha256))
+    })
+}
+
+fn with_descriptor_root<T>(
+    root: &crate::root::RepoRoot,
+    action: impl FnOnce(&crate::root::RepoRoot) -> Result<T, String>,
+) -> Result<T, String> {
+    let repository = artifact::RepositoryBinding::open(root).map_err(|error| error.to_string())?;
+    let source_root = repository
+        .descriptor_root(root)
         .map_err(|error| error.to_string())?;
-    Ok((identity.stim_binary_sha256, identity.stab_binary_sha256))
+    let result = action(&source_root);
+    repository
+        .require_current(root)
+        .map_err(|error| error.to_string())?;
+    result
 }
 
 pub(crate) fn run_qualification(

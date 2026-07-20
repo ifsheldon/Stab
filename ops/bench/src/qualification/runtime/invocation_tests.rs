@@ -620,5 +620,10 @@ fn invalid_pauli_work_rejections_must_precede_the_start_barrier() {
 fn private_worker_builds_are_byte_reproducible() {
     let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    verify_private_worker_reproducibility(&root).expect("reproducible private workers");
+    let repository =
+        super::super::artifact::RepositoryBinding::open(&root).expect("bind repository");
+    let source_root = repository
+        .descriptor_root(&root)
+        .expect("descriptor-root view");
+    verify_private_worker_reproducibility(&source_root).expect("reproducible private workers");
 }

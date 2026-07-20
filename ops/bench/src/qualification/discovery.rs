@@ -4,7 +4,7 @@ use std::path::{Component, Path, PathBuf};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::checklist::{RawChecklistItem, parse as parse_checklist};
+use super::checklist::{RawChecklistItem, parse as parse_checklist, parse_inventory_counts};
 use super::model::{
     ChecklistItem, ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator,
     InputByteCount, ManifestRowDisposition, MeasurementPair, MemoryMethod, MemoryPolicy,
@@ -271,7 +271,20 @@ pub(super) fn generate(
             regression_waivers.schema_version
         )));
     }
-    let raw_checklist = parse_checklist(&read_repo_text_bounded(root, &root.feature_checklist())?)?;
+    let checklist_source = read_repo_text_bounded(root, &root.feature_checklist())?;
+    let advertised_counts = parse_inventory_counts(&checklist_source)?;
+    let algebra_api_items = correctness
+        .public_api_items
+        .iter()
+        .filter(|item| {
+            item.performance_groups
+                .iter()
+                .any(|group| group == "PERF-STABILIZER-ALGEBRA")
+        })
+        .count();
+    advertised_counts.validate(correctness.public_api_items.len(), algebra_api_items)?;
+    advertised_counts.validate_rendered_summary(&checklist_source)?;
+    let raw_checklist = parse_checklist(&checklist_source)?;
     let upstream_perf_sources = discover_perf_sources(root, benchmark_manifest)?;
 
     let threshold_by_id = thresholds

@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use stab_core::{
-    BitMatrix, BitVec, Circuit, CliffordString, PauliBasis, PauliSign, PauliString,
-    PauliStringIterator, SparseXorVec, TableauIterator, stabilizers_to_tableau,
+    BitMatrix, BitVec, Circuit, PauliBasis, PauliSign, PauliString, PauliStringIterator,
+    SparseXorVec, TableauIterator, stabilizers_to_tableau,
 };
 
 use crate::allocations::measure_tracked_memory;
@@ -24,6 +24,7 @@ mod convert;
 mod m10;
 mod m11;
 mod m4;
+mod m6;
 mod m7;
 mod m8;
 mod m9;
@@ -52,7 +53,6 @@ const M5_POPCOUNT_BITS: usize = 1024 * 256;
 const M5_SPARSE_ROWS_USIZE: usize = 1000;
 const M5_SPARSE_ROWS_U32: u32 = 1000;
 const TINY_DIRECT_COMPARE_REPETITIONS: usize = 4096;
-const M6_CLIFFORD_QUBITS: usize = 10_000;
 const M6_PAULI_CASES: [(&str, usize); 3] = [
     ("stab_pauli_string_multiplication_1M", 1_000_000),
     ("stab_pauli_string_multiplication_100K", 100_000),
@@ -398,21 +398,7 @@ pub(crate) fn run_stab_compare_row_with_root(
                 measure_sparse_xor_items("stab_sparse_xor_item_7", &mut buf, &xor_items)?,
             ]))
         }
-        "m6-clifford-string" => {
-            let mut left = CliffordString::identity(M6_CLIFFORD_QUBITS)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let right = CliffordString::identity(M6_CLIFFORD_QUBITS)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            Ok(Some(vec![measure_stab(
-                "stab_clifford_string_multiplication_10K",
-                || {
-                    left.right_multiply_in_place(&right)
-                        .map_err(|error| stab_runner_error(&row.id, error))?;
-                    black_box(&left);
-                    Ok(())
-                },
-            )?]))
-        }
+        "m6-clifford-string" => Ok(Some(m6::clifford_string(&row.id)?)),
         "m6-pauli-string" => {
             let mut measurements = Vec::with_capacity(M6_PAULI_CASES.len());
             for (name, num_qubits) in M6_PAULI_CASES {
@@ -874,6 +860,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = m7::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = m6::measurement_work(row_id, name) {
+        return Some(work);
+    }
     match (row_id, name) {
         ("m5-simd-bit-table", "stab_bit_matrix_row_xor_128x128_contract") => {
             Some(((M5_BIT_TABLE_BITS - 1) as f64, "row-xors/s"))
@@ -897,9 +886,6 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some(((M5_SPARSE_ROWS_USIZE * 2) as f64, "row-xors/s"))
         }
         ("m5-sparse-xor", "stab_sparse_xor_item_7") => Some((7.0, "items/s")),
-        ("m6-clifford-string", "stab_clifford_string_multiplication_10K") => {
-            Some((M6_CLIFFORD_QUBITS as f64, "single-qubit-products/s"))
-        }
         ("m6-pauli-string", "stab_pauli_string_multiplication_1M") => {
             Some((1_000_000.0, "qubits/s"))
         }
@@ -982,7 +968,7 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "direct-match: Stab measures sparse table row XOR and sparse item XOR against the pinned Stim sparse_xor_vec perf filters",
         ),
         "m6-clifford-string" => Some(
-            "direct-match: Stab measures in-place 10K CliffordString multiplication against the pinned Stim perf filter",
+            "partial-match: Stab measures in-place 10K CliffordString multiplication against the pinned Stim perf filter and separately reports fixed-one-qubit-RHS scaling over 10K, 100K, and 1M left widths",
         ),
         "m6-pauli-string" => Some(
             "direct-match: Stab measures in-place PauliString multiplication at 10K, 100K, and 1M against the pinned Stim perf filters",

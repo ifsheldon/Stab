@@ -613,7 +613,12 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
     for (id, expected_measurements) in [
         (
             "m6-clifford-string",
-            &["stab_clifford_string_multiplication_10K"][..],
+            &[
+                "stab_clifford_string_multiplication_10K",
+                "stab_clifford_string_short_rhs_left_10K",
+                "stab_clifford_string_short_rhs_left_100K",
+                "stab_clifford_string_short_rhs_left_1M",
+            ][..],
         ),
         (
             "m6-pauli-string",
@@ -671,6 +676,25 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
             .collect::<Vec<_>>();
 
         assert_eq!(names.as_slice(), expected_measurements);
+        if id == "m6-clifford-string" {
+            for (measurement, left_qubits) in measurements
+                .iter()
+                .skip(1)
+                .zip([10_000, 100_000, 1_000_000])
+            {
+                let observation = |name| {
+                    measurement
+                        .observations
+                        .iter()
+                        .find(|observation| observation.name == name)
+                        .map(|observation| observation.value)
+                        .expect("short-RHS measurement observation")
+                };
+                assert_eq!(observation("left_qubits"), left_qubits);
+                assert_eq!(observation("right_qubits"), 1);
+                assert_eq!(observation("batch_repetitions"), 64);
+            }
+        }
         assert!(
             compare_note(id).is_some(),
             "{id} should explain benchmark comparability"

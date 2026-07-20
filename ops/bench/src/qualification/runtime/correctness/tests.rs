@@ -149,6 +149,115 @@ fn required_preflight_reconstructs_canonical_cq_artifacts() {
 }
 
 #[test]
+fn bound_correctness_artifacts_reject_in_place_mutation() {
+    for artifact in ["report.md", "cases/cq-case/execution-receipt.json"] {
+        let fixture = fixture(FixtureMutation::None);
+        let (_, binding) = validate_bound(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &["cq-case".to_string()],
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
+            },
+        )
+        .expect("bind correctness evidence");
+        let path = fixture.root.path.join(&fixture.relative).join(artifact);
+        let mut bytes = std::fs::read(&path).expect("read bound artifact");
+        assert!(!bytes.is_empty(), "bound artifact must be nonempty");
+        if let Some(first) = bytes.first_mut() {
+            *first ^= 1;
+        }
+        std::fs::write(&path, bytes).expect("mutate bound artifact in place");
+
+        assert!(matches!(
+            binding.require_current(),
+            Err(CorrectnessError::ArtifactChanged(changed)) if changed == path
+        ));
+    }
+}
+
+#[test]
+fn bound_correctness_tree_rejects_unexpected_entries() {
+    for relative in [
+        "unexpected.txt",
+        "cases/unexpected-case",
+        "cases/cq-case/unexpected.txt",
+    ] {
+        let fixture = fixture(FixtureMutation::None);
+        let (_, binding) = validate_bound(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &["cq-case".to_string()],
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
+            },
+        )
+        .expect("bind correctness evidence");
+        let path = fixture.root.path.join(&fixture.relative).join(relative);
+        if relative == "cases/unexpected-case" {
+            std::fs::create_dir(&path).expect("create unexpected case directory");
+        } else {
+            std::fs::write(&path, b"unexpected").expect("write unexpected artifact");
+        }
+
+        assert!(binding.require_current().is_err(), "relative={relative}");
+    }
+}
+
+#[test]
+fn bound_correctness_tree_rejects_hardlinked_directory_replacement() {
+    for relative in ["", "cases", "cases/cq-case"] {
+        let fixture = fixture(FixtureMutation::None);
+        let (_, binding) = validate_bound(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &["cq-case".to_string()],
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
+            },
+        )
+        .expect("bind correctness evidence");
+        let source = fixture.root.path.join(&fixture.relative).join(relative);
+        let detached = fixture
+            .root
+            .path
+            .join(format!("detached-{}", relative.replace('/', "-")));
+        std::fs::rename(&source, &detached).expect("detach bound directory");
+        hardlink_tree(&detached, &source);
+
+        assert!(binding.require_current().is_err(), "relative={relative}");
+    }
+}
+
+fn hardlink_tree(source: &Path, destination: &Path) {
+    std::fs::create_dir(destination).expect("create replacement directory");
+    for entry in std::fs::read_dir(source).expect("read source directory") {
+        let entry = entry.expect("source directory entry");
+        let source = entry.path();
+        let destination = destination.join(entry.file_name());
+        let metadata = entry.metadata().expect("source metadata");
+        if metadata.is_dir() {
+            hardlink_tree(&source, &destination);
+        } else {
+            assert!(
+                metadata.is_file(),
+                "fixture tree contains only regular files"
+            );
+            std::fs::hard_link(source, destination).expect("hard-link replacement artifact");
+        }
+    }
+}
+
+#[test]
 fn oracle_produced_schema_v7_artifacts_reconstruct() {
     let fixture = oracle_v7_fixture();
     let evidence = validate(
@@ -313,6 +422,11 @@ fn oracle_v7_fixture() -> OracleFixture {
             .expect("create fixture parent");
         std::fs::write(destination, bytes).expect("write Oracle fixture");
     }
+    std::fs::write(
+        output.join("report.md"),
+        b"# Stab Correctness Qualification Report\n",
+    )
+    .expect("write Oracle report Markdown");
     OracleFixture {
         _repository: repository,
         root,
@@ -331,6 +445,11 @@ fn oracle_v7_statistical_fixture() -> OracleFixture {
             .expect("create fixture parent");
         std::fs::write(destination, bytes).expect("write Oracle statistical fixture");
     }
+    std::fs::write(
+        output.join("report.md"),
+        b"# Stab Correctness Qualification Report\n",
+    )
+    .expect("write Oracle statistical report Markdown");
     OracleFixture {
         _repository: repository,
         root,
@@ -857,6 +976,11 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         )]),
     };
     std::fs::write(output.join("preflight.json"), canonical(&preflight)).expect("write preflight");
+    std::fs::write(
+        output.join("report.md"),
+        b"# Stab Correctness Qualification Report\n",
+    )
+    .expect("write report Markdown");
 
     Fixture {
         _repository: repository,

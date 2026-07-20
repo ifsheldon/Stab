@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use serde::Deserialize;
+
 use super::discovery::{PERFORMANCE_FEATURE_IDS, sha256_hex};
 use super::model::{ChecklistChildOwnership, ChecklistScope};
 use crate::error::BenchError;
@@ -19,6 +21,90 @@ pub(super) struct RawChecklistItem {
     pub(super) deferred_child_ids: Vec<String>,
     pub(super) selected_child_ownership: Vec<ChecklistChildOwnership>,
     pub(super) performance_features: Vec<String>,
+}
+
+const INVENTORY_COUNTS_PREFIX: &str = "<!-- qualification-inventory-counts ";
+const INVENTORY_COUNTS_SUFFIX: &str = " -->";
+const INVENTORY_COUNTS_SUMMARY_PREFIX: &str = "Qualification inventory counts: ";
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AdvertisedInventoryCounts {
+    public_api_items: usize,
+    algebra_api_items: usize,
+}
+
+impl AdvertisedInventoryCounts {
+    pub(super) fn validate(
+        self,
+        public_api_items: usize,
+        algebra_api_items: usize,
+    ) -> Result<(), BenchError> {
+        if self.public_api_items == public_api_items && self.algebra_api_items == algebra_api_items
+        {
+            Ok(())
+        } else {
+            Err(BenchError::Qualification(format!(
+                "feature-checklist qualification counts are stale: advertised public_api_items={} algebra_api_items={}, discovered public_api_items={public_api_items} algebra_api_items={algebra_api_items}",
+                self.public_api_items, self.algebra_api_items
+            )))
+        }
+    }
+
+    pub(super) fn validate_rendered_summary(self, source: &str) -> Result<(), BenchError> {
+        let expected = format!(
+            "{INVENTORY_COUNTS_SUMMARY_PREFIX}**{}** default-feature public Rust API items and **{}** Algebra API items.",
+            format_count(self.public_api_items),
+            format_count(self.algebra_api_items),
+        );
+        let rendered = source
+            .lines()
+            .filter(|line| line.starts_with(INVENTORY_COUNTS_SUMMARY_PREFIX))
+            .collect::<Vec<_>>();
+        if rendered == [expected.as_str()] {
+            Ok(())
+        } else {
+            Err(BenchError::Qualification(format!(
+                "feature-checklist rendered qualification counts are stale or ambiguous: expected {expected:?}, found {rendered:?}"
+            )))
+        }
+    }
+}
+
+fn format_count(value: usize) -> String {
+    let digits = value.to_string();
+    let mut rendered = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            rendered.push(',');
+        }
+        rendered.push(digit);
+    }
+    rendered
+}
+
+pub(super) fn parse_inventory_counts(
+    source: &str,
+) -> Result<AdvertisedInventoryCounts, BenchError> {
+    let mut values = source.lines().filter_map(|line| {
+        line.strip_prefix(INVENTORY_COUNTS_PREFIX)
+            .and_then(|value| value.strip_suffix(INVENTORY_COUNTS_SUFFIX))
+    });
+    let value = values.next().ok_or_else(|| {
+        BenchError::Qualification(
+            "feature checklist is missing qualification-inventory-counts metadata".to_string(),
+        )
+    })?;
+    if values.next().is_some() {
+        return Err(BenchError::Qualification(
+            "feature checklist has duplicate qualification-inventory-counts metadata".to_string(),
+        ));
+    }
+    serde_json::from_str(value).map_err(|source| {
+        BenchError::Qualification(format!(
+            "feature-checklist qualification-inventory-counts metadata is invalid: {source}"
+        ))
+    })
 }
 
 pub(super) fn parse(source: &str) -> Result<Vec<RawChecklistItem>, BenchError> {
@@ -746,4 +832,51 @@ fn stable_suffix(value: &str) -> String {
         .get(..16)
         .unwrap_or("invalid-digest")
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const COUNTS: &str = concat!(
+        "<!-- qualification-inventory-counts ",
+        r#"{"public_api_items":1974,"algebra_api_items":656}"#,
+        " -->\n",
+        "Qualification inventory counts: **1,974** default-feature public Rust API items and **656** Algebra API items."
+    );
+
+    #[test]
+    fn advertised_inventory_counts_are_exact_and_fail_closed() {
+        let counts = parse_inventory_counts(COUNTS).expect("parse counts");
+        counts.validate(1_974, 656).expect("matching counts");
+        counts
+            .validate_rendered_summary(COUNTS)
+            .expect("matching rendered counts");
+        assert!(counts.validate(1_975, 656).is_err());
+        assert!(counts.validate(1_974, 655).is_err());
+    }
+
+    #[test]
+    fn rendered_inventory_counts_reject_visible_only_drift() {
+        let counts = parse_inventory_counts(COUNTS).expect("parse counts");
+        let stale = COUNTS.replace("**1,974**", "**1,973**");
+        assert!(counts.validate_rendered_summary(&stale).is_err());
+        assert!(
+            counts
+                .validate_rendered_summary(&format!("{COUNTS}\n{COUNTS}"))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn inventory_count_metadata_rejects_missing_duplicate_and_unknown_fields() {
+        assert!(parse_inventory_counts("").is_err());
+        assert!(parse_inventory_counts(&format!("{COUNTS}\n{COUNTS}")).is_err());
+        assert!(
+            parse_inventory_counts(
+                "<!-- qualification-inventory-counts {\"public_api_items\":1974,\"algebra_api_items\":656,\"extra\":1} -->"
+            )
+            .is_err()
+        );
+    }
 }

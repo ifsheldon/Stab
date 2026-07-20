@@ -3,7 +3,9 @@ mod scalar;
 mod simd;
 mod transpose;
 
-pub(crate) use clifford::{CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words};
+pub(crate) use clifford::{
+    CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
+};
 
 use std::fmt::{Display, Formatter};
 use std::ops::Range;

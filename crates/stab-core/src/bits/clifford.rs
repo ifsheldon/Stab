@@ -22,6 +22,19 @@ pub(crate) struct CliffordPlanesMut<'a> {
     pub(crate) inv_z2z: &'a mut [u64],
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CliffordNonIdentityCounts {
+    pub(crate) before: usize,
+    pub(crate) after: usize,
+}
+
+impl CliffordNonIdentityCounts {
+    fn add(&mut self, before: usize, after: usize) {
+        self.before += before;
+        self.after += after;
+    }
+}
+
 #[derive(Clone, Copy)]
 struct CliffordBlock {
     z_signs: WordBlock,
@@ -65,7 +78,7 @@ impl CliffordBlock {
 pub(crate) fn clifford_right_multiply_words(
     left: CliffordPlanesMut<'_>,
     right: CliffordPlanes<'_>,
-) -> usize {
+) -> CliffordNonIdentityCounts {
     debug_assert!(same_plane_lengths_mut(&left));
     debug_assert!(same_plane_lengths(&right));
     debug_assert_eq!(left.z_signs.len(), right.z_signs.len());
@@ -114,7 +127,7 @@ pub(crate) fn clifford_right_multiply_words(
         .zip(right_x2z_blocks)
         .zip(right_z2x_blocks)
         .zip(right_inv_z2z_blocks);
-    let mut non_identity_count = 0_usize;
+    let mut non_identity_counts = CliffordNonIdentityCounts::default();
     for (left, right) in left_blocks.zip(right_blocks) {
         let (((((left_z_signs, left_x_signs), left_inv_x2x), left_x2z), left_z2x), left_inv_z2z) =
             left;
@@ -122,15 +135,15 @@ pub(crate) fn clifford_right_multiply_words(
             ((((right_z_signs, right_x_signs), right_inv_x2x), right_x2z), right_z2x),
             right_inv_z2z,
         ) = right;
-        let result = CliffordBlock {
+        let left = CliffordBlock {
             z_signs: WordBlock::from_array(*left_z_signs),
             x_signs: WordBlock::from_array(*left_x_signs),
             inv_x2x: WordBlock::from_array(*left_inv_x2x),
             x2z: WordBlock::from_array(*left_x2z),
             z2x: WordBlock::from_array(*left_z2x),
             inv_z2z: WordBlock::from_array(*left_inv_z2z),
-        }
-        .right_multiply(CliffordBlock {
+        };
+        let result = left.right_multiply(CliffordBlock {
             z_signs: WordBlock::from_array(*right_z_signs),
             x_signs: WordBlock::from_array(*right_x_signs),
             inv_x2x: WordBlock::from_array(*right_inv_x2x),
@@ -144,15 +157,10 @@ pub(crate) fn clifford_right_multiply_words(
         *left_x2z = result.x2z.to_array();
         *left_z2x = result.z2x.to_array();
         *left_inv_z2z = result.inv_z2z.to_array();
-        non_identity_count += result
-            .any()
-            .to_array()
-            .into_iter()
-            .map(|word| word.count_ones() as usize)
-            .sum::<usize>();
+        non_identity_counts.add(count_non_identity(left), count_non_identity(result));
     }
 
-    non_identity_count += scalar_right_multiply_words(
+    let scalar_counts = scalar_right_multiply_words(
         CliffordPlanesMut {
             z_signs: left_z_sign_tail,
             x_signs: left_x_sign_tail,
@@ -170,10 +178,23 @@ pub(crate) fn clifford_right_multiply_words(
             inv_z2z: right_inv_z2z_tail,
         },
     );
-    non_identity_count
+    non_identity_counts.add(scalar_counts.before, scalar_counts.after);
+    non_identity_counts
 }
 
-fn scalar_right_multiply_words(left: CliffordPlanesMut<'_>, right: CliffordPlanes<'_>) -> usize {
+fn count_non_identity(block: CliffordBlock) -> usize {
+    block
+        .any()
+        .to_array()
+        .into_iter()
+        .map(|word| word.count_ones() as usize)
+        .sum()
+}
+
+fn scalar_right_multiply_words(
+    left: CliffordPlanesMut<'_>,
+    right: CliffordPlanes<'_>,
+) -> CliffordNonIdentityCounts {
     let left_words = left
         .z_signs
         .iter_mut()
@@ -190,7 +211,7 @@ fn scalar_right_multiply_words(left: CliffordPlanesMut<'_>, right: CliffordPlane
         .zip(right.x2z)
         .zip(right.z2x)
         .zip(right.inv_z2z);
-    let mut non_identity_count = 0_usize;
+    let mut non_identity_counts = CliffordNonIdentityCounts::default();
     for (left, right) in left_words.zip(right_words) {
         let (((((left_z_signs, left_x_signs), left_inv_x2x), left_x2z), left_z2x), left_inv_z2z) =
             left;
@@ -198,15 +219,16 @@ fn scalar_right_multiply_words(left: CliffordPlanesMut<'_>, right: CliffordPlane
             ((((right_z_signs, right_x_signs), right_inv_x2x), right_x2z), right_z2x),
             right_inv_z2z,
         ) = right;
+        let left = [
+            *left_z_signs,
+            *left_x_signs,
+            *left_inv_x2x,
+            *left_x2z,
+            *left_z2x,
+            *left_inv_z2z,
+        ];
         let result = scalar_product(
-            [
-                *left_z_signs,
-                *left_x_signs,
-                *left_inv_x2x,
-                *left_x2z,
-                *left_z2x,
-                *left_inv_z2z,
-            ],
+            left,
             [
                 *right_z_signs,
                 *right_x_signs,
@@ -224,12 +246,17 @@ fn scalar_right_multiply_words(left: CliffordPlanesMut<'_>, right: CliffordPlane
             *left_z2x,
             *left_inv_z2z,
         ] = result;
-        non_identity_count += result
-            .into_iter()
-            .fold(0, |combined, word| combined | word)
-            .count_ones() as usize;
+        non_identity_counts.add(
+            left.into_iter()
+                .fold(0, |combined, word| combined | word)
+                .count_ones() as usize,
+            result
+                .into_iter()
+                .fold(0, |combined, word| combined | word)
+                .count_ones() as usize,
+        );
     }
-    non_identity_count
+    non_identity_counts
 }
 
 fn scalar_product(left: [u64; 6], right: [u64; 6]) -> [u64; 6] {
@@ -312,15 +339,15 @@ mod tests {
             let (left, right) = valid_planes(width);
             let mut scalar = left.clone();
             let mut portable = left;
-            let scalar_non_identity_count =
+            let scalar_non_identity_counts =
                 scalar_right_multiply_words(mutable_planes(&mut scalar), immutable_planes(&right));
-            let portable_non_identity_count = clifford_right_multiply_words(
+            let portable_non_identity_counts = clifford_right_multiply_words(
                 mutable_planes(&mut portable),
                 immutable_planes(&right),
             );
             assert_eq!(portable, scalar, "width={width}");
             assert_eq!(
-                portable_non_identity_count, scalar_non_identity_count,
+                portable_non_identity_counts, scalar_non_identity_counts,
                 "width={width}"
             );
         }

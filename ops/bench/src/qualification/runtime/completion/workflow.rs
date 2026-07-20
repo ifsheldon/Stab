@@ -61,9 +61,10 @@ impl Actions for ProductionActions {
     ) -> Result<WorkerIdentityEvidence, CompletionError> {
         checked_action(
             context.root,
+            context.repository,
             context.repository_commit,
             "worker reproducibility",
-            || super::super::invocation::verify_private_worker_reproducibility(context.root),
+            super::super::invocation::verify_private_worker_reproducibility,
         )
     }
 
@@ -74,9 +75,12 @@ impl Actions for ProductionActions {
     ) -> Result<AdapterProbeReceipt, CompletionError> {
         checked_action(
             context.root,
+            context.repository,
             context.repository_commit,
             "adapter probe",
-            || super::super::probe::run_source_owned_adapter_probe(context.root, group_id),
+            |source_root| {
+                super::super::probe::run_source_owned_adapter_probe(source_root, group_id)
+            },
         )
     }
 
@@ -85,21 +89,23 @@ impl Actions for ProductionActions {
         context: &ReplayContext<'_>,
         selected: &SelectedReport,
     ) -> Result<Vec<ArtifactReceipt>, CompletionError> {
-        let path = selected.path.clone().into_path_buf();
         checked_action(
             context.root,
+            context.repository,
             context.repository_commit,
             "report replay",
-            || {
-                super::super::report::run(
+            |source_root| {
+                super::super::report::run_with_repository(
                     context.root,
+                    source_root,
+                    context.repository,
+                    &selected.path,
                     context.performance_inventory_sha256,
                     context.correctness_inventory_sha256,
-                    super::super::report::ReportArgs::for_input(path),
                 )
             },
         )?;
-        read_artifact_receipts(context.root, &selected.path)
+        read_artifact_receipts(context.root, context.repository, &selected.path)
     }
 
     fn regression(
@@ -107,17 +113,19 @@ impl Actions for ProductionActions {
         context: &ReplayContext<'_>,
         selected: &SelectedReport,
     ) -> Result<super::super::regression::RegressionSummary, CompletionError> {
-        let path = selected.path.clone().into_path_buf();
         checked_action(
             context.root,
+            context.repository,
             context.repository_commit,
             "regression replay",
-            || {
-                super::super::regression::run(
+            |source_root| {
+                super::super::regression::run_with_repository(
                     context.root,
+                    source_root,
+                    context.repository,
                     context.performance_inventory_sha256,
                     context.correctness_inventory_sha256,
-                    super::super::regression::RegressionArgs::for_input(path),
+                    &selected.path,
                 )
             },
         )
@@ -135,22 +143,24 @@ impl Actions for ProductionActions {
         ),
         CompletionError,
     > {
-        let before = read_artifact_receipts(context.root, path)?;
-        let input = path.clone().into_path_buf();
+        let before = read_artifact_receipts(context.root, context.repository, path)?;
         let evidence = checked_action(
             context.root,
+            context.repository,
             context.repository_commit,
             "rollup replay",
-            || {
-                super::super::rollup::replay(
+            |source_root| {
+                super::super::rollup::replay_with_repository(
                     context.root,
+                    source_root,
+                    context.repository,
                     context.performance_inventory_sha256,
                     context.correctness_inventory_sha256,
-                    super::super::rollup::RollupReportArgs::for_input(input),
+                    path.clone(),
                 )
             },
         )?;
-        let after = read_artifact_receipts(context.root, path)?;
+        let after = read_artifact_receipts(context.root, context.repository, path)?;
         Ok((before, after, evidence))
     }
 }

@@ -24,8 +24,8 @@ mod timing;
 mod worker_contract;
 
 pub(super) use published::{
-    MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES, load_validated_published_evidence,
-    load_validated_published_report, run,
+    MAX_PUBLISHED_MARKDOWN_BYTES, MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES,
+    load_validated_published_evidence, run, run_with_repository,
 };
 #[cfg(test)]
 use timing::validate_attempt_policy as validate_timing_attempt_policy;
@@ -47,12 +47,6 @@ pub(crate) struct ReportArgs {
     /// Published qualification directory to validate and refresh.
     #[arg(long, default_value = "target/benchmarks/qualification/latest")]
     input: PathBuf,
-}
-
-impl ReportArgs {
-    pub(super) fn for_input(input: PathBuf) -> Self {
-        Self { input }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -90,7 +84,7 @@ pub(super) fn validate_report(
     report: &QualificationReport,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
-) -> Result<(), ReportError> {
+) -> Result<super::correctness::CorrectnessArtifactBinding, ReportError> {
     if report.schema_version != REPORT_SCHEMA_VERSION {
         return Err(ReportError::SchemaVersion {
             actual: report.schema_version,
@@ -242,7 +236,8 @@ pub(super) fn validate_report(
     }
     report.host.validate_against_policy(root)?;
     validate_all_worker_receipts(report, &resolved_group.contract)?;
-    validate_correctness_evidence(root, report, &resolved_group.contract)?;
+    let correctness_binding =
+        validate_correctness_evidence(root, report, &resolved_group.contract)?;
     validate_pair_execution(
         &report.semantic_preflight,
         EvidenceMode::Timing,
@@ -253,7 +248,7 @@ pub(super) fn validate_report(
     validate_failure_evidence(report)?;
     validate_memory(report)?;
     validate_claim(report, &resolved_group.contract)?;
-    Ok(())
+    Ok(correctness_binding)
 }
 
 fn validate_failure_evidence(report: &QualificationReport) -> Result<(), ReportError> {
@@ -285,7 +280,7 @@ fn validate_correctness_evidence(
     root: &crate::root::RepoRoot,
     report: &QualificationReport,
     group: &super::group::GroupContract,
-) -> Result<(), ReportError> {
+) -> Result<super::correctness::CorrectnessArtifactBinding, ReportError> {
     let evidence = &report.correctness_preflight;
     match evidence.status {
         CorrectnessPreflightStatus::NotApplicable => {
@@ -345,7 +340,7 @@ fn validate_correctness_evidence(
             {
                 return Err(ReportError::CorrectnessEvidence);
             }
-            let reconstructed = super::correctness::validate(
+            let (reconstructed, binding) = super::correctness::validate_bound(
                 root,
                 super::correctness::CorrectnessRequirement::Required {
                     output: std::path::Path::new(output),
@@ -359,9 +354,10 @@ fn validate_correctness_evidence(
             if *evidence != reconstructed {
                 return Err(ReportError::CorrectnessEvidence);
             }
+            return Ok(binding);
         }
     }
-    Ok(())
+    Ok(super::correctness::CorrectnessArtifactBinding::default())
 }
 
 fn validate_all_worker_receipts(
@@ -1044,6 +1040,8 @@ pub(super) enum ReportError {
     OutputBinding,
     #[error("qualification preflight does not exactly reproduce from report.json")]
     PreflightBinding,
+    #[error("qualification Markdown does not exactly reproduce from report.json")]
+    MarkdownBinding,
     #[error("qualification report JSON is invalid: {0}")]
     Json(serde_json::Error),
 }

@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Iterator Qualification Progress Report
 
-> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176` without relabeling the iterator evidence. The measurements below remain historical.
+> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `33579ca890c930241ed852c625524057ec47bee120f23c18c50de8238cb5690c` without relabeling the iterator evidence. The measurements below remain historical.
 
 ## Status
 
@@ -14,7 +14,7 @@ Median Stab-to-Stim elapsed-time ratios range from `0.025664x` to `0.568566x`, c
 The worst bootstrap confidence-interval upper bound is `0.570628x`, below the exact `1.25x` gate.
 
 This accepted report closes only the two pinned borrowed-iterator workload shapes on Linux AArch64.
-It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f` and is recorded in `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+It does not qualify restart timing, owned `Iterator::next`, clone, formatting, comparison, arbitrary axis or weight distributions, `CommutingPauliStringIterator`, Tableau iteration, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint remains accepted historical evidence at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f` and is recorded in `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Frozen Evidence
 
@@ -26,8 +26,8 @@ It does not qualify restart timing, owned `Iterator::next`, clone, formatting, c
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current correctness inventory contains 2,886 upstream records, 1,974 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
-The current performance inventory contains 548 groups and exactly fifteen executable product groups plus one diagnostic protocol group, with 21 exact threshold pairs; the frozen evidence inventory had the same group and threshold contracts.
+The later shared-harness correctness checkpoint named in the banner contains 2,886 upstream records, 1,974 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
+The later shared-harness performance checkpoint named in the banner contains 549 groups and exactly seventeen executable product groups plus one diagnostic protocol group. This report closes only its frozen `48eacf03` inventory and does not imply that the later Clifford groups or shared contracts were executed with the iterator evidence.
 The inherited `m6-pauli-iter` row is superseded for timing, while its memory baseline remains guarded until PQ6 supplies equal or stronger evidence.
 
 ## Correctness Preflight
@@ -46,7 +46,7 @@ The clean correctness report at `target/qualification/pq2-pauli-iter-full-afaf0b
 | Preflight | `a06417d24a8f446f4974e4cd7de8b179ae2218e42560d776633ab304000fe5f1` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, execution receipts, and exact three-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run. Its source-current PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller.
+The complete 271-parent CQ2 family remains a separate historical checkpoint and is not claimed by this focused prerequisite run. Its PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller and is not relabeled as current-revision evidence.
 
 ## Correctness Oracle
 

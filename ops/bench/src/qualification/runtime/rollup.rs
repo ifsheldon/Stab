@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::artifact::{DirectQualificationArtifactPath, QualificationOutput};
+use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessPreflightStatus};
 use super::group::{BaselineEligibility, GroupContract, ProfilerNoteContract, ScaleContract};
 use super::invocation::WorkerIdentityEvidence;
@@ -16,11 +17,18 @@ use super::statistics::GateOutcome;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
+mod repository;
+
+use repository::require_current_producer;
+#[cfg(test)]
+use repository::require_current_producer_state;
+
 const ROLLUP_SCHEMA_VERSION: u32 = 4;
 const ROLLUP_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/rollup-latest";
 const MAX_ROLLUP_REPORT_BYTES: usize = 4 << 20;
 const MAX_ROLLUP_PREFLIGHT_BYTES: usize = 1 << 20;
+const MAX_ROLLUP_MARKDOWN_BYTES: usize = 4 << 20;
 const MAX_SCALE_REPORTS: usize = 64;
 
 #[derive(Clone, Debug, Args)]
@@ -47,12 +55,6 @@ pub(crate) struct RollupReportArgs {
     /// Published scale-family rollup directory to replay and refresh.
     #[arg(long, default_value = DEFAULT_OUTPUT)]
     input: PathBuf,
-}
-
-impl RollupReportArgs {
-    pub(super) fn for_input(input: PathBuf) -> Self {
-        Self { input }
-    }
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -114,6 +116,8 @@ struct LoadedCandidate {
     path: DirectQualificationArtifactPath,
     report_sha256: String,
     preflight_sha256: String,
+    markdown_sha256: String,
+    correctness_binding: Arc<super::correctness::CorrectnessArtifactBinding>,
     candidate: Candidate,
 }
 
@@ -263,13 +267,20 @@ pub(super) fn run(
     expected_correctness_inventory_sha256: &str,
     args: RollupArgs,
 ) -> Result<PathBuf, RollupError> {
-    let repository_before = super::git::repository_state(root)?;
+    let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
+    let input_paths = collect_input_paths(args.input.iter().map(PathBuf::as_path), &output_path)?;
+    let live_repository = RepositoryBinding::open(root)?;
+    QualificationOutput::require_absent_with_repository(root, &live_repository, &output_path)?;
+    let source_root = live_repository.descriptor_root(root)?;
+    let repository_before = super::run::bound_repository_state(root, &live_repository)?;
     require_clean_repository(&repository_before)?;
     let tier = QualificationTier::from(args.tier);
-    let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
-    QualificationOutput::require_absent(root, output_path.as_path())?;
-    let resolved =
-        super::group::load_group(root, expected_performance_inventory_sha256, &args.group)?;
+    let resolved = super::group::load_group(
+        &source_root,
+        expected_performance_inventory_sha256,
+        &args.group,
+    )?;
+    live_repository.require_current(root)?;
     if resolved.contract.scales.len() > MAX_SCALE_REPORTS
         || args.input.len() != resolved.contract.scales.len()
     {
@@ -278,15 +289,17 @@ pub(super) fn run(
             expected: resolved.contract.scales.len(),
         });
     }
-    let input_paths = collect_input_paths(args.input.iter().map(PathBuf::as_path), &output_path)?;
     let loaded = load_candidates(
         root,
+        &source_root,
+        &live_repository,
         &input_paths,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
     let expected_stab_commit = expected_stab_commit(&loaded)?;
-    let repository_after = super::git::repository_state(root)?;
+    live_repository.require_current(root)?;
+    let repository_after = super::run::bound_repository_state(root, &live_repository)?;
     let producer_repository =
         bind_producer_repository(repository_before, repository_after, &expected_stab_commit)?;
 
@@ -310,13 +323,18 @@ pub(super) fn run(
     let preflight_json = render_json(&preflight)?;
     let markdown = render_markdown(&report, &sha256_hex(&report_json));
 
-    let mut output = QualificationOutput::begin_new(root, output_path.as_path())?;
+    let mut output =
+        QualificationOutput::begin_new_with_repository(root, &live_repository, &output_path)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     require_current_sources(&mut output, &loaded)?;
-    require_current_producer(root, &report.producer_repository)?;
-    output.commit_new()?;
+    require_current_correctness(&loaded)?;
+    require_current_producer(root, &live_repository, &report.producer_repository)?;
+    output.commit_new_with_source_validation(|repository| {
+        super::run::require_current_repository(root, &report.producer_repository, repository)?;
+        require_current_correctness(&loaded)
+    })?;
     Ok(output_path.into_path_buf())
 }
 
@@ -341,20 +359,49 @@ pub(super) fn replay(
     expected_correctness_inventory_sha256: &str,
     args: RollupReportArgs,
 ) -> Result<RollupReplayEvidence, RollupError> {
-    let repository_before = super::git::repository_state(root)?;
-    require_clean_repository(&repository_before)?;
     let output_path = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let existing_report_json = super::artifact::read_artifact_bounded(
+    let live_repository = RepositoryBinding::open(root)?;
+    let source_root = live_repository.descriptor_root(root)?;
+    replay_with_repository(
         root,
-        output_path.as_path(),
+        &source_root,
+        &live_repository,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        output_path,
+    )
+}
+
+pub(super) fn replay_with_repository(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    output_path: DirectQualificationArtifactPath,
+) -> Result<RollupReplayEvidence, RollupError> {
+    let repository_before = super::run::bound_repository_state(root, live_repository)?;
+    require_clean_repository(&repository_before)?;
+    let existing_report_json = super::artifact::read_artifact_bounded_with_repository(
+        root,
+        live_repository,
+        &output_path,
         "report.json",
         MAX_ROLLUP_REPORT_BYTES,
     )?;
-    let existing_preflight_json = super::artifact::read_artifact_bounded(
+    let existing_preflight_json = super::artifact::read_artifact_bounded_with_repository(
         root,
-        output_path.as_path(),
+        live_repository,
+        &output_path,
         "preflight.json",
         MAX_ROLLUP_PREFLIGHT_BYTES,
+    )?;
+    let existing_markdown = super::artifact::read_artifact_bounded_with_repository(
+        root,
+        live_repository,
+        &output_path,
+        "report.md",
+        MAX_ROLLUP_MARKDOWN_BYTES,
     )?;
     let existing_report = parse_existing_rollup(
         &existing_report_json,
@@ -364,10 +411,11 @@ pub(super) fn replay(
         expected_correctness_inventory_sha256,
     )?;
     let resolved = super::group::load_group(
-        root,
+        source_root,
         expected_performance_inventory_sha256,
         &existing_report.group_id,
     )?;
+    live_repository.require_current(root)?;
     if existing_report.scales.len() != resolved.contract.scales.len()
         || existing_report.scales.len() > MAX_SCALE_REPORTS
     {
@@ -385,12 +433,15 @@ pub(super) fn replay(
     )?;
     let loaded = load_candidates(
         root,
+        source_root,
+        live_repository,
         &input_paths,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
     let expected_stab_commit = expected_stab_commit(&loaded)?;
-    let repository_after = super::git::repository_state(root)?;
+    live_repository.require_current(root)?;
+    let repository_after = super::run::bound_repository_state(root, live_repository)?;
     let producer_repository =
         bind_producer_repository(repository_before, repository_after, &expected_stab_commit)?;
     let reconstructed = assemble(
@@ -415,15 +466,25 @@ pub(super) fn replay(
     }
     let markdown = render_markdown(&reconstructed, &sha256_hex(&report_json));
 
-    let mut output = QualificationOutput::begin(root, output_path.as_path())?;
+    let mut output =
+        QualificationOutput::begin_with_repository(root, live_repository, &output_path)?;
     output.require_current_artifact("report.json", &existing_report_json)?;
     output.require_current_artifact("preflight.json", &existing_preflight_json)?;
+    output.require_current_artifact("report.md", &existing_markdown)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     require_current_sources(&mut output, &loaded)?;
-    require_current_producer(root, &reconstructed.producer_repository)?;
-    output.commit()?;
+    require_current_correctness(&loaded)?;
+    require_current_producer(root, live_repository, &reconstructed.producer_repository)?;
+    output.commit_with_source_validation(|repository| {
+        super::run::require_current_repository(
+            root,
+            &reconstructed.producer_repository,
+            repository,
+        )?;
+        require_current_correctness(&loaded)
+    })?;
     Ok(RollupReplayEvidence {
         output: output_path.into_path_buf(),
         report_sha256: sha256_hex(&report_json),
@@ -475,6 +536,8 @@ fn collect_input_paths<'a>(
 
 fn load_candidates(
     root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
     input_paths: &[DirectQualificationArtifactPath],
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
@@ -483,7 +546,9 @@ fn load_candidates(
     for path in input_paths {
         let evidence = super::report::load_validated_published_evidence(
             root,
-            path.as_path(),
+            source_root,
+            repository,
+            path,
             expected_performance_inventory_sha256,
             expected_correctness_inventory_sha256,
         )?;
@@ -497,6 +562,8 @@ fn load_candidates(
             path: path.clone(),
             report_sha256: evidence.report_sha256,
             preflight_sha256: evidence.preflight_sha256,
+            markdown_sha256: evidence.markdown_sha256,
+            correctness_binding: evidence.correctness_binding,
             candidate,
         });
     }
@@ -546,28 +613,6 @@ fn bind_producer_repository(
         local_modifications_before: before.local_modifications,
         local_modifications_after: after.local_modifications,
     })
-}
-
-fn require_current_producer(
-    root: &RepoRoot,
-    expected: &RepositoryEvidence,
-) -> Result<(), RollupError> {
-    let current = super::git::repository_state(root)?;
-    require_current_producer_state(&current, expected)
-}
-
-fn require_current_producer_state(
-    current: &super::git::RepositoryState,
-    expected: &RepositoryEvidence,
-) -> Result<(), RollupError> {
-    require_clean_repository(current)?;
-    if current.commit != expected.commit_after {
-        return Err(RollupError::RepositoryChanged {
-            before: expected.commit_after.clone(),
-            after: current.commit.clone(),
-        });
-    }
-    Ok(())
 }
 
 fn parse_existing_rollup(
@@ -637,6 +682,28 @@ fn require_current_sources(
             &evidence.preflight_sha256,
             super::report::MAX_PUBLISHED_PREFLIGHT_BYTES,
         )?;
+        output.require_sibling_artifact_digest(
+            &evidence.path,
+            "report.md",
+            &evidence.markdown_sha256,
+            super::report::MAX_PUBLISHED_MARKDOWN_BYTES,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_current_correctness(
+    loaded: &[LoadedCandidate],
+) -> Result<(), super::artifact::ArtifactError> {
+    for evidence in loaded {
+        evidence
+            .correctness_binding
+            .require_current()
+            .map_err(|_| {
+                super::artifact::ArtifactError::ExternalSourceChanged(
+                    "correctness qualification evidence",
+                )
+            })?;
     }
     Ok(())
 }

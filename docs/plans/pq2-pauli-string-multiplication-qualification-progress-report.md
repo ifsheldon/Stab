@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Multiplication Qualification Progress Report
 
-> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator contracts produced post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`. The results below are not relabeled as simultaneous current-inventory evidence.
+> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator contracts produced post-migration performance digest `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`; later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `33579ca890c930241ed852c625524057ec47bee120f23c18c50de8238cb5690c`. The results below are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 
@@ -12,7 +12,7 @@ These are small Stab slowdowns of approximately 0.2% through 3.2%, not speedups,
 The faithful scalar public path already passes, so this slice did not add portable SIMD merely to improve an already accepted ratio.
 
 This report closes `PERFQ-M6-PAULI-STRING/right-multiply-in-place` on Linux AArch64 only.
-It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
+It does not qualify allocating or unequal-width multiplication, the identity fast path, scalar-product or commutation queries, parsing, formatting, randomization, Clifford or Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface. The separate 271-parent CQ2 checkpoint remains accepted historical evidence at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
 
 ## Frozen Evidence
 
@@ -44,7 +44,7 @@ The clean correctness report at `target/qualification/pq2-m6-pauli-full-cd1e33e`
 | Preflight | `6377ba3310afb3e605487325ec1a3eea2043c5ffa4777da5b0de46d963763116` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, both execution receipts, and exact two-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its source-current PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller.
+The complete 271-parent CQ2 family remains a separate historical checkpoint and is not claimed by this focused prerequisite run; its PR, full, and soak execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller and is not relabeled as current-revision evidence.
 
 ## Workload Contract
 

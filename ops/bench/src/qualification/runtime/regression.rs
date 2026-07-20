@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use serde::Deserialize;
@@ -8,6 +8,7 @@ use thiserror::Error;
 use super::group::BaselineEligibility;
 use super::run::ClaimClass;
 use super::statistics::GateOutcome;
+use super::{artifact::DirectQualificationArtifactPath, artifact::RepositoryBinding};
 use crate::root::RepoRoot;
 
 const BASELINE_SCHEMA_VERSION: u32 = 2;
@@ -23,15 +24,6 @@ pub(crate) struct RegressionArgs {
     /// Source-owned regression baseline.
     #[arg(long, default_value = DEFAULT_BASELINE)]
     baseline: PathBuf,
-}
-
-impl RegressionArgs {
-    pub(super) fn for_input(input: PathBuf) -> Self {
-        Self {
-            input,
-            baseline: PathBuf::from(DEFAULT_BASELINE),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -71,16 +63,58 @@ pub(super) fn run(
     expected_correctness_inventory_sha256: &str,
     args: RegressionArgs,
 ) -> Result<RegressionSummary, RegressionError> {
-    let baseline_path = root.resolve_relative(&args.baseline);
-    let baseline_bytes = crate::source_file::read_repo_regular_file_bounded(
+    let input = DirectQualificationArtifactPath::try_new(&args.input)?;
+    let repository = RepositoryBinding::open(root)?;
+    let source_root = repository.descriptor_root(root)?;
+    run_with_repository_and_baseline(
         root,
+        &source_root,
+        &repository,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        &input,
+        &args.baseline,
+    )
+}
+
+pub(super) fn run_with_repository(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    input: &DirectQualificationArtifactPath,
+) -> Result<RegressionSummary, RegressionError> {
+    run_with_repository_and_baseline(
+        root,
+        source_root,
+        repository,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        input,
+        Path::new(DEFAULT_BASELINE),
+    )
+}
+
+fn run_with_repository_and_baseline(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    input: &DirectQualificationArtifactPath,
+    baseline: &Path,
+) -> Result<RegressionSummary, RegressionError> {
+    let baseline_path = source_root.resolve_relative(baseline);
+    let baseline_bytes = crate::source_file::read_repo_regular_file_bounded(
+        source_root,
         &baseline_path,
         MAX_BASELINE_BYTES,
     )
     .map_err(|error| RegressionError::BaselineRead(error.to_string()))?;
     let baseline: RegressionBaseline =
         serde_json::from_slice(&baseline_bytes).map_err(RegressionError::BaselineJson)?;
-    let contracts = super::group::load_groups(root, expected_performance_inventory_sha256)?;
+    let contracts = super::group::load_groups(source_root, expected_performance_inventory_sha256)?;
     validate_baseline(&baseline, &contracts)?;
     if baseline.performance_inventory_sha256 != expected_performance_inventory_sha256 {
         return Err(RegressionError::InventoryMismatch {
@@ -88,12 +122,15 @@ pub(super) fn run(
             report: expected_performance_inventory_sha256.to_string(),
         });
     }
-    let report = super::report::load_validated_published_report(
+    let evidence = super::report::load_validated_published_evidence(
         root,
-        &args.input,
+        source_root,
+        repository,
+        input,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
+    let report = evidence.report;
     if baseline.performance_inventory_sha256 != report.performance_inventory_sha256 {
         return Err(RegressionError::InventoryMismatch {
             baseline: baseline.performance_inventory_sha256,

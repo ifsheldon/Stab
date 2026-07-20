@@ -1,13 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::artifact::{DirectQualificationArtifactPath, QualificationOutput};
+use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::group::{BaselineEligibility, GroupContract};
 use super::invocation::WorkerIdentityEvidence;
 use super::probe::AdapterProbeReceipt;
@@ -32,6 +33,7 @@ const PREFLIGHT_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/completion-latest";
 const MAX_COMPLETION_REPORT_BYTES: usize = 8 << 20;
 const MAX_COMPLETION_PREFLIGHT_BYTES: usize = 2 << 20;
+const MAX_COMPLETION_MARKDOWN_BYTES: usize = 4 << 20;
 const MAX_BOUND_ARTIFACT_BYTES: usize = 4 << 20;
 const MAX_SOURCE_REPORTS: usize = 128;
 
@@ -75,16 +77,37 @@ struct SelectedReport {
     scale_id: String,
     workers: WorkerIdentityEvidence,
     artifacts: Vec<ArtifactReceipt>,
+    correctness_binding: Arc<super::correctness::CorrectnessArtifactBinding>,
+}
+
+struct AdmittedCompletionPaths {
+    output: DirectQualificationArtifactPath,
+    full_inputs: Vec<DirectQualificationArtifactPath>,
+    soak_inputs: Vec<DirectQualificationArtifactPath>,
+    full_rollup: DirectQualificationArtifactPath,
+    soak_rollup: DirectQualificationArtifactPath,
 }
 
 struct ExecutionOptions<'a> {
     generated_unix_epoch_seconds: u64,
     existing_report_json: Option<&'a [u8]>,
     existing_preflight_json: Option<&'a [u8]>,
+    existing_markdown: Option<&'a [u8]>,
+}
+
+struct SourceSelectionContext<'a> {
+    root: &'a RepoRoot,
+    source_root: &'a RepoRoot,
+    repository: &'a RepositoryBinding,
+    contract: &'a GroupContract,
+    expected_commit: &'a str,
+    performance_inventory_sha256: &'a str,
+    correctness_inventory_sha256: &'a str,
 }
 
 struct CompletionPublication<'a> {
     root: &'a RepoRoot,
+    repository: &'a RepositoryBinding,
     output_path: &'a DirectQualificationArtifactPath,
     receipt: &'a CompletionReceipt,
     report_json: &'a [u8],
@@ -92,6 +115,8 @@ struct CompletionPublication<'a> {
     markdown: &'a str,
     existing_report_json: Option<&'a [u8]>,
     existing_preflight_json: Option<&'a [u8]>,
+    existing_markdown: Option<&'a [u8]>,
+    correctness_bindings: &'a [Arc<super::correctness::CorrectnessArtifactBinding>],
 }
 
 impl CompletionPublication<'_> {
@@ -100,20 +125,28 @@ impl CompletionPublication<'_> {
         repository_before: &super::git::RepositoryState,
     ) -> Result<(), CompletionError> {
         let root = self.root;
+        let correctness_bindings = self.correctness_bindings;
+        self.publish_production_with(|repository| {
+            repository.require_current(root)?;
+            let source_root = repository.descriptor_root(root)?;
+            let repository_at_publication = super::git::repository_state(&source_root)?;
+            repository.require_current(root)?;
+            require_same_clean_repository(repository_before, &repository_at_publication)?;
+            require_current_correctness(correctness_bindings)
+        })
+    }
+
+    fn publish_production_with<ValidateSource>(
+        self,
+        validate_source: ValidateSource,
+    ) -> Result<(), CompletionError>
+    where
+        ValidateSource: FnMut(&super::artifact::BoundRepository<'_>) -> Result<(), CompletionError>,
+    {
         let replay = self.existing_report_json.is_some();
         self.publish_with(
-            || {
-                let repository_at_publication = super::git::repository_state(root)?;
-                require_same_clean_repository(repository_before, &repository_at_publication)
-            },
-            |output| {
-                if replay {
-                    output.commit()
-                } else {
-                    output.commit_new()
-                }
-                .map_err(CompletionError::Artifact)
-            },
+            || Ok(()),
+            |output| commit_completion_output(output, replay, validate_source),
         )
     }
 
@@ -127,15 +160,26 @@ impl CompletionPublication<'_> {
         Commit: FnOnce(QualificationOutput) -> Result<(), CompletionError>,
     {
         let mut output = if self.existing_report_json.is_some() {
-            QualificationOutput::begin(self.root, self.output_path.as_path())?
+            QualificationOutput::begin_with_repository(
+                self.root,
+                self.repository,
+                self.output_path,
+            )?
         } else {
-            QualificationOutput::begin_new(self.root, self.output_path.as_path())?
+            QualificationOutput::begin_new_with_repository(
+                self.root,
+                self.repository,
+                self.output_path,
+            )?
         };
         if let Some(existing) = self.existing_report_json {
             output.require_current_artifact("report.json", existing)?;
         }
         if let Some(existing) = self.existing_preflight_json {
             output.require_current_artifact("preflight.json", existing)?;
+        }
+        if let Some(existing) = self.existing_markdown {
+            output.require_current_artifact("report.md", existing)?;
         }
         output.write("report.json", self.report_json)?;
         output.write("preflight.json", self.preflight_json)?;
@@ -146,9 +190,31 @@ impl CompletionPublication<'_> {
     }
 }
 
+fn commit_completion_output<ValidateSource>(
+    output: QualificationOutput,
+    replay: bool,
+    mut validate_source: ValidateSource,
+) -> Result<(), CompletionError>
+where
+    ValidateSource: FnMut(&super::artifact::BoundRepository<'_>) -> Result<(), CompletionError>,
+{
+    let validate = |repository: &super::artifact::BoundRepository<'_>| {
+        validate_source(repository).map_err(|_| {
+            super::artifact::ArtifactError::ExternalSourceChanged("completion source evidence")
+        })
+    };
+    if replay {
+        output.commit_with_source_validation(validate)
+    } else {
+        output.commit_new_with_source_validation(validate)
+    }
+    .map_err(CompletionError::Artifact)
+}
+
 #[derive(Clone, Copy)]
 struct ReplayContext<'a> {
     root: &'a RepoRoot,
+    repository: &'a RepositoryBinding,
     performance_inventory_sha256: &'a str,
     correctness_inventory_sha256: &'a str,
     contract: &'a GroupContract,
@@ -170,7 +236,9 @@ pub(super) fn run(
             generated_unix_epoch_seconds: current_unix_epoch_seconds()?,
             existing_report_json: None,
             existing_preflight_json: None,
+            existing_markdown: None,
         },
+        None,
     )
 }
 
@@ -180,17 +248,28 @@ pub(super) fn run_report(
     expected_correctness_inventory_sha256: &str,
     args: CompletionReportArgs,
 ) -> Result<PathBuf, CompletionError> {
-    let report_json = super::artifact::read_artifact_bounded(
+    let input_path = DirectQualificationArtifactPath::try_new(&args.input)?;
+    let live_repository = RepositoryBinding::open(root)?;
+    let report_json = super::artifact::read_artifact_bounded_with_repository(
         root,
-        &args.input,
+        &live_repository,
+        &input_path,
         "report.json",
         MAX_COMPLETION_REPORT_BYTES,
     )?;
-    let preflight_json = super::artifact::read_artifact_bounded(
+    let preflight_json = super::artifact::read_artifact_bounded_with_repository(
         root,
-        &args.input,
+        &live_repository,
+        &input_path,
         "preflight.json",
         MAX_COMPLETION_PREFLIGHT_BYTES,
+    )?;
+    let markdown = super::artifact::read_artifact_bounded_with_repository(
+        root,
+        &live_repository,
+        &input_path,
+        "report.md",
+        MAX_COMPLETION_MARKDOWN_BYTES,
     )?;
     let receipt: CompletionReceipt = parse_canonical(&report_json)?;
     let preflight: CompletionPreflight = parse_canonical(&preflight_json)?;
@@ -198,7 +277,7 @@ pub(super) fn run_report(
         &receipt,
         &preflight,
         &report_json,
-        &args.input,
+        input_path.as_path(),
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
@@ -212,7 +291,9 @@ pub(super) fn run_report(
             generated_unix_epoch_seconds: receipt.generated_unix_epoch_seconds,
             existing_report_json: Some(&report_json),
             existing_preflight_json: Some(&preflight_json),
+            existing_markdown: Some(&markdown),
         },
+        Some(live_repository),
     )
 }
 
@@ -222,15 +303,25 @@ fn execute(
     expected_correctness_inventory_sha256: &str,
     args: CompletionArgs,
     options: ExecutionOptions<'_>,
+    repository: Option<RepositoryBinding>,
 ) -> Result<PathBuf, CompletionError> {
-    let repository_before = super::git::repository_state(root)?;
-    require_clean_repository(&repository_before)?;
-    let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
+    let paths = admit_completion_paths(&args)?;
+    let live_repository = match repository {
+        Some(repository) => repository,
+        None => RepositoryBinding::open(root)?,
+    };
     if options.existing_report_json.is_none() {
-        QualificationOutput::require_absent(root, output_path.as_path())?;
+        QualificationOutput::require_absent_with_repository(root, &live_repository, &paths.output)?;
     }
-    let resolved =
-        super::group::load_group(root, expected_performance_inventory_sha256, &args.group)?;
+    let source_root = live_repository.descriptor_root(root)?;
+    let repository_before = super::run::bound_repository_state(root, &live_repository)?;
+    require_clean_repository(&repository_before)?;
+    let resolved = super::group::load_group(
+        &source_root,
+        expected_performance_inventory_sha256,
+        &args.group,
+    )?;
+    live_repository.require_current(root)?;
     require_completion_group(&resolved.contract)?;
     if resolved.contract.scales.len() > MAX_SOURCE_REPORTS {
         return Err(CompletionError::SourceReportCount {
@@ -238,29 +329,25 @@ fn execute(
             expected: MAX_SOURCE_REPORTS,
         });
     }
-    let full = select_reports(
+    let selection = SourceSelectionContext {
         root,
-        &resolved.contract,
-        QualificationTier::Full,
-        &args.full_inputs,
-        &repository_before.commit,
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-    )?;
-    let soak = select_reports(
-        root,
-        &resolved.contract,
-        QualificationTier::Soak,
-        &args.soak_inputs,
-        &repository_before.commit,
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-    )?;
-    let full_rollup = DirectQualificationArtifactPath::try_new(&args.full_rollup)?;
-    let soak_rollup = DirectQualificationArtifactPath::try_new(&args.soak_rollup)?;
-    require_unique_paths(&output_path, &full, &soak, &full_rollup, &soak_rollup)?;
+        source_root: &source_root,
+        repository: &live_repository,
+        contract: &resolved.contract,
+        expected_commit: &repository_before.commit,
+        performance_inventory_sha256: expected_performance_inventory_sha256,
+        correctness_inventory_sha256: expected_correctness_inventory_sha256,
+    };
+    let full = select_reports(&selection, QualificationTier::Full, &paths.full_inputs)?;
+    let soak = select_reports(&selection, QualificationTier::Soak, &paths.soak_inputs)?;
+    let correctness_bindings = full
+        .iter()
+        .chain(&soak)
+        .map(|report| Arc::clone(&report.correctness_binding))
+        .collect::<Vec<_>>();
     let replay = ReplayContext {
         root,
+        repository: &live_repository,
         performance_inventory_sha256: expected_performance_inventory_sha256,
         correctness_inventory_sha256: expected_correctness_inventory_sha256,
         contract: &resolved.contract,
@@ -271,14 +358,14 @@ fn execute(
         &args.group,
         full,
         soak,
-        full_rollup,
-        soak_rollup,
+        paths.full_rollup,
+        paths.soak_rollup,
         &mut workflow::ProductionActions,
     )?;
 
-    let repository_after = super::git::repository_state(root)?;
+    let repository_after = super::run::bound_repository_state(root, &live_repository)?;
     require_same_clean_repository(&repository_before, &repository_after)?;
-    let output = path_text(output_path.as_path())?;
+    let output = path_text(paths.output.as_path())?;
     let receipt = CompletionReceipt {
         schema_version: COMPLETION_SCHEMA_VERSION,
         output,
@@ -320,58 +407,99 @@ fn execute(
         || options
             .existing_preflight_json
             .is_some_and(|existing| existing != preflight_json)
+        || options
+            .existing_markdown
+            .is_some_and(|existing| existing != markdown.as_bytes())
     {
         return Err(CompletionError::Reconstruction);
     }
 
     CompletionPublication {
         root,
-        output_path: &output_path,
+        repository: &live_repository,
+        output_path: &paths.output,
         receipt: &receipt,
         report_json: &report_json,
         preflight_json: &preflight_json,
         markdown: &markdown,
         existing_report_json: options.existing_report_json,
         existing_preflight_json: options.existing_preflight_json,
+        existing_markdown: options.existing_markdown,
+        correctness_bindings: &correctness_bindings,
     }
     .publish(&repository_before)?;
-    Ok(output_path.into_path_buf())
+    Ok(paths.output.into_path_buf())
+}
+
+fn admit_completion_paths(
+    args: &CompletionArgs,
+) -> Result<AdmittedCompletionPaths, CompletionError> {
+    let output = DirectQualificationArtifactPath::try_new(&args.out)?;
+    let full_inputs = args
+        .full_inputs
+        .iter()
+        .map(|path| DirectQualificationArtifactPath::try_new(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    let soak_inputs = args
+        .soak_inputs
+        .iter()
+        .map(|path| DirectQualificationArtifactPath::try_new(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    let full_rollup = DirectQualificationArtifactPath::try_new(&args.full_rollup)?;
+    let soak_rollup = DirectQualificationArtifactPath::try_new(&args.soak_rollup)?;
+    require_unique_paths(
+        &output,
+        &full_inputs,
+        &soak_inputs,
+        &full_rollup,
+        &soak_rollup,
+    )?;
+    Ok(AdmittedCompletionPaths {
+        output,
+        full_inputs,
+        soak_inputs,
+        full_rollup,
+        soak_rollup,
+    })
 }
 
 fn select_reports(
-    root: &RepoRoot,
-    contract: &GroupContract,
+    context: &SourceSelectionContext<'_>,
     tier: QualificationTier,
-    inputs: &[PathBuf],
-    expected_commit: &str,
-    expected_performance_inventory_sha256: &str,
-    expected_correctness_inventory_sha256: &str,
+    inputs: &[DirectQualificationArtifactPath],
 ) -> Result<Vec<SelectedReport>, CompletionError> {
-    if inputs.len() != contract.scales.len() {
+    if inputs.len() != context.contract.scales.len() {
         return Err(CompletionError::SourceReportCount {
             actual: inputs.len(),
-            expected: contract.scales.len(),
+            expected: context.contract.scales.len(),
         });
     }
     let mut by_scale = BTreeMap::new();
-    for input in inputs {
-        let path = DirectQualificationArtifactPath::try_new(input)?;
+    for path in inputs {
         let evidence = super::report::load_validated_published_evidence(
-            root,
-            path.as_path(),
-            expected_performance_inventory_sha256,
-            expected_correctness_inventory_sha256,
+            context.root,
+            context.source_root,
+            context.repository,
+            path,
+            context.performance_inventory_sha256,
+            context.correctness_inventory_sha256,
         )?;
-        validate_source_report(&evidence.report, contract, tier, expected_commit)?;
-        let artifacts = read_artifact_receipts(root, &path)?;
+        validate_source_report(
+            &evidence.report,
+            context.contract,
+            tier,
+            context.expected_commit,
+        )?;
+        let artifacts = read_artifact_receipts(context.root, context.repository, path)?;
         require_artifact_digest(&artifacts, "report.json", &evidence.report_sha256)?;
         require_artifact_digest(&artifacts, "preflight.json", &evidence.preflight_sha256)?;
         let selected = SelectedReport {
-            path,
+            path: path.clone(),
             tier: evidence.report.tier,
             scale_id: evidence.report.scale_id,
             workers: evidence.report.workers,
             artifacts,
+            correctness_binding: evidence.correctness_binding,
         };
         if by_scale
             .insert(selected.scale_id.clone(), selected)
@@ -380,8 +508,8 @@ fn select_reports(
             return Err(CompletionError::DuplicateScale);
         }
     }
-    let mut ordered = Vec::with_capacity(contract.scales.len());
-    for scale in &contract.scales {
+    let mut ordered = Vec::with_capacity(context.contract.scales.len());
+    for scale in &context.contract.scales {
         let scale_id = scale.id.to_string();
         ordered.push(
             by_scale
@@ -539,21 +667,23 @@ fn validate_probe(
 
 fn checked_action<T, E, F>(
     root: &RepoRoot,
+    repository: &RepositoryBinding,
     expected_commit: &str,
     name: &'static str,
     action: F,
 ) -> Result<T, CompletionError>
 where
     E: Display,
-    F: FnOnce() -> Result<T, E>,
+    F: FnOnce(&RepoRoot) -> Result<T, E>,
 {
-    let before = super::git::repository_state(root)?;
+    let source_root = repository.descriptor_root(root)?;
+    let before = super::run::bound_repository_state(root, repository)?;
     require_expected_repository(&before, expected_commit)?;
-    let result = action().map_err(|source| CompletionError::Action {
+    let result = action(&source_root).map_err(|source| CompletionError::Action {
         name,
         detail: source.to_string(),
     })?;
-    let after = super::git::repository_state(root)?;
+    let after = super::run::bound_repository_state(root, repository)?;
     require_expected_repository(&after, expected_commit)?;
     Ok(result)
 }
@@ -581,14 +711,16 @@ fn push_step(
 
 fn read_artifact_receipts(
     root: &RepoRoot,
+    repository: &RepositoryBinding,
     path: &DirectQualificationArtifactPath,
 ) -> Result<Vec<ArtifactReceipt>, CompletionError> {
     ["report.json", "preflight.json", "report.md"]
         .into_iter()
         .map(|name| {
-            let bytes = super::artifact::read_artifact_bounded(
+            let bytes = super::artifact::read_artifact_bounded_with_repository(
                 root,
-                path.as_path(),
+                repository,
+                path,
                 name,
                 MAX_BOUND_ARTIFACT_BYTES,
             )?;
@@ -617,6 +749,17 @@ fn require_current_evidence(
                 MAX_BOUND_ARTIFACT_BYTES,
             )?;
         }
+    }
+    Ok(())
+}
+
+fn require_current_correctness(
+    bindings: &[Arc<super::correctness::CorrectnessArtifactBinding>],
+) -> Result<(), CompletionError> {
+    for binding in bindings {
+        binding
+            .require_current()
+            .map_err(|_| CompletionError::CorrectnessEvidenceChanged)?;
     }
     Ok(())
 }
@@ -710,18 +853,13 @@ fn unique_rollup(
 
 fn require_unique_paths(
     output: &DirectQualificationArtifactPath,
-    full: &[SelectedReport],
-    soak: &[SelectedReport],
+    full: &[DirectQualificationArtifactPath],
+    soak: &[DirectQualificationArtifactPath],
     full_rollup: &DirectQualificationArtifactPath,
     soak_rollup: &DirectQualificationArtifactPath,
 ) -> Result<(), CompletionError> {
     let mut paths = BTreeSet::new();
-    for path in full
-        .iter()
-        .chain(soak)
-        .map(|selected| &selected.path)
-        .chain([full_rollup, soak_rollup])
-    {
+    for path in full.iter().chain(soak).chain([full_rollup, soak_rollup]) {
         if path == output || !paths.insert(path.clone()) {
             return Err(CompletionError::DuplicatePath(path.clone().into_path_buf()));
         }
@@ -916,6 +1054,8 @@ pub(super) enum CompletionError {
     NonIdempotentReplay(PathBuf),
     #[error("qualification completion artifact {0} is missing, duplicated, or stale")]
     ArtifactBinding(String),
+    #[error("qualification correctness evidence changed during completion publication")]
+    CorrectnessEvidenceChanged,
     #[error("qualification completion artifact size does not fit u64")]
     ArtifactSize,
     #[error("qualification completion path is not valid UTF-8: {0}")]

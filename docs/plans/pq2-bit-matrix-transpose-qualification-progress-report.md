@@ -29,7 +29,7 @@ It does not qualify native Linux x86-64, cross-scale memory growth, row XOR, mas
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current inventory contains 547 groups: 545 measured, zero covered by a parent, two not performance relevant, and zero without a faithful comparator.
+The inventory frozen for this slice contains 547 groups: 545 measured, zero covered by a parent, two not performance relevant, and zero without a faithful comparator.
 Its 161 inherited rows are classified as 12 retained, 135 reworked, four diagnostic, eight superseded, and two removed.
 The inventory preserves 123 missing scale families, 158 missing correctness preflights, 158 missing output digests, 73 missing comparators, 58 asymmetric CLI rows, and 20 heterogeneous selections as later work instead of counting this slice as broader completion.
 
@@ -48,7 +48,7 @@ The clean correctness report at `target/qualification/pq2-m5-transpose-review-fi
 | Preflight | `15b6d704b2807bc07f55532c2c9abb79b5ae67a3239e65f7bbfa92585a6c0596` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, both execution receipts, and two-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run; its source-current execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller.
+The complete 271-parent CQ2 family remains a separate historical checkpoint and is not claimed by this focused prerequisite run; its execution passed at clean revision `3f2f382627c8421de0a668819d467a9f252de20f` under the hardened controller and is not relabeled as current-revision evidence.
 
 ## Workload Contracts
 
@@ -168,7 +168,7 @@ No milestone under-specification was revealed, so `docs/plans/milestone-spec-gap
 The final independent GPT-5.6/max follow-up review reported no P0, P1, P2, or P3 findings and no actionable defect at `f912cc3af1f13cc9fab798d69937c155d37d83a0`.
 It independently confirmed the critical-edge first-result oracle, pre-setup and pre-barrier semantic-work overflow rejection, 90-receipt worker preflight, schema-version-26 replay bindings, equal public lifecycles and work counts, canonical input and output digests, exact allocation contracts at dimensions 256, 2,048, and 16,384, ordered source fingerprints, and the narrow legacy timing migration.
 The reviewer also verified all 12 clean first-attempt reports, report replays, regressions, four rollup bindings, and two completion receipts against the immutable evidence revision without rerunning timing.
-Its residual observations match this report's unclaimed scope: native x86-64 performance, PQ6 cross-scale memory growth, Stim allocator-count instrumentation, and broader BitMatrix operations remain future work rather than defects in this slice. The separate full 271-parent CQ2 family is source-current at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
+Its residual observations match this report's unclaimed scope: native x86-64 performance, PQ6 cross-scale memory growth, Stim allocator-count instrumentation, and broader BitMatrix operations remain future work rather than defects in this slice. The separate full 271-parent CQ2 family remains accepted historical evidence at clean hardened-controller revision `3f2f382627c8421de0a668819d467a9f252de20f`.
 
 ## Verification Record
 

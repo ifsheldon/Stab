@@ -8,6 +8,8 @@ use crate::qualification::runtime::group::ScaleContract;
 use crate::qualification::runtime::protocol::{InputDigest, ProtocolId};
 use crate::qualification::runtime::rollup::{RollupReplayEvidence, RollupSourceEvidence};
 
+mod publication;
+
 fn digest(byte: char) -> String {
     byte.to_string().repeat(64)
 }
@@ -44,7 +46,8 @@ fn publish_directory(
     preflight: &[u8],
     markdown: &[u8],
 ) {
-    let output = super::super::artifact::QualificationOutput::begin(root, path)
+    let path = DirectQualificationArtifactPath::try_new(path).expect("direct test path");
+    let mut output = super::super::artifact::QualificationOutput::begin(root, &path)
         .expect("begin test publication");
     output
         .write("report.json", report)
@@ -323,6 +326,9 @@ fn selected_report(
         scale_id: directory.scale_id.clone().expect("source scale"),
         workers: workers.clone(),
         artifacts: directory.artifacts.clone(),
+        correctness_binding: Arc::new(
+            super::super::correctness::CorrectnessArtifactBinding::default(),
+        ),
     }
 }
 
@@ -433,12 +439,14 @@ fn run_fake_workflow(
 ) -> Result<workflow::WorkflowEvidence, CompletionError> {
     let temporary = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(temporary.path()).expect("repository root");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
     let contract = group_contract();
     let commit = actions.receipt.repository.commit_after.clone();
     let performance_inventory = actions.receipt.performance_inventory_sha256.clone();
     let correctness_inventory = actions.receipt.correctness_inventory_sha256.clone();
     let context = ReplayContext {
         root: &root,
+        repository: &live_repository,
         performance_inventory_sha256: &performance_inventory,
         correctness_inventory_sha256: &correctness_inventory,
         contract: &contract,
@@ -655,6 +663,7 @@ fn completion_preflight_binds_steps_and_every_evidence_directory() {
 fn completion_final_publication_rejects_source_replacement() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("repository root");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
     let source_path = Path::new("target/benchmarks/qualification/completion-source");
     publish_directory(
         &root,
@@ -668,7 +677,8 @@ fn completion_final_publication_rejects_source_replacement() {
         tier: QualificationTier::Full,
         scale_id: Some("small".to_string()),
         path: path_text(source_path.as_path()).expect("source path text"),
-        artifacts: read_artifact_receipts(&root, &source_path).expect("source artifacts"),
+        artifacts: read_artifact_receipts(&root, &live_repository, &source_path)
+            .expect("source artifacts"),
     };
     let mut completion = receipt();
     completion.source_reports = vec![source_receipt];
@@ -679,6 +689,7 @@ fn completion_final_publication_rejects_source_replacement() {
     .expect("completion output path");
     let publication = CompletionPublication {
         root: &root,
+        repository: &live_repository,
         output_path: &output_path,
         receipt: &completion,
         report_json: b"completion report\n",
@@ -686,6 +697,8 @@ fn completion_final_publication_rejects_source_replacement() {
         markdown: "completion markdown\n",
         existing_report_json: None,
         existing_preflight_json: None,
+        existing_markdown: None,
+        correctness_bindings: &[],
     };
     assert!(matches!(
         publication.publish_with(
@@ -709,9 +722,115 @@ fn completion_final_publication_rejects_source_replacement() {
 }
 
 #[test]
+fn completion_production_dispatcher_preserves_append_only_outputs() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("repository root");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+    let mut completion = receipt();
+    completion.source_reports.clear();
+    completion.rollups.clear();
+    let existing_path = Path::new("target/benchmarks/qualification/completion-existing");
+    publish_directory(
+        &root,
+        existing_path,
+        b"retained report\n",
+        b"retained preflight\n",
+        b"retained markdown\n",
+    );
+    let existing_path =
+        DirectQualificationArtifactPath::try_new(existing_path).expect("existing path");
+    assert!(matches!(
+        (CompletionPublication {
+            root: &root,
+            repository: &live_repository,
+            output_path: &existing_path,
+            receipt: &completion,
+            report_json: b"replacement report\n",
+            preflight_json: b"replacement preflight\n",
+            markdown: "replacement markdown\n",
+            existing_report_json: None,
+            existing_preflight_json: None,
+            existing_markdown: None,
+            correctness_bindings: &[],
+        })
+        .publish_production_with(|_| Ok(())),
+        Err(CompletionError::Artifact(
+            super::super::artifact::ArtifactError::OutputAlreadyExists(_)
+        ))
+    ));
+    assert_eq!(
+        std::fs::read(
+            repository
+                .path()
+                .join(existing_path.as_path())
+                .join("report.json")
+        )
+        .expect("read retained report"),
+        b"retained report\n"
+    );
+
+    (CompletionPublication {
+        root: &root,
+        repository: &live_repository,
+        output_path: &existing_path,
+        receipt: &completion,
+        report_json: b"replacement report\n",
+        preflight_json: b"replacement preflight\n",
+        markdown: "replacement markdown\n",
+        existing_report_json: Some(b"retained report\n"),
+        existing_preflight_json: Some(b"retained preflight\n"),
+        existing_markdown: Some(b"retained markdown\n"),
+        correctness_bindings: &[],
+    })
+    .publish_production_with(|_| Ok(()))
+    .expect("publish replay replacement");
+    assert_eq!(
+        std::fs::read(
+            repository
+                .path()
+                .join(existing_path.as_path())
+                .join("report.json")
+        )
+        .expect("read replay replacement"),
+        b"replacement report\n"
+    );
+
+    let new_path = DirectQualificationArtifactPath::try_new(Path::new(
+        "target/benchmarks/qualification/completion-new",
+    ))
+    .expect("new path");
+    (CompletionPublication {
+        root: &root,
+        repository: &live_repository,
+        output_path: &new_path,
+        receipt: &completion,
+        report_json: b"new report\n",
+        preflight_json: b"new preflight\n",
+        markdown: "new markdown\n",
+        existing_report_json: None,
+        existing_preflight_json: None,
+        existing_markdown: None,
+        correctness_bindings: &[],
+    })
+    .publish_production_with(|_| Ok(()))
+    .expect("publish new completion");
+    assert_eq!(
+        std::fs::read(
+            repository
+                .path()
+                .join(new_path.as_path())
+                .join("report.json")
+        )
+        .expect("read new report"),
+        b"new report\n"
+    );
+}
+
+#[test]
 fn completion_final_publication_rejects_replay_target_replacement() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("repository root");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
     let output_path = Path::new("target/benchmarks/qualification/completion-replay");
     publish_directory(
         &root,
@@ -727,6 +846,7 @@ fn completion_final_publication_rejects_replay_target_replacement() {
     completion.rollups.clear();
     let publication = CompletionPublication {
         root: &root,
+        repository: &live_repository,
         output_path: &output_path,
         receipt: &completion,
         report_json: b"new report\n",
@@ -734,6 +854,8 @@ fn completion_final_publication_rejects_replay_target_replacement() {
         markdown: "new markdown\n",
         existing_report_json: Some(b"old report\n"),
         existing_preflight_json: Some(b"old preflight\n"),
+        existing_markdown: Some(b"old markdown\n"),
+        correctness_bindings: &[],
     };
     assert!(matches!(
         publication.publish_with(
@@ -766,10 +888,11 @@ fn completion_final_publication_rejects_replay_target_replacement() {
 }
 
 #[test]
-fn completion_replay_publication_survives_old_tree_cleanup_failure() {
+fn completion_final_publication_rejects_in_place_replay_markdown_mutation() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("repository root");
-    let output_path = Path::new("target/benchmarks/qualification/completion-cleanup");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+    let output_path = Path::new("target/benchmarks/qualification/completion-markdown-replay");
     publish_directory(
         &root,
         output_path,
@@ -782,8 +905,9 @@ fn completion_replay_publication_survives_old_tree_cleanup_failure() {
     let mut completion = receipt();
     completion.source_reports.clear();
     completion.rollups.clear();
-    CompletionPublication {
+    let publication = CompletionPublication {
         root: &root,
+        repository: &live_repository,
         output_path: &output_path,
         receipt: &completion,
         report_json: b"new report\n",
@@ -791,20 +915,28 @@ fn completion_replay_publication_survives_old_tree_cleanup_failure() {
         markdown: "new markdown\n",
         existing_report_json: Some(b"old report\n"),
         existing_preflight_json: Some(b"old preflight\n"),
-    }
-    .publish_with(
-        || Ok(()),
-        |output| {
-            output
-                .commit_with_cleanup(|_, _, _, _| {
-                    Err(super::super::artifact::ArtifactError::DirectoryIdentity(
-                        "injected cleanup failure",
-                    ))
-                })
-                .map_err(CompletionError::Artifact)
-        },
-    )
-    .expect("cleanup failure must not invalidate completion publication");
+        existing_markdown: Some(b"old markdown\n"),
+        correctness_bindings: &[],
+    };
+    assert!(matches!(
+        publication.publish_with(
+            || {
+                std::fs::write(
+                    repository
+                        .path()
+                        .join(output_path.as_path())
+                        .join("report.md"),
+                    b"tampered markdown\n",
+                )
+                .expect("mutate replay Markdown in place");
+                Ok(())
+            },
+            |output| output.commit().map_err(CompletionError::Artifact),
+        ),
+        Err(CompletionError::Artifact(
+            super::super::artifact::ArtifactError::ConcurrentReplacement("report.md")
+        ))
+    ));
     assert_eq!(
         std::fs::read(
             repository
@@ -812,8 +944,18 @@ fn completion_replay_publication_survives_old_tree_cleanup_failure() {
                 .join(output_path.as_path())
                 .join("report.json")
         )
-        .expect("read published completion"),
-        b"new report\n"
+        .expect("read retained report"),
+        b"old report\n"
+    );
+    assert_eq!(
+        std::fs::read(
+            repository
+                .path()
+                .join(output_path.as_path())
+                .join("report.md")
+        )
+        .expect("read tampered Markdown"),
+        b"tampered markdown\n"
     );
 }
 
@@ -933,6 +1075,34 @@ fn completion_group_must_be_nonempty_promotable_and_thresholded() {
     let mut no_measurements = group_contract();
     no_measurements.measurement_ids.clear();
     assert!(require_completion_group(&no_measurements).is_err());
+}
+
+#[test]
+fn completion_path_admission_rejects_every_invalid_or_colliding_path_up_front() {
+    let mut args = CompletionArgs {
+        group: "PERFQ-M6-TEST".to_string(),
+        full_inputs: vec![PathBuf::from("target/benchmarks/qualification/full-small")],
+        soak_inputs: vec![PathBuf::from("target/benchmarks/qualification/soak-small")],
+        full_rollup: PathBuf::from("target/benchmarks/qualification/full-rollup"),
+        soak_rollup: PathBuf::from("target/benchmarks/qualification/soak-rollup"),
+        out: PathBuf::from("target/benchmarks/qualification/completion"),
+    };
+    args.full_inputs.push(PathBuf::from(
+        "target/benchmarks/qualification/nested/invalid",
+    ));
+    assert!(matches!(
+        admit_completion_paths(&args),
+        Err(CompletionError::Artifact(
+            super::super::artifact::ArtifactError::NonDirectArtifact(_)
+        ))
+    ));
+
+    args.full_inputs.pop();
+    args.soak_rollup.clone_from(&args.out);
+    assert!(matches!(
+        admit_completion_paths(&args),
+        Err(CompletionError::DuplicatePath(path)) if path == args.out
+    ));
 }
 
 #[test]

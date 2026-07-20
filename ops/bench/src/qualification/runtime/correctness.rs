@@ -8,6 +8,10 @@ use thiserror::Error;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
+mod binding;
+
+pub(super) use binding::CorrectnessArtifactBinding;
+
 const RUN_REQUEST_SCHEMA_VERSION: u32 = 3;
 const RUN_COMPLETION_SCHEMA_VERSION: u32 = 1;
 const MAX_CORRECTNESS_ARTIFACT_BYTES: usize = 64 << 20;
@@ -82,22 +86,32 @@ pub(super) fn validate(
     root: &RepoRoot,
     requirement: CorrectnessRequirement<'_>,
 ) -> Result<CorrectnessPreflightEvidence, CorrectnessError> {
+    Ok(validate_bound(root, requirement)?.0)
+}
+
+pub(super) fn validate_bound(
+    root: &RepoRoot,
+    requirement: CorrectnessRequirement<'_>,
+) -> Result<(CorrectnessPreflightEvidence, CorrectnessArtifactBinding), CorrectnessError> {
     match requirement {
         CorrectnessRequirement::NotApplicable { reason } => {
             if reason.trim().is_empty() {
                 return Err(CorrectnessError::MissingReason);
             }
-            Ok(CorrectnessPreflightEvidence {
-                status: CorrectnessPreflightStatus::NotApplicable,
-                case_ids: Vec::new(),
-                reason: reason.to_string(),
-                source_directory: None,
-                qualification_manifest_sha256: None,
-                request_sha256: None,
-                completion_sha256: None,
-                report_sha256: None,
-                preflight_sha256: None,
-            })
+            Ok((
+                CorrectnessPreflightEvidence {
+                    status: CorrectnessPreflightStatus::NotApplicable,
+                    case_ids: Vec::new(),
+                    reason: reason.to_string(),
+                    source_directory: None,
+                    qualification_manifest_sha256: None,
+                    request_sha256: None,
+                    completion_sha256: None,
+                    report_sha256: None,
+                    preflight_sha256: None,
+                },
+                CorrectnessArtifactBinding::default(),
+            ))
         }
         CorrectnessRequirement::Required {
             output,
@@ -120,6 +134,28 @@ pub(super) fn validate(
     }
 }
 
+#[cfg(test)]
+pub(in crate::qualification::runtime) fn bind_test_artifact_tree(
+    output: &Path,
+    case_ids: &[&str],
+) -> Result<CorrectnessArtifactBinding, CorrectnessError> {
+    let mut binding = CorrectnessArtifactBinding::open(output)?;
+    for name in [
+        "completion.json",
+        "preflight.json",
+        "report.json",
+        "report.md",
+        "request.json",
+    ] {
+        binding.read_top_and_bind(name, MAX_CORRECTNESS_ARTIFACT_BYTES)?;
+    }
+    binding.bind_case_directories(case_ids.iter().copied())?;
+    for case_id in case_ids {
+        binding.read_case_receipt_and_bind(case_id, MAX_EXECUTION_RECEIPT_BYTES)?;
+    }
+    Ok(binding)
+}
+
 struct RequiredValidation<'a> {
     output: &'a Path,
     case_ids: &'a [String],
@@ -132,7 +168,7 @@ struct RequiredValidation<'a> {
 fn validate_required(
     root: &RepoRoot,
     validation: RequiredValidation<'_>,
-) -> Result<CorrectnessPreflightEvidence, CorrectnessError> {
+) -> Result<(CorrectnessPreflightEvidence, CorrectnessArtifactBinding), CorrectnessError> {
     let RequiredValidation {
         output,
         case_ids,
@@ -158,10 +194,15 @@ fn validate_required(
     }
 
     let absolute = root.path.join(output);
-    let request_bytes = read_artifact(root, &absolute.join("request.json"))?;
-    let completion_bytes = read_artifact(root, &absolute.join("completion.json"))?;
-    let report_bytes = read_artifact(root, &absolute.join("report.json"))?;
-    let preflight_bytes = read_artifact(root, &absolute.join("preflight.json"))?;
+    let mut binding = CorrectnessArtifactBinding::open(&absolute)?;
+    let request_bytes =
+        binding.read_top_and_bind("request.json", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
+    let completion_bytes =
+        binding.read_top_and_bind("completion.json", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
+    let report_bytes = binding.read_top_and_bind("report.json", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
+    let preflight_bytes =
+        binding.read_top_and_bind("preflight.json", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
+    binding.read_top_and_bind("report.md", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
     let request: RunRequest = parse_canonical("request.json", &request_bytes)?;
     let completion: RunCompletion = parse_canonical("completion.json", &completion_bytes)?;
     let report: CorrectnessReport = parse_canonical("report.json", &report_bytes)?;
@@ -180,13 +221,12 @@ fn validate_required(
     let statistical_attempts = validate_statistical_ledger(&report, &results)?;
     validate_completion(&completion, &request_sha256, &report_sha256, &results)?;
     validate_execution_receipts(
-        root,
-        &absolute,
         &request,
         &request_sha256,
         schema_family,
         &statistical_attempts,
         &results,
+        &mut binding,
     )?;
     validate_preflight(
         &preflight,
@@ -205,17 +245,20 @@ fn validate_required(
 
     let mut case_ids = case_ids.to_vec();
     case_ids.sort();
-    Ok(CorrectnessPreflightEvidence {
-        status: CorrectnessPreflightStatus::Passed,
-        case_ids,
-        reason: "canonical CQ request, report, completion, preflight, and passing execution receipts independently reconstructed before timing".to_string(),
-        source_directory: Some(output.to_string_lossy().into_owned()),
-        qualification_manifest_sha256: Some(expected_manifest_sha256.to_string()),
-        request_sha256: Some(request_sha256),
-        completion_sha256: Some(completion_sha256),
-        report_sha256: Some(report_sha256),
-        preflight_sha256: Some(super::run::sha256_hex(&preflight_bytes)),
-    })
+    Ok((
+        CorrectnessPreflightEvidence {
+            status: CorrectnessPreflightStatus::Passed,
+            case_ids,
+            reason: "canonical CQ request, report, completion, preflight, and passing execution receipts independently reconstructed before timing".to_string(),
+            source_directory: Some(output.to_string_lossy().into_owned()),
+            qualification_manifest_sha256: Some(expected_manifest_sha256.to_string()),
+            request_sha256: Some(request_sha256),
+            completion_sha256: Some(completion_sha256),
+            report_sha256: Some(report_sha256),
+            preflight_sha256: Some(super::run::sha256_hex(&preflight_bytes)),
+        },
+        binding,
+    ))
 }
 
 fn validate_request<'a>(
@@ -457,20 +500,17 @@ fn validate_completion(
 }
 
 fn validate_execution_receipts(
-    root: &RepoRoot,
-    output: &Path,
     request: &RunRequest,
     request_sha256: &str,
     schema_family: CorrectnessSchemaFamily,
     report_attempts: &BTreeMap<&str, Vec<&StatisticalAttempt>>,
     results: &BTreeMap<&str, &CaseResult>,
+    binding: &mut CorrectnessArtifactBinding,
 ) -> Result<(), CorrectnessError> {
+    binding.bind_case_directories(results.keys().copied())?;
     for result in results.values() {
-        let path = output
-            .join("cases")
-            .join(&result.case_id)
-            .join("execution-receipt.json");
-        let bytes = read_artifact_bounded(root, &path, MAX_EXECUTION_RECEIPT_BYTES)?;
+        let bytes =
+            binding.read_case_receipt_and_bind(&result.case_id, MAX_EXECUTION_RECEIPT_BYTES)?;
         if super::run::sha256_hex(&bytes) != result.execution_receipt_sha256 {
             return Err(CorrectnessError::ExecutionReceipt(result.case_id.clone()));
         }
@@ -591,19 +631,6 @@ where
         return Err(CorrectnessError::NonCanonical(name));
     }
     Ok(value)
-}
-
-fn read_artifact(root: &RepoRoot, path: &Path) -> Result<Vec<u8>, CorrectnessError> {
-    read_artifact_bounded(root, path, MAX_CORRECTNESS_ARTIFACT_BYTES)
-}
-
-fn read_artifact_bounded(
-    root: &RepoRoot,
-    path: &Path,
-    maximum: usize,
-) -> Result<Vec<u8>, CorrectnessError> {
-    crate::source_file::read_repo_regular_file_bounded(root, path, maximum)
-        .map_err(|error| CorrectnessError::Read(error.to_string()))
 }
 
 fn validate_output_path(path: &Path) -> Result<(), CorrectnessError> {
@@ -895,6 +922,13 @@ pub(super) enum CorrectnessError {
     InvalidCases,
     #[error("failed to read correctness evidence: {0}")]
     Read(String),
+    #[error("correctness evidence artifact changed before performance publication: {0}")]
+    ArtifactChanged(PathBuf),
+    #[error("correctness evidence artifact size cannot be represented on this host")]
+    SizeOverflow,
+    #[cfg(not(unix))]
+    #[error("correctness evidence artifact binding requires a Unix host")]
+    UnsupportedBindingHost,
     #[error("correctness artifact {0} must be nonempty and newline terminated")]
     ArtifactBoundary(&'static str),
     #[error("correctness artifact {0} is not in canonical generated form")]

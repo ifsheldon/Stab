@@ -48,7 +48,7 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
         },
         parent_group_ids,
         reason: if behavioral {
-            "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+            "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
                 .to_string()
         } else {
             "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."

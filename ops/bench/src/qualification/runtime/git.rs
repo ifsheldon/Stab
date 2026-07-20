@@ -107,10 +107,10 @@ struct GitView {
 impl GitView {
     fn open(worktree: &Path) -> Result<Self, GitError> {
         ensure_git()?;
-        let worktree = std::fs::canonicalize(worktree).map_err(|source| GitError::Io {
-            path: worktree.to_path_buf(),
-            source,
-        })?;
+        if !worktree.is_absolute() {
+            return Err(GitError::UnsafeGitDirectory(worktree.to_path_buf()));
+        }
+        let worktree = worktree.to_path_buf();
         let source_git_dir = resolve_git_dir(&worktree)?;
         let common_dir = resolve_common_dir(&source_git_dir)?;
         let temporary = tempfile::Builder::new()
@@ -324,10 +324,7 @@ fn resolve_git_dir(worktree: &Path) -> Result<PathBuf, GitError> {
         return Err(GitError::UnsafeGitMarker(marker));
     }
     if metadata.is_dir() {
-        return std::fs::canonicalize(&marker).map_err(|source| GitError::Io {
-            path: marker,
-            source,
-        });
+        return Ok(marker);
     }
     if !metadata.is_file() {
         return Err(GitError::UnsafeGitMarker(marker));
@@ -485,14 +482,14 @@ fn is_shared_index_name(name: &OsStr) -> bool {
 }
 
 fn link_git_directory(source: &Path, destination: &Path) -> Result<(), GitError> {
-    let source = std::fs::canonicalize(source).map_err(|error| GitError::Io {
+    let metadata = std::fs::symlink_metadata(source).map_err(|error| GitError::Io {
         path: source.to_path_buf(),
         source: error,
     })?;
-    if !source.is_dir() {
-        return Err(GitError::UnsafeGitDirectory(source));
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(GitError::UnsafeGitDirectory(source.to_path_buf()));
     }
-    std::os::unix::fs::symlink(&source, destination).map_err(|source| GitError::Io {
+    std::os::unix::fs::symlink(source, destination).map_err(|source| GitError::Io {
         path: destination.to_path_buf(),
         source,
     })

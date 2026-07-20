@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
-use super::artifact::QualificationOutput;
+use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::calibration::{CalibrationDecision, CalibrationPolicy, CalibrationProbe, calibrate};
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessRequirement};
 use super::host::{HostEvidence, HostGuard};
@@ -266,9 +266,14 @@ pub(super) fn run(
     correctness_inventory_sha256: &str,
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
-    QualificationOutput::require_absent(root, &args.out)?;
-    let repository_before = super::git::repository_state(root)?;
-    let resolved_group = super::group::load_group(root, performance_inventory_sha256, &args.group)?;
+    let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
+    let live_repository = RepositoryBinding::open(root)?;
+    QualificationOutput::require_absent_with_repository(root, &live_repository, &output_path)?;
+    let source_root = live_repository.descriptor_root(root)?;
+    let repository_before = bound_repository_state(root, &live_repository)?;
+    let resolved_group =
+        super::group::load_group(&source_root, performance_inventory_sha256, &args.group)?;
+    live_repository.require_current(root)?;
     let scale = resolved_group.contract.scale(&args.scale)?;
     let scale_id = scale.id.clone();
     let workload_id = resolved_group.contract.workload_id.clone();
@@ -278,15 +283,19 @@ pub(super) fn run(
         .validate_worker_shape(&workload_id, &measurement_id)?;
     let claim_class = resolved_group.contract.claim_class;
     let correctness_preflight = correctness_preflight(
-        root,
+        &source_root,
         &resolved_group.contract,
         &args,
         correctness_inventory_sha256,
         &repository_before.commit,
     )?;
-    let mut host_guard = HostGuard::prepare(root, args.allow_unverified_host)?;
-    let toolchain = super::toolchain::collect(root)?;
-    let mut workers = PreparedWorkers::prepare(root, &repository_before.commit, &toolchain)?;
+    live_repository.require_current(root)?;
+    let mut host_guard = HostGuard::prepare(&source_root, args.allow_unverified_host)?;
+    let toolchain = super::toolchain::collect(&source_root)?;
+    live_repository.require_current(root)?;
+    let mut workers =
+        PreparedWorkers::prepare(&source_root, &repository_before.commit, &toolchain)?;
+    live_repository.require_current(root)?;
     workers.pin_to_cpu(host_guard.selected_cpu());
 
     let policy = calibration_policy()?;
@@ -435,7 +444,7 @@ pub(super) fn run(
     let memory = memory_evidence(memory_execution, common_iterations)?;
     workers.verify()?;
     let host = host_guard.finish()?;
-    let repository_after = super::git::repository_state(root)?;
+    let repository_after = bound_repository_state(root, &live_repository)?;
     if repository_before.commit != repository_after.commit {
         return Err(RunError::RepositoryChanged {
             before: repository_before.commit,
@@ -469,7 +478,7 @@ pub(super) fn run(
         profiler_note: resolved_group.contract.profiler_note.clone(),
         tier: args.tier,
         command: RunCommandEvidence {
-            output: args.out.to_string_lossy().into_owned(),
+            output: output_path.as_path().to_string_lossy().into_owned(),
             group_id: resolved_group.contract.id.to_string(),
             scale_id: scale_id.to_string(),
             work_items: scale.work_items.get(),
@@ -504,8 +513,8 @@ pub(super) fn run(
         memory,
         promotable,
     };
-    super::report::validate_report(
-        root,
+    let correctness_binding = super::report::validate_report(
+        &source_root,
         &report,
         performance_inventory_sha256,
         correctness_inventory_sha256,
@@ -514,13 +523,62 @@ pub(super) fn run(
     let preflight = super::report::preflight_artifact(&report, &report_json)?;
     let preflight_json = render_json(&preflight)?;
     let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json))?;
-    let output = QualificationOutput::begin_new(root, &args.out)?;
+    let repository_evidence = report.repository.clone();
+    let mut output =
+        QualificationOutput::begin_new_with_repository(root, &live_repository, &output_path)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     let relative = output.relative().to_path_buf();
-    output.commit_new()?;
+    output.commit_new_with_source_validation(|repository| {
+        require_current_repository(root, &repository_evidence, repository)?;
+        correctness_binding.require_current().map_err(|_| {
+            super::artifact::ArtifactError::ExternalSourceChanged(
+                "correctness qualification evidence",
+            )
+        })
+    })?;
     Ok(relative)
+}
+
+pub(super) fn bound_repository_state(
+    root: &RepoRoot,
+    repository: &RepositoryBinding,
+) -> Result<super::git::RepositoryState, super::artifact::ArtifactError> {
+    repository.require_current(root)?;
+    let descriptor_root = repository.descriptor_root(root)?;
+    let state = super::git::repository_state(&descriptor_root)
+        .map_err(|_| super::artifact::ArtifactError::ExternalSourceChanged("repository state"))?;
+    repository.require_current(root)?;
+    Ok(state)
+}
+
+pub(super) fn require_current_repository(
+    root: &RepoRoot,
+    expected: &RepositoryEvidence,
+    repository: &super::artifact::BoundRepository<'_>,
+) -> Result<(), super::artifact::ArtifactError> {
+    repository.require_current(root)?;
+    let descriptor_root = repository.descriptor_root(root)?;
+    let current = super::git::repository_state(&descriptor_root)
+        .map_err(|_| super::artifact::ArtifactError::ExternalSourceChanged("repository state"))?;
+    repository.require_current(root)?;
+    require_current_repository_state(&current, expected)
+}
+
+fn require_current_repository_state(
+    current: &super::git::RepositoryState,
+    expected: &RepositoryEvidence,
+) -> Result<(), super::artifact::ArtifactError> {
+    if current.commit == expected.commit_after
+        && current.local_modifications == expected.local_modifications_after
+    {
+        Ok(())
+    } else {
+        Err(super::artifact::ArtifactError::ExternalSourceChanged(
+            "repository state",
+        ))
+    }
 }
 
 fn correctness_preflight(

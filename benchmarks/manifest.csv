@@ -8,7 +8,7 @@ m5-simd-bit-table,M5,report-only,stim-perf,src/stim/mem/simd_bit_table.perf.cc,s
 m5-simd-bits,M5,report-only,stim-perf,src/stim/mem/simd_bits.perf.cc,simd_bits_*,,,throughput,bit-vector,bit vector xor and nonzero baseline plus Stab masked range and copy contract rates,partial-match
 m5-simd-word,M5,report-only,stim-perf,src/stim/mem/simd_word.perf.cc,simd_compat_popcnt,,,throughput,bit-word,popcount-like bit-vector workload over the upstream bit count,direct-match
 m5-sparse-xor,M5,report-only,stim-perf,src/stim/mem/sparse_xor_vec.perf.cc,SparseXor*,,,throughput,sparse-xor,sparse table row XOR and item XOR workloads,direct-match
-m6-clifford-string,M6,report-only,stim-perf,src/stim/stabilizers/clifford_string.perf.cc,CliffordString_*,,,throughput,clifford-string,Clifford string multiplication workload,direct-match
+m6-clifford-string,M6,report-only,stim-perf,src/stim/stabilizers/clifford_string.perf.cc,CliffordString_*,,,throughput,clifford-string,Clifford string multiplication plus short-right scaling workloads,partial-match
 m6-pauli-string,M6,report-only,stim-perf,src/stim/stabilizers/pauli_string.perf.cc,PauliString_*,,,throughput,pauli-string,Pauli string multiplication workloads,direct-match
 m6-pauli-iter,M6,report-only,stim-perf,src/stim/stabilizers/pauli_string_iter.perf.cc,pauli_iter_*,,,throughput,pauli-iterator,Pauli string iterator workloads,direct-match
 m6-tableau,M6,report-only,stim-perf,src/stim/stabilizers/tableau.perf.cc,"tableau_random*,tableau_cnot_10Kqubits",,,throughput,tableau,tableau construction and gate workloads,report-only

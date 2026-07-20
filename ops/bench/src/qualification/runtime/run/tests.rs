@@ -1,5 +1,6 @@
 use super::*;
 use clap::Parser;
+use std::path::Path;
 
 #[derive(Debug, Parser)]
 struct RunCli {
@@ -204,4 +205,91 @@ fn run_cli_selects_source_owned_group_and_scale_without_free_work() {
         RunCli::try_parse_from(["qualification-run", "--tier", "pr", "--work-items", "1",])
             .is_err()
     );
+}
+
+#[test]
+fn output_admission_rejects_nested_and_injection_names_without_mutation() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("repository root");
+    let existing = repository
+        .path()
+        .join("target/benchmarks/qualification/existing");
+    std::fs::create_dir_all(&existing).expect("create existing evidence");
+    std::fs::write(existing.join("report.json"), b"retained\n").expect("write evidence");
+
+    for path in [
+        Path::new("target/benchmarks/qualification/existing/nested"),
+        Path::new("target/benchmarks/qualification/bad|name"),
+        Path::new("target/benchmarks/qualification/.publication.lock"),
+    ] {
+        let result = DirectQualificationArtifactPath::try_new(path).and_then(|output| {
+            let repository = RepositoryBinding::open(&root)?;
+            QualificationOutput::require_absent_with_repository(&root, &repository, &output)
+        });
+        assert!(result.is_err(), "path={path:?}");
+    }
+
+    assert_eq!(
+        std::fs::read(existing.join("report.json")).expect("read retained evidence"),
+        b"retained\n"
+    );
+    assert_eq!(
+        std::fs::read_dir(&existing)
+            .expect("read existing evidence")
+            .count(),
+        1
+    );
+    assert!(!existing.join(".publication.lock").exists());
+}
+
+#[test]
+fn retained_repository_binding_rejects_root_swap_after_output_admission() {
+    let parent = tempfile::tempdir().expect("temporary parent");
+    let repository = parent.path().join("repository");
+    std::fs::create_dir(&repository).expect("create repository");
+    let root = RepoRoot::resolve(&repository).expect("repository root");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+    let output = DirectQualificationArtifactPath::try_new(Path::new(
+        "target/benchmarks/qualification/root-swap",
+    ))
+    .expect("direct output path");
+    QualificationOutput::require_absent_with_repository(&root, &live_repository, &output)
+        .expect("admit output");
+
+    let detached = parent.path().join("detached-repository");
+    std::fs::rename(&repository, &detached).expect("detach repository");
+    std::fs::create_dir(&repository).expect("replace repository");
+
+    assert!(matches!(
+        bound_repository_state(&root, &live_repository),
+        Err(super::super::artifact::ArtifactError::RepositoryIdentity)
+    ));
+    assert!(matches!(
+        QualificationOutput::begin_new_with_repository(&root, &live_repository, &output),
+        Err(super::super::artifact::ArtifactError::RepositoryIdentity)
+    ));
+    assert!(!repository.join(output.as_path()).exists());
+}
+
+#[test]
+fn publication_repository_binding_rejects_commit_and_dirty_state_drift() {
+    let expected = RepositoryEvidence {
+        commit_before: "a".repeat(40),
+        commit_after: "a".repeat(40),
+        local_modifications_before: false,
+        local_modifications_after: false,
+    };
+    let current = super::super::git::RepositoryState {
+        commit: "a".repeat(40),
+        local_modifications: false,
+    };
+    require_current_repository_state(&current, &expected).expect("matching repository state");
+
+    let mut changed_commit = current.clone();
+    changed_commit.commit = "b".repeat(40);
+    assert!(require_current_repository_state(&changed_commit, &expected).is_err());
+
+    let mut dirty = current;
+    dirty.local_modifications = true;
+    assert!(require_current_repository_state(&dirty, &expected).is_err());
 }

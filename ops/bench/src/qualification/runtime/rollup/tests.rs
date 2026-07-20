@@ -147,6 +147,49 @@ fn assemble_candidates(candidates: Vec<Candidate>) -> Result<RollupReport, Rollu
     )
 }
 
+#[test]
+fn loaded_candidate_retains_correctness_tree_binding() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let output = repository.path().join("correctness-source");
+    let case = output.join("cases/case-a");
+    std::fs::create_dir_all(&case).expect("create correctness case");
+    for name in [
+        "completion.json",
+        "preflight.json",
+        "report.json",
+        "report.md",
+        "request.json",
+    ] {
+        std::fs::write(output.join(name), format!("{name}\n")).expect("write correctness artifact");
+    }
+    let receipt = case.join("execution-receipt.json");
+    std::fs::write(&receipt, b"receipt\n").expect("write correctness receipt");
+    let binding = super::super::correctness::bind_test_artifact_tree(&output, &["case-a"])
+        .expect("bind correctness tree");
+    let loaded = vec![LoadedCandidate {
+        path: DirectQualificationArtifactPath::try_new(Path::new(
+            "target/benchmarks/qualification/source",
+        ))
+        .expect("source path"),
+        report_sha256: digest('1'),
+        preflight_sha256: digest('2'),
+        markdown_sha256: digest('3'),
+        correctness_binding: Arc::new(binding),
+        candidate: candidate("small", 1, GateOutcome::Passed),
+    }];
+
+    require_current_correctness(&loaded).expect("current correctness tree");
+    std::fs::write(&receipt, b"changed\n").expect("mutate correctness receipt");
+    assert!(matches!(
+        require_current_correctness(&loaded),
+        Err(
+            super::super::artifact::ArtifactError::ExternalSourceChanged(
+                "correctness qualification evidence"
+            )
+        )
+    ));
+}
+
 fn assert_reconstruction_rejects_tampering(
     reference: &RollupReport,
     output: &DirectQualificationArtifactPath,
