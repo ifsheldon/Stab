@@ -33,9 +33,13 @@ jobs:
         run: rustup show active-toolchain
 
       - name: Record primary baseline
+        env:
+          RUSTFLAGS: -C target-cpu=native
         run: just bench::baseline --primary --out target/benchmarks/m12-scheduled-primary-baseline
 
       - name: Check primary regression thresholds
+        env:
+          RUSTFLAGS: -C target-cpu=native
         run: just bench::primary-regression --baseline target/benchmarks/m12-scheduled-primary-baseline/baseline.json --report target/benchmarks/m12-scheduled-primary-regression
 
       - name: Upload benchmark reports
