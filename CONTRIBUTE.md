@@ -5,6 +5,7 @@ Nightly is required by the roadmap because the core bit kernels will use `std::s
 
 The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.
 Clone with tags and initialize `vendor/stim` with its tags because pinned Stim validation requires both commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` and exact tag `v1.16.0`.
+The correctness qualification extractor also requires `uv` on the controlled system path for bounded parsing of pinned Python tests.
 
 Install the local staged-aware Git hook with:
 
