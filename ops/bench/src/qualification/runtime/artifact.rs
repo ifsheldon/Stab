@@ -382,16 +382,7 @@ impl QualificationOutput {
             file.sync_all().map_err(ArtifactError::Write)
         })();
         if let Err(source) = write_result {
-            let removed = self.staged_children.get(name).is_some_and(|descriptor| {
-                artifact_entry_matches(&self.staging, OsStr::new(name), descriptor)
-                    .is_ok_and(|matches| matches)
-                    && rustix::fs::unlinkat(&self.staging, name, rustix::fs::AtFlags::empty())
-                        .is_ok()
-            });
-            if removed {
-                self.staged_children.remove(name);
-            }
-            return Err(source);
+            return Err(self.handle_write_failure(source));
         }
         let descriptor = self
             .staged_children
@@ -408,6 +399,59 @@ impl QualificationOutput {
                 maximum_bytes: MAX_ARTIFACT_BYTES,
             },
         );
+        Ok(())
+    }
+
+    fn handle_write_failure(&mut self, source: ArtifactError) -> ArtifactError {
+        match self.abort_staging() {
+            Ok(()) => source,
+            Err(cleanup) => ArtifactError::WriteCleanup {
+                write: Box::new(source),
+                cleanup: Box::new(cleanup),
+            },
+        }
+    }
+
+    fn abort_staging(&mut self) -> Result<(), ArtifactError> {
+        self.require_repository_current()?;
+        ensure_directory_chain(&self.repository, &self.parent_components, &self.parent)?;
+        if !directory_entry_matches(&self.parent, &self.staging_name, &self.staging)? {
+            return Err(ArtifactError::DirectoryIdentity(
+                "failed qualification staging directory changed before cleanup",
+            ));
+        }
+        let expected = self
+            .staged_children
+            .keys()
+            .map(|name| OsString::from(*name))
+            .collect::<BTreeSet<_>>();
+        let actual = directory_names(&self.staging, MAX_DIRECTORY_ENTRIES)?;
+        if actual != expected {
+            return Err(ArtifactError::UnexpectedStagedArtifacts(actual));
+        }
+        for (name, descriptor) in &self.staged_children {
+            if !artifact_entry_matches(&self.staging, OsStr::new(name), descriptor)? {
+                return Err(ArtifactError::DirectoryIdentity(
+                    "failed qualification artifact changed before staging cleanup",
+                ));
+            }
+            rustix::fs::unlinkat(&self.staging, *name, rustix::fs::AtFlags::empty())
+                .map_err(ArtifactError::Io)?;
+        }
+        rustix::fs::fsync(&self.staging).map_err(ArtifactError::Io)?;
+        if !directory_entry_matches(&self.parent, &self.staging_name, &self.staging)? {
+            return Err(ArtifactError::DirectoryIdentity(
+                "failed qualification staging directory changed during cleanup",
+            ));
+        }
+        rustix::fs::unlinkat(
+            &self.parent,
+            &self.staging_name,
+            rustix::fs::AtFlags::REMOVEDIR,
+        )
+        .map_err(ArtifactError::Io)?;
+        sync_directory_chain(&self.repository, &self.parent_components, &self.parent)?;
+        self.staging_active = false;
         Ok(())
     }
 
@@ -1107,6 +1151,11 @@ pub(crate) enum ArtifactError {
     PublicationRollback,
     #[error("qualification artifact write failed: {0}")]
     Write(std::io::Error),
+    #[error("{write}; qualification staging cleanup also failed: {cleanup}")]
+    WriteCleanup {
+        write: Box<ArtifactError>,
+        cleanup: Box<ArtifactError>,
+    },
     #[error("qualification artifact is not a bounded regular file: {0}")]
     UnsafeArtifact(&'static str),
     #[error("qualification artifact {0} changed while its derived report was being validated")]

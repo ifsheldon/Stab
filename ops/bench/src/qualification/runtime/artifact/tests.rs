@@ -151,6 +151,56 @@ fn producer_begin_rejects_an_existing_output_before_work() {
 }
 
 #[test]
+fn failed_write_abort_removes_the_bound_staging_tree() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let output = Path::new("target/benchmarks/qualification/failed-write-abort");
+    let mut publication = begin_new_output(&root, output).expect("begin publication");
+    publication
+        .write("report.json", b"partial\n")
+        .expect("stage artifact before simulated write failure");
+    let staging = repository
+        .path()
+        .join("target/benchmarks/qualification")
+        .join(&publication.staging_name);
+
+    let error = publication.handle_write_failure(ArtifactError::Write(std::io::Error::other(
+        "injected write failure",
+    )));
+
+    assert!(matches!(error, ArtifactError::Write(_)));
+    assert!(!staging.exists());
+    assert!(!publication.staging_active);
+}
+
+#[test]
+fn failed_write_abort_reports_staging_cleanup_failure() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let output = Path::new("target/benchmarks/qualification/failed-write-cleanup-error");
+    let mut publication = begin_new_output(&root, output).expect("begin publication");
+    publication
+        .write("report.json", b"partial\n")
+        .expect("stage artifact before simulated write failure");
+    let parent = repository.path().join("target/benchmarks/qualification");
+    let staging = parent.join(&publication.staging_name);
+    let detached = parent.join("detached-failed-write-staging");
+    std::fs::rename(&staging, &detached).expect("detach bound staging directory");
+    std::fs::create_dir(&staging).expect("replace staging directory");
+    let write = ArtifactError::Write(std::io::Error::other("injected write failure"));
+
+    let error = publication.handle_write_failure(write);
+
+    assert!(matches!(
+        error,
+        ArtifactError::WriteCleanup { write, cleanup }
+            if matches!(*write, ArtifactError::Write(_))
+                && matches!(*cleanup, ArtifactError::DirectoryIdentity(_))
+    ));
+    assert!(detached.join("report.json").exists());
+}
+
+#[test]
 fn absence_admission_does_not_create_the_output_hierarchy() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
