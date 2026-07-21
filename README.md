@@ -2,10 +2,10 @@
 
 Stab(ilizer) is an agent-native toolkit for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend.
 
-Its first milestone is a verified drop-in replacement for [Stim](https://github.com/quantumlib/Stim) v1.16.0, the standard simulator and analysis tool for QEC research.
+Its first milestone is a verified drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research.
 Stab reads the same `.stim` circuit and `.dem` detector error model formats, implements the same `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem` commands, and streams results in the same `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` result formats.
 
-Compatibility: Every implemented surface is pinned against the real Stim v1.16.0 through a committed compatibility matrix, an oracle fixture corpus, and machine-checkable correctness and performance qualification reports, and this evidence machinery ships with the repository so that anyone who forks or modifies Stab can re-run the same checks.
+> Compatibility: Every implemented surface is pinned against the real Stim through extensive parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). Please feel free to report any discrepancies, and we will investigate and fix them.
 
 The longer-term vision is composable Rust components for QEC tooling.
 
@@ -49,7 +49,7 @@ Use `stab help commands`, `stab help formats`, and `stab help gates` to explore 
 
 ## Supported Platforms
 
-Development and all correctness and performance qualification evidence run on Linux (x86-64 and AArch64), and the qualification harness is currently Linux-only, while macOS (Apple Silicon) is supported but not tested.
+Development and all correctness tests and performance benchmarks run on Linux  (AArch64, actually my DGX Spark), and they are currently Linux-only, while macOS (Apple Silicon) is supported but not tested.
 
 The prebuilt Linux and macOS AArch64 binaries are convenience artifacts built by GitHub Actions.
 
@@ -57,7 +57,7 @@ The prebuilt Linux and macOS AArch64 binaries are convenience artifacts built by
 
 Stab is an agent-built codebase: the implementation was developed with OpenAI Codex, and the test, oracle, and benchmark qualification harnesses were developed with GPT-5.6 Sol and previously GPT 5.5.
 
-The working style is plan-first and evidence-first, and the workflow artifacts are committed in this repository: milestone plans and qualification contracts in [docs/plans/](docs/plans/), agent operating rules in [AGENTS.md](AGENTS.md), the pinned Stim v1.16.0 reference sources in [vendor/stim](vendor/stim), and the frozen correctness and performance inventories under [oracle/](oracle/) and [benchmarks/](benchmarks/).
+The working style is plan-first and evidence-first, and the workflow artifacts are committed in this repository: milestone plans and qualification contracts in [docs/plans/](docs/plans/), agent operating rules in [AGENTS.md](AGENTS.md), the pinned Stim v1.16.0 reference sources in [vendor/stim](vendor/stim), and the frozen correctness and performance inventories under [oracle/](oracle/) and [benchmarks/](benchmarks/). For our specialized review skills, see [the skill inventory](.agents/skills/).
 
 Key decisions, including the portable-SIMD bit kernels, the streaming CLI architecture, and the machine-checkable qualification program, are documented in the milestone and progress reports under [docs/plans/](docs/plans/).
 
