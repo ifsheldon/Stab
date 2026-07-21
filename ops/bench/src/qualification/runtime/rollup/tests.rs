@@ -150,7 +150,9 @@ fn assemble_candidates(candidates: Vec<Candidate>) -> Result<RollupReport, Rollu
 #[test]
 fn loaded_candidate_retains_correctness_tree_binding() {
     let repository = tempfile::tempdir().expect("temporary repository");
-    let output = repository.path().join("correctness-source");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve correctness repository");
+    let relative = Path::new("correctness-source");
+    let output = repository.path().join(relative);
     let case = output.join("cases/case-a");
     std::fs::create_dir_all(&case).expect("create correctness case");
     for name in [
@@ -164,7 +166,7 @@ fn loaded_candidate_retains_correctness_tree_binding() {
     }
     let receipt = case.join("execution-receipt.json");
     std::fs::write(&receipt, b"receipt\n").expect("write correctness receipt");
-    let binding = super::super::correctness::bind_test_artifact_tree(&output, &["case-a"])
+    let binding = super::super::correctness::bind_test_artifact_tree(&root, relative, &["case-a"])
         .expect("bind correctness tree");
     let loaded = vec![LoadedCandidate {
         path: DirectQualificationArtifactPath::try_new(Path::new(

@@ -15,7 +15,8 @@ fn bound_correctness_tree(
     Arc<crate::qualification::runtime::correctness::CorrectnessArtifactBinding>,
     PathBuf,
 ) {
-    let output = repository.path().join("correctness-source");
+    let relative = Path::new("correctness-source");
+    let output = repository.path().join(relative);
     let case = output.join("cases/case-a");
     std::fs::create_dir_all(&case).expect("create correctness case");
     for name in [
@@ -29,9 +30,13 @@ fn bound_correctness_tree(
     }
     let receipt = case.join("execution-receipt.json");
     std::fs::write(&receipt, b"receipt\n").expect("write correctness receipt");
-    let binding =
-        crate::qualification::runtime::correctness::bind_test_artifact_tree(&output, &["case-a"])
-            .expect("bind correctness tree");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve correctness repository");
+    let binding = crate::qualification::runtime::correctness::bind_test_artifact_tree(
+        &root,
+        relative,
+        &["case-a"],
+    )
+    .expect("bind correctness tree");
     (Arc::new(binding), receipt)
 }
 

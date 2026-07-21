@@ -6,6 +6,7 @@ use std::os::fd::OwnedFd;
 use std::path::{Component, Path, PathBuf};
 
 use super::CorrectnessError;
+use crate::root::RepoRoot;
 
 const TOP_LEVEL_NAMES: [&str; 6] = [
     "cases",
@@ -25,14 +26,22 @@ pub(in crate::qualification::runtime) struct CorrectnessArtifactBinding {
 }
 
 impl CorrectnessArtifactBinding {
-    pub(super) fn open(output_path: &Path) -> Result<Self, CorrectnessError> {
-        let output = open_absolute_directory(output_path)?;
-        require_names(&output, top_level_names(), output_path)?;
+    pub(super) fn open(
+        root: &RepoRoot,
+        relative_output_path: &Path,
+    ) -> Result<Self, CorrectnessError> {
+        let output_path = root.path.join(relative_output_path);
+        let (repository, ancestors, output_name, output) =
+            open_repository_directory_chain(root, relative_output_path, &output_path)?;
+        require_names(&output, top_level_names(), &output_path)?;
         let cases_path = output_path.join("cases");
         let cases = open_directory_at(&output, OsStr::new("cases"), &cases_path)?;
         Ok(Self {
             tree: Some(BoundCorrectnessTree {
-                output_path: output_path.to_path_buf(),
+                output_path,
+                repository,
+                ancestors,
+                output_name,
                 output,
                 cases,
                 top_artifacts: BTreeMap::new(),
@@ -137,8 +146,12 @@ impl CorrectnessArtifactBinding {
         let Some(tree) = &self.tree else {
             return Ok(());
         };
-        let current_output = open_absolute_directory(&tree.output_path)?;
-        require_same_file(&current_output, &tree.output, &tree.output_path)?;
+        let mut parent = &tree.repository;
+        for ancestor in &tree.ancestors {
+            require_directory_entry(parent, &ancestor.name, &ancestor.descriptor, &ancestor.path)?;
+            parent = &ancestor.descriptor;
+        }
+        require_directory_entry(parent, &tree.output_name, &tree.output, &tree.output_path)?;
         require_names(&tree.output, top_level_names(), &tree.output_path)?;
         require_directory_entry(
             &tree.output,
@@ -184,10 +197,20 @@ impl CorrectnessArtifactBinding {
 #[derive(Debug)]
 struct BoundCorrectnessTree {
     output_path: PathBuf,
+    repository: OwnedFd,
+    ancestors: Vec<BoundDirectoryEntry>,
+    output_name: OsString,
     output: OwnedFd,
     cases: OwnedFd,
     top_artifacts: BTreeMap<&'static str, BoundCorrectnessArtifact>,
     case_directories: BTreeMap<OsString, BoundCaseDirectory>,
+}
+
+#[derive(Debug)]
+struct BoundDirectoryEntry {
+    name: OsString,
+    path: PathBuf,
+    descriptor: OwnedFd,
 }
 
 #[derive(Debug)]
@@ -290,20 +313,44 @@ fn directory_names(
     Ok(names)
 }
 
-fn open_absolute_directory(path: &Path) -> Result<OwnedFd, CorrectnessError> {
-    if !path.is_absolute() {
-        return Err(CorrectnessError::ArtifactChanged(path.to_path_buf()));
+fn open_repository_directory_chain(
+    root: &RepoRoot,
+    relative_path: &Path,
+    display_path: &Path,
+) -> Result<(OwnedFd, Vec<BoundDirectoryEntry>, OsString, OwnedFd), CorrectnessError> {
+    let mut components = Vec::new();
+    for component in relative_path.components() {
+        let Component::Normal(name) = component else {
+            return Err(CorrectnessError::ArtifactChanged(
+                display_path.to_path_buf(),
+            ));
+        };
+        components.push(name.to_os_string());
     }
-    let mut current =
-        rustix::fs::open("/", directory_flags(), rustix::fs::Mode::empty()).map_err(read_error)?;
-    for component in path.components() {
-        match component {
-            Component::RootDir => {}
-            Component::Normal(name) => current = open_directory_at(&current, name, path)?,
-            _ => return Err(CorrectnessError::ArtifactChanged(path.to_path_buf())),
-        }
+    let output_name = components
+        .pop()
+        .ok_or_else(|| CorrectnessError::ArtifactChanged(display_path.to_path_buf()))?;
+    let repository = crate::source_file::duplicate_repo_root_descriptor(root, display_path)
+        .map_err(|error| CorrectnessError::Read(error.to_string()))?;
+    let mut ancestors = Vec::with_capacity(components.len());
+    let mut current_path = root.path.clone();
+    for name in components {
+        current_path.push(&name);
+        let parent = ancestors
+            .last()
+            .map_or(&repository, |entry: &BoundDirectoryEntry| &entry.descriptor);
+        let descriptor = open_directory_at(parent, &name, &current_path)?;
+        ancestors.push(BoundDirectoryEntry {
+            name,
+            path: current_path.clone(),
+            descriptor,
+        });
     }
-    Ok(current)
+    let parent = ancestors
+        .last()
+        .map_or(&repository, |entry| &entry.descriptor);
+    let output = open_directory_at(parent, &output_name, display_path)?;
+    Ok((repository, ancestors, output_name, output))
 }
 
 fn open_directory_at(

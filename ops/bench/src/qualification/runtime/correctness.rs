@@ -136,10 +136,11 @@ pub(super) fn validate_bound(
 
 #[cfg(test)]
 pub(in crate::qualification::runtime) fn bind_test_artifact_tree(
+    root: &RepoRoot,
     output: &Path,
     case_ids: &[&str],
 ) -> Result<CorrectnessArtifactBinding, CorrectnessError> {
-    let mut binding = CorrectnessArtifactBinding::open(output)?;
+    let mut binding = CorrectnessArtifactBinding::open(root, output)?;
     for name in [
         "completion.json",
         "preflight.json",
@@ -193,8 +194,7 @@ fn validate_required(
         return Err(CorrectnessError::InvalidCases);
     }
 
-    let absolute = root.path.join(output);
-    let mut binding = CorrectnessArtifactBinding::open(&absolute)?;
+    let mut binding = CorrectnessArtifactBinding::open(root, output)?;
     let request_bytes =
         binding.read_top_and_bind("request.json", MAX_CORRECTNESS_ARTIFACT_BYTES)?;
     let completion_bytes =

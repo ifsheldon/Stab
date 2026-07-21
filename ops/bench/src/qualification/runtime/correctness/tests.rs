@@ -148,6 +148,33 @@ fn required_preflight_reconstructs_canonical_cq_artifacts() {
     assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
 }
 
+#[cfg(unix)]
+#[test]
+fn bound_correctness_artifacts_support_retained_repository_roots() {
+    let fixture = fixture(FixtureMutation::None);
+    let descriptor =
+        crate::source_file::open_repo_directory_descriptor(&fixture.root, &fixture.root.path)
+            .expect("retain correctness repository");
+    let retained = RepoRoot::from_retained_descriptor(descriptor);
+
+    let (_, binding) = validate_bound(
+        &retained,
+        CorrectnessRequirement::Required {
+            output: &fixture.relative,
+            case_ids: &["cq-case".to_string()],
+            expected_manifest_sha256: &fixture.manifest,
+            expected_stab_commit: &fixture.commit,
+            expected_request_sha256: &fixture.request_sha256,
+            expected_completion_sha256: &fixture.completion_sha256,
+        },
+    )
+    .expect("bind correctness evidence through retained repository root");
+
+    binding
+        .require_current()
+        .expect("retained correctness evidence remains current");
+}
+
 #[test]
 fn bound_correctness_artifacts_reject_in_place_mutation() {
     for artifact in ["report.md", "cases/cq-case/execution-receipt.json"] {
@@ -232,6 +259,34 @@ fn bound_correctness_tree_rejects_hardlinked_directory_replacement() {
             .path
             .join(format!("detached-{}", relative.replace('/', "-")));
         std::fs::rename(&source, &detached).expect("detach bound directory");
+        hardlink_tree(&detached, &source);
+
+        assert!(binding.require_current().is_err(), "relative={relative}");
+    }
+}
+
+#[test]
+fn bound_correctness_tree_rejects_ancestor_replacement() {
+    for relative in ["target", "target/qualification"] {
+        let fixture = fixture(FixtureMutation::None);
+        let (_, binding) = validate_bound(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &["cq-case".to_string()],
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
+            },
+        )
+        .expect("bind correctness evidence");
+        let source = fixture.root.path.join(relative);
+        let detached = fixture
+            .root
+            .path
+            .join(format!("detached-{}", relative.replace('/', "-")));
+        std::fs::rename(&source, &detached).expect("detach bound ancestor");
         hardlink_tree(&detached, &source);
 
         assert!(binding.require_current().is_err(), "relative={relative}");
