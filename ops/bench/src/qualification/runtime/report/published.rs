@@ -13,19 +13,19 @@ pub(in crate::qualification::runtime) const MAX_PUBLISHED_REPORT_BYTES: usize = 
 pub(in crate::qualification::runtime) const MAX_PUBLISHED_PREFLIGHT_BYTES: usize = 1 << 20;
 pub(in crate::qualification::runtime) const MAX_PUBLISHED_MARKDOWN_BYTES: usize = 4 << 20;
 
-pub(in crate::qualification::runtime) fn run(
+pub(in crate::qualification::runtime) fn run_args_with_repository(
     root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: ReportArgs,
 ) -> Result<PathBuf, ReportError> {
     let input_path = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let live_repository = RepositoryBinding::open(root)?;
-    let source_root = live_repository.descriptor_root(root)?;
     run_with_repository(
         root,
-        &source_root,
-        &live_repository,
+        source_root,
+        live_repository,
         &input_path,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,

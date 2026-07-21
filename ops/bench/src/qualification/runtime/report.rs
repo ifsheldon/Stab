@@ -25,7 +25,7 @@ mod worker_contract;
 
 pub(super) use published::{
     MAX_PUBLISHED_MARKDOWN_BYTES, MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES,
-    load_validated_published_evidence, run, run_with_repository,
+    load_validated_published_evidence, run_args_with_repository, run_with_repository,
 };
 #[cfg(test)]
 use timing::validate_attempt_policy as validate_timing_attempt_policy;

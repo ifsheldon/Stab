@@ -57,26 +57,6 @@ pub(crate) struct RegressionSummary {
     pub(crate) report_only: bool,
 }
 
-pub(super) fn run(
-    root: &RepoRoot,
-    expected_performance_inventory_sha256: &str,
-    expected_correctness_inventory_sha256: &str,
-    args: RegressionArgs,
-) -> Result<RegressionSummary, RegressionError> {
-    let input = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let repository = RepositoryBinding::open(root)?;
-    let source_root = repository.descriptor_root(root)?;
-    run_with_repository_and_baseline(
-        root,
-        &source_root,
-        &repository,
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-        &input,
-        &args.baseline,
-    )
-}
-
 pub(super) fn run_with_repository(
     root: &RepoRoot,
     source_root: &RepoRoot,
@@ -96,7 +76,27 @@ pub(super) fn run_with_repository(
     )
 }
 
-fn run_with_repository_and_baseline(
+pub(super) fn run_args_with_repository(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    args: RegressionArgs,
+) -> Result<RegressionSummary, RegressionError> {
+    let input = DirectQualificationArtifactPath::try_new(&args.input)?;
+    run_with_repository_and_baseline(
+        root,
+        source_root,
+        repository,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        &input,
+        &args.baseline,
+    )
+}
+
+pub(super) fn run_with_repository_and_baseline(
     root: &RepoRoot,
     source_root: &RepoRoot,
     repository: &RepositoryBinding,

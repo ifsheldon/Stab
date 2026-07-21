@@ -248,8 +248,6 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         command => command,
     };
     let root = RepoRoot::resolve(&root)?;
-    let manifest = BenchmarkManifest::read(&root)?;
-    manifest.check(&root)?;
     match command {
         Command::QualificationWorker(_) => {
             return Err(BenchError::Qualification(
@@ -257,21 +255,26 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             ));
         }
         Command::List { milestone } => {
+            let manifest = checked_manifest(&root)?;
             manifest.list(milestone.as_deref());
         }
         Command::Smoke => {
+            let manifest = checked_manifest(&root)?;
             println!(
                 "[{PREFIX}] benchmark manifest OK: {} planned rows",
                 manifest.rows.len()
             );
         }
         Command::QualificationCheck => {
+            let manifest = checked_manifest(&root)?;
             qualification::check(&root, &manifest)?;
         }
         Command::QualificationList { feature } => {
+            let manifest = checked_manifest(&root)?;
             qualification::list(&root, &manifest, feature.as_deref())?;
         }
         Command::QualificationRegenerate { check } => {
+            let manifest = checked_manifest(&root)?;
             qualification::regenerate(&root, &manifest, check)?;
         }
         Command::QualificationCliffordVectors { check } => {
@@ -281,28 +284,28 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             qualification::probe(&root, args)?;
         }
         Command::QualificationWorkerReproducibility => {
-            qualification::worker_reproducibility(&root, &manifest)?;
+            qualification::worker_reproducibility(&root)?;
         }
         Command::QualificationRun(args) => {
-            qualification::run_qualification(&root, &manifest, args)?;
+            qualification::run_qualification(&root, args)?;
         }
         Command::QualificationReport(args) => {
-            qualification::report(&root, &manifest, args)?;
+            qualification::report(&root, args)?;
         }
         Command::QualificationCompletion(args) => {
-            qualification::completion(&root, &manifest, args)?;
+            qualification::completion(&root, args)?;
         }
         Command::QualificationCompletionReport(args) => {
-            qualification::completion_report(&root, &manifest, args)?;
+            qualification::completion_report(&root, args)?;
         }
         Command::QualificationRegression(args) => {
-            qualification::regression(&root, &manifest, args)?;
+            qualification::regression(&root, args)?;
         }
         Command::QualificationRollup(args) => {
-            qualification::rollup(&root, &manifest, args)?;
+            qualification::rollup(&root, args)?;
         }
         Command::QualificationRollupReport(args) => {
-            qualification::rollup_report(&root, &manifest, args)?;
+            qualification::rollup_report(&root, args)?;
         }
         Command::Baseline {
             stim,
@@ -313,6 +316,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             primary,
             rebuild_stim,
         } => {
+            let manifest = checked_manifest(&root)?;
             run_baseline(
                 &root,
                 &manifest,
@@ -347,6 +351,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             measurement_runs,
             strict,
         } => {
+            let manifest = checked_manifest(&root)?;
             run_compare(
                 &root,
                 &manifest,
@@ -374,4 +379,10 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
     }
     Ok(())
+}
+
+fn checked_manifest(root: &RepoRoot) -> Result<BenchmarkManifest, BenchError> {
+    let manifest = BenchmarkManifest::read(root)?;
+    manifest.check(root)?;
+    Ok(manifest)
 }

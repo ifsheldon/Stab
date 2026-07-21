@@ -31,14 +31,43 @@ pub(crate) use rollup::{RollupArgs, RollupReportArgs};
 pub(crate) use run::RunArgs;
 pub(crate) use worker::WorkerArgs;
 
+pub(super) struct QualificationSession {
+    root: crate::root::RepoRoot,
+    source_root: crate::root::RepoRoot,
+    repository: artifact::RepositoryBinding,
+}
+
+impl QualificationSession {
+    pub(super) fn open(root: &crate::root::RepoRoot) -> Result<Self, String> {
+        let repository =
+            artifact::RepositoryBinding::open(root).map_err(|error| error.to_string())?;
+        let source_root = repository
+            .descriptor_root(root)
+            .map_err(|error| error.to_string())?;
+        Ok(Self {
+            root: root.clone(),
+            source_root,
+            repository,
+        })
+    }
+
+    pub(super) fn source_root(&self) -> &crate::root::RepoRoot {
+        &self.source_root
+    }
+
+    pub(super) fn require_current(&self) -> Result<(), String> {
+        self.repository
+            .require_current(&self.root)
+            .map_err(|error| error.to_string())
+    }
+}
+
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), String> {
     worker::run(args).map_err(|error| error.to_string())
 }
 
-pub(crate) fn run_probe(root: &crate::root::RepoRoot, args: ProbeArgs) -> Result<(), String> {
-    with_descriptor_root(root, |source_root| {
-        probe::run(source_root, args).map_err(|error| error.to_string())
-    })
+pub(crate) fn run_probe(session: &QualificationSession, args: ProbeArgs) -> Result<(), String> {
+    probe::run(&session.source_root, args).map_err(|error| error.to_string())
 }
 
 pub(crate) fn regenerate_clifford_vectors(
@@ -49,95 +78,128 @@ pub(crate) fn regenerate_clifford_vectors(
 }
 
 pub(crate) fn verify_worker_reproducibility(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
 ) -> Result<(String, String), String> {
-    with_descriptor_root(root, |source_root| {
-        let identity = invocation::verify_private_worker_reproducibility(source_root)
-            .map_err(|error| error.to_string())?;
-        Ok((identity.stim_binary_sha256, identity.stab_binary_sha256))
-    })
-}
-
-fn with_descriptor_root<T>(
-    root: &crate::root::RepoRoot,
-    action: impl FnOnce(&crate::root::RepoRoot) -> Result<T, String>,
-) -> Result<T, String> {
-    let repository = artifact::RepositoryBinding::open(root).map_err(|error| error.to_string())?;
-    let source_root = repository
-        .descriptor_root(root)
+    let identity = invocation::verify_private_worker_reproducibility(&session.source_root)
         .map_err(|error| error.to_string())?;
-    let result = action(&source_root);
-    repository
-        .require_current(root)
-        .map_err(|error| error.to_string())?;
-    result
+    Ok((identity.stim_binary_sha256, identity.stab_binary_sha256))
 }
 
 pub(crate) fn run_qualification(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: RunArgs,
 ) -> Result<std::path::PathBuf, String> {
-    run::run(root, inventory_digest, correctness_digest, args).map_err(|error| error.to_string())
+    run::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_report(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: ReportArgs,
 ) -> Result<std::path::PathBuf, String> {
-    report::run(root, inventory_digest, correctness_digest, args).map_err(|error| error.to_string())
+    report::run_args_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_completion(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: CompletionArgs,
 ) -> Result<std::path::PathBuf, String> {
-    completion::run(root, inventory_digest, correctness_digest, args)
-        .map_err(|error| error.to_string())
+    completion::run_with_repository(
+        &session.root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_completion_report(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: CompletionReportArgs,
 ) -> Result<std::path::PathBuf, String> {
-    completion::run_report(root, inventory_digest, correctness_digest, args)
-        .map_err(|error| error.to_string())
+    completion::run_report_with_repository(
+        &session.root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_regression(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: RegressionArgs,
 ) -> Result<regression::RegressionSummary, String> {
-    regression::run(root, inventory_digest, correctness_digest, args)
-        .map_err(|error| error.to_string())
+    regression::run_args_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_rollup(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: RollupArgs,
 ) -> Result<std::path::PathBuf, String> {
-    rollup::run(root, inventory_digest, correctness_digest, args).map_err(|error| error.to_string())
+    rollup::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_rollup_report(
-    root: &crate::root::RepoRoot,
+    session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
     args: RollupReportArgs,
 ) -> Result<std::path::PathBuf, String> {
-    rollup::run_report(root, inventory_digest, correctness_digest, args)
-        .map_err(|error| error.to_string())
+    rollup::run_report_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn check_contracts(
@@ -148,4 +210,37 @@ pub(crate) fn check_contracts(
     host::check_policy(root).map_err(|error| error.to_string())?;
     group::check(root, inventory_digest, suite).map_err(|error| error.to_string())?;
     regression::check_baseline(root, inventory_digest).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::QualificationSession;
+    use crate::root::RepoRoot;
+
+    #[cfg(unix)]
+    #[test]
+    fn qualification_session_keeps_source_reads_on_the_retained_repository() {
+        let parent = tempfile::tempdir().expect("temporary parent");
+        let repository = parent.path().join("repository");
+        std::fs::create_dir(&repository).expect("create repository");
+        std::fs::write(repository.join("marker"), b"retained").expect("write retained marker");
+        let root = RepoRoot::resolve(&repository).expect("resolve repository");
+        let session = QualificationSession::open(&root).expect("open qualification session");
+        let detached = parent.path().join("detached");
+        std::fs::rename(&repository, &detached).expect("detach repository");
+        std::fs::create_dir(&repository).expect("create replacement repository");
+        std::fs::write(repository.join("marker"), b"replacement")
+            .expect("write replacement marker");
+        let marker_path = session.source_root().path.join("marker");
+
+        let marker = crate::source_file::read_repo_regular_file_bounded(
+            session.source_root(),
+            &marker_path,
+            16,
+        )
+        .expect("read through retained repository descriptor");
+
+        assert_eq!(marker, b"retained");
+        assert!(session.require_current().is_err());
+    }
 }

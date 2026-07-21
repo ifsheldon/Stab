@@ -221,8 +221,9 @@ struct ReplayContext<'a> {
     repository_commit: &'a str,
 }
 
-pub(super) fn run(
+pub(super) fn run_with_repository(
     root: &RepoRoot,
+    repository: &RepositoryBinding,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: CompletionArgs,
@@ -238,35 +239,35 @@ pub(super) fn run(
             existing_preflight_json: None,
             existing_markdown: None,
         },
-        None,
+        repository,
     )
 }
 
-pub(super) fn run_report(
+pub(super) fn run_report_with_repository(
     root: &RepoRoot,
+    live_repository: &RepositoryBinding,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: CompletionReportArgs,
 ) -> Result<PathBuf, CompletionError> {
     let input_path = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let live_repository = RepositoryBinding::open(root)?;
     let report_json = super::artifact::read_artifact_bounded_with_repository(
         root,
-        &live_repository,
+        live_repository,
         &input_path,
         "report.json",
         MAX_COMPLETION_REPORT_BYTES,
     )?;
     let preflight_json = super::artifact::read_artifact_bounded_with_repository(
         root,
-        &live_repository,
+        live_repository,
         &input_path,
         "preflight.json",
         MAX_COMPLETION_PREFLIGHT_BYTES,
     )?;
     let markdown = super::artifact::read_artifact_bounded_with_repository(
         root,
-        &live_repository,
+        live_repository,
         &input_path,
         "report.md",
         MAX_COMPLETION_MARKDOWN_BYTES,
@@ -293,7 +294,7 @@ pub(super) fn run_report(
             existing_preflight_json: Some(&preflight_json),
             existing_markdown: Some(&markdown),
         },
-        Some(live_repository),
+        live_repository,
     )
 }
 
@@ -303,18 +304,14 @@ fn execute(
     expected_correctness_inventory_sha256: &str,
     args: CompletionArgs,
     options: ExecutionOptions<'_>,
-    repository: Option<RepositoryBinding>,
+    live_repository: &RepositoryBinding,
 ) -> Result<PathBuf, CompletionError> {
     let paths = admit_completion_paths(&args)?;
-    let live_repository = match repository {
-        Some(repository) => repository,
-        None => RepositoryBinding::open(root)?,
-    };
     if options.existing_report_json.is_none() {
-        QualificationOutput::require_absent_with_repository(root, &live_repository, &paths.output)?;
+        QualificationOutput::require_absent_with_repository(root, live_repository, &paths.output)?;
     }
     let source_root = live_repository.descriptor_root(root)?;
-    let repository_before = super::run::bound_repository_state(root, &live_repository)?;
+    let repository_before = super::run::bound_repository_state(root, live_repository)?;
     require_clean_repository(&repository_before)?;
     let resolved = super::group::load_group(
         &source_root,
@@ -332,7 +329,7 @@ fn execute(
     let selection = SourceSelectionContext {
         root,
         source_root: &source_root,
-        repository: &live_repository,
+        repository: live_repository,
         contract: &resolved.contract,
         expected_commit: &repository_before.commit,
         performance_inventory_sha256: expected_performance_inventory_sha256,
@@ -347,7 +344,7 @@ fn execute(
         .collect::<Vec<_>>();
     let replay = ReplayContext {
         root,
-        repository: &live_repository,
+        repository: live_repository,
         performance_inventory_sha256: expected_performance_inventory_sha256,
         correctness_inventory_sha256: expected_correctness_inventory_sha256,
         contract: &resolved.contract,
@@ -363,7 +360,7 @@ fn execute(
         &mut workflow::ProductionActions,
     )?;
 
-    let repository_after = super::run::bound_repository_state(root, &live_repository)?;
+    let repository_after = super::run::bound_repository_state(root, live_repository)?;
     require_same_clean_repository(&repository_before, &repository_after)?;
     let output = path_text(paths.output.as_path())?;
     let receipt = CompletionReceipt {
@@ -416,7 +413,7 @@ fn execute(
 
     CompletionPublication {
         root,
-        repository: &live_repository,
+        repository: live_repository,
         output_path: &paths.output,
         receipt: &receipt,
         report_json: &report_json,

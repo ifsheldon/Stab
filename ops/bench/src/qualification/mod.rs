@@ -32,7 +32,9 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
 }
 
 pub(crate) fn probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), BenchError> {
-    runtime::run_probe(root, args).map_err(BenchError::Qualification)
+    with_formal_session(root, |session| {
+        runtime::run_probe(session, args).map_err(BenchError::Qualification)
+    })
 }
 
 pub(crate) fn regenerate_clifford_vectors(root: &RepoRoot, check: bool) -> Result<(), BenchError> {
@@ -44,165 +46,170 @@ pub(crate) fn regenerate_clifford_vectors(root: &RepoRoot, check: bool) -> Resul
     Ok(())
 }
 
-pub(crate) fn worker_reproducibility(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let (stim_binary_sha256, stab_binary_sha256) =
-        runtime::verify_worker_reproducibility(root).map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] private qualification workers are reproducible: stim={} stab={}",
-        stim_binary_sha256, stab_binary_sha256
-    );
-    Ok(())
+pub(crate) fn worker_reproducibility(root: &RepoRoot) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let (stim_binary_sha256, stab_binary_sha256) =
+            runtime::verify_worker_reproducibility(session).map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] private qualification workers are reproducible: stim={} stab={}",
+            stim_binary_sha256, stab_binary_sha256
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn run_qualification(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: RunArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_qualification(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] published performance qualification evidence at {}",
-        output.display()
-    );
-    Ok(())
+pub(crate) fn run_qualification(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_qualification(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published performance qualification evidence at {}",
+            output.display()
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn report(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: ReportArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_report(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] validated performance qualification evidence at {}",
-        output.display()
-    );
-    Ok(())
+pub(crate) fn report(root: &RepoRoot, args: ReportArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_report(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] validated performance qualification evidence at {}",
+            output.display()
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn completion(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: CompletionArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_completion(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] published performance qualification completion receipt at {}",
-        output.display()
-    );
-    Ok(())
+pub(crate) fn completion(root: &RepoRoot, args: CompletionArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_completion(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published performance qualification completion receipt at {}",
+            output.display()
+        );
+        Ok(())
+    })
 }
 
 pub(crate) fn completion_report(
     root: &RepoRoot,
-    manifest: &BenchmarkManifest,
     args: CompletionReportArgs,
 ) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_completion_report(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] replayed performance qualification completion receipt at {}",
-        output.display()
-    );
-    Ok(())
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_completion_report(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] replayed performance qualification completion receipt at {}",
+            output.display()
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn regression(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: RegressionArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let summary = runtime::run_regression(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] qualification regression group={} checked={} report_only={}",
-        summary.group_id, summary.checked_measurements, summary.report_only
-    );
-    Ok(())
+pub(crate) fn regression(root: &RepoRoot, args: RegressionArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let summary = runtime::run_regression(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] qualification regression group={} checked={} report_only={}",
+            summary.group_id, summary.checked_measurements, summary.report_only
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn rollup(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: RollupArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_rollup(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] published performance qualification scale-family rollup at {}",
-        output.display()
-    );
-    Ok(())
+pub(crate) fn rollup(root: &RepoRoot, args: RollupArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_rollup(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published performance qualification scale-family rollup at {}",
+            output.display()
+        );
+        Ok(())
+    })
 }
 
-pub(crate) fn rollup_report(
+pub(crate) fn rollup_report(root: &RepoRoot, args: RollupReportArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_rollup_report(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] replayed performance qualification scale-family rollup at {}",
+            output.display()
+        );
+        Ok(())
+    })
+}
+
+fn with_checked_formal_session<T>(
     root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    args: RollupReportArgs,
-) -> Result<(), BenchError> {
-    check(root, manifest)?;
-    let checked = read(root)?;
-    let output = runtime::run_rollup_report(
-        root,
-        EXPECTED_FROZEN_DIGEST,
-        &checked.correctness_digest,
-        args,
-    )
-    .map_err(BenchError::Qualification)?;
-    println!(
-        "[{PREFIX}] replayed performance qualification scale-family rollup at {}",
-        output.display()
-    );
-    Ok(())
+    action: impl FnOnce(&runtime::QualificationSession) -> Result<T, BenchError>,
+) -> Result<T, BenchError> {
+    with_formal_session(root, |session| {
+        let source_root = session.source_root();
+        let manifest = BenchmarkManifest::read(source_root)?;
+        manifest.check(source_root)?;
+        check(source_root, &manifest)?;
+        action(session)
+    })
+}
+
+fn with_formal_session<T>(
+    root: &RepoRoot,
+    action: impl FnOnce(&runtime::QualificationSession) -> Result<T, BenchError>,
+) -> Result<T, BenchError> {
+    let session = runtime::QualificationSession::open(root).map_err(BenchError::Qualification)?;
+    let result = action(&session);
+    session
+        .require_current()
+        .map_err(BenchError::Qualification)?;
+    result
 }
 
 pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {

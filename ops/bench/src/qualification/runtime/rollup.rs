@@ -261,22 +261,22 @@ pub(super) struct RollupReplayEvidence {
     pub(super) sources: Vec<RollupSourceEvidence>,
 }
 
-pub(super) fn run(
+pub(super) fn run_with_repository(
     root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: RollupArgs,
 ) -> Result<PathBuf, RollupError> {
     let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
     let input_paths = collect_input_paths(args.input.iter().map(PathBuf::as_path), &output_path)?;
-    let live_repository = RepositoryBinding::open(root)?;
-    QualificationOutput::require_absent_with_repository(root, &live_repository, &output_path)?;
-    let source_root = live_repository.descriptor_root(root)?;
-    let repository_before = super::run::bound_repository_state(root, &live_repository)?;
+    QualificationOutput::require_absent_with_repository(root, live_repository, &output_path)?;
+    let repository_before = super::run::bound_repository_state(root, live_repository)?;
     require_clean_repository(&repository_before)?;
     let tier = QualificationTier::from(args.tier);
     let resolved = super::group::load_group(
-        &source_root,
+        source_root,
         expected_performance_inventory_sha256,
         &args.group,
     )?;
@@ -291,15 +291,15 @@ pub(super) fn run(
     }
     let loaded = load_candidates(
         root,
-        &source_root,
-        &live_repository,
+        source_root,
+        live_repository,
         &input_paths,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
     let expected_stab_commit = expected_stab_commit(&loaded)?;
     live_repository.require_current(root)?;
-    let repository_after = super::run::bound_repository_state(root, &live_repository)?;
+    let repository_after = super::run::bound_repository_state(root, live_repository)?;
     let producer_repository =
         bind_producer_repository(repository_before, repository_after, &expected_stab_commit)?;
 
@@ -324,13 +324,13 @@ pub(super) fn run(
     let markdown = render_markdown(&report, &sha256_hex(&report_json));
 
     let mut output =
-        QualificationOutput::begin_new_with_repository(root, &live_repository, &output_path)?;
+        QualificationOutput::begin_new_with_repository(root, live_repository, &output_path)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
     require_current_sources(&mut output, &loaded)?;
     require_current_correctness(&loaded)?;
-    require_current_producer(root, &live_repository, &report.producer_repository)?;
+    require_current_producer(root, live_repository, &report.producer_repository)?;
     output.commit_new_with_source_validation(|repository| {
         super::run::require_current_repository(root, &report.producer_repository, repository)?;
         require_current_correctness(&loaded)
@@ -338,38 +338,24 @@ pub(super) fn run(
     Ok(output_path.into_path_buf())
 }
 
-pub(super) fn run_report(
+pub(super) fn run_report_with_repository(
     root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: RollupReportArgs,
 ) -> Result<PathBuf, RollupError> {
-    Ok(replay(
-        root,
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-        args,
-    )?
-    .output)
-}
-
-pub(super) fn replay(
-    root: &RepoRoot,
-    expected_performance_inventory_sha256: &str,
-    expected_correctness_inventory_sha256: &str,
-    args: RollupReportArgs,
-) -> Result<RollupReplayEvidence, RollupError> {
     let output_path = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let live_repository = RepositoryBinding::open(root)?;
-    let source_root = live_repository.descriptor_root(root)?;
-    replay_with_repository(
+    Ok(replay_with_repository(
         root,
-        &source_root,
-        &live_repository,
+        source_root,
+        live_repository,
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
         output_path,
-    )
+    )?
+    .output)
 }
 
 pub(super) fn replay_with_repository(

@@ -260,19 +260,19 @@ pub(super) struct MemoryEvidence {
     pub(super) execution: PairExecution,
 }
 
-pub(super) fn run(
+pub(super) fn run_with_repository(
     root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
     performance_inventory_sha256: &str,
     correctness_inventory_sha256: &str,
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
     let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
-    let live_repository = RepositoryBinding::open(root)?;
-    QualificationOutput::require_absent_with_repository(root, &live_repository, &output_path)?;
-    let source_root = live_repository.descriptor_root(root)?;
-    let repository_before = bound_repository_state(root, &live_repository)?;
+    QualificationOutput::require_absent_with_repository(root, live_repository, &output_path)?;
+    let repository_before = bound_repository_state(root, live_repository)?;
     let resolved_group =
-        super::group::load_group(&source_root, performance_inventory_sha256, &args.group)?;
+        super::group::load_group(source_root, performance_inventory_sha256, &args.group)?;
     live_repository.require_current(root)?;
     let scale = resolved_group.contract.scale(&args.scale)?;
     let scale_id = scale.id.clone();
@@ -283,18 +283,17 @@ pub(super) fn run(
         .validate_worker_shape(&workload_id, &measurement_id)?;
     let claim_class = resolved_group.contract.claim_class;
     let correctness_preflight = correctness_preflight(
-        &source_root,
+        source_root,
         &resolved_group.contract,
         &args,
         correctness_inventory_sha256,
         &repository_before.commit,
     )?;
     live_repository.require_current(root)?;
-    let mut host_guard = HostGuard::prepare(&source_root, args.allow_unverified_host)?;
-    let toolchain = super::toolchain::collect(&source_root)?;
+    let mut host_guard = HostGuard::prepare(source_root, args.allow_unverified_host)?;
+    let toolchain = super::toolchain::collect(source_root)?;
     live_repository.require_current(root)?;
-    let mut workers =
-        PreparedWorkers::prepare(&source_root, &repository_before.commit, &toolchain)?;
+    let mut workers = PreparedWorkers::prepare(source_root, &repository_before.commit, &toolchain)?;
     live_repository.require_current(root)?;
     workers.pin_to_cpu(host_guard.selected_cpu());
 
@@ -444,7 +443,7 @@ pub(super) fn run(
     let memory = memory_evidence(memory_execution, common_iterations)?;
     workers.verify()?;
     let host = host_guard.finish()?;
-    let repository_after = bound_repository_state(root, &live_repository)?;
+    let repository_after = bound_repository_state(root, live_repository)?;
     if repository_before.commit != repository_after.commit {
         return Err(RunError::RepositoryChanged {
             before: repository_before.commit,
@@ -514,7 +513,7 @@ pub(super) fn run(
         promotable,
     };
     let correctness_binding = super::report::validate_report(
-        &source_root,
+        source_root,
         &report,
         performance_inventory_sha256,
         correctness_inventory_sha256,
@@ -525,7 +524,7 @@ pub(super) fn run(
     let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json))?;
     let repository_evidence = report.repository.clone();
     let mut output =
-        QualificationOutput::begin_new_with_repository(root, &live_repository, &output_path)?;
+        QualificationOutput::begin_new_with_repository(root, live_repository, &output_path)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
