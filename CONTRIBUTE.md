@@ -3,6 +3,9 @@
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
 Nightly is required by the roadmap because the core bit kernels will use `std::simd` through `portable_simd`; until `portable_simd` is stable, the pin keeps local and CI behavior aligned.
 
+The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.
+Clone with tags and initialize `vendor/stim` with its tags because pinned Stim validation requires both commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` and exact tag `v1.16.0`.
+
 Install the local staged-aware Git hook with:
 
 ```sh
