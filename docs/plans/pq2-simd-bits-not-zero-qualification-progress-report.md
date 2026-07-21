@@ -1,6 +1,6 @@
 # PQ2 SIMD-Bits `not_zero` Qualification Progress Report
 
-> Historical-inventory note, 2026-07-19: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. Later product groups, evidence-authorized migrations, and the reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `33579ca890c930241ed852c625524057ec47bee120f23c18c50de8238cb5690c`. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
+> Historical-inventory note, 2026-07-19: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. Later product groups, evidence-authorized migrations, and the reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
 
 ## Status
 

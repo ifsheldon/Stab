@@ -54,10 +54,6 @@
       ]
     },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
-    { "id": "m6-stabilizers-to-tableau", "max_relative_ratio": 1.25 },
-    { "id": "m6-tableau", "max_relative_ratio": 1.25 },
-    { "id": "m6-tableau-iter", "max_relative_ratio": 1.25 },
-    { "id": "m7-cli-dispatch", "max_relative_ratio": 1.25 },
     { "id": "m7-convert-01-to-b8", "max_relative_ratio": 1.25 },
     { "id": "m7-convert-b8-to-01", "max_relative_ratio": 1.25 },
     { "id": "m7-convert-b8-to-b8-wide", "max_relative_ratio": 1.25 },
@@ -89,7 +85,6 @@
     { "id": "m7-gen-unrotated-surface-d5-r50", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-unrotated-surface-d9-r9", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-unrotated-surface-d9-r90", "max_relative_ratio": 1.25 },
-    { "id": "m8-frame-simulator", "max_relative_ratio": 1.25 },
     {
       "id": "m8-measure-reader-01",
       "measurement_thresholds": [
@@ -206,7 +201,6 @@
         }
       ]
     },
-    { "id": "m8-sample-analysis-1shot", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-high-repeat-contract", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-primary-repetition-contract", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-primary-rotated-surface-contract", "max_relative_ratio": 1.25 },

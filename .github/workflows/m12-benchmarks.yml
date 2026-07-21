@@ -18,6 +18,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes build-essential cmake
 
       - name: Install just
         run: cargo install just --locked
@@ -26,9 +33,13 @@ jobs:
         run: rustup show active-toolchain
 
       - name: Record primary baseline
+        env:
+          RUSTFLAGS: -C target-cpu=native
         run: just bench::baseline --primary --out target/benchmarks/m12-scheduled-primary-baseline
 
       - name: Check primary regression thresholds
+        env:
+          RUSTFLAGS: -C target-cpu=native
         run: just bench::primary-regression --baseline target/benchmarks/m12-scheduled-primary-baseline/baseline.json --report target/benchmarks/m12-scheduled-primary-regression
 
       - name: Upload benchmark reports

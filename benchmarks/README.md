@@ -62,9 +62,11 @@ Optimization-log rows use schema version 2 and record before and after reports, 
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
 Threshold files must not contain stale ids: every configured threshold id must be selected by the compare run so row renames and matrix changes cannot silently drop a regression guard.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
+The heterogeneous report-only rows `m6-stabilizers-to-tableau`, `m6-tableau`, `m6-tableau-iter`, `m7-cli-dispatch`, `m8-frame-simulator`, and `m8-sample-analysis-1shot` intentionally have no row-level threshold because their current Stab and Stim measurements do not perform comparable work.
 Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds and checked timing-regression waivers for the frozen primary matrix after a Stab-side warmup pass, three recorded measurement runs, and source-owned profiler-note validation.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
-The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
+The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, compiles the Rust benchmark runner with `-C target-cpu=native` to match pinned Stim's CMake-selected `-march=native` machine target, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
+This native target applies only to machine-local benchmark evidence; Stab release binaries remain generic and portable.
 Threshold files are JSON with schema version 1 or 2.
 Schema version 1 rows use only row-level thresholds:
 

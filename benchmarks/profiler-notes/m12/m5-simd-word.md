@@ -1,2 +1,2 @@
-Dominant cost: the popcount row is a small direct bit-word microbenchmark where minor timer variation can move the median across the 1.25x line even though the implementation is already close to pinned Stim.
-Next owner action: increase the Stab-side repeated work or benchmark sample stability for this row before adding a 1.25x regression threshold.
+Dominant cost: the scheduled x86-64 comparison previously compiled pinned Stim with its CMake-selected `-march=native` target but compiled the Rust runner for the generic target, leaving native popcount instructions unavailable to Stab and producing an unequal-target ratio.
+Next owner action: keep scheduled M12 comparisons on one native machine target while retaining portable Rust source and generic release binaries, then replace this legacy row with receipt-bound architecture-specific PQ2 evidence.

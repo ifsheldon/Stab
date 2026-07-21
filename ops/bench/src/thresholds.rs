@@ -513,7 +513,20 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 75);
+        assert_eq!(thresholds.rows.len(), 69);
+        for id in [
+            "m6-stabilizers-to-tableau",
+            "m6-tableau",
+            "m6-tableau-iter",
+            "m7-cli-dispatch",
+            "m8-frame-simulator",
+            "m8-sample-analysis-1shot",
+        ] {
+            assert!(
+                thresholds.rows.iter().all(|row| row.id != id),
+                "{id} has heterogeneous report-only work and cannot own a row-level ratio"
+            );
+        }
         assert!(
             thresholds
                 .rows

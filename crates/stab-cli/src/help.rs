@@ -74,6 +74,9 @@ fn topic_help(topic: &str) -> Result<String, CliError> {
 
 fn command_list_help() -> String {
     let mut out = String::new();
+    out.push_str(
+        "Stab(ilizer): an agent-native simulation toolkit for quantum error correction research,\nwritten in safe Rust. It is now a drop-in replacement for the Stim v1.16 with future extensions coming soon.\ncommand-line tool: the same .stim circuit and .dem detector error model\nformats, and the same 01, b8, r8, hits, dets, and ptb64 result formats.\n\n",
+    );
     out.push_str("Available stab commands:\n\n");
     for (name, summary) in COMMANDS {
         out.push_str("    stab ");
@@ -82,8 +85,14 @@ fn command_list_help() -> String {
         out.push_str(summary);
         out.push('\n');
     }
+    out.push_str("\nExample:\n");
+    out.push_str("    stab gen --code repetition_code --task memory --distance 3 --rounds 3 --out circuit.stim\n");
+    out.push_str("    stab sample --shots 100 --in circuit.stim --out shots.01\n");
     out.push_str("\nUse `stab help [topic]` for help on commands, formats, and gates.\n");
     out.push_str("Useful topics: commands, formats, gates, convert, sample, 01, ptb64, H.\n");
+    out.push_str("\nDocs and sources: ");
+    out.push_str(env!("CARGO_PKG_REPOSITORY"));
+    out.push('\n');
     out
 }
 

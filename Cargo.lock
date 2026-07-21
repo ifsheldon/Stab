@@ -2100,7 +2100,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "stab-bench"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocation-counter",
  "clap",
@@ -2121,7 +2121,7 @@ dependencies = [
 
 [[package]]
 name = "stab-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "stab-core",
@@ -2131,7 +2131,7 @@ dependencies = [
 
 [[package]]
 name = "stab-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "allocation-counter",
  "hashbrown 0.17.1",
@@ -2144,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "stab-oracle"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "csv",
@@ -2161,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "stab-pre-commit"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "gix",
