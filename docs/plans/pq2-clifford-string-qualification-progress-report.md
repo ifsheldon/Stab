@@ -28,7 +28,7 @@ It does not qualify allocating multiplication, unequal-width growth, constructio
 - Focused migration commit: `91f62d0a78659da2e8e264a6968b3c6cd32456de`.
 - Clean pre-migration authorization revision: `127d6661a9e00872fc4aa4c0b0d27171e005afa5`.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
-- Current performance inventory: `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`; historical schema-version-30 evidence inventory: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`.
+- Current performance inventory: `4c2407613ee63903c57acb4b177e91799047ed60f7bff780929fe84532f57643`; historical schema-version-30 evidence inventory: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`.
 - Correctness inventory: `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f`.
 - Historical runtime-group contract: `4d7b0e4808828217dc0a353ea991321c8483579ed62b84ca42a1cae6f1b4c2ee`; the replacement report will record the current contract digest.
 - Current profiler note: `benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md` at SHA-256 `147fa44d09ee656f20f05c92407195880f7a83f417f590018625259fe311e43a`.

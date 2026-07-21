@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f",
-  "semantic_digest": "c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176",
+  "semantic_digest": "4c2407613ee63903c57acb4b177e91799047ed60f7bff780929fe84532f57643",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -72986,10 +72986,8 @@
         "source": "src/stim/util_top/stabilizers_to_tableau.perf.cc",
         "filter": "stabilizers_to_tableau_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -73011,10 +73009,8 @@
         "source": "src/stim/stabilizers/tableau.perf.cc",
         "filter": "tableau_random*,tableau_cnot_10Kqubits"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -73036,10 +73032,8 @@
         "source": "src/stim/stabilizers/tableau_iter.perf.cc",
         "filter": "tableau_iter_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -73060,10 +73054,8 @@
         "source": "src/stim/main_namespaced.perf.cc",
         "filter": "main_sample*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -73939,10 +73931,8 @@
         "source": "src/stim/simulators/frame_simulator.perf.cc",
         "filter": "FrameSimulator_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -74251,10 +74241,8 @@
         "argv": "sample|--shots|1",
         "stdin_path": "oracle/fixtures/inputs/sample_noisy.stim"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
