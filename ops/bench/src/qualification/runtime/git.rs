@@ -1,18 +1,22 @@
 use std::ffi::{OsStr, OsString};
 use std::io::Write as _;
-use std::path::{Path, PathBuf};
+use std::mem::MaybeUninit;
+use std::os::unix::ffi::OsStringExt as _;
+use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use thiserror::Error;
 
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use crate::config::{STIM_COMMIT, STIM_TAG};
+use crate::error::BenchError;
 use crate::root::RepoRoot;
 
 const GIT: &str = "/usr/bin/git";
 const MAX_GIT_FILE_BYTES: u64 = 512 << 20;
 const MAX_GIT_OUTPUT_BYTES: usize = 4 << 20;
 const MAX_GIT_STDERR_BYTES: usize = 64 << 10;
+const MAX_GIT_DIRECTORY_ENTRIES: usize = 4096;
 const MAX_SHARED_INDEX_FILES: usize = 256;
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -23,11 +27,12 @@ pub(super) struct RepositoryState {
 }
 
 pub(super) fn repository_state(root: &RepoRoot) -> Result<RepositoryState, GitError> {
-    GitView::open(&root.path)?.state()
+    GitView::open(root)?.state()
 }
 
 pub(super) fn validate_pinned_stim(root: &RepoRoot) -> Result<(), GitError> {
-    let view = GitView::open(&root.default_stim_source())?;
+    let stim_root = open_nested_worktree(root, &root.default_stim_source())?;
+    let view = GitView::open(&stim_root)?;
     let state = view.state()?;
     if state.commit != STIM_COMMIT {
         return Err(GitError::WrongStimCommit {
@@ -53,15 +58,17 @@ pub(super) fn materialize_repository_commit(
     expected_commit: &str,
     destination: &Path,
 ) -> Result<(), GitError> {
-    materialize_worktree_commit(&root.path, expected_commit, destination)
+    materialize_worktree_commit(root, &root.path, expected_commit, destination)
 }
 
 pub(super) fn materialize_worktree_commit(
+    root: &RepoRoot,
     worktree: &Path,
     expected_commit: &str,
     destination: &Path,
 ) -> Result<(), GitError> {
-    let view = GitView::open(worktree)?;
+    let worktree = open_nested_worktree(root, worktree)?;
+    let view = GitView::open(&worktree)?;
     if view.commit != expected_commit {
         return Err(GitError::RepositoryCommitChanged {
             actual: view.commit,
@@ -96,7 +103,8 @@ pub(super) fn materialize_worktree_commit(
 
 struct GitView {
     _temporary: tempfile::TempDir,
-    worktree: PathBuf,
+    worktree: RepoRoot,
+    _source_directories: Vec<RepoRoot>,
     git_dir: PathBuf,
     head_index: PathBuf,
     staged_index: PathBuf,
@@ -105,12 +113,12 @@ struct GitView {
 }
 
 impl GitView {
-    fn open(worktree: &Path) -> Result<Self, GitError> {
+    fn open(worktree: &RepoRoot) -> Result<Self, GitError> {
         ensure_git()?;
-        if !worktree.is_absolute() {
-            return Err(GitError::UnsafeGitDirectory(worktree.to_path_buf()));
+        if !worktree.path.is_absolute() {
+            return Err(GitError::UnsafeGitDirectory(worktree.path.clone()));
         }
-        let worktree = worktree.to_path_buf();
+        let worktree = worktree.clone();
         let source_git_dir = resolve_git_dir(&worktree)?;
         let common_dir = resolve_common_dir(&source_git_dir)?;
         let temporary = tempfile::Builder::new()
@@ -121,23 +129,25 @@ impl GitView {
         let scratch = temporary.path().join("home");
         create_directory(&git_dir)?;
         create_directory(&scratch)?;
-        copy_git_file(&source_git_dir.join("HEAD"), &git_dir.join("HEAD"), true)?;
+        copy_git_file(&source_git_dir, "HEAD", &git_dir.join("HEAD"), true)?;
         copy_git_file(
-            &common_dir.join("packed-refs"),
+            &common_dir,
+            "packed-refs",
             &git_dir.join("packed-refs"),
             false,
         )?;
-        copy_git_file(&common_dir.join("shallow"), &git_dir.join("shallow"), false)?;
-        link_git_directory(&common_dir.join("objects"), &git_dir.join("objects"))?;
-        link_git_directory(&common_dir.join("refs"), &git_dir.join("refs"))?;
+        copy_git_file(&common_dir, "shallow", &git_dir.join("shallow"), false)?;
+        let objects = link_git_directory(&common_dir, "objects", &git_dir.join("objects"))?;
+        let refs = link_git_directory(&common_dir, "refs", &git_dir.join("refs"))?;
         let head_index = git_dir.join("head-index");
         let staged_index = git_dir.join("staged-index");
-        copy_git_file(&source_git_dir.join("index"), &staged_index, true)?;
+        copy_git_file(&source_git_dir, "index", &staged_index, true)?;
         copy_shared_indexes(&source_git_dir, &git_dir)?;
 
         let mut view = Self {
             _temporary: temporary,
             worktree,
+            _source_directories: vec![source_git_dir, common_dir, objects, refs],
             git_dir,
             head_index,
             staged_index,
@@ -223,7 +233,7 @@ impl GitView {
             OsString::from("--git-dir"),
             self.git_dir.as_os_str().to_owned(),
             OsString::from("--work-tree"),
-            self.worktree.as_os_str().to_owned(),
+            self.worktree.path.as_os_str().to_owned(),
             OsString::from("-c"),
             OsString::from("core.fsmonitor=false"),
             OsString::from("-c"),
@@ -247,7 +257,7 @@ impl GitView {
             program: PathBuf::from(GIT),
             args,
             stdin: Vec::new(),
-            working_directory: self.worktree.clone(),
+            working_directory: self.worktree.path.clone(),
             environment,
             affinity_cpu: None,
             limits: ProcessLimits {
@@ -314,122 +324,97 @@ fn create_directory(path: &Path) -> Result<(), GitError> {
     })
 }
 
-fn resolve_git_dir(worktree: &Path) -> Result<PathBuf, GitError> {
-    let marker = worktree.join(".git");
-    let metadata = std::fs::symlink_metadata(&marker).map_err(|source| GitError::Io {
-        path: marker.clone(),
-        source,
-    })?;
-    if metadata.file_type().is_symlink() {
-        return Err(GitError::UnsafeGitMarker(marker));
+fn open_nested_worktree(root: &RepoRoot, path: &Path) -> Result<RepoRoot, GitError> {
+    if path == root.path {
+        return Ok(root.clone());
     }
-    if metadata.is_dir() {
-        return Ok(marker);
+    let descriptor = crate::source_file::open_repo_directory_descriptor(root, path)
+        .map_err(|error| map_source_error(path, error))?;
+    Ok(RepoRoot::from_retained_descriptor(descriptor))
+}
+
+fn resolve_git_dir(worktree: &RepoRoot) -> Result<RepoRoot, GitError> {
+    let marker = worktree.path.join(".git");
+    match crate::source_file::open_repo_directory_descriptor(worktree, &marker) {
+        Ok(descriptor) => return Ok(RepoRoot::from_retained_descriptor(descriptor)),
+        Err(BenchError::SourceInputIo { source, .. })
+            if source.kind() == std::io::ErrorKind::NotADirectory => {}
+        Err(error) => return Err(map_git_marker_error(&marker, error)),
     }
-    if !metadata.is_file() {
-        return Err(GitError::UnsafeGitMarker(marker));
-    }
-    let text = read_git_text_file(&marker, 4096)?;
+    let text = read_git_marker_text(worktree, OsStr::new(".git"), 4096)?;
     let relative = text
         .trim()
         .strip_prefix("gitdir: ")
         .ok_or_else(|| GitError::MalformedGitMarker(marker.clone()))?;
     let path = PathBuf::from(relative);
-    let path = if path.is_absolute() {
-        path
+    let display = if path.is_absolute() {
+        path.clone()
     } else {
-        worktree.join(path)
+        worktree.path.join(&path)
     };
-    std::fs::canonicalize(&path).map_err(|source| GitError::Io { path, source })
+    open_git_directory_reference(worktree, &path, &display)
 }
 
-fn resolve_common_dir(git_dir: &Path) -> Result<PathBuf, GitError> {
-    let marker = git_dir.join("commondir");
-    let metadata = match std::fs::symlink_metadata(&marker) {
-        Ok(metadata) => metadata,
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(git_dir.to_path_buf());
+fn resolve_common_dir(git_dir: &RepoRoot) -> Result<RepoRoot, GitError> {
+    let marker = git_dir.path.join("commondir");
+    let bytes = match read_git_marker_file(git_dir, OsStr::new("commondir"), 4096) {
+        Ok(bytes) => bytes,
+        Err(GitError::Io { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(git_dir.clone());
         }
-        Err(source) => {
-            return Err(GitError::Io {
-                path: marker,
-                source,
-            });
-        }
+        Err(error) => return Err(error),
     };
-    if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err(GitError::UnsafeGitMarker(marker));
-    }
-    let text = read_git_text_file(&marker, 4096)?;
-    let path = PathBuf::from(text.trim());
-    let path = if path.is_absolute() {
-        path
-    } else {
-        git_dir.join(path)
-    };
-    std::fs::canonicalize(&path).map_err(|source| GitError::Io { path, source })
-}
-
-fn read_git_text_file(path: &Path, maximum: u64) -> Result<String, GitError> {
-    let bytes = read_git_file(path, maximum)?;
-    String::from_utf8(bytes).map_err(|source| GitError::NonUtf8File {
-        path: path.to_path_buf(),
+    let text = String::from_utf8(bytes).map_err(|source| GitError::NonUtf8File {
+        path: marker.clone(),
         source,
-    })
-}
-
-fn read_git_file(path: &Path, maximum: u64) -> Result<Vec<u8>, GitError> {
-    use std::io::Read as _;
-
-    let mut file = crate::source_file::open_regular_file_bounded_descriptor(path, maximum)
-        .map_err(|source| GitError::UnsafeFile {
-            path: path.to_path_buf(),
-            reason: source.to_string(),
-        })?;
-    let length = file
-        .metadata()
-        .map_err(|source| GitError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?
-        .len();
-    let capacity = usize::try_from(length).map_err(|_| GitError::UnsafeFile {
-        path: path.to_path_buf(),
-        reason: "file size does not fit usize".to_string(),
     })?;
-    let mut bytes = Vec::with_capacity(capacity);
-    file.read_to_end(&mut bytes)
-        .map_err(|source| GitError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > maximum {
-        return Err(GitError::UnsafeFile {
-            path: path.to_path_buf(),
-            reason: format!("file grew beyond {maximum} bytes"),
-        });
-    }
-    Ok(bytes)
+    let path = PathBuf::from(text.trim());
+    let display = if path.is_absolute() {
+        path.clone()
+    } else {
+        git_dir.path.join(&path)
+    };
+    open_git_directory_reference(git_dir, &path, &display)
 }
 
-fn copy_git_file(source: &Path, destination: &Path, required: bool) -> Result<(), GitError> {
-    match std::fs::symlink_metadata(source) {
-        Ok(metadata) if !metadata.is_file() || metadata.file_type().is_symlink() => {
-            return Err(GitError::UnsafeFile {
-                path: source.to_path_buf(),
-                reason: "expected a nonsymlink regular file".to_string(),
-            });
+fn read_git_marker_text(root: &RepoRoot, name: &OsStr, maximum: u64) -> Result<String, GitError> {
+    let path = root.path.join(name);
+    let bytes = read_git_marker_file(root, name, maximum)?;
+    String::from_utf8(bytes).map_err(|source| GitError::NonUtf8File { path, source })
+}
+
+fn read_git_marker_file(root: &RepoRoot, name: &OsStr, maximum: u64) -> Result<Vec<u8>, GitError> {
+    let path = root.path.join(name);
+    let maximum = usize::try_from(maximum).map_err(|_| GitError::UnsafeGitMarker(path.clone()))?;
+    crate::source_file::read_repo_regular_file_bounded(root, &path, maximum)
+        .map_err(|error| map_git_marker_error(&path, error))
+}
+
+fn read_git_file(root: &RepoRoot, name: &OsStr, maximum: u64) -> Result<Vec<u8>, GitError> {
+    let path = root.path.join(name);
+    let maximum = usize::try_from(maximum).map_err(|_| GitError::UnsafeFile {
+        path: path.clone(),
+        reason: "file size limit does not fit usize".to_string(),
+    })?;
+    crate::source_file::read_repo_regular_file_bounded(root, &path, maximum)
+        .map_err(|error| map_source_error(&path, error))
+}
+
+fn copy_git_file(
+    source_root: &RepoRoot,
+    name: &str,
+    destination: &Path,
+    required: bool,
+) -> Result<(), GitError> {
+    let bytes = match read_git_file(source_root, OsStr::new(name), MAX_GIT_FILE_BYTES) {
+        Ok(bytes) => bytes,
+        Err(GitError::Io { source, .. })
+            if !required && source.kind() == std::io::ErrorKind::NotFound =>
+        {
+            return Ok(());
         }
-        Ok(_) => {}
-        Err(error) if !required && error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(source_error) => {
-            return Err(GitError::Io {
-                path: source.to_path_buf(),
-                source: source_error,
-            });
-        }
-    }
-    let bytes = read_git_file(source, MAX_GIT_FILE_BYTES)?;
+        Err(error) => return Err(error),
+    };
     let mut output = std::fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -448,25 +433,56 @@ fn copy_git_file(source: &Path, destination: &Path, required: bool) -> Result<()
     })
 }
 
-fn copy_shared_indexes(source_git_dir: &Path, destination: &Path) -> Result<(), GitError> {
+fn copy_shared_indexes(source_git_dir: &RepoRoot, destination: &Path) -> Result<(), GitError> {
+    copy_shared_indexes_bounded(
+        source_git_dir,
+        destination,
+        MAX_GIT_DIRECTORY_ENTRIES,
+        MAX_SHARED_INDEX_FILES,
+    )
+}
+
+fn copy_shared_indexes_bounded(
+    source_git_dir: &RepoRoot,
+    destination: &Path,
+    maximum_entries: usize,
+    maximum_shared_indexes: usize,
+) -> Result<(), GitError> {
+    let descriptor =
+        crate::source_file::duplicate_repo_root_descriptor(source_git_dir, &source_git_dir.path)
+            .map_err(|error| map_source_error(&source_git_dir.path, error))?;
+    let mut buffer = [MaybeUninit::uninit(); 8192];
+    let mut entries = rustix::fs::RawDir::new(descriptor, &mut buffer);
+    let mut entry_count = 0_usize;
     let mut count = 0_usize;
-    for entry in std::fs::read_dir(source_git_dir).map_err(|source| GitError::Io {
-        path: source_git_dir.to_path_buf(),
-        source,
-    })? {
+    while let Some(entry) = entries.next() {
         let entry = entry.map_err(|source| GitError::Io {
-            path: source_git_dir.to_path_buf(),
-            source,
+            path: source_git_dir.path.clone(),
+            source: source.into(),
         })?;
-        let name = entry.file_name();
+        let name = entry.file_name().to_bytes();
+        if name == b"." || name == b".." {
+            continue;
+        }
+        entry_count = entry_count
+            .checked_add(1)
+            .ok_or(GitError::TooManyGitDirectoryEntries)?;
+        if entry_count > maximum_entries {
+            return Err(GitError::TooManyGitDirectoryEntries);
+        }
+        let name = OsString::from_vec(name.to_vec());
         if !is_shared_index_name(&name) {
             continue;
         }
         count = count.checked_add(1).ok_or(GitError::TooManySharedIndexes)?;
-        if count > MAX_SHARED_INDEX_FILES {
+        if count > maximum_shared_indexes {
             return Err(GitError::TooManySharedIndexes);
         }
-        copy_git_file(&entry.path(), &destination.join(name), true)?;
+        let name_text = name.to_str().ok_or_else(|| GitError::UnsafeFile {
+            path: source_git_dir.path.join(&name),
+            reason: "shared index name is not UTF-8".to_string(),
+        })?;
+        copy_git_file(source_git_dir, name_text, &destination.join(&name), true)?;
     }
     Ok(())
 }
@@ -481,18 +497,91 @@ fn is_shared_index_name(name: &OsStr) -> bool {
     valid_commit(digest)
 }
 
-fn link_git_directory(source: &Path, destination: &Path) -> Result<(), GitError> {
-    let metadata = std::fs::symlink_metadata(source).map_err(|error| GitError::Io {
-        path: source.to_path_buf(),
-        source: error,
-    })?;
-    if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return Err(GitError::UnsafeGitDirectory(source.to_path_buf()));
-    }
-    std::os::unix::fs::symlink(source, destination).map_err(|source| GitError::Io {
+fn link_git_directory(
+    source_root: &RepoRoot,
+    name: &str,
+    destination: &Path,
+) -> Result<RepoRoot, GitError> {
+    let source = source_root.path.join(name);
+    let descriptor = crate::source_file::open_repo_directory_descriptor(source_root, &source)
+        .map_err(|error| map_source_error(&source, error))?;
+    let retained = RepoRoot::from_retained_descriptor(descriptor);
+    std::os::unix::fs::symlink(&retained.path, destination).map_err(|source| GitError::Io {
         path: destination.to_path_buf(),
         source,
-    })
+    })?;
+    Ok(retained)
+}
+
+fn open_git_directory_reference(
+    base: &RepoRoot,
+    reference: &Path,
+    display: &Path,
+) -> Result<RepoRoot, GitError> {
+    let mut directory = if reference.is_absolute() {
+        rustix::fs::open("/", directory_flags(), rustix::fs::Mode::empty()).map_err(|source| {
+            GitError::Io {
+                path: display.to_path_buf(),
+                source: source.into(),
+            }
+        })?
+    } else {
+        crate::source_file::duplicate_repo_root_descriptor(base, display)
+            .map_err(|error| map_source_error(display, error))?
+    };
+    for component in reference.components() {
+        let name = match component {
+            Component::Prefix(_) => {
+                return Err(GitError::UnsafeGitDirectory(display.to_path_buf()));
+            }
+            Component::RootDir | Component::CurDir => continue,
+            Component::ParentDir => OsStr::new(".."),
+            Component::Normal(name) => name,
+        };
+        directory = rustix::fs::openat(
+            &directory,
+            name,
+            directory_flags(),
+            rustix::fs::Mode::empty(),
+        )
+        .map_err(|source| GitError::Io {
+            path: display.to_path_buf(),
+            source: source.into(),
+        })?;
+    }
+    Ok(RepoRoot::from_retained_descriptor(directory))
+}
+
+fn map_git_marker_error(path: &Path, error: BenchError) -> GitError {
+    match error {
+        BenchError::SourceInputIo { source, .. }
+            if source.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) =>
+        {
+            GitError::UnsafeGitMarker(path.to_path_buf())
+        }
+        BenchError::SourceInput(_) => GitError::UnsafeGitMarker(path.to_path_buf()),
+        other => map_source_error(path, other),
+    }
+}
+
+fn map_source_error(path: &Path, error: BenchError) -> GitError {
+    match error {
+        BenchError::SourceInputIo { source, .. } => GitError::Io {
+            path: path.to_path_buf(),
+            source,
+        },
+        other => GitError::UnsafeFile {
+            path: path.to_path_buf(),
+            reason: other.to_string(),
+        },
+    }
+}
+
+fn directory_flags() -> rustix::fs::OFlags {
+    rustix::fs::OFlags::RDONLY
+        | rustix::fs::OFlags::CLOEXEC
+        | rustix::fs::OFlags::DIRECTORY
+        | rustix::fs::OFlags::NOFOLLOW
 }
 
 fn valid_commit(value: &str) -> bool {
@@ -528,6 +617,8 @@ pub(super) enum GitError {
     UnsafeGitDirectory(PathBuf),
     #[error("Git metadata contains too many shared indexes")]
     TooManySharedIndexes,
+    #[error("Git metadata directory contains too many entries")]
+    TooManyGitDirectoryEntries,
     #[error("Git command {arguments:?} failed with status {status:?}: {stderr}")]
     Command {
         arguments: String,
@@ -603,6 +694,71 @@ mod tests {
         test_git(repository.path(), &["commit", "--quiet", "-m", "initial"]);
         let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
         (repository, root)
+    }
+
+    #[test]
+    fn descriptor_backed_git_view_supports_linked_worktrees() {
+        let (repository, _) = initialized_repository();
+        let parent = tempfile::tempdir().expect("temporary worktree parent");
+        let worktree = parent.path().join("linked-worktree");
+        let worktree_text = worktree.to_str().expect("UTF-8 worktree path");
+        test_git(
+            repository.path(),
+            &[
+                "worktree",
+                "add",
+                "--quiet",
+                "--detach",
+                worktree_text,
+                "HEAD",
+            ],
+        );
+        let expected = test_git(repository.path(), &["rev-parse", "HEAD"]);
+        let root = RepoRoot::resolve(&worktree).expect("resolve linked worktree");
+        let repository_binding =
+            super::super::artifact::RepositoryBinding::open(&root).expect("bind worktree");
+        let retained = repository_binding
+            .descriptor_root(&root)
+            .expect("retain worktree root");
+
+        let state = repository_state(&retained).expect("audit linked worktree");
+        assert_eq!(state.commit, expected);
+        assert!(!state.local_modifications);
+
+        drop(retained);
+        drop(repository_binding);
+        test_git(
+            repository.path(),
+            &["worktree", "remove", "--force", worktree_text],
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repository_state_rejects_symlink_git_marker() {
+        let (repository, root) = initialized_repository();
+        let marker = repository.path().join(".git");
+        let retained_git = repository.path().join("retained-git");
+        std::fs::rename(&marker, &retained_git).expect("move Git directory");
+        std::os::unix::fs::symlink(&retained_git, &marker).expect("create Git marker symlink");
+
+        let error = repository_state(&root).expect_err("symlink Git marker must fail");
+
+        assert!(matches!(error, GitError::UnsafeGitMarker(path) if path == marker));
+    }
+
+    #[test]
+    fn shared_index_scan_enforces_directory_entry_limit() {
+        let source = tempfile::tempdir().expect("temporary Git directory");
+        let destination = tempfile::tempdir().expect("temporary private Git directory");
+        std::fs::write(source.path().join("first"), b"").expect("write first entry");
+        std::fs::write(source.path().join("second"), b"").expect("write second entry");
+        let source_root = RepoRoot::resolve(source.path()).expect("resolve Git directory");
+
+        let error = copy_shared_indexes_bounded(&source_root, destination.path(), 1, usize::MAX)
+            .expect_err("directory entry limit must fail closed");
+
+        assert!(matches!(error, GitError::TooManyGitDirectoryEntries));
     }
 
     #[test]

@@ -1,6 +1,8 @@
 #[cfg(unix)]
 use std::io::{Read, Write};
 #[cfg(unix)]
+use std::os::fd::OwnedFd;
+#[cfg(unix)]
 use std::path::Component;
 use std::path::Path;
 #[cfg(unix)]
@@ -35,8 +37,8 @@ pub(crate) fn read_repo_regular_file_bounded(
 ) -> Result<Vec<u8>, BenchError> {
     #[cfg(unix)]
     {
-        validate_repo_regular_file(root, path)?;
-        read_regular_file_bounded(path, max_bytes)
+        let file = open_repo_regular_file_unix(root, path)?;
+        read_open_regular_file_bounded(file, path, max_bytes)
     }
     #[cfg(not(unix))]
     {
@@ -48,51 +50,13 @@ pub(crate) fn read_repo_regular_file_bounded(
 pub(crate) fn validate_repo_regular_file(root: &RepoRoot, path: &Path) -> Result<(), BenchError> {
     #[cfg(unix)]
     {
-        validate_repo_regular_file_unix(root, path)
+        open_repo_regular_file_unix(root, path).map(drop)
     }
     #[cfg(not(unix))]
     {
         let _ = (root, path);
         Err(non_unix_unsupported("repository input validation"))
     }
-}
-
-#[cfg(unix)]
-fn validate_repo_regular_file_unix(root: &RepoRoot, path: &Path) -> Result<(), BenchError> {
-    let relative = path.strip_prefix(&root.path).map_err(|_| {
-        BenchError::SourceInput(format!(
-            "source input {} is outside the repository root",
-            path.display()
-        ))
-    })?;
-    if relative.as_os_str().is_empty()
-        || relative
-            .components()
-            .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err(BenchError::SourceInput(format!(
-            "source input {} is not a normal repository-relative file path",
-            path.display()
-        )));
-    }
-    let component_count = relative.components().count();
-    let mut current = root.path.clone();
-    for (index, component) in relative.components().enumerate() {
-        current.push(component.as_os_str());
-        let metadata = metadata(&current)?;
-        let final_component = index + 1 == component_count;
-        if metadata.file_type().is_symlink()
-            || final_component && !metadata.is_file()
-            || !final_component && !metadata.is_dir()
-        {
-            return Err(BenchError::SourceInput(format!(
-                "source input component {} must be a nonsymlink {}",
-                current.display(),
-                if final_component { "file" } else { "directory" }
-            )));
-        }
-    }
-    Ok(())
 }
 
 pub(crate) fn read_regular_file_bounded(
@@ -117,19 +81,7 @@ pub(crate) fn open_regular_file_bounded_descriptor(
     #[cfg(unix)]
     {
         let file = open_regular_file_unix(path)?;
-        let metadata = file
-            .metadata()
-            .map_err(|source| BenchError::SourceInputIo {
-                path: path.to_path_buf(),
-                source,
-            })?;
-        if !metadata.is_file() || metadata.len() > max_bytes {
-            return Err(BenchError::SourceInput(format!(
-                "source input {} must be a regular file no larger than {max_bytes} bytes",
-                path.display()
-            )));
-        }
-        Ok(file)
+        require_bounded_regular_file(file, path, max_bytes)
     }
     #[cfg(not(unix))]
     {
@@ -139,8 +91,48 @@ pub(crate) fn open_regular_file_bounded_descriptor(
 }
 
 #[cfg(unix)]
+pub(crate) fn open_repo_directory_descriptor(
+    root: &RepoRoot,
+    path: &Path,
+) -> Result<OwnedFd, BenchError> {
+    let components = normal_repo_components(root, path, true, "source input")?;
+    let mut directory = duplicate_repo_root_descriptor(root, path)?;
+    for component in components {
+        directory = rustix::fs::openat(
+            &directory,
+            component,
+            directory_flags(),
+            rustix::fs::Mode::empty(),
+        )
+        .map_err(source_io(path))?;
+    }
+    Ok(directory)
+}
+
+#[cfg(unix)]
+pub(crate) fn duplicate_repo_root_descriptor(
+    root: &RepoRoot,
+    path: &Path,
+) -> Result<OwnedFd, BenchError> {
+    if let Some(descriptor) = root.retained_descriptor() {
+        return rustix::io::dup(descriptor).map_err(source_io(path));
+    }
+    rustix::fs::open(&root.path, directory_flags(), rustix::fs::Mode::empty())
+        .map_err(source_io(path))
+}
+
+#[cfg(unix)]
 fn read_regular_file_bounded_unix(path: &Path, max_bytes: usize) -> Result<Vec<u8>, BenchError> {
     let file = open_regular_file_unix(path)?;
+    read_open_regular_file_bounded(file, path, max_bytes)
+}
+
+#[cfg(unix)]
+fn read_open_regular_file_bounded(
+    file: std::fs::File,
+    path: &Path,
+    max_bytes: usize,
+) -> Result<Vec<u8>, BenchError> {
     let opened = file
         .metadata()
         .map_err(|source| BenchError::SourceInputIo {
@@ -179,6 +171,27 @@ fn read_regular_file_bounded_unix(path: &Path, max_bytes: usize) -> Result<Vec<u
 }
 
 #[cfg(unix)]
+fn require_bounded_regular_file(
+    file: std::fs::File,
+    path: &Path,
+    max_bytes: u64,
+) -> Result<std::fs::File, BenchError> {
+    let metadata = file
+        .metadata()
+        .map_err(|source| BenchError::SourceInputIo {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    if !metadata.is_file() || metadata.len() > max_bytes {
+        return Err(BenchError::SourceInput(format!(
+            "source input {} must be a regular file no larger than {max_bytes} bytes",
+            path.display()
+        )));
+    }
+    Ok(file)
+}
+
+#[cfg(unix)]
 fn open_regular_file_unix(path: &Path) -> Result<std::fs::File, BenchError> {
     use rustix::fs::{Mode, OFlags};
 
@@ -201,13 +214,21 @@ fn open_regular_file_unix(path: &Path) -> Result<std::fs::File, BenchError> {
         )
         .map_err(source_io(path))?;
     }
-    let descriptor = rustix::fs::openat(
+    let descriptor = match rustix::fs::openat(
         &directory,
         file_name,
         OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
         Mode::empty(),
-    )
-    .map_err(source_io(path))?;
+    ) {
+        Ok(descriptor) => descriptor,
+        Err(rustix::io::Errno::LOOP) => {
+            return Err(BenchError::SourceInput(format!(
+                "source input {} must be a regular nonsymlink file",
+                path.display()
+            )));
+        }
+        Err(source) => return Err(source_io(path)(source)),
+    };
     let file = std::fs::File::from(descriptor);
     if !file
         .metadata()
@@ -226,11 +247,48 @@ fn open_regular_file_unix(path: &Path) -> Result<std::fs::File, BenchError> {
 }
 
 #[cfg(unix)]
-fn metadata(path: &Path) -> Result<std::fs::Metadata, BenchError> {
-    std::fs::symlink_metadata(path).map_err(|source| BenchError::SourceInputIo {
-        path: path.to_path_buf(),
-        source,
-    })
+fn open_repo_regular_file_unix(root: &RepoRoot, path: &Path) -> Result<std::fs::File, BenchError> {
+    use rustix::fs::{Mode, OFlags};
+
+    let mut components = normal_repo_components(root, path, false, "source input")?;
+    let file_name = components.pop().ok_or_else(|| {
+        BenchError::SourceInput(format!("source input {} has no file name", path.display()))
+    })?;
+    let mut directory = duplicate_repo_root_descriptor(root, path)?;
+    for component in components {
+        directory = rustix::fs::openat(&directory, component, directory_flags(), Mode::empty())
+            .map_err(source_io(path))?;
+    }
+    let descriptor = match rustix::fs::openat(
+        &directory,
+        file_name,
+        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+        Mode::empty(),
+    ) {
+        Ok(descriptor) => descriptor,
+        Err(rustix::io::Errno::LOOP) => {
+            return Err(BenchError::SourceInput(format!(
+                "source input {} must be a regular nonsymlink file",
+                path.display()
+            )));
+        }
+        Err(source) => return Err(source_io(path)(source)),
+    };
+    let file = std::fs::File::from(descriptor);
+    if !file
+        .metadata()
+        .map_err(|source| BenchError::SourceInputIo {
+            path: path.to_path_buf(),
+            source,
+        })?
+        .is_file()
+    {
+        return Err(BenchError::SourceInput(format!(
+            "source input {} must be a regular nonsymlink file",
+            path.display()
+        )));
+    }
+    Ok(file)
 }
 
 #[cfg(unix)]
@@ -242,12 +300,7 @@ fn atomic_write_repo_regular_file_unix(
     use rustix::fs::{AtFlags, Mode, OFlags};
 
     let (parents, file_name) = split_repo_file_path(root, path)?;
-    let mut directory = rustix::fs::open(
-        &root.path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW,
-        Mode::empty(),
-    )
-    .map_err(source_io(path))?;
+    let mut directory = duplicate_repo_root_descriptor(root, path)?;
     for component in parents {
         directory = rustix::fs::openat(
             &directory,
@@ -381,6 +434,38 @@ fn split_repo_file_path<'a>(
 }
 
 #[cfg(unix)]
+fn normal_repo_components<'a>(
+    root: &RepoRoot,
+    path: &'a Path,
+    allow_empty: bool,
+    operation: &str,
+) -> Result<Vec<&'a std::ffi::OsStr>, BenchError> {
+    let relative = path.strip_prefix(&root.path).map_err(|_| {
+        BenchError::SourceInput(format!(
+            "{operation} {} is outside the repository root",
+            path.display()
+        ))
+    })?;
+    let mut components = Vec::new();
+    for component in relative.components() {
+        let Component::Normal(component) = component else {
+            return Err(BenchError::SourceInput(format!(
+                "{operation} {} is not a normal repository-relative path",
+                path.display()
+            )));
+        };
+        components.push(component);
+    }
+    if !allow_empty && components.is_empty() {
+        return Err(BenchError::SourceInput(format!(
+            "{operation} {} has no file name",
+            path.display()
+        )));
+    }
+    Ok(components)
+}
+
+#[cfg(unix)]
 fn absolute_normal_components(path: &Path) -> Result<Vec<&std::ffi::OsStr>, BenchError> {
     let mut components = path.components();
     if !matches!(components.next(), Some(Component::RootDir)) {
@@ -408,6 +493,14 @@ fn source_io(path: &Path) -> impl FnOnce(rustix::io::Errno) -> BenchError + '_ {
         path: path.to_path_buf(),
         source: source.into(),
     }
+}
+
+#[cfg(unix)]
+fn directory_flags() -> rustix::fs::OFlags {
+    rustix::fs::OFlags::RDONLY
+        | rustix::fs::OFlags::CLOEXEC
+        | rustix::fs::OFlags::DIRECTORY
+        | rustix::fs::OFlags::NOFOLLOW
 }
 
 #[cfg(unix)]
@@ -457,6 +550,31 @@ mod tests {
         )
         .expect_err("symlink ancestor must fail");
 
-        assert!(error.to_string().contains("nonsymlink directory"));
+        assert!(error.to_string().contains("failed to access source input"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repository_reader_uses_retained_root_after_path_swap() {
+        let parent = tempfile::tempdir().expect("temporary parent");
+        let repository = parent.path().join("repository");
+        std::fs::create_dir(&repository).expect("create repository");
+        std::fs::write(repository.join("tracked.txt"), b"retained\n")
+            .expect("write retained source");
+        let root = RepoRoot::resolve(&repository).expect("resolve root");
+        let descriptor =
+            open_repo_directory_descriptor(&root, &root.path).expect("open retained repository");
+        let retained = RepoRoot::from_retained_descriptor(descriptor);
+
+        let detached = parent.path().join("detached-repository");
+        std::fs::rename(&repository, &detached).expect("detach repository");
+        std::fs::create_dir(&repository).expect("create replacement repository");
+        std::fs::write(repository.join("tracked.txt"), b"replacement\n")
+            .expect("write replacement source");
+
+        let bytes =
+            read_repo_regular_file_bounded(&retained, &retained.path.join("tracked.txt"), 1024)
+                .expect("read retained source");
+        assert_eq!(bytes, b"retained\n");
     }
 }

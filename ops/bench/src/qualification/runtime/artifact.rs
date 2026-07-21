@@ -681,6 +681,7 @@ impl QualificationOutput {
         BoundRepository {
             path: &self.repository_path,
             descriptor: &self.repository,
+            shared_descriptor: None,
         }
     }
 

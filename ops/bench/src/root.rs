@@ -1,12 +1,27 @@
 use std::path::{Component, Path, PathBuf};
+#[cfg(unix)]
+use std::{
+    os::fd::{AsRawFd as _, OwnedFd},
+    sync::Arc,
+};
 
 use crate::config::{BUILD_DIR, DEFAULT_STIM_PATH};
 use crate::error::BenchError;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct RepoRoot {
     pub(crate) path: PathBuf,
+    #[cfg(unix)]
+    retained_descriptor: Option<Arc<OwnedFd>>,
 }
+
+impl PartialEq for RepoRoot {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+impl Eq for RepoRoot {}
 
 impl RepoRoot {
     pub(crate) fn resolve(path: &Path) -> Result<Self, BenchError> {
@@ -14,7 +29,34 @@ impl RepoRoot {
             path: path.to_path_buf(),
             source,
         })?;
-        Ok(Self { path })
+        Ok(Self {
+            path,
+            #[cfg(unix)]
+            retained_descriptor: None,
+        })
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn from_retained_descriptor(descriptor: OwnedFd) -> Self {
+        Self::from_shared_retained_descriptor(Arc::new(descriptor))
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn from_shared_retained_descriptor(descriptor: Arc<OwnedFd>) -> Self {
+        let path = PathBuf::from(format!(
+            "/proc/{}/fd/{}",
+            std::process::id(),
+            descriptor.as_raw_fd()
+        ));
+        Self {
+            path,
+            retained_descriptor: Some(descriptor),
+        }
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn retained_descriptor(&self) -> Option<&OwnedFd> {
+        self.retained_descriptor.as_deref()
     }
 
     pub(crate) fn manifest(&self) -> PathBuf {

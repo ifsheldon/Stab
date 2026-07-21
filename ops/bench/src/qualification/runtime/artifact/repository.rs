@@ -1,5 +1,6 @@
-use std::os::fd::{AsRawFd as _, OwnedFd};
+use std::os::fd::OwnedFd;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::filesystem::{open_absolute_directory, same_file};
 use super::{ArtifactError, ensure_linux};
@@ -8,7 +9,7 @@ use crate::root::RepoRoot;
 #[derive(Debug)]
 pub(in crate::qualification::runtime) struct RepositoryBinding {
     pub(super) path: PathBuf,
-    pub(super) descriptor: OwnedFd,
+    pub(super) descriptor: Arc<OwnedFd>,
 }
 
 impl RepositoryBinding {
@@ -17,7 +18,7 @@ impl RepositoryBinding {
         let descriptor = open_absolute_directory(&root.path)?;
         Ok(Self {
             path: root.path.clone(),
-            descriptor,
+            descriptor: Arc::new(descriptor),
         })
     }
 
@@ -38,7 +39,8 @@ impl RepositoryBinding {
     fn as_bound(&self) -> BoundRepository<'_> {
         BoundRepository {
             path: &self.path,
-            descriptor: &self.descriptor,
+            descriptor: self.descriptor.as_ref(),
+            shared_descriptor: Some(&self.descriptor),
         }
     }
 }
@@ -46,6 +48,7 @@ impl RepositoryBinding {
 pub(in crate::qualification::runtime) struct BoundRepository<'a> {
     pub(super) path: &'a Path,
     pub(super) descriptor: &'a OwnedFd,
+    pub(super) shared_descriptor: Option<&'a Arc<OwnedFd>>,
 }
 
 impl BoundRepository<'_> {
@@ -64,13 +67,13 @@ impl BoundRepository<'_> {
         root: &RepoRoot,
     ) -> Result<RepoRoot, ArtifactError> {
         self.require_current(root)?;
-        Ok(RepoRoot {
-            path: PathBuf::from(format!(
-                "/proc/{}/fd/{}",
-                std::process::id(),
-                self.descriptor.as_raw_fd()
-            )),
-        })
+        if let Some(descriptor) = self.shared_descriptor {
+            return Ok(RepoRoot::from_shared_retained_descriptor(Arc::clone(
+                descriptor,
+            )));
+        }
+        let descriptor = rustix::io::dup(self.descriptor).map_err(ArtifactError::Io)?;
+        Ok(RepoRoot::from_retained_descriptor(descriptor))
     }
 
     pub(super) fn require_path_current(&self) -> Result<(), ArtifactError> {

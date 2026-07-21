@@ -284,6 +284,7 @@ pub(crate) fn prepare_adapter(
     }
     super::git::materialize_repository_commit(root, repository_commit, &stab_source)?;
     super::git::materialize_worktree_commit(
+        root,
         &root.default_stim_source(),
         STIM_COMMIT,
         &stim_source,
