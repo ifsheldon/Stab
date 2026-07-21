@@ -186,7 +186,7 @@ fn validate_required(
     {
         return Err(CorrectnessError::InvalidExpectation);
     }
-    let required = case_ids.iter().collect::<BTreeSet<_>>();
+    let required = case_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
     if required.is_empty()
         || required.len() != case_ids.len()
         || required.iter().any(|case_id| !valid_case_id(case_id))
@@ -237,10 +237,12 @@ fn validate_required(
         schema_family,
         &results,
     )?;
-    for case_id in &required {
-        if !results.contains_key(case_id.as_str()) {
-            return Err(CorrectnessError::MissingCase((*case_id).clone()));
-        }
+    let actual = results.keys().copied().collect::<BTreeSet<_>>();
+    if actual != required {
+        return Err(CorrectnessError::CaseSetMismatch {
+            required: required.into_iter().map(str::to_string).collect(),
+            actual: actual.into_iter().map(str::to_string).collect(),
+        });
     }
 
     let mut case_ids = case_ids.to_vec();
@@ -947,8 +949,13 @@ pub(super) enum CorrectnessError {
     PreflightContract,
     #[error("correctness execution receipt for case {0} is stale or inconsistent")]
     ExecutionReceipt(String),
-    #[error("correctness preflight omits required case {0}")]
-    MissingCase(String),
+    #[error(
+        "correctness preflight case set differs from the exact performance prerequisite: required {required:?}, actual {actual:?}"
+    )]
+    CaseSetMismatch {
+        required: BTreeSet<String>,
+        actual: BTreeSet<String>,
+    },
 }
 
 #[cfg(test)]

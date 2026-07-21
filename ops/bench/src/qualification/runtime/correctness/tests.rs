@@ -65,6 +65,7 @@ const ORACLE_V7_STATISTICAL_FIXTURE_FILES: [(&str, &[u8]); 5] = [
 #[derive(Clone, Copy)]
 enum FixtureMutation {
     None,
+    ExtraPassingCase,
     LegacySchema,
     MismatchedReceiptSchema,
     MismatchedPreflightSchema,
@@ -146,6 +147,33 @@ fn required_preflight_reconstructs_canonical_cq_artifacts() {
     )
     .expect("bound correctness preflight");
     assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
+}
+
+#[test]
+fn required_preflight_rejects_a_valid_but_unrequested_extra_case() {
+    let fixture = fixture(FixtureMutation::ExtraPassingCase);
+    let error = validate(
+        &fixture.root,
+        CorrectnessRequirement::Required {
+            output: &fixture.relative,
+            case_ids: &["cq-case".to_string()],
+            expected_manifest_sha256: &fixture.manifest,
+            expected_stab_commit: &fixture.commit,
+            expected_request_sha256: &fixture.request_sha256,
+            expected_completion_sha256: &fixture.completion_sha256,
+        },
+    )
+    .expect_err("broad correctness evidence must not qualify an exact prerequisite");
+
+    assert!(matches!(
+        error,
+        CorrectnessError::CaseSetMismatch { required, actual }
+            if required == BTreeSet::from(["cq-case".to_string()])
+                && actual == BTreeSet::from([
+                    "cq-case".to_string(),
+                    "cq-extra".to_string(),
+                ])
+    ));
 }
 
 #[cfg(unix)]
@@ -829,6 +857,11 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     let relative = PathBuf::from("target/qualification/correctness/full");
     let output = repository.path().join(&relative);
     std::fs::create_dir_all(output.join("cases/cq-case")).expect("create correctness output");
+    let include_extra_case = matches!(mutation, FixtureMutation::ExtraPassingCase);
+    if include_extra_case {
+        std::fs::create_dir_all(output.join("cases/cq-extra"))
+            .expect("create extra correctness case output");
+    }
     let manifest = "a".repeat(64);
     let commit = "b".repeat(40);
     let schema_family = if matches!(mutation, FixtureMutation::LegacySchema) {
@@ -860,6 +893,18 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         bytes: 1,
         sha256: "c".repeat(64),
     };
+    let mut selected_cases = vec![RequestedCase {
+        case_id: "cq-case".to_string(),
+        selector_sha256: selector_sha256.clone(),
+        case_contract_sha256: "e".repeat(64),
+    }];
+    if include_extra_case {
+        selected_cases.push(RequestedCase {
+            case_id: "cq-extra".to_string(),
+            selector_sha256: selector_sha256.clone(),
+            case_contract_sha256: "2".repeat(64),
+        });
+    }
     let request = RunRequest {
         schema_version: RUN_REQUEST_SCHEMA_VERSION,
         qualification_manifest_digest: manifest.clone(),
@@ -873,11 +918,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         allow_deferred: false,
         executables: vec![executable.clone()],
         execution_environment_sha256: "d".repeat(64),
-        selected_cases: vec![RequestedCase {
-            case_id: "cq-case".to_string(),
-            selector_sha256: selector_sha256.clone(),
-            case_contract_sha256: "e".repeat(64),
-        }],
+        selected_cases,
         planned_case_ids: Vec::new(),
         deferred_case_ids: Vec::new(),
     };
@@ -894,7 +935,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         run_request_sha256: request_sha256.clone(),
         case_id: "cq-case".to_string(),
         selector_sha256: selector_sha256.clone(),
-        executables: vec![executable],
+        executables: vec![executable.clone()],
         execution_environment_sha256: "d".repeat(64),
         verdict: "accepted".to_string(),
         exit_status: Some(0),
@@ -916,15 +957,55 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     let receipt_sha256 = super::super::run::sha256_hex(&receipt_bytes);
     std::fs::write(
         output.join("cases/cq-case/execution-receipt.json"),
-        receipt_bytes,
+        &receipt_bytes,
     )
     .expect("write execution receipt");
+    let extra_receipt_sha256 = if include_extra_case {
+        let mut extra_receipt = receipt.clone();
+        extra_receipt.case_id = "cq-extra".to_string();
+        let bytes = canonical(&extra_receipt);
+        let digest = super::super::run::sha256_hex(&bytes);
+        std::fs::write(output.join("cases/cq-extra/execution-receipt.json"), bytes)
+            .expect("write extra execution receipt");
+        Some(digest)
+    } else {
+        None
+    };
 
     let outcome = if matches!(mutation, FixtureMutation::FailedReport) {
         "failed"
     } else {
         "passed"
     };
+    let mut results = vec![CaseResult {
+        case_id: "cq-case".to_string(),
+        feature_id: "CQ-CASE".to_string(),
+        comparator: "exact-value".to_string(),
+        selector: selector.clone(),
+        selector_sha256: selector_sha256.clone(),
+        execution_receipt_sha256: receipt_sha256,
+        outcome: outcome.to_string(),
+        exact_test_count: Some(1),
+        stdout_sha256: Some("f".repeat(64)),
+        stderr_sha256: Some("1".repeat(64)),
+        artifacts: Vec::new(),
+    }];
+    if let Some(extra_receipt_sha256) = extra_receipt_sha256 {
+        results.push(CaseResult {
+            case_id: "cq-extra".to_string(),
+            feature_id: "CQ-EXTRA".to_string(),
+            comparator: "exact-value".to_string(),
+            selector,
+            selector_sha256,
+            execution_receipt_sha256: extra_receipt_sha256,
+            outcome: outcome.to_string(),
+            exact_test_count: Some(1),
+            stdout_sha256: Some("f".repeat(64)),
+            stderr_sha256: Some("1".repeat(64)),
+            artifacts: Vec::new(),
+        });
+    }
+    let selected_count = results.len();
     let report = CorrectnessReport {
         schema_version: schema_family.report_and_preflight_version(),
         qualification_manifest_digest: manifest.clone(),
@@ -941,11 +1022,11 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         feature_filters: Vec::new(),
         case_filters: Vec::new(),
         allow_deferred: false,
-        selected_count: 1,
+        selected_count,
         planned_count: 0,
         deferred_count: 0,
-        passed_count: usize::from(outcome == "passed"),
-        failed_count: usize::from(outcome == "failed"),
+        passed_count: selected_count * usize::from(outcome == "passed"),
+        failed_count: selected_count * usize::from(outcome == "failed"),
         selection_complete: true,
         statistical_declared_budget: "0.00000000000000000e0".to_string(),
         statistical_consumed_bound: "0.00000000000000000e0".to_string(),
@@ -960,19 +1041,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         deferred_products: BTreeMap::new(),
         case_counts: Vec::new(),
         resource_contracts: Vec::new(),
-        results: vec![CaseResult {
-            case_id: "cq-case".to_string(),
-            feature_id: "CQ-CASE".to_string(),
-            comparator: "exact-value".to_string(),
-            selector,
-            selector_sha256,
-            execution_receipt_sha256: receipt_sha256,
-            outcome: outcome.to_string(),
-            exact_test_count: Some(1),
-            stdout_sha256: Some("f".repeat(64)),
-            stderr_sha256: Some("1".repeat(64)),
-            artifacts: Vec::new(),
-        }],
+        results,
     };
     let report_bytes = canonical(&report);
     let report_sha256 = super::super::run::sha256_hex(&report_bytes);
@@ -984,14 +1053,25 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     } else {
         result.execution_receipt_sha256.clone()
     };
+    let mut completion_cases = vec![CompletedCase {
+        case_id: "cq-case".to_string(),
+        execution_receipt_sha256: completion_digest,
+    }];
+    if let Some(result) = report
+        .results
+        .iter()
+        .find(|result| result.case_id == "cq-extra")
+    {
+        completion_cases.push(CompletedCase {
+            case_id: result.case_id.clone(),
+            execution_receipt_sha256: result.execution_receipt_sha256.clone(),
+        });
+    }
     let completion = RunCompletion {
         schema_version: RUN_COMPLETION_SCHEMA_VERSION,
         run_request_sha256: request_sha256.clone(),
         report_sha256: report_sha256.clone(),
-        cases: vec![CompletedCase {
-            case_id: "cq-case".to_string(),
-            execution_receipt_sha256: completion_digest,
-        }],
+        cases: completion_cases,
     };
     let completion_bytes = canonical(&completion);
     let completion_sha256 = super::super::run::sha256_hex(&completion_bytes);
@@ -1002,6 +1082,32 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
     } else {
         outcome
     };
+    let mut preflight_cases = BTreeMap::from([(
+        "cq-case".to_string(),
+        CorrectnessCaseReceipt {
+            outcome: preflight_outcome.to_string(),
+            selector_sha256: result.selector_sha256.clone(),
+            execution_receipt_sha256: result.execution_receipt_sha256.clone(),
+            stdout_sha256: result.stdout_sha256.clone(),
+            stderr_sha256: result.stderr_sha256.clone(),
+        },
+    )]);
+    if let Some(extra) = report
+        .results
+        .iter()
+        .find(|result| result.case_id == "cq-extra")
+    {
+        preflight_cases.insert(
+            extra.case_id.clone(),
+            CorrectnessCaseReceipt {
+                outcome: preflight_outcome.to_string(),
+                selector_sha256: extra.selector_sha256.clone(),
+                execution_receipt_sha256: extra.execution_receipt_sha256.clone(),
+                stdout_sha256: extra.stdout_sha256.clone(),
+                stderr_sha256: extra.stderr_sha256.clone(),
+            },
+        );
+    }
     let preflight = CorrectnessPreflight {
         schema_version: if matches!(mutation, FixtureMutation::MismatchedPreflightSchema) {
             CorrectnessSchemaFamily::V6.report_and_preflight_version()
@@ -1019,16 +1125,7 @@ fn fixture(mutation: FixtureMutation) -> Fixture {
         allow_deferred: false,
         selection_complete: true,
         deferred_count: 0,
-        cases: BTreeMap::from([(
-            "cq-case".to_string(),
-            CorrectnessCaseReceipt {
-                outcome: preflight_outcome.to_string(),
-                selector_sha256: result.selector_sha256.clone(),
-                execution_receipt_sha256: result.execution_receipt_sha256.clone(),
-                stdout_sha256: result.stdout_sha256.clone(),
-                stderr_sha256: result.stderr_sha256.clone(),
-            },
-        )]),
+        cases: preflight_cases,
     };
     std::fs::write(output.join("preflight.json"), canonical(&preflight)).expect("write preflight");
     std::fs::write(
