@@ -124,12 +124,6 @@ pub(crate) enum BenchError {
     #[error("performance qualification validation failed:\n{0}")]
     Qualification(String),
 
-    #[error("failed to access performance qualification input {path}: {source}")]
-    QualificationIo {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
     #[error(
         "performance qualification inventory differs from deterministic regeneration; run just bench::qualification-regenerate"
     )]

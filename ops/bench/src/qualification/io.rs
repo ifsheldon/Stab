@@ -1,18 +1,9 @@
-use std::path::Path;
-
 use crate::error::BenchError;
 
 const MAX_JSON_OBJECTS: usize = 50_000;
 const MAX_JSON_ARRAYS: usize = 50_000;
 const MAX_JSON_DEPTH: usize = 64;
 const MAX_JSON_STRING_TOKEN_BYTES: usize = 16_384;
-
-pub(super) fn read_regular_file_bounded(
-    path: &Path,
-    max_bytes: usize,
-) -> Result<Vec<u8>, BenchError> {
-    crate::source_file::read_regular_file_bounded(path, max_bytes)
-}
 
 pub(super) fn preflight_json_shape(bytes: &[u8]) -> Result<(), BenchError> {
     let mut objects = 0_usize;
@@ -77,18 +68,6 @@ pub(super) fn preflight_json_shape(bytes: &[u8]) -> Result<(), BenchError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg(unix)]
-    #[test]
-    fn bounded_reader_rejects_oversized_regular_file() {
-        let directory = tempfile::tempdir().expect("temporary directory");
-        let path = directory.path().join("oversized.json");
-        std::fs::write(&path, b"0123456789").expect("write oversized input");
-
-        let error = read_regular_file_bounded(&path, 8).expect_err("oversized input must fail");
-
-        assert!(error.to_string().contains("exceeds 8 bytes"));
-    }
 
     #[test]
     fn json_preflight_rejects_deep_and_oversized_string_shapes() {

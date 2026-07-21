@@ -799,10 +799,11 @@ fn discover_perf_sources(
     root: &RepoRoot,
     manifest: &BenchmarkManifest,
 ) -> Result<Vec<UpstreamPerfSource>, BenchError> {
-    let list = read_text_bounded(&safe_stim_source_path(root, "file_lists/perf_files")?)?;
+    let list =
+        read_repo_text_bounded(root, &safe_stim_source_path(root, "file_lists/perf_files")?)?;
     let mut sources = Vec::new();
     for path in list.lines().map(str::trim).filter(|line| !line.is_empty()) {
-        let source = read_text_bounded(&safe_stim_source_path(root, path)?)?;
+        let source = read_repo_text_bounded(root, &safe_stim_source_path(root, path)?)?;
         let mut symbols = source
             .lines()
             .filter_map(extract_benchmark_symbol)
@@ -847,27 +848,9 @@ fn safe_stim_source_path(root: &RepoRoot, requested: &str) -> Result<PathBuf, Be
         })?
         .to_path_buf();
     let relative = stim_relative.join(requested);
-    let component_count = relative.components().count();
-    let mut current = root.path.clone();
-    for (index, component) in relative.components().enumerate() {
-        current.push(component.as_os_str());
-        let metadata =
-            std::fs::symlink_metadata(&current).map_err(|source| BenchError::QualificationIo {
-                path: current.clone(),
-                source,
-            })?;
-        let final_component = index + 1 == component_count;
-        if metadata.file_type().is_symlink()
-            || final_component && !metadata.is_file()
-            || !final_component && !metadata.is_dir()
-        {
-            return Err(BenchError::Qualification(format!(
-                "pinned-Stim source component {} has an unsafe file type",
-                current.display()
-            )));
-        }
-    }
-    Ok(current)
+    let path = root.path.join(relative);
+    crate::source_file::validate_repo_regular_file(root, &path)?;
+    Ok(path)
 }
 
 fn extract_benchmark_symbol(line: &str) -> Option<String> {
@@ -997,16 +980,6 @@ pub(super) fn sha256_hex(bytes: &[u8]) -> String {
     encoded
 }
 
-fn read_text_bounded(path: &Path) -> Result<String, BenchError> {
-    let bytes = super::io::read_regular_file_bounded(path, MAX_INPUT_BYTES)?;
-    String::from_utf8(bytes).map_err(|_| {
-        BenchError::Qualification(format!(
-            "qualification input {} is not UTF-8",
-            path.display()
-        ))
-    })
-}
-
 fn read_repo_text_bounded(root: &RepoRoot, path: &Path) -> Result<String, BenchError> {
     let bytes = crate::source_file::read_repo_regular_file_bounded(root, path, MAX_INPUT_BYTES)?;
     String::from_utf8(bytes).map_err(|error| {
@@ -1113,6 +1086,30 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn pinned_stim_sources_support_a_retained_repository_root() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        std::fs::create_dir_all(directory.path().join("vendor/stim/file_lists"))
+            .expect("create Stim source directory");
+        std::fs::write(
+            directory.path().join("vendor/stim/file_lists/perf_files"),
+            b"src/example.perf.cc\n",
+        )
+        .expect("write Stim perf list");
+        let root = RepoRoot::resolve(directory.path()).expect("resolve repository");
+        let descriptor = crate::source_file::open_repo_directory_descriptor(&root, &root.path)
+            .expect("retain repository root");
+        let retained = RepoRoot::from_retained_descriptor(descriptor);
+
+        let path = safe_stim_source_path(&retained, "file_lists/perf_files")
+            .expect("validate through retained root");
+        let contents = read_repo_text_bounded(&retained, &path)
+            .expect("read Stim source through retained root");
+
+        assert_eq!(contents, "src/example.perf.cc\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn pinned_stim_source_paths_reject_symlinked_ancestors() {
         let directory = tempfile::tempdir().expect("temporary repository");
         let outside = tempfile::tempdir().expect("outside directory");
@@ -1130,7 +1127,7 @@ mod tests {
         let error = safe_stim_source_path(&root, "src/case.perf.cc")
             .expect_err("symlinked source ancestor must fail");
 
-        assert!(error.to_string().contains("unsafe file type"));
+        assert!(error.to_string().contains("source input"));
     }
 
     #[cfg(unix)]
