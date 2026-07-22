@@ -201,6 +201,62 @@ fn failed_write_abort_reports_staging_cleanup_failure() {
 }
 
 #[test]
+fn artifact_creation_failure_reports_hostile_staging_cleanup_failure() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let output = Path::new("target/benchmarks/qualification/creation-cleanup-error");
+    let mut publication = begin_new_output(&root, output).expect("begin publication");
+    let staging = repository
+        .path()
+        .join("target/benchmarks/qualification")
+        .join(&publication.staging_name);
+    std::fs::write(staging.join("report.json"), b"hostile\n")
+        .expect("create hostile staging entry");
+
+    let error = publication
+        .write("report.json", b"intended\n")
+        .expect_err("creation and cleanup failures must both be reported");
+
+    assert!(matches!(
+        error,
+        ArtifactError::WriteCleanup { write, cleanup }
+            if matches!(*write, ArtifactError::Io(rustix::io::Errno::EXIST))
+                && matches!(*cleanup, ArtifactError::UnexpectedStagedArtifacts(_))
+    ));
+    assert!(!publication.staging_active);
+    assert_eq!(
+        std::fs::read(staging.join("report.json")).expect("hostile entry remains untouched"),
+        b"hostile\n"
+    );
+}
+
+#[test]
+fn post_write_binding_failure_uses_fallible_terminal_abort() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let output = Path::new("target/benchmarks/qualification/binding-abort");
+    let mut publication = begin_new_output(&root, output).expect("begin publication");
+    let staging = repository
+        .path()
+        .join("target/benchmarks/qualification")
+        .join(&publication.staging_name);
+
+    let error = publication
+        .write_with_binder("report.json", b"complete\n", |_| {
+            Err(ArtifactError::Io(rustix::io::Errno::MFILE))
+        })
+        .expect_err("binding failure must abort the complete staged write");
+
+    assert!(matches!(error, ArtifactError::Io(rustix::io::Errno::MFILE)));
+    assert!(!publication.staging_active);
+    assert!(!staging.exists());
+    assert!(matches!(
+        publication.write("preflight.json", b"later\n"),
+        Err(ArtifactError::InactiveStaging)
+    ));
+}
+
+#[test]
 fn absence_admission_does_not_create_the_output_hierarchy() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("resolve repository");

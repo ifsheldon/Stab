@@ -205,11 +205,17 @@ fn with_formal_session<T>(
     action: impl FnOnce(&runtime::QualificationSession) -> Result<T, BenchError>,
 ) -> Result<T, BenchError> {
     let session = runtime::QualificationSession::open(root).map_err(BenchError::Qualification)?;
-    let result = action(&session);
-    session
-        .require_current()
-        .map_err(BenchError::Qualification)?;
-    result
+    let action_result = action(&session);
+    let session_result = session.require_current().map_err(BenchError::Qualification);
+    match (action_result, session_result) {
+        (Ok(value), Ok(())) => Ok(value),
+        (Err(action), Ok(())) => Err(action),
+        (Ok(_), Err(session)) => Err(session),
+        (Err(action), Err(session)) => Err(BenchError::QualificationSession {
+            action: Box::new(action),
+            session: Box::new(session),
+        }),
+    }
 }
 
 pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {
@@ -575,5 +581,30 @@ mod tests {
 
         assert!(error.to_string().contains("source input"));
         assert!(!outside.path().join("inventory.json").exists());
+    }
+
+    #[test]
+    fn formal_session_preserves_action_and_final_identity_failures() {
+        let parent = tempfile::tempdir().expect("temporary parent");
+        let repository = parent.path().join("repository");
+        std::fs::create_dir(&repository).expect("create repository");
+        let root = RepoRoot::resolve(&repository).expect("resolve repository");
+        let detached = parent.path().join("detached");
+
+        let error = with_formal_session(&root, |_| {
+            std::fs::rename(&repository, &detached).expect("detach repository");
+            std::fs::create_dir(&repository).expect("replace repository");
+            Err::<(), _>(BenchError::Qualification(
+                "injected action failure".to_string(),
+            ))
+        })
+        .expect_err("both failures must be preserved");
+
+        assert!(matches!(
+            error,
+            BenchError::QualificationSession { action, session }
+                if matches!(*action, BenchError::Qualification(ref message) if message == "injected action failure")
+                    && matches!(*session, BenchError::Qualification(ref message) if message.contains("repository root"))
+        ));
     }
 }

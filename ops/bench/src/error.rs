@@ -124,6 +124,12 @@ pub(crate) enum BenchError {
     #[error("performance qualification validation failed:\n{0}")]
     Qualification(String),
 
+    #[error("{action}; qualification session validation also failed: {session}")]
+    QualificationSession {
+        action: Box<BenchError>,
+        session: Box<BenchError>,
+    },
+
     #[error(
         "performance qualification inventory differs from deterministic regeneration; run just bench::qualification-regenerate"
     )]

@@ -218,6 +218,13 @@ fn validate_required(
 
     let requested = validate_request(&request, expected_manifest_sha256, expected_stab_commit)?;
     let (schema_family, results) = validate_report(&report, &request, &request_sha256, &requested)?;
+    let actual = results.keys().copied().collect::<BTreeSet<_>>();
+    if actual != required {
+        return Err(CorrectnessError::CaseSetMismatch {
+            required: required.into_iter().map(str::to_string).collect(),
+            actual: actual.into_iter().map(str::to_string).collect(),
+        });
+    }
     let statistical_attempts = validate_statistical_ledger(&report, &results)?;
     validate_completion(&completion, &request_sha256, &report_sha256, &results)?;
     validate_execution_receipts(
@@ -237,14 +244,6 @@ fn validate_required(
         schema_family,
         &results,
     )?;
-    let actual = results.keys().copied().collect::<BTreeSet<_>>();
-    if actual != required {
-        return Err(CorrectnessError::CaseSetMismatch {
-            required: required.into_iter().map(str::to_string).collect(),
-            actual: actual.into_iter().map(str::to_string).collect(),
-        });
-    }
-
     let mut case_ids = case_ids.to_vec();
     case_ids.sort();
     Ok((

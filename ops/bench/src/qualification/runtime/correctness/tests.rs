@@ -152,6 +152,14 @@ fn required_preflight_reconstructs_canonical_cq_artifacts() {
 #[test]
 fn required_preflight_rejects_a_valid_but_unrequested_extra_case() {
     let fixture = fixture(FixtureMutation::ExtraPassingCase);
+    std::fs::remove_file(
+        fixture
+            .root
+            .path
+            .join(&fixture.relative)
+            .join("cases/cq-extra/execution-receipt.json"),
+    )
+    .expect("make the unrequested receipt inaccessible");
     let error = validate(
         &fixture.root,
         CorrectnessRequirement::Required {
@@ -163,7 +171,7 @@ fn required_preflight_rejects_a_valid_but_unrequested_extra_case() {
             expected_completion_sha256: &fixture.completion_sha256,
         },
     )
-    .expect_err("broad correctness evidence must not qualify an exact prerequisite");
+    .expect_err("case-set mismatch must precede access to the unrequested receipt");
 
     assert!(matches!(
         error,

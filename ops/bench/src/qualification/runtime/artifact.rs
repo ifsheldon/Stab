@@ -4,13 +4,13 @@ use std::io::{Read as _, Seek as _, Write as _};
 use std::os::fd::OwnedFd;
 use std::path::{Component, Path, PathBuf};
 
-use thiserror::Error;
-
 use crate::root::RepoRoot;
 
+mod error;
 mod filesystem;
 mod repository;
 
+pub(crate) use error::ArtifactError;
 pub(in crate::qualification::runtime) use repository::{BoundRepository, RepositoryBinding};
 
 use filesystem::{
@@ -341,6 +341,38 @@ impl QualificationOutput {
     }
 
     pub(crate) fn write(&mut self, name: &'static str, bytes: &[u8]) -> Result<(), ArtifactError> {
+        self.write_with_binder(name, bytes, |descriptor| {
+            rustix::io::dup(descriptor).map_err(ArtifactError::Io)
+        })
+    }
+
+    fn write_with_binder<F>(
+        &mut self,
+        name: &'static str,
+        bytes: &[u8],
+        bind: F,
+    ) -> Result<(), ArtifactError>
+    where
+        F: FnOnce(&OwnedFd) -> Result<OwnedFd, ArtifactError>,
+    {
+        if !self.staging_active {
+            return Err(ArtifactError::InactiveStaging);
+        }
+        match self.write_inner(name, bytes, bind) {
+            Ok(()) => Ok(()),
+            Err(source) => Err(self.handle_write_failure(source)),
+        }
+    }
+
+    fn write_inner<F>(
+        &mut self,
+        name: &'static str,
+        bytes: &[u8],
+        bind: F,
+    ) -> Result<(), ArtifactError>
+    where
+        F: FnOnce(&OwnedFd) -> Result<OwnedFd, ArtifactError>,
+    {
         if !ARTIFACT_NAMES.contains(&name) {
             return Err(ArtifactError::InvalidArtifactName(name));
         }
@@ -381,9 +413,7 @@ impl QualificationOutput {
             file.write_all(bytes).map_err(ArtifactError::Write)?;
             file.sync_all().map_err(ArtifactError::Write)
         })();
-        if let Err(source) = write_result {
-            return Err(self.handle_write_failure(source));
-        }
+        write_result?;
         let descriptor = self
             .staged_children
             .get(name)
@@ -393,7 +423,7 @@ impl QualificationOutput {
         self.staged_artifacts.insert(
             name,
             BoundArtifact {
-                descriptor: rustix::io::dup(descriptor).map_err(ArtifactError::Io)?,
+                descriptor: bind(descriptor)?,
                 sha256: super::run::sha256_hex(bytes),
                 len: bytes.len(),
                 maximum_bytes: MAX_ARTIFACT_BYTES,
@@ -403,7 +433,9 @@ impl QualificationOutput {
     }
 
     fn handle_write_failure(&mut self, source: ArtifactError) -> ArtifactError {
-        match self.abort_staging() {
+        let cleanup = self.abort_staging();
+        self.staging_active = false;
+        match cleanup {
             Ok(()) => source,
             Err(cleanup) => ArtifactError::WriteCleanup {
                 write: Box::new(source),
@@ -1104,72 +1136,6 @@ fn ensure_linux() -> Result<(), ArtifactError> {
     } else {
         Err(ArtifactError::UnsupportedHost)
     }
-}
-
-#[derive(Debug, Error)]
-pub(crate) enum ArtifactError {
-    #[error("performance qualification artifact publication requires Linux")]
-    UnsupportedHost,
-    #[error(
-        "qualification output must be a normal repository-relative directory below target/benchmarks/qualification: {0}"
-    )]
-    InvalidOutput(PathBuf),
-    #[error("qualification artifact name is not source-owned: {0}")]
-    InvalidArtifactName(&'static str),
-    #[error("qualification artifact {name} is {actual} bytes, exceeding {maximum}")]
-    ArtifactTooLarge {
-        name: &'static str,
-        actual: usize,
-        maximum: usize,
-    },
-    #[error("qualification output contains unexpected existing artifacts: {0:?}")]
-    UnexpectedExistingArtifacts(BTreeSet<OsString>),
-    #[error("qualification staging output contains unexpected artifacts: {0:?}")]
-    UnexpectedStagedArtifacts(BTreeSet<OsString>),
-    #[error("qualification staging output contains a duplicate artifact: {0}")]
-    DuplicateStagedArtifact(&'static str),
-    #[error(
-        "qualification bound directory artifact set changed: expected {expected:?}, actual {actual:?}"
-    )]
-    BoundArtifactSetChanged {
-        expected: BTreeSet<OsString>,
-        actual: BTreeSet<OsString>,
-    },
-    #[error("qualification output contains too many existing artifacts")]
-    TooManyExistingArtifacts,
-    #[error("qualification producer output already exists and cannot be replaced: {0}")]
-    OutputAlreadyExists(PathBuf),
-    #[error("failed to reserve a unique qualification staging directory")]
-    NoStagingName,
-    #[error("qualification artifact filesystem operation failed: {0}")]
-    Io(rustix::io::Errno),
-    #[error("qualification artifact directory identity check failed: {0}")]
-    DirectoryIdentity(&'static str),
-    #[error("qualification repository root is not the bound live absolute directory")]
-    RepositoryIdentity,
-    #[error("qualification artifact publication changed state and could not be rolled back")]
-    PublicationRollback,
-    #[error("qualification artifact write failed: {0}")]
-    Write(std::io::Error),
-    #[error("{write}; qualification staging cleanup also failed: {cleanup}")]
-    WriteCleanup {
-        write: Box<ArtifactError>,
-        cleanup: Box<ArtifactError>,
-    },
-    #[error("qualification artifact is not a bounded regular file: {0}")]
-    UnsafeArtifact(&'static str),
-    #[error("qualification artifact {0} changed while its derived report was being validated")]
-    ConcurrentReplacement(&'static str),
-    #[error("qualification source changed while its derived report was being published: {0}")]
-    ExternalSourceChanged(&'static str),
-    #[error("qualification rollup source is not a direct sibling artifact: {0}")]
-    NonSiblingArtifact(PathBuf),
-    #[error("qualification artifact is not a direct child of its source-owned root: {0}")]
-    NonDirectArtifact(PathBuf),
-    #[error("qualification artifact size cannot be represented on this host")]
-    SizeOverflow,
-    #[error("qualification artifact read limit exceeds the source-owned maximum: {0}")]
-    InvalidReadLimit(usize),
 }
 
 #[cfg(test)]
