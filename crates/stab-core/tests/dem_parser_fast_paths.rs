@@ -13,6 +13,8 @@ fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
         "detector[tag#value] D8 # hash inside the tag is not a comment\n",
         "LoGiCaL_ObSeRvAbLe L3\n",
         "ShIfT_DeTeCtOrS(1, 2, 3) 9\n",
+        "error[this-tag-is-longer-than-inline](0.5) D9\n",
+        "detector[ééééééééé] D10\n",
     );
     let expected = concat!(
         "error[edge\\Ctag](0.25) D0 D1 ^ L2 D3 D4\n",
@@ -20,6 +22,8 @@ fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
         "detector[tag#value] D8\n",
         "logical_observable L3\n",
         "shift_detectors(1, 2, 3) 9\n",
+        "error[this-tag-is-longer-than-inline](0.5) D9\n",
+        "detector[ééééééééé] D10\n",
     );
 
     let model = DetectorErrorModel::from_dem_str(input).expect("parse generic DEM forms");
@@ -36,8 +40,8 @@ fn qualification_cycle_has_bounded_parser_allocations() {
     const TOP_LEVEL_ITEMS: usize = 4_096;
     const CYCLE_ITEMS: usize = 8;
     const CYCLES: usize = TOP_LEVEL_ITEMS / CYCLE_ITEMS;
-    const MAX_ALLOCATIONS_PER_CYCLE: u64 = 8;
-    const FIXED_ALLOCATIONS: u64 = 4;
+    const MAX_ALLOCATIONS_PER_CYCLE: u64 = 4;
+    const FIXED_ALLOCATIONS: u64 = 2;
     const CYCLE: &str = concat!(
         "error(0.125) D0\n",
         "error[edge](0.25) D1 D2 L0 ^ D3\n",

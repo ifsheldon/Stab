@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::str::Lines;
 
+use arrayvec::ArrayString;
 use smallvec::SmallVec;
 
 mod analyze;
@@ -35,10 +36,12 @@ pub(crate) use traversal::{
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 type DemArgVec = SmallVec<[f64; 2]>;
 type DemTargetVec = SmallVec<[DemTarget; 1]>;
+const INLINE_DEM_TAG_BYTES: usize = 16;
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
+const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
 pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
 pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -229,15 +232,23 @@ impl DemItem {
 pub struct DemRepeatBlock {
     repeat_count: RepeatCount,
     body: DetectorErrorModel,
-    tag: Option<String>,
+    tag: Option<DemTag>,
 }
 
 impl DemRepeatBlock {
     pub fn new(repeat_count: RepeatCount, body: DetectorErrorModel, tag: Option<String>) -> Self {
+        Self::from_parts(repeat_count, body, normalize_tag(tag))
+    }
+
+    fn from_parts(
+        repeat_count: RepeatCount,
+        body: DetectorErrorModel,
+        tag: Option<DemTag>,
+    ) -> Self {
         Self {
             repeat_count,
             body,
-            tag: normalize_tag(tag),
+            tag,
         }
     }
 
@@ -250,7 +261,7 @@ impl DemRepeatBlock {
     }
 
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_deref()
+        self.tag.as_ref().map(DemTag::as_str)
     }
 
     fn write_dem(&self, out: &mut String, indent: usize) {
@@ -302,7 +313,7 @@ pub struct DemInstruction {
     kind: DemInstructionKind,
     args: DemArgVec,
     targets: DemTargetVec,
-    tag: Option<String>,
+    tag: Option<DemTag>,
 }
 
 impl DemInstruction {
@@ -316,7 +327,7 @@ impl DemInstruction {
             kind,
             DemArgVec::from_vec(args),
             DemTargetVec::from_vec(targets),
-            tag,
+            normalize_tag(tag),
         )
     }
 
@@ -324,14 +335,14 @@ impl DemInstruction {
         kind: DemInstructionKind,
         args: DemArgVec,
         targets: DemTargetVec,
-        tag: Option<String>,
+        tag: Option<DemTag>,
     ) -> CircuitResult<Self> {
         validate_dem_instruction(kind, &args, &targets)?;
         Ok(Self {
             kind,
             args,
             targets,
-            tag: normalize_tag(tag),
+            tag,
         })
     }
 
@@ -346,7 +357,7 @@ impl DemInstruction {
             DemInstructionKind::Error,
             args,
             DemTargetVec::from_vec(targets),
-            tag,
+            normalize_tag(tag),
         )
     }
 
@@ -361,7 +372,7 @@ impl DemInstruction {
             DemInstructionKind::Detector,
             DemArgVec::from_vec(coordinates),
             targets,
-            tag,
+            normalize_tag(tag),
         )
     }
 
@@ -372,7 +383,7 @@ impl DemInstruction {
             DemInstructionKind::LogicalObservable,
             DemArgVec::new(),
             targets,
-            tag,
+            normalize_tag(tag),
         )
     }
 
@@ -387,7 +398,7 @@ impl DemInstruction {
             DemInstructionKind::ShiftDetectors,
             DemArgVec::from_vec(coordinates),
             targets,
-            tag,
+            normalize_tag(tag),
         )
     }
 
@@ -410,7 +421,7 @@ impl DemInstruction {
     }
 
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_deref()
+        self.tag.as_ref().map(DemTag::as_str)
     }
 
     pub(crate) fn detector_shift(&self) -> CircuitResult<u64> {
@@ -759,13 +770,33 @@ impl<'a> DemParser<'a> {
             .parse::<u64>()
             .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
         let body = self.parse_block(true, parent_depth + 1)?;
-        Ok(DemRepeatBlock::new(RepeatCount::try_new(count)?, body, tag))
+        Ok(DemRepeatBlock::from_parts(
+            RepeatCount::try_new(count)?,
+            body,
+            tag,
+        ))
     }
 }
 
 fn top_level_item_capacity(input: &str) -> usize {
-    let newline_count = input.bytes().filter(|byte| *byte == b'\n').count();
-    (newline_count + usize::from(!input.is_empty() && !input.ends_with('\n')))
+    if input.is_empty() {
+        return 0;
+    }
+    let sample_len = input.len().min(DEM_PREALLOCATION_SAMPLE_BYTES);
+    let newline_count = input
+        .as_bytes()
+        .iter()
+        .take(sample_len)
+        .filter(|byte| **byte == b'\n')
+        .count();
+    if newline_count == 0 {
+        return 1;
+    }
+    input
+        .len()
+        .saturating_mul(newline_count)
+        .div_ceil(sample_len)
+        .saturating_add(1)
         .min(MAX_DEM_PREALLOCATED_ITEMS)
 }
 
@@ -798,11 +829,24 @@ fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
     Ok(line.split_at(end))
 }
 
-fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<String>, &str)> {
+fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<DemTag>, &str)> {
     let rest = rest.trim_start();
     let Some(mut body) = rest.strip_prefix('[') else {
         return Ok((None, rest));
     };
+    if let Some(end) = body.as_bytes().iter().position(|byte| *byte == b']') {
+        let (raw_tag, tail_with_terminator) = body.split_at(end);
+        if !raw_tag
+            .as_bytes()
+            .iter()
+            .any(|byte| matches!(byte, b'\\' | b'\r' | b'\n'))
+        {
+            let tail = tail_with_terminator
+                .strip_prefix(']')
+                .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated tag"))?;
+            return Ok((DemTag::from_text(raw_tag), tail));
+        }
+    }
     let mut tag = String::new();
     loop {
         let Some((ch, after_ch)) = split_first_char(body) else {
@@ -810,7 +854,7 @@ fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<S
         };
         body = after_ch;
         match ch {
-            ']' => return Ok((Some(tag), body)),
+            ']' => return Ok((DemTag::from_string(tag), body)),
             '\\' => {
                 let Some((escaped, after_escaped)) = split_first_char(body) else {
                     return Err(CircuitError::parse_line(
@@ -868,9 +912,11 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgV
 }
 
 fn parse_dem_targets(rest: &str) -> CircuitResult<DemTargetVec> {
-    let target_count = rest.split_whitespace().count();
-    let mut targets = DemTargetVec::with_capacity(target_count);
+    let mut targets = DemTargetVec::new();
     for raw in rest.split_whitespace() {
+        if targets.len() == 1 {
+            targets.reserve(4);
+        }
         let target = if raw.bytes().all(|byte| byte.is_ascii_digit()) {
             DemTarget::numeric(parse_unsigned_dem_value(raw, "numeric DEM target")?)
         } else {
@@ -978,8 +1024,43 @@ fn write_escaped_tag(out: &mut String, tag: &str) {
     }
 }
 
-fn normalize_tag(tag: Option<String>) -> Option<String> {
-    tag.filter(|tag| !tag.is_empty())
+#[derive(Clone, Debug, PartialEq)]
+enum DemTag {
+    Inline(ArrayString<INLINE_DEM_TAG_BYTES>),
+    Heap(String),
+}
+
+impl DemTag {
+    fn from_text(tag: &str) -> Option<Self> {
+        if tag.is_empty() {
+            return None;
+        }
+        Some(match ArrayString::from(tag) {
+            Ok(tag) => Self::Inline(tag),
+            Err(_) => Self::Heap(tag.to_owned()),
+        })
+    }
+
+    fn from_string(tag: String) -> Option<Self> {
+        if tag.is_empty() {
+            return None;
+        }
+        Some(match ArrayString::from(tag.as_str()) {
+            Ok(inline) => Self::Inline(inline),
+            Err(_) => Self::Heap(tag),
+        })
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Inline(tag) => tag.as_str(),
+            Self::Heap(tag) => tag,
+        }
+    }
+}
+
+fn normalize_tag(tag: Option<String>) -> Option<DemTag> {
+    tag.and_then(DemTag::from_string)
 }
 
 fn wrap_line(line: usize, error: CircuitError) -> CircuitError {
