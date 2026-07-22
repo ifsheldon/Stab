@@ -20,9 +20,13 @@ The new public regressions preserve mixed-case instruction names, Unicode target
 
 A dirty-tree source-owned adapter probe after the change reported `stim_seconds=0.001916643`, `stab_seconds=0.002525429`, and diagnostic ratio `1.317631x` over 16,384 top-level item operations. A separate dirty-tree Stab worker executed 10,000 owned parses of the 64-item fixture in `0.096216406` seconds. These are optimization guidance only: neither result is clean paired evidence, neither can satisfy the gate, and both are superseded by the required clean note-binding revision.
 
+Clean note-binding revision `3a78eb74ef62d22631709b10618186567a1ece17` passed both sequential source-owned adapter probes with exact output parity. The parse probe reported `stim_seconds=0.003617204`, `stab_seconds=0.002420963`, and diagnostic ratio `0.669291x`; the print probe reported `stim_seconds=0.005289254`, `stab_seconds=0.006054023`, and diagnostic ratio `1.144589x`. Worker reproducibility also passed with pinned-Stim digest `cb484542faaeba73156a1ba5d7a1f35104b697320847ad33994b9bb1f33b67d4` and Stab digest `9a2205c5522144b4a25facc69dd60b2a5cd7bf6f9ef6d574e8513b126d930382`.
+
+The focused CQ producer at that revision then stopped before execution or publication because the parser optimization moved 108 rustdoc source lines and the generated correctness digest no longer matched the frozen inventory. No correctness artifact was created. Regeneration confirmed that only those 108 source-line fields and the derived digest changed: selected parents, owners, selectors, dispositions, case IDs, counts, and the exact DEM prerequisite remained unchanged. The clean probes and worker check prove the pre-refresh implementation contract but cannot be promoted across the inventory change.
+
 ## Required Owner Action
 
-Next owner action: from the clean revision binding this updated note, regenerate the exact CQ prerequisite, worker reproducibility, and both adapter probes, then publish the first post-fix full and soak report at every parse and print scale without rerunning a non-noisy result.
+Next owner action: commit the reviewed source-line-only correctness and derived performance inventory refresh with this updated note, then regenerate the exact CQ prerequisite, worker reproducibility, and both adapter probes from that clean revision before publishing the first post-fix full and soak report at every parse and print scale without rerunning a non-noisy result.
 
 1. Reproduce both sealed workers and probes from the clean note-binding revision, then publish the first post-fix full and soak result at every scale without rerunning a non-noisy failure.
 2. Inspect retained raw samples, calibration decisions, paired-ratio relative MAD, confidence bounds, setup and peak RSS, and Stab allocation behavior before accepting the optimization.

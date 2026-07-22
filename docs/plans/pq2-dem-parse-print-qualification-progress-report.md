@@ -4,10 +4,10 @@
 
 In progress as of 2026-07-23.
 
-The source-current implementation inventory is performance digest `8094995692c48c98723467cf6e90c3c685797fb4a02bf0efe15c273d844fbfef` and correctness digest `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`.
+The source-current implementation inventory is performance digest `acd913e0966b9968b24c06bd2fed678f4608f0ff1ab82735dab5ebc109f119b3` and correctness digest `b9ed22cfcf637e740e68501b32b764015e937e6bc8d75ced3328f62ecc20cf40`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, contract-preflight schema version 13 with 228 ordered receipts, and qualification report schema version 32.
 Neither group has promotable timing evidence or legacy-migration authorization yet.
-Both groups now bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose SHA-256 is `453e3068b89458a3da4bc9f83ecd881cdc0fa6aa1bb0656a72be0d9e8ef3afcc`, so future failed or noisy formal reports can be retained and audited.
+Both groups now bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose SHA-256 is `04ecdbe4cc065f9842041b0ff0e91e2f3a00d36465e807ffaf95ce516bd8f62f`, so future failed or noisy formal reports can be retained and audited.
 
 ## Retained Attempts
 
@@ -86,3 +86,15 @@ Clean implementation commit `fb089098406892756572ea14439452a1001df57a` removes t
 The new regression suite proves mixed-case names, Unicode whitespace, comments, hashes and escapes inside tags, payloads larger than inline storage, canonical reparsing, and the exact 4,096-item qualification family. The allocation test failed before the implementation at 14,859 calls and now admits at most 4,100. All `stab-core` tests, workspace tests, formatting, workspace Clippy, and staged pre-commit checks passed for the implementation commit.
 
 A dirty-tree parse adapter probe after the optimization passed exact parity and reported diagnostic ratio `1.317631x` with `stim_seconds=0.001916643` and `stab_seconds=0.002525429`. A separate dirty-tree Stab worker completed 10,000 owned parses of the 64-item fixture in `0.096216406` seconds. These numbers are optimization guidance only and are not clean paired evidence. The updated profiler-note binding changes the runtime source contract, so the entire prerequisite and timing chain must be regenerated from the next clean revision.
+
+### Clean Post-Optimization Checkpoint At `3a78eb74`
+
+- Parse adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.003617204`, `stab_seconds=0.002420963`, diagnostic ratio `0.669291x`, Stim parent peak RSS `5111808`, and Stab parent peak RSS `94208`.
+- Print adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.005289254`, `stab_seconds=0.006054023`, diagnostic ratio `1.144589x`, Stim parent peak RSS `4923392`, and Stab parent peak RSS `6434816`.
+- The probes ran sequentially. Their short timings remain diagnostic and cannot satisfy the formal paired-sample gate; the unusually small parse parent RSS is retained as an observation, not a memory claim.
+- Worker reproducibility: passed with pinned-Stim digest `cb484542faaeba73156a1ba5d7a1f35104b697320847ad33994b9bb1f33b67d4` and Stab digest `9a2205c5522144b4a25facc69dd60b2a5cd7bf6f9ef6d574e8513b126d930382`.
+- Focused correctness attempt: rejected before execution and publication because generated correctness digest `b9ed22cfcf637e740e68501b32b764015e937e6bc8d75ced3328f62ecc20cf40` did not match the frozen pre-optimization digest `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`.
+- Artifact disposition: no `target/qualification/pq2-dem-cq-full-3a78eb7` directory or partial correctness artifact exists.
+- Inventory review: regeneration changed exactly 108 `source_line` fields in `crates/stab-core/src/dem.rs` plus the derived digest. It did not change a selected parent, owner, selector, disposition, case ID, count, or the exact DEM primary case `cq-evidence-qualification-0908c21b917526e3`.
+
+These results prove that the optimized code and private workers were internally coherent before the source inventory was refreshed. They do not cross the inventory boundary. Both probes, worker reproducibility, and the exact focused correctness chain must run again from the clean inventory-refresh revision before any post-fix timing evidence is produced.
