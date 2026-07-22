@@ -2,7 +2,6 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::str::Lines;
 
-use arrayvec::ArrayString;
 use smallvec::SmallVec;
 
 mod analyze;
@@ -16,6 +15,7 @@ mod graphlike;
 mod hyper;
 mod sat;
 mod search_budget;
+mod tag;
 mod traversal;
 
 #[cfg(feature = "ops-contracts")]
@@ -34,9 +34,9 @@ pub(crate) use traversal::{
 };
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
+use tag::DemTag;
 type DemArgVec = SmallVec<[f64; 2]>;
 type DemTargetVec = SmallVec<[DemTarget; 1]>;
-const INLINE_DEM_TAG_BYTES: usize = 16;
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
@@ -529,13 +529,13 @@ impl FromStr for DemTarget {
         if raw == "^" {
             return Ok(Self::Separator);
         }
-        if let Some(value) = raw.strip_prefix('D') {
+        if let Some(value) = raw.strip_prefix('D').or_else(|| raw.strip_prefix('d')) {
             return Self::relative_detector(parse_unsigned_dem_value(
                 value,
                 "relative detector target",
             )?);
         }
-        if let Some(value) = raw.strip_prefix('L') {
+        if let Some(value) = raw.strip_prefix('L').or_else(|| raw.strip_prefix('l')) {
             return Self::logical_observable(parse_unsigned_dem_value(
                 value,
                 "logical observable target",
@@ -700,7 +700,7 @@ impl<'a> DemParser<'a> {
             let Some(line) = strip_comment(raw_line) else {
                 continue;
             };
-            let line = line.trim();
+            let line = trim_dem(line);
             if line.is_empty() {
                 continue;
             }
@@ -713,7 +713,7 @@ impl<'a> DemParser<'a> {
             if let Some(prefix) = line.strip_suffix('{') {
                 model.push_repeat_block(self.parse_repeat(
                     line_number,
-                    prefix.trim_end(),
+                    trim_dem_end(prefix),
                     depth,
                 )?);
             } else {
@@ -830,7 +830,7 @@ fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
 }
 
 fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<DemTag>, &str)> {
-    let rest = rest.trim_start();
+    let rest = trim_dem_start(rest);
     let Some(mut body) = rest.strip_prefix('[') else {
         return Ok((None, rest));
     };
@@ -885,7 +885,7 @@ fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<D
 }
 
 fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgVec, &str)> {
-    let rest = rest.trim_start();
+    let rest = trim_dem_start(rest);
     let Some(body) = rest.strip_prefix('(') else {
         return Ok((DemArgVec::new(), rest));
     };
@@ -900,9 +900,10 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgV
         .strip_prefix(')')
         .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
     let mut args = DemArgVec::new();
-    if !raw_args.trim().is_empty() {
+    let raw_args = trim_dem(raw_args);
+    if !raw_args.is_empty() {
         for arg in raw_args.split(',') {
-            let arg = arg.trim();
+            let arg = trim_dem(arg);
             args.push(arg.parse::<f64>().map_err(|_| {
                 CircuitError::parse_line(line_number, format!("invalid argument {arg}"))
             })?);
@@ -917,14 +918,38 @@ fn parse_dem_targets(rest: &str) -> CircuitResult<DemTargetVec> {
         if targets.len() == 1 {
             targets.reserve(4);
         }
-        let target = if raw.bytes().all(|byte| byte.is_ascii_digit()) {
-            DemTarget::numeric(parse_unsigned_dem_value(raw, "numeric DEM target")?)
-        } else {
-            raw.parse()?
-        };
-        targets.push(target);
+        targets.push(parse_dem_target_token(raw)?);
     }
     Ok(targets)
+}
+
+fn parse_dem_target_token(raw: &str) -> CircuitResult<DemTarget> {
+    let Some((&prefix, _)) = raw.as_bytes().split_first() else {
+        return Err(CircuitError::invalid_detector_error_model(
+            "invalid DEM target \"\"",
+        ));
+    };
+    let value = raw.get(1..).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!("invalid DEM target {raw:?}"))
+    })?;
+    match prefix {
+        b'D' | b'd' => DemTarget::relative_detector(parse_unsigned_dem_value(
+            value,
+            "relative detector target",
+        )?),
+        b'L' | b'l' => DemTarget::logical_observable(parse_unsigned_dem_value(
+            value,
+            "logical observable target",
+        )?),
+        b'^' if value.is_empty() => Ok(DemTarget::separator()),
+        b'0'..=b'9' => Ok(DemTarget::numeric(parse_unsigned_dem_value(
+            raw,
+            "numeric DEM target",
+        )?)),
+        _ => Err(CircuitError::invalid_detector_error_model(format!(
+            "invalid DEM target {raw:?}"
+        ))),
+    }
 }
 
 fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
@@ -940,12 +965,13 @@ fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64
                 "invalid {kind} {text:?}"
             )));
         }
-        value = value
-            .checked_mul(10)
-            .and_then(|value| value.checked_add(u64::from(byte - b'0')))
-            .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!("invalid {kind} {text:?}"))
-            })?;
+        let digit = u64::from(byte - b'0');
+        if value > (u64::MAX - digit) / 10 {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "invalid {kind} {text:?}"
+            )));
+        }
+        value = value * 10 + digit;
     }
     Ok(value)
 }
@@ -976,6 +1002,36 @@ fn strip_comment(line: &str) -> Option<&str> {
 fn split_first_char(text: &str) -> Option<(char, &str)> {
     let ch = text.chars().next()?;
     Some((ch, text.split_at(ch.len_utf8()).1))
+}
+
+fn trim_dem_start(text: &str) -> &str {
+    let trimmed = text.trim_ascii_start();
+    if trimmed
+        .as_bytes()
+        .first()
+        .is_some_and(|byte| !byte.is_ascii())
+    {
+        trimmed.trim_start()
+    } else {
+        trimmed
+    }
+}
+
+fn trim_dem_end(text: &str) -> &str {
+    let trimmed = text.trim_ascii_end();
+    if trimmed
+        .as_bytes()
+        .last()
+        .is_some_and(|byte| !byte.is_ascii())
+    {
+        trimmed.trim_end()
+    } else {
+        trimmed
+    }
+}
+
+fn trim_dem(text: &str) -> &str {
+    trim_dem_end(trim_dem_start(text))
 }
 
 fn write_indent(out: &mut String, indent: usize) {
@@ -1020,41 +1076,6 @@ fn write_escaped_tag(out: &mut String, tag: &str) {
             '\n' => out.push_str("\\n"),
             '\\' => out.push_str("\\B"),
             _ => out.push(ch),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum DemTag {
-    Inline(ArrayString<INLINE_DEM_TAG_BYTES>),
-    Heap(String),
-}
-
-impl DemTag {
-    fn from_text(tag: &str) -> Option<Self> {
-        if tag.is_empty() {
-            return None;
-        }
-        Some(match ArrayString::from(tag) {
-            Ok(tag) => Self::Inline(tag),
-            Err(_) => Self::Heap(tag.to_owned()),
-        })
-    }
-
-    fn from_string(tag: String) -> Option<Self> {
-        if tag.is_empty() {
-            return None;
-        }
-        Some(match ArrayString::from(tag.as_str()) {
-            Ok(inline) => Self::Inline(inline),
-            Err(_) => Self::Heap(tag),
-        })
-    }
-
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Inline(tag) => tag.as_str(),
-            Self::Heap(tag) => tag,
         }
     }
 }

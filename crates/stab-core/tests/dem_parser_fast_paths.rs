@@ -3,15 +3,31 @@
     reason = "parser regression tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::DetectorErrorModel;
+use stab_core::{DemInstruction, DemItem, DemTarget, DetectorErrorModel};
+
+#[test]
+fn dem_model_layout_stays_bounded_for_large_parse_workloads() {
+    assert!(
+        std::mem::size_of::<DemTarget>() <= 16,
+        "DEM target layout unexpectedly grew"
+    );
+    assert!(
+        std::mem::size_of::<DemInstruction>() <= 96,
+        "DEM instruction layout unexpectedly grew"
+    );
+    assert!(
+        std::mem::size_of::<DemItem>() <= 96,
+        "DEM item layout unexpectedly grew"
+    );
+}
 
 #[test]
 fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
     let input = concat!(
-        "ErRoR[edge\\Ctag](0.25) D0\u{2003}D1 ^ L2 D3 D4\n",
-        "DeTeCtOr(1, 2, 3, 4) D7 # trailing comment\n",
-        "detector[tag#value] D8 # hash inside the tag is not a comment\n",
-        "LoGiCaL_ObSeRvAbLe L3\n",
+        "ErRoR[edge\\Ctag](0.25) d0\u{2003}D1 ^ l2 D3 D4\n",
+        " \u{2003}DeTeCtOr( \u{2003}1, 2, 3, 4\u{2003} ) D7\u{2003}  # trailing comment\n",
+        "detector \u{2003}[tag#value] D8 # hash inside the tag is not a comment\n",
+        "LoGiCaL_ObSeRvAbLe l3\n",
         "ShIfT_DeTeCtOrS(1, 2, 3) 9\n",
         "error[this-tag-is-longer-than-inline](0.5) D9\n",
         "detector[ééééééééé] D10\n",
@@ -33,6 +49,30 @@ fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
         DetectorErrorModel::from_dem_str(expected).expect("reparse canonical DEM"),
         model
     );
+}
+
+#[test]
+fn fast_target_parser_preserves_numeric_boundaries_and_rejections() {
+    let maximum = DetectorErrorModel::from_dem_str(
+        "shift_detectors 18446744073709551615\nerror(0.25) d0 l1\n",
+    )
+    .expect("parse maximum numeric target and lowercase typed targets");
+    assert_eq!(
+        maximum.to_dem_string(),
+        "shift_detectors 18446744073709551615\nerror(0.25) D0 L1\n"
+    );
+
+    for invalid in [
+        "shift_detectors 18446744073709551616\n",
+        "error(0.25) D\n",
+        "error(0.25) L\n",
+        "error(0.25) 1D\n",
+    ] {
+        assert!(
+            DetectorErrorModel::from_dem_str(invalid).is_err(),
+            "accepted invalid DEM target in {invalid:?}"
+        );
+    }
 }
 
 #[test]
