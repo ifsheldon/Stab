@@ -2,6 +2,8 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::str::Lines;
 
+use smallvec::SmallVec;
+
 mod analyze;
 mod api;
 mod arena_index;
@@ -31,8 +33,12 @@ pub(crate) use traversal::{
 };
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
+type DemArgVec = SmallVec<[f64; 2]>;
+type DemTargetVec = SmallVec<[DemTarget; 1]>;
+
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
+const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
 pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
 pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -51,6 +57,12 @@ impl DetectorErrorModel {
 
     pub fn from_dem_str(input: &str) -> CircuitResult<Self> {
         DemParser::new(input).parse()
+    }
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
     }
 
     pub fn items(&self) -> &[DemItem] {
@@ -273,11 +285,11 @@ impl DemInstructionKind {
     }
 
     fn from_name(name: &str) -> CircuitResult<Self> {
-        match name.to_ascii_lowercase().as_str() {
-            "error" => Ok(Self::Error),
-            "detector" => Ok(Self::Detector),
-            "logical_observable" => Ok(Self::LogicalObservable),
-            "shift_detectors" => Ok(Self::ShiftDetectors),
+        match name.len() {
+            5 if name.eq_ignore_ascii_case("error") => Ok(Self::Error),
+            8 if name.eq_ignore_ascii_case("detector") => Ok(Self::Detector),
+            18 if name.eq_ignore_ascii_case("logical_observable") => Ok(Self::LogicalObservable),
+            15 if name.eq_ignore_ascii_case("shift_detectors") => Ok(Self::ShiftDetectors),
             _ => Err(CircuitError::invalid_detector_error_model(format!(
                 "unknown DEM instruction {name}"
             ))),
@@ -288,8 +300,8 @@ impl DemInstructionKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DemInstruction {
     kind: DemInstructionKind,
-    args: Vec<f64>,
-    targets: Vec<DemTarget>,
+    args: DemArgVec,
+    targets: DemTargetVec,
     tag: Option<String>,
 }
 
@@ -298,6 +310,20 @@ impl DemInstruction {
         kind: DemInstructionKind,
         args: Vec<f64>,
         targets: Vec<DemTarget>,
+        tag: Option<String>,
+    ) -> CircuitResult<Self> {
+        Self::from_parts(
+            kind,
+            DemArgVec::from_vec(args),
+            DemTargetVec::from_vec(targets),
+            tag,
+        )
+    }
+
+    fn from_parts(
+        kind: DemInstructionKind,
+        args: DemArgVec,
+        targets: DemTargetVec,
         tag: Option<String>,
     ) -> CircuitResult<Self> {
         validate_dem_instruction(kind, &args, &targets)?;
@@ -314,10 +340,12 @@ impl DemInstruction {
         targets: Vec<DemTarget>,
         tag: Option<String>,
     ) -> CircuitResult<Self> {
-        Self::new(
+        let mut args = DemArgVec::new();
+        args.push(probability.get());
+        Self::from_parts(
             DemInstructionKind::Error,
-            vec![probability.get()],
-            targets,
+            args,
+            DemTargetVec::from_vec(targets),
             tag,
         )
     }
@@ -327,14 +355,23 @@ impl DemInstruction {
         target: DemTarget,
         tag: Option<String>,
     ) -> CircuitResult<Self> {
-        Self::new(DemInstructionKind::Detector, coordinates, vec![target], tag)
+        let mut targets = DemTargetVec::new();
+        targets.push(target);
+        Self::from_parts(
+            DemInstructionKind::Detector,
+            DemArgVec::from_vec(coordinates),
+            targets,
+            tag,
+        )
     }
 
     pub fn logical_observable(target: DemTarget, tag: Option<String>) -> CircuitResult<Self> {
-        Self::new(
+        let mut targets = DemTargetVec::new();
+        targets.push(target);
+        Self::from_parts(
             DemInstructionKind::LogicalObservable,
-            Vec::new(),
-            vec![target],
+            DemArgVec::new(),
+            targets,
             tag,
         )
     }
@@ -344,10 +381,12 @@ impl DemInstruction {
         detector_shift: u64,
         tag: Option<String>,
     ) -> CircuitResult<Self> {
-        Self::new(
+        let mut targets = DemTargetVec::new();
+        targets.push(DemTarget::numeric(detector_shift));
+        Self::from_parts(
             DemInstructionKind::ShiftDetectors,
-            coordinates,
-            vec![DemTarget::numeric(detector_shift)],
+            DemArgVec::from_vec(coordinates),
+            targets,
             tag,
         )
     }
@@ -615,6 +654,7 @@ fn validate_targets(
 struct DemParser<'a> {
     lines: Lines<'a>,
     line_number: usize,
+    top_level_capacity: usize,
 }
 
 impl<'a> DemParser<'a> {
@@ -622,6 +662,7 @@ impl<'a> DemParser<'a> {
         Self {
             lines: input.lines(),
             line_number: 0,
+            top_level_capacity: top_level_item_capacity(input),
         }
     }
 
@@ -639,7 +680,11 @@ impl<'a> DemParser<'a> {
                 "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
             )));
         }
-        let mut model = DetectorErrorModel::new();
+        let mut model = if stop_on_terminator {
+            DetectorErrorModel::new()
+        } else {
+            DetectorErrorModel::with_capacity(self.top_level_capacity)
+        };
         while let Some((line_number, raw_line)) = self.next_line()? {
             let Some(line) = strip_comment(raw_line) else {
                 continue;
@@ -718,6 +763,12 @@ impl<'a> DemParser<'a> {
     }
 }
 
+fn top_level_item_capacity(input: &str) -> usize {
+    let newline_count = input.bytes().filter(|byte| *byte == b'\n').count();
+    (newline_count + usize::from(!input.is_empty() && !input.ends_with('\n')))
+        .min(MAX_DEM_PREALLOCATED_ITEMS)
+}
+
 fn parse_dem_instruction(line_number: usize, line: &str) -> CircuitResult<DemInstruction> {
     let (name, rest) = parse_name(line_number, line)?;
     let kind =
@@ -725,22 +776,25 @@ fn parse_dem_instruction(line_number: usize, line: &str) -> CircuitResult<DemIns
     let (tag, rest) = parse_optional_tag(line_number, rest)?;
     let (args, rest) = parse_optional_args(line_number, rest)?;
     let targets = parse_dem_targets(rest).map_err(|error| wrap_line(line_number, error))?;
-    DemInstruction::new(kind, args, targets, tag).map_err(|error| wrap_line(line_number, error))
+    DemInstruction::from_parts(kind, args, targets, tag)
+        .map_err(|error| wrap_line(line_number, error))
 }
 
 fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
-    let end = line
-        .char_indices()
-        .take_while(|(index, ch)| {
-            if *index == 0 {
-                ch.is_ascii_alphabetic()
-            } else {
-                ch.is_ascii_alphanumeric() || *ch == '_'
-            }
-        })
-        .last()
-        .map(|(index, ch)| index + ch.len_utf8())
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing DEM instruction name"))?;
+    let mut end = None;
+    for (index, byte) in line.bytes().enumerate() {
+        let valid = if index == 0 {
+            byte.is_ascii_alphabetic()
+        } else {
+            byte.is_ascii_alphanumeric() || byte == b'_'
+        };
+        if !valid {
+            break;
+        }
+        end = Some(index + 1);
+    }
+    let end =
+        end.ok_or_else(|| CircuitError::parse_line(line_number, "missing DEM instruction name"))?;
     Ok(line.split_at(end))
 }
 
@@ -786,10 +840,10 @@ fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<S
     }
 }
 
-fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64>, &str)> {
+fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgVec, &str)> {
     let rest = rest.trim_start();
     let Some(body) = rest.strip_prefix('(') else {
-        return Ok((Vec::new(), rest));
+        return Ok((DemArgVec::new(), rest));
     };
     let Some(end) = body.find(')') else {
         return Err(CircuitError::parse_line(
@@ -801,7 +855,7 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
     let tail = tail_with_paren
         .strip_prefix(')')
         .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
-    let mut args = Vec::new();
+    let mut args = DemArgVec::new();
     if !raw_args.trim().is_empty() {
         for arg in raw_args.split(',') {
             let arg = arg.trim();
@@ -813,31 +867,48 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
     Ok((args, tail))
 }
 
-fn parse_dem_targets(rest: &str) -> CircuitResult<Vec<DemTarget>> {
-    rest.split_whitespace()
-        .map(|raw| {
-            if raw.bytes().all(|byte| byte.is_ascii_digit()) {
-                return Ok(DemTarget::numeric(parse_unsigned_dem_value(
-                    raw,
-                    "numeric DEM target",
-                )?));
-            }
-            raw.parse()
-        })
-        .collect()
+fn parse_dem_targets(rest: &str) -> CircuitResult<DemTargetVec> {
+    let target_count = rest.split_whitespace().count();
+    let mut targets = DemTargetVec::with_capacity(target_count);
+    for raw in rest.split_whitespace() {
+        let target = if raw.bytes().all(|byte| byte.is_ascii_digit()) {
+            DemTarget::numeric(parse_unsigned_dem_value(raw, "numeric DEM target")?)
+        } else {
+            raw.parse()?
+        };
+        targets.push(target);
+    }
+    Ok(targets)
 }
 
 fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
-    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+    if text.is_empty() {
         return Err(CircuitError::invalid_detector_error_model(format!(
             "invalid {kind} {text:?}"
         )));
     }
-    text.parse::<u64>()
-        .map_err(|_| CircuitError::invalid_detector_error_model(format!("invalid {kind} {text:?}")))
+    let mut value = 0_u64;
+    for byte in text.bytes() {
+        if !byte.is_ascii_digit() {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "invalid {kind} {text:?}"
+            )));
+        }
+        value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u64::from(byte - b'0')))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!("invalid {kind} {text:?}"))
+            })?;
+    }
+    Ok(value)
 }
 
 fn strip_comment(line: &str) -> Option<&str> {
+    if !line.as_bytes().contains(&b'#') {
+        return Some(line);
+    }
+
     let mut in_tag = false;
     let mut escaped = false;
     for (index, ch) in line.char_indices() {
