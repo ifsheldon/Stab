@@ -2,7 +2,11 @@
 
 ## Status
 
-The eleventh PQ2 executable slice remains active for source-current closure on controlled Linux AArch64.
+The eleventh PQ2 executable slice is complete and accepted on controlled Linux AArch64 at its source-current machine revision after milestone audit and independent follow-up review found no unresolved P0 through P3 issue.
+
+Clean Stab revision `859bf202bdd4bdfbca07e9b1d647afb1b0542846` published and replayed one exact three-case focused correctness report, byte-reproduced both private workers, passed both diagnostic adapter probes, published all 12 first-attempt full and soak scale reports, replayed and regression-checked every report, published and replayed four architecture-scoped rollups, and published and independently replayed two completion receipts under correctness digest `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289` and performance digest `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`.
+
+All 12 source-current timing reports passed on their first attempt without a noise rerun, waiver, report-only outcome, or threshold relaxation. Identity median Stab-to-Stim seconds-per-work ratios range from `0.000179x` to `0.017874x`, corresponding to approximately `55.95x` through `5589.83x` speedups for the exact identity workload. Non-identity median ratios range from `0.906236x` to `0.927767x`, corresponding to approximately `1.08x` through `1.10x` speedups for complete non-identity multiplication. The worst source-current bootstrap confidence-interval upper bound is `0.928804x`, below the exact `1.25x` gate.
 
 Clean Stab revision `da7c787d1e9f49110d7054868b146b5fb7d7bda4` published and replayed a complete schema-version-31 chain: one exact three-case focused correctness report, byte-reproducible private workers, both diagnostic adapter probes, all 12 first-attempt full and soak scale reports and regression decisions, four architecture-scoped rollups, and two independently replayed completion receipts. That chain is historical under correctness digest `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f` and performance digest `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176` after follow-up review changed correctness source, artifact publication, and generated inventory ownership.
 
@@ -14,26 +18,29 @@ Identity median Stab-to-Stim seconds-per-work ratios ranged from `0.000146x` to 
 Non-identity median elapsed-time ratios ranged from `0.743053x` to `0.765340x`, corresponding to approximately `1.31x` through `1.35x` speedups for complete non-identity multiplication.
 The worst historical schema-version-31 bootstrap confidence-interval upper bound was `0.765806x`, below the exact `1.25x` gate.
 
-Successive independent reviews and the first replacement timing attempt after that chain found additional closure defects in short-right-operand complexity, pre-mutation path admission, end-to-end artifact and repository binding, rollback and cleanup safety, production-dispatch coverage, generated checklist ownership, descriptor-root source access, and final correctness-tree revalidation. The current source returns prefix non-identity deltas from the packed kernel, admits every direct output and input path before mutating work, binds exact staged, target, CQ, report, rollup, and completion file sets by descriptor identity, length, and digest through hierarchy durability, owns retained repository descriptors in typed roots, performs repository-relative source, Git metadata, and correctness-tree access from those descriptors without following untrusted path components or reopening procfs descriptor magic links, revalidates every repository-relative correctness ancestor through the exact CQ output, revalidates the recorded repository state through publication, performs descriptor-checked rollback and cleanup, tests the production completion dispatcher, and makes advertised checklist counts a checked inventory contract. These fixes require a fresh clean focused correctness and performance chain before the slice can be source-current again.
+Successive independent reviews and replacement attempts found closure defects in short-right-operand complexity, pre-mutation path admission, end-to-end artifact and repository binding, rollback and cleanup safety, production-dispatch coverage, generated checklist ownership, descriptor-root source access, final correctness-tree revalidation, exact correctness-case ownership, early formal-session binding, failed-write cleanup reporting, and pinned-Stim inventory reads through retained roots. Revision `29a29d5` fixed the first group but remained review-rejected because it accepted broad correctness reports containing the required cases plus extras, read and validated the benchmark manifest before retaining the formal repository descriptor, and could suppress staging cleanup failure after a write error. Revisions `99a743e`, `9bf5b05`, and `ad8917c` close those findings. The first clean rerun then exposed a remaining path-based Stim inventory reader at `vendor/stim/file_lists/perf_files`; revision `0b86f07` made that validation and read handle-relative and produced a complete replacement chain. A subsequent lifecycle review rejected that chain because exact case-set equality was checked only after opening every selected receipt, artifact creation and final descriptor-binding failures bypassed the fallible staging-abort path, and simultaneous action and final session-identity failures could mask the action error. Revision `859bf20` closes those final findings and produces the source-current machine chain. The source-current milestone audit found no implementation defect or newly revealed under-specification, and independent full-code-review found no unresolved P0 through P3 issue.
 
 The identity result is not used as a proxy for non-identity multiplication.
 Its source-owned independent-throughput policy is valid because both implementations perform the same public logical operation and declare the same per-iteration single-qubit work, while Stab's semantically equivalent identity-right metadata fast path is O(1).
 Every identity report separately proves exact output at the smaller selected iteration count and normalizes timing by each implementation's exact report-bound work.
 The non-identity family retains ordinary common-iteration timing with equal total work.
 
-When the replacement chain passes, this report will close only equal-width public in-place Clifford-string multiplication on Linux AArch64.
+This report closes only equal-width public in-place Clifford-string multiplication on Linux AArch64.
 It does not qualify allocating multiplication, unequal-width growth, construction, randomization, concatenation, repetition, display, Tableau operations, native Linux x86-64, cross-scale memory growth, or the remaining Algebra surface.
 
 ## Current Contract And Historical Evidence
 
-- Latest historical clean Stab revision: `da7c787d1e9f49110d7054868b146b5fb7d7bda4`, with `local_modifications=false` before and after every schema-version-31 correctness and performance producer.
+- Source-current clean Stab revision: `859bf202bdd4bdfbca07e9b1d647afb1b0542846`, with `local_modifications=false` before and after every correctness and performance producer, rollup, and completion controller.
+- Latest historical review-rejected clean Stab revision: `0b86f07881198c57df1237b23a7d7c0084f2a272`; its complete machine chain passed under the current inventories but cannot qualify the milestone because the final lifecycle defects above changed correctness admission and failure integrity.
+- Earlier historical review-rejected clean Stab revision: `29a29d5f68767e4ab131b051c88f6b77417e0338`; its machine chain passed under the current inventories but cannot qualify the milestone because the controller defects above changed correctness admission and lifecycle integrity.
+- Earlier historical clean Stab revision: `da7c787d1e9f49110d7054868b146b5fb7d7bda4`, with `local_modifications=false` before and after every schema-version-31 correctness and performance producer.
 - Historical clean post-migration Stab revision: `91f62d0a78659da2e8e264a6968b3c6cd32456de`, with `local_modifications=false` before and after every historical producer and completion controller.
 - Focused migration commit: `91f62d0a78659da2e8e264a6968b3c6cd32456de`.
 - Clean pre-migration authorization revision: `127d6661a9e00872fc4aa4c0b0d27171e005afa5`.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 - Current performance inventory: `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`; historical `da7c787` evidence inventory: `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`; earlier schema-version-30 evidence inventory: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`.
 - Current correctness inventory: `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`; historical `da7c787` evidence inventory: `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f`.
-- Current runtime-group contract: `e76e8e26a7daad8a5f5504511d8091c5499766e83e065d7b7c785b4bf57ddaf3`; historical runtime-group contract: `4d7b0e4808828217dc0a353ea991321c8483579ed62b84ca42a1cae6f1b4c2ee`.
+- Current runtime-group contract: `8e5e5dcc5b0f7575a637113dc72b448daa981e4b04ef8aa18e0d4361ed41de1d`; historical runtime-group contract: `4d7b0e4808828217dc0a353ea991321c8483579ed62b84ca42a1cae6f1b4c2ee`.
 - Current profiler note: `benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md` at SHA-256 `4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04`.
 - Current frozen vector fixture: `benchmarks/fixtures/pq2-clifford-string-vectors.json` at SHA-256 `e61cd02dd29eb006892444eddd30693031e39746add588a8f538888499a29d85`.
 - Checked migration ledger: `benchmarks/qualification-threshold-migrations.json` at SHA-256 `e27cd284ad76c91b213fe5e5fff8c8f5058810c33874965dfe53f49883cec810`.
@@ -43,7 +50,7 @@ It does not qualify allocating multiplication, unequal-width growth, constructio
 
 The source-current performance inventory contains seventeen executable product contracts with one exact `1.25x` rule at each of three scales.
 The inherited `m6-clifford-string` timing row is superseded, while its process-memory baseline remains guarded until PQ6 supplies equal or stronger cross-scale evidence.
-Current source-owned closure continues to require private Stab build-receipt schema version 5, adapter receipt schema version 11, contract-preflight schema version 12 with 212 probes, and qualification report schema version 31. No report under the two current inventory digests exists yet; the replacement must bind one focused correctness family, worker identities, inventories, runtime-group contract, toolchain, verified host profile, and clean revision.
+Current source-owned closure uses private Stab build-receipt schema version 5, adapter receipt schema version 11, contract-preflight schema version 12 with 212 probes, qualification report schema version 31, rollup schema version 4, and completion schema version 1. The `859bf20` chain binds one exact focused correctness family, one reproducible worker identity set, both current inventories, the current runtime-group contract, the pinned toolchain, the verified host profile, and the clean revision through both completion replays.
 
 ## Inventory Status
 
@@ -51,11 +58,29 @@ Current source-owned closure continues to require private Stab build-receipt sch
 The 161 inherited benchmark rows contain nine retained, 135 reworked, four diagnostic, eleven superseded, and two removed rows.
 This slice changes only the inherited `m6-clifford-string` row from reworked to superseded after its exact identity replacement completion authorized migration.
 
-The historical schema-version-31 chain contributes twelve raw source measurements: six identity and six non-identity reports across full and soak tiers and three scales.
+The source-current schema-version-31 chain contributes twelve raw source measurements: six identity and six non-identity reports across full and soak tiers and three scales.
 Full reports contain nine retained pairs apiece and soak reports contain 15, for 144 retained timing pairs in total.
 Its exact timing outcome is twelve passed, zero failed, zero noisy, and zero report-only.
 There is no slow or noisy row requiring a next action; the source-owned profiler note remains bound because it records the scalar failure, packed portable-SIMD optimization, identity timing policy, and migration provenance.
 The schema-version-30 chain has the same 12-report shape and remains historical under its exact producer and inventory. Memory evidence remains report-only, and no scaling or Stim-relative memory claim is made before PQ6.
+
+## Source-Current Correctness Preflight
+
+The clean focused full-tier report at `target/qualification/pq2-clifford-cq-full-859bf20` selected and passed exactly the three required generated qualification cases with zero failed, planned, or deferred selections under correctness inventory `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`:
+
+- `cq-evidence-qualification-40e5ad2f2f4c4fd4` owns the public Clifford-string resource contract, accepted 1,048,576-qubit equal-width multiplication, first rejection at 1,048,577 qubits, bounded iterator consumption, checked growth, and pre-RNG rejection.
+- `cq-evidence-qualification-510e746ec36e7d1c` owns equal-width public in-place output, right-operand immutability, deterministic identity and complete non-identity cycles, and the representative Clifford-string value contract.
+- `cq-evidence-qualification-ae9390dd6a207cb6` owns the independent all-24-by-24 Tableau-backed Clifford multiplication table and all-24-cubed associativity contract.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Request | `74f0e11b64146a4215cce92f3a1ee42a953ce663998b8b264fd4cfb66661e856` |
+| Report | `10d9fe0eb1aa72fc09a5fd10af444f0c29f0e9de9a36966b3be81f4efb3a1731` |
+| Completion | `409b1395a504c18302d8592584257a9d2c5728b3407a19118f2e6ea6cfdd29c4` |
+| Preflight | `3df8889ea8b5245a955d72684de07b43923445b85a50013df6e371457ac55749` |
+| Markdown | `898cdee91d9316fcfd5d26b289891bfa426931fe2e2956c43beb3fb9b78dd754` |
+
+The correctness report and exact preflight replayed successfully before timing. Every source-current performance report, rollup, and completion controller independently reconstructed the canonical correctness request, report, completion, preflight, and exact execution receipts and retained the complete correctness tree through final publication.
 
 ## Historical Schema-Version-31 Correctness Preflight
 
@@ -72,7 +97,7 @@ The clean focused full-tier report at `target/qualification/pq2-clifford-cq-full
 | Completion | `ebe9084416da312a7b1e427f71f99bb48d5c0bcfaa475e76b825e6525f98a7d8` |
 | Preflight | `67dcbac6551214f9cde880b1ff91e6135decefc3db3ae5945da1ff037a1a4f74` |
 
-The correctness report and exact preflight replayed successfully before timing. Every `da7c787` performance report independently reconstructed the same canonical correctness request, report, completion, execution receipts, and exact three-case preflight before accepting timing evidence. The next clean revision must generate a replacement under correctness inventory `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`.
+The correctness report and exact preflight replayed successfully before timing. Every `da7c787` performance report independently reconstructed the same canonical correctness request, report, completion, execution receipts, and exact three-case preflight before accepting timing evidence. Revision `859bf20` fulfills the historical replacement requirement under correctness inventory `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`.
 
 ## Earlier Historical Schema-Version-30 Correctness Preflight
 
@@ -114,6 +139,22 @@ Rejected requests cover first-over-cap, zero width, unknown and opposite valid w
 The non-identity oracle uses a scalar 24-by-24 reference independent of the packed production representation and proves that every complete 552-position cycle contains every left Clifford against every non-identity right Clifford exactly once.
 The correctness owner independently uses Tableau-backed multiplication across all 24-by-24 pairs, so benchmark-worker agreement alone cannot establish the group law.
 
+## Source-Current Worker Identity
+
+`just bench::qualification-worker-reproducibility` rebuilt both sealed workers twice from clean revision `859bf202bdd4bdfbca07e9b1d647afb1b0542846` and reproduced these identities:
+
+| Identity | SHA-256 |
+| --- | --- |
+| Stim source | `248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf` |
+| Stim build fingerprint | `57ca1f53144f10ced1c93860b3c8d9a5cbef7759ef1c55fc87910ed8df0d6d41` |
+| Stim binary | `e6bbc3877c52a32174c05318b2c55a7174c2a9ddcf888b6fbc5f40b538cf2856` |
+| Stab source | `d8b2f0d59be9e0d2685c2ae243eb203a71abaa17d4edf47af79bb71b0e230bc6` |
+| Stab build fingerprint | `accbf5a181a8379532c6a6707207661c658caaa720afad6868caac53ad4a3ff4` |
+| Stab binary | `1af05c9e23d67516c20c3d34ff855733ed2f0845270976628d9c3eedfaee6329` |
+| Contract preflight | `2235a5fbe0912ed8a28843eebebbedb5466d4e83e154973e0c3a519056621b6f` |
+
+Both source-owned adapter probes passed their exact semantic and protocol matrices before timing and again inside each completion producer and replay. Their tiny process timings varied as expected and remain diagnostic only; no adapter-probe ratio contributes to the product performance claim.
+
 ## Historical Schema-Version-31 Worker Identity
 
 `just bench::qualification-worker-reproducibility` rebuilt both sealed workers twice from clean revision `da7c787d1e9f49110d7054868b146b5fb7d7bda4` and reproduced these identities:
@@ -147,6 +188,29 @@ The private Stab build receipt is schema version 5, the adapter receipt is schem
 The historical private Stab build receipt is schema version 4.
 The historical adapter receipt and contract preflight are schema version 11, and the historical qualification report is schema version 30.
 The historical identities remain evidence only for revision `91f62d0a78659da2e8e264a6968b3c6cd32456de` and report schema version 30. Adapter smoke timings remain diagnostic and are never product speed evidence.
+
+## Source-Current Timing Results
+
+Every full report retains nine interleaved pairs and every soak report retains 15. Each report contains one timing attempt and independently passes both the median and bootstrap-upper `1.25x` rules.
+
+| Group | Scale | Tier | Pairs | Stim selected iterations | Stab selected iterations | Median ratio | 95% upper | Ratio rMAD | Outcome |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Identity | Small | Full | 9 | 408,766 | 22,865,127 | 0.017874 | 0.017927 | 0.002787 | Passed |
+| Identity | Medium | Full | 9 | 41,082 | 23,102,941 | 0.001778 | 0.001793 | 0.001965 | Passed |
+| Identity | Large | Full | 9 | 4,143 | 23,366,852 | 0.000179 | 0.000181 | 0.001730 | Passed |
+| Identity | Small | Soak | 15 | 408,607 | 23,021,639 | 0.017856 | 0.017907 | 0.003229 | Passed |
+| Identity | Medium | Soak | 15 | 41,100 | 23,280,727 | 0.001781 | 0.001788 | 0.002782 | Passed |
+| Identity | Large | Soak | 15 | 4,142 | 23,397,341 | 0.000179 | 0.000179 | 0.001258 | Passed |
+| Non-identity | Small | Full | 9 | 401,452 | 432,855 | 0.927639 | 0.928804 | 0.000363 | Passed |
+| Non-identity | Medium | Full | 9 | 41,074 | 45,291 | 0.906633 | 0.906948 | 0.000348 | Passed |
+| Non-identity | Large | Full | 9 | 4,143 | 4,570 | 0.907061 | 0.907737 | 0.000551 | Passed |
+| Non-identity | Small | Soak | 15 | 401,547 | 432,790 | 0.927767 | 0.928178 | 0.000364 | Passed |
+| Non-identity | Medium | Soak | 15 | 41,094 | 45,334 | 0.906236 | 0.906777 | 0.000487 | Passed |
+| Non-identity | Large | Soak | 15 | 4,143 | 4,567 | 0.906722 | 0.906821 | 0.000122 | Passed |
+
+The source-current outcome count is 12 passed, zero failed, zero noisy, and zero report-only timing measurements across 144 retained pairs. All 12 reports passed on their first attempt, so no timing result was rerun toward a more favorable sample. Every identity report uses source-owned `independent-throughput`; every non-identity report uses standard common iterations after exact common semantic preflight.
+
+All reports passed the verified `linux-aarch64-controlled` host profile with one-minute load readings from `0.97` through `1.77`, maximum observed temperature `48,100` millidegrees Celsius, at least `120,269,107,200` available memory bytes, unchanged cumulative swap counters, performance frequency governor before and after every report, and `local_modifications=false` before and after execution. The reports prove only that their recorded swap counters did not move. The operator separately observed that `/swap.img` was disabled inside a `finally`-guarded formal timing window, restored afterward, and active at 16 GiB with zero bytes used at the final `swapon --show --bytes` check.
 
 ## Historical Schema-Version-31 Timing Results
 
@@ -205,12 +269,32 @@ Every historical post-migration producer passed host verification without a retr
 The allocation-counted test `qualification::runtime::worker::clifford_string::tests::equal_width_callbacks_allocate_nothing_at_every_contract_scale` proves zero timed Stab allocation calls and zero requested bytes for both identity and non-identity callbacks at widths 10,000, 100,000, 1,000,000, and the accepted maximum 1,048,576.
 Construction allocations remain outside timing, and no Stim allocation-count claim is made without matching instrumentation.
 
-Across all 12 historical schema-version-31 reports, observed Stim setup RSS ranges from 3,575,808 to 7,036,928 bytes and Stim peak RSS ranges from 3,575,808 to 9,506,816 bytes.
-Observed Stab setup RSS ranges from 5,623,808 to 11,370,496 bytes and Stab peak RSS ranges from 5,689,344 to 11,501,568 bytes.
+Across all 12 source-current reports, observed Stim setup RSS ranges from 3,575,808 to 7,041,024 bytes and Stim peak RSS ranges from 3,575,808 to 9,506,816 bytes. Observed Stab setup RSS ranges from 5,820,416 to 11,571,200 bytes and Stab peak RSS ranges from 5,885,952 to 11,702,272 bytes.
 These process observations are report-only and do not establish cross-scale or Stim-relative memory parity.
 The retained `m6-clifford-string` entry in `benchmarks/m12-primary-memory-baseline.json` remains explicitly guarded until PQ6 defines and passes equal or stronger growth evidence.
 
-The earlier historical schema-version-30 RSS ranges remain recorded in its source reports and must not be merged with the schema-version-31 observations into one scaling claim.
+The historical schema-version-30 and schema-version-31 RSS ranges remain recorded in their source reports and must not be merged with the source-current observations into one scaling claim.
+
+## Source-Current Reports
+
+Every source directory contains canonical `report.json`, `preflight.json`, and derived `report.md`. Each report passed immediate offline replay and source-owned regression, and both completion controllers independently repeated all six report replays and regressions for their group.
+
+| Group | Scale | Tier | Directory suffix | Report SHA-256 | Preflight SHA-256 | Markdown SHA-256 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Identity | Small | Full | `identity-full-small` | `e94f1f996c4b64d463a75ce791af957e7d8720ad7869f8b3afabdca17b2f3411` | `c0ea80a46740ddb72c8d1acf16ef0927ea2a7b98ab467924e02e2921ada436bf` | `d87abef78d40eb15c66146ec148cff5b0e66074818d5be43d7f8071609b992ec` |
+| Identity | Medium | Full | `identity-full-medium` | `d3246c5439676d2a71f92f1d5eb95793ad28c9959adada9031e0b46f62ea8b19` | `496fed465138d2d7724e7763e4a01cae999352833721d5f5ff40ba5e2c57a9fd` | `2842074bf64adfa5a8ed68bb2bc758991ad23a4bed38742c418991ef186f9489` |
+| Identity | Large | Full | `identity-full-large` | `3798b8ee0c1fb36230551149ea34165fb205df4a458cdbcdcb872b55536a2189` | `58149c7f2ab6e46a434d77cecfc5810d6664d32386174b7b43bb637d3a7192b2` | `89c140ff9b9bb69542b69882e5467cb399cbf7dcd98e21ebc88d490014efc955` |
+| Identity | Small | Soak | `identity-soak-small` | `e396aec740948a2c6c0dbb8b3650e60bb1b4475e53a5809188d43d29e505aaee` | `266719740fad649254c3edbc99d89e056d97142c918e4e46caeeb74afa121c92` | `4e5dd37a77247e82d45281b1654ad161025e827d41fab0b60d87a1d89cb98af8` |
+| Identity | Medium | Soak | `identity-soak-medium` | `3c0cc471feaa8ff4287af17fd46b89bcd9f7f2482d1b880f3f57632f20069f1a` | `66700fc788f64084661b8cf7ec797425ee5a637a3336e68b1fc06cba40c16eb1` | `b150e5e9e3710c5ccad81fd14f4a880383082bfc7fc3602deb182a69bdff9046` |
+| Identity | Large | Soak | `identity-soak-large` | `a94e4b89cb31f1640b3ae368bf0df88df8d9d69e5fdd82a2bce3e3f059c3d866` | `ffbb679ffc198ee690832dfb98b013ce0423b72879190f7da638558599ec803b` | `8f0cd196f83cff3400c46610aa8c4fabb36e81fcc27b097fecdcfb7fea0372db` |
+| Non-identity | Small | Full | `nonidentity-full-small` | `4666089c699431e1e68d3d9665007891665a78325842c4b61a7983f69fe52d66` | `74772a869650b1673a5bd87d10b030cda51fdf7ecf25b0c535fe51e504906bfb` | `b2b31e095d667de81a42b109e6b4004e0337608e29451e7fca9f54587002a38c` |
+| Non-identity | Medium | Full | `nonidentity-full-medium` | `a0094aa926a2340df0b7cbc7deab1f525ef0827dd6e345c2cde45295d78b925d` | `4b84b774ec1d55db29da95fa5ae25f36eac78abc7d3cb3fcd92f4c6ae9c194ec` | `9a264315eb24de756df17888ad976e22b438c092e9556b85f5e60633748f9e2e` |
+| Non-identity | Large | Full | `nonidentity-full-large` | `000d061c1800e21d0db77ce2471f969d909143864fb30ca195cee92be008db76` | `a538e6b1e6c3b2f5c0ee804002b2f5f25829024d2743c82dfd256e5a15936742` | `82822384882b936feb8e103ddb3ba514ae69be73c04a522a5ffd628a76abbbe3` |
+| Non-identity | Small | Soak | `nonidentity-soak-small` | `6bc6dc39c7db81d6ebfaeea964f6068dc17951d6f482a0271cb5bd3c6bac771c` | `6fe508f123c6bb321af46f5eefcb701bcd5982e532252ae3b8aa29fb429dd5e0` | `6c48783851933a2fb25f0f226bf2126cda3aab0456b3ea2c28a5545b82e6f498` |
+| Non-identity | Medium | Soak | `nonidentity-soak-medium` | `c6382dca4138f6529fb8fb144952d41ebee35e73f394311b1cb3c8619b1129fd` | `2689961568d4341d0afe97ed44ab8e3a55e486bda848fadf083035096914abca` | `ffaa651af28a14b25a6ac694b119230a3f35ac4589b62a94019775b3ec4605fd` |
+| Non-identity | Large | Soak | `nonidentity-soak-large` | `2347a8bce03c67806ff985b817de25209f8d47852fcb09724fd4c1330a82229e` | `3630d950538e0c5e8bdc6efd47ad7240273933c29c058d64312a00d5f77eb22f` | `a95157ab8015f6d3d906716cf97025239d20e211dd54fd1a1a1c95aab35c4c84` |
+
+Every directory above is prefixed by `target/benchmarks/qualification/pq2-clifford-schema31-859bf20-`.
 
 ## Historical Schema-Version-31 Source Reports
 
@@ -253,6 +337,19 @@ The completion controllers independently replayed and regression-checked all 12 
 | Non-identity | Medium | Soak | `target/benchmarks/qualification/pq2-clifford-post-migration-91f62d0a-nonidentity-soak-medium` | `eeaf07ee6d976b1f07239d1c869248c6ed8ba21a3b54769040238affbed2dd07` |
 | Non-identity | Large | Soak | `target/benchmarks/qualification/pq2-clifford-post-migration-91f62d0a-nonidentity-soak-large` | `76690e279ac20ab96fd35dfaf2bcef8875d550bae996859dfb4d9b3a1cb15dec` |
 
+## Source-Current Rollups And Completion Receipts
+
+| Group | Artifact | Directory suffix | Report SHA-256 | Preflight SHA-256 | Markdown SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| Identity | Full rollup | `identity-full-rollup` | `41dd21b0136477d16230102b59a64d08a350466c6761b081e403b51afde02b8c` | `3980be0383059535f39309d288a5857ecaa0a66d13bd933ad2c590f1a473ab55` | `ed7eb3a9bff3145a593b4302f07d0c68dd99050dc7cd355de6b4ec2428d36e3e` |
+| Identity | Soak rollup | `identity-soak-rollup` | `c09958eae3da46b6bbebc16532e40a73fbddd09c96e40fdb179c66f821ba5078` | `b422686ff140d596f726f495fae79b5c0e29400b339674bc4ae0448d85cfbd26` | `96992a13c7eb77460fdef617550129b549d0e6dddb60c4a0b4d8406e88952182` |
+| Identity | Completion | `identity-completion` | `54a71683fc307bb254862a62003c9efab32517fd2d72a63402646d23349dd7c8` | `153a3996d00cb4c134c294a5ec2d697a681cbd97d8bca2c0bbcedb2f6bebba9a` | `a86175dd818edeb93eb834bb9b7c5f0aea7e2da6e01c4fbeae9ea2792a92444d` |
+| Non-identity | Full rollup | `nonidentity-full-rollup` | `2f6d6e0b6800007e77cb6099a9a47450d57811368aa275027015f2cc7db39ae2` | `4fb4017988489c8efa84c95f62447d2f1671560cae6cf6f69e5d9995918a13cc` | `f5fda0fc49afb90b4bbf5d8df484c95259bb853b1828f10099e8e16184ce3065` |
+| Non-identity | Soak rollup | `nonidentity-soak-rollup` | `3bb8997e64a36533b4ee526e76ebc6fd6e06be8d1a0407857079b80dfe1c4e1e` | `74a1d1ab6a7665d6c964fa33b1b5100dcfbffeaf18cdcff3f135f9c501da51f0` | `2434cb239a6a22a154ae72ce7344d7030299e8b5a0da9506ccb5683183fd0c80` |
+| Non-identity | Completion | `nonidentity-completion` | `a7fa2e7e2e423c6df22f8c854175dff93d65221afbe9439e74fd1c937884cc3f` | `59e3b578d86610a88ec7225afdef7ef0ab6f764f05951b702a65a1d5aa430930` | `3f804e8135effda7825ce320cc1e2c7804a6b1399957ecfa85f2919cd9a30f27` |
+
+Every directory above is prefixed by `target/benchmarks/qualification/pq2-clifford-schema31-859bf20-`. All four schema-version-4 rollups passed publication and byte-for-byte replay with three passed, zero failed, and zero noisy scales. Each schema-version-1 completion receipt binds six source reports, two rollups, 16 machine-checked closure steps, exact focused correctness artifacts, one reproducible worker identity set, one clean revision, one CPU identity, one source-owned adapter probe, every report replay and regression, and both rollup replays. Both completion receipts passed independent byte-for-byte reconstruction.
+
 ## Historical Schema-Version-31 Rollups And Completion Receipts
 
 | Group | Artifact | Directory suffix | Report SHA-256 | Preflight SHA-256 |
@@ -294,23 +391,23 @@ Migration commit `91f62d0a78659da2e8e264a6968b3c6cd32456de` made that focused ch
 
 ## Milestone Audit
 
-The audit that followed revision `da7c787d1e9f49110d7054868b146b5fb7d7bda4` closed the preceding schema-version-30 findings, but a subsequent independent review found additional source, lifecycle, regression, and documentation defects. The current source fixes all confirmed findings and keeps the `da7c787` evidence intact as historical evidence under its exact inventories. Follow-up milestone audit remains required after targeted verification and before the replacement evidence commit.
+The audit that followed revision `da7c787d1e9f49110d7054868b146b5fb7d7bda4` closed the preceding schema-version-30 findings, but subsequent independent reviews and replacement producers found additional source, lifecycle, regression, documentation, and descriptor-root defects. A follow-up audit at revision `29a29d5` found only stale documentation, but a later independent lifecycle review superseded that result by finding exact-case admission, early formal-session binding, and failed-write cleanup defects. The first rerun after those fixes then exposed a path-based pinned-Stim inventory read through the retained repository root. Revision `0b86f07` fixed those findings and completed a replacement chain, but the final lifecycle review found that exact case-set rejection occurred after unnecessary extra-receipt access, not every staged-write failure used fallible terminal abort, and simultaneous action and final session errors were not both preserved. Revision `859bf20` fixes every confirmed finding and completes the source-current replacement machine chain while keeping all earlier chains historical under their exact contracts. The source-current milestone audit found no implementation defect, unsupported evidence promotion, acceptance loophole, or newly revealed under-specification.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Independent identity and non-identity contracts | Implemented; replacement evidence pending | Distinct checked runtime groups, measurements, thresholds, historical 12-report chains, four rollups, and two completion receipts |
-| Exact correctness and independent oracle | Implemented; replacement evidence pending | Complete 24-by-23 cycle, independent scalar worker oracle, all-24-by-24 Tableau-backed group owner, and prefix-delta metadata repair for short right operands |
-| Public lifecycle and optimizer resistance | Implemented; replacement evidence pending | Symmetric public in-place calls, typed prepared-workload lifecycle, receipt-owned barriers, callback counts, result-derived witnesses, final-state digests, and source-shape tests |
-| Hostile and resource boundaries | Implemented; replacement evidence pending | Frozen 72-receipt Clifford matrix, accepted maximum, first rejection, opposite valid markers, malformed descriptor hex, width/work mismatch, work overflow, pre-allocation rejection, and pre-barrier rejection |
-| Performance and resource claims | Historical timing accepted; current timing pending | Twelve first-attempt `da7c787` reports under historical inventories, independent `1.25x` rules, replayed regressions, zero timed Stab allocations, and explicitly report-only RSS observations |
-| Migration and artifact lifecycle | Implemented; follow-up audit pending | Checked pre-migration authorization, focused timing-only retirement, preserved memory baseline, all-path pre-mutation admission, exact descriptor-and-digest file-set bindings, repository-state binding through publication, descriptor-checked rollback and cleanup, and production-dispatch regressions |
-| Documentation and inventory ownership | Implemented; follow-up audit pending | Current and historical digests are separated, generated public-API counts are checked against the checklist marker, swap restoration is recorded, and commands remain `just` plus Rust ops |
+| Independent identity and non-identity contracts | Satisfied | Distinct checked runtime groups, measurements, thresholds, 12 source-current reports, four replayed rollups, and two replayed completion receipts |
+| Exact correctness and independent oracle | Satisfied | Exact three-case source-current CQ report, complete 24-by-23 cycle, independent scalar worker oracle, all-24-by-24 Tableau-backed group owner, and prefix-delta metadata repair for short right operands |
+| Public lifecycle and optimizer resistance | Satisfied | Symmetric public in-place calls, typed prepared-workload lifecycle, receipt-owned barriers, callback counts, result-derived witnesses, final-state digests, source-shape tests, and byte-reproducible workers |
+| Hostile and resource boundaries | Satisfied | Frozen 72-receipt Clifford matrix, accepted maximum, first rejection, opposite valid markers, malformed descriptor hex, width/work mismatch, work overflow, pre-allocation rejection, pre-barrier rejection, and allocation-counted accepted-maximum coverage |
+| Performance and resource claims | Satisfied | Twelve first-attempt source-current passes, 144 retained pairs, independent `1.25x` rules, replayed regressions, zero timed Stab allocations, and explicitly report-only RSS observations |
+| Migration and artifact lifecycle | Satisfied | Checked pre-migration authorization, focused timing-only retirement, preserved memory baseline, all-path pre-mutation admission, exact descriptor-and-digest file-set bindings, retained-handle correctness revalidation, repository-state binding through publication, descriptor-checked rollback and cleanup, and nested completion replay |
+| Documentation and inventory ownership | Satisfied | Current and historical digests are separated, generated public-API counts are checked against the checklist marker, all no-artifact attempts and swap restoration are recorded, and commands remain `just` plus Rust ops |
 
-Milestone status is **Active** for source-current controlled Linux AArch64 closure. The previously resolved independent-throughput, selected-calibration-floor, and Clifford-vector amendments in `docs/plans/milestone-spec-gaps.md` specify the current behavior. The follow-up review did not reveal a new product-scope under-specification; it revealed concrete implementation and evidence-lifecycle defects that are fixed in source and must now pass audit, review, and clean replacement evidence. Native Linux x86-64 execution and PQ6 cross-scale memory rules remain explicit later-plan work rather than loopholes in this architecture-scoped acceptance.
+Milestone status is **Complete** for the controlled Linux AArch64 machine chain. The previously resolved independent-throughput, selected-calibration-floor, and Clifford-vector amendments in `docs/plans/milestone-spec-gaps.md` specify the current behavior. The replacement implementation and evidence chain pass every machine-checkable acceptance step, and the final audit and review found no new specification loophole. Native Linux x86-64 execution and PQ6 cross-scale memory rules remain explicit later-plan work rather than loopholes in this architecture-scoped acceptance.
 
 ## Independent Review
 
-Independent GPT-5.6/max review lanes inspected qualification lifecycle and publication, Clifford implementation and complexity, scientific evidence, and documentation. They preserved the scientific interpretation of the equal-width `da7c787` timing results but found the following defects that prevent source-current promotion.
+Independent review lanes inspected qualification lifecycle and publication, Clifford implementation and complexity, scientific evidence, and documentation. They preserved the scientific interpretation of the equal-width historical timing results but found the following defects that prevented their source-current promotion.
 
 Confirmed findings and resolutions:
 
@@ -331,14 +428,21 @@ Confirmed findings and resolutions:
 - Correctness preflight opened its artifact tree through the retained descriptor but stored only the synthetic `/proc/<controller-pid>/fd/<n>/target/qualification/...` path for final publication validation. The final check fed that path back through the generic absolute `O_NOFOLLOW` walker, which rejected the procfs magic-link component as an apparent artifact mutation after timing completed. Correctness bindings now duplicate the retained repository descriptor, retain every repository-relative ancestor through the exact CQ output, and revalidate the chain with `openat` before checking bound files and case receipts. Regressions reproduce a retained descriptor root directly and reject replacement of `target`, `target/qualification`, the output directory, `cases`, or a case directory.
 - The completion tests exercised helper publication but not the real producer dispatch branch. A production dispatcher now has a regression proving that producer mode preserves an existing output and publishes a previously absent output.
 - The checklist advertised 1,972 public APIs and 654 Algebra APIs while generated ownership contained 1,974 and 656. A checked metadata marker now binds both counts to discovery, and malformed, missing, duplicate, unknown-field, and mismatched markers fail closed.
+- Correctness prerequisite admission accepted a report whose selected set contained the required three cases plus extras. The controller now requires exact set equality and has regressions for missing, duplicate, and additional selected cases.
+- Formal performance commands parsed the benchmark manifest before retaining the repository descriptor, leaving their first semantic input outside the descriptor-owned session. Every formal run, report replay, rollup, and completion command now establishes one retained formal session before manifest or source access and carries that binding through final publication.
+- A staging write failure could return its write error while suppressing a cleanup failure from the staged tree. Staging abort is now explicitly fallible, preserves both errors when both operations fail, and has regression coverage for cleanup-failure propagation.
+- Qualification discovery validated and read `vendor/stim/file_lists/perf_files` through an admitted path after the formal session had switched to a retained procfs root. That path-based reader failed with `ENOTDIR` before worker reproducibility or timing. Stim inventory validation and bounded reads are now handle-relative, and a path-swap regression proves they continue through the retained repository root.
+- Exact correctness-case equality was enforced only after statistical validation, completion validation, and every selected execution receipt had been opened. A report with an extra inaccessible case could therefore fail on that unrequested receipt, and a sufficiently broad report could consume descriptors before the intended exact-set rejection. Exact set equality now runs immediately after report validation, before any receipt access, and a regression deletes the extra receipt while still requiring `CaseSetMismatch`.
+- `QualificationOutput::write` routed payload write and sync failures through fallible staging abort, but artifact-creation and final descriptor-binding failures returned directly and left best-effort `Drop` cleanup to suppress any cleanup error. Every active write failure now enters one fallible terminal-abort path, preserves both primary and cleanup errors, and marks the publication inactive so it cannot be reused or silently retried; regressions cover hostile artifact creation and injected descriptor exhaustion.
+- A formal operation error could be masked when final repository-session identity validation also failed because the final check used early return. Formal session closure now combines both failures in `QualificationSession`, with a path-swap regression proving that the action error and final identity error are both retained.
 
-Acceptance remains pending until targeted verification, follow-up milestone audit, GPT-5.6/max review, one clean source commit, and fresh same-revision schema-version-31 evidence confirm that these resolutions introduce no remaining P0 through P3 finding.
+Machine acceptance is complete at clean revision `859bf202bdd4bdfbca07e9b1d647afb1b0542846`. Follow-up milestone audit and full-code-review inspected the source-current implementation, exact evidence, artifact lifecycle, qualification admission, Clifford correctness and SIMD kernel, hostile boundaries, tests, and documentation and found no unresolved P0 through P3 issue. A future source, fixture, runtime-contract, receipt, or schema change still invalidates the affected evidence and requires regeneration from its replacement revision.
 
 ## Verification Record
 
 Historical clean revision `da7c787d1e9f49110d7054868b146b5fb7d7bda4` passed the exact three-case correctness run, report replay, and preflight; worker reproducibility; both adapter probes; all full and soak report producers; all report replays and regressions; all four rollup producers and replays; both completion producers and replays; and the allocation-counted Clifford contract under its recorded inventories.
 
-The current review-fix source state passes all 374 non-ignored `stab-bench` tests with two explicitly ignored subprocess or reproducibility tests, including repository-reader path-swap, linked-worktree Git, unsafe Git-marker, bounded Git-directory-scan, artifact-publication, completion, replay-CAS, early-admission root-swap, and swap-and-restore descriptor-root regressions; all 386 non-ignored allocation-enabled `stab-bench` tests with two ignored; strict ordinary, allocation-enabled, and complete-workspace Clippy; complete workspace tests; correctness inventory validation at `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`; performance inventory validation at `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`; frozen Clifford-vector validation; and a dirty diagnostic identity adapter probe that exercised retained source reads, the pinned Stim submodule Git view, private source materialization, native adapter build, and both workers. Clean same-revision probes, follow-up audit and review, and all replacement evidence commands remain pending until this source state is committed.
+Clean source revision `859bf202bdd4bdfbca07e9b1d647afb1b0542846` passes the retained Stim-inventory, early exact correctness-case admission, early-session, dual session-error, all-write terminal-abort, retained correctness-root, and descriptor-root regression tests; strict workspace and allocation-enabled Clippy; the full workspace test suite, including 383 benchmark-harness tests with two ignored; 395 allocation-enabled benchmark-harness tests with two ignored; correctness inventory validation at `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`; performance inventory validation at `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`; frozen Clifford-vector validation; the exact focused correctness chain; clean worker reproducibility; both source-owned probes; all 12 report producers, replays, and regressions; all four rollup producers and replays; and both completion producers and independent replays.
 
 The first source-current correctness invocation at revision `cf44e57b0d2cd6fdb78cd62c4c8c5dfffcf1f451` passed the three source contract labels directly to `--case` and was rejected before execution because the runner accepts generated `cq-evidence-qualification-*` IDs. It created no output directory and therefore has no request, execution, report, completion, or preflight artifact; it is operator-observed command history, not qualification evidence. `GOAL.md` now requires the checked source-label-to-case-ID mapping so later agents do not repeat the mismatch.
 
@@ -346,9 +450,11 @@ Clean revision `476be59a68d4cd9706a2354f6fbf1565ef3a901c` then generated and rep
 
 The first formal timing invocation at revision `476be59a68d4cd9706a2354f6fbf1565ef3a901c` targeted the identity full-tier small scale at `target/benchmarks/qualification/pq2-clifford-schema31-476be59-identity-full-small`. Timing execution completed, but final publication rejected the unchanged correctness source as `correctness evidence artifact changed before performance publication` when it reopened the retained procfs descriptor path through the generic absolute nofollow walker. The producer created no output directory and therefore retained no canonical request, execution, report, preflight, or timing samples; this is operator-observed command history, not qualification evidence or a timing outcome. The trap-protected timing window restored `/swap.img` immediately, and `swapon --show --bytes` reported the 16 GiB swap file active with zero bytes used.
 
+Revision `ad8917c9d2b69ac2b250010d9c4b57fb962ff9a2` then generated and replayed its exact focused correctness prerequisite, but worker reproducibility stopped before any timing artifact when discovery tried to validate the pinned Stim performance-file inventory through a synthetic descriptor-root path and received `ENOTDIR`. The failed command published no worker, report, rollup, or completion artifact and is operator-observed diagnosis rather than qualification evidence. Revision `0b86f07` moved that inventory boundary to handle-relative validation and bounded reading before producing a complete machine chain at `target/qualification/pq2-clifford-cq-full-0b86f07` and `target/benchmarks/qualification/pq2-clifford-schema31-0b86f07-*`. That chain is historical and review-rejected because the later exact-set ordering, all-write abort, and dual session-error findings changed its lifecycle integrity; revision `859bf20` replaces it.
+
 The dirty-tree report-only compare at `target/benchmarks/clifford-short-rhs-review-compare-20260720` measured the fixed one-qubit non-identity RHS at `31 ns` per public call for each 10,000-, 100,000-, and 1,000,000-qubit left width. The flat diagnostic is regression guidance only: it was not produced by the qualification controller, does not satisfy a Stim comparator, and cannot be promoted as source-current timing evidence.
 
-The final closure revision must also pass:
+Final closure verification passed:
 
 ```sh
 cargo fmt --all --check
@@ -360,14 +466,12 @@ just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
 just bench::qualification-check
+just bench::qualification-clifford-vectors --check
 just maintenance::pre-commit
 ```
 
 ## Remaining Work
 
-1. Commit the review-fix source state, generate and replay a fresh same-revision focused CQ report, reproduce both workers, and pass both current adapter probes.
-2. Run all twelve unique full and soak reports, report replays and regressions, four rollups and replays, and two completion receipts and replays on the controlled Linux AArch64 host under schema version 31, with swap restored immediately after the timing window.
-3. Run follow-up milestone audit and independent GPT-5.6/max full review, fix every confirmed finding, and regenerate any evidence invalidated by a source or contract change.
-4. Run both clean full and soak families, rollups, and completion receipts on a controlled native Linux x86-64 host before making an x86-64 conclusion.
-5. Define and validate explicit cross-scale RSS and allocation-growth rules in PQ6 before making a memory qualification claim or retiring the legacy memory baseline.
-6. Qualify allocating multiplication, unequal-width growth, construction, randomization, concatenation, repetition, display, Tableau operations, and the remaining Algebra surfaces only through their own exact public API groups.
+1. Run both clean full and soak families, rollups, and completion receipts on a controlled native Linux x86-64 host before making an x86-64 conclusion.
+2. Define and validate explicit cross-scale RSS and allocation-growth rules in PQ6 before making a memory qualification claim or retiring the legacy memory baseline.
+3. Qualify allocating multiplication, unequal-width growth, construction, randomization, concatenation, repetition, display, Tableau operations, and the remaining Algebra surfaces only through their own exact public API groups.
