@@ -16,6 +16,7 @@ use sha2::{Digest as _, Sha256};
 
 mod bits;
 pub(super) mod clifford_string;
+mod dem_model;
 mod error;
 mod not_zero;
 mod pauli;
@@ -40,13 +41,14 @@ use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use prepared::PreparedWorkload;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 12] = [
+const WORKER_SOURCES: [(&str, &[u8]); 13] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     (
         "worker/clifford_string.rs",
         include_bytes!("worker/clifford_string.rs"),
     ),
+    ("worker/dem_model.rs", include_bytes!("worker/dem_model.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
     ("worker/pauli.rs", include_bytes!("worker/pauli.rs")),
     (
@@ -271,6 +273,8 @@ enum WorkloadOutput {
 
 enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
+    DemParsed(stab_core::DetectorErrorModel),
+    DemSerialized(String),
     PopcountChecksum(u64),
     DenseXorComplete,
     NotZeroChecksum(u64),
@@ -574,6 +578,40 @@ mod tests {
     #[test]
     fn canonical_print_workload_is_registered() {
         assert!(WorkerWorkload::from_str("circuit-canonical-print", true).is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn dem_workers_reject_wrong_measurements_and_semantic_work_overflow_first() {
+        let args = |workload, measurement_id, iterations, work_items| WorkerArgs {
+            workload,
+            measurement_id,
+            iterations: NonZeroU64::new(iterations).expect("positive iterations"),
+            work_items: NonZeroU64::new(work_items).expect("positive work items"),
+            input_descriptor_hex: None,
+            evidence_mode: WorkerEvidenceMode::Timing,
+            start_barrier: false,
+            expected_cpu: None,
+        };
+
+        for (workload, wrong_measurement) in [
+            (WorkerWorkload::DemParse, "serialize"),
+            (WorkerWorkload::DemCanonicalPrint, "parse"),
+        ] {
+            assert!(matches!(
+                run(args(workload, wrong_measurement.to_string(), 1, 64)),
+                Err(WorkerError::MeasurementMismatch { .. })
+            ));
+        }
+        assert!(matches!(
+            run(args(
+                WorkerWorkload::DemParse,
+                "parse".to_string(),
+                u64::MAX,
+                dem_model::DEM_CYCLE_ITEMS,
+            )),
+            Err(WorkerError::WorkOverflow)
+        ));
     }
 
     #[test]

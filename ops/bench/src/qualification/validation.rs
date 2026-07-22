@@ -1078,7 +1078,10 @@ fn validate_rows(
             .contains(&RowClassification::InProcessProcessMismatch)
             && groups
                 .get(row.primary_group_id.as_str())
-                .is_some_and(|group| group.threshold_policy == ThresholdPolicy::Primary1_25)
+                .is_some_and(|group| {
+                    group.threshold_policy == ThresholdPolicy::Primary1_25
+                        && !replacements::allows_asymmetric_direct_adapter(row, group)
+                })
         {
             issues.push(format!(
                 "manifest row {} uses an asymmetric in-process/process primary gate",

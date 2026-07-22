@@ -26,6 +26,7 @@
 
 #include "bit_matrix_transpose_contract.h"
 #include "clifford_string_contract.h"
+#include "dem_model_contract.h"
 #include "pauli_string_iter_contract.h"
 #include "pauli_string_multiply_contract.h"
 #include "simd_bits_not_zero_contract.h"
@@ -146,6 +147,9 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool circuit_parse = result.workload == "circuit-parse" && result.measurement_id == "parse";
     const bool circuit_canonical_print =
         result.workload == "circuit-canonical-print" && result.measurement_id == "serialize";
+    const bool dem_parse = result.workload == "dem-parse" && result.measurement_id == "parse";
+    const bool dem_canonical_print =
+        result.workload == "dem-canonical-print" && result.measurement_id == "serialize";
     const bool gate_name_hash =
         result.workload == "gate-name-hash" && result.measurement_id == "hash-all-names";
     const bool simd_word_popcount =
@@ -175,10 +179,10 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool clifford_string =
         clifford_kind.has_value() &&
         result.measurement_id == stab_qualification::clifford_measurement(clifford_kind.value());
-    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
-        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor &&
-        !bit_matrix_transpose && !pauli_string_multiply && !pauli_string_iter &&
-        !clifford_string) {
+    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !dem_parse &&
+        !dem_canonical_print && !gate_name_hash && !simd_word_popcount && !simd_bits_xor &&
+        !simd_bits_not_zero && !sparse_xor && !bit_matrix_transpose &&
+        !pauli_string_multiply && !pauli_string_iter && !clifford_string) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -850,6 +854,17 @@ int main(int argc, const char **argv) {
             arguments.workload == "circuit-canonical-print"
                 ? std::optional<stim::Circuit>(stim::Circuit(circuit_fixture))
                 : std::nullopt;
+        const bool dem_model_workload =
+            stab_qualification::is_dem_model_workload(arguments.workload);
+        const std::string dem_fixture = dem_model_workload
+                                            ? stab_qualification::dem_model_fixture(
+                                                  arguments.work_items)
+                                            : std::string{};
+        const std::optional<stim::DetectorErrorModel> dem_print_model =
+            arguments.workload == "dem-canonical-print"
+                ? std::optional<stim::DetectorErrorModel>(
+                      stim::DetectorErrorModel(dem_fixture))
+                : std::nullopt;
         const std::optional<std::vector<std::string>> gate_names =
             arguments.workload == "gate-name-hash"
                 ? std::optional<std::vector<std::string>>(gate_hash_names())
@@ -919,6 +934,8 @@ int main(int argc, const char **argv) {
                                          ? pauli_iter->input_bytes
                                      : clifford_string.has_value()
                                          ? stab_qualification::CLIFFORD_DESCRIPTOR_BYTES
+                                     : dem_model_workload
+                                         ? static_cast<uint64_t>(dem_fixture.size())
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -934,7 +951,9 @@ int main(int argc, const char **argv) {
                                       ? pauli_multiply->input_digest
                                   : pauli_iter.has_value()
                                       ? pauli_iter->input_digest
-                                      : byte_digest(circuit_fixture);
+                                      : dem_model_workload
+                                          ? byte_digest(dem_fixture)
+                                          : byte_digest(circuit_fixture);
         const std::string input_digest_text = clifford_string.has_value()
                                                   ? clifford_string->input_digest
                                                   : semantic_digest(input_digest);
@@ -951,6 +970,8 @@ int main(int argc, const char **argv) {
         std::array<uint64_t, 4> digest_state{};
         stim::Circuit parsed;
         std::string canonical;
+        stim::DetectorErrorModel parsed_dem;
+        std::string canonical_dem;
         uint64_t popcount_checksum = 0;
         uint64_t not_zero_checksum = 0;
         double elapsed_seconds = 0;
@@ -964,6 +985,17 @@ int main(int argc, const char **argv) {
             const auto &prepared_circuit = canonical_print_circuit.value();
             elapsed_seconds = measure_workload([&]() {
                 canonical = circuit_canonical_print(arguments.iterations, prepared_circuit);
+            });
+        } else if (arguments.workload == "dem-parse") {
+            elapsed_seconds = measure_workload([&]() {
+                parsed_dem = stab_qualification::dem_model_parse(
+                    arguments.iterations, dem_fixture);
+            });
+        } else if (arguments.workload == "dem-canonical-print") {
+            const auto &prepared_model = dem_print_model.value();
+            elapsed_seconds = measure_workload([&]() {
+                canonical_dem = stab_qualification::dem_model_serialize(
+                    arguments.iterations, prepared_model);
             });
         } else if (arguments.workload == "gate-name-hash") {
             const uint64_t prepared_sweeps = gate_sweeps.value();
@@ -1042,6 +1074,13 @@ int main(int argc, const char **argv) {
             digest_state = byte_digest(parsed.str());
         } else if (arguments.workload == "circuit-canonical-print") {
             digest_state = byte_digest(canonical);
+        } else if (arguments.workload == "dem-parse") {
+            canonical_dem = parsed_dem.str();
+            digest_state = byte_digest(
+                stab_qualification::validate_dem_canonical(canonical_dem, dem_fixture));
+        } else if (arguments.workload == "dem-canonical-print") {
+            digest_state = byte_digest(
+                stab_qualification::validate_dem_canonical(canonical_dem, dem_fixture));
         } else if (arguments.workload == "simd-word-popcount") {
             const bool final_bit = popcount->bits[POPCOUNT_TOGGLE_BIT];
             digest_state = popcount_output_digest(

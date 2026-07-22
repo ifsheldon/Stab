@@ -115,6 +115,48 @@ pub(super) fn clifford_contract(
     }
 }
 
+pub(super) fn dem_contracts() -> [GroupContract; 2] {
+    [
+        dem_contract(
+            super::super::invocation::DEM_PARSE_GROUP_ID,
+            "dem-parse",
+            "parse",
+        ),
+        dem_contract(
+            super::super::invocation::DEM_CANONICAL_PRINT_GROUP_ID,
+            "dem-canonical-print",
+            "serialize",
+        ),
+    ]
+}
+
+fn dem_contract(group_id: &str, workload_id: &str, measurement_id: &str) -> GroupContract {
+    GroupContract {
+        id: ProtocolId::try_new(group_id).expect("group id"),
+        claim_class: ClaimClass::PromotablePerformance,
+        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
+        workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
+        measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
+        scales: vec![ScaleContract {
+            id: ProtocolId::try_new("small").expect("scale id"),
+            work_items: NonZeroU64::new(64).expect("positive work"),
+            input_bytes: 1_776,
+            input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
+        }],
+        correctness_case_ids: vec!["cq-evidence-qualification-0908c21b917526e3".to_string()],
+        owner: ProtocolId::try_new("stab-core/dem-model").expect("owner"),
+        profiler_note: None,
+        comparator_sources: comparators::DEM_MODEL
+            .iter()
+            .map(|path| ComparatorSourceContract {
+                path: ComparatorSourcePath::try_new((*path).to_string()).expect("comparator path"),
+                sha256: Sha256Digest::try_new("a".repeat(64)).expect("comparator digest"),
+            })
+            .collect(),
+    }
+}
+
 #[test]
 fn runtime_contract_requires_an_explicit_timing_policy() {
     let value = serde_json::json!({

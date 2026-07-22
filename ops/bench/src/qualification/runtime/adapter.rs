@@ -28,7 +28,8 @@ const PAULI_STRING_ITER_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_iter_contract.h";
 const CLIFFORD_STRING_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/clifford_string_contract.h";
-const COMPARATOR_SOURCES: [&str; 8] = [
+const DEM_MODEL_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/dem_model_contract.h";
+const COMPARATOR_SOURCES: [&str; 9] = [
     SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
     SIMD_BITS_XOR_COMPARATOR_SOURCE,
     SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE,
@@ -37,8 +38,9 @@ const COMPARATOR_SOURCES: [&str; 8] = [
     PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE,
     PAULI_STRING_ITER_COMPARATOR_SOURCE,
     CLIFFORD_STRING_COMPARATOR_SOURCE,
+    DEM_MODEL_COMPARATOR_SOURCE,
 ];
-const RECEIPT_SCHEMA_VERSION: u32 = 11;
+const RECEIPT_SCHEMA_VERSION: u32 = 12;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
@@ -1119,6 +1121,7 @@ mod tests {
         let pauli_source = runtime.path().join("pauli_string_multiply_contract.h");
         let pauli_iter_source = runtime.path().join("pauli_string_iter_contract.h");
         let clifford_source = runtime.path().join("clifford_string_contract.h");
+        let dem_source = runtime.path().join("dem_model_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
@@ -1130,6 +1133,7 @@ mod tests {
         std::fs::write(&pauli_source, b"source").expect("write Pauli source");
         std::fs::write(&pauli_iter_source, b"source").expect("write Pauli iterator source");
         std::fs::write(&clifford_source, b"source").expect("write Clifford source");
+        std::fs::write(&dem_source, b"source").expect("write DEM source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -1159,6 +1163,7 @@ mod tests {
                 pauli_source.clone(),
                 pauli_iter_source.clone(),
                 clifford_source.clone(),
+                dem_source.clone(),
             ],
             library_path: library,
         };
@@ -1168,8 +1173,8 @@ mod tests {
 
         std::fs::write(&adapter.source_path, b"source").expect("restore source");
         adapter.verify().expect("restored adapter verifies");
-        std::fs::write(popcount_source, b"drifted comparator source")
-            .expect("drift comparator source");
+        std::fs::write(dem_source, b"drifted DEM comparator source")
+            .expect("drift DEM comparator source");
         assert!(matches!(adapter.verify(), Err(AdapterError::StaleBuild)));
     }
 }

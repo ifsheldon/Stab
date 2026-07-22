@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289",
-  "semantic_digest": "a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51",
+  "semantic_digest": "8094995692c48c98723467cf6e90c3c685797fb4a02bf0efe15c273d844fbfef",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -61760,35 +61760,68 @@
       "checklist_child_ids": [],
       "public_api_items": [],
       "disposition": "measured",
-      "phase": "end-to-end",
-      "runner_fidelity": "process-cli",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M10-DEM-PARSE-CONTRACT",
+      "phase": "parse",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-0908c21b917526e3"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "repository-file",
-          "path": "oracle/fixtures/inputs/sample_dem_deterministic.dem",
-          "sha256": "5f22950a062c570007ead998f2a44d4b64873a3b37f4e28744ba65ff3b498d2c"
+          "kind": "generated",
+          "id": "dem-model-cycle-v1"
         },
         "source": "src/stim/dem/detector_error_model.test.cc",
-        "deterministic_seed": "corpus-digest-owned",
+        "deterministic_seed": "none; exact-eight-item-cycle; complete-cycles-only",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "DEM parse path exercised through sample_dem",
+            "id": "small",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=64; cycle_items=8; max_items=524288",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 12
-            }
+              "bytes": 1776
+            },
+            "semantic_work": 64,
+            "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=4096; cycle_items=8; max_items=524288",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 113664
+            },
+            "semantic_work": 4096,
+            "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=65536; cycle_items=8; max_items=524288",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1818624
+            },
+            "semantic_work": 65536,
+            "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
           }
         ]
       },
-      "work_unit": "instructions",
+      "work_unit": "top-level DEM items",
       "output_contract": {
-        "expected_shape": "dem-parse output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both public processes consume equivalent complete output sinks after an untimed exact-output preflight."
+        "expected_shape": "Exact source fixture byte count and digest plus exact normalized final canonical DEM byte count and semantic digest.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers generate the exact source-owned fixture before timing, repeatedly construct and optimizer-consume a fresh owned model in timing, retain the final model, serialize it outside timing, normalize only one terminal newline, and compare its exact bytes and digest.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
+          },
+          {
+            "path": "benchmarks/stim_adapter/dem_model_contract.h",
+            "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+          }
+        ]
       },
       "timing_policy": {
         "batch_policy": "common-iterations",
@@ -61803,14 +61836,16 @@
       "memory_policy": {
         "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust direct DEM text parsing with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts.",
+      "owner": "stab-core/dem-parser",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M10-DEM-PRINT-CONTRACT",
@@ -61823,31 +61858,66 @@
       "disposition": "measured",
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M10-DEM-PRINT-CONTRACT",
+      "correctness_cases": [
+        "cq-evidence-qualification-0908c21b917526e3"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m10-dem-print-contract"
+          "kind": "generated",
+          "id": "dem-model-cycle-v1"
         },
         "source": "src/stim/dem/detector_error_model.test.cc",
-        "deterministic_seed": "source-owned-inline:m10-dem-print-contract",
+        "deterministic_seed": "none; exact-eight-item-cycle; complete-cycles-only",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "DEM canonical print contract for future Rust direct benchmark",
+            "id": "small",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=64; cycle_items=8; max_items=524288",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 1776
+            },
+            "semantic_work": 64,
+            "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=4096; cycle_items=8; max_items=524288",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 113664
+            },
+            "semantic_work": 4096,
+            "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=dem-model-cycle-v1; top_level_items=65536; cycle_items=8; max_items=524288",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1818624
+            },
+            "semantic_work": 65536,
+            "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
           }
         ]
       },
-      "work_unit": "instructions",
+      "work_unit": "top-level DEM items",
       "output_contract": {
-        "expected_shape": "dem-print output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact source fixture byte count and digest plus exact normalized final canonical DEM byte count and semantic digest.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers generate and parse the exact source-owned fixture before timing, repeatedly produce and optimizer-consume an owned canonical string in timing, retain the final string, normalize only one terminal newline, and compare its exact bytes and digest outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
+          },
+          {
+            "path": "benchmarks/stim_adapter/dem_model_contract.h",
+            "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+          }
+        ]
       },
       "timing_policy": {
         "batch_policy": "common-iterations",
@@ -61860,16 +61930,18 @@
         "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust direct canonical DEM serialization with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts.",
+      "owner": "stab-core/dem-printer",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M10-ERROR-ANALYZER",
@@ -62799,7 +62871,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62899,7 +62971,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -63055,7 +63127,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -63152,7 +63224,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63249,7 +63321,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63346,7 +63418,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63444,7 +63516,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63540,7 +63612,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63636,7 +63708,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63735,7 +63807,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -63837,7 +63909,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -63942,7 +64014,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -64040,7 +64112,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -64140,7 +64212,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "248420592bb5c243f86a854d43567fe3ce27e4c273612f6a1809eab7e0308ebf"
+            "sha256": "ccf5d463a296fd870b69a8444839b0f66cc409730a42c0ddc6353af1e33be953"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",

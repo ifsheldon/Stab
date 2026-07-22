@@ -25,6 +25,8 @@ const PAULI_STRING_ITER_RANGE_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
 const PAULI_STRING_ITER_SINGLETON_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
 const CLIFFORD_STRING_IDENTITY_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING";
 const CLIFFORD_STRING_NON_IDENTITY_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY";
+const DEM_PARSE_GROUP_ID: &str = "PERFQ-M10-DEM-PARSE-CONTRACT";
+const DEM_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M10-DEM-PRINT-CONTRACT";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
@@ -40,6 +42,7 @@ const PAULI_STRING_ITER_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_iter_contract.h";
 const CLIFFORD_STRING_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/clifford_string_contract.h";
+const DEM_MODEL_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/dem_model_contract.h";
 const CLIFFORD_VECTOR_PATH: &str = "benchmarks/fixtures/pq2-clifford-string-vectors.json";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
@@ -78,6 +81,7 @@ const CLIFFORD_STRING_CORRECTNESS_CASES: [&str; 3] = [
     "cq-evidence-qualification-510e746ec36e7d1c",
     "cq-evidence-qualification-ae9390dd6a207cb6",
 ];
+const DEM_MODEL_CORRECTNESS_CASE: &str = "cq-evidence-qualification-0908c21b917526e3";
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 struct NotZeroGroupSpec {
@@ -107,9 +111,103 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         PAULI_STRING_ITER_SINGLETON_GROUP_ID => apply_pauli_string_iter(root, group, true)?,
         CLIFFORD_STRING_IDENTITY_GROUP_ID => apply_clifford_string(root, group, false)?,
         CLIFFORD_STRING_NON_IDENTITY_GROUP_ID => apply_clifford_string(root, group, true)?,
+        DEM_PARSE_GROUP_ID => apply_dem_model(root, group, false)?,
+        DEM_CANONICAL_PRINT_GROUP_ID => apply_dem_model(root, group, true)?,
         _ => {}
     }
     Ok(())
+}
+
+fn apply_dem_model(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+    serialize: bool,
+) -> Result<(), BenchError> {
+    group.phase = if serialize {
+        Phase::Serialize
+    } else {
+        Phase::Parse
+    };
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = vec![DEM_MODEL_CORRECTNESS_CASE.to_string()];
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = dem_model_workload_family();
+    group.work_unit = "top-level DEM items".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact source fixture byte count and digest plus exact normalized final canonical DEM byte count and semantic digest."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: if serialize {
+            "Both workers generate and parse the exact source-owned fixture before timing, repeatedly produce and optimizer-consume an owned canonical string in timing, retain the final string, normalize only one terminal newline, and compare its exact bytes and digest outside timing."
+        } else {
+            "Both workers generate the exact source-owned fixture before timing, repeatedly construct and optimizer-consume a fresh owned model in timing, retain the final model, serialize it outside timing, normalize only one terminal newline, and compare its exact bytes and digest."
+        }
+        .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, DEM_MODEL_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = if serialize {
+        "stab-core/dem-printer"
+    } else {
+        "stab-core/dem-parser"
+    }
+    .to_string();
+    group.reason = if serialize {
+        "Implemented paired pinned-Stim and Rust direct canonical DEM serialization with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts."
+    } else {
+        "Implemented paired pinned-Stim and Rust direct DEM text parsing with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts."
+    }
+    .to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(())
+}
+
+fn dem_model_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "dem-model-cycle-v1".to_string(),
+        },
+        source: "src/stim/dem/detector_error_model.test.cc".to_string(),
+        deterministic_seed: "none; exact-eight-item-cycle; complete-cycles-only".to_string(),
+        scales: [
+            (
+                "small",
+                64,
+                1_776,
+                "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773",
+            ),
+            (
+                "medium",
+                4_096,
+                113_664,
+                "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c",
+            ),
+            (
+                "large",
+                65_536,
+                1_818_624,
+                "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, items, input_bytes, input_digest)| ScalePoint {
+            id: id.to_string(),
+            parameters: format!(
+                "generator=dem-model-cycle-v1; top_level_items={items}; cycle_items=8; max_items=524288"
+            ),
+            input_bytes: InputByteCount::Exact { bytes: input_bytes },
+            semantic_work: Some(items),
+            input_digest: Some(input_digest.to_string()),
+        })
+        .collect(),
+    }
 }
 
 fn apply_clifford_string(

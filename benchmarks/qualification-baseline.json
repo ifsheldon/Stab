@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51",
+  "performance_inventory_sha256": "8094995692c48c98723467cf6e90c3c685797fb4a02bf0efe15c273d844fbfef",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -189,6 +189,28 @@
       "measurements": [
         {
           "measurement_id": "right-multiply-non-identity",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M10-DEM-PARSE-CONTRACT",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "parse",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M10-DEM-PRINT-CONTRACT",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "serialize",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

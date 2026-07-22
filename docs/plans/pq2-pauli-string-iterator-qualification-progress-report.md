@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Iterator Qualification Progress Report
 
-> Historical-inventory note, 2026-07-19: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced now-historical digest `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`; the current shared-harness digest is `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51` without relabeling the iterator evidence. The measurements below remain historical.
+> Historical-inventory note, 2026-07-23: this report remains accepted Linux AArch64 evidence under frozen performance inventory `48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf`. Later reviewed Clifford contracts produced subsequent historical digests; the current shared-harness digest after adding the unexecuted DEM pair is `8094995692c48c98723467cf6e90c3c685797fb4a02bf0efe15c273d844fbfef` without relabeling the iterator evidence. The measurements below remain historical.
 
 ## Status
 
@@ -27,7 +27,7 @@ It does not qualify restart timing, owned `Iterator::next`, clone, formatting, c
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
 The later shared-harness correctness checkpoint named in the banner contains 2,886 upstream records, 1,974 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
-The later shared-harness performance checkpoint named in the banner contains 549 groups and exactly seventeen executable product groups plus one diagnostic protocol group. This report closes only its frozen `48eacf03` inventory and does not imply that the later Clifford groups or shared contracts were executed with the iterator evidence.
+The current shared-harness performance checkpoint named in the banner contains 549 groups and exactly nineteen executable product groups plus one diagnostic protocol group. This report closes only its frozen `48eacf03` inventory and does not imply that the later Clifford, DEM, or shared contracts were executed with the iterator evidence.
 The inherited `m6-pauli-iter` row is superseded for timing, while its memory baseline remains guarded until PQ6 supplies equal or stronger evidence.
 
 ## Correctness Preflight

@@ -22,6 +22,28 @@ pub(crate) enum WorkerError {
     CircuitScaleRange(u64),
     #[error("circuit-parse fixture capacity overflows usize")]
     CircuitFixtureOverflow,
+    #[error("DEM model work count {actual} is not a positive multiple of {cycle}")]
+    DemItemShape { actual: u64, cycle: u64 },
+    #[error("DEM model work count {actual} exceeds maximum {maximum}")]
+    DemItemLimit { actual: u64, maximum: u64 },
+    #[error("DEM model work count {0} cannot be represented on this host")]
+    DemItemRange(u64),
+    #[error("DEM model fixture capacity overflows")]
+    DemFixtureOverflow,
+    #[error("DEM model fixture allocation failed: {0}")]
+    DemFixtureAllocation(std::collections::TryReserveError),
+    #[error("DEM model fixture has {actual} bytes, expected {expected}")]
+    DemFixtureSize { actual: usize, expected: usize },
+    #[error("DEM model fixture is missing its canonical terminal newline")]
+    DemFixtureTerminalNewline,
+    #[error(
+        "DEM canonical output differs at byte {first_difference}: actual bytes {actual_bytes}, expected {expected_bytes}"
+    )]
+    DemCanonicalMismatch {
+        actual_bytes: usize,
+        expected_bytes: usize,
+        first_difference: usize,
+    },
     #[error("qualification input byte count cannot be represented as u64")]
     InputSizeRange,
     #[error("gate-name-hash registry has {actual} names, expected {expected}")]

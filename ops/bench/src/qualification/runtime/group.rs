@@ -773,6 +773,7 @@ mod tests {
                 "right-multiply-non-identity",
             ),
         ]);
+        groups.extend(test_contracts::dem_contracts());
         GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
             performance_inventory_sha256: "a".repeat(64),

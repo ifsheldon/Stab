@@ -10,6 +10,7 @@ use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use super::clifford_string::expected_clifford_probes;
+use super::dem_model::expected_dem_model_probes;
 use super::pauli::{
     PAULI_EVEN_CASE_ID, PAULI_EVEN_OUTPUT_DIGEST, PAULI_MAX_CASE_ID, PAULI_MAX_INPUT_BYTES,
     PAULI_MAX_INPUT_DIGEST, PAULI_MAX_OUTPUT_DIGEST, PAULI_MAX_WORK_ITEMS, PAULI_ODD_CASE_ID,
@@ -190,7 +191,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(212);
+    let mut probes = Vec::with_capacity(228);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -605,6 +606,7 @@ pub(super) fn expected_contract_preflight_probes()
         }
     }
     probes.extend(expected_clifford_probes()?);
+    probes.extend(expected_dem_model_probes()?);
     Ok(probes)
 }
 

@@ -180,6 +180,16 @@ pub(crate) enum InvocationError {
         stdout: String,
         stderr: String,
     },
+    #[error(
+        "{implementation} did not reject the first unsupported {workload} item count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    DemWorkRejection {
+        implementation: Implementation,
+        workload: &'static str,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
     #[error("qualification invocation returned no measurement")]
     MissingMeasurement,
     #[error("qualification worker measured invalid duration {0}")]

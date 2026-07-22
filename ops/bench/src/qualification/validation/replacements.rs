@@ -7,6 +7,19 @@ use super::super::model::{
 use super::Issues;
 use super::values::{validate_identifier, validate_text};
 
+pub(super) fn allows_asymmetric_direct_adapter(
+    row: &ManifestRowDisposition,
+    group: &QualificationGroup,
+) -> bool {
+    row.id == "m10-dem-parse-contract"
+        && group.id == "PERFQ-M10-DEM-PARSE-CONTRACT"
+        && row.decision == RowDecision::Reworked
+        && group.runner_fidelity == RunnerFidelity::AdapterLibrary
+        && group.correctness_binding == CorrectnessBinding::ExactCases
+        && group.output_contract.digest_state == EvidenceState::Existing
+        && group.output_contract.comparator_sources.len() >= 2
+}
+
 pub(super) fn validate(
     row: &ManifestRowDisposition,
     primary_feature: Option<&str>,

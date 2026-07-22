@@ -38,7 +38,7 @@ It does not qualify allocating multiplication, unequal-width growth, constructio
 - Focused migration commit: `91f62d0a78659da2e8e264a6968b3c6cd32456de`.
 - Clean pre-migration authorization revision: `127d6661a9e00872fc4aa4c0b0d27171e005afa5`.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
-- Current performance inventory: `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`; historical `da7c787` evidence inventory: `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`; earlier schema-version-30 evidence inventory: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`.
+- Accepted `859bf20` evidence inventory: `a47866ba5eab70392dd2754391d3d7d8588567a7cbfc1f81a569be813804ce51`; historical `da7c787` evidence inventory: `c238dc4e2500192f310ef3d2378ecaafc9744662b5127784dd4eeb6c60726176`; earlier schema-version-30 evidence inventory: `a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025`. The later DEM inventory is outside this report and does not relabel the chain.
 - Current correctness inventory: `648e7ea5a66997a810498dc871257bd654c7f9af9304651d43a88103eded0289`; historical `da7c787` evidence inventory: `4dbbb4b2cda3117bdd3d3ddfcd30b55f09e6f401352e3e86130222189d47791f`.
 - Current runtime-group contract: `8e5e5dcc5b0f7575a637113dc72b448daa981e4b04ef8aa18e0d4361ed41de1d`; historical runtime-group contract: `4d7b0e4808828217dc0a353ea991321c8483579ed62b84ca42a1cae6f1b4c2ee`.
 - Current profiler note: `benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md` at SHA-256 `4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04`.
@@ -48,7 +48,7 @@ It does not qualify allocating multiplication, unequal-width growth, constructio
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current performance inventory contains seventeen executable product contracts with one exact `1.25x` rule at each of three scales.
+The accepted Clifford evidence inventory contains seventeen executable product contracts with one exact `1.25x` rule at each of three scales; the later shared harness contains nineteen after adding the unexecuted DEM pair.
 The inherited `m6-clifford-string` timing row is superseded, while its process-memory baseline remains guarded until PQ6 supplies equal or stronger cross-scale evidence.
 Current source-owned closure uses private Stab build-receipt schema version 5, adapter receipt schema version 11, contract-preflight schema version 12 with 212 probes, qualification report schema version 31, rollup schema version 4, and completion schema version 1. The `859bf20` chain binds one exact focused correctness family, one reproducible worker identity set, both current inventories, the current runtime-group contract, the pinned toolchain, the verified host profile, and the clean revision through both completion replays.
 

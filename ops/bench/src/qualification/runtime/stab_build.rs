@@ -15,12 +15,12 @@ use super::worker;
 use super::worker::WorkerIdentity;
 use crate::root::RepoRoot;
 
-const RECEIPT_SCHEMA_VERSION: u32 = 5;
+const RECEIPT_SCHEMA_VERSION: u32 = 6;
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
-const WORKER_SOURCES: [(&str, &str); 12] = [
+const WORKER_SOURCES: [(&str, &str); 13] = [
     ("worker.rs", "ops/bench/src/qualification/runtime/worker.rs"),
     (
         "worker/bits.rs",
@@ -29,6 +29,10 @@ const WORKER_SOURCES: [(&str, &str); 12] = [
     (
         "worker/clifford_string.rs",
         "ops/bench/src/qualification/runtime/worker/clifford_string.rs",
+    ),
+    (
+        "worker/dem_model.rs",
+        "ops/bench/src/qualification/runtime/worker/dem_model.rs",
     ),
     (
         "worker/not_zero.rs",

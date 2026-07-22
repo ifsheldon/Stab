@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::qualification::model::{Phase, RunnerFidelity};
 use crate::root::RepoRoot;
 
 fn fixture() -> (QualificationSuite, BenchmarkManifest, SourceReferences) {
@@ -278,6 +279,103 @@ fn superseded_clifford_row_retires_identity_only_timing_pair() {
 
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("superseded identity-only provenance owns no timing threshold");
+}
+
+#[test]
+fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
+    let (mut suite, manifest, references) = fixture();
+    let expected = [
+        (
+            "PERFQ-M10-DEM-PARSE-CONTRACT",
+            "m10-dem-parse-contract",
+            Phase::Parse,
+            "stab-core/dem-parser",
+        ),
+        (
+            "PERFQ-M10-DEM-PRINT-CONTRACT",
+            "m10-dem-print-contract",
+            Phase::Serialize,
+            "stab-core/dem-printer",
+        ),
+    ];
+    for (group_id, manifest_row, phase, owner) in expected {
+        let group = suite
+            .qualification_groups
+            .iter()
+            .find(|group| group.id == group_id)
+            .expect("exact DEM model group");
+        assert_eq!(group.status, QualificationStatus::Implemented);
+        assert_eq!(group.runner_fidelity, RunnerFidelity::AdapterLibrary);
+        assert_eq!(group.phase, phase);
+        assert_eq!(group.manifest_row, manifest_row);
+        assert_eq!(group.work_unit, "top-level DEM items");
+        assert_eq!(group.owner, owner);
+        assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+        assert_eq!(
+            group.correctness_cases,
+            ["cq-evidence-qualification-0908c21b917526e3"]
+        );
+        assert_eq!(
+            group
+                .workload_family
+                .scales
+                .iter()
+                .map(|scale| (
+                    scale.id.as_str(),
+                    scale.semantic_work,
+                    &scale.input_bytes,
+                    scale.input_digest.as_deref(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    "small",
+                    Some(64),
+                    &InputByteCount::Exact { bytes: 1_776 },
+                    Some("fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"),
+                ),
+                (
+                    "medium",
+                    Some(4_096),
+                    &InputByteCount::Exact { bytes: 113_664 },
+                    Some("9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"),
+                ),
+                (
+                    "large",
+                    Some(65_536),
+                    &InputByteCount::Exact { bytes: 1_818_624 },
+                    Some("240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"),
+                ),
+            ]
+        );
+        assert_eq!(group.output_contract.digest_state, EvidenceState::Existing);
+        assert_eq!(group.output_contract.comparator_sources.len(), 2);
+        assert_eq!(
+            group
+                .output_contract
+                .comparator_sources
+                .get(1)
+                .map(|source| source.path.as_str()),
+            Some("benchmarks/stim_adapter/dem_model_contract.h")
+        );
+    }
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("independent direct DEM contracts validate");
+
+    suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == "PERFQ-M10-DEM-PARSE-CONTRACT")
+        .expect("DEM parse group")
+        .runner_fidelity = RunnerFidelity::StabReportOnly;
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("the legacy asymmetric row needs the exact direct adapter replacement");
+    assert!(
+        error
+            .to_string()
+            .contains("asymmetric in-process/process primary gate")
+    );
 }
 
 #[test]

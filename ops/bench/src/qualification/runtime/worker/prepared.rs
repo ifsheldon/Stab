@@ -1,5 +1,6 @@
 use super::bits::{DenseXorFixture, PopcountFixture};
 use super::clifford_string::{CliffordDescriptor, CliffordStringFixture};
+use super::dem_model::{self, DemFixture};
 use super::not_zero::NotZeroFixture;
 use super::pauli::PauliMultiplyFixture;
 use super::pauli_iter::PauliIterFixture;
@@ -26,6 +27,11 @@ enum PreparedState {
     CircuitCanonicalPrint {
         input: String,
         circuit: stab_core::Circuit,
+    },
+    DemParse(DemFixture),
+    DemCanonicalPrint {
+        fixture: DemFixture,
+        model: stab_core::DetectorErrorModel,
     },
     GateNameHash {
         names: Vec<String>,
@@ -69,6 +75,12 @@ impl PreparedWorkload {
                 let input = circuit_parse_fixture(work_items)?;
                 let circuit = stab_core::Circuit::from_stim_str(&input)?;
                 PreparedState::CircuitCanonicalPrint { input, circuit }
+            }
+            WorkerWorkload::DemParse => PreparedState::DemParse(DemFixture::prepare(work_items)?),
+            WorkerWorkload::DemCanonicalPrint => {
+                let fixture = DemFixture::prepare(work_items)?;
+                let model = stab_core::DetectorErrorModel::from_dem_str(fixture.text())?;
+                PreparedState::DemCanonicalPrint { fixture, model }
             }
             WorkerWorkload::GateNameHash => {
                 let names = gate_hash_names()?;
@@ -168,6 +180,12 @@ impl PreparedWorkload {
                     circuit_canonical_print(iterations, circuit),
                 )),
             ),
+            PreparedState::DemParse(fixture) => {
+                dem_model::parse(iterations, fixture).map(TimedWorkloadOutput::DemParsed)
+            }
+            PreparedState::DemCanonicalPrint { model, .. } => Ok(
+                TimedWorkloadOutput::DemSerialized(dem_model::serialize(iterations, model)),
+            ),
             PreparedState::GateNameHash {
                 names,
                 sweeps,
@@ -218,6 +236,13 @@ impl PreparedWorkload {
     ) -> Result<String, WorkerError> {
         match (output, &self.state) {
             (TimedWorkloadOutput::Complete(output), _) => Ok(output.semantic_digest()),
+            (TimedWorkloadOutput::DemParsed(model), PreparedState::DemParse(fixture)) => {
+                fixture.validate_canonical(&dem_model::serialize(1, &model))
+            }
+            (
+                TimedWorkloadOutput::DemSerialized(canonical),
+                PreparedState::DemCanonicalPrint { fixture, .. },
+            ) => fixture.validate_canonical(&canonical),
             (
                 TimedWorkloadOutput::PopcountChecksum(checksum),
                 PreparedState::SimdWordPopcount { fixture, .. },
@@ -276,6 +301,9 @@ fn input_evidence(state: &PreparedState) -> Result<(u64, InputDigest), WorkerErr
                 u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?,
                 semantic_digest(byte_digest(input.as_bytes())),
             )
+        }
+        PreparedState::DemParse(fixture) | PreparedState::DemCanonicalPrint { fixture, .. } => {
+            (fixture.input_bytes()?, fixture.input_digest())
         }
         PreparedState::SimdWordPopcount { fixture, .. } => {
             (fixture.input_bytes, semantic_digest(fixture.input_digest))

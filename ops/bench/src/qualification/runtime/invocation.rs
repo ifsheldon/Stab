@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 mod bit_acceptance;
 pub(in crate::qualification::runtime) mod clifford_string;
+mod dem_model;
 mod dense_xor;
 mod error;
 mod not_zero;
@@ -84,7 +85,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 12;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 13;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -113,6 +114,8 @@ pub(super) const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str =
 pub(super) const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 pub(super) const PAULI_STRING_ITER_RANGE_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
 pub(super) const PAULI_STRING_ITER_SINGLETON_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
+pub(super) const DEM_PARSE_GROUP_ID: &str = "PERFQ-M10-DEM-PARSE-CONTRACT";
+pub(super) const DEM_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M10-DEM-PRINT-CONTRACT";
 pub(super) use clifford_string::{CLIFFORD_IDENTITY_GROUP_ID, CLIFFORD_NON_IDENTITY_GROUP_ID};
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
@@ -179,11 +182,17 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == CLIFFORD_NON_IDENTITY_GROUP_ID
                     && workload == "clifford-string-right-multiply-non-identity"
                     && measurement == "right-multiply-non-identity")
+                || (group == DEM_PARSE_GROUP_ID
+                    && workload == "dem-parse"
+                    && measurement == "parse")
+                || (group == DEM_CANONICAL_PRINT_GROUP_ID
+                    && workload == "dem-canonical-print"
+                    && measurement == "serialize")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    18
+    20
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -452,7 +461,7 @@ impl PreparedWorkers {
     fn verify_identity_handshake(
         &self,
     ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
-        let mut probes = Vec::with_capacity(212);
+        let mut probes = Vec::with_capacity(228);
         let protocol_output = SemanticDigest::try_new(protocol_smoke_output_digest())?;
         probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
         probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
@@ -588,6 +597,7 @@ impl PreparedWorkers {
         probes.extend(self.invoke_pauli_rejection_probes()?);
         probes.extend(self.invoke_pauli_iter_rejection_probes()?);
         probes.extend(self.invoke_clifford_contract_probes()?);
+        probes.extend(self.invoke_dem_model_contract_probes()?);
         WorkerContractPreflightEvidence::from_actual_probes(
             self.contract_identity_evidence()?,
             probes,

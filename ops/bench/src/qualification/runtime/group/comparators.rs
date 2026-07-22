@@ -24,6 +24,7 @@ pub(super) const PAULI_STRING_ITER: [&str; 2] =
     [MAIN, "benchmarks/stim_adapter/pauli_string_iter_contract.h"];
 pub(super) const CLIFFORD_STRING: [&str; 2] =
     [MAIN, "benchmarks/stim_adapter/clifford_string_contract.h"];
+pub(super) const DEM_MODEL: [&str; 2] = [MAIN, "benchmarks/stim_adapter/dem_model_contract.h"];
 
 pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
     match group_id {
@@ -41,6 +42,7 @@ pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
         invocation::CLIFFORD_IDENTITY_GROUP_ID | invocation::CLIFFORD_NON_IDENTITY_GROUP_ID => {
             &CLIFFORD_STRING
         }
+        invocation::DEM_PARSE_GROUP_ID | invocation::DEM_CANONICAL_PRINT_GROUP_ID => &DEM_MODEL,
         _ => &[],
     }
 }

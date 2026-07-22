@@ -19,6 +19,7 @@ use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
 mod clifford_string;
+mod dem_model;
 mod pauli_iter;
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
@@ -38,6 +39,8 @@ const BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID: &str =
 const PAULI_STRING_MULTIPLY_PROBE_ID: &str = "pq2-pauli-string-multiply-adapter-smoke";
 const PAULI_STRING_ITER_RANGE_PROBE_ID: &str = "pq2-pauli-iter-range-adapter-smoke";
 const PAULI_STRING_ITER_SINGLETON_PROBE_ID: &str = "pq2-pauli-iter-singleton-adapter-smoke";
+const DEM_PARSE_PROBE_ID: &str = "pq2-dem-parse-adapter-smoke";
+const DEM_CANONICAL_PRINT_PROBE_ID: &str = "pq2-dem-canonical-print-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -86,6 +89,8 @@ const BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID: &str =
 const PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 const PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
 const PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
+const DEM_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M10-DEM-PARSE-CONTRACT";
+const DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M10-DEM-PRINT-CONTRACT";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -127,6 +132,10 @@ enum ProbeGroup {
     CliffordStringIdentityAdapter,
     #[value(name = "pq2-clifford-string-non-identity-adapter-smoke")]
     CliffordStringNonIdentityAdapter,
+    #[value(name = "pq2-dem-parse-adapter-smoke")]
+    DemParseAdapter,
+    #[value(name = "pq2-dem-canonical-print-adapter-smoke")]
+    DemCanonicalPrintAdapter,
 }
 
 impl ProbeGroup {
@@ -161,6 +170,8 @@ impl ProbeGroup {
             Self::CliffordStringNonIdentityAdapter => {
                 Some(clifford_string::NON_IDENTITY_RUNTIME_GROUP_ID)
             }
+            Self::DemParseAdapter => Some(DEM_PARSE_RUNTIME_GROUP_ID),
+            Self::DemCanonicalPrintAdapter => Some(DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID),
         }
     }
 
@@ -194,6 +205,8 @@ impl ProbeGroup {
             clifford_string::NON_IDENTITY_RUNTIME_GROUP_ID => {
                 Some(Self::CliffordStringNonIdentityAdapter)
             }
+            DEM_PARSE_RUNTIME_GROUP_ID => Some(Self::DemParseAdapter),
+            DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID => Some(Self::DemCanonicalPrintAdapter),
             _ => None,
         }
     }
@@ -282,7 +295,9 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::PauliStringIterRangeAdapter
         | ProbeGroup::PauliStringIterSingletonAdapter
         | ProbeGroup::CliffordStringIdentityAdapter
-        | ProbeGroup::CliffordStringNonIdentityAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::CliffordStringNonIdentityAdapter
+        | ProbeGroup::DemParseAdapter
+        | ProbeGroup::DemCanonicalPrintAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -429,6 +444,12 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
                 ProbeError::Contract("missing Clifford probe contract".to_string())
             })?
         }
+        ProbeGroup::DemParseAdapter => (DEM_PARSE_PROBE_ID, "dem-parse", "parse"),
+        ProbeGroup::DemCanonicalPrintAdapter => (
+            DEM_CANONICAL_PRINT_PROBE_ID,
+            "dem-canonical-print",
+            "serialize",
+        ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -538,6 +559,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         &current_exe,
         &worker_identity,
     )?;
+    dem_model::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
 
     if args.evidence_mode == ProbeEvidenceMode::Timing {
         let pairs = pair_measurements(0, PairOrder::StimThenStab, &stim_rows, &stab_rows)?;
@@ -646,6 +668,9 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::PauliStringIterSingletonAdapter => DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
             ProbeGroup::CliffordStringIdentityAdapter
             | ProbeGroup::CliffordStringNonIdentityAdapter => DEFAULT_CLIFFORD_WORK_ITEMS,
+            ProbeGroup::DemParseAdapter | ProbeGroup::DemCanonicalPrintAdapter => {
+                dem_model::MEDIUM_ITEMS
+            }
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -658,6 +683,7 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
 fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), ProbeError> {
     clifford_string::validate_work_items(group, work_items)?;
     pauli_iter::validate_work_items(group, work_items)?;
+    dem_model::validate_work_items(group, work_items)?;
     if group == ProbeGroup::GateNameHashAdapter && !work_items.is_multiple_of(GATE_HASH_NAME_COUNT)
     {
         return Err(ProbeError::Contract(format!(
