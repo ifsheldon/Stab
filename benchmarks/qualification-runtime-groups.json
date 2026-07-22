@@ -785,7 +785,10 @@
       ],
       "correctness_case_ids": ["cq-evidence-qualification-0908c21b917526e3"],
       "owner": "stab-core/dem-parser",
-      "profiler_note": null,
+      "profiler_note": {
+        "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
+        "sha256": "9fc933d7bf06394bfb2d03166b18ae8fe7c0a2c28e5fe79abe38ab02d5559ef4"
+      },
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
@@ -826,7 +829,10 @@
       ],
       "correctness_case_ids": ["cq-evidence-qualification-0908c21b917526e3"],
       "owner": "stab-core/dem-printer",
-      "profiler_note": null,
+      "profiler_note": {
+        "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
+        "sha256": "9fc933d7bf06394bfb2d03166b18ae8fe7c0a2c28e5fe79abe38ab02d5559ef4"
+      },
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
