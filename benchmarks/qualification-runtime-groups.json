@@ -1,6 +1,6 @@
 {
   "schema_version": 5,
-  "performance_inventory_sha256": "acd913e0966b9968b24c06bd2fed678f4608f0ff1ab82735dab5ebc109f119b3",
+  "performance_inventory_sha256": "d27b71d205ec938a77c9981fb524e70c9b17eeafeadf3ade6367632aeb3b1693",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -787,7 +787,7 @@
       "owner": "stab-core/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "04ecdbe4cc065f9842041b0ff0e91e2f3a00d36465e807ffaf95ce516bd8f62f"
+        "sha256": "7118ff7a6163d54e2552ec136f45257aacf07b70d27f56922955078817e42182"
       },
       "comparator_sources": [
         {
@@ -831,7 +831,7 @@
       "owner": "stab-core/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "04ecdbe4cc065f9842041b0ff0e91e2f3a00d36465e807ffaf95ce516bd8f62f"
+        "sha256": "7118ff7a6163d54e2552ec136f45257aacf07b70d27f56922955078817e42182"
       },
       "comparator_sources": [
         {

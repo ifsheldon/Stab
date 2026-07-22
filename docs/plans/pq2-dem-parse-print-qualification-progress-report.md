@@ -4,10 +4,10 @@
 
 In progress as of 2026-07-23.
 
-The source-current implementation inventory is performance digest `acd913e0966b9968b24c06bd2fed678f4608f0ff1ab82735dab5ebc109f119b3` and correctness digest `b9ed22cfcf637e740e68501b32b764015e937e6bc8d75ced3328f62ecc20cf40`.
+The source-current implementation inventory is performance digest `d27b71d205ec938a77c9981fb524e70c9b17eeafeadf3ade6367632aeb3b1693` and correctness digest `e5635ca4a2c217ee79768d35336c50611a9f12f86edded8a7f01fce1ca72add4`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, contract-preflight schema version 13 with 228 ordered receipts, and qualification report schema version 32.
-Neither group has promotable timing evidence or legacy-migration authorization yet.
-Both groups now bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose SHA-256 is `04ecdbe4cc065f9842041b0ff0e91e2f3a00d36465e807ffaf95ce516bd8f62f`, so future failed or noisy formal reports can be retained and audited.
+Neither group has passing timing evidence or legacy-migration authorization yet.
+Both groups now bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose SHA-256 is `7118ff7a6163d54e2552ec136f45257aacf07b70d27f56922955078817e42182`, so future failed or noisy formal reports can be retained and audited.
 
 ## Retained Attempts
 
@@ -98,3 +98,40 @@ A dirty-tree parse adapter probe after the optimization passed exact parity and 
 - Inventory review: regeneration changed exactly 108 `source_line` fields in `crates/stab-core/src/dem.rs` plus the derived digest. It did not change a selected parent, owner, selector, disposition, case ID, count, or the exact DEM primary case `cq-evidence-qualification-0908c21b917526e3`.
 
 These results prove that the optimized code and private workers were internally coherent before the source inventory was refreshed. They do not cross the inventory boundary. Both probes, worker reproducibility, and the exact focused correctness chain must run again from the clean inventory-refresh revision before any post-fix timing evidence is produced.
+
+### Clean Inventory-Refresh Checkpoint At `d8de73d5`
+
+- Parse adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.003631854`, `stab_seconds=0.002592191`, diagnostic ratio `0.713738x`, Stim parent peak RSS `5148672`, and Stab parent peak RSS `397312`.
+- Print adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.005250589`, `stab_seconds=0.006093213`, diagnostic ratio `1.160482x`, Stim parent peak RSS `4935680`, and Stab parent peak RSS `6524928`.
+- Worker reproducibility: passed with pinned-Stim digest `cb484542faaeba73156a1ba5d7a1f35104b697320847ad33994b9bb1f33b67d4` and Stab digest `d5be065a25c748b480165c72992a7046d4043a50c646457a66d6301021914384`.
+- Exact focused correctness prerequisite: passed one selected case with zero failures, replayed successfully, and passed exact preflight under `target/qualification/pq2-dem-cq-full-d8de73d`.
+- Correctness request SHA-256: `a7c1eace9e0abc36b4c11969385d5c54acd75c358671ca3000f6f6053fad6f97`.
+- Correctness preflight SHA-256: `c78b62ab77722ab4576e43e573c6f3702f2dd30d1c230cc2d3fa3ea73e824af0`.
+- Correctness JSON report SHA-256: `ea88180a08ca4cd2c492a9b7dcd508c1522206ff7c3dd3c355c7c13fb830b229`.
+- Correctness Markdown report SHA-256: `46a815319072e274dddf0a65266b663aea45896f5b423a50317be910a3e6c11f`.
+- Correctness completion SHA-256: `dfb828c7639c6f2a302e54c62e047658d30c49ecd74dc80ba85c19a31d0f075e`.
+
+An operator invoked the correctness report command before the producer PTY had completed, so that command failed because the report did not exist yet. No artifact had been created or mutated by the premature invocation. After the producer completed, the normal replay and exact preflight both passed.
+
+### Parse Small Full Attempt 3
+
+- Source revision: `d8de73d50fbeb4e001ea38c784d1fdcfc76dad76`.
+- Artifact: `target/benchmarks/qualification/pq2-dem-d8de73d-parse-small-full-1`.
+- Host preparation: swap was disabled only during timing through an exit restoration trap and `/swap.img` was restored immediately after publication.
+- Result: stable failed evidence with 29,527 common iterations per sample, 1,889,728 item operations per sample, nine pairs, median ratio `1.3729706998216054x`, bootstrap 95 percent interval `[1.366241707530459x, 1.3773752216236312x]`, and paired relative MAD `0.0032080231592692974`.
+- Report SHA-256: `c32f59a9016a9c05cc6ede5f79b29e7d64ef329efabed3999f2ae37c460471c9`.
+- Preflight SHA-256: `8faaac3ca19e007cbfb9d2cdcfc79e5f38e5e7bca7163b6e8bad9fa62aab1cdb`.
+- Markdown SHA-256: `8f580cc26609a737f0ad42e34ba9c475f664270ed2c153785902322b279ab54c`.
+- Replay: passed and reproduced the artifact.
+- Regression: failed closed because measurement `parse` has non-passing outcome `Failed`, as required.
+- Disposition: retain permanently as the first faithful result from the refreshed inventory. It is stable, was not rerun from the same revision, and reduced the preceding clean median failure from `1.773450x` to `1.372971x` without changing the contract.
+
+## Second Parser Optimization
+
+Clean implementation commit `e9b94d524167b2ca7bb953e525abc26e77641629` preserves the public DEM model and parser grammar while removing more common-path allocation and rescanning. Short UTF-8 tags now use a private 16-byte inline representation with a `String` fallback, unescaped tags take a direct closing-bracket path, target parsing is single-pass and reserves once when a second target proves spill storage is needed, and top-level capacity estimation samples at most 256 bytes instead of rescanning the entire input.
+
+The qualification-family allocation guard now admits at most 2,050 calls, and the implementation records 2,049 calls and 963,816 allocated bytes for the exact 4,096-item input. Long ASCII tags, multi-byte UTF-8 tags, escaped tags, comments, and multi-target errors remain covered, and all `stab-core` tests, workspace tests, formatting, workspace Clippy, and staged pre-commit checks passed before the commit.
+
+Dirty-tree direct-worker diagnostics for the final layout reported `0.416383174` seconds for the small diagnostic run and `0.377149828` seconds for the large diagnostic run, with observed peak RSS `34701312` bytes in the latter. Alternative two- and three-target inline layouts were slightly faster in isolated runs but were rejected because they materially enlarged every instruction model; the selected one-target inline layout plus one spill reservation retained the projected timing margin with a smaller persistent footprint. These figures are implementation guidance only, are not paired Stim evidence, and cannot satisfy any qualification gate.
+
+Because the parser source, direct dependency graph, profiler note, and generated source inventories now change again, no evidence from `d8de73d5` can be relabeled as current. The next evidence chain must begin from a clean commit that binds this diagnosis and regenerated inventories, then repeat both probes, worker reproducibility, the exact CQ prerequisite, and every formal parse and print report.

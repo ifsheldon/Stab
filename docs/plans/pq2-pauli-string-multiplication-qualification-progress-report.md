@@ -1,6 +1,6 @@
 # PQ2 Pauli-String Multiplication Qualification Progress Report
 
-> Historical-inventory note, 2026-07-23: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator and reviewed Clifford contracts produced later historical digests; the current shared-harness digest after the DEM parser source refresh is `acd913e0966b9968b24c06bd2fed678f4608f0ff1ab82735dab5ebc109f119b3`. The results below are not relabeled as simultaneous current-inventory evidence.
+> Historical-inventory note, 2026-07-23: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding and migrating the split Pauli iterator and reviewed Clifford contracts produced later historical digests; the current shared-harness digest after the DEM parser source refresh is `d27b71d205ec938a77c9981fb524e70c9b17eeafeadf3ade6367632aeb3b1693`. The results below are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 

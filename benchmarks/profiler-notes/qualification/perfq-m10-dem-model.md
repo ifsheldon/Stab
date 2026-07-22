@@ -2,7 +2,7 @@
 
 Owners: `stab-core/dem-parser` for `PERFQ-M10-DEM-PARSE-CONTRACT` and `stab-core/dem-printer` for `PERFQ-M10-DEM-PRINT-CONTRACT`.
 
-Status: clean revision `f23386bdc12258eab97b9997b3f478841caa050c` produced and replayed the first faithful parse/small/full report after this note was bound. The report failed the `1.25x` gate with median ratio `1.773450x`, bootstrap 95 percent interval `[1.767688x, 1.793239x]`, and paired relative MAD `0.003249`. It is stable failed evidence, not a noisy result, and must not be rerun from the same revision. The fixture, semantic-work denominator, comparator, output obligations, scales, common-iteration policy, and threshold remain unchanged and unwaived.
+Status: clean revisions `f23386bdc12258eab97b9997b3f478841caa050c` and `d8de73d50fbeb4e001ea38c784d1fdcfc76dad76` produced and replayed faithful parse/small/full reports under their exact source inventories. Their stable median failures were respectively `1.773450x` and `1.372971x`; neither was noisy or rerun from the same revision. Clean implementation commit `e9b94d524167b2ca7bb953e525abc26e77641629` applies a second source-owned optimization, but it has no formal timing evidence yet. The fixture, semantic-work denominator, comparator, output obligations, scales, common-iteration policy, and `1.25x` threshold remain unchanged and unwaived.
 
 ## Initial Diagnosis
 
@@ -24,9 +24,19 @@ Clean note-binding revision `3a78eb74ef62d22631709b10618186567a1ece17` passed bo
 
 The focused CQ producer at that revision then stopped before execution or publication because the parser optimization moved 108 rustdoc source lines and the generated correctness digest no longer matched the frozen inventory. No correctness artifact was created. Regeneration confirmed that only those 108 source-line fields and the derived digest changed: selected parents, owners, selectors, dispositions, case IDs, counts, and the exact DEM prerequisite remained unchanged. The clean probes and worker check prove the pre-refresh implementation contract but cannot be promoted across the inventory change.
 
+Clean inventory-refresh revision `d8de73d50fbeb4e001ea38c784d1fdcfc76dad76` passed both sequential adapter probes, private-worker reproducibility, the exact one-case CQ prerequisite, its replay, and exact preflight. Its parse/small/full report retained 29,527 common iterations and 1,889,728 item operations per sample across nine pairs, then failed stably at median ratio `1.3729706998216054x`, bootstrap 95 percent interval `[1.366241707530459x, 1.3773752216236312x]`, and paired relative MAD `0.0032080231592692974`. Replay passed and regression failed closed on the non-passing outcome. This is permanent evidence that the first optimization was material but insufficient; it must not be rerun or replaced by a favorable sample from the same revision.
+
+## Second Implemented Optimization
+
+Commit `e9b94d524167b2ca7bb953e525abc26e77641629` stores short UTF-8 DEM tags in a private 16-byte inline representation with a heap fallback, fast-paths tags without escapes, parses targets in one pass, reserves spill storage once when a second target is present, and estimates top-level capacity from at most 256 input bytes. These changes preserve arbitrary UTF-8 tags, escaped tags, public `Option<&str>` accessors, constructor inputs, parser limits, canonical output, and the frozen benchmark fixture.
+
+The exact 4,096-item qualification-family allocation measurement fell from the first optimization's guard of 4,100 calls to 2,049 observed calls under a 2,050-call guard, with 963,816 allocated bytes. Long ASCII tags, an 18-byte multi-byte UTF-8 tag, escaped tags, comments, and multi-target instructions exercise the inline and fallback paths. Full `stab-core` tests, workspace tests, formatting, workspace Clippy, and staged pre-commit checks passed for the clean commit.
+
+Final dirty-tree direct-worker diagnostics reported `0.416383174` seconds for the small diagnostic run and `0.377149828` seconds for the large diagnostic run, with observed peak RSS `34701312` bytes in the latter. Two- and three-target inline alternatives were marginally faster but materially enlarged every instruction, so the final implementation retained one inline target and a single spill reservation. These measurements are local optimization guidance only; they have no paired Stim samples, cannot be promoted, and do not prove the gate.
+
 ## Required Owner Action
 
-Next owner action: commit the reviewed source-line-only correctness and derived performance inventory refresh with this updated note, then regenerate the exact CQ prerequisite, worker reproducibility, and both adapter probes from that clean revision before publishing the first post-fix full and soak report at every parse and print scale without rerunning a non-noisy result.
+Next owner action: bind this updated note, its digest, and the regenerated correctness and performance inventories in one reviewed source-contract commit, then regenerate the exact CQ prerequisite, worker reproducibility, and both adapter probes from that clean revision before publishing the first second-optimization full and soak report at every parse and print scale without rerunning a non-noisy result.
 
 1. Reproduce both sealed workers and probes from the clean note-binding revision, then publish the first post-fix full and soak result at every scale without rerunning a non-noisy failure.
 2. Inspect retained raw samples, calibration decisions, paired-ratio relative MAD, confidence bounds, setup and peak RSS, and Stab allocation behavior before accepting the optimization.
