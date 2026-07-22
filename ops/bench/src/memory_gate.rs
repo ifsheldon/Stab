@@ -457,6 +457,12 @@ mod tests {
                 .any(|row| row.id == "m6-clifford-string"),
             "Clifford timing migration must preserve the legacy memory baseline until PQ6"
         );
+        for id in ["m10-dem-parse-contract", "m10-dem-print-contract"] {
+            assert!(
+                baseline.rows.iter().any(|row| row.id == id),
+                "DEM timing migration must preserve the legacy memory baseline {id} until PQ6"
+            );
+        }
         assert!(
             baseline
                 .rows

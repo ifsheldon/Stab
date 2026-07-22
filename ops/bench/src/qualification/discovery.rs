@@ -909,7 +909,6 @@ fn waiver_retirement_mapping(id: &str) -> &'static str {
         }
         "m7-convert-01-to-ptb64" => "stim_adapter::result::convert_01_to_ptb64",
         "m8-measure-reader-ptb64-contract" => "stim_adapter::result::read_ptb64_dense_sparse",
-        "m10-dem-print-contract" => "stim_adapter::dem::canonical_serialize",
         _ => "UNMAPPED-WAIVER",
     }
 }

@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 69);
+        assert_eq!(thresholds.rows.len(), 68);
         for id in [
             "m6-stabilizers-to-tableau",
             "m6-tableau",
@@ -551,6 +551,13 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m6-clifford-string"),
             "the exact identity and non-identity groups supersede the identity-only legacy timing row"
+        );
+        assert!(
+            thresholds
+                .rows
+                .iter()
+                .all(|row| row.id != "m10-dem-parse-contract"),
+            "the exact direct parser group supersedes the asymmetric legacy timing row"
         );
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)

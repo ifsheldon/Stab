@@ -294,7 +294,14 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(waivers.schema_version, 1);
-        assert_eq!(waivers.rows.len(), 4);
+        assert_eq!(waivers.rows.len(), 3);
+        assert!(
+            waivers
+                .rows
+                .iter()
+                .all(|row| row.id != "m10-dem-print-contract"),
+            "the qualified direct print contract retires the legacy no-ratio waiver"
+        );
         for row in &waivers.rows {
             assert!(
                 primary_ids.contains(row.id.as_str()),

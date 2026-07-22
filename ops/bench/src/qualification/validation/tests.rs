@@ -363,14 +363,35 @@ fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("independent direct DEM contracts validate");
 
+    for row_id in ["m10-dem-parse-contract", "m10-dem-print-contract"] {
+        let row = suite
+            .manifest_rows
+            .iter()
+            .find(|row| row.id == row_id)
+            .expect("superseded DEM legacy row");
+        assert_eq!(row.decision, RowDecision::Superseded);
+        assert!(row.threshold_refs.is_empty());
+        assert!(row.threshold_max_relative_ratio.is_none());
+        assert!(row.threshold_measurement_pairs.is_empty());
+        assert!(row.waiver_refs.is_empty());
+        assert!(row.replacement_contracts.is_empty());
+        assert!(row.classifications.contains(&RowClassification::Duplicate));
+    }
+
     suite
         .qualification_groups
         .iter_mut()
         .find(|group| group.id == "PERFQ-M10-DEM-PARSE-CONTRACT")
         .expect("DEM parse group")
         .runner_fidelity = RunnerFidelity::StabReportOnly;
+    suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m10-dem-parse-contract")
+        .expect("DEM parse legacy row")
+        .decision = RowDecision::Reworked;
     let error = validate(&suite, &manifest, &references, "UNFROZEN")
-        .expect_err("the legacy asymmetric row needs the exact direct adapter replacement");
+        .expect_err("an active asymmetric row cannot use the direct primary gate");
     assert!(
         error
             .to_string()

@@ -29,7 +29,7 @@ const EXPECTED_PUBLIC_API_ITEMS: usize = 1_974;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
-const EXPECTED_WAIVERS: usize = 4;
+const EXPECTED_WAIVERS: usize = 3;
 const MAX_ISSUES: usize = 256;
 
 #[derive(Default)]
@@ -1076,12 +1076,10 @@ fn validate_rows(
         if row
             .classifications
             .contains(&RowClassification::InProcessProcessMismatch)
+            && matches!(row.decision, RowDecision::Retained | RowDecision::Reworked)
             && groups
                 .get(row.primary_group_id.as_str())
-                .is_some_and(|group| {
-                    group.threshold_policy == ThresholdPolicy::Primary1_25
-                        && !replacements::allows_asymmetric_direct_adapter(row, group)
-                })
+                .is_some_and(|group| group.threshold_policy == ThresholdPolicy::Primary1_25)
         {
             issues.push(format!(
                 "manifest row {} uses an asymmetric in-process/process primary gate",
@@ -1153,15 +1151,15 @@ fn validate_rows(
         ));
     }
     validate_decision_count(suite, RowDecision::Retained, 9, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 135, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 133, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
-    validate_decision_count(suite, RowDecision::Superseded, 11, issues);
+    validate_decision_count(suite, RowDecision::Superseded, 13, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 14, issues);
     validate_classification_count(suite, RowClassification::Diagnostic, 134, issues);
     validate_classification_count(suite, RowClassification::Proxy, 11, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
-    validate_classification_count(suite, RowClassification::Duplicate, 11, issues);
+    validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 123, issues);
     validate_classification_count(
         suite,

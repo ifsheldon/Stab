@@ -714,6 +714,8 @@ mod tests {
             "m9-detecting-regions-basic-batch",
             "m9-missing-detectors-basic-batch",
             "m9-feedback-inline-mpp-batch",
+            "m10-dem-parse-contract",
+            "m10-dem-print-contract",
             "pf1-circuit-coordinate-query",
             "pf7-cli-legacy-dispatch-startup",
         ] {

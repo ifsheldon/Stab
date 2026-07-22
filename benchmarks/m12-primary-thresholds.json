@@ -24,7 +24,6 @@
     { "id": "m10-analyze-errors-decompose-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-fold-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-high-repeat-contract", "max_relative_ratio": 1.25 },
-    { "id": "m10-dem-parse-contract", "max_relative_ratio": 1.25 },
     { "id": "m10-error-analyzer", "max_relative_ratio": 1.25 },
     {
       "id": "m10-error-decomp",

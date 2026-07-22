@@ -116,9 +116,9 @@ Beta and timing-regression waiver files are JSON with schema version 1:
   "schema_version": 1,
   "rows": [
     {
-      "id": "m10-dem-print-contract",
-      "reason": "Pinned Stim has no public comparable baseline for this exact workload.",
-      "follow_up": "Replace the waiver if a faithful baseline becomes available."
+      "id": "m8-measure-reader-ptb64-contract",
+      "reason": "Pinned Stim has no isolated public ptb64 reader timing surface for this exact workload.",
+      "follow_up": "Replace the waiver if a faithful ptb64 reader baseline becomes available."
     }
   ]
 }

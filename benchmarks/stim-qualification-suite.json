@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0",
-  "semantic_digest": "a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a",
+  "semantic_digest": "3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -72485,9 +72485,10 @@
       "supporting_performance_features": [
         "PERF-CLI-STARTUP-AND-ERRORS"
       ],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "proxy",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
@@ -72498,10 +72499,8 @@
         "argv": "sample_dem|--shots|1",
         "stdin_path": "oracle/fixtures/inputs/sample_dem_deterministic.dem"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
@@ -72509,9 +72508,10 @@
       "id": "m10-dem-print-contract",
       "primary_group_id": "PERFQ-M10-DEM-PRINT-CONTRACT",
       "supporting_performance_features": [],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "diagnostic",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
@@ -72520,16 +72520,13 @@
       ],
       "stim_mapping": {
         "kind": "planned-adapter",
-        "symbol": "stim_adapter::dem::canonical_serialize",
+        "symbol": "stim_adapter::m10_dem_print_contract",
         "source": "src/stim/dem/detector_error_model.test.cc"
       },
       "threshold_refs": [],
       "threshold_max_relative_ratio": null,
       "threshold_measurement_pairs": [],
-      "waiver_refs": [
-        "benchmarks/m12-primary-beta-waivers.json",
-        "benchmarks/m12-primary-regression-waivers.json"
-      ]
+      "waiver_refs": []
     },
     {
       "id": "m10-error-analyzer",
@@ -76660,26 +76657,6 @@
     }
   ],
   "waiver_rows": [
-    {
-      "id": "m10-dem-print-contract",
-      "waiver_files": [
-        "benchmarks/m12-primary-beta-waivers.json",
-        "benchmarks/m12-primary-regression-waivers.json"
-      ],
-      "reasons": [
-        {
-          "waiver_file": "benchmarks/m12-primary-beta-waivers.json",
-          "reason": "Pinned Stim v1.16.0 exposes DEM parsing through commands such as `convert --dem` and `sample_dem`, but it has no public CLI or stim_perf row that canonical-prints an existing .dem file."
-        },
-        {
-          "waiver_file": "benchmarks/m12-primary-regression-waivers.json",
-          "reason": "Pinned Stim v1.16.0 exposes DEM parsing through commands such as `convert --dem` and `sample_dem`, but it has no public CLI or stim_perf row that canonical-prints an existing .dem file."
-        }
-      ],
-      "qualification_disposition": "measured",
-      "retirement_mapping": "stim_adapter::dem::canonical_serialize",
-      "follow_up": "Replace this waiver with a faithful comparable DEM print baseline if Stim exposes one, or keep `.dem` parse and print covered by M10 oracle parity plus Stab-only throughput evidence."
-    },
     {
       "id": "m7-convert-01-to-ptb64",
       "waiver_files": [
