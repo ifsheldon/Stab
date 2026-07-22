@@ -27,6 +27,7 @@ The plans were written to prevent the specific failures recorded there: file-lev
 - Historical passing reports for the first two PQ2 product groups: `docs/plans/pq2-circuit-parse-qualification-progress-report.md` and `docs/plans/pq2-circuit-canonical-print-qualification-progress-report.md`.
 - PQ2 gate, bit-kernel, Pauli, and Clifford evidence: `docs/plans/pq2-gate-name-hash-qualification-progress-report.md`, `docs/plans/pq2-simd-word-popcount-qualification-progress-report.md`, `docs/plans/pq2-simd-bits-xor-qualification-progress-report.md`, `docs/plans/pq2-simd-bits-not-zero-qualification-progress-report.md`, `docs/plans/pq2-sparse-xor-qualification-progress-report.md`, `docs/plans/pq2-bit-matrix-transpose-qualification-progress-report.md`, `docs/plans/pq2-pauli-string-multiplication-qualification-progress-report.md`, `docs/plans/pq2-pauli-string-iterator-qualification-progress-report.md`, and `docs/plans/pq2-clifford-string-qualification-progress-report.md`.
 - Completed PQ2 completion-receipt infrastructure evidence: `docs/plans/pq2-completion-receipt-progress-report.md`.
+- In-progress twelfth-slice evidence and retained attempts: `docs/plans/pq2-dem-parse-print-qualification-progress-report.md`.
 - Implemented and deferred feature boundary: `docs/stab-feature-checklist.md`.
 - Upstream feature inventory: `docs/stim-feature-list.md`.
 - Historical upstream test hierarchy: `docs/plans/stim-test-porting-plan.md`.

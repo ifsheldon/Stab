@@ -327,7 +327,7 @@ fn guard_expectation(
 ) -> (i32, String) {
     let message = match (implementation, class) {
         (Implementation::Stim, DemGuardRejection::Zero) => {
-            "adapter requires --iterations and --work-items".to_string()
+            "work-items must be positive".to_string()
         }
         (Implementation::Stab, DemGuardRejection::Zero) => {
             return (
