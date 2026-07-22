@@ -4,10 +4,10 @@
 
 In progress as of 2026-07-23.
 
-The source-current implementation inventory is performance digest `d27b71d205ec938a77c9981fb524e70c9b17eeafeadf3ade6367632aeb3b1693` and correctness digest `e5635ca4a2c217ee79768d35336c50611a9f12f86edded8a7f01fce1ca72add4`.
+The source-current implementation inventory is performance digest `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a` and correctness digest `fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, contract-preflight schema version 13 with 228 ordered receipts, and qualification report schema version 32.
-Neither group has passing timing evidence or legacy-migration authorization yet.
-Both groups now bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose SHA-256 is `7118ff7a6163d54e2552ec136f45257aacf07b70d27f56922955078817e42182`, so future failed or noisy formal reports can be retained and audited.
+Parse has passing full evidence at small and medium scale under the preceding inventories, but its retained large-scale report failed; print has no formal timing evidence, and neither group has legacy-migration authorization yet.
+Both groups bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose new SHA-256 is `0af72ac0d94b9fc0f9a4dcf6011a4c7061cd9b7c782aedcdcd4cb809fd6a6bc4`, so future failed or noisy formal reports can be retained and audited.
 
 ## Retained Attempts
 
@@ -135,3 +135,60 @@ The qualification-family allocation guard now admits at most 2,050 calls, and th
 Dirty-tree direct-worker diagnostics for the final layout reported `0.416383174` seconds for the small diagnostic run and `0.377149828` seconds for the large diagnostic run, with observed peak RSS `34701312` bytes in the latter. Alternative two- and three-target inline layouts were slightly faster in isolated runs but were rejected because they materially enlarged every instruction model; the selected one-target inline layout plus one spill reservation retained the projected timing margin with a smaller persistent footprint. These figures are implementation guidance only, are not paired Stim evidence, and cannot satisfy any qualification gate.
 
 Because the parser source, direct dependency graph, profiler note, and generated source inventories now change again, no evidence from `d8de73d5` can be relabeled as current. The next evidence chain must begin from a clean commit that binds this diagnosis and regenerated inventories, then repeat both probes, worker reproducibility, the exact CQ prerequisite, and every formal parse and print report.
+
+### Clean Second-Optimization Checkpoint At `ca9fd68d`
+
+- Parse adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.002103587`, `stab_seconds=0.002461219`, diagnostic ratio `1.170011x`, Stim parent peak RSS `184320`, and Stab parent peak RSS `352256`.
+- Print adapter probe: passed exact fixture and output parity with `work=16384`, `stim_seconds=0.005327000`, `stab_seconds=0.002971140`, diagnostic ratio `0.557751x`, Stim parent peak RSS `4902912`, and Stab parent peak RSS `81920`.
+- Worker reproducibility: passed with pinned-Stim digest `cb484542faaeba73156a1ba5d7a1f35104b697320847ad33994b9bb1f33b67d4` and Stab digest `34e4f33e92ac0377dd8372a83ae9214e4433f5711bc208ebf292e4464623c437`.
+- Exact focused correctness prerequisite: passed one selected case with zero failures, replayed successfully, and passed exact preflight under `target/qualification/pq2-dem-cq-full-ca9fd68`.
+- Correctness request SHA-256: `d906a38d6c1c63cc58083c50e81c5c9f03a43d582a5ec2a93b153723dbff0e06`.
+- Correctness JSON report SHA-256: `43ed3b1fa4e4f3435b2694a5abad48e8d57449e323748e269a5298f6d8e4a9fb`.
+- Correctness completion SHA-256: `4caaba719d15c8d02cb8488234b3669a5b498e604f640e4a570b9e6b06189aa1`.
+- Correctness preflight SHA-256: `d05ed6126213a775b6849f91dad7251e5589b2d2623397947ebb765ce80fe54c`.
+- Correctness Markdown report SHA-256: `ec4a79db8a6ef5179ad32490d5306f3d4a0e12bceb69b898fe8b8fea8110f7ca`.
+
+### Parse Small Full Attempt 4
+
+- Source revision: `ca9fd68d3856e9cac9cc6da16433947d056e8848`.
+- Artifact: `target/benchmarks/qualification/pq2-dem-ca9fd68-parse-small-full-1`.
+- Host preparation: swap was disabled only during timing through an exit restoration trap and `/swap.img` was restored with zero bytes in use immediately afterward.
+- Result: passed with 29,378 common iterations, 1,880,192 item operations per sample, nine pairs, median ratio `1.1741490288680279x`, bootstrap 95 percent interval `[1.1520024305094314x, 1.1828408574028013x]`, and paired relative MAD `0.0074026621161992255`.
+- Report SHA-256: `4b5ac2870af44c4edb7af1367466dab6a6aa230382dbdc6c6cb97eb507364fbb`.
+- Preflight SHA-256: `ccfa71be38630c59437f7607b10411a8d4ffcd0b0d9883fe51e28d3fd9b0718a`.
+- Markdown SHA-256: `87c5851242e54ea71c740b0d3f64f7d29c62fd4e68f9c7a206336b1b2ebf38bf`.
+- Replay and regression: passed.
+
+### Parse Medium Full Attempt 1
+
+- Source revision: `ca9fd68d3856e9cac9cc6da16433947d056e8848`.
+- Artifact: `target/benchmarks/qualification/pq2-dem-ca9fd68-parse-medium-full-1`.
+- Host preparation: swap was disabled only during timing through an exit restoration trap and restored immediately afterward.
+- Result: passed with 483 common iterations, 1,978,368 item operations per sample, nine pairs, median ratio `1.204309243184199x`, bootstrap 95 percent interval `[1.1913888243751443x, 1.2143650043774166x]`, and paired relative MAD `0.006107643956684444`.
+- Report SHA-256: `1d4e870484a7a811929e3adf6103f91f25ffc92d8436771e09a5f6510b7d9018`.
+- Preflight SHA-256: `047352972b660ef430e664ddad70e32ae6e9ae745c2376b03f9146c1573e9fb2`.
+- Markdown SHA-256: `a589ba781d83e3cb568a54a28cb6052d0405cf120259ff9efdc660994bc2cac5`.
+- Replay and regression: passed.
+
+### Parse Large Full Attempt 1
+
+- Source revision: `ca9fd68d3856e9cac9cc6da16433947d056e8848`.
+- Artifact: `target/benchmarks/qualification/pq2-dem-ca9fd68-parse-large-full-1`.
+- Host preparation: swap was disabled only during timing through an exit restoration trap and restored immediately afterward.
+- Result: stable failed evidence with 31 common iterations, 2,031,616 item operations per sample, nine pairs, median ratio `1.2482205525151264x`, bootstrap 95 percent interval `[1.2297776854679268x, 1.2639196099402108x]`, and paired relative MAD `0.012577150242760585`.
+- Report SHA-256: `61c46998f7b8540f57c82a4b585a6a88f88d65a411feeb423861edb0e26be291`.
+- Preflight SHA-256: `cfd5b35151bfba438b49200f9df0f60315c61e527fa53a6a629fcce70866d49c`.
+- Markdown SHA-256: `c946320132704217d5ef3435b58e13233b5ea6fb43781f8a4457745063b9e966`.
+- Replay: passed and reproduced the artifact.
+- Regression: failed closed because the confidence-interval upper bound exceeds `1.25x`.
+- Disposition: retain permanently. The result is stable and must not be rerun or replaced by a favorable sample from the same revision.
+
+## Third Parser Optimization
+
+Clean implementation commit `430428ea93a40af25a352746acc2bc517e7ad1fd` stores spilled tags as `Box<str>`, bounds `DemInstruction` and `DemItem` at 96 bytes, parses target tokens without a preliminary digit scan, and uses one explicit decimal-overflow bound per digit. Extracting the private tag representation leaves `dem.rs` at 1,172 lines. Lowercase `d` and `l` targets now match pinned Stim and canonicalize to uppercase.
+
+The regression suite covers the model-layout ceiling, maximum and overflowing unsigned values, malformed targets, lowercase target canonicalization, mixed ASCII and Unicode whitespace, existing tag cases, and the exact allocation ceiling. Full workspace tests, formatting, workspace Clippy, and staged pre-commit checks passed before the commit.
+
+Five dirty-tree direct-worker diagnostics over the large 31-iteration shape improved from `0.458354964` through `0.465637638` seconds and approximately 34.7 MiB peak RSS before this optimization to `0.426247111` through `0.431028809` seconds and approximately 33.0 MiB peak RSS afterward. Dirty-tree exact-parity probes reported parse diagnostic ratio `1.137073x` and print diagnostic ratio `0.588801x`. These are optimization guidance only and cannot satisfy the gate.
+
+The next source-contract commit must bind the updated profiler-note digest and regenerated correctness and performance inventories. The clean Git revision, private Cargo build, sealed Stab binary digest, and worker identity bind the new private tag module; comparator sources remain the pinned-Stim comparator implementation. From that clean revision, repeat both adapter probes, worker reproducibility, the exact focused CQ producer, replay, and preflight before restarting append-only formal full and soak evidence at every parse and print scale. No `ca9fd68d` report may be rerun.

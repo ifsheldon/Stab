@@ -1,6 +1,6 @@
 # PQ2 Gate Name Hash Qualification Progress Report
 
-> Historical-evidence note, 2026-07-23: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups, migrations, exact-CQ strengthening, and the reviewed Clifford contracts produced now-historical digests; the current shared-harness digest after the DEM parser source refresh is `d27b71d205ec938a77c9981fb524e70c9b17eeafeadf3ade6367632aeb3b1693`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
+> Historical-evidence note, 2026-07-23: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups, migrations, exact-CQ strengthening, and the reviewed Clifford contracts produced now-historical digests; the current shared-harness digest after the third DEM parser source refresh is `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 
