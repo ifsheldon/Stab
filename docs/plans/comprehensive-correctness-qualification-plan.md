@@ -230,6 +230,7 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 - Assign every upstream record one or more domain-relevance ids where applicable and assign every selected executable record one or more exact primary qualification owners without allowing deferred records to contribute passing evidence.
 - Name all deferred-product and not-applicable cases explicitly.
 - Freeze independent planned `CQ-RESOURCE` owners for parser admission, checked count arithmetic, result-record admission, materialized expansion, streaming buffer slope, writer failure, visitor failure, replay and side-input admission, folded traversal work, search and solver admission, allocation scaling, typed path boundaries, and output-file lifecycle; retain symlink rejection as its own implemented owner.
+- Prove streaming buffer reuse through bounded allocation count, retained-capacity limits, width-dependent growth, record-count independence, and immediate cancellation. Do not require pointer identity unless the public API explicitly promises that callers may rely on the same storage address.
 - Add a semantic digest and bounded validation before source-file reads or statistical work.
 
 ### Tests

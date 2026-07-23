@@ -2,10 +2,10 @@
 
 Stab(ilizer) is an agent-native toolkit for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend.
 
-Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Selected implemented Stab surfaces have pinned Stim v1.16.0 compatibility evidence; the active qualification state and reopened remediation work are recorded in [docs/plans/GOAL.md](docs/plans/GOAL.md).
+Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Selected implemented Stab surfaces have pinned Stim v1.16.0 compatibility evidence; the generated current state is in [docs/qualification-status.md](docs/qualification-status.md), and the active execution contract is [docs/plans/GOAL.md](docs/plans/GOAL.md).
 Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, and result-format surfaces. Support and qualification are tracked separately in [docs/stab-feature-checklist.md](docs/stab-feature-checklist.md); a feature being implemented does not by itself mean its compatibility qualification is complete.
 
-> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The active goal and feature checklist distinguish implemented, qualified, reopened, and deferred surfaces. Please report discrepancies so they can be reproduced against the pinned target.
+> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The generated dashboard and feature checklist distinguish implemented, qualified, reopened, and deferred surfaces. Please report discrepancies so they can be reproduced against the pinned target.
 
 The longer-term vision is composable Rust components for QEC tooling.
 

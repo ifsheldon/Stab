@@ -1,4 +1,4 @@
-name: M12 Benchmarks
+name: M12 Diagnostic Performance Trend
 
 on:
   workflow_dispatch:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  primary-regression:
-    name: Primary Regression Thresholds
+  diagnostic-trend:
+    name: Diagnostic Performance Trend
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -37,7 +37,7 @@ jobs:
           RUSTFLAGS: -C target-cpu=native
         run: just bench::baseline --primary --out target/benchmarks/m12-scheduled-primary-baseline
 
-      - name: Check primary regression thresholds
+      - name: Record diagnostic threshold trend
         env:
           RUSTFLAGS: -C target-cpu=native
         run: just bench::primary-regression --baseline target/benchmarks/m12-scheduled-primary-baseline/baseline.json --report target/benchmarks/m12-scheduled-primary-regression
@@ -46,7 +46,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m12-primary-regression-reports
+          name: m12-diagnostic-performance-trend
           path: |
             target/benchmarks/m12-scheduled-primary-baseline/baseline.json
             target/benchmarks/m12-scheduled-primary-baseline/report.md

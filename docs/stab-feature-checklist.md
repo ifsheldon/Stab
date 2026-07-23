@@ -2,11 +2,7 @@
 
 This checklist maps the Stim v1.16.0 inventory in [stim-feature-list.md](stim-feature-list.md) onto the current Stab codebase.
 It is a feature-availability document, not a new roadmap.
-Use [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md), [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md), and [plans/GOAL.md](plans/GOAL.md) for the active qualification goals; the historical implementation roadmap remains [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md).
-
-<!-- qualification-inventory-counts {"public_api_items":2065,"algebra_api_items":656} -->
-
-Qualification inventory counts: **2,065** default-feature public Rust API items and **656** Algebra API items.
+Use [qualification-status.md](qualification-status.md) for generated current counts and evidence state, [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) and [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md) for the normative contracts, and [plans/GOAL.md](plans/GOAL.md) for the active execution sequence; the historical implementation roadmap remains [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md).
 
 Status key:
 
@@ -226,7 +222,7 @@ Planning those suites does not change a feature's current availability status un
 
 | Feature | Stab status | Evidence and notes |
 | --- | --- | --- |
-| Upstream test inventory and porting plan | Reopened | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream files and historical Rust port priorities. The regenerated CQ0 inventory contains 2,886 upstream records, 2,065 public API items, and 1,757 evidence parents: 593 implemented, 17 evidence-close, and 1,147 planned. The result-format domain now has 43 implemented parents, but its historical clean execution predates the corrected oracle and remains non-current until the affected tiers rerun from a clean revision. |
+| Upstream test inventory and porting plan | Reopened | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream files and historical Rust port priorities. [qualification-status.md](qualification-status.md) provides generated current inventory counts. Historical result-format execution predates the corrected oracle and remains non-current until the affected tiers rerun from a clean revision. |
 | Oracle fixture matrix | Done for current implemented surfaces and CQ1 harness acceptance | `oracle/fixtures/manifest.csv`, `ops/oracle`, and milestone reports track current exact, statistical, structural, and semantic-mining rows. CQ0 references 440 implemented oracle rows, 165 source-owned blocker-ledger cases, and one exact hostile-path regression as current evidence inputs. The CQ1 comparator, selector, statistical, property, resource, receipt, report, and PR/full/soak execution harness is implemented; [plans/cq2-deterministic-qualification-progress-report.md](plans/cq2-deterministic-qualification-progress-report.md) records all-domain clean PR, full, and soak checkpoints with their exact revisions, digests, replay status, and current-versus-historical classification. CQ3 through CQ6 still own feature-domain expansion. |
 | Benchmark manifest and primary beta gate | Done for current performance infrastructure; PQ0 inventory complete | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and M12/post-beta reports provide current primary evidence. PQ0 freezes all 161 inherited rows, 127 checklist rows, every source-owned default-feature Rust API item advertised above, 23 upstream perf files, and 74 upstream benchmark symbols in `benchmarks/stim-qualification-suite.json`; current PQ1 PR, full, and soak runs are historical report-only harness evidence, while PQ2 through PQ7 still must add faithful paired, process, memory, scaling, and final product qualification evidence. |
 | Current beta performance gate | Done for current report state | The expanded clean 1.25x beta evidence records 80 comparable rows passing and 5 checked no-ratio waivers across 85 primary rows. |

@@ -6,7 +6,7 @@ Active execution contract as of 2026-07-23.
 
 Follow [qualification-economy-regression-plan.md](qualification-economy-regression-plan.md). The R0 through R5 compatibility repair is committed. Its old R6 evidence procedure was superseded before formal repaired-contract evidence began.
 
-Formal evidence must wait until Q0 through Q7 are implemented, reviewed, committed, and regenerated from a clean unchanged revision.
+Q0 through Q7 are implemented in source and are in final validation. Formal evidence must wait until these changes are reviewed, committed, and regenerated from a clean unchanged revision.
 
 ## Sources Of Truth
 
@@ -20,15 +20,9 @@ Stop if these sources disagree. Fix the source and regenerate derived state inst
 
 ## Current Work
 
-1. Q0: freeze the replacement program and documentation hierarchy.
-2. Q1: centralize the result-format corpus and remove low-value test assertions.
-3. Q2: curate the finite release and diagnostic performance matrices.
-4. Q3: separate Stim parity from Stab self-regression.
-5. Q4: reduce the global worker preflight to source-derived representative receipts.
-6. Q5: add three representative DEM workload families.
-7. Q6: replace the active completion ceremony with one revision manifest and replay.
-8. Q7: add contract CI and generated qualification status.
-9. Q8: freeze the source revision and produce formal correctness, timing, memory, rollup, completion, and baseline evidence.
+1. Completed source work: Q0 documentation freeze, Q1 corpus/test economy, Q2 curated matrix, Q3 parity and self-regression separation, Q4 representative worker preflight, Q5 DEM families, Q6 revision manifest, and Q7 contract CI plus generated status.
+2. Current blocker: finish generated-contract checks, milestone audit, full code review, focused commits, and clean-revision regeneration.
+3. Next: Q8 reopened correctness evidence, diagnostic legacy benchmarks, controlled AArch64 DEM timing and memory evidence, four rollups, one completion manifest and replay, then a separately reviewed self-regression baseline candidate.
 
 Do not begin Q8 while any Q0 through Q7 contract is unsettled.
 

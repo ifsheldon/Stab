@@ -6,6 +6,8 @@ Active qualification contract as of 2026-07-23.
 
 This plan supersedes the R6 evidence-production procedure in [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) before formal repaired-contract evidence began. The R0 through R5 implementation remains accepted source work. Historical and failed artifacts retain their original schema, source revision, and status.
 
+Implementation checkpoint: Q0 through Q7 are implemented in source and undergoing final contract validation, milestone audit, and code review. Q8 formal timing and completion evidence has not started.
+
 ## Objective
 
 Preserve Stab's compatibility, filesystem-safety, process-supervision, and benchmark-science guarantees while reducing low-value tests, speculative benchmark obligations, duplicated corpus code, and evidence ceremony. Separate Stim parity from Stab self-regression, curate a finite release matrix, add representative DEM workloads, enforce source-owned qualification contracts in CI, and produce formal evidence once under the frozen replacement contracts.

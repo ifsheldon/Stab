@@ -2,51 +2,53 @@
 
 ## Status
 
-Planned: 2026-07-13.
+Normative performance contract, revised 2026-07-23 by [qualification-economy-regression-plan.md](qualification-economy-regression-plan.md).
 
-PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md).
+PQ0 and PQ1 implementation history remains in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and [pq1-performance-harness-progress-report.md](pq1-performance-harness-progress-report.md). Historical reports retain their recorded schemas and identities.
 
-PQ1 completed: 2026-07-14, with clean schema-version-13 PR, full, and soak evidence from commit `bfef511ccaa57c61cbe209c41d89d77ba8f52eee` recorded in [pq1-performance-harness-progress-report.md](pq1-performance-harness-progress-report.md). The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, canonical CQ preflight reconstruction, host and current-toolchain policy, process-memory evidence, atomic reports, and report-only regression dispatch passed milestone audit and GPT-5.6/max review.
-
-PQ2 is active after clean CQ2 completion; PQ3 through PQ7 remain planned.
+The current program has a curated release matrix, separate Stim parity and Stab self-regression policies, `raw-work-v2`, representative DEM families, and a schema-version-2 revision completion manifest. Formal repaired-contract evidence has not started. Current generated counts and evidence state live only in [../qualification-status.md](../qualification-status.md).
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
-Scope target: every implemented, non-deferred Rust and CLI contract identified by `docs/stab-feature-checklist.md` and every exported Rust API item that implements those selected contracts, with measurements for all meaningful variable-size work.
+Scope target: every implemented, non-deferred Rust and CLI contract identified by `docs/stab-feature-checklist.md` and every exported Rust API item that implements those selected contracts has a performance disposition. Only demonstrated hot paths and representative public phases become active runtime groups.
 
 ## Objective
 
-Build a source-owned performance qualification suite that compares Stab with pinned Stim across the implemented product surface, exposes setup and execution costs separately, measures throughput, latency, memory, and scaling where each matters, and produces reproducible evidence without manufacturing ratios from unlike work.
+Maintain a finite source-owned performance qualification suite that compares representative Stab hot paths with pinned Stim, exposes setup and execution costs separately, measures throughput, latency, memory, and scaling where each matters, and produces reproducible evidence without manufacturing ratios from unlike work.
 
 The suite must retain the existing benchmark manifest and 1.25x primary gate as useful evidence, but it must requalify every inherited row against stricter workload-equivalence, runner-symmetry, measurement-pairing, and statistical-confidence rules before counting that row as comprehensive evidence.
 
 ## Meaning Of Comprehensive
 
-The performance suite is comprehensive only when all of the following are true:
+The performance program is complete for a release matrix only when all of the following are true:
 
-1. Every implemented selected feature and exported Rust API item has a stable performance disposition of `measured`, `covered-by-parent`, `not-performance-relevant`, or `no-faithful-stim-comparator`.
-2. Every `measured` feature has at least one representative workload family, and every workload family declares its phase, scale points, work unit, correctness preflight, output-consumption rule, and memory policy.
+1. Every implemented selected feature and exported Rust API item has a stable performance disposition of `measured`, `covered-by-parent`, `not-performance-relevant`, `no-faithful-stim-comparator`, or `future-candidate`.
+2. Every active release group has an executable representative workload family, and every family declares its phase, scale points, work unit, correctness preflight, output-consumption rule, and memory policy.
 3. Every claimed Stim ratio compares equivalent semantic work through a `stim-perf`, symmetric process CLI, or source-owned pinned-Stim adapter runner.
 4. Every public CLI throughput ratio uses process-versus-process execution, while in-process CLI-body timings remain diagnostic and cannot stand in for end-to-end CLI parity.
 5. Every multi-measurement row pairs exact named submeasurements or reports each measurement independently, and no heterogeneous row median is used as a performance claim.
 6. Every timed workload verifies input identity, output width or count, and a semantic output digest before timing.
-7. Every variable-size algorithm has small, medium, and large scale evidence or a documented mathematical reason why scale does not apply.
-8. Every materializing path has peak-memory evidence at its largest supported workload, and every streaming or compact path has memory-growth evidence over at least three scales.
+7. Every active variable-size workload family has small, medium, and large scale evidence or a documented mathematical reason why scale does not apply.
+8. Every active materializing family has peak-memory evidence at its largest supported workload, and every active streaming or compact family has memory-growth evidence over at least three scales.
 9. Every comparable primary row reports a paired ratio distribution and confidence interval against the frozen Stim build.
 10. Every selected no-ratio row has a machine-checked reason proving that no faithful pinned-Stim comparator exists at the claimed surface.
-11. The final report distinguishes suite completeness, 1.25x timing parity, memory regression status, and unresolved optimization work.
+11. The final report independently distinguishes matrix completion, Stim `1.25x` parity, Stab self-regression, environment validity, memory/scaling status, and unresolved optimization work.
+
+The checked matrix is capped at 40 release runtime groups and 60 diagnostic runtime groups. Adding a group beyond either cap requires consolidating or removing another active group. The complete API inventory remains a coverage map and must not generate speculative benchmark obligations.
 
 Comprehensive does not mean benchmarking deferred Python, JS/WASM, diagram, ecosystem, public interactive simulator, full ErrorMatcher provenance, exact random-stream, C++ header compatibility, QASM, Quirk, Crumble, or GPU products.
 
-## Completion Versus Performance Parity
+## Completion, Parity, And Regression
 
-Suite completion and performance parity are separate conclusions.
+Matrix completion, Stim parity, and Stab self-regression are separate conclusions.
 
-- The suite is complete when every selected feature has a valid disposition and every measured group produces faithful, reproducible timing and resource evidence.
+- The release matrix is complete when every selected feature has a valid disposition and every active release group produces faithful, reproducible timing and resource evidence.
 - A comparable row passes the performance target only when its declared gate statistic is at most `1.25x` pinned Stim.
 - A slow comparable row is a valid benchmark result but a failed parity target; it must remain visible with an owner and profiler evidence and cannot be waived.
+- Stab self-regression compares current accepted evidence with a reviewed architecture-specific Stab baseline. The default tolerated deterioration is 15 percent; a precommitted justified exception may be at most 25 percent.
+- Missing or identity-mismatched Stab baselines are `unseeded`, never passing. A first architecture run can seed a candidate but cannot retroactively claim a self-regression pass.
 - A row can be `no-faithful-stim-comparator` only when pinned Stim lacks equivalent behavior at that surface and the suite validator proves that the disposition is still current.
-- Existing M12 primary thresholds remain release-regression evidence until this plan explicitly graduates a replacement matrix.
+- Existing M12 primary thresholds remain diagnostic compatibility evidence until an equivalent qualification group has accepted evidence and a reviewed migration retires the legacy row.
 
 ## Sources Of Truth
 
@@ -57,6 +59,10 @@ Suite completion and performance parity are separate conclusions.
 - Existing timing gates: `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and `benchmarks/m12-primary-regression-waivers.json`.
 - Existing memory evidence: `benchmarks/m12-primary-memory-baseline.json`.
 - Checked threshold-migration authorization: `benchmarks/qualification-threshold-migrations.json`.
+- Executable runtime contracts: `benchmarks/qualification-runtime-groups.json`.
+- Stim parity policy: `benchmarks/qualification-parity-policy.json`.
+- Stab self-regression policy and baselines: `benchmarks/qualification-regression-policy.json` and `benchmarks/qualification-regression-baselines.json`.
+- Generated current state: `docs/qualification-status.md`.
 - Existing runner implementation: `ops/bench` and `justfiles/bench.just`.
 - Frozen upstream code and performance tests: `vendor/stim`.
 - Planning lessons: `docs/plans/lessons-learned.md`.
@@ -78,9 +84,9 @@ Each qualification group must include:
 - `checklist_anchors`: exact section and row descriptions from `docs/stab-feature-checklist.md`.
 - `checklist_child_ids`: exact selected child ids owned by a checklist group in its one performance domain; API and inherited-row groups must leave checklist ownership empty.
 - `public_api_items`: exact rustdoc paths covered by the group or disposition.
-- `disposition`: `measured`, `covered-by-parent`, `not-performance-relevant`, or `no-faithful-stim-comparator`.
+- `disposition`: `measured`, `covered-by-parent`, `not-performance-relevant`, `no-faithful-stim-comparator`, or `future-candidate`.
 - `reason`: required for every group so retained, reworked, diagnostic, superseded, removed, and replacement intent remains reviewable.
-- `manifest_row` and `row_origin`: one nonempty stable primary row id classified as `inherited` when it exists in `benchmarks/manifest.csv` or `planned` when PQ0 owns a concrete future API, checklist, or resource workload.
+- `manifest_row` and `row_origin`: one nonempty stable primary row id classified as `inherited` when it exists in `benchmarks/manifest.csv` or `planned` only for a concrete active or reviewed future candidate. Inventory generation must not synthesize one planned runtime group per API item.
 - `phase`: `startup`, `parse`, `compile`, `execute`, `convert`, `serialize`, `search`, `transform`, or `end-to-end`.
 - `runner_fidelity`: `stim-perf`, `adapter-library`, `process-cli`, or `stab-report-only`.
 - `correctness_cases`: exact CQ0 owner ids that must pass before timing can run, or one stable `planned_correctness_case_id` when PQ0 has proved that no exact workload preflight exists yet; feature-level or truncated fallback cases are forbidden.
@@ -91,9 +97,9 @@ Each qualification group must include:
 - `memory_policy`: selected scales, allocation or process-RSS method, and expected growth class.
 - `threshold_policy`: `primary-1.25`, `regression-only`, `report-only`, or `not-applicable`.
 - `owner`: crate or subsystem responsible for regressions.
-- `status`: `planned`, `implemented`, `qualified`, or `blocked`.
+- `status`: `planned`, `implemented`, `qualified`, or `blocked`; `future-candidate` is a disposition, not an active measured status.
 
-The inventory schema must deny unknown fields, validate all referenced feature, correctness, fixture, manifest, measurement, and waiver ids, reject unsafe paths and symlinks, bound all row and string counts before expensive work, and include a frozen semantic digest.
+The inventory schema must deny unknown fields, validate all referenced feature, correctness, fixture, manifest, measurement, and waiver ids, reject unsafe paths and symlinks, bound all row and string counts before expensive work, enforce the 40 release and 60 diagnostic caps, reject `future-candidate` thresholds, and include a frozen semantic digest.
 Benchmark source, fixture, stdin, and checked-output operations must use descriptor-relative nofollow traversal on qualification hosts; until equivalent non-Unix primitives are implemented, the ops binary must fail closed there instead of using path-check-then-open fallbacks.
 
 ### Pinned-Stim Adapter
@@ -133,10 +139,13 @@ just bench::qualification-run --tier pr
 just bench::qualification-run --tier full
 just bench::qualification-run --tier soak
 just bench::qualification-report --input target/benchmarks/qualification/latest
-just bench::qualification-regression --baseline benchmarks/qualification-baseline.json
+just bench::qualification-parity --input target/benchmarks/qualification/latest
+just bench::qualification-self-regression --full <full-rollup> --soak <soak-rollup>
+just bench::qualification-baseline-candidate --full <full-rollup> --soak <soak-rollup> --out <new-directory>
+just qualification::status --check
 ```
 
-The existing `bench::baseline`, `bench::compare`, `bench::primary-beta`, `bench::primary-regression`, and `bench::primary-memory-regression` commands remain supported during migration.
+`qualification-regression` remains temporarily as a deprecated alias for `qualification-parity`. The existing `bench::baseline`, `bench::compare`, `bench::primary-beta`, `bench::primary-regression`, and `bench::primary-memory-regression` commands remain supported as diagnostic compatibility coverage during migration.
 No recipe may contain complex branching or a multiline shell implementation.
 
 ### Report Contract
@@ -147,14 +156,14 @@ Every JSON and Markdown report must record:
 - Stim tag, commit, source digest, binary digest, and adapter digest when used.
 - Rust and C++ compiler versions, build profiles, relevant flags, target triple, operating system, architecture, CPU model, logical CPU count, available memory, and CPU-affinity or governor status when observable.
 - Tier, group filters, fixture digests, correctness preflight result, timeout policy, warmup count, sample count, calibration decisions, and run order.
-- Runtime-group contract digest, immutable claim class, baseline eligibility, exact workload and measurement IDs, exact group-owned correctness cases, and controller-approved correctness request and completion digests for promotable groups.
+- Runtime-group contract digest, immutable claim class, parity eligibility, family and size class, exact workload and measurement IDs, exact group-owned correctness cases, and controller-approved correctness request and completion digests for promotable groups.
 - Raw sample durations, work counts, normalized rates, paired ratios, median paired ratio, relative median absolute deviation, and deterministic bootstrap confidence interval.
 - Peak resident memory, allocation counts and bytes where available, memory-growth classification, and scaling slopes where required.
-- Passed, failed, noisy, report-only, covered-by-parent, not-performance-relevant, and no-faithful-comparator counts by domain.
+- Passed, failed, noisy, report-only, covered-by-parent, not-performance-relevant, no-faithful-comparator, and future-candidate counts by domain.
 - Every ratio failure with its exact measurement pair, profiler-note path, and owning subsystem.
 - Every no-ratio group with its machine-checked reason and follow-up condition.
 
-Generated artifacts belong below `target/benchmarks/qualification/` and must never be treated as source-owned baselines merely because a local run succeeded. Every formal run, rollup, and completion producer must validate every direct-child output and input path, reject collisions, and reject an existing producer output before creating a lock, reading an artifact, starting private Git work, or mutating the filesystem; only the corresponding offline replay command may compare-and-swap refreshed derived bytes into the exact existing artifact. The controller must open and retain the repository descriptor before its first artifact, Git, source, build, or subprocess access, resolve all qualification source and nested worker, probe, regression, report, rollup, and completion work through the Linux descriptor-root view of that exact directory, and use the admitted absolute path only to prove repeatedly that the descriptor still names the live repository root. Publication must retain descriptor-backed identity, length, digest, directory identity, and exact child-name sets for the complete staged, source, target, correctness, and displaced artifact trees; reject same-inode mutation, substituted directories, and unexpected entries before and after exchange; verify both exchanged directory entries before rollback; refuse to unlink a displaced child unless its retained descriptor still matches the live entry; propagate cleanup failure; revalidate retained sources after cleanup; and durably synchronize the complete output hierarchy before returning success.
+Generated artifacts belong below `target/benchmarks/qualification/` and must never be treated as source-owned baselines merely because a local run succeeded. Every formal run, rollup, completion, or baseline-candidate producer validates direct-child paths, rejects collisions and existing output paths before mutation, opens source and artifact inputs through retained descriptor-safe roots, binds identity and digest metadata, uses bounded subprocesses, and publishes atomically. Offline replay reconstructs derived bytes from immutable source artifacts. The active contract does not require a parallel per-step transcript or completion tree.
 
 ## Fair Comparison Policy
 
@@ -216,6 +225,8 @@ Generated artifacts belong below `target/benchmarks/qualification/` and must nev
 - Compute each pair as Stab seconds per work unit divided by Stim seconds per work unit.
 - Report the median paired ratio and a fixed-seed 10,000-resample bootstrap 95 percent confidence interval over paired ratios.
 - A primary 1.25x row passes only when both the median paired ratio and upper confidence bound are at most `1.25`.
+- Stab self-regression separately gates the current paired median against the accepted median and the current confidence upper bound against the accepted upper bound. Both relative ratios must stay within the source-owned tolerance.
+- Self-regression keys include group, family, scale, measurement, host profile, CPU, architecture, target, toolchain, Stim build, timing boundary, and semantic workload-contract digest. Stab source identity and profiler prose are not part of that workload digest.
 - Report relative median absolute deviation for each implementation and for paired ratios.
 - Do not delete outliers.
 - If paired relative median absolute deviation exceeds 10 percent, mark the row noisy and require exactly one complete group rerun containing fresh warmups and the full pair count. Retain both attempts, make the second attempt authoritative regardless of its outcome, and never rerun a non-noisy result or continue rerunning until favorable.
@@ -235,15 +246,14 @@ The PR tier may use three paired samples for smoke and regression direction, but
 - Report-only Stab extras remain visible but do not weaken or improve a paired ratio.
 - A parent group may summarize child status counts but must not synthesize a timing ratio from heterogeneous children.
 
-### Milestone Completion Receipts
+### Revision Completion Manifests
 
-- Every executable PQ2 product slice whose closure is claimed after completion receipt schema version 1 was introduced must publish one canonical machine-readable completion receipt before its progress report may claim closure. Earlier reviewed slices remain historical under their preceding acceptance contract and must not be relabeled as receipt-backed.
-- Invoke `just bench::qualification-completion --group <group> --full-input <report> ... --soak-input <report> ... --full-rollup <rollup> --soak-rollup <rollup> --out <completion-directory>` from the same clean committed revision recorded by all source evidence. Every source report, rollup, and output must be a distinct direct child of `target/benchmarks/qualification/`.
-- The completion controller invokes the same typed handlers as worker reproducibility, the source-owned adapter probe, report replay, regression, and rollup replay. Each typed step records the clean revision, canonical standalone argument vector, exact input artifact identities, command-equivalent exit status zero after successful handler return, typed result, and output artifact identities. A handler error aborts without publishing a receipt.
-- Require exactly one promotable full and one promotable soak report per source-owned scale, an idempotent replay of every report and rollup, a passing source-owned regression result for every report, and passing full and soak rollups. Reject a repaired replay because a completion receipt must reconstruct from already valid evidence rather than conceal stale derived artifacts.
-- Require private-worker reproducibility to produce the exact worker identity shared by every source report and rollup. Require the source-owned adapter probe to match the reports' Stim source, build, and binary identities and the Stab worker source identity. Require full and soak rollups to share exact host policy, host profile, CPU identity, architecture, target triple, toolchain, correctness preflight, and worker identity.
-- Publish completion `report.json`, `preflight.json`, and derived `report.md` atomically into a previously absent direct-child output directory only after checks prove that the exact staged file set, every bound source and correctness tree, and the clean repository state remain unchanged through hierarchy synchronization. Admit all source-report, rollup, replay-target, and output paths and reject collisions before lock creation or artifact reads, even when later bytes are invalid, failed, noisy, or host-rejected. Completion receipt schema version 1 and preflight schema version 1 bind the complete typed step sequence and all source directory artifact digests; only `qualification-completion-report` may compare-and-swap refresh an existing completion artifact. A failed post-exchange validation must verify both exchanged entries against retained descriptors before restoring the displaced target. Replay cleanup must retain and recheck the exact displaced child set, refuse to unlink a substituted child, propagate failure, fsync the hierarchy after removal, and revalidate repository and source identities before success.
-- Invoke `just bench::qualification-completion-report --input <completion-directory>` to rerun every machine-checkable closure operation and require byte-identical receipt and preflight reconstruction. Human milestone audit and GPT-5.6/max full code review remain separately recorded human evidence and must not be represented as mechanically self-certified receipt steps.
+- The active DEM R6 scope publishes one schema-version-2 architecture/revision completion manifest from four rollups: parse full, parse soak, print full, and print soak. Earlier schema-version-1 per-group completion receipts remain readable historical evidence and are not relabeled under the new contract.
+- Invoke `just bench::qualification-completion --scope dem-r6 --rollup <parse-full> --rollup <parse-soak> --rollup <print-full> --rollup <print-soak> --out <completion-directory>` from the same clean committed revision recorded by all source evidence.
+- Replay all four rollups, validate their 36 source reports and every source report's Stim parity result, and require exact repository, Stim, toolchain, host, CPU, worker, inventory, policy, timing-boundary, correctness, and workload identity.
+- Record parity, self-regression, environment, and memory/scaling outcomes separately. A first architecture run may record self-regression as `unseeded`; a failed seeded self-regression cannot complete.
+- Publish `report.json`, `preflight.json`, and `report.md` atomically into a previously absent direct-child directory. Do not create per-group step transcripts or parallel completion trees.
+- Invoke `just bench::qualification-completion-report --input <completion-directory>` to reconstruct the manifest deterministically from its exact reports and rollups. Human milestone audit and full code review remain separately recorded human evidence.
 
 ### Memory And Scaling
 
@@ -384,7 +394,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md), the PQ2 slice reports, `benchmarks/stim-qualification-suite.json` at checked schema-version-2 performance digest `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358`, and the checked schema-version-2 `benchmarks/qualification-threshold-migrations.json` authorization ledger, all bound to correctness digest `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`. Nineteen exact product runtime contracts retain one exact `1.25x` rule over each three-scale family, for 57 scale outcomes. Clean revisions `9497df0350cb33dcd249ea12fda802b5a68efe00` and `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` retain complete historical DEM chains, but both are review-rejected as current evidence. The later chain still used an implicit `raw-work-v1` boundary whose Rust helper sampled elapsed time after moving the raw result into its protocol return tuple. The active repair binds `raw-work-v2`; all affected evidence must be regenerated from one clean reviewed revision and unique paths. Earlier Clifford, iterator, Pauli, transpose, kernel, and circuit evidence remains accepted only under its recorded inventory and is not relabeled under the current shared-adapter digest.
+Evidence history is preserved in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and the PQ2 slice reports. Current schema versions, inventory digests, matrix counts, and completion state are generated in [../qualification-status.md](../qualification-status.md) and must not be duplicated here. The source-current inventory curates active runtime groups and classifies unselected plausible work as `future-candidate`; it does not retain the former speculative measured backlog.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 
@@ -450,7 +460,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 5. Implement exact submeasurement pairing and worst-upper-bound group summaries.
 6. Implement correctness and output-digest preflight before timing, with exact correctness cases owned by a source runtime-group contract and externally approved CQ request and completion digests.
 7. Implement host-policy validation, process peak-RSS and setup-baseline sampling, and existing Stab allocation tracking as separate evidence.
-8. Add `qualification-list`, `qualification-check`, `qualification-probe`, `qualification-run`, `qualification-report`, and `qualification-regression` commands.
+8. Add `qualification-list`, `qualification-check`, `qualification-probe`, `qualification-run`, `qualification-report`, and Stim parity commands. Stab self-regression, baseline-candidate, status, rollup, and completion commands are later source-owned extensions.
 
 ### Tests
 
@@ -464,7 +474,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Integration-test adapter commit mismatch, source digest mismatch, stale binary fingerprint, malformed JSON, extra rows, missing fields, non-finite values, and oversized output.
 - Integration-test Stab worker fingerprint mismatch, protocol drift, setup-memory ordering, worker panic, and parent-child work or digest disagreement.
 - Integration-test host-policy pass, affinity failure, excessive load, insufficient memory, active swap, unavailable required probes, environment-unverified local mode, exclusive-lease contention and release, source-policy digest drift, and hostile report mutations that hide or fabricate violations.
-- Test runtime-group duplicate, claim-class, baseline-eligibility, worker-shape, and correctness-case validation; baseline missing, unknown, stale, diagnostic-threshold, and incomplete-rule rejection; and externally approved CQ request and completion digest mismatch.
+- Test runtime-group duplicate, claim-class, parity-eligibility, worker-shape, and correctness-case validation; parity-policy missing, unknown, stale, diagnostic-threshold, and incomplete-rule rejection; self-regression boundary and unseeded behavior; and externally approved CQ request and completion digest mismatch.
 - Test that a memory-instrumented run cannot be consumed as timing-gate evidence.
 - Test that a dirty worktree report cannot be promoted as source-owned final evidence.
 
@@ -479,7 +489,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 
 ## PQ2: Qualify Models, Formats, Gates, Kernels, And Algebra
 
-Status: Active as of 2026-07-23. All 275 selected CQ2 parents have complete exact source ownership, but the 43-parent result-format domain is reopened pending clean-revision execution. The source-current correctness inventory is `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`, and the source-current performance inventory is `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358`. Nineteen exact product runtime groups are implemented; the twelfth slice owns independent direct DEM parse and canonical-print groups with fixed scales, exact input and output identities, common-iteration timing, accepted-maximum and hostile-boundary contracts, strict `1.25x` rules, and a source-owned profiler note. The complete `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` and `9497df0350cb33dcd249ea12fda802b5a68efe00` DEM chains remain historical `raw-work-v1` evidence and are review-rejected as current evidence. Source-current runtime-group schema version 6, worker protocol version 5, contract-preflight version 15, and report version 34 bind `raw-work-v2`, but no promotable DEM report exists under that contract until the repair is committed and the full chain is regenerated. Native x86-64, PQ6 memory growth, and all later runtime groups remain unclaimed.
+Status: Active as of 2026-07-23. Current inventories and counts are generated in [../qualification-status.md](../qualification-status.md). Nineteen product runtime groups are implemented. DEM parse and canonical print each own three representative families at small, medium, and large scales, exact input and output identities, common-iteration timing, family-specific accepted maxima, strict `1.25x` parity, and source-owned profiler notes. Historical DEM chains at revisions `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` and `9497df0350cb33dcd249ea12fda802b5a68efe00` remain immutable `raw-work-v1` evidence and are review-rejected as current evidence. Source-current runtime-group schema version 7, worker protocol version 5, contract-preflight version 16, report version 35, rollup version 5, and completion version 2 bind `raw-work-v2`. Formal repaired-contract DEM evidence has not started.
 
 ### Objective
 
@@ -730,23 +740,23 @@ The eleventh slice deliberately qualifies only equal-width public in-place Cliff
 ### Twelfth Executable Slice
 
 1. Graduate `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` as independent direct adapter-library groups. The parser group owns only `DetectorErrorModel::from_dem_str` versus pinned Stim `DetectorErrorModel(std::string_view)` with measurement `parse`; the printer group owns only `DetectorErrorModel::to_dem_string` versus pinned Stim `DetectorErrorModel::str()` with measurement `serialize`. Do not aggregate parsing and serialization, substitute CLI `sample_dem`, or use either result as evidence for traversal, counting, flattening, searching, analysis, sampling, mutation, or file-I/O behavior.
-2. Bind both groups exactly to `cq-evidence-qualification-0908c21b917526e3`, the generated evidence parent for `cq2-dem-model-parse-print-tag-newline-contract`. That prerequisite must pass from the same clean revision and prove the selected error, detector, logical-observable, shift, repeat, tag, canonical-printer, Unix-newline, and Windows-newline semantics before either timing group can produce a ratio.
-3. Freeze one source-owned eight-item top-level DEM cycle in this exact order: `error(0.125) D0`; `error[edge](0.25) D1 D2 L0 ^ D3`; `detector(0.5, 1) D4`; `logical_observable L1`; `shift_detectors(1.5, 3) 5`; `detector[tagged] D2`; `repeat[loop] 3 {` with indented body `error(0.375) D0 D1` and `shift_detectors 2`; and `error(0.0625) D5 ^ L2`. Emit one canonical newline after every instruction and closing brace. Generate complete cycles only, outside timing, without RNG or architecture-dependent formatting.
-4. Use `small`, `medium`, and `large` scales of 64, 4,096, and 65,536 top-level DEM items. Their exact input byte counts are 1,776, 113,664, and 1,818,624, and their exact four-lane input digests are `fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773`, `9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c`, and `240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716`. Count checked `iterations * top_level_items` as semantic work for both groups.
-5. Freeze 524,288 top-level items as the accepted source-owned worker maximum. Its fixture is 14,548,992 bytes with input digest `127e88c725aa88acdea3be1aed5369af43166e27365e1dbd11dbe89c8e807789`; it contains 720,896 physical lines and therefore remains below Stab's independent one-million-line parser limit. Reject zero items, item counts that are not complete eight-item cycles, 524,289 items, and checked semantic-work overflow before fixture allocation and before consuming an enabled start barrier. The accepted maximum is contract evidence, not a timing scale.
-6. For `parse`, construct the exact fixture before the barrier, then time only repeated construction of a fresh detector error model and replacement of the previous result. Retain the final model, consume it through an optimizer-opaque reference after every successful parse, and perform canonical serialization and output hashing only after timing. Include destruction of each replaced model in the measured lifecycle because both public APIs return owned models.
-7. For `serialize`, construct the fixture and parse one detector error model before the barrier, then time only repeated owned-string production by the public canonical-printer API. Consume every produced string through an optimizer-opaque reference, retain the final string, and hash it only after timing. Allocation and destruction of each produced output string remain inside the measured lifecycle; fixture generation and model parsing remain setup.
-8. Normalize exactly one known terminal-newline difference for semantic comparison: pinned Stim canonical DEM text omits a final newline while Stab's canonical printer emits one. Reject any other byte difference. The normalized canonical output byte counts are 1,775, 113,663, 1,818,623, and 14,548,991 for small, medium, large, and accepted maximum; their exact semantic digests are `02ad6cd3910a69ae416bdaadeb16126fdf813aba8154bb682bf75a01c609093f`, `c8a5116b4e1748d63c0baf8b9eb378d1c53e986b983b405aab7cc7da417561a9`, `bf2206ba69567e3a48c9b74a0cd22b97ef7a5d11bd0297afc428462c237fef38`, and `5bd41410a3ee8859fa7589abe6a20fa61d4e5c06e08105f60a5f3aa474d478b2`. Parse and serialize must produce the same normalized digest at a given request.
-9. Put the Rust fixture, parse, serialize, normalization, and output-validation implementation in a dedicated `qualification/runtime/worker/dem_model.rs` module with scalar unit tests. Put the pinned comparator in a separately hashed `benchmarks/stim_adapter/dem_model_contract.h` that calls only the public pinned Stim constructor and `str()` API. Keep `main.cc`, `worker.rs`, `prepared.rs`, `probe.rs`, `invocation.rs`, and `graduation.rs` below 1,200 lines by moving DEM-specific lifecycle and boundary logic into dedicated modules instead of extending already-large dispatch files with inline implementations.
-10. Add ordered worker tests that freeze all four fixture byte counts and input digests, all four normalized output byte counts and digests, exact cycle text, exact item and physical-line counts, odd and even iteration behavior, parser/printer output equality, accepted-maximum execution, incomplete-cycle rejection, first-over-cap rejection, zero rejection, wrong-measurement rejection, and semantic-work overflow. Cross-check the Rust constants against an independently implemented C++ fixture and normalization path through adapter receipts; neither worker may read the other's generated fixture.
-11. Extend the canonical preflight with exactly sixteen DEM receipts in this nesting order: Stab parse accepted small-odd, small-even, maximum, and rejected first-over-cap; Stab serialize in the same order; then the matching eight Stim receipts. Accepted requests use `(items, iterations)` pairs `(64, 1)`, `(64, 2)`, and `(524_288, 1)`; each rejection starts from the matching accepted small-odd request and changes only items to `524_289`. Add separately selected unit and invocation tests for zero, incomplete-cycle, wrong-measurement, and work-overflow guards without inflating the mandatory maximum-memory preflight matrix.
-12. Use private Stab build-receipt schema version 6, adapter receipt schema version 12, worker-protocol schema version 5, contract-preflight schema version 15 with 228 ordered receipts, runtime-group schema version 6, and qualification report schema version 34. Every worker receipt and runtime group must bind `raw-work-v2`. Every accepted and rejected contract-preflight receipt must bind `contract`, finite zero elapsed time is valid only in that non-statistical mode, and `timing` and `memory` must remain finite and strictly positive. Add every new Rust and C++ source to the ordered worker or adapter source receipt. Reproducibility and offline replay must reject an omitted, extra, reordered, renamed, modified, stale, or cross-worker-transplanted DEM source or receipt, an incorrect receipt count, any fixture or digest drift, a stale schema, evidence-mode drift, or timing-boundary drift.
-13. Add `pq2-dem-parse-adapter-smoke` and `pq2-dem-canonical-print-adapter-smoke` with source-owned default scale `medium`. Each probe must compare exact input identity, work, normalized output identity, odd and even requests, accepted maximum, first-over-cap pre-barrier rejection, and parser/printer group isolation. Probe timing remains diagnostic and cannot substitute for full or soak evidence.
-14. Report setup and peak process RSS separately at all three scales and at the accepted-maximum contract probe. This slice makes no cross-scale allocation or RSS acceptance claim because both selected public APIs intentionally allocate owned results; PQ6 must define and validate parser-model and canonical-output growth slopes. Preserve both inherited M12 memory-baseline rows until PQ6 supplies equal or stronger machine-checked evidence.
-15. Apply independent `1.25x` median and bootstrap-upper-bound thresholds to `parse` and `serialize` at all three scales with no waiver path. Use common iterations, alternating paired samples, the existing 350-millisecond calibration target, the existing selected-batch limits, and exact seconds-per-top-level-item normalization. Any ratio failure or noise remains a failed or noisy result with a source-owned profiler note and owner action; do not switch to independent throughput, change fixture composition, merge scales, or relax the threshold after seeing a result.
-16. Treat the existing `m10-dem-parse-contract` threshold and `m10-dem-print-contract` no-ratio waiver as legacy guards until clean completion receipts pass and replay. The parse completion may authorize retirement only of the exact inherited parse timing threshold and replacement mapping. The print completion may authorize removal only of the exact print timing waiver and replacement mapping. Perform each change through the checked threshold-migration ledger from a clean pre-migration completion, preserve both memory baselines, and regenerate both groups from one clean post-migration revision before claiming source-current timing.
-17. From one clean pre-migration revision, run the exact CQ prerequisite, private-worker reproducibility, both adapter probes, full and soak reports for both groups at every scale, immediate report replay and regression, separate full and soak architecture-scoped rollups for each group, and one completion receipt plus independent replay per group. Preserve every first faithful failed, noisy, nonpromotable, or host-rejected attempt. After the focused migration, regenerate the complete two-group chain from one clean revision and do not combine AArch64 and x86-64 conclusions.
-18. Finish with `milestone-audit` and independent GPT-5.6/max `full-code-review` lanes over DEM fixture equivalence, public API lifecycle, terminal-newline normalization, optimizer barriers, hostile bounds, schemas, receipts, migration authorization, artifact publication, exact evidence, tests, and documentation. Fix every confirmed issue, log only genuinely newly revealed under-specification, and publish `docs/plans/pq2-dem-parse-print-qualification-progress-report.md` with exact revisions, inventories, worker identities, artifact hashes, ratios, confidence bounds, resource observations, failed attempts, audit closure, review closure, and remaining x86-64 and PQ6 scope.
+2. Bind both groups to the exact canonical parse/print prerequisite and the three family-specific correctness prerequisites `cq2-dem-qualification-flat-errors-family`, `cq2-dem-qualification-coordinate-sparse-family`, and `cq2-dem-qualification-folded-repeats-family`. All prerequisites must pass from the same clean revision before timing.
+3. Give each group nine scales: small, medium, and large variants of `flat-errors`, `coordinate-sparse`, and `folded-repeats`. Each scale binds `family_id`, `size_class`, exact generated bytes, input digest, semantic work, output digest, and the independent Rust and C++ generator contracts.
+4. `flat-errors` covers flat error-heavy throughput with varied probabilities, separators, detector targets, and observable targets. `coordinate-sparse` covers tags, coordinates, shifts, sparse high detector IDs, and sparse high observable IDs. `folded-repeats` covers nested compact repeats with large repeat counts that must remain folded.
+5. Use 64, 4,096, and 65,536 compact work items for small, medium, and large. Accept at most 524,288 work items for flat and coordinate families and 262,144 for folded repeats. Validate monotonic work only within one family.
+6. Generate fixtures outside timing without RNG or architecture-dependent formatting. Rust and C++ must implement the generators independently and agree on exact bytes and digests; neither worker may consume the other's generated fixture.
+7. For `parse`, time only repeated construction and replacement of owned detector error models. For `serialize`, parse one model during setup and time only repeated owned canonical-string production. Output hashing and semantic comparison remain outside timing.
+8. Normalize only the documented terminal-newline difference between Stim and Stab canonical DEM output. Any other byte difference blocks timing.
+9. Keep DEM lifecycle, fixture, and boundary logic in dedicated Rust and C++ modules below the repository file-size limit. Bind every executable source into worker or adapter identities.
+10. Test every family and scale, exact cross-worker fixtures, odd and even iterations, family-specific accepted maxima, first over-cap requests, malformed descriptors, wrong measurements, checked semantic-work overflow, parser/printer output agreement, nested-repeat preservation, and output-mismatch detection.
+11. Keep the global contract preflight representative: one accepted small request per active runtime group and implementation plus three shared rejection classes per implementation. DEM-specific maximum, malformed, odd/even, and overflow behavior belongs to focused unit tests and adapter probes rather than an expanded global matrix.
+12. Use private Stab build-receipt schema version 6, adapter receipt schema version 12, worker protocol version 5, contract-preflight version 16, runtime-group version 7, report version 35, rollup version 5, and completion version 2. Every current runtime receipt binds `raw-work-v2`.
+13. Keep `pq2-dem-parse-adapter-smoke` and `pq2-dem-canonical-print-adapter-smoke`. Each probe validates exact input, work, and normalized output for all families and scale classes plus family-specific boundaries and group isolation. Probe timing remains diagnostic.
+14. Report setup and peak process RSS for all nine scales and the accepted-maximum probes. Preserve inherited M12 memory guards until equal or stronger reviewed qualification evidence replaces them.
+15. Apply independent `1.25x` median and bootstrap-upper-bound Stim parity thresholds to `parse` and `serialize` at all nine scales with no waiver. Use common iterations, alternating paired samples, the existing calibration bounds, and exact seconds-per-work-item normalization.
+16. Evaluate Stab self-regression separately against an architecture-specific reviewed baseline. The first controlled AArch64 full and soak rollups are `unseeded` and generate a baseline candidate; they cannot claim a self-regression pass.
+17. From one clean revision, run full and soak evidence for both groups and all nine scales, producing 36 source reports and four architecture-scoped rollups. Publish one `dem-r6` completion manifest and replay it once. Do not create per-scale replay ceremonies or per-group completion trees.
+18. Finish with milestone audit and full code review over generator equivalence, public API lifecycle, normalization, timing boundaries, hostile bounds, schemas, parity, self-regression, publication, exact evidence, tests, and documentation. Preserve failed attempts and do not combine AArch64 and x86-64 conclusions.
 
 The twelfth slice deliberately qualifies only in-memory DEM text parsing and canonical string serialization. It does not complete `PERF-DEM-MODEL`, deterministic PQ2, traversal, counting, flattening, coordinates, mutation, file I/O, analysis, search, sampling, or any later CQ or PQ milestone.
 
@@ -775,23 +785,23 @@ The twelfth slice deliberately qualifies only in-memory DEM text parsing and can
 - Verify each scale increases declared semantic work monotonically.
 - Verify the adapter and Stab worker emit the same exact input byte count, input digest, and workload semantic output digest for every timing scale; prove that canonically equivalent but byte-distinct input is rejected by the input-identity contract where canonicalization applies.
 - Verify each Stim receipt records the exact ordered CMake-generated `libstim` compile flags and that the adapter compile arguments preserve them, including `-march=native` or explicit SIMD flags where CMake resolves those flags; tampered, omitted, reordered, or injected flags must invalidate the receipt and build fingerprint.
-- Verify every normal qualification run and `just bench::qualification-worker-reproducibility` require the canonical worker preflight. The preflight must make both sealed workers confirm source and build identity through the protocol, execute the shared frozen protocol, fixed odd and even popcount vectors, fixed odd and even dense-XOR vectors, fixed early, all-zero, and late `not_zero` vectors, every accepted maximum, the first unsupported circuit-parse scale, and an 83-item partial gate-table sweep with the start barrier enabled and no input. It must invoke each bit workload's applicable below-minimum, unaligned, and over-cap widths with the start barrier enabled and no input; `not_zero` has no alignment rejection. The sixth slice expands the report from 30 to 42 actual receipts with accepted row fields or rejected process digests, and the preflight digest must include both workers' exact source, build-fingerprint, and binary identities. Offline replay must reject omitted, reordered, altered, refingerprinted, stale, or cross-worker-transplanted receipts even when an attacker recomputes the outer preflight digest. The standalone reproducibility command must additionally require two isolated private builds to produce identical source, build-fingerprint, binary-digest, and preflight identities; a dirty checkout must fail before either private build.
+- Verify every normal qualification run and `just bench::qualification-worker-reproducibility` require the canonical worker preflight. Derive one accepted small request per active runtime group and implementation plus three shared rejection classes per implementation, require deterministic order, reject missing, extra, duplicate, stale, wrong-implementation, or cross-worker-transplanted receipts, and enforce the hard 128-receipt cap. Keep workload-specific odd/even, accepted-maximum, malformed, unsupported, and overflow coverage in focused worker tests and adapter probes. Standalone reproducibility additionally requires two isolated private builds to produce identical source, build-fingerprint, binary-digest, and preflight identities; a dirty checkout fails before either private build.
 - Verify product PR reports are valid but nonpromotable, clean verified full and soak reports are promotable, and regression rejects nonpromotable product reports.
 - Verify source-report offline replay rejects checked-inventory drift, runtime-group drift, stale profiler-note content, wrong ownership, and altered input or memory receipts.
 - Generate separate full-tier and soak-tier architecture-scoped scale-family rollups that list every required scale and fail closed when a scale report is missing, stale, duplicated, nonpromotable, bound to another commit or inventory digest, produced by different worker source, build, or binary identities, or produced on another architecture.
 - Verify formal run and rollup publication reject an existing output directory, a dirty, changed, or source-mismatched producer revision, non-direct or injection-capable artifact names before any lock or filesystem mutation, a live repository-root replacement, an altered exact CQ tree, and both identity-changing and same-inode source replacement during publication. Verify retained CQ bindings survive report loading into rollup publication and that a failed post-exchange validation restores the displaced target.
 - Verify rollup offline replay rejects noncanonical or oversized artifacts, output-path drift, modified source paths or digests, modified timing or memory outcomes, modified aggregate counts, modified producer identity, stale preflight bytes, and compare-and-swap replacement; verify it reconstructs valid failed and noisy families without converting them into passes.
 - Verify family outcome precedence is failed when any measurement failed, otherwise noisy when any measurement is noisy, and passed only when every scale measurement passed.
-- Verify completion publication rejects an existing output directory, dirty or changed repositories, a live repository-root replacement, missing or duplicate scales, colliding or nondirect paths before mutation, mixed report workers, stale probe identity, nonpromotable reports, report-only or incomplete regression results, failed or mixed-identity rollups, non-idempotent report or rollup replay, altered exact CQ trees, altered staged or bound artifact identities and bytes, unexpected staged entries, nonzero step status, malformed step order, stale preflight, noncanonical JSON, identity-changing replacement, and same-inode source or replay-target mutation before or during publication. Verify the real completion dispatcher preserves an existing producer output and publishes an absent output, retained CQ bindings survive source-report loading into the final completion checkpoint, the producer makes its complete output hierarchy durable, rollback never exchanges a substituted directory into the canonical target, a valid displaced target is restored after failed post-exchange validation, substituted displaced children are never unlinked, cleanup failure is reported, and successful cleanup is followed by hierarchy sync plus final repository and source revalidation.
+- Verify completion publication rejects an existing output, missing, extra, or duplicate rollups, missing or duplicate workloads, mixed commits, hosts, inventories, workers, correctness evidence, timing boundaries, or policies, failed parity, failed seeded self-regression, altered sources, noncanonical artifacts, and nondeterministic replay. Verify an unseeded first-architecture regression remains visible without being mislabeled as passing.
 - Keep the existing `m6-clifford-string` baseline row's exact 10,000-qubit Stim comparison and add report-only Stab measurements with a fixed one-qubit non-identity RHS and 10,000-, 100,000-, and 1,000,000-qubit left operands. Require all four runner measurements, normalized work metadata, and the profiler-note link in benchmark harness tests. Use the asymmetric rows only to detect left-tail scaling regressions; they do not qualify unequal-width Stim parity and carry no timing threshold.
-- Verify completion replay reruns worker reproducibility, the exact source-owned adapter probe, every report replay and regression, and both rollup replays before requiring byte-identical canonical receipt and preflight reconstruction. Do not encode milestone audit or independent code review as a machine-certified step.
+- Verify completion replay reconstructs the summary from the exact four rollups and 36 bound reports and requires byte-identical manifest, preflight, and Markdown output. Do not encode milestone audit or independent code review as a machine-certified step.
 
 ### Acceptance Criteria
 
 - Every selected deterministic foundation feature is measured or has a validated non-performance disposition.
 - Every comparable row has exact named measurement pairs and three scales where applicable.
 - Streaming and folded rows satisfy their declared memory-growth classes.
-- Every executable PQ2 product slice completed after completion receipt schema version 1 was introduced has a replayed canonical completion receipt that binds its exact full and soak source reports, regressions, rollups, worker reproducibility, and adapter probe from one clean unchanged revision and one exact CPU identity. Historical slices accepted under the preceding contract remain historical and are not counted as receipt-backed.
+- The active DEM R6 scope has one replayed schema-version-2 architecture/revision completion manifest binding its 36 source reports, four rollups, worker identity, correctness evidence, parity, self-regression, environment, and memory evidence. Historical schema-version-1 receipts remain historical.
 - Every ratio above 1.25 has a profiler note and owner and remains a failed target.
 - Every measured scale binds exact input identity as well as semantic work and output identity.
 - The private Stim and Stab worker builds are byte-reproducible under their source-owned receipts, and each scale-family rollup binds one exact worker identity.
@@ -983,9 +993,10 @@ just bench::qualification-run --tier soak --out target/benchmarks/qualification/
 just bench::qualification-report --input target/benchmarks/qualification/pq1-pr
 just bench::qualification-report --input target/benchmarks/qualification/pq1-full
 just bench::qualification-report --input target/benchmarks/qualification/pq1-soak
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-pr
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-full
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-soak
+just bench::qualification-parity --input target/benchmarks/qualification/pq1-pr
+just bench::qualification-parity --input target/benchmarks/qualification/pq1-full
+just bench::qualification-parity --input target/benchmarks/qualification/pq1-soak
+just qualification::status --check
 just bench::primary-beta --baseline <fresh-primary-baseline>
 just bench::primary-regression --baseline <fresh-primary-baseline> --report target/benchmarks/qualification/m12-regression
 just bench::primary-memory-regression --baseline <fresh-primary-baseline>

@@ -8,6 +8,7 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 - [plans/](plans/): milestone plans and progress reports. `plans/rust-stim-drop-in-rewrite.md` is the implementation roadmap, and `plans/GOAL.md` is the active execution contract for `plans/qualification-economy-regression-plan.md`.
 - [stab-feature-checklist.md](stab-feature-checklist.md): Stab feature availability against Stim v1.16.0.
 - [stim-feature-list.md](stim-feature-list.md): the upstream Stim v1.16.0 feature inventory that the checklist maps onto.
+- [qualification-status.md](qualification-status.md): generated current qualification counts, contract identities, and completion checkpoint.
 
 ## Documentation Policy
 
@@ -25,6 +26,7 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 - Use `just qualification::correctness-report --out <report-directory>` to validate `request.json`, `report.json`, `completion.json`, every case execution receipt, and the derived Markdown and preflight artifacts, then use `just qualification::correctness-preflight --out <report-directory> --case <qualification-case-id> --request-sha256 <run-request-sha256> --completion-sha256 <run-completion-sha256>` to verify the controller-approved selection and outcomes before dependent performance work.
 - Use `--allow-deferred` only with explicit correctness `--case` filters for diagnostic visibility; a report containing deferred cases is never valid preflight evidence.
 - Existing Cargo primary selectors in the correctness manifest must select one concrete libtest case with `--exact`; broad filters are supporting evidence only and cannot close a planned atomic owner.
+- Every selected public item still needs inventory ownership, but ordinary derived traits, trivial accessors, marker declarations, and Rust `Debug` formatting do not need standalone runtime assertions unless their behavior or representation is part of the compatibility contract. Test resource promises through bounded allocation, capacity, and cancellation behavior instead of pointer identity unless the public API explicitly promises storage identity.
 
 ## Oracle Corpus Workflows
 
