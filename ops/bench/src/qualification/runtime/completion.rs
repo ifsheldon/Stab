@@ -839,14 +839,25 @@ fn validate_manifest(manifest: &CompletionManifest) -> Result<(), CompletionErro
         .iter()
         .map(|rollup| rollup_key(&rollup.group_id, rollup.tier))
         .collect::<Vec<_>>();
+    let expected_regression_groups = [DEM_PARSE_GROUP, DEM_PRINT_GROUP];
+    let actual_regression_groups = manifest
+        .regression_outcomes
+        .iter()
+        .map(|outcome| outcome.group_id.as_str())
+        .collect::<Vec<_>>();
     if actual_keys != expected_keys
         || manifest
             .rollups
             .iter()
             .any(|rollup| rollup.overall_outcome != GateOutcome::Passed)
         || manifest.regression_outcomes.len() != 2
+        || actual_regression_groups != expected_regression_groups
         || manifest.regression_outcomes.iter().any(|outcome| {
-            outcome.outcome == SelfRegressionOutcome::Passed && outcome.unseeded_measurements != 0
+            (outcome.checked_measurements == 0 && outcome.unseeded_measurements == 0)
+                || match outcome.outcome {
+                    SelfRegressionOutcome::Passed => outcome.unseeded_measurements != 0,
+                    SelfRegressionOutcome::Unseeded => outcome.unseeded_measurements == 0,
+                }
         })
     {
         return Err(CompletionError::Boundary);

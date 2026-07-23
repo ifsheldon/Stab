@@ -41,6 +41,15 @@ pub(super) struct QualificationSession {
     repository: artifact::RepositoryBinding,
 }
 
+pub(super) struct QualificationPolicyStatus {
+    pub(super) parity_policy_sha256: String,
+    pub(super) maximum_parity_ratio: f64,
+    pub(super) regression_policy_sha256: String,
+    pub(super) regression_baselines_sha256: String,
+    pub(super) regression_default_max_relative_ratio: String,
+    pub(super) regression_seeded_identity_count: usize,
+}
+
 impl QualificationSession {
     pub(super) fn open(root: &crate::root::RepoRoot) -> Result<Self, String> {
         let repository =
@@ -68,6 +77,29 @@ impl QualificationSession {
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), String> {
     worker::run(args).map_err(|error| error.to_string())
+}
+
+pub(super) fn qualification_policy_status(
+    root: &crate::root::RepoRoot,
+    inventory_digest: &str,
+) -> Result<QualificationPolicyStatus, String> {
+    let regression = self_regression::source_identities(root, inventory_digest)
+        .map_err(|error| error.to_string())?;
+    Ok(QualificationPolicyStatus {
+        parity_policy_sha256: parity::policy_sha256(root, inventory_digest)
+            .map_err(|error| error.to_string())?,
+        maximum_parity_ratio: parity::MAX_PARITY_RATIO,
+        regression_policy_sha256: regression.policy_sha256,
+        regression_baselines_sha256: regression.baselines_sha256,
+        regression_default_max_relative_ratio: regression.default_max_relative_ratio,
+        regression_seeded_identity_count: regression.seeded_identity_count,
+    })
+}
+
+pub(super) fn validate_status_artifact_path(path: &std::path::Path) -> Result<(), String> {
+    artifact::DirectQualificationArtifactPath::try_new(path)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 pub(super) fn validate_migration_target(
@@ -101,7 +133,13 @@ pub(super) fn validate_migration_target(
 }
 
 pub(crate) fn run_probe(session: &QualificationSession, args: ProbeArgs) -> Result<(), String> {
-    probe::run(&session.source_root, args).map_err(|error| error.to_string())
+    probe::run(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        args,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(crate) fn regenerate_clifford_vectors(

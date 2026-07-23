@@ -1,13 +1,14 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::num::NonZeroU64;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Args, ValueEnum};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::adapter::prepare_adapter;
+use super::artifact::RepositoryBinding;
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
@@ -20,7 +21,11 @@ use crate::root::RepoRoot;
 
 mod clifford_string;
 mod dem_model;
+mod memory_receipt;
 mod pauli_iter;
+
+use memory_receipt::AdapterProbeExecution;
+pub(in crate::qualification::runtime) use memory_receipt::AdapterProbeReceipt;
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
@@ -245,31 +250,22 @@ pub(crate) struct ProbeArgs {
     /// Produce timing or separately classified memory evidence.
     #[arg(long, value_enum, default_value = "timing")]
     evidence_mode: ProbeEvidenceMode,
+
+    /// New immutable accepted-maximum memory receipt directory for a DEM memory probe.
+    #[arg(long)]
+    out: Option<PathBuf>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct AdapterProbeReceipt {
-    pub(super) probe_id: String,
-    pub(super) runtime_group_id: String,
-    pub(super) evidence_mode: String,
-    pub(super) iteration_count: u64,
-    pub(super) work_items: u64,
-    pub(super) work_count: u64,
-    pub(super) input_bytes: u64,
-    pub(super) input_digest: String,
-    pub(super) output_digest: String,
-    pub(super) stim_source_sha256: String,
-    pub(super) stim_build_fingerprint: String,
-    pub(super) stim_binary_sha256: String,
-    pub(super) stab_source_sha256: String,
-    pub(super) stab_build_fingerprint: String,
-}
-
-pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
+pub(super) fn run(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
+    args: ProbeArgs,
+) -> Result<(), ProbeError> {
     validate_probe_work_items(args.group, probe_work_items(&args))?;
+    let output = memory_receipt::prepare_output(root, repository, &args)?;
     match args.group {
-        ProbeGroup::ProcessContract => run_process_probe(root, args),
+        ProbeGroup::ProcessContract => run_process_probe(source_root, args),
         ProbeGroup::AdapterProtocol
         | ProbeGroup::CircuitParseAdapter
         | ProbeGroup::CircuitCanonicalPrintAdapter
@@ -289,7 +285,22 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::CliffordStringIdentityAdapter
         | ProbeGroup::CliffordStringNonIdentityAdapter
         | ProbeGroup::DemParseAdapter
-        | ProbeGroup::DemCanonicalPrintAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::DemCanonicalPrintAdapter => {
+            if output.is_none() {
+                return run_adapter_probe(source_root, args).map(|_| ());
+            }
+            let repository_before = super::run::bound_repository_state(root, repository)?;
+            memory_receipt::require_clean_repository(&repository_before)?;
+            let execution = run_adapter_probe(source_root, args)?;
+            let repository_after = super::run::bound_repository_state(root, repository)?;
+            let repository_evidence =
+                memory_receipt::bind_repository(repository_before, repository_after)?;
+            let output = output.ok_or_else(|| {
+                ProbeError::Contract("DEM memory receipt output disappeared".to_string())
+            })?;
+            memory_receipt::publish(root, repository, output, repository_evidence, execution)?;
+            Ok(())
+        }
     }
 }
 
@@ -345,7 +356,10 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     Ok(())
 }
 
-fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeReceipt, ProbeError> {
+fn run_adapter_probe(
+    root: &RepoRoot,
+    args: ProbeArgs,
+) -> Result<AdapterProbeExecution, ProbeError> {
     let expected_work_count = expected_work_count(&args)?;
     let (probe_id, workload, measurement) = match args.group {
         ProbeGroup::AdapterProtocol => (ADAPTER_PROBE_ID, "protocol-smoke", "main"),
@@ -534,7 +548,8 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         &current_exe,
         &worker_identity,
     )?;
-    dem_model::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
+    let dem_accepted_maximum_memory =
+        dem_model::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
 
     if args.evidence_mode == ProbeEvidenceMode::Timing {
         let pairs = pair_measurements(0, PairOrder::StimThenStab, &stim_rows, &stab_rows)?;
@@ -583,21 +598,24 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         .group
         .runtime_group_id()
         .ok_or_else(|| ProbeError::Contract("adapter probe has no runtime group".to_string()))?;
-    Ok(AdapterProbeReceipt {
-        probe_id: probe_id.to_string(),
-        runtime_group_id: runtime_group_id.to_string(),
-        evidence_mode: args.evidence_mode.as_str().to_string(),
-        iteration_count: args.iterations.get(),
-        work_items: probe_work_items(&args),
-        work_count: stim.work_count,
-        input_bytes: stim.input_bytes,
-        input_digest: stim.input_digest.as_str().to_string(),
-        output_digest: stim.output_digest.as_str().to_string(),
-        stim_source_sha256: stim.source_digest.as_str().to_string(),
-        stim_build_fingerprint: stim.build_fingerprint.as_str().to_string(),
-        stim_binary_sha256: adapter.binary_digest.as_str().to_string(),
-        stab_source_sha256: stab.source_digest.as_str().to_string(),
-        stab_build_fingerprint: stab.build_fingerprint.as_str().to_string(),
+    Ok(AdapterProbeExecution {
+        receipt: AdapterProbeReceipt {
+            probe_id: probe_id.to_string(),
+            runtime_group_id: runtime_group_id.to_string(),
+            evidence_mode: args.evidence_mode.as_str().to_string(),
+            iteration_count: args.iterations.get(),
+            work_items: probe_work_items(&args),
+            work_count: stim.work_count,
+            input_bytes: stim.input_bytes,
+            input_digest: stim.input_digest.as_str().to_string(),
+            output_digest: stim.output_digest.as_str().to_string(),
+            stim_source_sha256: stim.source_digest.as_str().to_string(),
+            stim_build_fingerprint: stim.build_fingerprint.as_str().to_string(),
+            stim_binary_sha256: adapter.binary_digest.as_str().to_string(),
+            stab_source_sha256: stab.source_digest.as_str().to_string(),
+            stab_build_fingerprint: stab.build_fingerprint.as_str().to_string(),
+        },
+        dem_accepted_maximum_memory,
     })
 }
 
@@ -802,6 +820,8 @@ fn display_rss(value: Option<u64>) -> String {
 #[derive(Debug, Error)]
 pub(super) enum ProbeError {
     #[error(transparent)]
+    Artifact(#[from] super::artifact::ArtifactError),
+    #[error(transparent)]
     Adapter(#[from] super::adapter::AdapterError),
     #[error(transparent)]
     Git(#[from] super::git::GitError),
@@ -819,8 +839,16 @@ pub(super) enum ProbeError {
     CurrentExecutable(std::io::Error),
     #[error("Stab qualification worker identity changed during the probe")]
     WorkerIdentityChanged,
+    #[error("qualification probe publication requires a clean repository")]
+    DirtyRepository,
+    #[error("qualification probe repository changed from {before} to {after}")]
+    RepositoryChanged { before: String, after: String },
+    #[error("DEM accepted-maximum memory receipt is incomplete or malformed")]
+    MemoryReceipt,
     #[error("qualification probe semantic work count overflows u64")]
     WorkOverflow,
+    #[error("failed to serialize the qualification probe receipt: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("qualification probe contract failed: {0}")]
     Contract(String),
 }
@@ -1027,6 +1055,7 @@ mod tests {
             iterations: NonZeroU64::new(1_u64 << 48).expect("nonzero overflow iterations"),
             work_items: NonZeroU64::new(DEFAULT_TRANSPOSE_WORK_ITEMS),
             evidence_mode: ProbeEvidenceMode::Timing,
+            out: None,
         };
         assert!(
             validate_probe_work_items(args.group, probe_work_items(&args)).is_ok(),
@@ -1065,6 +1094,7 @@ mod tests {
             iterations: NonZeroU64::new(1_u64 << 44).expect("nonzero overflow iterations"),
             work_items: NonZeroU64::new(PAULI_MAX_QUBITS),
             evidence_mode: ProbeEvidenceMode::Timing,
+            out: None,
         };
         assert!(
             validate_probe_work_items(args.group, probe_work_items(&args)).is_ok(),
@@ -1151,6 +1181,7 @@ mod tests {
                 iterations: NonZeroU64::new(u64::MAX).expect("nonzero overflow iterations"),
                 work_items: NonZeroU64::new(work_items),
                 evidence_mode: ProbeEvidenceMode::Timing,
+                out: None,
             };
             assert!(validate_probe_work_items(group, work_items).is_ok());
             assert!(matches!(

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
-use super::protocol::TimingBoundary;
+use super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
 use super::rollup::{RollupRegressionScale, RollupReplayEvidence};
 use super::run::QualificationTier;
 use crate::qualification::model::SizeClass;
@@ -17,7 +17,7 @@ const REGRESSION_BASELINE_SCHEMA_VERSION: u32 = 1;
 const MAX_POLICY_BYTES: usize = 1 << 20;
 const MAX_BASELINE_BYTES: usize = 8 << 20;
 const MAX_ENTRIES: usize = 4_096;
-const MAX_DEFAULT_TOLERANCE: f64 = 1.15;
+const DEFAULT_TOLERANCE: f64 = 1.15;
 const MAX_EXCEPTION_TOLERANCE: f64 = 1.25;
 pub(super) const DEFAULT_REGRESSION_POLICY: &str =
     "benchmarks/qualification-regression-policy.json";
@@ -77,6 +77,8 @@ pub(crate) struct SelfRegressionSummary {
 pub(super) struct RegressionSourceIdentities {
     pub(super) policy_sha256: String,
     pub(super) baselines_sha256: String,
+    pub(super) default_max_relative_ratio: String,
+    pub(super) seeded_identity_count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -270,17 +272,25 @@ pub(super) fn check_sources(
     root: &RepoRoot,
     expected_performance_inventory_sha256: &str,
 ) -> Result<(), SelfRegressionError> {
-    let policy = load_policy(root, Path::new(DEFAULT_REGRESSION_POLICY))?;
-    validate_policy(&policy)?;
-    let baselines = load_baselines(root, Path::new(DEFAULT_REGRESSION_BASELINES))?;
-    validate_baselines(&baselines, expected_performance_inventory_sha256)
+    load_checked_sources(
+        root,
+        expected_performance_inventory_sha256,
+        Path::new(DEFAULT_REGRESSION_POLICY),
+        Path::new(DEFAULT_REGRESSION_BASELINES),
+    )
+    .map(|_| ())
 }
 
 pub(super) fn source_identities(
     root: &RepoRoot,
     expected_performance_inventory_sha256: &str,
 ) -> Result<RegressionSourceIdentities, SelfRegressionError> {
-    check_sources(root, expected_performance_inventory_sha256)?;
+    let (policy, baselines) = load_checked_sources(
+        root,
+        expected_performance_inventory_sha256,
+        Path::new(DEFAULT_REGRESSION_POLICY),
+        Path::new(DEFAULT_REGRESSION_BASELINES),
+    )?;
     Ok(RegressionSourceIdentities {
         policy_sha256: source_sha256(root, Path::new(DEFAULT_REGRESSION_POLICY), MAX_POLICY_BYTES)?,
         baselines_sha256: source_sha256(
@@ -288,6 +298,8 @@ pub(super) fn source_identities(
             Path::new(DEFAULT_REGRESSION_BASELINES),
             MAX_BASELINE_BYTES,
         )?,
+        default_max_relative_ratio: policy.default_max_relative_ratio,
+        seeded_identity_count: baselines.entries.len(),
     })
 }
 
@@ -316,11 +328,28 @@ fn evaluate_evidence_with_sources(
     baselines_path: &Path,
 ) -> Result<SelfRegressionSummary, SelfRegressionError> {
     let current = current_measurements(full, soak)?;
-    let policy = load_policy(source_root, policy_path)?;
-    validate_policy(&policy)?;
-    let baselines = load_baselines(source_root, baselines_path)?;
-    validate_baselines(&baselines, expected_performance_inventory_sha256)?;
+    let (policy, baselines) = load_checked_sources(
+        source_root,
+        expected_performance_inventory_sha256,
+        policy_path,
+        baselines_path,
+    )?;
     evaluate_current(full.group_id.clone(), &current, &policy, &baselines)
+}
+
+fn load_checked_sources(
+    root: &RepoRoot,
+    expected_performance_inventory_sha256: &str,
+    policy_path: &Path,
+    baselines_path: &Path,
+) -> Result<(RegressionPolicy, RegressionBaselineFile), SelfRegressionError> {
+    let policy = load_policy(root, policy_path)?;
+    validate_policy(&policy)?;
+    let baselines = load_baselines(root, baselines_path)?;
+    validate_baselines(&baselines, expected_performance_inventory_sha256)?;
+    let contracts = super::group::load_groups(root, expected_performance_inventory_sha256)?;
+    validate_source_targets(&policy, &baselines, &contracts)?;
+    Ok((policy, baselines))
 }
 
 fn evaluate_current(
@@ -517,7 +546,6 @@ fn require_matching_scale(
 #[serde(deny_unknown_fields)]
 struct WorkloadDigestMaterial<'a> {
     group_id: &'a str,
-    group_contract_sha256: &'a str,
     workload_id: &'a str,
     family_id: &'a str,
     scale_id: &'a str,
@@ -535,7 +563,6 @@ fn workload_contract_digest(
 ) -> Result<String, SelfRegressionError> {
     let bytes = serde_json::to_vec(&WorkloadDigestMaterial {
         group_id: &rollup.group_id,
-        group_contract_sha256: &rollup.group_contract_sha256,
         workload_id: &rollup.workload_id,
         family_id: &scale.family_id,
         scale_id: &scale.scale_id,
@@ -574,7 +601,7 @@ fn validate_policy(policy: &RegressionPolicy) -> Result<(), SelfRegressionError>
         "default_max_relative_ratio",
         &policy.default_max_relative_ratio,
     )?;
-    if default > MAX_DEFAULT_TOLERANCE {
+    if default != DEFAULT_TOLERANCE {
         return Err(SelfRegressionError::InvalidTolerance(default));
     }
     let mut unique = BTreeSet::new();
@@ -619,13 +646,77 @@ fn validate_baselines(
         {
             return Err(SelfRegressionError::BaselineIdentity);
         }
-        parse_positive_ratio("accepted_median_ratio", &entry.accepted_median_ratio)?;
-        parse_positive_ratio(
+        let median = parse_positive_ratio("accepted_median_ratio", &entry.accepted_median_ratio)?;
+        let upper = parse_positive_ratio(
             "accepted_confidence_interval_upper",
             &entry.accepted_confidence_interval_upper,
         )?;
+        if upper < median {
+            return Err(SelfRegressionError::BaselineIdentity);
+        }
     }
     Ok(())
+}
+
+fn validate_source_targets(
+    policy: &RegressionPolicy,
+    baselines: &RegressionBaselineFile,
+    contracts: &[super::group::GroupContract],
+) -> Result<(), SelfRegressionError> {
+    for exception in &policy.exceptions {
+        let Some(contract) = release_contract(contracts, &exception.group_id) else {
+            return Err(SelfRegressionError::InvalidException);
+        };
+        let scale_matches = contract.scales.iter().any(|scale| {
+            scale.id.to_string() == exception.scale_id
+                && scale.family_id.to_string() == exception.family_id
+        });
+        let measurement_matches = contract
+            .measurement_ids
+            .iter()
+            .any(|measurement| measurement.to_string() == exception.measurement_id);
+        if !scale_matches || !measurement_matches {
+            return Err(SelfRegressionError::InvalidException);
+        }
+    }
+    for entry in &baselines.entries {
+        let key = &entry.key;
+        let Some(contract) = release_contract(contracts, &key.group_id) else {
+            return Err(SelfRegressionError::BaselineIdentity);
+        };
+        let scale_matches = contract.scales.iter().any(|scale| {
+            scale.id.to_string() == key.scale_id
+                && scale.family_id.to_string() == key.family_id
+                && scale.size_class == key.size_class
+        });
+        let measurement_matches = contract
+            .measurement_ids
+            .iter()
+            .any(|measurement| measurement.to_string() == key.measurement_id);
+        if !scale_matches
+            || !measurement_matches
+            || key.host_profile_id.is_empty()
+            || key.cpu_identity.is_empty()
+            || key.architecture.is_empty()
+            || key.target_triple.is_empty()
+            || key.stim_commit != crate::config::STIM_COMMIT
+            || key.timing_boundary != RAW_WORK_TIMING_BOUNDARY
+        {
+            return Err(SelfRegressionError::BaselineIdentity);
+        }
+    }
+    Ok(())
+}
+
+fn release_contract<'a>(
+    contracts: &'a [super::group::GroupContract],
+    group_id: &str,
+) -> Option<&'a super::group::GroupContract> {
+    contracts.iter().find(|contract| {
+        contract.id.to_string() == group_id
+            && contract.claim_class == super::run::ClaimClass::PromotablePerformance
+            && contract.parity_eligibility == super::group::ParityEligibility::ThresholdEligible
+    })
 }
 
 fn tolerance_for(
@@ -687,11 +778,13 @@ pub(super) enum SelfRegressionError {
     Rollup(#[from] super::rollup::RollupError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Group(#[from] super::group::GroupError),
     #[error("failed to read self-regression source contract: {0}")]
     Read(String),
     #[error("self-regression policy schema is unsupported")]
     PolicySchema,
-    #[error("self-regression tolerance {0} is outside the source-owned limit")]
+    #[error("self-regression default tolerance {0} must be exactly 1.15")]
     InvalidTolerance(f64),
     #[error("self-regression exception is duplicated, unjustified, or outside 1.15..=1.25")]
     InvalidException,
@@ -723,6 +816,8 @@ pub(super) enum SelfRegressionError {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU64;
+
     use super::*;
 
     fn key() -> RegressionKey {
@@ -767,6 +862,34 @@ mod tests {
             accepted_confidence_interval_upper: "1.0".to_string(),
             full_rollup_sha256: "f".repeat(64),
             soak_rollup_sha256: "0".repeat(64),
+        }
+    }
+
+    fn contract() -> super::super::group::GroupContract {
+        super::super::group::GroupContract {
+            id: super::super::protocol::ProtocolId::try_new("group").expect("group id"),
+            claim_class: super::super::run::ClaimClass::PromotablePerformance,
+            parity_eligibility: super::super::group::ParityEligibility::ThresholdEligible,
+            timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
+            workload_id: super::super::protocol::ProtocolId::try_new("workload")
+                .expect("workload id"),
+            measurement_ids: vec![
+                super::super::protocol::ProtocolId::try_new("main").expect("measurement id"),
+            ],
+            scales: vec![super::super::group::ScaleContract {
+                id: super::super::protocol::ProtocolId::try_new("family-small").expect("scale id"),
+                family_id: super::super::protocol::ProtocolId::try_new("family")
+                    .expect("family id"),
+                size_class: SizeClass::Small,
+                work_items: NonZeroU64::new(1).expect("nonzero work"),
+                input_bytes: 0,
+                input_digest: super::super::protocol::InputDigest::try_new("1".repeat(64))
+                    .expect("input digest"),
+            }],
+            correctness_case_ids: Vec::new(),
+            owner: super::super::protocol::ProtocolId::try_new("owner").expect("owner id"),
+            profiler_note: None,
+            comparator_sources: Vec::new(),
         }
     }
 
@@ -815,6 +938,35 @@ mod tests {
     }
 
     #[test]
+    fn policy_requires_the_exact_default_regression_tolerance() {
+        assert!(validate_policy(&policy("1.15")).is_ok());
+        assert!(matches!(
+            validate_policy(&policy("1.149")),
+            Err(SelfRegressionError::InvalidTolerance(value)) if value == 1.149
+        ));
+    }
+
+    #[test]
+    fn workload_digest_material_excludes_source_and_profiler_identity() {
+        let material = WorkloadDigestMaterial {
+            group_id: "group",
+            workload_id: "workload",
+            family_id: "family",
+            scale_id: "family-small",
+            size_class: SizeClass::Small,
+            work_items: 64,
+            input_digest: "a",
+            timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
+            timing_boundary: TimingBoundary::RawWorkV2,
+            comparator_sources: &[("comparator.cc".to_string(), "b".repeat(64))],
+        };
+        let value = serde_json::to_value(material).expect("workload digest material");
+        assert!(value.get("group_contract_sha256").is_none());
+        assert!(value.get("profiler_note").is_none());
+        assert!(value.get("stab_commit").is_none());
+    }
+
+    #[test]
     fn baselines_reject_duplicates_and_stale_identities() {
         let mut duplicated = baseline(entry());
         let first_baseline = duplicated.entries.first().expect("first baseline").clone();
@@ -837,6 +989,64 @@ mod tests {
         assert!(matches!(
             validate_baselines(&baseline(entry()), &"1".repeat(64)),
             Err(SelfRegressionError::BaselineIdentity)
+        ));
+        let mut inverted = baseline(entry());
+        let entry = inverted.entries.first_mut().expect("first baseline");
+        entry.accepted_median_ratio = "1.1".to_string();
+        entry.accepted_confidence_interval_upper = "1.0".to_string();
+        assert!(matches!(
+            validate_baselines(&inverted, &"e".repeat(64)),
+            Err(SelfRegressionError::BaselineIdentity)
+        ));
+    }
+
+    #[test]
+    fn source_targets_must_match_an_active_release_contract() {
+        let mut accepted = entry();
+        accepted.key.stim_commit = crate::config::STIM_COMMIT.to_string();
+        assert!(
+            validate_source_targets(&policy("1.15"), &baseline(accepted.clone()), &[contract()])
+                .is_ok()
+        );
+
+        let mut stale = accepted.clone();
+        stale.key.family_id = "retired-family".to_string();
+        assert!(matches!(
+            validate_source_targets(&policy("1.15"), &baseline(stale), &[contract()]),
+            Err(SelfRegressionError::BaselineIdentity)
+        ));
+
+        let mut diagnostic = contract();
+        diagnostic.claim_class = super::super::run::ClaimClass::DiagnosticInfrastructure;
+        diagnostic.parity_eligibility = super::super::group::ParityEligibility::ReportOnly;
+        assert!(matches!(
+            validate_source_targets(&policy("1.15"), &baseline(accepted), &[diagnostic]),
+            Err(SelfRegressionError::BaselineIdentity)
+        ));
+    }
+
+    #[test]
+    fn regression_exceptions_cannot_target_retired_measurements() {
+        let mut with_exception = policy("1.15");
+        with_exception.exceptions.push(RegressionException {
+            group_id: "group".to_string(),
+            family_id: "family".to_string(),
+            scale_id: "family-small".to_string(),
+            measurement_id: "retired-measurement".to_string(),
+            max_relative_ratio: "1.20".to_string(),
+            justification: "A committed source-owned exception for a noisy workload.".to_string(),
+        });
+        assert!(matches!(
+            validate_source_targets(
+                &with_exception,
+                &RegressionBaselineFile {
+                    schema_version: REGRESSION_BASELINE_SCHEMA_VERSION,
+                    performance_inventory_sha256: "e".repeat(64),
+                    entries: Vec::new(),
+                },
+                &[contract()]
+            ),
+            Err(SelfRegressionError::InvalidException)
         ));
     }
 

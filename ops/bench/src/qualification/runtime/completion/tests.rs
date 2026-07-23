@@ -241,6 +241,18 @@ fn completion_manifest_distinguishes_unseeded_and_passing_regression() {
         .expect("first regression outcome")
         .unseeded_measurements = 1;
     assert!(validate_manifest(&current).is_err());
+
+    let mut false_unseeded = manifest();
+    false_unseeded
+        .regression_outcomes
+        .first_mut()
+        .expect("first regression outcome")
+        .unseeded_measurements = 0;
+    assert!(validate_manifest(&false_unseeded).is_err());
+
+    let mut wrong_group_order = manifest();
+    wrong_group_order.regression_outcomes.swap(0, 1);
+    assert!(validate_manifest(&wrong_group_order).is_err());
 }
 
 #[test]
@@ -301,6 +313,10 @@ fn completion_scope_rejects_unknown_missing_and_duplicate_rollups() {
     assert!(matches!(
         admit_paths(&output, &[duplicate.clone(), duplicate]),
         Err(CompletionError::DuplicatePath(_))
+    ));
+    assert!(matches!(
+        admit_paths(&output, &[output.as_path().to_path_buf()]),
+        Err(CompletionError::OutputCollision(_))
     ));
 }
 

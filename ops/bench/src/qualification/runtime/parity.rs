@@ -13,6 +13,7 @@ use crate::root::RepoRoot;
 
 const PARITY_POLICY_SCHEMA_VERSION: u32 = 2;
 const MAX_PARITY_POLICY_BYTES: usize = 4 << 20;
+pub(super) const MAX_PARITY_RATIO: f64 = 1.25;
 pub(super) const DEFAULT_PARITY_POLICY: &str = "benchmarks/qualification-parity-policy.json";
 
 #[derive(Clone, Debug, Args)]
@@ -105,23 +106,7 @@ pub(super) fn run_with_repository_and_policy(
     input: &DirectQualificationArtifactPath,
     policy: &Path,
 ) -> Result<ParitySummary, ParityError> {
-    let policy_path = source_root.resolve_relative(policy);
-    let policy_bytes = crate::source_file::read_repo_regular_file_bounded(
-        source_root,
-        &policy_path,
-        MAX_PARITY_POLICY_BYTES,
-    )
-    .map_err(|error| ParityError::PolicyRead(error.to_string()))?;
-    let policy: ParityPolicy =
-        serde_json::from_slice(&policy_bytes).map_err(ParityError::PolicyJson)?;
-    let contracts = super::group::load_groups(source_root, expected_performance_inventory_sha256)?;
-    validate_policy(&policy, &contracts)?;
-    if policy.performance_inventory_sha256 != expected_performance_inventory_sha256 {
-        return Err(ParityError::InventoryMismatch {
-            policy: policy.performance_inventory_sha256,
-            report: expected_performance_inventory_sha256.to_string(),
-        });
-    }
+    let policy = load_checked_policy(source_root, expected_performance_inventory_sha256, policy)?;
     let evidence = super::report::load_validated_published_evidence(
         root,
         source_root,
@@ -130,11 +115,30 @@ pub(super) fn run_with_repository_and_policy(
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
     )?;
-    let report = evidence.report;
+    evaluate_report_with_policy(&evidence.report, &policy)
+}
+
+pub(super) fn evaluate_report(
+    source_root: &RepoRoot,
+    expected_performance_inventory_sha256: &str,
+    report: &super::run::QualificationReport,
+) -> Result<ParitySummary, ParityError> {
+    let policy = load_checked_policy(
+        source_root,
+        expected_performance_inventory_sha256,
+        Path::new(DEFAULT_PARITY_POLICY),
+    )?;
+    evaluate_report_with_policy(report, &policy)
+}
+
+fn evaluate_report_with_policy(
+    report: &super::run::QualificationReport,
+    policy: &ParityPolicy,
+) -> Result<ParitySummary, ParityError> {
     if policy.performance_inventory_sha256 != report.performance_inventory_sha256 {
         return Err(ParityError::InventoryMismatch {
-            policy: policy.performance_inventory_sha256,
-            report: report.performance_inventory_sha256,
+            policy: policy.performance_inventory_sha256.clone(),
+            report: report.performance_inventory_sha256.clone(),
         });
     }
     let selected = policy
@@ -150,14 +154,14 @@ pub(super) fn run_with_repository_and_policy(
     )? {
         RuleDisposition::ReportOnly => {
             return Ok(ParitySummary {
-                group_id: report.group_id,
+                group_id: report.group_id.clone(),
                 checked_measurements: 0,
                 report_only: true,
             });
         }
         RuleDisposition::Gated => {}
     }
-    let authoritative = super::report::authoritative_timing_attempt(&report)?;
+    let authoritative = super::report::authoritative_timing_attempt(report)?;
     let mut checked = 0;
     for rule in &selected.measurements {
         let summary = authoritative
@@ -185,10 +189,35 @@ pub(super) fn run_with_repository_and_policy(
         checked += 1;
     }
     Ok(ParitySummary {
-        group_id: report.group_id,
+        group_id: report.group_id.clone(),
         checked_measurements: checked,
         report_only: false,
     })
+}
+
+fn load_checked_policy(
+    source_root: &RepoRoot,
+    expected_performance_inventory_sha256: &str,
+    policy_path: &Path,
+) -> Result<ParityPolicy, ParityError> {
+    let policy_path = source_root.resolve_relative(policy_path);
+    let policy_bytes = crate::source_file::read_repo_regular_file_bounded(
+        source_root,
+        &policy_path,
+        MAX_PARITY_POLICY_BYTES,
+    )
+    .map_err(|error| ParityError::PolicyRead(error.to_string()))?;
+    let policy: ParityPolicy =
+        serde_json::from_slice(&policy_bytes).map_err(ParityError::PolicyJson)?;
+    let contracts = super::group::load_groups(source_root, expected_performance_inventory_sha256)?;
+    validate_policy(&policy, &contracts)?;
+    if policy.performance_inventory_sha256 != expected_performance_inventory_sha256 {
+        return Err(ParityError::InventoryMismatch {
+            policy: policy.performance_inventory_sha256,
+            report: expected_performance_inventory_sha256.to_string(),
+        });
+    }
+    Ok(policy)
 }
 
 fn require_passed_outcome(measurement_id: &str, outcome: GateOutcome) -> Result<(), ParityError> {
@@ -322,7 +351,7 @@ fn parse_ratio(field: &'static str, value: &str) -> Result<f64, ParityError> {
             field,
             value: value.to_string(),
         })?;
-    if ratio.is_finite() && ratio > 0.0 {
+    if ratio.is_finite() && ratio > 0.0 && ratio <= MAX_PARITY_RATIO {
         Ok(ratio)
     } else {
         Err(ParityError::InvalidRatio {
@@ -440,6 +469,7 @@ mod tests {
         assert!(validate_policy(&policy, &[diagnostic_contract()]).is_err());
         assert!(parse_ratio("ratio", "NaN").is_err());
         assert!(parse_ratio("ratio", "0").is_err());
+        assert!(parse_ratio("ratio", "1.2500001").is_err());
     }
 
     #[test]

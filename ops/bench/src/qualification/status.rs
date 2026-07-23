@@ -11,8 +11,9 @@ use crate::root::RepoRoot;
 
 const STATUS_PATH: &str = "docs/qualification-status.md";
 const RUNTIME_GROUPS_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const REGRESSION_BASELINES_PATH: &str = "benchmarks/qualification-regression-baselines.json";
 const COMPLETION_CHECKPOINT_PATH: &str = "benchmarks/qualification-completion-checkpoint.json";
+const COMPLETION_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
+const COMPLETION_SCOPE: &str = "dem-r6";
 const MAX_SOURCE_BYTES: usize = 32 << 20;
 
 #[derive(Clone, Debug, Args)]
@@ -61,12 +62,6 @@ enum RuntimeClaimClass {
 }
 
 #[derive(Debug, Deserialize)]
-struct RegressionBaselines {
-    performance_inventory_sha256: String,
-    entries: Vec<serde_json::Value>,
-}
-
-#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CompletionCheckpoint {
     schema_version: u32,
@@ -83,8 +78,38 @@ struct CurrentCompletion {
     architecture: String,
     performance_inventory_sha256: String,
     correctness_inventory_sha256: String,
-    parity_outcome: String,
-    regression_outcome: String,
+    parity_outcome: CompletionParityOutcome,
+    regression_outcome: CompletionRegressionOutcome,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum CompletionParityOutcome {
+    Passed,
+}
+
+impl CompletionParityOutcome {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum CompletionRegressionOutcome {
+    Passed,
+    Unseeded,
+}
+
+impl CompletionRegressionOutcome {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Unseeded => "unseeded",
+        }
+    }
 }
 
 struct StatusData {
@@ -96,6 +121,11 @@ struct StatusData {
     diagnostic_groups: usize,
     future_candidates: usize,
     regression_seeded: usize,
+    parity_policy_sha256: String,
+    maximum_parity_ratio: f64,
+    regression_policy_sha256: String,
+    regression_baselines_sha256: String,
+    regression_default_max_relative_ratio: String,
     completion: Option<CurrentCompletion>,
 }
 
@@ -140,34 +170,22 @@ fn collect(root: &RepoRoot, suite: &QualificationSuite) -> Result<StatusData, Be
             "qualification status found stale runtime contracts".to_string(),
         ));
     }
-    let baselines: RegressionBaselines = parse(
-        root,
-        &root.path.join(REGRESSION_BASELINES_PATH),
-        "regression baselines",
-    )?;
-    if baselines.performance_inventory_sha256 != suite.semantic_digest {
-        return Err(BenchError::Qualification(
-            "qualification status found stale regression baselines".to_string(),
-        ));
-    }
+    let policies = super::runtime::qualification_policy_status(root, &suite.semantic_digest)
+        .map_err(|error| {
+            BenchError::Qualification(format!(
+                "qualification status found an invalid policy contract: {error}"
+            ))
+        })?;
     let checkpoint: CompletionCheckpoint = parse(
         root,
         &root.path.join(COMPLETION_CHECKPOINT_PATH),
         "completion checkpoint",
     )?;
-    if checkpoint.schema_version != 1 {
-        return Err(BenchError::Qualification(
-            "qualification completion checkpoint schema is unsupported".to_string(),
-        ));
-    }
-    if let Some(current) = &checkpoint.current
-        && (current.performance_inventory_sha256 != suite.semantic_digest
-            || current.correctness_inventory_sha256 != suite.correctness_digest)
-    {
-        return Err(BenchError::Qualification(
-            "qualification completion checkpoint is stale".to_string(),
-        ));
-    }
+    validate_completion_checkpoint(
+        &checkpoint,
+        &suite.semantic_digest,
+        &suite.correctness_digest,
+    )?;
 
     let checklist_source = read(root, &root.feature_checklist())?;
     let checklist_text = std::str::from_utf8(&checklist_source).map_err(|error| {
@@ -198,9 +216,64 @@ fn collect(root: &RepoRoot, suite: &QualificationSuite) -> Result<StatusData, Be
         release_groups,
         diagnostic_groups,
         future_candidates,
-        regression_seeded: baselines.entries.len(),
+        regression_seeded: policies.regression_seeded_identity_count,
+        parity_policy_sha256: policies.parity_policy_sha256,
+        maximum_parity_ratio: policies.maximum_parity_ratio,
+        regression_policy_sha256: policies.regression_policy_sha256,
+        regression_baselines_sha256: policies.regression_baselines_sha256,
+        regression_default_max_relative_ratio: policies.regression_default_max_relative_ratio,
         completion: checkpoint.current,
     })
+}
+
+fn validate_completion_checkpoint(
+    checkpoint: &CompletionCheckpoint,
+    performance_inventory_sha256: &str,
+    correctness_inventory_sha256: &str,
+) -> Result<(), BenchError> {
+    if checkpoint.schema_version != COMPLETION_CHECKPOINT_SCHEMA_VERSION {
+        return Err(BenchError::Qualification(
+            "qualification completion checkpoint schema is unsupported".to_string(),
+        ));
+    }
+    let Some(current) = &checkpoint.current else {
+        return Ok(());
+    };
+    if current.scope_id != COMPLETION_SCOPE
+        || current.performance_inventory_sha256 != performance_inventory_sha256
+        || current.correctness_inventory_sha256 != correctness_inventory_sha256
+        || !valid_sha256(&current.report_sha256)
+        || !valid_git_commit(&current.stab_commit)
+        || !valid_identity_token(&current.architecture)
+        || super::runtime::validate_status_artifact_path(Path::new(&current.path)).is_err()
+    {
+        return Err(BenchError::Qualification(
+            "qualification completion checkpoint is stale or malformed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_git_commit(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_identity_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 fn counts<T: Ord>(values: impl IntoIterator<Item = T>) -> BTreeMap<T, usize> {
@@ -239,13 +312,13 @@ fn render(data: &StatusData) -> String {
                 current.architecture,
                 current.path,
                 current.report_sha256,
-                current.parity_outcome,
-                current.regression_outcome,
+                current.parity_outcome.as_str(),
+                current.regression_outcome.as_str(),
             )
         },
     );
     format!(
-        "<!-- Generated by `just qualification::status`. Do not edit by hand. -->\n# Qualification Status\n\nThis dashboard is generated from the checked correctness inventory, performance inventory, runtime contracts, regression baselines, feature checklist, and completion checkpoint.\n\n## Current Checkpoint\n\n{checkpoint}\n\n## Inventory\n\n| Category | Count |\n| --- | ---: |\n| Implemented correctness evidence parents | {implemented} |\n| Evidence-close correctness parents | {evidence_close} |\n| Planned correctness parents | {planned} |\n| Deferred checklist surfaces or remainders | {} |\n| Release runtime groups | {} |\n| Diagnostic runtime groups | {} |\n| Future performance candidates | {} |\n| Seeded self-regression identities | {} |\n\n## Contract Identities\n\n- Correctness inventory: `{}`\n- Performance inventory: `{}`\n- Stim parity policy: paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.\n- Stab self-regression: architecture-specific accepted baselines use the source-owned tolerance policy; missing identities are unseeded, never passing.\n\n## Interpretation\n\nImplementation, correctness qualification, Stim parity, Stab self-regression, environment validity, and memory/scaling evidence are separate conclusions. Shared-host scheduled timing is diagnostic and is not authoritative release evidence.\n",
+        "<!-- Generated by `just qualification::status`. Do not edit by hand. -->\n# Qualification Status\n\nThis dashboard is generated from the checked correctness inventory, performance inventory, runtime contracts, parity policy, regression policy and baselines, feature checklist, and completion checkpoint.\n\n## Current Checkpoint\n\n{checkpoint}\n\n## Inventory\n\n| Category | Count |\n| --- | ---: |\n| Implemented correctness evidence parents | {implemented} |\n| Evidence-close correctness parents | {evidence_close} |\n| Planned correctness parents | {planned} |\n| Deferred checklist surfaces or remainders | {} |\n| Release runtime groups | {} |\n| Diagnostic runtime groups | {} |\n| Future performance candidates | {} |\n| Seeded self-regression identities | {} |\n\n## Contract Identities\n\n- Correctness inventory: `{}`\n- Performance inventory: `{}`\n- Stim parity policy: `{}`; paired median and confidence upper bound must each be no greater than `{:.2}x` for threshold-eligible groups.\n- Stab self-regression policy: `{}`; the default maximum deterioration is `{}x`.\n- Stab self-regression baselines: `{}`; missing identities are unseeded, never passing.\n\n## Interpretation\n\nImplementation, correctness qualification, Stim parity, Stab self-regression, environment validity, and memory/scaling evidence are separate conclusions. Shared-host scheduled timing is diagnostic and is not authoritative release evidence.\n",
         data.deferred_checklist_surfaces,
         data.release_groups,
         data.diagnostic_groups,
@@ -253,6 +326,11 @@ fn render(data: &StatusData) -> String {
         data.regression_seeded,
         data.correctness_digest,
         data.performance_digest,
+        data.parity_policy_sha256,
+        data.maximum_parity_ratio,
+        data.regression_policy_sha256,
+        data.regression_default_max_relative_ratio,
+        data.regression_baselines_sha256,
     )
 }
 
@@ -290,5 +368,29 @@ mod tests {
         assert!(data.correctness_counts.values().sum::<usize>() > 1_000);
         assert!(rendered.contains("Formal repaired-contract completion: **not started**"));
         assert!(rendered.contains(&data.performance_digest));
+        assert!(rendered.contains(&data.parity_policy_sha256));
+        assert!(rendered.contains(&data.regression_policy_sha256));
+        assert!(rendered.contains(&data.regression_baselines_sha256));
+    }
+
+    #[test]
+    fn completion_checkpoint_rejects_malformed_current_identity() {
+        let checkpoint = CompletionCheckpoint {
+            schema_version: COMPLETION_CHECKPOINT_SCHEMA_VERSION,
+            current: Some(CurrentCompletion {
+                scope_id: COMPLETION_SCOPE.to_string(),
+                path: "target/benchmarks/qualification/formal".to_string(),
+                report_sha256: "not-a-digest".to_string(),
+                stab_commit: "1".repeat(40),
+                architecture: "aarch64".to_string(),
+                performance_inventory_sha256: "2".repeat(64),
+                correctness_inventory_sha256: "3".repeat(64),
+                parity_outcome: CompletionParityOutcome::Passed,
+                regression_outcome: CompletionRegressionOutcome::Unseeded,
+            }),
+        };
+        assert!(
+            validate_completion_checkpoint(&checkpoint, &"2".repeat(64), &"3".repeat(64)).is_err()
+        );
     }
 }

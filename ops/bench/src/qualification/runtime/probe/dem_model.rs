@@ -2,6 +2,8 @@ use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
 
+use serde::Serialize;
+
 use super::super::adapter::AdapterExecutable;
 use super::super::process::{ProcessRequest, ProcessResult, run_bounded_process};
 use super::super::protocol::{
@@ -17,6 +19,29 @@ use crate::root::RepoRoot;
 pub(super) const MEDIUM_ITEMS: u64 = 4_096;
 const SMALL_ITEMS: u64 = 64;
 const LARGE_ITEMS: u64 = 65_536;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DemAcceptedMaximumMemory {
+    pub(super) family_id: String,
+    pub(super) work_items: u64,
+    pub(super) input_bytes: u64,
+    pub(super) input_digest: String,
+    pub(super) output_digest: String,
+    pub(super) stim_setup_rss_bytes: u64,
+    pub(super) stim_peak_rss_bytes: u64,
+    pub(super) stim_parent_observed_peak_rss_bytes: Option<u64>,
+    pub(super) stab_setup_rss_bytes: u64,
+    pub(super) stab_peak_rss_bytes: u64,
+    pub(super) stab_parent_observed_peak_rss_bytes: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MemoryObservation {
+    setup_rss_bytes: u64,
+    peak_rss_bytes: u64,
+    parent_observed_peak_rss_bytes: Option<u64>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DemProbeKind {
@@ -77,12 +102,47 @@ pub(super) fn validate_boundaries(
     adapter: &AdapterExecutable,
     worker_program: &Path,
     worker_identity: &WorkerIdentity,
-) -> Result<(), ProbeError> {
+) -> Result<Vec<DemAcceptedMaximumMemory>, ProbeError> {
     let Some(kind) = kind(group) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
+    let mut accepted_maximum_memory = Vec::with_capacity(DemFamily::ALL.len());
     for family in DemFamily::ALL {
         for items in [SMALL_ITEMS, MEDIUM_ITEMS, LARGE_ITEMS] {
+            let observation = validate_accepted_fixture(
+                root,
+                kind,
+                family,
+                adapter,
+                worker_program,
+                worker_identity,
+                EvidenceMode::Timing,
+                1,
+                items,
+            )?;
+            if observation.is_some() {
+                return Err(ProbeError::Contract(
+                    "DEM timing boundary unexpectedly returned memory evidence".to_string(),
+                ));
+            }
+        }
+        let observation = validate_accepted_fixture(
+            root,
+            kind,
+            family,
+            adapter,
+            worker_program,
+            worker_identity,
+            EvidenceMode::Timing,
+            2,
+            SMALL_ITEMS,
+        )?;
+        if observation.is_some() {
+            return Err(ProbeError::Contract(
+                "DEM timing boundary unexpectedly returned memory evidence".to_string(),
+            ));
+        }
+        accepted_maximum_memory.push(
             validate_accepted_fixture(
                 root,
                 kind,
@@ -90,34 +150,18 @@ pub(super) fn validate_boundaries(
                 adapter,
                 worker_program,
                 worker_identity,
+                EvidenceMode::Memory,
                 1,
-                items,
-            )?;
-        }
-        validate_accepted_fixture(
-            root,
-            kind,
-            family,
-            adapter,
-            worker_program,
-            worker_identity,
-            2,
-            SMALL_ITEMS,
-        )?;
-        validate_accepted_fixture(
-            root,
-            kind,
-            family,
-            adapter,
-            worker_program,
-            worker_identity,
-            1,
-            family.maximum_items(),
-        )?;
+                family.maximum_items(),
+            )?
+            .ok_or_else(|| {
+                ProbeError::Contract("DEM accepted maximum omitted memory evidence".to_string())
+            })?,
+        );
         validate_guard_rejections(root, kind, family, adapter, worker_program)?;
         validate_first_rejection(root, kind, family, adapter, worker_program)?;
     }
-    Ok(())
+    Ok(accepted_maximum_memory)
 }
 
 #[allow(
@@ -131,9 +175,10 @@ fn validate_accepted_fixture(
     adapter: &AdapterExecutable,
     worker_program: &Path,
     worker_identity: &WorkerIdentity,
+    evidence_mode: EvidenceMode,
     iterations: u64,
     items: u64,
-) -> Result<(), ProbeError> {
+) -> Result<Option<DemAcceptedMaximumMemory>, ProbeError> {
     let fixture = DemFixture::prepare(family, items)
         .map_err(|error| ProbeError::Contract(error.to_string()))?;
     let model = parse(1, &fixture).map_err(|error| ProbeError::Contract(error.to_string()))?;
@@ -148,6 +193,7 @@ fn validate_accepted_fixture(
         adapter,
         worker_program,
         worker_identity,
+        evidence_mode,
         iterations,
         items,
         fixture
@@ -169,17 +215,20 @@ fn validate_accepted(
     adapter: &AdapterExecutable,
     worker_program: &Path,
     worker_identity: &WorkerIdentity,
+    evidence_mode: EvidenceMode,
     iterations: u64,
     items: u64,
     input_bytes: u64,
     input_digest: &str,
     output_digest: &str,
-) -> Result<(), ProbeError> {
+) -> Result<Option<DemAcceptedMaximumMemory>, ProbeError> {
     let workload_id = ProtocolId::try_new(kind.workload())?;
     let measurement_ids = BTreeSet::from([ProtocolId::try_new(kind.measurement())?]);
     let expected_input_digest = InputDigest::try_new(input_digest)?;
     let expected_output_digest = SemanticDigest::try_new(output_digest)?;
     let stim_commit = GitCommit::try_new(STIM_COMMIT)?;
+    let mut stim_memory = None;
+    let mut stab_memory = None;
     for implementation in [Implementation::Stim, Implementation::Stab] {
         let output = checked_process(
             run_bounded_process(&request(
@@ -190,6 +239,7 @@ fn validate_accepted(
                 kind,
                 family,
                 kind.measurement(),
+                evidence_mode,
                 iterations,
                 items,
                 false,
@@ -212,7 +262,7 @@ fn validate_accepted(
         };
         ProtocolExpectation {
             implementation,
-            evidence_mode: EvidenceMode::Timing,
+            evidence_mode,
             workload_id: workload_id.clone(),
             measurement_ids: measurement_ids.clone(),
             iteration_count: iterations,
@@ -228,8 +278,44 @@ fn validate_accepted(
             build_fingerprint,
         }
         .validate(&rows)?;
+        if evidence_mode == EvidenceMode::Memory {
+            let row = rows.first().ok_or_else(|| {
+                ProbeError::Contract("DEM memory boundary returned no row".to_string())
+            })?;
+            let observation = MemoryObservation {
+                setup_rss_bytes: row.setup_rss_bytes.ok_or_else(|| {
+                    ProbeError::Contract("DEM memory boundary omitted setup RSS".to_string())
+                })?,
+                peak_rss_bytes: row.peak_rss_bytes.ok_or_else(|| {
+                    ProbeError::Contract("DEM memory boundary omitted peak RSS".to_string())
+                })?,
+                parent_observed_peak_rss_bytes: output.parent_observed_peak_rss_bytes,
+            };
+            match implementation {
+                Implementation::Stim => stim_memory = Some(observation),
+                Implementation::Stab => stab_memory = Some(observation),
+            }
+        }
     }
-    Ok(())
+    match (evidence_mode, stim_memory, stab_memory) {
+        (EvidenceMode::Memory, Some(stim), Some(stab)) => Ok(Some(DemAcceptedMaximumMemory {
+            family_id: family.id().to_string(),
+            work_items: items,
+            input_bytes,
+            input_digest: input_digest.to_string(),
+            output_digest: output_digest.to_string(),
+            stim_setup_rss_bytes: stim.setup_rss_bytes,
+            stim_peak_rss_bytes: stim.peak_rss_bytes,
+            stim_parent_observed_peak_rss_bytes: stim.parent_observed_peak_rss_bytes,
+            stab_setup_rss_bytes: stab.setup_rss_bytes,
+            stab_peak_rss_bytes: stab.peak_rss_bytes,
+            stab_parent_observed_peak_rss_bytes: stab.parent_observed_peak_rss_bytes,
+        })),
+        (EvidenceMode::Timing, None, None) => Ok(None),
+        _ => Err(ProbeError::Contract(
+            "DEM accepted-maximum memory evidence is incomplete".to_string(),
+        )),
+    }
 }
 
 fn validate_guard_rejections(
@@ -258,6 +344,7 @@ fn validate_guard_rejections(
                 kind,
                 family,
                 measurement,
+                EvidenceMode::Timing,
                 iterations,
                 items,
                 true,
@@ -284,6 +371,7 @@ fn validate_first_rejection(
             kind,
             family,
             kind.measurement(),
+            EvidenceMode::Timing,
             1,
             family.maximum_items() + 1,
             true,
@@ -305,6 +393,7 @@ fn request(
     kind: DemProbeKind,
     family: DemFamily,
     measurement: &str,
+    evidence_mode: EvidenceMode,
     iterations: u64,
     items: u64,
     start_barrier: bool,
@@ -325,7 +414,11 @@ fn request(
         OsString::from("--input-family"),
         OsString::from(family.id()),
         OsString::from("--evidence-mode"),
-        OsString::from("timing"),
+        OsString::from(match evidence_mode {
+            EvidenceMode::Contract => "contract",
+            EvidenceMode::Timing => "timing",
+            EvidenceMode::Memory => "memory",
+        }),
         OsString::from("--start-barrier"),
         OsString::from(start_barrier.to_string()),
     ]);
@@ -521,6 +614,7 @@ mod tests {
             iterations: std::num::NonZeroU64::new(u64::MAX).expect("positive iterations"),
             work_items: std::num::NonZeroU64::new(DEM_CYCLE_ITEMS),
             evidence_mode: super::super::ProbeEvidenceMode::Timing,
+            out: None,
         };
         assert!(matches!(
             super::super::expected_work_count(&args),

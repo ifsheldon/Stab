@@ -630,6 +630,14 @@ fn load_candidates(
             expected_performance_inventory_sha256,
             expected_correctness_inventory_sha256,
         )?;
+        let parity = super::parity::evaluate_report(
+            source_root,
+            expected_performance_inventory_sha256,
+            &evidence.report,
+        )?;
+        if parity.report_only || parity.checked_measurements == 0 {
+            return Err(RollupError::ParityNotGated(parity.group_id));
+        }
         let candidate = Candidate::from_report(
             path.as_path(),
             evidence.report,
@@ -1124,6 +1132,8 @@ pub(super) enum RollupError {
     MixedIdentity(String),
     #[error("qualification rollup source scale {0} is not promotable")]
     NonPromotable(String),
+    #[error("qualification rollup source group {0} has no passing Stim parity gate")]
+    ParityNotGated(String),
     #[error("qualification rollup repeats a scale")]
     DuplicateScale,
     #[error("qualification rollup is missing scale {0}")]
@@ -1156,6 +1166,8 @@ pub(super) enum RollupError {
     Group(#[from] super::group::GroupError),
     #[error(transparent)]
     Report(#[from] super::report::ReportError),
+    #[error(transparent)]
+    Parity(#[from] super::parity::ParityError),
     #[error(transparent)]
     Artifact(#[from] super::artifact::ArtifactError),
     #[error(transparent)]
