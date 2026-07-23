@@ -41,8 +41,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     let maximum_distance = CodeDistance::try_new(2047).expect("maximum distance");
     assert_eq!(minimum_distance.get(), 2);
     assert_eq!(maximum_distance.get(), 2047);
-    assert_eq!(minimum_distance, minimum_distance.clone());
-    assert_eq!(format!("{minimum_distance:?}"), "CodeDistance(2)");
     assert_invalid_domain_value(CodeDistance::try_new(0), "code distance", "0");
     assert_invalid_domain_value(CodeDistance::try_new(1), "code distance", "1");
     assert_invalid_domain_value(CodeDistance::try_new(2048), "code distance", "2048");
@@ -51,13 +49,9 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     let maximum_rounds = RoundCount::try_new(u64::MAX).expect("maximum rounds");
     assert_eq!(minimum_rounds.get(), 1);
     assert_eq!(maximum_rounds.get(), u64::MAX);
-    assert_eq!(minimum_rounds, minimum_rounds.clone());
-    assert_eq!(format!("{minimum_rounds:?}"), "RoundCount(1)");
     assert_invalid_domain_value(RoundCount::try_new(0), "round count", "0");
 
     let repetition_task = RepetitionCodeTask::Memory;
-    assert_eq!(repetition_task, repetition_task.clone());
-    assert_eq!(format!("{repetition_task:?}"), "Memory");
 
     let surface_tasks = [
         SurfaceCodeTask::RotatedMemoryX,
@@ -65,15 +59,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
         SurfaceCodeTask::UnrotatedMemoryX,
         SurfaceCodeTask::UnrotatedMemoryZ,
     ];
-    for (task, expected_debug) in surface_tasks.into_iter().zip([
-        "RotatedMemoryX",
-        "RotatedMemoryZ",
-        "UnrotatedMemoryX",
-        "UnrotatedMemoryZ",
-    ]) {
-        assert_eq!(task, task.clone());
-        assert_eq!(format!("{task:?}"), expected_debug);
-    }
     for (index, task) in surface_tasks.iter().enumerate() {
         for distinct in surface_tasks.iter().skip(index + 1) {
             assert_ne!(task, distinct);
@@ -81,8 +66,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     }
 
     let color_task = ColorCodeTask::MemoryXyz;
-    assert_eq!(color_task, color_task.clone());
-    assert_eq!(format!("{color_task:?}"), "MemoryXyz");
 
     let before_round = probability(0.0625);
     let before_measure = probability(0.125);
@@ -116,8 +99,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     assert_eq!(repetition.before_measure_flip_probability(), before_measure);
     assert_eq!(repetition.after_reset_flip_probability(), after_reset);
     assert_eq!(repetition.after_clifford_depolarization(), after_clifford);
-    assert_eq!(repetition, repetition.clone());
-    assert!(format!("{repetition:?}").contains("RepetitionCodeParams"));
     assert_eq!(repetition_defaults.before_round_data_depolarization(), zero);
 
     let surface_defaults = SurfaceCodeParams::new(
@@ -146,8 +127,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     assert_eq!(surface.before_measure_flip_probability(), before_measure);
     assert_eq!(surface.after_reset_flip_probability(), after_reset);
     assert_eq!(surface.after_clifford_depolarization(), after_clifford);
-    assert_eq!(surface, surface.clone());
-    assert!(format!("{surface:?}").contains("SurfaceCodeParams"));
     assert_eq!(surface_defaults.before_round_data_depolarization(), zero);
 
     let color_defaults = ColorCodeParams::new(
@@ -176,8 +155,6 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     assert_eq!(color.before_measure_flip_probability(), before_measure);
     assert_eq!(color.after_reset_flip_probability(), after_reset);
     assert_eq!(color.after_clifford_depolarization(), after_clifford);
-    assert_eq!(color, color.clone());
-    assert!(format!("{color:?}").contains("ColorCodeParams"));
     assert_eq!(color_defaults.before_round_data_depolarization(), zero);
 
     let allocations = allocation_counter::measure(|| {
@@ -303,8 +280,6 @@ fn cq2_generation_repetition_matches_complete_pinned_stim_case() {
             "OBSERVABLE_INCLUDE(0) rec[-1]\n",
         )
     );
-    assert_eq!(generated, generated.clone());
-    assert!(format!("{generated:?}").contains("GeneratedCircuit"));
 }
 
 #[test]

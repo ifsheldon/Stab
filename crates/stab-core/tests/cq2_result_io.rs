@@ -39,39 +39,9 @@ fn bitslice_to_vec(bits: BitSlice<'_>) -> Vec<bool> {
         .collect()
 }
 
-fn clone_value<T: Clone>(value: &T) -> T {
-    value.clone()
-}
-
-#[test]
-fn cq_result_sample_format_value_contract_matches_stim() {
-    let module_path_value: stab_core::result_formats::SampleFormat = SampleFormat::ZeroOne;
-    assert_eq!(module_path_value, SampleFormat::ZeroOne);
-    let formats = [
-        SampleFormat::ZeroOne,
-        SampleFormat::B8,
-        SampleFormat::R8,
-        SampleFormat::Hits,
-        SampleFormat::Dets,
-    ];
-    let copied = formats;
-    let cloned = formats.map(|format| clone_value(&format));
-    assert_eq!(formats, copied);
-    assert_eq!(formats, cloned);
-    assert_eq!(
-        formats.map(|format| format!("{format:?}")),
-        ["ZeroOne", "B8", "R8", "Hits", "Dets"]
-    );
-    assert_ne!(SampleFormat::ZeroOne, SampleFormat::B8);
-}
-
 #[test]
 fn cq_result_writer_exact_format_bytes_match_stim() {
     let bytes = [0xF8];
-
-    let value = MeasureRecordWriter::new(SampleFormat::ZeroOne);
-    assert_eq!(value, value.clone());
-    assert!(format!("{value:?}").contains("MeasureRecordWriter"));
 
     let mut writer = MeasureRecordWriter::with_capacity(SampleFormat::ZeroOne, 18);
     writer.write_bytes(&bytes);
@@ -202,9 +172,6 @@ fn cq_result_batch_writer_small_table_contract_matches_stim() {
         for column in columns {
             writer.batch_write_bit(&column).unwrap();
         }
-        let cloned = writer.clone();
-        assert_eq!(writer, cloned);
-        assert!(format!("{writer:?}").contains("MeasureRecordBatchWriter"));
         assert_eq!(writer.write_end(), expected, "{format:?}");
     }
 
@@ -553,9 +520,7 @@ fn cq_result_streaming_visitors_stop_at_first_error() {
 #[test]
 fn cq_result_sparse_shot_value_string_and_mask_match_stim() {
     let empty = SparseShot::new(Vec::new(), vec![false; 64]);
-    assert_eq!(empty, empty.clone());
     assert_ne!(empty, SparseShot::new(vec![2], vec![false; 64]));
-    assert!(format!("{empty:?}").contains("SparseShot"));
 
     let mut mask = vec![false; 125];
     mask[2] = true;

@@ -337,7 +337,6 @@ fn cq2_bit_block_contract_matches_scalar_words() {
 fn cq2_bit_matrix_row_contract_matches_scalar_reference() {
     for &cols in &[0, 1, 63, 64, 65, 255, 256, 257, 1025] {
         let mut matrix = BitMatrix::zeros(4, cols).expect("bounded matrix");
-        assert_eq!(matrix, matrix.clone());
         assert_eq!(matrix.rows(), 4);
         assert_eq!(matrix.cols(), cols);
         let source = patterned_bools(cols, 0x19);

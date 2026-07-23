@@ -2129,12 +2129,20 @@ name = "stab-cli"
 version = "0.1.1"
 dependencies = [
  "clap",
- "hex",
  "same-file",
- "serde",
- "serde_json",
+ "stab-compat-corpus",
  "stab-core",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "stab-compat-corpus"
+version = "0.1.1"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
@@ -2145,13 +2153,11 @@ dependencies = [
  "allocation-counter",
  "arrayvec",
  "hashbrown 0.17.1",
- "hex",
  "num-complex",
  "proptest",
  "rand 0.10.1",
- "serde",
- "serde_json",
  "smallvec",
+ "stab-compat-corpus",
  "thiserror",
 ]
 
@@ -2161,12 +2167,12 @@ version = "0.1.1"
 dependencies = [
  "clap",
  "csv",
- "hex",
  "rustix",
  "serde",
  "serde_json",
  "sha2",
  "signal-hook",
+ "stab-compat-corpus",
  "stab-core",
  "statrs",
  "tempfile",

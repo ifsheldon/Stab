@@ -45,7 +45,6 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
     assert_eq!(x_error.observable_id_argument().unwrap(), None);
     assert_eq!(x_error.coordinate_arguments(), None);
     assert_eq!(x_error.tag(), None);
-    assert_eq!(x_error, x_error.clone());
     assert_ne!(
         x_error,
         CircuitInstruction::new(
@@ -258,7 +257,6 @@ fn cq2_circuit_api_value_items_and_repeat_blocks_are_independent() {
     assert_eq!(repeat.repeat_count().get(), 5);
     assert_eq!(repeat.body(), &clone);
     assert_eq!(repeat.tag(), Some("loop"));
-    assert_eq!(repeat, repeat.clone());
     let mut body_copy = repeat.body().clone();
     body_copy.append_instruction(instruction("S 0\n"));
     assert_eq!(repeat.body().to_string(), "H 0\n");
@@ -307,7 +305,6 @@ fn cq2_circuit_api_value_items_and_repeat_blocks_are_independent() {
         repeat_item.as_repeat_block().expect("repeat item").body(),
         &clone
     );
-    assert_eq!(instruction_item, instruction_item.clone());
 
     assert_eq!(instruction("H[tag] 0\n"), instruction("H[tag] 0\n"));
     assert_ne!(instruction("H[tag] 0\n"), instruction("H[other] 0\n"));
@@ -326,7 +323,6 @@ fn cq2_circuit_api_value_items_and_repeat_blocks_are_independent() {
     assert_ne!(equality_a, equality_b);
     assert_ne!(equality_a, equality_c);
     assert_ne!(equality_b, equality_c);
-    assert_eq!(equality_a, equality_a.clone());
 
     let nested = Circuit::from_stim_str(
         "H 0\nM 0 1\nREPEAT 2 {\n    X 1\n    REPEAT 3 {\n        Y 2\n        M 2\n        X 0\n    }\n}\n",
@@ -544,7 +540,6 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
     for (error, expected) in cases {
         assert_circuit_error_variant_is_covered(&error);
         assert_eq!(error.to_string(), expected);
-        assert_eq!(error, error.clone());
         assert_eq!(circuit_result_error(error.clone()), Err(error));
     }
 }

@@ -19,10 +19,6 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
     let observable = DemObservableId::try_new(6).expect("L6");
     assert_eq!(detector.get(), 5);
     assert_eq!(observable.get(), 6);
-    assert_eq!(detector, detector.clone());
-    assert_eq!(observable, observable.clone());
-    assert!(format!("{detector:?}").contains('5'));
-    assert!(format!("{observable:?}").contains('6'));
     assert_eq!(
         BTreeSet::from([detector]).into_iter().next(),
         Some(detector)
@@ -38,8 +34,6 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
     for (target, text) in targets {
         assert_eq!(target.to_string(), text);
         assert_eq!(text.parse::<DemTarget>().expect("parse target"), target);
-        assert_eq!(target, target.clone());
-        assert!(!format!("{target:?}").is_empty());
     }
     assert_ne!(
         DemTarget::relative_detector(5).expect("D5"),
@@ -127,17 +121,6 @@ fn cq2_dem_instruction_value_validation_and_print_contract_matches_stim() {
         ]
     );
     assert_eq!(error.tag(), Some("err"));
-    assert_eq!(error, error.clone());
-    assert!(!format!("{error:?}").is_empty());
-
-    let kinds = [
-        DemInstructionKind::Error,
-        DemInstructionKind::Detector,
-        DemInstructionKind::LogicalObservable,
-        DemInstructionKind::ShiftDetectors,
-    ];
-    assert_eq!(kinds[0], kinds[0].clone());
-    assert_eq!(format!("{:?}", kinds[3]), "ShiftDetectors");
 
     let mut model = DetectorErrorModel::new();
     for instruction in [
@@ -371,8 +354,6 @@ fn cq2_dem_model_value_mutation_and_repeat_contract_matches_stim() {
     assert_eq!(repeat.repeat_count().get(), 5);
     assert_eq!(repeat.body(), &body);
     assert_eq!(repeat.tag(), Some("loop"));
-    assert_eq!(repeat, repeat.clone());
-    assert!(!format!("{repeat:?}").is_empty());
 
     let zero_repeat_count = DemRepeatCount::new(0);
     assert_eq!(zero_repeat_count.get(), 0);
@@ -419,8 +400,6 @@ fn cq2_dem_model_value_mutation_and_repeat_contract_matches_stim() {
         1
     );
     assert!(model.instruction_range(..2).is_err());
-    assert_eq!(model, model.clone());
-    assert!(!format!("{model:?}").is_empty());
     assert_eq!(
         model.to_string(),
         concat!(

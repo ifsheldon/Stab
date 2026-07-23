@@ -84,8 +84,6 @@ fn cq2_algebra_tableau_access_and_value_contract_is_exact() {
         );
     }
 
-    assert_eq!(cnot, cnot.clone());
-    assert!(format!("{cnot:?}").contains("Tableau"));
     assert_eq!(
         Tableau::gate1("+X", "-Z")
             .expect("signed Tableau")
@@ -194,7 +192,6 @@ fn cq2_algebra_pauli_iterator_state_contract_is_restartable_and_typed() {
     let mut paulis_clone = paulis.clone();
     assert_eq!(paulis.next(), paulis_clone.next());
     assert_eq!(paulis, paulis_clone);
-    assert!(format!("{paulis:?}").contains("PauliStringIterator"));
     paulis.restart();
     assert_eq!(paulis.next().expect("restarted Pauli").to_string(), "+X__");
 }
@@ -287,7 +284,6 @@ fn cq2_algebra_commuting_iterator_state_contract_is_restartable_and_typed() {
         Err(StabilizerError::LengthMismatch { left: 1, right: 2 })
     );
     assert_eq!(commuting, before_error);
-    assert!(format!("{commuting:?}").contains("CommutingPauliStringIterator"));
 }
 
 #[test]
@@ -308,7 +304,6 @@ fn cq2_algebra_tableau_iterator_state_contract_is_restartable_and_typed() {
     assert_eq!(tableaus.next(), tableaus_clone.next());
     assert_eq!(tableaus, tableaus_clone);
     assert!(first.satisfies_invariants().expect("iterator invariants"));
-    assert!(format!("{tableaus:?}").contains("TableauIterator"));
     tableaus.restart().expect("restart Tableau iterator");
     assert_eq!(tableaus.next(), Some(first));
 }

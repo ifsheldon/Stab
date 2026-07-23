@@ -2405,43 +2405,6 @@
       ],
       "oracle_fixture_owners": ["coverage-util-top-mbqc-decomposition"]
     },
-    {
-      "id": "cq2-result-sample-format-value-contract",
-      "feature_id": "CQ-RESULT-FORMATS",
-      "comparator": "exact-bytes",
-        "primary_selector": {
-          "state": "existing",
-          "kind": "cargo-test",
-          "value": [
-            "cargo",
-            "test",
-            "-p",
-            "stab-core",
-            "--test",
-            "cq2_result_io",
-            "cq_result_sample_format_value_contract_matches_stim",
-            "--quiet",
-            "--exact"
-          ]
-        },
-      "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "A fixed value corpus proves both public SampleFormat paths, all selected variants, copy and clone behavior, debug names, and equality."
-      },
-      "negative_axes": [
-        "variant-aliasing"
-      ],
-      "public_api_owners": [
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::SampleFormat"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SampleFormat"
-        }
-      ]
-      },
       {
         "id": "cq2-result-writer-exact-format-contract",
         "feature_id": "CQ-RESULT-FORMATS",
@@ -2492,6 +2455,14 @@
           }
         ],
       "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SampleFormat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SampleFormat"
+        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::result_formats::MeasureRecordWriter::new"

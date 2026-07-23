@@ -4,6 +4,7 @@ members = [
     "crates/stab-cli",
     "crates/stab-core",
     "ops/bench",
+    "ops/compat-corpus",
     "ops/oracle",
     "ops/pre-commit",
 ]

@@ -164,8 +164,6 @@ fn cq_result_measure_record_basic_usage_and_value_contract_match_stim() {
     assert_eq!(record.storage_len(), 102);
     assert_eq!(record.lookback(1), Some(false));
     assert_eq!(record.lookback(2), Some(true));
-    assert_eq!(record, record.clone());
-    assert!(format!("{record:?}").contains("MeasureRecord"));
 
     let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
     record.write_unwritten_results_to(&mut writer).unwrap();
@@ -242,7 +240,5 @@ fn cq_result_batch_zero_edit_and_value_contract_match_stim() {
         batch.lookback(1),
         Some([false, false, false, true, false].as_slice())
     );
-    assert_eq!(batch, batch.clone());
-    assert!(format!("{batch:?}").contains("MeasureRecordBatch"));
     assert!(batch.record_result(vec![false; 4]).is_err());
 }

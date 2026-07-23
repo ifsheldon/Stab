@@ -219,7 +219,7 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 ### Tasks
 
 - Parse all GTest macro declarations from the 103 pinned C++ test files and all pytest function declarations from the 91 pinned Python test files.
-- Generate a deterministic rustdoc JSON inventory for selected `stab-core` and `stab-cli` exports and assign every public item to a qualification feature, explicit parent contract, or documented non-semantic API disposition.
+- Generate a deterministic rustdoc JSON inventory for selected `stab-core` and `stab-cli` exports and assign every public item to a qualification feature, explicit semantic parent contract, or documented non-semantic API disposition. Derived traits, trivial accessors, marker types, and ordinary Rust `Debug` output do not require standalone runtime assertions unless their representation or behavior is explicitly part of the Stim compatibility contract.
 - Define the public API filter as default-feature reachable types, functions, constants, inherent methods, and explicitly implemented public traits; exclude compiler-generated auto or blanket implementation noise and the evidence-only `ops-contracts` feature from product API counts while testing that evidence-only exports do not leak into default builds.
 - Record the exact extraction grammar, including `TEST`, `TEST_F`, `TYPED_TEST`, and Stim word-size macros; reject ambiguous or duplicate anchors.
 - Use Python's isolated standard-library AST through `uv` to find module, class, and async pytest functions without executing test modules or accepting declarations hidden in comments, strings, or nested helper functions.

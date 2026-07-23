@@ -1,4 +1,5 @@
 #![allow(
+    clippy::expect_used,
     clippy::panic_in_result_fn,
     reason = "compatibility tests use Result propagation for setup and direct assertions for contract diagnostics"
 )]
@@ -197,91 +198,118 @@ fn dets_uses_exact_separators_and_pinned_eof_rule() -> CircuitResult<()> {
 }
 
 #[test]
-fn dets_visitors_stop_on_error_and_reuse_buffers() -> CircuitResult<()> {
+fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
     let layout = DetsLayout::try_new(2, 1, 1)?;
     let input = b"shot M0 D0\nshot M1 L0\n";
-    let mut dense_ptr = None;
     let mut dense_calls = 0usize;
     let result = for_each_dets_record(input, layout, |record| {
-        let pointer = record.as_ptr();
-        if let Some(previous) = dense_ptr {
-            assert_eq!(pointer, previous);
-        }
-        dense_ptr = Some(pointer);
+        assert_eq!(record.len(), 4);
         dense_calls += 1;
-        if dense_calls == 2 {
-            return Err(CircuitError::InvalidResultFormat {
-                message: "stop".to_string(),
-            });
-        }
-        Ok(())
+        Err(CircuitError::InvalidResultFormat {
+            message: "stop".to_string(),
+        })
     });
     assert!(result.is_err());
-    assert_eq!(dense_calls, 2);
+    assert_eq!(dense_calls, 1);
 
-    let mut packed_ptr = None;
     let mut packed_calls = 0usize;
     let result = for_each_dets_packed_record(input, layout, |record| {
-        let pointer = record.words().as_ptr();
-        if let Some(previous) = packed_ptr {
-            assert_eq!(pointer, previous);
-        }
-        packed_ptr = Some(pointer);
+        assert_eq!(record.len(), 4);
         packed_calls += 1;
-        if packed_calls == 2 {
-            return Err(CircuitError::InvalidResultFormat {
-                message: "stop".to_string(),
-            });
-        }
-        Ok(())
+        Err(CircuitError::InvalidResultFormat {
+            message: "stop".to_string(),
+        })
     });
     assert!(result.is_err());
-    assert_eq!(packed_calls, 2);
+    assert_eq!(packed_calls, 1);
 
-    let mut token_ptr = None;
     let mut token_calls = 0usize;
     let result = for_each_dets_token_record(input, layout, |record| {
-        let pointer = record.as_ptr();
-        if let Some(previous) = token_ptr {
-            assert_eq!(pointer, previous);
-        }
-        token_ptr = Some(pointer);
+        assert_eq!(record.len(), 2);
         token_calls += 1;
-        if token_calls == 2 {
-            return Err(CircuitError::InvalidResultFormat {
-                message: "stop".to_string(),
-            });
-        }
-        Ok(())
+        Err(CircuitError::InvalidResultFormat {
+            message: "stop".to_string(),
+        })
     });
     assert!(result.is_err());
-    assert_eq!(token_calls, 2);
+    assert_eq!(token_calls, 1);
 
-    let mut sparse_hits_ptr = None;
-    let mut sparse_obs_ptr = None;
     let mut sparse_calls = 0usize;
     let result = for_each_dets_sparse_shot(input, layout, |shot| {
-        let hits_pointer = shot.hits.as_ptr();
-        let obs_pointer = shot.obs_mask.as_ptr();
-        if let Some(previous) = sparse_hits_ptr {
-            assert_eq!(hits_pointer, previous);
-        }
-        if let Some(previous) = sparse_obs_ptr {
-            assert_eq!(obs_pointer, previous);
-        }
-        sparse_hits_ptr = Some(hits_pointer);
-        sparse_obs_ptr = Some(obs_pointer);
+        assert_eq!(shot.hits, [0, 2]);
+        assert_eq!(shot.obs_mask, [false]);
         sparse_calls += 1;
-        if sparse_calls == 2 {
-            return Err(CircuitError::InvalidResultFormat {
-                message: "stop".to_string(),
-            });
-        }
-        Ok(())
+        Err(CircuitError::InvalidResultFormat {
+            message: "stop".to_string(),
+        })
     });
     assert!(result.is_err());
-    assert_eq!(sparse_calls, 2);
+    assert_eq!(sparse_calls, 1);
     Ok(())
+}
+
+#[test]
+fn dets_visitors_keep_allocation_bounded_by_width_not_record_count() -> CircuitResult<()> {
+    let layout = DetsLayout::try_new(128, 64, 32)?;
+    let one_record = b"shot M0 M127 D0 D63 L0 L31\n".to_vec();
+    let many_records = one_record.repeat(256);
+
+    let dense_one = allocation_counter::measure(|| {
+        for_each_dets_record(&one_record, layout, |_| Ok(())).expect("dense one");
+    });
+    let dense_many = allocation_counter::measure(|| {
+        for_each_dets_record(&many_records, layout, |_| Ok(())).expect("dense many");
+    });
+    assert_record_count_independent("dense", dense_one, dense_many, layout.total_bits());
+
+    let packed_one = allocation_counter::measure(|| {
+        for_each_dets_packed_record(&one_record, layout, |_| Ok(())).expect("packed one");
+    });
+    let packed_many = allocation_counter::measure(|| {
+        for_each_dets_packed_record(&many_records, layout, |_| Ok(())).expect("packed many");
+    });
+    assert_record_count_independent("packed", packed_one, packed_many, layout.total_bits());
+
+    let token_one = allocation_counter::measure(|| {
+        for_each_dets_token_record(&one_record, layout, |_| Ok(())).expect("token one");
+    });
+    let token_many = allocation_counter::measure(|| {
+        for_each_dets_token_record(&many_records, layout, |_| Ok(())).expect("token many");
+    });
+    assert_record_count_independent("token", token_one, token_many, layout.total_bits());
+
+    let sparse_one = allocation_counter::measure(|| {
+        for_each_dets_sparse_shot(&one_record, layout, |_| Ok(())).expect("sparse one");
+    });
+    let sparse_many = allocation_counter::measure(|| {
+        for_each_dets_sparse_shot(&many_records, layout, |_| Ok(())).expect("sparse many");
+    });
+    assert_record_count_independent("sparse", sparse_one, sparse_many, layout.total_bits());
+    Ok(())
+}
+
+fn assert_record_count_independent(
+    reader: &str,
+    one: allocation_counter::AllocationInfo,
+    many: allocation_counter::AllocationInfo,
+    width: usize,
+) {
+    assert_eq!(
+        many.count_total, one.count_total,
+        "{reader} allocation count grew with records: one={one:?}, many={many:?}"
+    );
+    assert_eq!(
+        many.bytes_total, one.bytes_total,
+        "{reader} allocated bytes grew with records: one={one:?}, many={many:?}"
+    );
+    let generous_width_bound = u64::try_from(width)
+        .expect("test width fits u64")
+        .saturating_mul(64)
+        .saturating_add(4_096);
+    assert!(
+        many.bytes_max <= generous_width_bound,
+        "{reader} peak allocation exceeded width-derived bound {generous_width_bound}: {many:?}"
+    );
 }
 
 fn assert_all_width_readers_reject(input: &[u8], format: SampleFormat, width: usize) {

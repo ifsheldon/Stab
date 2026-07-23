@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use serde::Deserialize;
+use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, ResultFormat};
 use tempfile::tempdir;
 
 use crate::run_from;
@@ -16,47 +16,6 @@ const MALFORMED_TEXT_RECORDS: &[(&str, &[u8])] = &[
     ("dets", b"shot M0 \n"),
     ("dets", b"shot\tM0\n"),
 ];
-
-#[derive(Debug, Deserialize)]
-struct Corpus {
-    schema_version: u32,
-    cases: Vec<CorpusCase>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CorpusCase {
-    id: String,
-    format: String,
-    layout: Layout,
-    input_hex: String,
-    replay_shots: usize,
-    acceptance: Acceptance,
-    canonical_01_hex: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-struct Layout {
-    measurements: usize,
-    detectors: usize,
-    observables: usize,
-}
-
-impl Layout {
-    fn width(self) -> usize {
-        self.measurements + self.detectors + self.observables
-    }
-
-    const fn is_measurement_only(self) -> bool {
-        self.detectors == 0 && self.observables == 0
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-enum Acceptance {
-    Accepted,
-    Rejected,
-}
 
 fn assert_cli_rejects(args: impl IntoIterator<Item = OsString>, input: &[u8], context: &str) {
     let mut stdout = Vec::new();
@@ -128,64 +87,58 @@ fn malformed_text_records_are_rejected_by_convert_m2d_and_replay() {
 
 #[test]
 fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
-    let corpus: Corpus =
-        serde_json::from_str(include_str!("../../../../oracle/result-format-corpus.json"))
-            .expect("parse result-format corpus");
-    assert_eq!(corpus.schema_version, 1);
+    let corpus = CheckedCorpus::parse(include_bytes!(
+        "../../../../oracle/result-format-corpus.json"
+    ))
+    .expect("parse result-format corpus");
     let dir = tempdir().expect("temp dir");
 
-    for case in corpus.cases {
-        let input = hex::decode(&case.input_hex).expect("decode corpus input");
-        let expected = case
-            .canonical_01_hex
-            .as_deref()
-            .map(hex::decode)
-            .transpose()
-            .expect("decode canonical output");
+    for case in corpus.cases() {
+        let layout = case.layout();
         let convert_args = vec![
             OsString::from("stab"),
             OsString::from("convert"),
             OsString::from("--in_format"),
-            OsString::from(&case.format),
+            OsString::from(case.format().name()),
             OsString::from("--out_format"),
             OsString::from("01"),
             OsString::from("--num_measurements"),
-            OsString::from(case.layout.measurements.to_string()),
+            OsString::from(layout.measurements().to_string()),
             OsString::from("--num_detectors"),
-            OsString::from(case.layout.detectors.to_string()),
+            OsString::from(layout.detectors().to_string()),
             OsString::from("--num_observables"),
-            OsString::from(case.layout.observables.to_string()),
+            OsString::from(layout.observables().to_string()),
         ];
-        let (status, stdout, stderr) = run_cli_owned(convert_args, &input);
-        assert_acceptance(&case, "convert", status, &stderr);
-        if let Some(expected) = expected {
-            assert_eq!(stdout, expected, "{} convert output", case.id);
+        let (status, stdout, stderr) = run_cli_owned(convert_args, case.input());
+        assert_acceptance(case, "convert", status, &stderr);
+        if let Some(expected) = case.canonical_01() {
+            assert_eq!(stdout, expected, "{} convert output", case.id());
         }
 
-        if case.format == "dets" && !case.layout.is_measurement_only() {
+        if case.format() == ResultFormat::Dets && !layout.is_measurement_only() {
             continue;
         }
-        let circuit_path = dir.path().join(format!("{}.stim", case.id));
-        std::fs::write(&circuit_path, measurement_circuit(case.layout.width()))
-            .expect("write corpus circuit");
+        let circuit_path = dir.path().join(format!("{}.stim", case.id()));
+        let width = layout.total_bits().expect("validated layout");
+        std::fs::write(&circuit_path, measurement_circuit(width)).expect("write corpus circuit");
         let (status, _, stderr) = run_cli_owned(
             vec![
                 OsString::from("stab"),
                 OsString::from("m2d"),
                 OsString::from("--in_format"),
-                OsString::from(&case.format),
+                OsString::from(case.format().name()),
                 OsString::from("--out_format"),
                 OsString::from("01"),
                 OsString::from("--skip_reference_sample"),
                 OsString::from("--circuit"),
                 circuit_path.into_os_string(),
             ],
-            &input,
+            case.input(),
         );
-        assert_acceptance(&case, "m2d", status, &stderr);
+        assert_acceptance(case, "m2d", status, &stderr);
 
-        let replay_path = dir.path().join(format!("{}.replay", case.id));
-        std::fs::write(&replay_path, &input).expect("write corpus replay");
+        let replay_path = dir.path().join(format!("{}.replay", case.id()));
+        std::fs::write(&replay_path, case.input()).expect("write corpus replay");
         let (status, _, stderr) = run_cli_owned(
             vec![
                 OsString::from("stab"),
@@ -193,13 +146,13 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
                 OsString::from("--replay_err_in"),
                 replay_path.into_os_string(),
                 OsString::from("--replay_err_in_format"),
-                OsString::from(&case.format),
+                OsString::from(case.format().name()),
                 OsString::from("--shots"),
-                OsString::from(case.replay_shots.to_string()),
+                OsString::from(case.replay_shots().to_string()),
             ],
-            measurement_dem(case.layout.width()).as_bytes(),
+            measurement_dem(width).as_bytes(),
         );
-        assert_acceptance(&case, "sample_dem replay", status, &stderr);
+        assert_acceptance(case, "sample_dem replay", status, &stderr);
     }
 }
 
@@ -214,15 +167,15 @@ fn run_cli_owned(args: Vec<OsString>, input: &[u8]) -> (i32, Vec<u8>, String) {
     )
 }
 
-fn assert_acceptance(case: &CorpusCase, path: &str, status: i32, stderr: &str) {
-    match case.acceptance {
+fn assert_acceptance(case: &CheckedCase, path: &str, status: i32, stderr: &str) {
+    match case.acceptance() {
         Acceptance::Accepted => {
-            assert_eq!(status, 0, "{} through {path}: {stderr}", case.id);
-            assert_eq!(stderr, "", "{} through {path}", case.id);
+            assert_eq!(status, 0, "{} through {path}: {stderr}", case.id());
+            assert_eq!(stderr, "", "{} through {path}", case.id());
         }
         Acceptance::Rejected => {
-            assert_ne!(status, 0, "{} through {path}", case.id);
-            assert!(!stderr.is_empty(), "{} through {path}", case.id);
+            assert_ne!(status, 0, "{} through {path}", case.id());
+            assert!(!stderr.is_empty(), "{} through {path}", case.id());
         }
     }
 }

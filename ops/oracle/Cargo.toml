@@ -14,12 +14,12 @@ workspace = true
 [dependencies]
 clap = { workspace = true }
 csv = { workspace = true }
-hex = { workspace = true }
 rustix = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
+stab-compat-corpus = { path = "../compat-corpus" }
 stab-core = { path = "../../crates/stab-core", features = ["ops-contracts"] }
 statrs = { workspace = true }
 tempfile = { workspace = true }

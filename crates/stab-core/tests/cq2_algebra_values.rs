@@ -47,8 +47,6 @@ fn cq2_algebra_pauli_value_types_have_complete_scalar_contract() {
     for (sign, negative, text) in [(PauliSign::Plus, false, "+"), (PauliSign::Minus, true, "-")] {
         assert_eq!(sign.is_negative(), negative);
         assert_eq!(sign.to_string(), text);
-        assert_eq!(sign, sign.clone());
-        assert!(!format!("{sign:?}").is_empty());
     }
 
     for (phase, real, negative, sign, text) in [
@@ -62,8 +60,6 @@ fn cq2_algebra_pauli_value_types_have_complete_scalar_contract() {
         assert_eq!(phase.is_negative(), negative);
         assert_eq!(phase.sign(), sign);
         assert_eq!(phase.to_string(), text);
-        assert_eq!(phase, phase.clone());
-        assert!(!format!("{phase:?}").is_empty());
     }
 
     let bases = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
@@ -100,8 +96,6 @@ fn cq2_algebra_pauli_value_types_have_complete_scalar_contract() {
             "round trip {left:?}"
         );
         assert_eq!(left.to_string(), ["_", "X", "Y", "Z"][left_index]);
-        assert_eq!(left, left.clone());
-        assert!(!format!("{left:?}").is_empty());
         for (right_index, right) in bases.into_iter().enumerate() {
             let expected = expected_products[left_index][right_index];
             assert_eq!(left.multiply(right), expected, "{left:?} * {right:?}");
@@ -162,8 +156,6 @@ fn cq2_algebra_pauli_owned_value_contract_is_typed_and_canonical() {
         }))
     );
     assert_eq!(value, before_error);
-    assert_eq!(value, value.clone());
-    assert!(format!("{value:?}").contains("PauliString"));
 
     let empty = PauliString::identity(0).expect("empty identity");
     assert!(empty.is_empty());
@@ -205,8 +197,6 @@ fn cq2_algebra_flex_pauli_contract_tracks_all_four_phases() {
         assert_eq!(value.get(2), Some(PauliBasis::Z));
         assert_eq!(value.get(3), None);
         assert_eq!(value.value().sign(), phase.sign());
-        assert_eq!(value, value.clone());
-        assert!(format!("{value:?}").contains("FlexPauliString"));
     }
 
     let empty = FlexPauliString::identity(0).expect("empty flexible identity");
@@ -271,8 +261,6 @@ fn cq2_algebra_single_qubit_clifford_contract_covers_values_and_names() {
         let gate = Gate::from_name(value.canonical_name()).expect("canonical gate");
         assert_eq!(SingleQubitClifford::from_gate(gate), Ok(value));
         assert_eq!(SingleQubitClifford::try_from(gate), Ok(value));
-        assert_eq!(value, value.clone());
-        assert!(!format!("{value:?}").is_empty());
     }
     assert_eq!(canonical_names.len(), 24);
     assert_eq!(tokens.len(), 24);
@@ -384,8 +372,6 @@ fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
     first.randomize(&mut first_rng);
     second.randomize(&mut second_rng);
     assert_eq!(first, second);
-    assert_eq!(first, first.clone());
-    assert!(format!("{first:?}").contains("CliffordString"));
 }
 
 #[test]
@@ -395,8 +381,6 @@ fn cq2_algebra_flow_value_contract_canonicalizes_and_reports_typed_errors() {
     assert_eq!(negative.get(), -3);
     assert_eq!(absolute.get(), 5);
     assert!(negative < absolute);
-    assert_eq!(negative, negative.clone());
-    assert!(!format!("{negative:?}").is_empty());
 
     let input = PauliString::from_str("X_").expect("flow input");
     let output = PauliString::from_str("_Z").expect("flow output");
@@ -416,8 +400,6 @@ fn cq2_algebra_flow_value_contract_canonicalizes_and_reports_typed_errors() {
         "X_ -> _Z xor rec[5] xor obs[1] xor obs[3]"
     );
     assert_eq!(Flow::from_str(&value.to_string()), Ok(value.clone()));
-    assert_eq!(value, value.clone());
-    assert!(format!("{value:?}").contains("Flow"));
     assert!(Flow::from_str("1 -> 1").expect("identity flow") < value);
 
     let x = Flow::from_str("X -> X").expect("X flow");
@@ -602,8 +584,6 @@ fn cq2_algebra_error_and_resource_contract_is_exhaustive() {
     ];
     for (error, expected) in errors {
         assert_eq!(error.to_string(), expected, "{}", error_variant(&error));
-        assert_eq!(error, error.clone());
-        assert!(!format!("{error:?}").is_empty());
     }
 
     let source_error = StabilizerError::from(BitError::BitIndexOutOfRange { index: 2, len: 1 });
@@ -647,8 +627,6 @@ fn cq2_algebra_error_and_resource_contract_is_exhaustive() {
     ] {
         assert_eq!(resource.limit(), limit);
         assert_eq!(resource.to_string(), text);
-        assert_eq!(resource, resource.clone());
-        assert!(!format!("{resource:?}").is_empty());
     }
 }
 
