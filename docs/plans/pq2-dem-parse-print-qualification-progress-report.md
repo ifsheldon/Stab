@@ -2,7 +2,7 @@
 
 ## Status
 
-Independent review complete; source repair implemented and fresh machine evidence pending as of 2026-07-23.
+Fresh repaired-source machine evidence complete; final milestone audit and independent review pending as of 2026-07-23.
 
 The source-current reviewed implementation inventory is performance digest `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498` and correctness digest `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, worker-protocol schema version 4, contract-preflight schema version 14 with 228 ordered receipts, and qualification report schema version 33.
@@ -375,7 +375,79 @@ Five independent GPT-5.6/max lanes completed on 2026-07-23. Hostile-input and ar
 
 The source repair expands the correctness inventory from 1,974 to 1,986 public API records because `DemRepeatCount`, its two methods, and nine derived trait implementations are now explicit public owners. The exact DEM model mutation/repeat case owns all twelve records and now tests zero and nonzero repeat counts. The frozen correctness inventory is `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`; the corrected shared adapter, profiler note, runtime contract, baseline binding, and performance inventory are frozen at `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498`.
 
-Fresh execution must start from a clean commit containing these repairs. It must reproduce both private workers and both DEM probes, publish and replay the expanded exact CQ prerequisite, rerun all twelve full and soak reports once, run every regression, publish and replay four rollups and two completion receipts, and repeat accepted-maximum memory probes at the corrected RSS boundary. A new milestone audit and independent full-code-review pass are required after that evidence; neither the initial audit below nor the first review closes the repaired source state.
+At that review checkpoint, fresh execution had to start from a clean commit containing these repairs, reproduce both private workers and both DEM probes, publish and replay the expanded exact CQ prerequisite, run all twelve full and soak reports once, run every regression, publish and replay four rollups and two completion receipts, and repeat accepted-maximum memory probes at the corrected RSS boundary. The following section records that completed machine chain; a new milestone audit and independent full-code-review pass still remain required before final acceptance.
+
+## Fresh Repaired-Source Machine Chain At `80fb540`
+
+Clean revision `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` bound performance inventory `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498`, correctness inventory `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`, and `local_modifications=false` before and after every source-owned producer.
+
+- The parse adapter probe passed with `work=16384`, Stim `0.002099536` seconds, Stab `0.002367873` seconds, diagnostic ratio `1.127808x`, and parent peak RSS observations of 348,160 and 430,080 bytes.
+- The print adapter probe passed with `work=16384`, Stim `0.005350368` seconds, Stab `0.003100928` seconds, diagnostic ratio `0.579573x`, and parent peak RSS observations of 4,919,296 and 438,272 bytes.
+- The first print-probe invocation misspelled the group as `pq2-dem-print-adapter-smoke`. Clap rejected it before a worker ran or an artifact was created; the correctly named source-owned probe then passed once.
+- Private-worker reproducibility passed with pinned-Stim source SHA-256 `696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9`, build fingerprint `f0bb3fc28f0237771528b4d9eb3c5e7d9166bf247e476c06b3377bbd9b77ab09`, and binary SHA-256 `23546566e9320aa4e625ad939437027ba94fabf88b36914c5682dd7752859c01`; the matching Stab values were `7338a6ebbbc9aac00a2d0533215eba2d9ec619a5827ed48ae3f82f5a74f772ce`, `535c2b2355888f9f275d9ab787be65f1d77064f316d2935770a6d7f9bda8fc37`, and `ea7af8a9cb8f70ff36ea659457138e76b55810c30924fc75436f0150d8f337fc`.
+- The canonical 228-receipt contract preflight SHA-256 was `7760dea8c67564cc8470786ffed1dbf811bdfd11079950b3e62d1f0fc4d40471`.
+- The exact focused CQ prerequisite selected `cq-evidence-qualification-0908c21b917526e3`, passed with zero failures, independently replayed, and passed exact preflight at `target/qualification/pq2-dem-cq-full-80fb540`.
+- The correctness request, JSON report, completion, preflight, and Markdown SHA-256 values were `9158df6ccdcc6a7d47e826923fe878e1a2dc9d6caf6b49f155f4e02df7fe7f30`, `2bbb0db76bf8e67fe610a2a2cb5bd31495d1aade427c5fee63dea4a1808f626a`, `6677a61838cea4d31479184f9df039cb646787a7adedc7eb8c915bb0a67e4832`, `558077632e2fbba2644e3f964e4f5afcd3655fd09d7438ae1512e3823e3e8e8a`, and `99e683236ebfc67e37652c8616a2100ab5765693c77a9b0034e8350794f31257`.
+
+All twelve formal producers passed on their first attempts, all twelve reports independently replayed, and all twelve regressions passed. No noisy or failed timing result was rerun. Swap was disabled only around each producer through an unconditional exit restoration trap, and `/swap.img` was verified restored with zero bytes in use after every producer and at the end of the matrix.
+
+| Measurement | Tier | Scale | Median ratio | Bootstrap 95 percent interval | Paired rMAD | Common iterations | Work per sample |
+| --- | --- | --- | ---: | --- | ---: | ---: | ---: |
+| Parse | Full | Small | `1.013478x` | `[1.005502x, 1.020394x]` | `0.003751` | 29,342 | 1,877,888 |
+| Parse | Full | Medium | `1.009355x` | `[1.002133x, 1.017851x]` | `0.007155` | 480 | 1,966,080 |
+| Parse | Full | Large | `1.051397x` | `[1.043306x, 1.073689x]` | `0.009146` | 30 | 1,966,080 |
+| Parse | Soak | Small | `1.011242x` | `[1.007687x, 1.017095x]` | `0.005216` | 29,291 | 1,874,624 |
+| Parse | Soak | Medium | `1.023586x` | `[1.013485x, 1.029980x]` | `0.007281` | 481 | 1,970,176 |
+| Parse | Soak | Large | `1.049982x` | `[1.039894x, 1.055401x]` | `0.008732` | 30 | 1,966,080 |
+| Print | Full | Small | `0.583053x` | `[0.580683x, 0.594079x]` | `0.005263` | 14,955 | 957,120 |
+| Print | Full | Medium | `0.579148x` | `[0.572375x, 0.589983x]` | `0.009352` | 239 | 978,944 |
+| Print | Full | Large | `0.575247x` | `[0.569240x, 0.593008x]` | `0.010443` | 15 | 983,040 |
+| Print | Soak | Small | `0.591557x` | `[0.581215x, 0.595736x]` | `0.015854` | 14,876 | 952,064 |
+| Print | Soak | Medium | `0.574133x` | `[0.570351x, 0.582052x]` | `0.008556` | 239 | 978,944 |
+| Print | Soak | Large | `0.571684x` | `[0.570693x, 0.580001x]` | `0.005873` | 15 | 983,040 |
+
+The parse medians range from `1.009355x` through `1.051397x`; the print medians range from `0.571684x` through `0.591557x`. Every median and confidence-interval upper bound passes its independent `1.25x` rule, and the worst upper bound is parse large full at `1.073689x`.
+
+The exact report, preflight, and Markdown SHA-256 triples are:
+
+| Measurement | Tier | Scale | Report | Preflight | Markdown |
+| --- | --- | --- | --- | --- | --- |
+| Parse | Full | Small | `1c2538496efa2e94cf31a68625f3b1d2b29fbf9b22514c22ced05e4d182f7d3f` | `fc53c337b89e9fb4b51afd847ac4dba67d83482758c9a635591b7fb60ebc80d6` | `ae9d6b60589d6202d053b9ecd8dcb3bb006c56f9639e3f377baeaf464cbdc6bc` |
+| Parse | Full | Medium | `a14a545f1797bb0cdfa53b8d29c4579bd65a2ea2d81d6d98a544e6b9d8fdb9b7` | `b1ecd103d8fb55c545c0d621b8901a353d0ed13ac1157777c04e3f79e9b3708e` | `2045cf1286624c6f2ab8ff6f54feb400ddf5ab8b88a806f8eb631c8e0ffb6f2d` |
+| Parse | Full | Large | `558fbc54bb3bca223b292d274397680fa7459b7640dbaa192fa81ff07c2768fc` | `58a29f6d40d57f2b03d58dc69cb95ca43cad480abcc59ebe4d8f212d0450d474` | `162f00499d58bb1883655a54e64dc4b7e30844f713807a5aced709dced642718` |
+| Parse | Soak | Small | `012c395729b34f10084dd2c4308257bf12bd56d9540c1320a922b388e643e8d8` | `fea2a480250aefb74d544858971d4d9bda651209423d83aae3466429d31d8055` | `e5492b331f37a80aa4e1d86e4fe01398b17a7c2df3fbebb5c4c977f3c5c54a9c` |
+| Parse | Soak | Medium | `471c4c83f5a3579447a688b6b49598e5bb63f700257d3d7c98ca04eeceaf9a17` | `ad808f6a6aec69ebbdb67c4efc83bc1077018cae8203c0c1b1b43bb77a31ef3f` | `5e84f61a107aa5cc8b923e511e9cf00f3786c132b3e1e61dd83756c8a99e9ce2` |
+| Parse | Soak | Large | `8358bd1cac90b53716772f36b295bc3214e960cb571b22b2f55914a3c8b11828` | `b49e46ca50f16a2827bd4a59958e3f146c836fcf508b82f9c09d2da7c232d133` | `a700f3d2be8e95c404eba5da64520fb793233e43ac1621ebb2524f541cda71ae` |
+| Print | Full | Small | `e928b4c0fded99537c3fab20cff53eae52b4ff6efa2e67c31f3704638b45a268` | `1ffff70d7fac1c83d31eea8c474c74853cdc7d40fd2ce60896250792b48e26a4` | `b76887b2c6f03c28c4eb3104759ea222065431b1ddfc7beadc4cd761b025b2ae` |
+| Print | Full | Medium | `33bb4af841134a34626076cc8fa532cb5779579c1e2cfd54c0544978cad5d36f` | `ab95af8e747b23495a8708430ceb1f5936cbf47540dfba7c28094b74f8b87f14` | `c442498cf1a7bec35fcccab86995546dbd300f9d62a2b1c5b44cdfb4e872afa9` |
+| Print | Full | Large | `2c0f0b8afc167183eff9fa7b0abffbbcc7843f00d8bf15f46f53e56d270a876a` | `12f65463b91f4f78c03866ede72c8c013bd1082c667260570cd8af702d571f42` | `c40c9c024803e945585b5cb82cff2c5dfd9237f2f56c415ab17f2b7cbec698c7` |
+| Print | Soak | Small | `97f290dc84ac2af600669042cf85651363d5a597bf31fc45951958ff96103ef4` | `acc3a59a388aa19b62435bb586d20e13befa4d99efc6805251ed778cfa62fa19` | `43da1961454ee7f95a15eee141ef7cb119a90c091ed293685b5c542c6f8c466c` |
+| Print | Soak | Medium | `fe573b7019c5685829c63b8ebb263e1d532b8f119645b6802d8f23493286d81e` | `373f9155245fde88c9fedd0aeff32138e753bf3cbf5b11bebfd41965e8328ce6` | `490866614e50630adcb5ec2423f30d7c4971731862891a960a56da6f57efa1fd` |
+| Print | Soak | Large | `1b4b02d0f145ede4d6c1db026586b104e312551637c97c60110f93d1f9be561d` | `0191394278905b9c90d3bc6a1b93f4e1097250419fe22c29c786bbfcb5f48498` | `3f6952f0a5b557f03eb815edae728bd96d4fdeb0da21c66a7f2212400e7f48b4` |
+
+The four scale-family rollups published and independently replayed:
+
+| Group | Tier | Artifact | Report | Preflight | Markdown |
+| --- | --- | --- | --- | --- | --- |
+| Parse | Full | `target/benchmarks/qualification/pq2-dem-80fb540-parse-full-rollup` | `b5a63d7a520d7f80cf1c2acc2053ebf553193b7e475c68636afaac7cf8de2a52` | `865b256ad9a399561538a4e06e86179fc7097e17d9e3f07e695dbb1cc4e1b31c` | `65789510909e1b3bd4ee4bcaac179311759ec849fb4e097a634ac7db05de9f59` |
+| Parse | Soak | `target/benchmarks/qualification/pq2-dem-80fb540-parse-soak-rollup` | `6f39710cb09cb17142012d6ea80c160a0161b3d5961731064aa58ddd421d807c` | `2259dfd160f4e76057220f75a2ecb39fb85116633b78164976b0801ce24d6bb1` | `34790c2d80c351af35963aa52b7018b82e1abdd031a601821b3b95686250044c` |
+| Print | Full | `target/benchmarks/qualification/pq2-dem-80fb540-print-full-rollup` | `67f0b796b907d1753484a2a3249fb2a1fb298a5053c800b8d430a55ab9ffb68a` | `27f82fe3837005d132f2d3f82f4617fbc9663c6d70c15e5ac789c784215fab32` | `22cd3e06a002f2adeefb2323f5495e5f741c89c5dafd6c26e687e24ce7386698` |
+| Print | Soak | `target/benchmarks/qualification/pq2-dem-80fb540-print-soak-rollup` | `02c5581d997912c0274e271aa80bc8bd7aa61ba4c0bd4c79ab4a994545007cfa` | `fb802024fa29c0f24001e7f8534ab239e4115cf059016327ab6e0fed618f0113` | `7f8de333c2fd73596fec859bf05a849eaaa7a21733e146c48f328f38dafba8e9` |
+
+The two completion receipts published and independently replayed:
+
+| Group | Artifact | Report | Preflight | Markdown |
+| --- | --- | --- | --- | --- |
+| Parse | `target/benchmarks/qualification/pq2-dem-80fb540-parse-completion` | `24ca408cfb9165bf5847a90d599ab9d97ab6d4b56a0daa14eba8609056bc8f31` | `f9c2091f46c485494d22681e9fd784ef68e97f9e6ab5a54448e8acff2c52997e` | `d8c448e498e30e64a80f4bfecf080a6048590c010e4a4bbdcf133814f30b2288` |
+| Print | `target/benchmarks/qualification/pq2-dem-80fb540-print-completion` | `b514c73c92be30308c39402cacca6ed98ef924f1f3e09b2b7e88c1e807b2c683` | `f0ed3c09913861c6f4f4f950e5e142cd859d99239e64b3242b02316d1801214f` | `58007cd90571b95a65b04c3b1374da64c2ab4e67fec610440eb8c6d5fc540f9e` |
+
+Completion replay rebuilt the pinned-Stim adapter from clean source and reran the source-owned probe. The final parse replay probe reported diagnostic ratio `1.009205x`; the final print replay probe reported `0.593212x`.
+
+Peak RSS remains report-only. Across the formal parse matrix, pinned-Stim setup and peak RSS ranged from 3,682,304 / 3,780,608 bytes through 5,505,024 / 27,463,680 bytes, while Stab ranged from 4,476,928 / 4,804,608 bytes through 6,299,648 / 32,759,808 bytes. Across the formal print matrix, pinned-Stim ranged from 3,764,224 / 3,903,488 bytes through 15,372,288 / 21,737,472 bytes, while Stab ranged from 4,665,344 / 4,993,024 bytes through 19,509,248 / 23,486,464 bytes.
+
+The corrected accepted-maximum memory probes used 524,288 items and the same pre-digest phase boundary on both implementations. Parse reported pinned-Stim setup/peak RSS of 18,165,760 / 96,501,760 bytes and Stab 19,152,896 / 124,239,872 bytes. Print reported pinned-Stim setup/peak RSS of 96,493,568 / 127,750,144 bytes and Stab 124,170,240 / 139,051,008 bytes. These observations do not define a growth rule and do not replace PQ6 memory qualification.
+
+This machine chain closes fresh execution steps 1 through 8 of the repaired-source contract. Final acceptance remains blocked on the repeated milestone audit, five new independent GPT-5.6/max review lanes, resolution of every confirmed finding, synchronized final documentation, full repository verification, restored swap, no qualification process, and a clean committed worktree.
 
 ## Initial Milestone Audit (Superseded By Independent Review)
 
