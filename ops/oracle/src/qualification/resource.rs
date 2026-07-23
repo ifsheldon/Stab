@@ -10,6 +10,13 @@ use super::validation::ValidationIssues;
 pub(super) const EXISTING_RESOURCE_SOURCE_ID: &str =
     "safe_file::tests::descriptor_walk_rejects_symlinked_parent";
 pub(super) const EXISTING_PROPERTY_SOURCE_ID: &str = super::property::PASS_TARGET_ID;
+pub(super) const BOUNDED_TEXT_LINE_SOURCE_ID: &str = "cq3-resource-bounded-text-line-reader";
+
+const EXISTING_RESOURCE_SOURCE_IDS: [&str; 3] = [
+    EXISTING_RESOURCE_SOURCE_ID,
+    EXISTING_PROPERTY_SOURCE_ID,
+    BOUNDED_TEXT_LINE_SOURCE_ID,
+];
 
 struct PlannedResourceCaseSpec {
     source_id: &'static str,
@@ -111,8 +118,8 @@ const PLANNED_RESOURCE_CASES: [PlannedResourceCaseSpec; 13] = [
 ];
 
 pub(super) fn required_source_ids() -> impl Iterator<Item = &'static str> {
-    std::iter::once(EXISTING_RESOURCE_SOURCE_ID)
-        .chain(std::iter::once(EXISTING_PROPERTY_SOURCE_ID))
+    EXISTING_RESOURCE_SOURCE_IDS
+        .into_iter()
         .chain(PLANNED_RESOURCE_CASES.iter().map(|spec| spec.source_id))
 }
 
@@ -135,10 +142,7 @@ pub(super) fn validate_inventory(
             .push("CQ-RESOURCE source-owned case inventory is incomplete or stale".to_string());
     }
     for case in resource_cases {
-        let existing = matches!(
-            case.source_id.as_str(),
-            EXISTING_RESOURCE_SOURCE_ID | EXISTING_PROPERTY_SOURCE_ID
-        );
+        let existing = EXISTING_RESOURCE_SOURCE_IDS.contains(&case.source_id.as_str());
         let expected_status = if existing {
             EvidenceStatus::Implemented
         } else {

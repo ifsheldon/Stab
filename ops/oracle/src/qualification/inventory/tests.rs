@@ -280,7 +280,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
         .filter(|case| case.source_id.starts_with("cq2-result-"))
         .collect::<Vec<_>>();
-    assert_eq!(result_qualification_cases.len(), 36);
+    assert_eq!(result_qualification_cases.len(), 40);
     assert!(
         result_qualification_cases
             .iter()
@@ -303,7 +303,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .iter()
         .filter(|item| item.feature_id == FeatureId::ResultFormats)
         .collect::<Vec<_>>();
-    assert_eq!(result_api_items.len(), 97);
+    assert_eq!(result_api_items.len(), 176);
     assert!(result_api_items.iter().all(|item| {
         manifest
             .evidence_cases
@@ -321,6 +321,42 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .starts_with("stab_core::SampleFormat as Clone")
             && item.owner_case_id == sample_format_parent.id
     }));
+
+    let dets_type_parent = result_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-result-dets-public-type-contract")
+        .expect("typed DETS qualification parent");
+    for path in [
+        "stab_core::DetsLayout",
+        "stab_core::DetsResultType",
+        "stab_core::DetsToken",
+        "stab_core::result_formats::DetsLayout",
+        "stab_core::result_formats::DetsResultType",
+        "stab_core::result_formats::DetsToken",
+    ] {
+        let item = result_api_items
+            .iter()
+            .find(|item| item.path.as_str() == path)
+            .expect("typed DETS API item");
+        assert_eq!(item.owner_case_id, dets_type_parent.id, "path={path}");
+    }
+    let accepted_corpus_parent = result_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-result-reader-boundary-type-newline-contract")
+        .expect("accepted result-format corpus parent");
+    for path in [
+        "stab_core::result_formats::read_dets_records",
+        "stab_core::result_streaming::for_each_dets_record",
+        "stab_core::result_streaming::for_each_dets_packed_record",
+        "stab_core::result_streaming::for_each_dets_token_record",
+        "stab_core::result_streaming::for_each_dets_sparse_shot",
+    ] {
+        let item = result_api_items
+            .iter()
+            .find(|item| item.path.as_str() == path)
+            .expect("typed DETS reader API item");
+        assert_eq!(item.owner_case_id, accepted_corpus_parent.id, "path={path}");
+    }
 
     let duplicate_dense_parent = result_qualification_cases
         .iter()

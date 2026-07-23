@@ -32,3 +32,8 @@ matrix *args:
 [working-directory: '..']
 blockers *args:
     cargo run -q -p stab-oracle -- blockers {{args}}
+
+# Validate the pinned result-format acceptance and canonical-output corpus.
+[working-directory: '..']
+result-formats *args:
+    cargo run -q -p stab-oracle -- result-formats {{args}}

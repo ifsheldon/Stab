@@ -3320,6 +3320,142 @@
       ]
       },
       {
+        "id": "cq2-result-dets-public-type-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_text_compat",
+            "dets_public_layout_and_token_value_contract",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed layouts and tokens prove checked M/D/L width construction, measurement-only construction, namespace counts, total width, prefixes, token values, and width-overflow rejection."
+        },
+        "negative_axes": [
+          "layout-width-overflow",
+          "namespace-prefix-alias",
+          "token-type-index-alias"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::try_new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::measurement_only"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::measurements"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::detectors"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::observables"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsLayout::total_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsResultType"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsResultType::prefix"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsToken"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsToken::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsToken::result_type"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetsToken::index"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::try_new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::measurement_only"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::measurements"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::detectors"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::observables"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsLayout::total_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsResultType"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsResultType::prefix"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsToken"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsToken::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsToken::result_type"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::DetsToken::index"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "cq2-result-reader-boundary-type-newline-contract",
         "feature_id": "CQ-RESULT-FORMATS",
         "comparator": "exact-bytes",
@@ -3332,18 +3468,20 @@
             "-p",
             "stab-core",
             "--test",
-            "cq2_result_io",
-            "cq_result_reader_record_boundaries_types_and_crlf_match_stim",
+            "result_format_corpus",
+            "checked_accepted_corpus_matches_every_applicable_core_reader",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Exact multi-record inputs prove final-line handling, empty dets records, measurement-only dets typing, blank-line handling, and CRLF acceptance."
+          "detail": "The checked pinned-Stim corpus proves LF and CRLF handling, DETS EOF handling, empty HITS and DETS records, typed namespace offsets, duplicate semantics, and reusable materialized, dense, packed, sparse, token, and SparseShot consumers."
         },
         "negative_axes": [
-          "non-measurement-dets-token"
+          "namespace-offset-alias",
+          "line-ending-normalization",
+          "duplicate-semantics-drift"
         ],
         "upstream_owners": [
           {
@@ -3426,6 +3564,26 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::result_formats::read_measurement_records"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::read_dets_records"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_dets_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_dets_packed_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_dets_token_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_dets_sparse_shot"
         }
       ]
       },
@@ -3576,22 +3734,24 @@
             "-p",
             "stab-core",
             "--test",
-            "cq2_result_io",
-            "cq_result_reader_rejects_malformed_widths_and_indices",
+            "result_format_corpus",
+            "checked_rejected_corpus_matches_every_applicable_core_reader",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Positive integer parsing and exact negative cases prove width, byte, run-length, sparse-index, u64-overflow, dets-prefix, and token validation in every reader family."
+          "detail": "The checked pinned-Stim corpus rejects unterminated 01 and HITS records, malformed separators, invalid bytes, numeric overflow, namespace crossings, out-of-range tokens, and malformed DETS prefixes through every applicable reader family."
         },
         "negative_axes": [
           "integer-overflow",
           "record-width-mismatch",
-          "run-length-overshoot",
           "sparse-index-out-of-range",
-          "invalid-dets-prefix"
+          "invalid-dets-prefix",
+          "unterminated-text-record",
+          "malformed-text-separator",
+          "namespace-boundary-crossing"
         ],
         "upstream_owners": [
           {
@@ -3693,17 +3853,17 @@
             "stab-core",
             "--test",
             "cq2_result_formats",
-            "cq_result_sparse_duplicate_tokens_toggle_dense_records",
+            "cq_result_hits_duplicate_tokens_toggle_dense_records",
             "--quiet",
             "--exact"
           ]
         },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Repeated hits and dets tokens prove dense materialized, dense streaming, and packed streaming readers toggle duplicate indices."
+        "detail": "Repeated HITS tokens prove dense materialized, dense streaming, and packed streaming readers retain Stim's parity semantics."
       },
       "negative_axes": [
-        "duplicate-token-set-semantics"
+        "hits-duplicate-set-semantics"
       ],
         "upstream_owners": [
           {
@@ -4198,17 +4358,338 @@
             "test",
             "-p",
             "stab-cli",
-            "tests::convert::convert_sparse_duplicate_tokens_toggle_typed_bits",
+            "tests::convert::convert_sparse_duplicate_tokens_set_typed_bits",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Typed CLI dets conversion toggles repeated tokens using the same parity semantics as Stim dense readers."
+          "detail": "Typed CLI DETS conversion sets repeated dense tokens, matching Stim's dense DETS semantics without applying HITS parity."
         },
         "negative_axes": [
-          "duplicate-typed-token"
+          "duplicate-typed-token-parity"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-result-cli-checked-text-corpus",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::result_text_compat::checked_corpus_matches_convert_and_applicable_streaming_cli_paths",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The checked 62-case corpus proves exact convert output plus matching acceptance for every applicable m2d and sample_dem replay path without independent CLI grammar normalization."
+      },
+      "negative_axes": [
+        "convert-core-grammar-drift",
+        "m2d-core-grammar-drift",
+        "replay-core-grammar-drift"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-result-cli-hits-replay-duplicate-set-semantics",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::m11::sample_dem_hits_replay_sets_duplicate_error_indices",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "sample_dem HITS replay consumes duplicate sparse indices as set membership, matching pinned Stim's table-minor replay reader while ordinary dense HITS readers retain their separate parity contract."
+      },
+      "negative_axes": [
+        "hits-replay-duplicate-parity-confusion"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-result-cli-convert-success-prefix-on-error",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::convert::convert_preserves_successful_record_prefix_before_later_parse_error",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "convert writes each completed record before parsing the next record, preserving pinned Stim's successful stdout prefix when a later input record is malformed."
+      },
+      "negative_axes": [
+        "materialized-convert-error-prefix-loss"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-resource-bounded-text-line-reader",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "input::tests::limited_line_rejects_before_consuming_an_over_limit_chunk",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The shared m2d and replay text-line reader rejects an over-limit available chunk before consuming it or extending its retained line buffer past the source-owned cap."
+      },
+      "negative_axes": [
+        "unterminated-text-line-overallocation"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-special-output-stream-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::special_output_files_are_streamed_without_regular_file_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The retained output owner truncates regular files but writes special files such as /dev/null as streams without set_len or seek, including mixed regular and special multi-output commands."
+      },
+      "negative_axes": [
+        "special-output-set-len",
+        "multi-output-partial-truncation"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-convert-mode-specific-file-roles",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::convert::stim_extension_rejects_irrelevant_roles_without_touching_them",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The Stab-specific stim-to-stim extension validates mode-specific options before preflight, rejects inactive circuit, DEM, layout, and observable roles, and leaves their paths untouched."
+      },
+      "negative_axes": [
+        "inactive-output-truncation",
+        "inactive-input-open"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-direct-alias-safety",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::explicit_direct_file_role_aliases_fail_without_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "All explicit input/output and output/output role pairs for sample, detect, m2d, analyze_errors, sample_dem, and convert reject direct aliases before any retained sentinel is truncated."
+      },
+      "negative_axes": [
+        "direct-path-alias",
+        "input-truncation",
+        "output-truncation"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-normalized-alias-safety",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::normalized_relative_file_role_aliases_fail_without_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The complete file-role matrix rejects lexically distinct normalized-relative aliases before truncation."
+      },
+      "negative_axes": [
+        "normalized-relative-alias",
+        "lexical-path-comparison"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-symlink-alias-safety",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::symlink_file_role_aliases_fail_without_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The complete file-role matrix rejects output symlinks that resolve to retained inputs or other outputs before truncation."
+      },
+      "negative_axes": [
+        "symlink-alias",
+        "path-only-identity"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-hardlink-alias-safety",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::hardlink_file_role_aliases_fail_without_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The complete file-role matrix rejects distinct directory entries that identify the same hard-linked file before truncation."
+      },
+      "negative_axes": [
+        "hardlink-alias",
+        "canonical-path-only-identity"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-zero-shot-alias-safety",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::zero_shot_commands_still_reject_explicit_input_output_aliases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Zero-shot sample, detect, and sample_dem still execute role preflight before their empty-output shortcut."
+      },
+      "negative_axes": [
+        "zero-shot-preflight-bypass"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-cli-file-role-input-sharing-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::path_alias::m2d_allows_measurement_and_sweep_inputs_to_share_one_file",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Input/input identity remains legal: m2d can retain independent measurement and sweep handles for the same file without weakening input/output rejection."
+      },
+      "negative_axes": [
+        "overbroad-input-input-rejection"
       ],
       "standalone": true
     },

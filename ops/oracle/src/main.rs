@@ -14,6 +14,7 @@ mod fixtures;
 mod matrix;
 mod process;
 mod qualification;
+mod result_format_corpus;
 mod safe_file;
 mod statistical_contract;
 
@@ -133,6 +134,17 @@ enum Command {
         check_selectors: bool,
     },
 
+    /// Validate the pinned Stim result-format compatibility corpus.
+    ResultFormats {
+        /// Execute every corpus case against pinned Stim and Stab.
+        #[arg(long)]
+        check: bool,
+
+        /// Reconfigure and rebuild the C++ Stim oracle even if a binary exists.
+        #[arg(long)]
+        rebuild_stim: bool,
+    },
+
     /// Build, inspect, or validate comprehensive qualification inventories.
     Qualification {
         #[command(subcommand)]
@@ -164,6 +176,9 @@ enum OracleError {
 
     #[error(transparent)]
     Qualification(#[from] qualification::QualificationError),
+
+    #[error(transparent)]
+    ResultFormatCorpus(#[from] result_format_corpus::ResultFormatCorpusError),
 
     #[error("{0}")]
     InvalidRunSelection(String),
@@ -547,6 +562,13 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         } => {
             validate_stim_source(&root)?;
             blocker_ledger::validate_and_print(&root, list, check_selectors)?;
+        }
+        Command::ResultFormats {
+            check,
+            rebuild_stim,
+        } => {
+            validate_stim_source(&root)?;
+            result_format_corpus::run(&root, check, rebuild_stim)?;
         }
         Command::Qualification { command } => {
             validate_stim_source(&root)?;

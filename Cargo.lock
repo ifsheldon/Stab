@@ -2162,6 +2162,7 @@ version = "0.1.1"
 dependencies = [
  "clap",
  "csv",
+ "hex",
  "rustix",
  "serde",
  "serde_json",
