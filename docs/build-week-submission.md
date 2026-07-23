@@ -6,7 +6,7 @@ Submission components: a working project built with Codex and GPT-5.6, a project
 
 ## Positioning
 
-Thesis: Stab is agent-native infrastructure for quantum error correction research, a safe-Rust codebase that QEC researchers and their AI agents can safely modify and extend, starting from a verified drop-in replacement for Stim v1.16.0.
+Thesis: Stab is agent-native infrastructure for quantum error correction research, a safe-Rust codebase that QEC researchers and their AI agents can safely modify and extend, starting from selected implemented surfaces with pinned Stim v1.16.0 compatibility evidence.
 
 Focused audience: the QEC researcher who works with an LLM agent and whose next result needs simulator behavior that Stim does not have, such as new noise models, exotic feedback, custom decoders, or tight tool integration.
 Today that researcher must fork or reimplement a hand-tuned C++ simulator, and an agent editing manual-memory, architecture-specific vectorized C++ can introduce silent corruption that produces wrong science rather than crashes.
@@ -23,9 +23,9 @@ Supporting pillars, in priority order:
 Claims to make, because they are verified or documented:
 
 - `stab gen` produces byte-identical circuits to `stim gen` for the same arguments, including the comment header.
-- The implemented CLI surface covers `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem` with the same `.stim`, `.dem`, `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` formats.
+- The implemented CLI surface includes `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`, and accepts the selected `.stim`, `.dem`, `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` format surfaces recorded in the checklist.
 - The exact implemented scope and the deliberate deferrals (Python bindings, WASM, diagrams, `explain_errors`) are recorded in `docs/stab-feature-checklist.md`.
-- Compatibility evidence is machine-checkable and committed, with cryptographic provenance on qualification reports.
+- Selected compatibility evidence is machine-checkable and committed, with cryptographic provenance on qualification reports; reopened result-format claims are identified explicitly and are not presented as qualification-complete.
 
 Claims to avoid, because a judge can falsify them:
 
@@ -38,7 +38,7 @@ Claims to avoid, because a judge can falsify them:
 ## Demo Video Plan (target 2:45)
 
 - 0:00 to 0:25. Hook: a QEC researcher asks their agent for a simulator feature Stim does not have; today that means editing hand-tuned C++; Stab exists so the agent works in safe Rust with guardrails.
-- 0:25 to 0:45. What Stab is: `stab --help` on screen; same CLI, same formats, drop-in replacement for Stim v1.16.0 as milestone one.
+- 0:25 to 0:45. What Stab is: `stab --help` on screen; a Rust implementation targeting Stim v1.16.0 CLI and format compatibility as milestone one, with selected implemented surfaces already backed by pinned evidence.
 - 0:45 to 1:35. Live demo: `stab gen` a rotated surface code circuit, then `diff` against `stim gen` output to show byte-identical circuits; then the quickstart pipeline at distance 3 (`sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, `convert`).
 - 1:35 to 2:05. The differentiator: the committed compatibility matrix, `just oracle::list`, and one qualification report directory with its digest-bound receipts. Codex did not just write the simulator; it wrote the machinery that proves the simulator matches, and that machinery ships with the repo.
 - 2:05 to 2:20. Scale beat: `analyze_errors` at distance 15 plus instant `sample_dem`.
@@ -46,9 +46,9 @@ Claims to avoid, because a judge can falsify them:
 
 ## Devpost Description Draft
 
-> Stab is agent-native infrastructure for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend, starting from a verified drop-in replacement for Stim v1.16.0, the simulator the field uses to design quantum error-correcting codes.
+> Stab is agent-native infrastructure for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend, starting from selected implemented surfaces with pinned compatibility evidence against Stim v1.16.0, the simulator the field uses to design quantum error-correcting codes.
 >
-> QEC researchers increasingly work with LLM agents, but the field's standard simulator is hand-tuned C++ with architecture-specific vectorized paths. An agent editing that code can introduce silent memory corruption that produces wrong science, not crashes. Stab reimplements the same surface in safe Rust with strict compiler guardrails: the same `.stim` circuit and `.dem` detector error model formats, the same `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem` commands, and the same `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` result formats. Generated circuits are byte-identical to Stim's.
+> QEC researchers increasingly work with LLM agents, but the field's standard simulator is hand-tuned C++ with architecture-specific vectorized paths. An agent editing that code can introduce silent memory corruption that produces wrong science, not crashes. Stab reimplements a growing selected Stim surface in safe Rust with strict compiler guardrails, including `.stim` and `.dem` handling, core CLI workflows, and standard result formats. The checked feature inventory distinguishes implementation from completed pinned qualification instead of presenting the unfinished surface as universal parity.
 >
 > Compatibility is proven, not promised, and the proof ships with the repo: a committed compatibility matrix against the pinned Stim v1.16.0 sources, an oracle fixture corpus that executes both implementations, and machine-checkable correctness and performance qualification reports with cryptographic provenance. When a researcher's agent modifies Stab, the same harness re-validates the fork. Performance-portable `std::simd` kernels replace per-architecture hand-tuning, with per-kernel ratios measured and published, including known gaps.
 >

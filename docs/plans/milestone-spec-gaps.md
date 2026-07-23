@@ -23,6 +23,24 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-23 - R1: Active File Roles And Non-Regular Outputs
+
+Status: Resolved
+Revealed by: post-implementation CLI file-role audit and `/dev/null` regression testing.
+Current text: R1 required every active output to be opened without truncation, identity-checked, and truncated only after all conflicts passed.
+Gap: the milestone did not define whether output roles that are irrelevant to the selected command mode should participate in preflight, whether special files must support output, or whether a newly created path may be removed after failed preflight. Applying regular-file truncation to `/dev/null` failed with `EINVAL`, preflighting inactive `.stim -> .stim` convert roles could touch unrelated paths, and pathname cleanup after identity checks introduced a replacement race.
+Proposed amendment: validate the selected command mode before constructing its role plan; include only active roles; truncate only regular files while writing devices and other special outputs as streams; retain validated descriptors; and never unlink a newly created output by pathname unless cleanup is descriptor-relative and proves the live path still identifies the created file.
+Resolution: [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) now states the active-role, regular-file, special-stream, retained-handle, and race-free-cleanup contract. CLI regressions cover `.stim -> .stim` inactive roles, mixed regular and `/dev/null` outputs, alias rejection, sentinel preservation, and failures after preflight.
+
+## 2026-07-23 - R2/R3: Grammar Acceptance Versus Consumer Semantics
+
+Status: Resolved
+Revealed by: independent result-format audit after the shared grammar and first differential corpus landed.
+Current text: R2 required all readers to consume one grammar implementation, while R3 required one checked corpus with pinned-Stim acceptance and canonical `01` output.
+Gap: shared token acceptance did not by itself define each consumer's duplicate behavior or partial-output lifecycle. Ordinary dense HITS records use parity, `sample_dem` HITS replay uses set membership, raw typed DETS visitors preserve duplicate tokens, dense DETS sets bits, and `convert` must retain successfully written records when a later record is malformed. A corpus that checked only acceptance could therefore pass while a consumer applied the wrong semantic reducer or materialized away Stim-visible output prefixes.
+Proposed amendment: separate grammar acceptance from consumer reduction; give replay, dense, packed, typed-token, and `SparseShot` paths independently selectable exact-output owners; require CLI conversion to emit each complete record before parsing the next; and keep round trips supporting-only.
+Resolution: the 62-case checked corpus owns pinned-Stim grammar acceptance and canonical output, while dedicated exact regressions own HITS replay duplicate set semantics, DETS dense set semantics, typed duplicate preservation, `SparseShot` observable parity, cancellation and buffer reuse, and convert's successful prefix before a later parse error. The regenerated correctness inventory records these as distinct source-owned parents.
+
 ## 2026-07-23 - PQ1/PQ2: Contract Preflight Elapsed-Time Semantics
 
 Status: Resolved

@@ -2,14 +2,17 @@
 
 ## Status
 
-Fresh repaired-source machine evidence complete; final milestone audit and independent review pending as of 2026-07-23.
+Review-rejected as current evidence as of 2026-07-23; retained as historical `raw-work-v1` evidence while post-review repair is active.
 
-The source-current reviewed implementation inventory is performance digest `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498` and correctness digest `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`.
-It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, worker-protocol schema version 4, contract-preflight schema version 14 with 228 ordered receipts, and qualification report schema version 33.
+The source-current contract uses performance digest `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358` and correctness digest `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`. It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, worker-protocol schema version 5, contract-preflight schema version 15 with 228 ordered receipts, runtime-group schema version 6, and qualification report schema version 34. These schemas bind `raw-work-v2`, but no source-current promotable DEM report exists before the repair is committed and rerun from one clean revision.
+
+The complete `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` chain used performance digest `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498`, correctness digest `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`, worker-protocol schema version 4, contract-preflight schema version 14, and qualification report schema version 33. Those schemas predate the explicit timing-boundary identity and are retained only as historical `raw-work-v1` evidence.
 Clean pre-migration revision `d9e2405d18cfff05d9b5d908525394476b0edcbc` passed and replayed the complete parse and print full and soak matrix, all regressions, four rollups, and both completion receipts under performance digest `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a`.
 Focused migration commit `1cfecd64cde4a5effdf07fdaabdbe51017e25a4a` retired only the exact legacy DEM timing guards, preserved both legacy memory baselines, and produced performance digest `3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d`. Clean revision `7c3e55301b3f098497613d7dad2d624dc08a4dda` completed both post-migration probes, worker reproducibility, focused correctness, all twelve first-attempt reports and regressions, and four rollups, but independent parse-completion replay exposed a shared contract-preflight protocol defect. That complete chain is retained and review-rejected.
 Clean protocol-fix revision `9497df0350cb33dcd249ea12fda802b5a68efe00` passed both probes, worker reproducibility, the exact focused correctness prerequisite, all twelve first-attempt full and soak reports, every report replay and regression, four rollup producers and replays, and both completion producers and independent replays. Parse medians range from `1.090387x` through `1.145890x`, print medians range from `0.569331x` through `0.589777x`, and the worst confidence-interval upper bound is `1.150114x`. Independent review later rejected this chain as current evidence because the exact CQ case missed five pinned-Stim DEM edge contracts, the C++ timer charged post-return assignment only to Stim, and C++ peak RSS included post-timing digest work that Rust excluded. Preserve every artifact as historical evidence under its exact source contract; no ratio or RSS observation may be relabeled under the repaired inventory.
 Both groups bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose source-current SHA-256 is `176a683c798e2d519a10eb8bf877fa00f279e3b99b4405dd9ac402810c0e3481`, so future failed or noisy formal reports can be retained and audited.
+
+Independent post-review verification rejected the complete `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` machine chain as current evidence. The Rust worker's timed helper sampled elapsed time only after moving an output into its protocol tuple, and neither worker receipt identified the raw-work timing boundary. The complete chain and its ratios remain historical under their exact source, inventory, and schema identities; they must never be relabeled as `raw-work-v2`. Fresh evidence is governed by [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md).
 
 ## Retained Attempts
 
@@ -377,7 +380,7 @@ The source repair expands the correctness inventory from 1,974 to 1,986 public A
 
 At that review checkpoint, fresh execution had to start from a clean commit containing these repairs, reproduce both private workers and both DEM probes, publish and replay the expanded exact CQ prerequisite, run all twelve full and soak reports once, run every regression, publish and replay four rollups and two completion receipts, and repeat accepted-maximum memory probes at the corrected RSS boundary. The following section records that completed machine chain; a new milestone audit and independent full-code-review pass still remain required before final acceptance.
 
-## Fresh Repaired-Source Machine Chain At `80fb540`
+## Historical Repaired-Source Machine Chain At `80fb540`
 
 Clean revision `80fb5405fb077c694a8a8a18e64a3a5831e20a5e` bound performance inventory `30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498`, correctness inventory `17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942`, and `local_modifications=false` before and after every source-owned producer.
 
@@ -447,7 +450,7 @@ Peak RSS remains report-only. Across the formal parse matrix, pinned-Stim setup 
 
 The corrected accepted-maximum memory probes used 524,288 items and the same pre-digest phase boundary on both implementations. Parse reported pinned-Stim setup/peak RSS of 18,165,760 / 96,501,760 bytes and Stab 19,152,896 / 124,239,872 bytes. Print reported pinned-Stim setup/peak RSS of 96,493,568 / 127,750,144 bytes and Stab 124,170,240 / 139,051,008 bytes. These observations do not define a growth rule and do not replace PQ6 memory qualification.
 
-This machine chain closes fresh execution steps 1 through 8 of the repaired-source contract. Final acceptance remains blocked on the repeated milestone audit, five new independent GPT-5.6/max review lanes, resolution of every confirmed finding, synchronized final documentation, full repository verification, restored swap, no qualification process, and a clean committed worktree.
+This machine chain closed execution steps 1 through 8 of the then-active repaired-source contract, but later review rejected it as current evidence because its receipts bind the defective implicit `raw-work-v1` timer boundary. It remains immutable historical evidence. Current acceptance requires the explicit `raw-work-v2` contract and a new unique-path evidence chain from a clean reviewed revision.
 
 ## Initial Milestone Audit (Superseded By Independent Review)
 
