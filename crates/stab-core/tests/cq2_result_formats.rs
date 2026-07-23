@@ -7,22 +7,21 @@
 use stab_core::{
     SampleFormat,
     result_formats::{
-        MeasureRecord, MeasureRecordBatch, MeasureRecordBatchWriter, MeasureRecordWriter,
-        read_records,
+        DetsLayout, MeasureRecord, MeasureRecordBatch, MeasureRecordBatchWriter,
+        MeasureRecordWriter, read_dets_records, read_records,
     },
-    result_streaming::{for_each_packed_record, for_each_record, for_each_sparse_record},
+    result_streaming::{
+        for_each_dets_packed_record, for_each_dets_token_record, for_each_record,
+        for_each_sparse_record,
+    },
 };
 
 #[test]
-fn cq_result_sparse_duplicate_tokens_toggle_dense_records() {
+fn cq_result_hits_duplicate_tokens_toggle_dense_records() {
     let expected = vec![false, false, false, false];
 
     assert_eq!(
         read_records(b"1,1\n", SampleFormat::Hits, 4).unwrap(),
-        vec![expected.clone()]
-    );
-    assert_eq!(
-        read_records(b"shot M1 M1\n", SampleFormat::Dets, 4).unwrap(),
         vec![expected.clone()]
     );
 
@@ -33,9 +32,19 @@ fn cq_result_sparse_duplicate_tokens_toggle_dense_records() {
     })
     .unwrap();
     assert_eq!(dense, vec![expected.clone()]);
+}
+
+#[test]
+fn cq_result_dets_duplicate_tokens_set_dense_records() {
+    let layout = DetsLayout::try_new(0, 4, 0).unwrap();
+    let expected = vec![false, true, false, false];
+    assert_eq!(
+        read_dets_records(b"shot D1 D1\n", layout).unwrap(),
+        vec![expected.clone()]
+    );
 
     let mut packed: Vec<Vec<bool>> = Vec::new();
-    for_each_packed_record(b"shot D1 D1\n", SampleFormat::Dets, 4, |record| {
+    for_each_dets_packed_record(b"shot D1 D1\n", layout, |record| {
         packed.push(
             (0..record.len())
                 .map(|index| record.get(index).unwrap())
@@ -57,13 +66,18 @@ fn cq_result_sparse_visitors_preserve_token_order_and_duplicates() {
     .unwrap();
     assert_eq!(records, vec![vec![3, 1, 1]]);
 
-    records.clear();
-    for_each_sparse_record(b"shot D3 D1 D1\n", SampleFormat::Dets, 4, |hits| {
-        records.push(hits.to_vec());
+    let layout = DetsLayout::try_new(0, 4, 0).unwrap();
+    let mut typed: Vec<Vec<u64>> = Vec::new();
+    for_each_dets_token_record(b"shot D3 D1 D1\n", layout, |hits| {
+        typed.push(
+            hits.iter()
+                .map(|token| u64::try_from(token.index()).unwrap())
+                .collect(),
+        );
         Ok(())
     })
     .unwrap();
-    assert_eq!(records, vec![vec![3, 1, 1]]);
+    assert_eq!(typed, vec![vec![3, 1, 1]]);
 }
 
 #[test]

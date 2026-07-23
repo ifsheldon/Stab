@@ -397,7 +397,7 @@ fn cq_result_large_all_format_table_round_trip_matches_stim() {
 fn cq_result_reader_record_boundaries_types_and_crlf_match_stim() {
     assert_eq!(
         read_records(
-            b"111011001\r\n010000000\n101100011",
+            b"111011001\r\n010000000\n101100011\n",
             SampleFormat::ZeroOne,
             9,
         )

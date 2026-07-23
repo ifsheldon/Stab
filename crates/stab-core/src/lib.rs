@@ -26,6 +26,7 @@ mod probability_util;
 mod reference_sample_tree;
 pub mod result_formats;
 pub mod result_streaming;
+mod result_text;
 mod sampling;
 mod sparse_rev_frame_tracker;
 pub mod stabilizers;
@@ -106,7 +107,7 @@ pub use matched_error::{
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use probability_util::biased_randomize_bits;
 pub use reference_sample_tree::ReferenceSampleTree;
-pub use result_formats::SampleFormat;
+pub use result_formats::{DetsLayout, DetsResultType, DetsToken, SampleFormat};
 pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,

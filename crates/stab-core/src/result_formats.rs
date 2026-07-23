@@ -1,5 +1,9 @@
 use crate::{CircuitError, CircuitResult};
 
+mod dets;
+
+pub use dets::{DetsLayout, DetsResultType, DetsToken, read_dets_records};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SampleFormat {
     ZeroOne,
@@ -595,7 +599,9 @@ pub fn read_records(
         SampleFormat::B8 => read_b8_records(input, bits_per_record),
         SampleFormat::R8 => read_r8_records(input, bits_per_record),
         SampleFormat::Hits => read_hits_records(input, bits_per_record),
-        SampleFormat::Dets => read_dets_records(input, bits_per_record, DetsTokenMode::Any),
+        SampleFormat::Dets => {
+            read_dets_records(input, DetsLayout::measurement_only(bits_per_record))
+        }
     }
 }
 
@@ -604,56 +610,16 @@ pub fn read_measurement_records(
     format: SampleFormat,
     bits_per_record: usize,
 ) -> CircuitResult<Vec<Vec<bool>>> {
-    match format {
-        SampleFormat::Dets => {
-            read_dets_records(input, bits_per_record, DetsTokenMode::MeasurementsOnly)
-        }
-        _ => read_records(input, format, bits_per_record),
-    }
+    read_records(input, format, bits_per_record)
 }
 
 fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
-    if input.is_empty() {
-        return Ok(Vec::new());
-    }
-
     let mut records = Vec::new();
-    let mut offset = 0usize;
-    while offset < input.len() {
-        let line_start = offset;
-        while input.get(offset).is_some_and(|byte| *byte != b'\n') {
-            offset += 1;
-        }
-        let mut line_end = offset;
-        if line_end > line_start && input.get(line_end - 1).is_some_and(|byte| *byte == b'\r') {
-            line_end -= 1;
-        }
-        let line = input.get(line_start..line_end).ok_or_else(|| {
-            CircuitError::invalid_result_format("01 record byte range was out of bounds")
-        })?;
-        if line.len() != bits_per_record {
-            return Err(CircuitError::invalid_result_format(format!(
-                "01 record expected {bits_per_record} bits, got {}",
-                line.len()
-            )));
-        }
-        let mut record = vec![false; bits_per_record];
-        for (bit, byte) in record.iter_mut().zip(line) {
-            match byte {
-                b'0' => {}
-                b'1' => *bit = true,
-                _ => {
-                    return Err(CircuitError::invalid_result_format(format!(
-                        "01 record contains non-bit byte {byte}"
-                    )));
-                }
-            }
-        }
+    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
+        let record = line.iter().map(|byte| *byte == b'1').collect();
         records.push(record);
-        if offset < input.len() {
-            offset += 1;
-        }
-    }
+        Ok(())
+    })?;
     Ok(records)
 }
 
@@ -719,95 +685,26 @@ fn read_r8_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Ve
 }
 
 fn read_hits_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    text.split_terminator('\n')
-        .map(|line| read_sparse_index_line(strip_trailing_cr(line), bits_per_record, None))
-        .collect()
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum DetsTokenMode {
-    Any,
-    MeasurementsOnly,
-}
-
-fn read_dets_records(
-    input: &[u8],
-    bits_per_record: usize,
-    token_mode: DetsTokenMode,
-) -> CircuitResult<Vec<Vec<bool>>> {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     let mut records = Vec::new();
-    for line in text.split_terminator('\n') {
-        let line = strip_trailing_cr(line).trim();
-        if line.is_empty() {
-            continue;
+    crate::result_text::for_each_hits(input, bits_per_record, |hits| {
+        let mut record = vec![false; bits_per_record];
+        for index in hits {
+            let index = usize::try_from(*index).map_err(|_| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} does not fit usize"
+                ))
+            })?;
+            let bit = record.get_mut(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} exceeds record width {bits_per_record}"
+                ))
+            })?;
+            *bit = !*bit;
         }
-        let Some(rest) = line.strip_prefix("shot") else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "dets record does not start with shot: {line:?}"
-            )));
-        };
-        records.push(read_sparse_index_line(
-            rest.trim(),
-            bits_per_record,
-            Some(token_mode),
-        )?);
-    }
+        records.push(record);
+        Ok(())
+    })?;
     Ok(records)
-}
-
-fn strip_trailing_cr(line: &str) -> &str {
-    line.strip_suffix('\r').unwrap_or(line)
-}
-
-fn read_sparse_index_line(
-    line: &str,
-    bits_per_record: usize,
-    dets_tokens: Option<DetsTokenMode>,
-) -> CircuitResult<Vec<bool>> {
-    let mut record = vec![false; bits_per_record];
-    if line.is_empty() {
-        return Ok(record);
-    }
-    for token in line.split(if dets_tokens.is_some() { ' ' } else { ',' }) {
-        if token.is_empty() {
-            continue;
-        }
-        let index = if let Some(token_mode) = dets_tokens {
-            let mut chars = token.chars();
-            let Some(prefix @ ('M' | 'D' | 'L')) = chars.next() else {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "invalid dets token {token:?}"
-                )));
-            };
-            if token_mode == DetsTokenMode::MeasurementsOnly && prefix != 'M' {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "measurement dets input cannot contain {prefix} tokens"
-                )));
-            }
-            parse_sparse_index(chars.as_str())?
-        } else {
-            parse_sparse_index(token)?
-        };
-        let index = usize::try_from(index).map_err(|_| {
-            CircuitError::invalid_result_format(format!("sparse index {index} does not fit usize"))
-        })?;
-        let Some(bit) = record.get_mut(index) else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "sparse index {index} exceeds record width {bits_per_record}"
-            )));
-        };
-        *bit = !*bit;
-    }
-    Ok(record)
-}
-
-fn parse_sparse_index(text: &str) -> CircuitResult<u64> {
-    text.parse::<u64>()
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))
 }
 
 fn unpack_b8_chunk(chunk: &[u8], bits_per_record: usize) -> Vec<bool> {
@@ -1060,11 +957,8 @@ mod tests {
     }
 
     #[test]
-    fn measure_record_reader_accepts_final_01_record_without_newline_and_rejects_non_bits() {
-        assert_eq!(
-            read_records(b"10", SampleFormat::ZeroOne, 2).unwrap(),
-            vec![vec![true, false]]
-        );
+    fn measure_record_reader_rejects_unterminated_01_records_and_non_bits() {
+        assert!(read_records(b"10", SampleFormat::ZeroOne, 2).is_err());
         assert!(read_records(&[b'0', 0xFF], SampleFormat::ZeroOne, 2).is_err());
     }
 

@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "stim_tag": "v1.16.0",
+  "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
+  "cases": [
+    {
+      "id": "01-lf-terminated",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3130310a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130310a"
+    },
+    {
+      "id": "01-crlf-terminated",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3130310d0a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130310a"
+    },
+    {
+      "id": "01-two-records",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3030300a3131310a",
+      "replay_shots": 2,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3030300a3131310a"
+    },
+    {
+      "id": "01-eof-after-bits",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "313031",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-cr-eof",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3130310d",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-cr-without-lf",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3130310d58",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-short-record",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "31300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-long-record",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "313031300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-invalid-byte",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3130ff0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-empty-record-at-nonzero-width",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-second-record-unterminated",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "3030300a313131",
+      "replay_shots": 2,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "01-space-in-record",
+      "format": "01",
+      "layout": { "measurements": 3, "detectors": 0, "observables": 0 },
+      "input_hex": "313020310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-empty-lf",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "0a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "303030300a"
+    },
+    {
+      "id": "hits-empty-crlf",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "0d0a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "303030300a"
+    },
+    {
+      "id": "hits-comma-separated",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c330a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "303130310a"
+    },
+    {
+      "id": "hits-duplicate-parity",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c310a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "303030300a"
+    },
+    {
+      "id": "hits-crlf-record",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "302c330d0a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "313030310a"
+    },
+    {
+      "id": "hits-leading-zeroes",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "30302c3030330a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "313030310a"
+    },
+    {
+      "id": "hits-eof-after-index",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c32",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-cr-eof",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c320d",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-carriage-return-comma-continuation",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "310d2c330a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "303130310a"
+    },
+    {
+      "id": "hits-leading-comma",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "2c310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-trailing-comma",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-doubled-comma",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c2c320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-space-after-comma",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c20320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-tab-after-comma",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "312c09320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-wrong-separator",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "313b320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-negative-index",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "2d310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-plus-index",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "2b310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-u64-overflow",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "31383434363734343037333730393535313631360a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-out-of-range",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "340a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-invalid-byte",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "31ff0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "hits-space-only-record",
+      "format": "hits",
+      "layout": { "measurements": 4, "detectors": 0, "observables": 0 },
+      "input_hex": "200a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-empty-lf",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f740a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3030303030300a"
+    },
+    {
+      "id": "dets-empty-eof",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3030303030300a"
+    },
+    {
+      "id": "dets-empty-cr-eof",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f740d",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3030303030300a"
+    },
+    {
+      "id": "dets-leading-whitespace-and-eof",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "200d0a0973686f74204d30204430204c30",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130313031300a"
+    },
+    {
+      "id": "dets-dense-duplicates-set",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d30204d30204430204430204c30204c300a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130313031300a"
+    },
+    {
+      "id": "dets-all-namespaces",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d31204431204c310a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3031303130310a"
+    },
+    {
+      "id": "dets-carriage-return-token-separators",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f740d204d300d2044300d204c300a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130313031300a"
+    },
+    {
+      "id": "dets-crlf-terminated",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d300d0a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130303030300a"
+    },
+    {
+      "id": "dets-leading-whitespace-between-records",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d300a0a0973686f742044300a",
+      "replay_shots": 2,
+      "acceptance": "accepted",
+      "canonical_01_hex": "3130303030300a3030313030300a"
+    },
+    {
+      "id": "dets-missing-space-after-shot",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f744d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-double-space",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f7420204d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-tab-separator",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74094d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-trailing-space",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d30200a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-unknown-namespace",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f742051300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-missing-index",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-negative-index",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d2d310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-plus-index",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d2b310a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-u64-overflow",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d31383434363734343037333730393535313631360a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-measurement-out-of-range",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-detector-out-of-range",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f742044320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-observable-out-of-range",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204c320a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-missing-shot-prefix",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "44300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-extra-shot-prefix-byte",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f7473204d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-tab-between-tokens",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f74204d300944300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-double-carriage-return",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f740d0d0a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-invalid-byte",
+      "format": "dets",
+      "layout": { "measurements": 2, "detectors": 2, "observables": 2 },
+      "input_hex": "73686f7420ff300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-zero-measurement-namespace-crossing",
+      "format": "dets",
+      "layout": { "measurements": 0, "detectors": 1, "observables": 1 },
+      "input_hex": "73686f74204d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-form-feed-is-not-leading-whitespace",
+      "format": "dets",
+      "layout": { "measurements": 1, "detectors": 0, "observables": 0 },
+      "input_hex": "0c0a73686f74204d300a",
+      "replay_shots": 1,
+      "acceptance": "rejected"
+    },
+    {
+      "id": "dets-zero-measurement-valid-detector-observable",
+      "format": "dets",
+      "layout": { "measurements": 0, "detectors": 1, "observables": 1 },
+      "input_hex": "73686f74204430204c300a",
+      "replay_shots": 1,
+      "acceptance": "accepted",
+      "canonical_01_hex": "31310a"
+    }
+  ]
+}

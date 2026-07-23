@@ -2,6 +2,7 @@ use crate::{
     CircuitError, CircuitResult, SampleFormat,
     bits::{BitSlice, BitVec},
     result_formats::{
+        DetsLayout, DetsResultType, DetsToken, SparseShot,
         ptb64_record_count as materialized_ptb64_record_count, validate_ptb64_shot_count,
     },
 };
@@ -20,7 +21,9 @@ where
         SampleFormat::B8 => for_each_b8_record(input, bits_per_record, visit),
         SampleFormat::R8 => for_each_r8_record(input, bits_per_record, visit),
         SampleFormat::Hits => for_each_hits_record(input, bits_per_record, visit),
-        SampleFormat::Dets => for_each_dets_record(input, bits_per_record, visit),
+        SampleFormat::Dets => {
+            for_each_dets_record(input, DetsLayout::measurement_only(bits_per_record), visit)
+        }
     }
 }
 
@@ -38,7 +41,9 @@ where
         SampleFormat::B8 => for_each_b8_packed_record(input, bits_per_record, visit),
         SampleFormat::R8 => for_each_r8_packed_record(input, bits_per_record, visit),
         SampleFormat::Hits => for_each_hits_packed_record(input, bits_per_record, visit),
-        SampleFormat::Dets => for_each_dets_packed_record(input, bits_per_record, visit),
+        SampleFormat::Dets => {
+            for_each_dets_packed_record(input, DetsLayout::measurement_only(bits_per_record), visit)
+        }
     }
 }
 
@@ -56,7 +61,9 @@ where
         SampleFormat::B8 => for_each_b8_sparse_record(input, bits_per_record, visit),
         SampleFormat::R8 => for_each_r8_sparse_record(input, bits_per_record, visit),
         SampleFormat::Hits => for_each_hits_sparse_record(input, bits_per_record, visit),
-        SampleFormat::Dets => for_each_dets_sparse_record(input, bits_per_record, visit),
+        SampleFormat::Dets => {
+            for_each_dets_sparse_record(input, DetsLayout::measurement_only(bits_per_record), visit)
+        }
     }
 }
 
@@ -144,47 +151,14 @@ fn for_each_zero_one_record<F>(
 where
     F: FnMut(&[bool]) -> CircuitResult<()>,
 {
-    if input.is_empty() {
-        return Ok(());
-    }
     let mut record = vec![false; bits_per_record];
-    let mut offset = 0usize;
-    while offset < input.len() {
-        let line_start = offset;
-        while input.get(offset).is_some_and(|byte| *byte != b'\n') {
-            offset += 1;
-        }
-        let mut line_end = offset;
-        if line_end > line_start && input.get(line_end - 1).is_some_and(|byte| *byte == b'\r') {
-            line_end -= 1;
-        }
-        let line = input.get(line_start..line_end).ok_or_else(|| {
-            CircuitError::invalid_result_format("01 record byte range was out of bounds")
-        })?;
-        if line.len() != bits_per_record {
-            return Err(CircuitError::invalid_result_format(format!(
-                "01 record expected {bits_per_record} bits, got {}",
-                line.len()
-            )));
-        }
+    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
         record.fill(false);
         for (bit, byte) in record.iter_mut().zip(line) {
-            match byte {
-                b'0' => {}
-                b'1' => *bit = true,
-                _ => {
-                    return Err(CircuitError::invalid_result_format(format!(
-                        "01 record contains non-bit byte {byte}"
-                    )));
-                }
-            }
+            *bit = *byte == b'1';
         }
-        visit(&record)?;
-        if offset < input.len() {
-            offset += 1;
-        }
-    }
-    Ok(())
+        visit(&record)
+    })
 }
 
 fn for_each_b8_record<F>(input: &[u8], bits_per_record: usize, mut visit: F) -> CircuitResult<()>
@@ -260,37 +234,44 @@ fn for_each_hits_record<F>(input: &[u8], bits_per_record: usize, mut visit: F) -
 where
     F: FnMut(&[bool]) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     let mut record = vec![false; bits_per_record];
-    for line in text.split_terminator('\n') {
-        fill_sparse_index_line(strip_trailing_cr(line), bits_per_record, None, &mut record)?;
-        visit(&record)?;
-    }
-    Ok(())
+    crate::result_text::for_each_hits(input, bits_per_record, |hits| {
+        record.fill(false);
+        for index in hits {
+            let index = usize::try_from(*index).map_err(|_| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} does not fit usize"
+                ))
+            })?;
+            let bit = record.get_mut(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} exceeds record width {bits_per_record}"
+                ))
+            })?;
+            *bit = !*bit;
+        }
+        visit(&record)
+    })
 }
 
-fn for_each_dets_record<F>(input: &[u8], bits_per_record: usize, mut visit: F) -> CircuitResult<()>
+pub fn for_each_dets_record<F>(input: &[u8], layout: DetsLayout, mut visit: F) -> CircuitResult<()>
 where
     F: FnMut(&[bool]) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    let mut record = vec![false; bits_per_record];
-    for line in text.split_terminator('\n') {
-        let line = strip_trailing_cr(line).trim();
-        if line.is_empty() {
-            continue;
+    let mut record = vec![false; layout.total_bits()];
+    crate::result_text::for_each_dets_tokens(input, layout, |tokens| {
+        record.fill(false);
+        for token in tokens {
+            let index = layout.resolve(token.result_type(), token.index())?;
+            let bit = record.get_mut(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(
+                    "DETS token resolved beyond the layout's total width",
+                )
+            })?;
+            *bit = true;
         }
-        let Some(rest) = line.strip_prefix("shot") else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "dets record does not start with shot: {line:?}"
-            )));
-        };
-        fill_sparse_index_line(rest.trim(), bits_per_record, Some(()), &mut record)?;
-        visit(&record)?;
-    }
-    Ok(())
+        visit(&record)
+    })
 }
 
 fn for_each_zero_one_packed_record<F>(
@@ -301,21 +282,12 @@ fn for_each_zero_one_packed_record<F>(
 where
     F: FnMut(BitSlice<'_>) -> CircuitResult<()>,
 {
-    if input.is_empty() {
-        return Ok(());
-    }
     let mut record = BitVec::zeros(bits_per_record);
-    for_each_zero_one_line(input, bits_per_record, |line| {
+    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
         record.clear();
         for (index, byte) in line.iter().enumerate() {
-            match byte {
-                b'0' => {}
-                b'1' => record.set(index, true).map_err(bit_error_to_format_error)?,
-                _ => {
-                    return Err(CircuitError::invalid_result_format(format!(
-                        "01 record contains non-bit byte {byte}"
-                    )));
-                }
+            if *byte == b'1' {
+                record.set(index, true).map_err(bit_error_to_format_error)?;
             }
         }
         visit(record.as_bitslice())
@@ -376,41 +348,45 @@ fn for_each_hits_packed_record<F>(
 where
     F: FnMut(BitSlice<'_>) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     let mut record = BitVec::zeros(bits_per_record);
-    for line in text.split_terminator('\n') {
-        fill_sparse_index_line_packed(strip_trailing_cr(line), bits_per_record, None, &mut record)?;
-        visit(record.as_bitslice())?;
-    }
-    Ok(())
+    crate::result_text::for_each_hits(input, bits_per_record, |hits| {
+        record.clear();
+        for index in hits {
+            let index = usize::try_from(*index).map_err(|_| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} does not fit usize"
+                ))
+            })?;
+            let value = record.get(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS index {index} exceeds record width {bits_per_record}"
+                ))
+            })?;
+            record
+                .set(index, !value)
+                .map_err(bit_error_to_format_error)?;
+        }
+        visit(record.as_bitslice())
+    })
 }
 
-fn for_each_dets_packed_record<F>(
+pub fn for_each_dets_packed_record<F>(
     input: &[u8],
-    bits_per_record: usize,
+    layout: DetsLayout,
     mut visit: F,
 ) -> CircuitResult<()>
 where
     F: FnMut(BitSlice<'_>) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    let mut record = BitVec::zeros(bits_per_record);
-    for line in text.split_terminator('\n') {
-        let line = strip_trailing_cr(line).trim();
-        if line.is_empty() {
-            continue;
+    let mut record = BitVec::zeros(layout.total_bits());
+    crate::result_text::for_each_dets_tokens(input, layout, |tokens| {
+        record.clear();
+        for token in tokens {
+            let index = layout.resolve(token.result_type(), token.index())?;
+            record.set(index, true).map_err(bit_error_to_format_error)?;
         }
-        let Some(rest) = line.strip_prefix("shot") else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "dets record does not start with shot: {line:?}"
-            )));
-        };
-        fill_sparse_index_line_packed(rest.trim(), bits_per_record, Some(()), &mut record)?;
-        visit(record.as_bitslice())?;
-    }
-    Ok(())
+        visit(record.as_bitslice())
+    })
 }
 
 fn for_each_zero_one_sparse_record<F>(
@@ -421,11 +397,8 @@ fn for_each_zero_one_sparse_record<F>(
 where
     F: FnMut(&[u64]) -> CircuitResult<()>,
 {
-    if input.is_empty() {
-        return Ok(());
-    }
     let mut hits = Vec::new();
-    for_each_zero_one_line(input, bits_per_record, |line| {
+    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
         hits.clear();
         for (index, byte) in line.iter().enumerate() {
             match byte {
@@ -499,206 +472,77 @@ fn for_each_hits_sparse_record<F>(
 where
     F: FnMut(&[u64]) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    let mut hits = Vec::new();
-    for line in text.split_terminator('\n') {
-        parse_sparse_index_line(strip_trailing_cr(line), bits_per_record, None, &mut hits)?;
-        visit(&hits)?;
-    }
-    Ok(())
+    crate::result_text::for_each_hits(input, bits_per_record, |hits| visit(hits))
 }
 
 fn for_each_dets_sparse_record<F>(
     input: &[u8],
-    bits_per_record: usize,
+    layout: DetsLayout,
     mut visit: F,
 ) -> CircuitResult<()>
 where
     F: FnMut(&[u64]) -> CircuitResult<()>,
 {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     let mut hits = Vec::new();
-    for line in text.split_terminator('\n') {
-        let line = strip_trailing_cr(line).trim();
-        if line.is_empty() {
-            continue;
+    crate::result_text::for_each_dets_tokens(input, layout, |tokens| {
+        hits.clear();
+        for token in tokens {
+            let index = layout.resolve(token.result_type(), token.index())?;
+            hits.push(u64::try_from(index).map_err(|_| {
+                CircuitError::invalid_result_format(format!(
+                    "DETS hit index {index} does not fit u64"
+                ))
+            })?);
         }
-        let Some(rest) = line.strip_prefix("shot") else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "dets record does not start with shot: {line:?}"
-            )));
-        };
-        parse_sparse_index_line(rest.trim(), bits_per_record, Some(()), &mut hits)?;
-        visit(&hits)?;
-    }
-    Ok(())
+        visit(&hits)
+    })
 }
 
-fn for_each_zero_one_line<F>(
+pub fn for_each_dets_token_record<F>(
     input: &[u8],
-    bits_per_record: usize,
+    layout: DetsLayout,
     mut visit: F,
 ) -> CircuitResult<()>
 where
-    F: FnMut(&[u8]) -> CircuitResult<()>,
+    F: FnMut(&[DetsToken]) -> CircuitResult<()>,
 {
-    let mut offset = 0usize;
-    while offset < input.len() {
-        let line_start = offset;
-        while input.get(offset).is_some_and(|byte| *byte != b'\n') {
-            offset += 1;
-        }
-        let mut line_end = offset;
-        if line_end > line_start && input.get(line_end - 1).is_some_and(|byte| *byte == b'\r') {
-            line_end -= 1;
-        }
-        let line = input.get(line_start..line_end).ok_or_else(|| {
-            CircuitError::invalid_result_format("01 record byte range was out of bounds")
-        })?;
-        if line.len() != bits_per_record {
-            return Err(CircuitError::invalid_result_format(format!(
-                "01 record expected {bits_per_record} bits, got {}",
-                line.len()
-            )));
-        }
-        visit(line)?;
-        if offset < input.len() {
-            offset += 1;
-        }
-    }
-    Ok(())
+    crate::result_text::for_each_dets_tokens(input, layout, |tokens| visit(tokens))
 }
 
-fn fill_sparse_index_line(
-    line: &str,
-    bits_per_record: usize,
-    dets_tokens: Option<()>,
-    record: &mut [bool],
-) -> CircuitResult<()> {
-    if record.len() != bits_per_record {
-        return Err(CircuitError::invalid_result_format(
-            "streaming record buffer width did not match requested width",
-        ));
-    }
-    record.fill(false);
-    if line.is_empty() {
-        return Ok(());
-    }
-    for token in line.split(if dets_tokens.is_some() { ' ' } else { ',' }) {
-        if token.is_empty() {
-            continue;
-        }
-        let index = if dets_tokens.is_some() {
-            let mut chars = token.chars();
-            let Some('M' | 'D' | 'L') = chars.next() else {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "invalid dets token {token:?}"
-                )));
-            };
-            parse_sparse_index(chars.as_str())?
-        } else {
-            parse_sparse_index(token)?
-        };
-        let index = usize::try_from(index).map_err(|_| {
-            CircuitError::invalid_result_format(format!("sparse index {index} does not fit usize"))
-        })?;
-        let Some(bit) = record.get_mut(index) else {
-            return Err(CircuitError::invalid_result_format(format!(
-                "sparse index {index} exceeds record width {bits_per_record}"
-            )));
-        };
-        *bit = !*bit;
-    }
-    Ok(())
-}
-
-fn fill_sparse_index_line_packed(
-    line: &str,
-    bits_per_record: usize,
-    dets_tokens: Option<()>,
-    record: &mut BitVec,
-) -> CircuitResult<()> {
-    if record.len() != bits_per_record {
-        return Err(CircuitError::invalid_result_format(
-            "streaming packed record buffer width did not match requested width",
-        ));
-    }
-    record.clear();
-    if line.is_empty() {
-        return Ok(());
-    }
-    for_each_sparse_index(line, bits_per_record, dets_tokens, |index| {
-        let index = usize::try_from(index).map_err(|_| {
-            CircuitError::invalid_result_format(format!("sparse index {index} does not fit usize"))
-        })?;
-        let value = record.get(index).ok_or_else(|| {
-            CircuitError::invalid_result_format(format!(
-                "sparse index {index} exceeds record width {bits_per_record}"
-            ))
-        })?;
-        record
-            .set(index, !value)
-            .map_err(bit_error_to_format_error)?;
-        Ok(())
-    })?;
-    Ok(())
-}
-
-fn parse_sparse_index_line(
-    line: &str,
-    bits_per_record: usize,
-    dets_tokens: Option<()>,
-    hits: &mut Vec<u64>,
-) -> CircuitResult<()> {
-    hits.clear();
-    if line.is_empty() {
-        return Ok(());
-    }
-    for_each_sparse_index(line, bits_per_record, dets_tokens, |index| {
-        hits.push(index);
-        Ok(())
-    })?;
-    Ok(())
-}
-
-fn for_each_sparse_index<F>(
-    line: &str,
-    bits_per_record: usize,
-    dets_tokens: Option<()>,
+pub fn for_each_dets_sparse_shot<F>(
+    input: &[u8],
+    layout: DetsLayout,
     mut visit: F,
 ) -> CircuitResult<()>
 where
-    F: FnMut(u64) -> CircuitResult<()>,
+    F: FnMut(&SparseShot) -> CircuitResult<()>,
 {
-    for token in line.split(if dets_tokens.is_some() { ' ' } else { ',' }) {
-        if token.is_empty() {
-            continue;
+    let mut shot = SparseShot::new(Vec::new(), vec![false; layout.observables()]);
+    crate::result_text::for_each_dets_tokens(input, layout, |tokens| {
+        shot.hits.clear();
+        shot.obs_mask.fill(false);
+        for token in tokens {
+            match token.result_type() {
+                DetsResultType::Measurement | DetsResultType::Detector => {
+                    let index = layout.resolve(token.result_type(), token.index())?;
+                    shot.hits.push(u64::try_from(index).map_err(|_| {
+                        CircuitError::invalid_result_format(format!(
+                            "DETS hit index {index} does not fit u64"
+                        ))
+                    })?);
+                }
+                DetsResultType::Observable => {
+                    let bit = shot.obs_mask.get_mut(token.index()).ok_or_else(|| {
+                        CircuitError::invalid_result_format(
+                            "DETS observable resolved beyond the observable mask",
+                        )
+                    })?;
+                    *bit = !*bit;
+                }
+            }
         }
-        let index = if dets_tokens.is_some() {
-            let mut chars = token.chars();
-            let Some('M' | 'D' | 'L') = chars.next() else {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "invalid dets token {token:?}"
-                )));
-            };
-            parse_sparse_index(chars.as_str())?
-        } else {
-            parse_sparse_index(token)?
-        };
-        if index
-            >= u64::try_from(bits_per_record).map_err(|_| {
-                CircuitError::invalid_result_format("record width does not fit sparse index bounds")
-            })?
-        {
-            return Err(CircuitError::invalid_result_format(format!(
-                "sparse index {index} exceeds record width {bits_per_record}"
-            )));
-        }
-        visit(index)?;
-    }
-    Ok(())
+        visit(&shot)
+    })
 }
 
 fn fill_r8_packed_record(
@@ -833,15 +677,6 @@ fn collect_b8_chunk_hits(
         }
     }
     Ok(())
-}
-
-fn strip_trailing_cr(line: &str) -> &str {
-    line.strip_suffix('\r').unwrap_or(line)
-}
-
-fn parse_sparse_index(text: &str) -> CircuitResult<u64> {
-    text.parse::<u64>()
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))
 }
 
 fn bit_error_to_format_error(error: crate::bits::BitError) -> CircuitError {
