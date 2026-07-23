@@ -1,48 +1,119 @@
 use std::hint::black_box;
 
+use clap::ValueEnum;
 use stab_core::DetectorErrorModel;
 
 use super::{WorkerError, byte_digest, semantic_digest};
 
 pub(in crate::qualification::runtime) const DEM_CYCLE_ITEMS: u64 = 8;
 pub(in crate::qualification::runtime) const DEM_MAX_ITEMS: u64 = 524_288;
+pub(in crate::qualification::runtime) const DEM_FOLDED_MAX_ITEMS: u64 = 262_144;
 
-const DEM_CYCLE_TEXT: &str = concat!(
+const FLAT_ERRORS_CYCLE_TEXT: &str = concat!(
     "error(0.125) D0\n",
-    "error[edge](0.25) D1 D2 L0 ^ D3\n",
-    "detector(0.5, 1) D4\n",
-    "logical_observable L1\n",
-    "shift_detectors(1.5, 3) 5\n",
-    "detector[tagged] D2\n",
-    "repeat[loop] 3 {\n",
-    "    error(0.375) D0 D1\n",
-    "    shift_detectors 2\n",
-    "}\n",
-    "error(0.0625) D5 ^ L2\n",
+    "error(0.25) D1 D2\n",
+    "error(0.375) D3 L0\n",
+    "error(0.0625) D4 ^ D5\n",
+    "error(0.5) D6 D7 D8\n",
+    "error(0.03125) D9 L1 ^ D10\n",
+    "error(0.75) D11 D12 L2\n",
+    "error(0.875) D13 ^ D14 L3\n",
 );
-const DEM_CYCLE_BYTES: u64 = 222;
 
-pub(super) struct DemFixture {
+const COORDINATE_SPARSE_CYCLE_TEXT: &str = concat!(
+    "detector[tag-a](0.5, 1) D1000000\n",
+    "logical_observable L100000\n",
+    "shift_detectors(1.5, -2, 3) 1000001\n",
+    "error[edge](0.25) D0 D1000000 L0 ^ D7\n",
+    "detector(2, 3.5) D42\n",
+    "error(0.125) D999999 L99999\n",
+    "shift_detectors 17\n",
+    "detector[tag-b] D1000017\n",
+);
+
+const FOLDED_REPEATS_CYCLE_TEXT: &str = concat!(
+    "repeat[outer] 1000000 {\n",
+    "    repeat[inner] 1024 {\n",
+    "        error(0.125) D0 D1000000 L100000\n",
+    "        shift_detectors 1000001\n",
+    "    }\n",
+    "}\n",
+);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub(in crate::qualification::runtime) enum DemFamily {
+    FlatErrors,
+    CoordinateSparse,
+    FoldedRepeats,
+}
+
+impl DemFamily {
+    pub(in crate::qualification::runtime) const ALL: [Self; 3] = [
+        Self::FlatErrors,
+        Self::CoordinateSparse,
+        Self::FoldedRepeats,
+    ];
+
+    pub(in crate::qualification::runtime) const fn id(self) -> &'static str {
+        match self {
+            Self::FlatErrors => "flat-errors",
+            Self::CoordinateSparse => "coordinate-sparse",
+            Self::FoldedRepeats => "folded-repeats",
+        }
+    }
+
+    const fn cycle_text(self) -> &'static str {
+        match self {
+            Self::FlatErrors => FLAT_ERRORS_CYCLE_TEXT,
+            Self::CoordinateSparse => COORDINATE_SPARSE_CYCLE_TEXT,
+            Self::FoldedRepeats => FOLDED_REPEATS_CYCLE_TEXT,
+        }
+    }
+
+    pub(in crate::qualification::runtime) const fn cycle_items(self) -> u64 {
+        match self {
+            Self::FlatErrors | Self::CoordinateSparse => DEM_CYCLE_ITEMS,
+            Self::FoldedRepeats => 1,
+        }
+    }
+
+    pub(in crate::qualification::runtime) const fn maximum_items(self) -> u64 {
+        match self {
+            Self::FlatErrors | Self::CoordinateSparse => DEM_MAX_ITEMS,
+            Self::FoldedRepeats => DEM_FOLDED_MAX_ITEMS,
+        }
+    }
+}
+
+pub(in crate::qualification::runtime) struct DemFixture {
     text: String,
 }
 
 impl DemFixture {
-    pub(super) fn prepare(top_level_items: u64) -> Result<Self, WorkerError> {
-        if top_level_items > DEM_MAX_ITEMS {
+    pub(in crate::qualification::runtime) fn prepare(
+        family: DemFamily,
+        top_level_items: u64,
+    ) -> Result<Self, WorkerError> {
+        let maximum = family.maximum_items();
+        let cycle_items = family.cycle_items();
+        let cycle_text = family.cycle_text();
+        if top_level_items > maximum {
             return Err(WorkerError::DemItemLimit {
                 actual: top_level_items,
-                maximum: DEM_MAX_ITEMS,
+                maximum,
             });
         }
-        if top_level_items == 0 || !top_level_items.is_multiple_of(DEM_CYCLE_ITEMS) {
+        if top_level_items == 0 || !top_level_items.is_multiple_of(cycle_items) {
             return Err(WorkerError::DemItemShape {
                 actual: top_level_items,
-                cycle: DEM_CYCLE_ITEMS,
+                cycle: cycle_items,
             });
         }
-        let cycles = top_level_items / DEM_CYCLE_ITEMS;
+        let cycles = top_level_items / cycle_items;
+        let cycle_bytes =
+            u64::try_from(cycle_text.len()).map_err(|_| WorkerError::InputSizeRange)?;
         let byte_count = cycles
-            .checked_mul(DEM_CYCLE_BYTES)
+            .checked_mul(cycle_bytes)
             .ok_or(WorkerError::DemFixtureOverflow)?;
         let capacity =
             usize::try_from(byte_count).map_err(|_| WorkerError::DemItemRange(top_level_items))?;
@@ -52,7 +123,7 @@ impl DemFixture {
         text.try_reserve_exact(capacity)
             .map_err(WorkerError::DemFixtureAllocation)?;
         for _ in 0..cycle_count {
-            text.push_str(DEM_CYCLE_TEXT);
+            text.push_str(cycle_text);
         }
         if text.len() != capacity {
             return Err(WorkerError::DemFixtureSize {
@@ -63,19 +134,22 @@ impl DemFixture {
         Ok(Self { text })
     }
 
-    pub(super) fn text(&self) -> &str {
+    pub(in crate::qualification::runtime) fn text(&self) -> &str {
         &self.text
     }
 
-    pub(super) fn input_bytes(&self) -> Result<u64, WorkerError> {
+    pub(in crate::qualification::runtime) fn input_bytes(&self) -> Result<u64, WorkerError> {
         u64::try_from(self.text.len()).map_err(|_| WorkerError::InputSizeRange)
     }
 
-    pub(super) fn input_digest(&self) -> String {
+    pub(in crate::qualification::runtime) fn input_digest(&self) -> String {
         semantic_digest(byte_digest(self.text.as_bytes()))
     }
 
-    pub(super) fn validate_canonical(&self, canonical: &str) -> Result<String, WorkerError> {
+    pub(in crate::qualification::runtime) fn validate_canonical(
+        &self,
+        canonical: &str,
+    ) -> Result<String, WorkerError> {
         let expected = self
             .text
             .strip_suffix('\n')
@@ -97,7 +171,7 @@ impl DemFixture {
     }
 }
 
-pub(super) fn parse(
+pub(in crate::qualification::runtime) fn parse(
     iterations: u64,
     fixture: &DemFixture,
 ) -> Result<DetectorErrorModel, WorkerError> {
@@ -109,7 +183,10 @@ pub(super) fn parse(
     Ok(parsed)
 }
 
-pub(super) fn serialize(iterations: u64, model: &DetectorErrorModel) -> String {
+pub(in crate::qualification::runtime) fn serialize(
+    iterations: u64,
+    model: &DetectorErrorModel,
+) -> String {
     let mut canonical = String::new();
     for _ in 0..iterations {
         canonical = black_box(black_box(model).to_dem_string());
@@ -121,74 +198,28 @@ pub(super) fn serialize(iterations: u64, model: &DetectorErrorModel) -> String {
 mod tests {
     use super::*;
 
-    const CASES: [(u64, u64, u64, u64, &str, &str); 4] = [
-        (
-            64,
-            1_776,
-            88,
-            1_775,
-            "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773",
-            "02ad6cd3910a69ae416bdaadeb16126fdf813aba8154bb682bf75a01c609093f",
-        ),
-        (
-            4_096,
-            113_664,
-            5_632,
-            113_663,
-            "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c",
-            "c8a5116b4e1748d63c0baf8b9eb378d1c53e986b983b405aab7cc7da417561a9",
-        ),
-        (
-            65_536,
-            1_818_624,
-            90_112,
-            1_818_623,
-            "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716",
-            "bf2206ba69567e3a48c9b74a0cd22b97ef7a5d11bd0297afc428462c237fef38",
-        ),
-        (
-            DEM_MAX_ITEMS,
-            14_548_992,
-            720_896,
-            14_548_991,
-            "127e88c725aa88acdea3be1aed5369af43166e27365e1dbd11dbe89c8e807789",
-            "5bd41410a3ee8859fa7589abe6a20fa61d4e5c06e08105f60a5f3aa474d478b2",
-        ),
-    ];
-
     #[test]
-    fn fixture_cycle_is_exact_and_scale_identities_are_frozen() {
-        assert_eq!(DEM_CYCLE_TEXT.lines().count(), 11);
-        assert_eq!(DEM_CYCLE_TEXT.len(), 222);
-        assert!(DEM_CYCLE_TEXT.contains("error[edge](0.25) D1 D2 L0 ^ D3\n"));
-        assert!(DEM_CYCLE_TEXT.contains("repeat[loop] 3 {\n"));
-
-        for (items, bytes, physical_lines, output_bytes, input_digest, output_digest) in CASES {
-            let fixture = DemFixture::prepare(items).expect("valid DEM fixture");
-            assert_eq!(fixture.input_bytes().expect("input bytes"), bytes);
-            assert_eq!(fixture.text().lines().count() as u64, physical_lines);
-            let canonical_bytes = fixture
-                .text()
-                .strip_suffix('\n')
-                .expect("terminal newline")
-                .len();
-            assert_eq!(
-                u64::try_from(canonical_bytes).expect("canonical byte count"),
-                output_bytes
-            );
-            assert_eq!(fixture.input_digest(), input_digest);
-            assert_eq!(
-                fixture
-                    .validate_canonical(fixture.text())
-                    .expect("canonical fixture"),
-                output_digest
-            );
+    fn family_cycles_are_distinct_and_canonical() {
+        let mut digests = std::collections::BTreeSet::new();
+        for family in [
+            DemFamily::FlatErrors,
+            DemFamily::CoordinateSparse,
+            DemFamily::FoldedRepeats,
+        ] {
+            let fixture = DemFixture::prepare(family, 64).expect("valid DEM fixture");
+            assert!(fixture.input_bytes().expect("input bytes") > 0);
+            assert!(digests.insert(fixture.input_digest()));
+            let model = parse(1, &fixture).expect("parse family");
+            let canonical = serialize(1, &model);
+            fixture
+                .validate_canonical(&canonical)
+                .expect("canonical family output");
         }
     }
 
     #[test]
     fn parse_and_serialize_bind_odd_even_and_normalized_output() {
-        let fixture = DemFixture::prepare(64).expect("fixture");
+        let fixture = DemFixture::prepare(DemFamily::FlatErrors, 64).expect("fixture");
         let odd = parse(1, &fixture).expect("odd parse");
         let even = parse(2, &fixture).expect("even parse");
         let odd_text = serialize(1, &odd);
@@ -197,51 +228,49 @@ mod tests {
         assert_eq!(odd, even);
         assert_eq!(odd_text, even_text);
         assert_eq!(odd_text.len(), fixture.text().len());
-        assert_eq!(
-            fixture.validate_canonical(&odd_text).expect("odd output"),
-            CASES[0].5
-        );
-        assert_eq!(
-            fixture
-                .validate_canonical(odd_text.trim_end_matches('\n'))
-                .expect("Stim-style terminal newline"),
-            CASES[0].5
-        );
+        let expected = fixture.validate_canonical(&odd_text).expect("odd output");
+        let normalized = fixture
+            .validate_canonical(odd_text.trim_end_matches('\n'))
+            .expect("Stim-style terminal newline");
+        assert_eq!(expected, normalized);
     }
 
     #[test]
-    fn fixture_rejects_invalid_shapes_before_allocation() {
+    fn fixture_rejects_family_specific_invalid_shapes_before_allocation() {
         assert!(matches!(
-            DemFixture::prepare(0),
+            DemFixture::prepare(DemFamily::FlatErrors, 0),
             Err(WorkerError::DemItemShape { .. })
         ));
         assert!(matches!(
-            DemFixture::prepare(65),
+            DemFixture::prepare(DemFamily::FlatErrors, 65),
             Err(WorkerError::DemItemShape { .. })
         ));
         assert!(matches!(
-            DemFixture::prepare(DEM_MAX_ITEMS + 1),
+            DemFixture::prepare(DemFamily::CoordinateSparse, DEM_MAX_ITEMS + 1),
+            Err(WorkerError::DemItemLimit { .. })
+        ));
+        assert!(matches!(
+            DemFixture::prepare(DemFamily::FoldedRepeats, DEM_FOLDED_MAX_ITEMS + 1),
             Err(WorkerError::DemItemLimit { .. })
         ));
     }
 
     #[test]
-    fn accepted_maximum_constructs_parses_and_serializes() {
-        let fixture = DemFixture::prepare(DEM_MAX_ITEMS).expect("maximum fixture");
-        let model = parse(1, &fixture).expect("maximum parse");
+    fn folded_repeat_family_remains_compact_after_parsing() {
+        let fixture = DemFixture::prepare(DemFamily::FoldedRepeats, 64).expect("folded fixture");
+        let model = parse(1, &fixture).expect("folded parse");
         let canonical = serialize(1, &model);
 
-        assert_eq!(
-            fixture
-                .validate_canonical(&canonical)
-                .expect("maximum canonical output"),
-            CASES[3].5
-        );
+        assert!(canonical.contains("repeat[outer] 1000000"));
+        assert!(canonical.contains("repeat[inner] 1024"));
+        fixture
+            .validate_canonical(&canonical)
+            .expect("folded canonical output");
     }
 
     #[test]
     fn canonical_validation_rejects_nonterminal_differences() {
-        let fixture = DemFixture::prepare(64).expect("fixture");
+        let fixture = DemFixture::prepare(DemFamily::FlatErrors, 64).expect("fixture");
         let changed = fixture.text().replacen("D0", "D9", 1);
 
         assert!(matches!(

@@ -461,7 +461,7 @@ mod tests {
             .iter_mut()
             .find(|migration| migration.id == "m10-dem-parse-scale-family")
             .expect("DEM parse migration")
-            .replacement_scale_id = Some("small".to_string());
+            .replacement_scale_id = Some("flat-errors-small".to_string());
 
         assert!(
             validate(&root, &suite, &ledger)

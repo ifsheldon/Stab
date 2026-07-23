@@ -1,1168 +1,343 @@
 use super::*;
-use std::num::NonZeroU64;
-
-use crate::qualification::runtime::correctness::{
-    CorrectnessPreflightEvidence, CorrectnessPreflightStatus,
-};
-use crate::qualification::runtime::group::ScaleContract;
-use crate::qualification::runtime::protocol::{InputDigest, ProtocolId};
-use crate::qualification::runtime::rollup::{RollupReplayEvidence, RollupSourceEvidence};
-
-mod publication;
-
-fn digest(byte: char) -> String {
-    byte.to_string().repeat(64)
-}
+use crate::qualification::runtime::correctness::CorrectnessPreflightStatus;
 
 fn workers() -> WorkerIdentityEvidence {
     WorkerIdentityEvidence {
-        stim_source_sha256: digest('1'),
-        stim_build_fingerprint: digest('2'),
-        stim_binary_sha256: digest('3'),
-        stab_source_sha256: digest('4'),
-        stab_build_fingerprint: digest('5'),
-        stab_binary_sha256: digest('6'),
-        contract_preflight_sha256: digest('7'),
+        stim_source_sha256: "a".repeat(64),
+        stim_build_fingerprint: "b".repeat(64),
+        stim_binary_sha256: "c".repeat(64),
+        stab_source_sha256: "d".repeat(64),
+        stab_build_fingerprint: "e".repeat(64),
+        stab_binary_sha256: "f".repeat(64),
+        contract_preflight_sha256: "1".repeat(64),
     }
 }
 
-fn artifacts(path: &str, byte: char) -> Vec<ArtifactReceipt> {
-    ["report.json", "preflight.json", "report.md"]
+fn correctness() -> CorrectnessPreflightEvidence {
+    CorrectnessPreflightEvidence {
+        status: CorrectnessPreflightStatus::Passed,
+        case_ids: vec!["case".to_string()],
+        reason: "passed".to_string(),
+        source_directory: Some("target/qualification/correctness".to_string()),
+        qualification_manifest_sha256: Some("2".repeat(64)),
+        request_sha256: Some("3".repeat(64)),
+        completion_sha256: Some("4".repeat(64)),
+        report_sha256: Some("5".repeat(64)),
+        preflight_sha256: Some("6".repeat(64)),
+    }
+}
+
+fn artifact(path: &str) -> CompletionArtifact {
+    CompletionArtifact {
+        path: path.to_string(),
+        report_sha256: "a".repeat(64),
+        preflight_sha256: "b".repeat(64),
+        markdown_sha256: "c".repeat(64),
+    }
+}
+
+fn regression(group_id: &str, outcome: SelfRegressionOutcome) -> CompletionRegression {
+    CompletionRegression {
+        group_id: group_id.to_string(),
+        outcome,
+        checked_measurements: usize::from(outcome == SelfRegressionOutcome::Passed),
+        unseeded_measurements: usize::from(outcome == SelfRegressionOutcome::Unseeded),
+    }
+}
+
+fn rollup(group_id: &str, tier: QualificationTier) -> CompletionRollup {
+    CompletionRollup {
+        group_id: group_id.to_string(),
+        group_contract_sha256: "d".repeat(64),
+        tier,
+        workload_id: "dem".to_string(),
+        timing_batch_policy: TimingBatchPolicy::CommonIterations,
+        comparator_sources: vec![("source.cc".to_string(), "e".repeat(64))],
+        artifact: artifact(&format!(
+            "target/benchmarks/qualification/{group_id}-{}",
+            tier_name(tier)
+        )),
+        source_report_count: 9,
+        parity_checked_measurements: 9,
+        overall_outcome: GateOutcome::Passed,
+    }
+}
+
+fn replay_evidence() -> RollupReplayEvidence {
+    RollupReplayEvidence {
+        output: PathBuf::from("target/benchmarks/qualification/rollup"),
+        report_sha256: "a".repeat(64),
+        preflight_sha256: "b".repeat(64),
+        markdown_sha256: "c".repeat(64),
+        group_id: DEM_PARSE_GROUP.to_string(),
+        group_contract_sha256: "d".repeat(64),
+        tier: QualificationTier::Full,
+        performance_inventory_sha256: "e".repeat(64),
+        stab_commit: "f".repeat(40),
+        stim_commit: STIM_COMMIT.to_string(),
+        host_policy_sha256: "1".repeat(64),
+        host_profile_id: "controlled-aarch64".to_string(),
+        operating_system: "linux".to_string(),
+        architecture: "aarch64".to_string(),
+        cpu_identity: "cpu".to_string(),
+        rust_toolchain: "nightly".to_string(),
+        target_triple: "aarch64-unknown-linux-gnu".to_string(),
+        toolchain_sha256: "2".repeat(64),
+        timing_boundary: TimingBoundary::RawWorkV2,
+        workload_id: "dem-parse".to_string(),
+        timing_batch_policy: TimingBatchPolicy::CommonIterations,
+        comparator_sources: vec![("source.cc".to_string(), "3".repeat(64))],
+        workers: workers(),
+        correctness_preflight: correctness(),
+        correctness_bindings: Vec::new(),
+        overall_outcome: GateOutcome::Passed,
+        sources: Vec::new(),
+        scales: Vec::new(),
+    }
+}
+
+fn source_reports() -> Vec<CompletionSourceReport> {
+    expected_rollup_keys()
         .into_iter()
-        .enumerate()
-        .map(|(index, name)| ArtifactReceipt {
-            path: path.to_string(),
-            name: name.to_string(),
-            bytes: 100 + u64::try_from(index).expect("small fixture index"),
-            sha256: digest(byte),
+        .flat_map(|key| {
+            let (group_id, tier) = key
+                .rsplit_once(':')
+                .map(|(group, tier)| {
+                    (
+                        group,
+                        if tier == "full" {
+                            QualificationTier::Full
+                        } else {
+                            QualificationTier::Soak
+                        },
+                    )
+                })
+                .expect("rollup key");
+            let group_id = group_id.to_string();
+            (0..9).map(move |index| CompletionSourceReport {
+                group_id: group_id.clone(),
+                tier,
+                scale_id: format!("scale-{index}"),
+                artifact: artifact(&format!(
+                    "target/benchmarks/qualification/{group_id}-{}-{index}",
+                    tier_name(tier)
+                )),
+            })
         })
         .collect()
 }
 
-fn publish_directory(
-    root: &RepoRoot,
-    path: &Path,
-    report: &[u8],
-    preflight: &[u8],
-    markdown: &[u8],
-) {
-    let path = DirectQualificationArtifactPath::try_new(path).expect("direct test path");
-    let mut output = super::super::artifact::QualificationOutput::begin(root, &path)
-        .expect("begin test publication");
-    output
-        .write("report.json", report)
-        .expect("write test report");
-    output
-        .write("preflight.json", preflight)
-        .expect("write test preflight");
-    output
-        .write("report.md", markdown)
-        .expect("write test markdown");
-    output.commit().expect("publish test directory");
+fn memory() -> Vec<CompletionMemory> {
+    source_reports()
+        .into_iter()
+        .map(|source| CompletionMemory {
+            group_id: source.group_id,
+            tier: source.tier,
+            scale_id: source.scale_id,
+            family_id: "family".to_string(),
+            size_class: SizeClass::Small,
+            stim_setup_rss_bytes: 1,
+            stim_peak_rss_bytes: 2,
+            stim_parent_observed_peak_rss_bytes: Some(3),
+            stab_setup_rss_bytes: 4,
+            stab_peak_rss_bytes: 5,
+            stab_parent_observed_peak_rss_bytes: Some(6),
+        })
+        .collect()
 }
 
-fn replace_directory(
-    repository: &tempfile::TempDir,
-    path: &Path,
-    report: &[u8],
-    preflight: &[u8],
-    markdown: &[u8],
-) {
-    let target = repository.path().join(path);
-    let moved = target.with_extension("detached");
-    std::fs::rename(&target, &moved).expect("move bound directory");
-    std::fs::create_dir(&target).expect("replace bound directory");
-    std::fs::write(target.join("report.json"), report).expect("write replacement report");
-    std::fs::write(target.join("preflight.json"), preflight).expect("write replacement preflight");
-    std::fs::write(target.join("report.md"), markdown).expect("write replacement markdown");
-}
-
-fn probe(workers: &WorkerIdentityEvidence) -> AdapterProbeReceipt {
-    AdapterProbeReceipt {
-        probe_id: "pq2-test-adapter-smoke".to_string(),
-        runtime_group_id: "PERFQ-TEST".to_string(),
-        evidence_mode: "timing".to_string(),
-        iteration_count: 4,
-        work_items: 4_096,
-        work_count: 16_384,
-        input_bytes: 512,
-        input_digest: digest('8'),
-        output_digest: digest('9'),
-        stim_source_sha256: workers.stim_source_sha256.clone(),
-        stim_build_fingerprint: workers.stim_build_fingerprint.clone(),
-        stim_binary_sha256: workers.stim_binary_sha256.clone(),
-        stab_source_sha256: workers.stab_source_sha256.clone(),
-        stab_build_fingerprint: digest('a'),
-    }
-}
-
-fn directory(
-    tier: QualificationTier,
-    scale: Option<&str>,
-    name: &str,
-    byte: char,
-) -> EvidenceDirectoryReceipt {
-    let path = format!("target/benchmarks/qualification/{name}");
-    EvidenceDirectoryReceipt {
-        tier,
-        scale_id: scale.map(ToOwned::to_owned),
-        artifacts: artifacts(&path, byte),
-        path,
-    }
-}
-
-fn receipt() -> CompletionReceipt {
-    let workers = workers();
-    let probe = probe(&workers);
-    let source_reports = vec![
-        directory(QualificationTier::Full, Some("small"), "full-small", 'b'),
-        directory(QualificationTier::Soak, Some("small"), "soak-small", 'c'),
-    ];
-    let rollups = vec![
-        directory(QualificationTier::Full, None, "full-rollup", 'd'),
-        directory(QualificationTier::Soak, None, "soak-rollup", 'e'),
-    ];
-    let mut steps = Vec::new();
-    push_step(
-        &mut steps,
-        CompletionStepKind::WorkerReproducibility,
-        &"f".repeat(40),
-        vec!["qualification-worker-reproducibility".to_string()],
-        Vec::new(),
-        Vec::new(),
-        CompletionStepResult::WorkerReproducibility {
-            workers: workers.clone(),
-        },
-    );
-    push_step(
-        &mut steps,
-        CompletionStepKind::AdapterProbe,
-        &"f".repeat(40),
-        probe_arguments(&probe),
-        Vec::new(),
-        Vec::new(),
-        CompletionStepResult::AdapterProbe { probe },
-    );
-    for source in &source_reports {
-        let scale_id = source.scale_id.clone().expect("source scale");
-        push_step(
-            &mut steps,
-            CompletionStepKind::ReportReplay,
-            &"f".repeat(40),
-            vec![
-                "qualification-report".to_string(),
-                "--input".to_string(),
-                source.path.clone(),
-            ],
-            source.artifacts.clone(),
-            source.artifacts.clone(),
-            CompletionStepResult::ReportReplay {
-                tier: source.tier,
-                scale_id,
-            },
-        );
-        push_step(
-            &mut steps,
-            CompletionStepKind::Regression,
-            &"f".repeat(40),
-            vec![
-                "qualification-regression".to_string(),
-                "--input".to_string(),
-                source.path.clone(),
-                "--baseline".to_string(),
-                super::super::regression::DEFAULT_BASELINE.to_string(),
-            ],
-            source.artifacts.clone(),
-            Vec::new(),
-            CompletionStepResult::Regression {
-                group_id: "PERFQ-TEST".to_string(),
-                checked_measurements: 1,
-                report_only: false,
-            },
-        );
-    }
-    for rollup in &rollups {
-        push_step(
-            &mut steps,
-            CompletionStepKind::RollupReplay,
-            &"f".repeat(40),
-            vec![
-                "qualification-rollup-report".to_string(),
-                "--input".to_string(),
-                rollup.path.clone(),
-            ],
-            rollup.artifacts.clone(),
-            rollup.artifacts.clone(),
-            CompletionStepResult::RollupReplay {
-                tier: rollup.tier,
-                scale_count: 1,
-                overall_outcome: GateOutcome::Passed,
-            },
-        );
-    }
-    CompletionReceipt {
+fn manifest() -> CompletionManifest {
+    CompletionManifest {
         schema_version: COMPLETION_SCHEMA_VERSION,
         output: "target/benchmarks/qualification/completion".to_string(),
-        generated_unix_epoch_seconds: 1_234,
-        group_id: "PERFQ-TEST".to_string(),
-        group_contract_sha256: digest('0'),
-        performance_inventory_sha256: digest('1'),
-        correctness_inventory_sha256: digest('2'),
+        generated_unix_epoch_seconds: 1,
+        scope_id: DEM_SCOPE_ID.to_string(),
+        performance_inventory_sha256: "1".repeat(64),
+        correctness_inventory_sha256: "2".repeat(64),
+        parity_policy_sha256: "3".repeat(64),
+        regression_policy_sha256: "4".repeat(64),
+        regression_baselines_sha256: "5".repeat(64),
         stim_tag: STIM_TAG.to_string(),
         stim_commit: STIM_COMMIT.to_string(),
         repository: RepositoryEvidence {
-            commit_before: "f".repeat(40),
-            commit_after: "f".repeat(40),
+            commit_before: "6".repeat(40),
+            commit_after: "6".repeat(40),
             local_modifications_before: false,
             local_modifications_after: false,
         },
-        environment: CompletionEnvironmentEvidence {
-            host_policy_sha256: digest('3'),
-            host_profile_id: "controlled".to_string(),
+        environment: CompletionEnvironment {
+            host_policy_sha256: "7".repeat(64),
+            host_profile_id: "host".to_string(),
+            operating_system: "linux".to_string(),
             architecture: "aarch64".to_string(),
-            cpu_identity: "test CPU".to_string(),
+            cpu_identity: "cpu".to_string(),
+            rust_toolchain: "nightly".to_string(),
             target_triple: "aarch64-unknown-linux-gnu".to_string(),
-            toolchain_sha256: digest('4'),
+            toolchain_sha256: "8".repeat(64),
         },
-        workers,
-        correctness_preflight: CorrectnessPreflightEvidence {
-            status: CorrectnessPreflightStatus::Passed,
-            case_ids: vec!["cq-test".to_string()],
-            reason: "exact prerequisite passed".to_string(),
-            source_directory: Some("target/qualification/correctness/test".to_string()),
-            qualification_manifest_sha256: Some(digest('5')),
-            request_sha256: Some(digest('6')),
-            completion_sha256: Some(digest('7')),
-            report_sha256: Some(digest('8')),
-            preflight_sha256: Some(digest('9')),
-        },
-        source_reports,
-        rollups,
-        steps,
+        workers: workers(),
+        timing_boundary: TimingBoundary::RawWorkV2,
+        correctness_preflight: correctness(),
+        rollups: vec![
+            rollup(DEM_PARSE_GROUP, QualificationTier::Full),
+            rollup(DEM_PARSE_GROUP, QualificationTier::Soak),
+            rollup(DEM_PRINT_GROUP, QualificationTier::Full),
+            rollup(DEM_PRINT_GROUP, QualificationTier::Soak),
+        ],
+        source_reports: source_reports(),
+        memory: memory(),
+        parity_outcome: GateOutcome::Passed,
+        regression_outcomes: vec![
+            regression(DEM_PARSE_GROUP, SelfRegressionOutcome::Unseeded),
+            regression(DEM_PRINT_GROUP, SelfRegressionOutcome::Unseeded),
+        ],
+        environment_valid: true,
+        memory_scaling_status: MemoryScalingStatus::Recorded,
     }
 }
 
-fn group_contract() -> GroupContract {
-    GroupContract {
-        id: ProtocolId::try_new("PERFQ-TEST").expect("group id"),
-        claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
-        timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
-        workload_id: ProtocolId::try_new("test-workload").expect("workload id"),
-        measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
-        scales: vec![ScaleContract {
-            id: ProtocolId::try_new("small").expect("scale id"),
-            work_items: NonZeroU64::new(4_096).expect("nonzero work"),
-            input_bytes: 512,
-            input_digest: InputDigest::try_new(digest('8')).expect("input digest"),
-        }],
-        correctness_case_ids: vec!["cq-test".to_string()],
-        owner: ProtocolId::try_new("bench").expect("owner id"),
-        profiler_note: None,
-        comparator_sources: Vec::new(),
-    }
-}
+#[test]
+fn completion_manifest_rejects_missing_extra_duplicate_and_failed_rollups() {
+    let valid = manifest();
+    validate_manifest(&valid).expect("valid completion manifest");
 
-fn rollup_evidence(receipt: &CompletionReceipt, tier: QualificationTier) -> RollupReplayEvidence {
-    let rollup = receipt
+    let mut missing = valid.clone();
+    missing.rollups.pop();
+    assert!(validate_manifest(&missing).is_err());
+
+    let mut extra = valid.clone();
+    extra
         .rollups
-        .iter()
-        .find(|rollup| rollup.tier == tier)
-        .expect("tier rollup");
-    let sources = receipt
-        .source_reports
-        .iter()
-        .filter(|source| source.tier == tier)
-        .map(|source| RollupSourceEvidence {
-            scale_id: source.scale_id.clone().expect("source scale"),
-            path: PathBuf::from(&source.path),
-            report_sha256: artifact_digest(&source.artifacts, "report.json")
-                .expect("source report digest")
-                .to_string(),
-            preflight_sha256: artifact_digest(&source.artifacts, "preflight.json")
-                .expect("source preflight digest")
-                .to_string(),
-        })
-        .collect();
-    RollupReplayEvidence {
-        output: PathBuf::from(&rollup.path),
-        report_sha256: artifact_digest(&rollup.artifacts, "report.json")
-            .expect("rollup report digest")
-            .to_string(),
-        preflight_sha256: artifact_digest(&rollup.artifacts, "preflight.json")
-            .expect("rollup preflight digest")
-            .to_string(),
-        markdown_sha256: artifact_digest(&rollup.artifacts, "report.md")
-            .expect("rollup markdown digest")
-            .to_string(),
-        group_id: receipt.group_id.clone(),
-        tier,
-        stab_commit: receipt.repository.commit_after.clone(),
-        host_policy_sha256: receipt.environment.host_policy_sha256.clone(),
-        host_profile_id: receipt.environment.host_profile_id.clone(),
-        architecture: receipt.environment.architecture.clone(),
-        cpu_identity: receipt.environment.cpu_identity.clone(),
-        target_triple: receipt.environment.target_triple.clone(),
-        toolchain_sha256: receipt.environment.toolchain_sha256.clone(),
-        workers: receipt.workers.clone(),
-        correctness_preflight: receipt.correctness_preflight.clone(),
-        overall_outcome: GateOutcome::Passed,
-        sources,
-    }
-}
+        .push(rollup(DEM_PARSE_GROUP, QualificationTier::Full));
+    assert!(validate_manifest(&extra).is_err());
 
-fn step_mut(receipt: &mut CompletionReceipt, index: usize) -> &mut CompletionStep {
-    receipt.steps.get_mut(index).expect("fixture step")
-}
+    let mut duplicate = valid.clone();
+    let first_rollup = duplicate.rollups.first().expect("first rollup").clone();
+    *duplicate.rollups.get_mut(1).expect("second rollup") = first_rollup;
+    assert!(validate_manifest(&duplicate).is_err());
 
-fn selected_report(
-    directory: &EvidenceDirectoryReceipt,
-    workers: &WorkerIdentityEvidence,
-) -> SelectedReport {
-    SelectedReport {
-        path: DirectQualificationArtifactPath::try_new(Path::new(&directory.path))
-            .expect("direct source path"),
-        tier: directory.tier,
-        scale_id: directory.scale_id.clone().expect("source scale"),
-        workers: workers.clone(),
-        artifacts: directory.artifacts.clone(),
-        correctness_binding: Arc::new(
-            super::super::correctness::CorrectnessArtifactBinding::default(),
-        ),
-    }
-}
-
-struct FakeActions {
-    receipt: CompletionReceipt,
-    calls: Vec<String>,
-    fail_at: Option<String>,
-    change_report_artifact: bool,
-}
-
-impl FakeActions {
-    fn new(receipt: CompletionReceipt) -> Self {
-        Self {
-            receipt,
-            calls: Vec::new(),
-            fail_at: None,
-            change_report_artifact: false,
-        }
-    }
-
-    fn record(&mut self, action: String) -> Result<(), CompletionError> {
-        self.calls.push(action.clone());
-        if self.fail_at.as_deref() == Some(&action) {
-            Err(CompletionError::Action {
-                name: "injected workflow action",
-                detail: action,
-            })
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl workflow::Actions for FakeActions {
-    fn workers(
-        &mut self,
-        _context: &ReplayContext<'_>,
-    ) -> Result<WorkerIdentityEvidence, CompletionError> {
-        self.record("workers".to_string())?;
-        Ok(self.receipt.workers.clone())
-    }
-
-    fn probe(
-        &mut self,
-        _context: &ReplayContext<'_>,
-        _group_id: &str,
-    ) -> Result<AdapterProbeReceipt, CompletionError> {
-        self.record("probe".to_string())?;
-        Ok(probe(&self.receipt.workers))
-    }
-
-    fn report(
-        &mut self,
-        _context: &ReplayContext<'_>,
-        selected: &SelectedReport,
-    ) -> Result<Vec<ArtifactReceipt>, CompletionError> {
-        self.record(format!("report-{:?}-{}", selected.tier, selected.scale_id))?;
-        let mut artifacts = selected.artifacts.clone();
-        if self.change_report_artifact {
-            artifacts.first_mut().expect("report artifact").sha256 = digest('a');
-        }
-        Ok(artifacts)
-    }
-
-    fn regression(
-        &mut self,
-        context: &ReplayContext<'_>,
-        selected: &SelectedReport,
-    ) -> Result<super::super::regression::RegressionSummary, CompletionError> {
-        self.record(format!(
-            "regression-{:?}-{}",
-            selected.tier, selected.scale_id
-        ))?;
-        Ok(super::super::regression::RegressionSummary {
-            group_id: context.contract.id.to_string(),
-            checked_measurements: context.contract.measurement_ids.len(),
-            report_only: false,
-        })
-    }
-
-    fn rollup(
-        &mut self,
-        _context: &ReplayContext<'_>,
-        path: &DirectQualificationArtifactPath,
-    ) -> Result<
-        (
-            Vec<ArtifactReceipt>,
-            Vec<ArtifactReceipt>,
-            RollupReplayEvidence,
-        ),
-        CompletionError,
-    > {
-        let directory = self
-            .receipt
-            .rollups
-            .iter()
-            .find(|rollup| Path::new(&rollup.path) == path.as_path())
-            .cloned()
-            .ok_or(CompletionError::RollupIdentity)?;
-        self.record(format!("rollup-{:?}", directory.tier))?;
-        let evidence = rollup_evidence(&self.receipt, directory.tier);
-        Ok((directory.artifacts.clone(), directory.artifacts, evidence))
-    }
-}
-
-fn run_fake_workflow(
-    actions: &mut FakeActions,
-) -> Result<workflow::WorkflowEvidence, CompletionError> {
-    let temporary = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(temporary.path()).expect("repository root");
-    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-    let contract = group_contract();
-    let commit = actions.receipt.repository.commit_after.clone();
-    let performance_inventory = actions.receipt.performance_inventory_sha256.clone();
-    let correctness_inventory = actions.receipt.correctness_inventory_sha256.clone();
-    let context = ReplayContext {
-        root: &root,
-        repository: &live_repository,
-        performance_inventory_sha256: &performance_inventory,
-        correctness_inventory_sha256: &correctness_inventory,
-        contract: &contract,
-        repository_commit: &commit,
-    };
-    let full = actions
-        .receipt
-        .source_reports
-        .iter()
-        .filter(|source| source.tier == QualificationTier::Full)
-        .map(|source| selected_report(source, &actions.receipt.workers))
-        .collect();
-    let soak = actions
-        .receipt
-        .source_reports
-        .iter()
-        .filter(|source| source.tier == QualificationTier::Soak)
-        .map(|source| selected_report(source, &actions.receipt.workers))
-        .collect();
-    let full_rollup = DirectQualificationArtifactPath::try_new(Path::new(
-        &actions.receipt.rollups.first().expect("full rollup").path,
-    ))
-    .expect("full rollup path");
-    let soak_rollup = DirectQualificationArtifactPath::try_new(Path::new(
-        &actions.receipt.rollups.get(1).expect("soak rollup").path,
-    ))
-    .expect("soak rollup path");
-    workflow::run(
-        &context,
-        "PERFQ-TEST",
-        full,
-        soak,
-        full_rollup,
-        soak_rollup,
-        actions,
-    )
-}
-
-#[test]
-fn completion_structure_binds_exact_step_sequence_and_artifacts() {
-    let valid = receipt();
-    validation::validate(&valid).expect("valid completion receipt");
-
-    let mut wrong_exit = valid.clone();
-    step_mut(&mut wrong_exit, 2).exit_status = 1;
-    assert!(validation::validate(&wrong_exit).is_err());
-
-    let mut repaired_input = valid.clone();
-    step_mut(&mut repaired_input, 2)
-        .inputs
-        .get_mut(2)
-        .expect("fixture report artifact")
-        .sha256 = digest('a');
-    assert!(validation::validate(&repaired_input).is_err());
-
-    let mut report_only = valid;
-    let result = &mut step_mut(&mut report_only, 3).result;
-    assert!(matches!(result, CompletionStepResult::Regression { .. }));
-    if let CompletionStepResult::Regression {
-        report_only: report_only_flag,
-        ..
-    } = result
-    {
-        *report_only_flag = true;
-    }
-    assert!(validation::validate(&report_only).is_err());
-}
-
-#[test]
-fn completion_workflow_runs_exact_handlers_in_order() {
-    let mut actions = FakeActions::new(receipt());
-    let evidence = run_fake_workflow(&mut actions).expect("successful workflow");
-    assert_eq!(
-        actions.calls,
-        [
-            "workers",
-            "probe",
-            "report-Full-small",
-            "regression-Full-small",
-            "report-Soak-small",
-            "regression-Soak-small",
-            "rollup-Full",
-            "rollup-Soak",
-        ]
-    );
-    assert_eq!(evidence.source_reports.len(), 2);
-    assert_eq!(evidence.rollups.len(), 2);
-    assert_eq!(evidence.steps.len(), 8);
-}
-
-#[test]
-fn completion_workflow_stops_at_first_handler_failure() {
-    let mut actions = FakeActions::new(receipt());
-    actions.fail_at = Some("regression-Full-small".to_string());
-    assert!(run_fake_workflow(&mut actions).is_err());
-    assert_eq!(
-        actions.calls,
-        [
-            "workers",
-            "probe",
-            "report-Full-small",
-            "regression-Full-small",
-        ]
-    );
-}
-
-#[test]
-fn completion_workflow_rejects_non_idempotent_live_report_replay() {
-    let mut actions = FakeActions::new(receipt());
-    actions.change_report_artifact = true;
-    assert!(matches!(
-        run_fake_workflow(&mut actions),
-        Err(CompletionError::NonIdempotentReplay(_))
-    ));
-    assert_eq!(actions.calls, ["workers", "probe", "report-Full-small"]);
-}
-
-#[test]
-fn completion_structure_rejects_path_tier_and_result_substitution() {
-    let valid = receipt();
-
-    let mut duplicate_path = valid.clone();
-    let full_path = duplicate_path
-        .source_reports
-        .first()
-        .expect("full source")
-        .path
-        .clone();
-    let duplicate_source = duplicate_path
-        .source_reports
-        .get_mut(1)
-        .expect("soak source");
-    duplicate_source.path.clone_from(&full_path);
-    for artifact in &mut duplicate_source.artifacts {
-        artifact.path.clone_from(&full_path);
-    }
-    assert!(validation::validate(&duplicate_path).is_err());
-
-    let mut wrong_scale_family = valid.clone();
-    wrong_scale_family
-        .source_reports
-        .get_mut(1)
-        .expect("soak source")
-        .scale_id = Some("different".to_string());
-    assert!(validation::validate(&wrong_scale_family).is_err());
-
-    let mut reversed_tiers = valid.clone();
-    reversed_tiers.source_reports.swap(0, 1);
-    assert!(validation::validate(&reversed_tiers).is_err());
-
-    let mut unsafe_path = valid.clone();
-    let unsafe_source = unsafe_path.source_reports.first_mut().expect("full source");
-    unsafe_source.path = "target/benchmarks/qualification/../escape".to_string();
-    let unsafe_source_path = unsafe_source.path.clone();
-    for artifact in &mut unsafe_source.artifacts {
-        artifact.path.clone_from(&unsafe_source_path);
-    }
-    assert!(validation::validate(&unsafe_path).is_err());
-
-    let mut failed_rollup = valid.clone();
-    let last = failed_rollup.steps.len() - 1;
-    if let CompletionStepResult::RollupReplay {
-        overall_outcome, ..
-    } = &mut step_mut(&mut failed_rollup, last).result
-    {
-        *overall_outcome = GateOutcome::Failed;
-    }
-    assert!(matches!(
-        &step_mut(&mut failed_rollup, last).result,
-        CompletionStepResult::RollupReplay {
-            overall_outcome: GateOutcome::Failed,
-            ..
-        }
-    ));
-    assert!(validation::validate(&failed_rollup).is_err());
-
-    let mut wrong_arguments = valid;
-    step_mut(&mut wrong_arguments, 3).canonical_arguments.pop();
-    assert!(validation::validate(&wrong_arguments).is_err());
-}
-
-#[test]
-fn completion_preflight_binds_steps_and_every_evidence_directory() {
-    let original = receipt();
-    let original_json = canonical_json(&original).expect("canonical receipt");
-    let original_preflight =
-        completion_preflight(&original, &original_json).expect("completion preflight");
-
-    let mut changed_step = original.clone();
-    step_mut(&mut changed_step, 1)
-        .canonical_arguments
-        .push("--changed".to_string());
-    let changed_json = canonical_json(&changed_step).expect("changed receipt");
-    let changed_preflight =
-        completion_preflight(&changed_step, &changed_json).expect("changed preflight");
-    assert_ne!(original_preflight, changed_preflight);
-
-    let mut changed_artifact = original;
-    changed_artifact
+    let mut failed = valid;
+    failed
         .rollups
         .first_mut()
-        .expect("full rollup")
-        .artifacts
+        .expect("first rollup")
+        .overall_outcome = GateOutcome::Failed;
+    assert!(validate_manifest(&failed).is_err());
+}
+
+#[test]
+fn completion_manifest_distinguishes_unseeded_and_passing_regression() {
+    let mut current = manifest();
+    validate_manifest(&current).expect("unseeded first-run manifest");
+    current.regression_outcomes = vec![
+        regression(DEM_PARSE_GROUP, SelfRegressionOutcome::Passed),
+        regression(DEM_PRINT_GROUP, SelfRegressionOutcome::Passed),
+    ];
+    validate_manifest(&current).expect("seeded regression manifest");
+
+    current
+        .regression_outcomes
         .first_mut()
-        .expect("rollup report")
-        .sha256 = digest('a');
-    let changed_json = canonical_json(&changed_artifact).expect("changed artifact receipt");
-    let changed_preflight =
-        completion_preflight(&changed_artifact, &changed_json).expect("changed artifact preflight");
-    assert_ne!(original_preflight, changed_preflight);
+        .expect("first regression outcome")
+        .unseeded_measurements = 1;
+    assert!(validate_manifest(&current).is_err());
 }
 
 #[test]
-fn completion_final_publication_rejects_source_replacement() {
-    let repository = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(repository.path()).expect("repository root");
-    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-    let source_path = Path::new("target/benchmarks/qualification/completion-source");
-    publish_directory(
-        &root,
-        source_path,
-        b"source report\n",
-        b"source preflight\n",
-        b"source markdown\n",
+fn completion_rejects_mixed_source_host_and_inventory_identities() {
+    let first = replay_evidence();
+    let second = first.clone();
+    shared_identity(&[first.clone(), second]).expect("matching identity");
+
+    let mut mixed_commit = first.clone();
+    mixed_commit.stab_commit = "0".repeat(40);
+    assert!(matches!(
+        shared_identity(&[first.clone(), mixed_commit]),
+        Err(CompletionError::MixedIdentity)
+    ));
+
+    let mut mixed_host = first.clone();
+    mixed_host.cpu_identity = "different-cpu".to_string();
+    assert!(matches!(
+        shared_identity(&[first.clone(), mixed_host]),
+        Err(CompletionError::MixedIdentity)
+    ));
+
+    let mut mixed_inventory = first.clone();
+    mixed_inventory.performance_inventory_sha256 = "9".repeat(64);
+    assert!(matches!(
+        shared_identity(&[first, mixed_inventory]),
+        Err(CompletionError::MixedIdentity)
+    ));
+}
+
+#[test]
+fn completion_json_and_markdown_replay_are_deterministic() {
+    let manifest = manifest();
+    let first = canonical_json(&manifest).expect("first manifest");
+    let second = canonical_json(&manifest).expect("second manifest");
+    assert_eq!(first, second);
+    assert_eq!(
+        render_markdown(&manifest, &sha256_hex(&first)),
+        render_markdown(&manifest, &sha256_hex(&second))
     );
-    let source_path = DirectQualificationArtifactPath::try_new(source_path).expect("source path");
-    let source_receipt = EvidenceDirectoryReceipt {
-        tier: QualificationTier::Full,
-        scale_id: Some("small".to_string()),
-        path: path_text(source_path.as_path()).expect("source path text"),
-        artifacts: read_artifact_receipts(&root, &live_repository, &source_path)
-            .expect("source artifacts"),
-    };
-    let mut completion = receipt();
-    completion.source_reports = vec![source_receipt];
-    completion.rollups.clear();
-    let output_path = DirectQualificationArtifactPath::try_new(Path::new(
-        "target/benchmarks/qualification/completion-output",
+}
+
+#[test]
+fn completion_scope_rejects_unknown_missing_and_duplicate_rollups() {
+    assert!(matches!(
+        require_scope("unknown", EXPECTED_DEM_ROLLUPS),
+        Err(CompletionError::UnknownScope(_))
+    ));
+    assert!(matches!(
+        require_scope(DEM_SCOPE_ID, EXPECTED_DEM_ROLLUPS - 1),
+        Err(CompletionError::RollupCount(_))
+    ));
+    let output = DirectQualificationArtifactPath::try_new(Path::new(
+        "target/benchmarks/qualification/completion",
     ))
-    .expect("completion output path");
-    let publication = CompletionPublication {
-        root: &root,
-        repository: &live_repository,
-        output_path: &output_path,
-        receipt: &completion,
-        report_json: b"completion report\n",
-        preflight_json: b"completion preflight\n",
-        markdown: "completion markdown\n",
-        existing_report_json: None,
-        existing_preflight_json: None,
-        existing_markdown: None,
-        correctness_bindings: &[],
-    };
+    .expect("output");
+    let duplicate = PathBuf::from("target/benchmarks/qualification/rollup");
     assert!(matches!(
-        publication.publish_with(
-            || {
-                replace_directory(
-                    &repository,
-                    source_path.as_path(),
-                    b"source report\n",
-                    b"source preflight\n",
-                    b"source markdown\n",
-                );
-                Ok(())
-            },
-            |output| output.commit().map_err(CompletionError::Artifact),
-        ),
-        Err(CompletionError::Artifact(
-            super::super::artifact::ArtifactError::DirectoryIdentity(_)
-        ))
-    ));
-    assert!(!repository.path().join(output_path.as_path()).exists());
-}
-
-#[test]
-fn completion_production_dispatcher_preserves_append_only_outputs() {
-    let repository = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(repository.path()).expect("repository root");
-    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-    let mut completion = receipt();
-    completion.source_reports.clear();
-    completion.rollups.clear();
-    let existing_path = Path::new("target/benchmarks/qualification/completion-existing");
-    publish_directory(
-        &root,
-        existing_path,
-        b"retained report\n",
-        b"retained preflight\n",
-        b"retained markdown\n",
-    );
-    let existing_path =
-        DirectQualificationArtifactPath::try_new(existing_path).expect("existing path");
-    assert!(matches!(
-        (CompletionPublication {
-            root: &root,
-            repository: &live_repository,
-            output_path: &existing_path,
-            receipt: &completion,
-            report_json: b"replacement report\n",
-            preflight_json: b"replacement preflight\n",
-            markdown: "replacement markdown\n",
-            existing_report_json: None,
-            existing_preflight_json: None,
-            existing_markdown: None,
-            correctness_bindings: &[],
-        })
-        .publish_production_with(|_| Ok(())),
-        Err(CompletionError::Artifact(
-            super::super::artifact::ArtifactError::OutputAlreadyExists(_)
-        ))
-    ));
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(existing_path.as_path())
-                .join("report.json")
-        )
-        .expect("read retained report"),
-        b"retained report\n"
-    );
-
-    (CompletionPublication {
-        root: &root,
-        repository: &live_repository,
-        output_path: &existing_path,
-        receipt: &completion,
-        report_json: b"replacement report\n",
-        preflight_json: b"replacement preflight\n",
-        markdown: "replacement markdown\n",
-        existing_report_json: Some(b"retained report\n"),
-        existing_preflight_json: Some(b"retained preflight\n"),
-        existing_markdown: Some(b"retained markdown\n"),
-        correctness_bindings: &[],
-    })
-    .publish_production_with(|_| Ok(()))
-    .expect("publish replay replacement");
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(existing_path.as_path())
-                .join("report.json")
-        )
-        .expect("read replay replacement"),
-        b"replacement report\n"
-    );
-
-    let new_path = DirectQualificationArtifactPath::try_new(Path::new(
-        "target/benchmarks/qualification/completion-new",
-    ))
-    .expect("new path");
-    (CompletionPublication {
-        root: &root,
-        repository: &live_repository,
-        output_path: &new_path,
-        receipt: &completion,
-        report_json: b"new report\n",
-        preflight_json: b"new preflight\n",
-        markdown: "new markdown\n",
-        existing_report_json: None,
-        existing_preflight_json: None,
-        existing_markdown: None,
-        correctness_bindings: &[],
-    })
-    .publish_production_with(|_| Ok(()))
-    .expect("publish new completion");
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(new_path.as_path())
-                .join("report.json")
-        )
-        .expect("read new report"),
-        b"new report\n"
-    );
-}
-
-#[test]
-fn completion_final_publication_rejects_replay_target_replacement() {
-    let repository = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(repository.path()).expect("repository root");
-    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-    let output_path = Path::new("target/benchmarks/qualification/completion-replay");
-    publish_directory(
-        &root,
-        output_path,
-        b"old report\n",
-        b"old preflight\n",
-        b"old markdown\n",
-    );
-    let output_path =
-        DirectQualificationArtifactPath::try_new(output_path).expect("completion output path");
-    let mut completion = receipt();
-    completion.source_reports.clear();
-    completion.rollups.clear();
-    let publication = CompletionPublication {
-        root: &root,
-        repository: &live_repository,
-        output_path: &output_path,
-        receipt: &completion,
-        report_json: b"new report\n",
-        preflight_json: b"new preflight\n",
-        markdown: "new markdown\n",
-        existing_report_json: Some(b"old report\n"),
-        existing_preflight_json: Some(b"old preflight\n"),
-        existing_markdown: Some(b"old markdown\n"),
-        correctness_bindings: &[],
-    };
-    assert!(matches!(
-        publication.publish_with(
-            || {
-                replace_directory(
-                    &repository,
-                    output_path.as_path(),
-                    b"old report\n",
-                    b"old preflight\n",
-                    b"old markdown\n",
-                );
-                Ok(())
-            },
-            |output| output.commit().map_err(CompletionError::Artifact),
-        ),
-        Err(CompletionError::Artifact(
-            super::super::artifact::ArtifactError::DirectoryIdentity(_)
-        ))
-    ));
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(output_path.as_path())
-                .join("report.json")
-        )
-        .expect("read replacement report"),
-        b"old report\n"
-    );
-}
-
-#[test]
-fn completion_final_publication_rejects_in_place_replay_markdown_mutation() {
-    let repository = tempfile::tempdir().expect("temporary repository");
-    let root = RepoRoot::resolve(repository.path()).expect("repository root");
-    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-    let output_path = Path::new("target/benchmarks/qualification/completion-markdown-replay");
-    publish_directory(
-        &root,
-        output_path,
-        b"old report\n",
-        b"old preflight\n",
-        b"old markdown\n",
-    );
-    let output_path =
-        DirectQualificationArtifactPath::try_new(output_path).expect("completion output path");
-    let mut completion = receipt();
-    completion.source_reports.clear();
-    completion.rollups.clear();
-    let publication = CompletionPublication {
-        root: &root,
-        repository: &live_repository,
-        output_path: &output_path,
-        receipt: &completion,
-        report_json: b"new report\n",
-        preflight_json: b"new preflight\n",
-        markdown: "new markdown\n",
-        existing_report_json: Some(b"old report\n"),
-        existing_preflight_json: Some(b"old preflight\n"),
-        existing_markdown: Some(b"old markdown\n"),
-        correctness_bindings: &[],
-    };
-    assert!(matches!(
-        publication.publish_with(
-            || {
-                std::fs::write(
-                    repository
-                        .path()
-                        .join(output_path.as_path())
-                        .join("report.md"),
-                    b"tampered markdown\n",
-                )
-                .expect("mutate replay Markdown in place");
-                Ok(())
-            },
-            |output| output.commit().map_err(CompletionError::Artifact),
-        ),
-        Err(CompletionError::Artifact(
-            super::super::artifact::ArtifactError::ConcurrentReplacement("report.md")
-        ))
-    ));
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(output_path.as_path())
-                .join("report.json")
-        )
-        .expect("read retained report"),
-        b"old report\n"
-    );
-    assert_eq!(
-        std::fs::read(
-            repository
-                .path()
-                .join(output_path.as_path())
-                .join("report.md")
-        )
-        .expect("read tampered Markdown"),
-        b"tampered markdown\n"
-    );
-}
-
-#[test]
-fn completion_boundary_rejects_stale_preflight_and_noncanonical_json() {
-    let receipt = receipt();
-    let report_json = canonical_json(&receipt).expect("canonical receipt");
-    let mut preflight = completion_preflight(&receipt, &report_json).expect("preflight");
-    preflight.step_count += 1;
-    assert!(
-        validate_existing_boundary(
-            &receipt,
-            &preflight,
-            &report_json,
-            Path::new(&receipt.output),
-            &receipt.performance_inventory_sha256,
-            &receipt.correctness_inventory_sha256,
-        )
-        .is_err()
-    );
-
-    let mut noncanonical = report_json;
-    noncanonical.extend_from_slice(b" \n");
-    assert!(parse_canonical::<CompletionReceipt>(&noncanonical).is_err());
-}
-
-#[test]
-fn replay_arguments_preserve_full_and_soak_evidence_roles() {
-    let receipt = receipt();
-    let args = arguments_from_receipt(&receipt).expect("replay arguments");
-    let full_source = receipt.source_reports.first().expect("full source");
-    let soak_source = receipt.source_reports.get(1).expect("soak source");
-    let full_rollup = receipt.rollups.first().expect("full rollup");
-    let soak_rollup = receipt.rollups.get(1).expect("soak rollup");
-    assert_eq!(args.group, receipt.group_id);
-    assert_eq!(args.full_inputs, [PathBuf::from(&full_source.path)]);
-    assert_eq!(args.soak_inputs, [PathBuf::from(&soak_source.path)]);
-    assert_eq!(args.full_rollup, PathBuf::from(&full_rollup.path));
-    assert_eq!(args.soak_rollup, PathBuf::from(&soak_rollup.path));
-    assert_eq!(args.out, PathBuf::from(&receipt.output));
-}
-
-#[test]
-fn adapter_probe_must_match_the_reproducible_report_workers() {
-    let workers = workers();
-    let valid = probe(&workers);
-    validate_probe(&valid, &workers, "PERFQ-TEST").expect("matching probe");
-
-    let mut stale = valid;
-    stale.stim_binary_sha256 = digest('a');
-    assert!(validate_probe(&stale, &workers, "PERFQ-TEST").is_err());
-
-    let valid = probe(&workers);
-    let mut wrong_group = valid.clone();
-    wrong_group.runtime_group_id = "PERFQ-OTHER".to_string();
-    assert!(validate_probe(&wrong_group, &workers, "PERFQ-TEST").is_err());
-
-    let mut zero_work = valid.clone();
-    zero_work.work_count = 0;
-    assert!(validate_probe(&zero_work, &workers, "PERFQ-TEST").is_err());
-
-    let mut wrong_mode = valid.clone();
-    wrong_mode.evidence_mode = "memory".to_string();
-    assert!(validate_probe(&wrong_mode, &workers, "PERFQ-TEST").is_err());
-
-    let mut stale_stab_source = valid;
-    stale_stab_source.stab_source_sha256 = digest('b');
-    assert!(validate_probe(&stale_stab_source, &workers, "PERFQ-TEST").is_err());
-}
-
-#[test]
-fn completion_requires_clean_unchanged_repository_identity() {
-    let clean = super::super::git::RepositoryState {
-        commit: "f".repeat(40),
-        local_modifications: false,
-    };
-    require_clean_repository(&clean).expect("clean repository");
-    require_expected_repository(&clean, &clean.commit).expect("expected repository");
-    require_same_clean_repository(&clean, &clean).expect("unchanged repository");
-
-    let dirty = super::super::git::RepositoryState {
-        local_modifications: true,
-        ..clean.clone()
-    };
-    assert!(matches!(
-        require_clean_repository(&dirty),
-        Err(CompletionError::DirtyRepository)
-    ));
-
-    let changed = super::super::git::RepositoryState {
-        commit: "e".repeat(40),
-        local_modifications: false,
-    };
-    assert!(matches!(
-        require_same_clean_repository(&clean, &changed),
-        Err(CompletionError::RepositoryChanged { .. })
+        admit_paths(&output, &[duplicate.clone(), duplicate]),
+        Err(CompletionError::DuplicatePath(_))
     ));
 }
 
 #[test]
-fn completion_group_must_be_nonempty_promotable_and_thresholded() {
-    let valid = group_contract();
-    require_completion_group(&valid).expect("completion-eligible group");
-
-    let mut diagnostic = group_contract();
-    diagnostic.claim_class = ClaimClass::DiagnosticInfrastructure;
-    assert!(require_completion_group(&diagnostic).is_err());
-
-    let mut report_only = group_contract();
-    report_only.baseline_eligibility = BaselineEligibility::ReportOnly;
-    assert!(require_completion_group(&report_only).is_err());
-
-    let mut no_scales = group_contract();
-    no_scales.scales.clear();
-    assert!(require_completion_group(&no_scales).is_err());
-
-    let mut no_measurements = group_contract();
-    no_measurements.measurement_ids.clear();
-    assert!(require_completion_group(&no_measurements).is_err());
-}
-
-#[test]
-fn completion_path_admission_rejects_every_invalid_or_colliding_path_up_front() {
-    let mut args = CompletionArgs {
-        group: "PERFQ-M6-TEST".to_string(),
-        full_inputs: vec![PathBuf::from("target/benchmarks/qualification/full-small")],
-        soak_inputs: vec![PathBuf::from("target/benchmarks/qualification/soak-small")],
-        full_rollup: PathBuf::from("target/benchmarks/qualification/full-rollup"),
-        soak_rollup: PathBuf::from("target/benchmarks/qualification/soak-rollup"),
-        out: PathBuf::from("target/benchmarks/qualification/completion"),
-    };
-    args.full_inputs.push(PathBuf::from(
-        "target/benchmarks/qualification/nested/invalid",
-    ));
-    assert!(matches!(
-        admit_completion_paths(&args),
-        Err(CompletionError::Artifact(
-            super::super::artifact::ArtifactError::NonDirectArtifact(_)
-        ))
-    ));
-
-    args.full_inputs.pop();
-    args.soak_rollup.clone_from(&args.out);
-    assert!(matches!(
-        admit_completion_paths(&args),
-        Err(CompletionError::DuplicatePath(path)) if path == args.out
-    ));
-}
-
-#[test]
-fn completion_rollups_bind_sources_workers_outcome_and_environment() {
-    let receipt = receipt();
-    let contract = group_contract();
-    let full = rollup_evidence(&receipt, QualificationTier::Full);
-    let soak = rollup_evidence(&receipt, QualificationTier::Soak);
-    validate_rollup(
-        &full,
-        &contract,
-        QualificationTier::Full,
-        &receipt.repository.commit_after,
-        &receipt.source_reports,
-        &receipt.workers,
-    )
-    .expect("valid full rollup");
-    require_matching_rollup_identity(&full, &soak).expect("matching rollup identity");
-
-    let mut failed = full.clone();
-    failed.overall_outcome = GateOutcome::Failed;
-    assert!(
-        validate_rollup(
-            &failed,
-            &contract,
-            QualificationTier::Full,
-            &receipt.repository.commit_after,
-            &receipt.source_reports,
-            &receipt.workers,
-        )
-        .is_err()
-    );
-
-    let mut wrong_source = full.clone();
-    wrong_source
-        .sources
-        .first_mut()
-        .expect("rollup source")
-        .report_sha256 = digest('a');
-    assert!(
-        validate_rollup(
-            &wrong_source,
-            &contract,
-            QualificationTier::Full,
-            &receipt.repository.commit_after,
-            &receipt.source_reports,
-            &receipt.workers,
-        )
-        .is_err()
-    );
-
-    let mut mixed_architecture = soak.clone();
-    mixed_architecture.architecture = "x86_64".to_string();
-    assert!(require_matching_rollup_identity(&full, &mixed_architecture).is_err());
-
-    let mut mixed_cpu = soak.clone();
-    mixed_cpu.cpu_identity = "different CPU".to_string();
-    assert!(require_matching_rollup_identity(&full, &mixed_cpu).is_err());
-
-    let mut mixed_correctness = soak;
-    mixed_correctness.correctness_preflight.report_sha256 = Some(digest('a'));
-    assert!(require_matching_rollup_identity(&full, &mixed_correctness).is_err());
+fn legacy_schema_one_receipts_remain_readable_but_not_current() {
+    let receipt = serde_json::json!({
+        "schema_version": 1,
+        "output": "target/benchmarks/qualification/historical",
+        "generated_unix_epoch_seconds": 1,
+        "group_id": "historical-group",
+        "group_contract_sha256": "a".repeat(64),
+        "performance_inventory_sha256": "b".repeat(64),
+        "correctness_inventory_sha256": "c".repeat(64),
+        "stim_tag": STIM_TAG,
+        "stim_commit": STIM_COMMIT,
+        "repository": {
+            "commit_before": "d".repeat(40),
+            "commit_after": "d".repeat(40),
+            "local_modifications_before": false,
+            "local_modifications_after": false
+        },
+        "environment": {
+            "host_policy_sha256": "e".repeat(64),
+            "host_profile_id": "host",
+            "architecture": "aarch64",
+            "cpu_identity": "cpu",
+            "target_triple": "aarch64-unknown-linux-gnu",
+            "toolchain_sha256": "f".repeat(64)
+        },
+        "workers": manifest().workers,
+        "correctness_preflight": manifest().correctness_preflight,
+        "source_reports": [],
+        "rollups": [],
+        "steps": []
+    });
+    let bytes = serde_json::to_vec(&receipt).expect("legacy bytes");
+    let summary = legacy::parse(&bytes).expect("legacy receipt");
+    assert_eq!(summary.group_id, "historical-group");
+    assert_eq!(schema_version(&bytes).expect("schema"), 1);
 }

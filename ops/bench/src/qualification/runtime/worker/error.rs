@@ -194,6 +194,10 @@ pub(crate) enum WorkerError {
     MissingCliffordDescriptor,
     #[error("--input-descriptor-hex is only valid for Clifford-string workloads")]
     UnexpectedCliffordDescriptor,
+    #[error("DEM model workload requires --input-family")]
+    MissingDemFamily,
+    #[error("--input-family is only valid for DEM model workloads")]
+    UnexpectedDemFamily,
     #[error("Clifford-string width must be positive")]
     CliffordWidthZero,
     #[error("Clifford-string width {actual} exceeds maximum {maximum}")]

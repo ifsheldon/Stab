@@ -175,12 +175,32 @@ pub(super) enum FixtureLocator {
 #[serde(deny_unknown_fields)]
 pub(super) struct ScalePoint {
     pub(super) id: String,
+    pub(super) family_id: String,
+    pub(super) size_class: SizeClass,
     pub(super) parameters: String,
     pub(super) input_bytes: InputByteCount,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) semantic_work: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) input_digest: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum SizeClass {
+    Small,
+    Medium,
+    Large,
+}
+
+impl SizeClass {
+    pub(super) fn from_scale_id(id: &str) -> Self {
+        match id {
+            "large" => Self::Large,
+            "medium" => Self::Medium,
+            _ => Self::Small,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

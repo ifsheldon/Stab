@@ -340,6 +340,109 @@ fn cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim() {
 }
 
 #[test]
+fn cq2_dem_qualification_flat_errors_family_matches_stim() {
+    let source = concat!(
+        "error(0.125) D0\n",
+        "error(0.25) D1 D2\n",
+        "error(0.375) D3 L0\n",
+        "error(0.0625) D4 ^ D5\n",
+        "error(0.5) D6 D7 D8\n",
+        "error(0.03125) D9 L1 ^ D10\n",
+        "error(0.75) D11 D12 L2\n",
+        "error(0.875) D13 ^ D14 L3\n",
+    );
+    let model = DetectorErrorModel::from_dem_str(source).expect("parse flat error family");
+
+    assert_eq!(model.to_dem_string(), source);
+    assert_eq!(model.count_errors().expect("error count"), 8);
+    assert_eq!(model.count_detectors().expect("detector count"), 15);
+    assert_eq!(model.count_observables().expect("observable count"), 4);
+
+    for rejected in [
+        "error(1.125) D0\n",
+        "error(0.25) 0\n",
+        "error(0.25) D0 ^ ^ D1\n",
+    ] {
+        assert!(
+            DetectorErrorModel::from_dem_str(rejected).is_err(),
+            "expected flat-family rejection: {rejected:?}"
+        );
+    }
+}
+
+#[test]
+fn cq2_dem_qualification_coordinate_sparse_family_matches_stim() {
+    let source = concat!(
+        "detector[tag-a](0.5, 1) D1000000\n",
+        "logical_observable L100000\n",
+        "shift_detectors(1.5, -2, 3) 1000001\n",
+        "error[edge](0.25) D0 D1000000 L0 ^ D7\n",
+        "detector(2, 3.5) D42\n",
+        "error(0.125) D999999 L99999\n",
+        "shift_detectors 17\n",
+        "detector[tag-b] D1000017\n",
+    );
+    let model = DetectorErrorModel::from_dem_str(source).expect("parse sparse coordinate family");
+
+    assert_eq!(model.to_dem_string(), source);
+    assert_eq!(model.count_errors().expect("error count"), 2);
+    assert_eq!(
+        model.count_observables().expect("observable count"),
+        100_001
+    );
+    assert_eq!(
+        model.final_coordinate_shift().expect("coordinate shift"),
+        vec![1.5, -2.0, 3.0]
+    );
+
+    for rejected in [
+        "detector[tag D1000000\n",
+        "shift_detectors(1.5, nope) 1000001\n",
+        "error(0.25) D1152921504606846976\n",
+    ] {
+        assert!(
+            DetectorErrorModel::from_dem_str(rejected).is_err(),
+            "expected coordinate-family rejection: {rejected:?}"
+        );
+    }
+}
+
+#[test]
+fn cq2_dem_qualification_folded_repeat_family_matches_stim() {
+    let source = concat!(
+        "repeat[outer] 1000000 {\n",
+        "    repeat[inner] 1024 {\n",
+        "        error(0.125) D0 D1000000 L100000\n",
+        "        shift_detectors 1000001\n",
+        "    }\n",
+        "}\n",
+    );
+    let model = DetectorErrorModel::from_dem_str(source).expect("parse folded repeat family");
+
+    assert_eq!(model.to_dem_string(), source);
+    assert_eq!(model.len(), 1);
+    assert_eq!(
+        model.count_observables().expect("observable count"),
+        100_001
+    );
+    assert_eq!(
+        model.total_detector_shift().expect("folded detector shift"),
+        1_024_001_024_000_000
+    );
+
+    for rejected in [
+        "repeat nope {\n}\n",
+        "repeat 1000000 {\n    error(0.125) D0\n",
+        "repeat 1152921504606846976 {\n}\n",
+    ] {
+        assert!(
+            DetectorErrorModel::from_dem_str(rejected).is_err(),
+            "expected folded-family rejection: {rejected:?}"
+        );
+    }
+}
+
+#[test]
 fn cq2_dem_model_value_mutation_and_repeat_contract_matches_stim() {
     let mut body = DetectorErrorModel::new();
     body.push_instruction(

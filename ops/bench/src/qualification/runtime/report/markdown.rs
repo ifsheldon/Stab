@@ -56,7 +56,7 @@ pub(super) fn render(
         report.command.work_items,
         group_contract_sha256,
         report.claim_class,
-        report.baseline_eligibility,
+        report.parity_eligibility,
         owner,
         profiler_note,
         input.0,

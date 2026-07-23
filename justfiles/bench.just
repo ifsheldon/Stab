@@ -48,20 +48,35 @@ qualification-run *args:
 qualification-report *args:
     cargo run -q -p stab-bench --profile release -- qualification-report {{args}}
 
-# Execute every machine-checkable closure operation and publish one completion receipt.
+# Publish one architecture/revision completion manifest from source-owned rollups.
 [working-directory: '..']
 qualification-completion *args:
     cargo run -q -p stab-bench --profile release -- qualification-completion {{args}}
 
-# Replay a qualification completion receipt from its exact source evidence.
+# Reconstruct a completion manifest offline from its exact rollups and reports.
 [working-directory: '..']
 qualification-completion-report *args:
     cargo run -q -p stab-bench --profile release -- qualification-completion-report {{args}}
 
-# Check promotable qualification evidence against source-owned thresholds.
+# Check promotable qualification evidence against source-owned Stim parity thresholds.
+[working-directory: '..']
+qualification-parity *args:
+    cargo run -q -p stab-bench --profile release -- qualification-parity {{args}}
+
+# Deprecated alias for the Stim parity check.
 [working-directory: '..']
 qualification-regression *args:
     cargo run -q -p stab-bench --profile release -- qualification-regression {{args}}
+
+# Check accepted full and soak evidence against Stab's architecture-specific baseline.
+[working-directory: '..']
+qualification-self-regression *args:
+    cargo run -q -p stab-bench --profile release -- qualification-self-regression {{args}}
+
+# Generate an immutable architecture-specific Stab regression baseline candidate.
+[working-directory: '..']
+qualification-baseline-candidate *args:
+    cargo run -q -p stab-bench --profile release -- qualification-baseline-candidate {{args}}
 
 # Bind one complete architecture-scoped qualification scale family.
 [working-directory: '..']

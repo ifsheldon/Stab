@@ -3,14 +3,17 @@ use std::path::Path;
 use super::super::model::{
     ComparatorSource, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
     MemoryMethod, MemoryPolicy, OutputContract, Phase, QualificationGroup, QualificationStatus,
-    RunnerFidelity, ScalePoint, ThresholdPolicy, TimingBatchPolicy, WorkloadFamily,
+    RunnerFidelity, ScalePoint, SizeClass, ThresholdPolicy, TimingBatchPolicy, WorkloadFamily,
 };
 use crate::error::BenchError;
 use crate::root::RepoRoot;
 
 mod curated;
+mod derived;
 
 pub(super) use curated::groups as curated_api_groups;
+pub(super) use derived::additional_groups;
+use derived::apply_sparse_xor;
 
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -85,16 +88,13 @@ const CLIFFORD_STRING_CORRECTNESS_CASES: [&str; 3] = [
     "cq-evidence-qualification-510e746ec36e7d1c",
     "cq-evidence-qualification-ae9390dd6a207cb6",
 ];
-const DEM_MODEL_CORRECTNESS_CASE: &str = "cq-evidence-qualification-0908c21b917526e3";
+const DEM_MODEL_CORRECTNESS_CASES: [&str; 4] = [
+    "cq-evidence-qualification-0908c21b917526e3",
+    "cq-evidence-qualification-2f6a06e3fffcf5c0",
+    "cq-evidence-qualification-966ab53fd109b7b3",
+    "cq-evidence-qualification-ae2cf29058be84b0",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
-
-struct NotZeroGroupSpec {
-    id: &'static str,
-    manifest_row: &'static str,
-    pattern: &'static str,
-    seed: &'static str,
-    input_digests: [&'static str; 3],
-}
 
 pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
     match group.id.as_str() {
@@ -133,7 +133,10 @@ fn apply_dem_model(
         Phase::Parse
     };
     group.runner_fidelity = RunnerFidelity::AdapterLibrary;
-    group.correctness_cases = vec![DEM_MODEL_CORRECTNESS_CASE.to_string()];
+    group.correctness_cases = DEM_MODEL_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     group.correctness_binding = CorrectnessBinding::ExactCases;
     group.planned_correctness_case_id = None;
     group.workload_family = dem_model_workload_family();
@@ -153,9 +156,7 @@ fn apply_dem_model(
             .map(|path| comparator_source(root, path))
             .collect::<Result<_, _>>()?,
     };
-    group.memory_policy = circuit_memory_policy(
-        "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance.",
-    );
+    group.memory_policy = dem_memory_policy();
     group.threshold_policy = ThresholdPolicy::Primary1_25;
     group.owner = if serialize {
         "stab-core/dem-printer"
@@ -173,43 +174,108 @@ fn apply_dem_model(
     Ok(())
 }
 
+fn dem_memory_policy() -> MemoryPolicy {
+    MemoryPolicy {
+        method: MemoryMethod::ProcessRss,
+        scale_ids: ["flat-errors", "coordinate-sparse", "folded-repeats"]
+            .into_iter()
+            .flat_map(|family| {
+                ["small", "medium", "large"]
+                    .into_iter()
+                    .map(move |size| format!("{family}-{size}"))
+            })
+            .collect(),
+        expected_growth: "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are reported independently for each family and size. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation."
+            .to_string(),
+    }
+}
+
 fn dem_model_workload_family() -> WorkloadFamily {
     WorkloadFamily {
         fixture: FixtureLocator::Generated {
-            id: "dem-model-cycle-v1".to_string(),
+            id: "dem-model-families-v2".to_string(),
         },
         source: "src/stim/dem/detector_error_model.test.cc".to_string(),
-        deterministic_seed: "none; exact-eight-item-cycle; complete-cycles-only".to_string(),
+        deterministic_seed: "none; exact source-owned family cycles".to_string(),
         scales: [
             (
+                "flat-errors",
                 "small",
                 64,
-                1_776,
-                "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773",
+                1_368,
+                "ac17cebf0983e626775012a7bab634d136669f36d706b3842b73a66b1c5684c5",
             ),
             (
+                "flat-errors",
                 "medium",
                 4_096,
-                113_664,
-                "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c",
+                87_552,
+                "4c2832178c6c44c8ef895a7cc8a8043699d096f678f6c624039ae126e4541b60",
             ),
             (
+                "flat-errors",
                 "large",
                 65_536,
-                1_818_624,
-                "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716",
+                1_400_832,
+                "756997bdca11be9e8d5f4e9470bea059ec516daf218e1a0b3b6c421dbb229de0",
+            ),
+            (
+                "coordinate-sparse",
+                "small",
+                64,
+                1_816,
+                "1065bcd0f102d45a035aa841c27717cfb4e02ea6ea600bb833e3eb8c80f40780",
+            ),
+            (
+                "coordinate-sparse",
+                "medium",
+                4_096,
+                116_224,
+                "f2d6a6395d630dae37ea9ef42f94604fbd42e6f98537390230f5f63173074fbb",
+            ),
+            (
+                "coordinate-sparse",
+                "large",
+                65_536,
+                1_859_584,
+                "5a15e24913a40f53a1a10e7760009b3e68be8114a76e9f18a3d831ee1f4addc1",
+            ),
+            (
+                "folded-repeats",
+                "small",
+                64,
+                8_320,
+                "c484e6f7c587a0b7edf9e3572ee745d2268ccde4f6d3d444d186b7cff5ae8db6",
+            ),
+            (
+                "folded-repeats",
+                "medium",
+                4_096,
+                532_480,
+                "0a0ac94bf0297b57a62e400c64ccce954519c051b4ef482c9af05babd9ee17c2",
+            ),
+            (
+                "folded-repeats",
+                "large",
+                65_536,
+                8_519_680,
+                "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e",
             ),
         ]
         .into_iter()
-        .map(|(id, items, input_bytes, input_digest)| ScalePoint {
-            id: id.to_string(),
-            parameters: format!(
-                "generator=dem-model-cycle-v1; top_level_items={items}; cycle_items=8; max_items=524288"
-            ),
-            input_bytes: InputByteCount::Exact { bytes: input_bytes },
-            semantic_work: Some(items),
-            input_digest: Some(input_digest.to_string()),
-        })
+        .map(
+            |(family, size, items, input_bytes, input_digest)| ScalePoint {
+                id: format!("{family}-{size}"),
+                family_id: family.to_string(),
+                size_class: SizeClass::from_scale_id(size),
+                parameters: format!(
+                    "generator=dem-model-families-v2; family={family}; top_level_items={items}"
+                ),
+                input_bytes: InputByteCount::Exact { bytes: input_bytes },
+                semantic_work: Some(items),
+                input_digest: Some(input_digest.to_string()),
+            },
+        )
         .collect(),
     }
 }
@@ -305,6 +371,8 @@ fn clifford_string_workload_family(
             .zip(input_digests)
             .map(|((id, width), input_digest)| ScalePoint {
                 id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
                 parameters: format!(
                     "generator=pq2-clifford-string-vectors-v1; width={width}; marker={marker}; canonical_gates=24; right_cycle={cycle}; complete_span={span}; public_cap=1048576"
                 ),
@@ -421,6 +489,8 @@ fn pauli_string_iter_workload_family(singleton: bool) -> WorkloadFamily {
             .into_iter()
             .map(|(id, width, outputs, input_digest)| ScalePoint {
                 id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
                 parameters: if singleton {
                     format!(
                         "generator={fixture}; qubits={width}; min_weight=1; max_weight=1; axes=XYZ; outputs={outputs}; marker={marker}"
@@ -504,6 +574,8 @@ fn pauli_string_multiply_workload_family() -> WorkloadFamily {
         .into_iter()
         .map(|(id, qubits, input_bytes, input_digest)| ScalePoint {
             id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
             parameters: format!(
                 "generator=pauli-right-multiply-splitmix64-v1; qubits={qubits}; marker=5; left_sign=plus; right_sign=minus"
             ),
@@ -600,6 +672,8 @@ fn bit_matrix_transpose_workload_family() -> WorkloadFamily {
         .map(
             |(id, dimension, transposed_bits, input_bytes, input_digest)| ScalePoint {
                 id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
                 parameters: format!(
                     "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension={dimension}; set_bits_per_row=8; seed=0xd1b54a32d192ed03"
                 ),
@@ -610,168 +684,6 @@ fn bit_matrix_transpose_workload_family() -> WorkloadFamily {
         )
         .collect(),
     }
-}
-
-pub(super) fn additional_groups(
-    root: &RepoRoot,
-    groups: &[QualificationGroup],
-) -> Result<Vec<QualificationGroup>, BenchError> {
-    let dense_xor = groups
-        .iter()
-        .find(|group| group.id == SIMD_BITS_XOR_GROUP_ID)
-        .ok_or_else(|| {
-            BenchError::Qualification(
-                "source-owned not-zero groups require the dense-XOR bit-kernel owner".to_string(),
-            )
-        })?;
-    let sparse_xor_row = groups
-        .iter()
-        .find(|group| group.id == SPARSE_XOR_ROW_GROUP_ID)
-        .ok_or_else(|| {
-            BenchError::Qualification(
-                "source-owned sparse-XOR item group requires the row-XOR owner".to_string(),
-            )
-        })?;
-    let pauli_iter_range = groups
-        .iter()
-        .find(|group| group.id == PAULI_STRING_ITER_RANGE_GROUP_ID)
-        .ok_or_else(|| {
-            BenchError::Qualification(
-                "source-owned Pauli singleton iterator group requires the range iterator owner"
-                    .to_string(),
-            )
-        })?;
-    let mut additional = [
-        NotZeroGroupSpec {
-            id: SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
-            manifest_row: "pq2-simd-bits-not-zero-early",
-            pattern: "early",
-            seed: "single-bit-at-3-of-50-v1",
-            input_digests: [
-                "652aebf153201450c8fe9d3707aed8cb0ee9fee8f5332d88e2001c56cfd0838f",
-                "f2af8de388713368d12e7bf4188e96c030bf1c3e2906250672e2f2eee9370aa8",
-                "84118644943bed7c2aa82daafc7e8b8f2358d0e38ab07fd140c8aba466fb3ba4",
-            ],
-        },
-        NotZeroGroupSpec {
-            id: SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID,
-            manifest_row: "pq2-simd-bits-not-zero-all-zero",
-            pattern: "zero",
-            seed: "all-zero-v1",
-            input_digests: [
-                "b6286dfe1dca80e14e17bbc6a371565900665697e8f4f2b22d30a303f804b537",
-                "60aace21d864e2176a3f43edcd21a970c401e36a0223c24d09a8d482e075aae0",
-                "080543f5fd6fe5ca816fbfc568988f74eb08c7477f433ccbdecbc16d62790ec8",
-            ],
-        },
-        NotZeroGroupSpec {
-            id: SIMD_BITS_NOT_ZERO_LATE_GROUP_ID,
-            manifest_row: "pq2-simd-bits-not-zero-late",
-            pattern: "late",
-            seed: "single-bit-at-logical-end-v1",
-            input_digests: [
-                "76618d8f234d913b3b6f99be0c83fca1e8a6eb3c5cdb6f622c06dccc7aaa2cc0",
-                "61aace21da17e2176a3f445b0d21a9b0c41d536a0223c24deda8d482e075aae6",
-                "0b0543f60288e5ca816fc551a8988eb4e96d37477f433ccbe2cbc16d62790f06",
-            ],
-        },
-    ]
-    .into_iter()
-    .map(|spec| not_zero_group(root, dense_xor, spec))
-    .collect::<Result<Vec<_>, _>>()?;
-    let mut sparse_xor_item = sparse_xor_row.clone();
-    sparse_xor_item.id = SPARSE_XOR_ITEM_GROUP_ID.to_string();
-    sparse_xor_item.manifest_row = "pq2-sparse-xor-item".to_string();
-    sparse_xor_item.row_origin = super::super::model::RowOrigin::Planned;
-    apply_sparse_xor(root, &mut sparse_xor_item, true)?;
-    additional.push(sparse_xor_item);
-    let mut pauli_iter_singleton = pauli_iter_range.clone();
-    pauli_iter_singleton.id = PAULI_STRING_ITER_SINGLETON_GROUP_ID.to_string();
-    pauli_iter_singleton.manifest_row = "pq2-pauli-string-iter-singleton".to_string();
-    pauli_iter_singleton.row_origin = super::super::model::RowOrigin::Planned;
-    pauli_iter_singleton.public_api_items.clear();
-    apply_pauli_string_iter(root, &mut pauli_iter_singleton, true)?;
-    additional.push(pauli_iter_singleton);
-    Ok(additional)
-}
-
-fn apply_sparse_xor(
-    root: &RepoRoot,
-    group: &mut QualificationGroup,
-    item_workload: bool,
-) -> Result<(), BenchError> {
-    group.phase = Phase::Execute;
-    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
-    group.correctness_cases = vec![SPARSE_XOR_CORRECTNESS_CASE.to_string()];
-    group.correctness_binding = CorrectnessBinding::ExactCases;
-    group.planned_correctness_case_id = None;
-    group.workload_family = sparse_xor_workload_family(item_workload);
-    group.work_unit = if item_workload {
-        "item-toggles"
-    } else {
-        "row-xors"
-    }
-    .to_string();
-    group.output_contract = OutputContract {
-        expected_shape: "Exact canonical input bytes plus a digest over iteration count, declared work, workload marker, callback work, all four input-fingerprint lanes, and all four final-state-fingerprint lanes."
-            .to_string(),
-        digest_state: EvidenceState::Existing,
-        sink_policy: "Both workers prepare the exact pinned-Stim sparse fixture, execute two untimed complete callbacks to restore canonical state while retaining capacity, time only complete callbacks behind matching compiler barriers and optimizer-opaque mutable references, and encode final state outside timing."
-            .to_string(),
-        comparator_sources: [STIM_ADAPTER_SOURCE, SPARSE_XOR_COMPARATOR_SOURCE]
-            .into_iter()
-            .map(|path| comparator_source(root, path))
-            .collect::<Result<_, _>>()?,
-    };
-    group.memory_policy = circuit_memory_policy(
-        "One capacity-primed sparse fixture remains live during timing and setup and peak process RSS are report-only observations at every scale. Stab's timed callbacks allocate nothing at all scales and the accepted maximum; PQ6 owns cross-scale RSS and Stim allocation acceptance.",
-    );
-    group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/bits".to_string();
-    group.reason = if item_workload {
-        "Implemented paired pinned-Stim and Rust seven-item sparse toggles with exact CQ2, complete-callback, canonical-state, allocation, scale, timing, and bounded-worker contracts."
-    } else {
-        "Implemented paired pinned-Stim and Rust 1,000-row sparse symmetric differences with exact CQ2, actual-operation, canonical-state, allocation, scale, timing, and bounded-worker contracts."
-    }
-    .to_string();
-    group.status = QualificationStatus::Implemented;
-    Ok(())
-}
-
-fn not_zero_group(
-    root: &RepoRoot,
-    dense_xor: &QualificationGroup,
-    spec: NotZeroGroupSpec,
-) -> Result<QualificationGroup, BenchError> {
-    let mut group = dense_xor.clone();
-    group.id = spec.id.to_string();
-    group.manifest_row = spec.manifest_row.to_string();
-    group.row_origin = super::super::model::RowOrigin::Planned;
-    group.correctness_cases = SIMD_BITS_XOR_CORRECTNESS_CASES
-        .into_iter()
-        .map(str::to_string)
-        .collect();
-    group.workload_family =
-        simd_bits_not_zero_workload_family(spec.pattern, spec.seed, spec.input_digests);
-    group.output_contract = OutputContract {
-        expected_shape: "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes."
-            .to_string(),
-        digest_state: EvidenceState::Existing,
-        sink_policy: "Both workers prepare the same logical u64 words outside timing, obtain the immutable input through matching optimizer-opaque references behind compiler fences, invoke only not_zero, accumulate the Boolean result, and digest the semantic output outside timing."
-            .to_string(),
-        comparator_sources: [STIM_ADAPTER_SOURCE, SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE]
-            .into_iter()
-            .map(|path| comparator_source(root, path))
-            .collect::<Result<_, _>>()?,
-    };
-    group.memory_policy = circuit_memory_policy(
-        "One logical bit vector remains live during timing and setup and peak process RSS are report-only observations at every scale. Timed scans allocate nothing; PQ6 owns explicit cross-scale RSS and allocation slack.",
-    );
-    group.reason = format!(
-        "Implemented paired pinned-Stim and Rust not_zero scans for the {} pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
-        spec.pattern,
-    );
-    Ok(group)
 }
 
 fn apply_simd_bits_xor(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
@@ -957,6 +869,8 @@ fn circuit_workload_family() -> WorkloadFamily {
         .into_iter()
         .map(|(id, instructions, input_bytes, input_digest)| ScalePoint {
             id: id.to_string(),
+            family_id: "default".to_string(),
+            size_class: SizeClass::from_scale_id(id),
             parameters: format!("generator=circuit-parse-cycle-v1; instructions={instructions}"),
             input_bytes: InputByteCount::Exact { bytes: input_bytes },
             semantic_work: Some(instructions),
@@ -990,6 +904,8 @@ fn gate_name_hash_workload_family() -> WorkloadFamily {
                 let gate_hashes = sweeps * 82;
                 ScalePoint {
                     id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
                     parameters: format!(
                         "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps={sweeps}"
                     ),
@@ -1032,6 +948,8 @@ fn simd_word_popcount_workload_family() -> WorkloadFamily {
         .into_iter()
         .map(|(id, bits, input_bytes, input_digest)| ScalePoint {
             id: id.to_string(),
+            family_id: "default".to_string(),
+            size_class: SizeClass::from_scale_id(id),
             parameters: format!(
                 "generator=splitmix64-word-v1; bits={bits}; alignment_bits=256; toggle_bit=300"
             ),
@@ -1073,6 +991,8 @@ fn simd_bits_xor_workload_family() -> WorkloadFamily {
         .into_iter()
         .map(|(id, bits, input_bytes, input_digest)| ScalePoint {
             id: id.to_string(),
+            family_id: "default".to_string(),
+            size_class: SizeClass::from_scale_id(id),
             parameters: format!(
                 "generator=splitmix64-xor-pair-v1; bits={bits}; alignment_bits=256"
             ),
@@ -1104,6 +1024,8 @@ fn simd_bits_not_zero_workload_family(
         .zip(input_digests)
         .map(|((id, bits, input_bytes), input_digest)| ScalePoint {
             id: id.to_string(),
+            family_id: "default".to_string(),
+            size_class: SizeClass::from_scale_id(id),
             parameters: format!("generator=simd-bits-not-zero-v1; bits={bits}; pattern={pattern}"),
             input_bytes: InputByteCount::Exact { bytes: input_bytes },
             semantic_work: Some(bits),
@@ -1142,6 +1064,8 @@ fn sparse_xor_workload_family(item_workload: bool) -> WorkloadFamily {
                 let work_items = sweeps * base_work;
                 ScalePoint {
                     id: id.to_string(),
+                    family_id: "default".to_string(),
+                    size_class: SizeClass::from_scale_id(id),
                     parameters: if item_workload {
                         format!(
                             "generator={fixture_id}; complete_callbacks={sweeps}; toggles_per_callback=7"

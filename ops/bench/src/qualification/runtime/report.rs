@@ -25,7 +25,7 @@ mod worker_contract;
 
 pub(super) use published::{
     MAX_PUBLISHED_MARKDOWN_BYTES, MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES,
-    load_validated_published_evidence, run_args_with_repository, run_with_repository,
+    load_validated_published_evidence, run_args_with_repository,
 };
 #[cfg(test)]
 use timing::validate_attempt_policy as validate_timing_attempt_policy;
@@ -59,7 +59,7 @@ pub(super) struct PerformancePreflightArtifact {
     work_items: u64,
     group_contract_sha256: String,
     claim_class: ClaimClass,
-    baseline_eligibility: super::group::BaselineEligibility,
+    parity_eligibility: super::group::ParityEligibility,
     tier: QualificationTier,
     performance_inventory_sha256: String,
     correctness_inventory_sha256: String,
@@ -128,7 +128,7 @@ pub(super) fn validate_report(
     )?;
     if report.group_contract_sha256 != resolved_group.source_sha256
         || report.claim_class != resolved_group.contract.claim_class
-        || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
+        || report.parity_eligibility != resolved_group.contract.parity_eligibility
         || report.owner != resolved_group.contract.owner.to_string()
         || report.profiler_note != resolved_group.contract.profiler_note
         || report.calibration.batch_policy != resolved_group.contract.timing_batch_policy
@@ -159,7 +159,12 @@ pub(super) fn validate_report(
         "contract_preflight_sha256",
         &report.workers.contract_preflight_sha256,
     )?;
-    validate_worker_contract_preflight(&report.contract_preflight, &report.workers)?;
+    validate_worker_contract_preflight(
+        &report.contract_preflight,
+        &report.workers,
+        root,
+        expected_performance_inventory_sha256,
+    )?;
     if !report.adapter_receipt.validates_report_identity(
         &report.workers.stim_source_sha256,
         &report.workers.stim_build_fingerprint,
@@ -729,7 +734,7 @@ fn validate_claim(
     match report.claim_class {
         ClaimClass::DiagnosticInfrastructure => {
             if report.promotable
-                || group.baseline_eligibility != super::group::BaselineEligibility::ReportOnly
+                || group.parity_eligibility != super::group::ParityEligibility::ReportOnly
                 || report.correctness_preflight.status != CorrectnessPreflightStatus::NotApplicable
                 || !report.correctness_preflight.case_ids.is_empty()
                 || !group.correctness_case_ids.is_empty()
@@ -738,7 +743,7 @@ fn validate_claim(
             }
         }
         ClaimClass::PromotablePerformance => {
-            if group.baseline_eligibility != super::group::BaselineEligibility::ThresholdEligible
+            if group.parity_eligibility != super::group::ParityEligibility::ThresholdEligible
                 || report.correctness_preflight.case_ids != group.correctness_case_ids
                 || report.promotable
                     != promotion_eligibility(PromotionEvidence {
@@ -911,7 +916,7 @@ pub(super) fn preflight_artifact(
         work_items: report.command.work_items,
         group_contract_sha256: report.group_contract_sha256.clone(),
         claim_class: report.claim_class,
-        baseline_eligibility: report.baseline_eligibility,
+        parity_eligibility: report.parity_eligibility,
         tier: report.tier,
         performance_inventory_sha256: report.performance_inventory_sha256.clone(),
         correctness_inventory_sha256: report.correctness_inventory_sha256.clone(),

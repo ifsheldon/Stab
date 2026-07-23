@@ -8,7 +8,7 @@ use crate::error::BenchError;
 use crate::manifest::{BenchmarkRow, Runner, ThresholdClass};
 use crate::qualification::model::{
     FixtureLocator, InputByteCount, Phase, RowClassification, RowDecision, RunnerFidelity,
-    ScalePoint, StimMapping, ThresholdPolicy, WorkloadFamily,
+    ScalePoint, SizeClass, StimMapping, ThresholdPolicy, WorkloadFamily,
 };
 use crate::root::RepoRoot;
 
@@ -410,6 +410,8 @@ pub(super) fn workload_family(
         deterministic_seed,
         scales: vec![ScalePoint {
             id: "inherited".to_string(),
+            family_id: "default".to_string(),
+            size_class: SizeClass::Small,
             parameters: row.description.clone(),
             input_bytes,
             semantic_work: None,

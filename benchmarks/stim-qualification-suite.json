@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "607ea33291a36f2b87d853eccde590db75752956e1c30652ce7661da5b5aa903",
-  "semantic_digest": "e7deb06a6d0de98266f64d77e48e027eba4a93233a40fbdb2b0ea676a31660ad",
+  "correctness_digest": "ffd01a5462de888077369a0f3780754ce65a755fe885e9738c043d8db4cddd80",
+  "semantic_digest": "7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -182,7 +182,7 @@
   "checklist_items": [
     {
       "id": "PERFC-03468f2932803ac9",
-      "source_line": 86,
+      "source_line": 82,
       "anchor_digest": "5f621685fa7f080b46760b965319c6705e42b9a6c9efc4d5e78b287a743fea14",
       "section": "4. Core Circuit Features",
       "feature": "Circuit transforms",
@@ -212,7 +212,7 @@
     },
     {
       "id": "PERFC-03d7d6a50d2629d8",
-      "source_line": 178,
+      "source_line": 174,
       "anchor_digest": "3e058d65ddac267c048f82e210a979c40a7a1c5a1b772c4553f0a557e166a6d1",
       "section": "11. Command-Line API",
       "feature": "Legacy top-level command flags",
@@ -242,7 +242,7 @@
     },
     {
       "id": "PERFC-08246ed23f9cca9b",
-      "source_line": 232,
+      "source_line": 228,
       "anchor_digest": "cbbc566e294631e3a912d202cac37d6fc73c19d447bc647c03e799d2051d5fad",
       "section": "16. Test And Benchmark Surface",
       "feature": "Current beta performance gate",
@@ -263,7 +263,7 @@
     },
     {
       "id": "PERFC-08b4d0f23d652b86",
-      "source_line": 110,
+      "source_line": 106,
       "anchor_digest": "36ded272ab84d6fd7bcb6f71e06bdc239eb85d99cb9ec08410950c97adb8e384",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Measurement-to-detection conversion",
@@ -345,7 +345,7 @@
     },
     {
       "id": "PERFC-0ab482a0514e2c0b",
-      "source_line": 71,
+      "source_line": 67,
       "anchor_digest": "556f8ac60878bfe93254655ee7d097990dcc611519c69327f1ba90c493881e8c",
       "section": "3. Gate And Instruction Surface",
       "feature": "Gate validation flags and categories",
@@ -375,7 +375,7 @@
     },
     {
       "id": "PERFC-127d570dfdbd69f2",
-      "source_line": 97,
+      "source_line": 93,
       "anchor_digest": "d33152e0bb01c250f757eca940bd5e6d497a0aad4e4fe4e67790d15f9cf2418d",
       "section": "5. Detector Error Model Features",
       "feature": "DEM transforms",
@@ -405,7 +405,7 @@
     },
     {
       "id": "PERFC-138c3b361a186e58",
-      "source_line": 98,
+      "source_line": 94,
       "anchor_digest": "f7086c7532c8b983a86ad36784b6f1b53de2753fb99fa168edde4a815e414e9a",
       "section": "5. Detector Error Model Features",
       "feature": "DEM sampling",
@@ -435,7 +435,7 @@
     },
     {
       "id": "PERFC-1451be08d4caacb8",
-      "source_line": 107,
+      "source_line": 103,
       "anchor_digest": "195e2eee8bf477ffa8fbdb83d370f8c356194e13ffffbdaa73f5d478d1c07b52",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Compiled measurement sampling",
@@ -465,7 +465,7 @@
     },
     {
       "id": "PERFC-147257abd12fe8fa",
-      "source_line": 124,
+      "source_line": 120,
       "anchor_digest": "b9ed1ade1c737eb050cb0ba800dc78a52159d5d2007d9671da11b52b4370c882",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`stim explain_errors` CLI",
@@ -486,7 +486,7 @@
     },
     {
       "id": "PERFC-161a6a005e05b3e9",
-      "source_line": 59,
+      "source_line": 55,
       "anchor_digest": "0c6affe85ac43f8970bc06f25bfa419731b9075521992caf866106cc865c0018",
       "section": "2. File Formats And IO Contracts",
       "feature": "`hits` sparse text or binary sparse index format",
@@ -516,7 +516,7 @@
     },
     {
       "id": "PERFC-1644aae3e8f22a7d",
-      "source_line": 126,
+      "source_line": 122,
       "anchor_digest": "c5f9eff7814a3e9d6518dfefe5a14754475fd79bf1f081c77353704ef0885b09",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "SAT or WCNF encoding",
@@ -546,7 +546,7 @@
     },
     {
       "id": "PERFC-1f7f9ad4fc536624",
-      "source_line": 125,
+      "source_line": 121,
       "anchor_digest": "67e4ea544dfd480e9a38d6966e4162824f62d281c240219b80d1490f2b00639d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Shortest graphlike and hypergraph logical-error search",
@@ -576,7 +576,7 @@
     },
     {
       "id": "PERFC-1ff33ed84805b2cc",
-      "source_line": 174,
+      "source_line": 170,
       "anchor_digest": "5d8c064325ef0d448833457b5973a7377bb799e9acd454e25c43c5971a5e534e",
       "section": "11. Command-Line API",
       "feature": "`stim diagram`",
@@ -597,7 +597,7 @@
     },
     {
       "id": "PERFC-2315c193520be282",
-      "source_line": 47,
+      "source_line": 43,
       "anchor_digest": "693f93a95da38caf42a6893a86409eacaaae8a0919cec14d974edcd796ac1ab2",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM parser and canonical printer",
@@ -627,7 +627,7 @@
     },
     {
       "id": "PERFC-29677000e90bf328",
-      "source_line": 150,
+      "source_line": 146,
       "anchor_digest": "6e791c95fe34c5086facb1a4ccd82a1e7ad5d45c43aeb18700940e5aa3f02c7a",
       "section": "9. Diagrams And Visualization",
       "feature": "Interactive HTML and Crumble diagram surfaces",
@@ -648,7 +648,7 @@
     },
     {
       "id": "PERFC-2daba248ab94a6e8",
-      "source_line": 85,
+      "source_line": 81,
       "anchor_digest": "6a1657e4cff9598bd0586aa37cb2109efcd659addec2e3a7dccb3ccedc954a5e",
       "section": "4. Core Circuit Features",
       "feature": "Repeat handling",
@@ -739,7 +739,7 @@
     },
     {
       "id": "PERFC-31c3e098ded9689f",
-      "source_line": 248,
+      "source_line": 244,
       "anchor_digest": "2ae94fe1fc5a88c26f90ec4b2cb2c6ce55028682cb9da9ee518c504d80e25a77",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Python bindings",
@@ -760,7 +760,7 @@
     },
     {
       "id": "PERFC-32f5951f3b880cdf",
-      "source_line": 170,
+      "source_line": 166,
       "anchor_digest": "3b3c663f266690c6d499924297aee84f03dfb2efe46df07f86bede24cca1e1f5",
       "section": "11. Command-Line API",
       "feature": "`stim detect`",
@@ -792,7 +792,7 @@
     },
     {
       "id": "PERFC-331008ea534a9350",
-      "source_line": 48,
+      "source_line": 44,
       "anchor_digest": "bb9321a54a0da1a71c5b403a0597c0851c8beb22472e10715738ccae0043eb43",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM instruction types",
@@ -822,7 +822,7 @@
     },
     {
       "id": "PERFC-3793c1cfc265b1fc",
-      "source_line": 61,
+      "source_line": 57,
       "anchor_digest": "6afa0e360909d824522ea563dad4b8838b685b9e4078fb0fbda9b21de85a9413",
       "section": "2. File Formats And IO Contracts",
       "feature": "`ptb64` transposed packed format",
@@ -852,7 +852,7 @@
     },
     {
       "id": "PERFC-3883f38fcee402eb",
-      "source_line": 217,
+      "source_line": 213,
       "anchor_digest": "f84c9addf8a8601d0b0ec81f1bdd9da56c7d8f74b1721825c583081088912730",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "JS packaging",
@@ -873,7 +873,7 @@
     },
     {
       "id": "PERFC-399173601ec6dbac",
-      "source_line": 214,
+      "source_line": 210,
       "anchor_digest": "76bf69678f23d972b931021fd00e27c0a106f5e815f710ea0a1ab3691b8f4182",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Cargo workspace",
@@ -894,7 +894,7 @@
     },
     {
       "id": "PERFC-3c34a55ffcf32e43",
-      "source_line": 108,
+      "source_line": 104,
       "anchor_digest": "5b97c81dd8117f154ab5368ec8182493efbc8c6872730f58212249f457c9b3d4",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Measurement-sampler Python API parity",
@@ -915,7 +915,7 @@
     },
     {
       "id": "PERFC-3e79dd61ca387b04",
-      "source_line": 96,
+      "source_line": 92,
       "anchor_digest": "fb223c6be26ee6e6fca96840834cba530e1fb796b3f0edc7189c0a976665359b",
       "section": "5. Detector Error Model Features",
       "feature": "DEM introspection",
@@ -945,7 +945,7 @@
     },
     {
       "id": "PERFC-40a806b1bb064311",
-      "source_line": 60,
+      "source_line": 56,
       "anchor_digest": "c4f63b64453703ce2384ae548f58d41eee3cb773346e5ff39a57e8d6f65bbaab",
       "section": "2. File Formats And IO Contracts",
       "feature": "`dets` sparse text",
@@ -975,7 +975,7 @@
     },
     {
       "id": "PERFC-40c76b4240bbf849",
-      "source_line": 109,
+      "source_line": 105,
       "anchor_digest": "0977b4264f87998f12d94ba753ed84945517d46fce5e250d0dd811b5bfc333c4",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Detector sampling",
@@ -1005,7 +1005,7 @@
     },
     {
       "id": "PERFC-413ac90cec749df6",
-      "source_line": 101,
+      "source_line": 97,
       "anchor_digest": "5b5d26dfe36f838c497daf30efa3f094f685aeadc5bc4b5492c8bb8a44a42a90",
       "section": "5. Detector Error Model Features",
       "feature": "DEM diagrams",
@@ -1026,7 +1026,7 @@
     },
     {
       "id": "PERFC-42edeb6afd2b02fb",
-      "source_line": 29,
+      "source_line": 25,
       "anchor_digest": "242769af1c4e35d4a8f1f25251f77482fa2f19f1b1ad0fbed01491c064d8b2da",
       "section": "1. Top-Level Product Surface",
       "feature": "GPU backend",
@@ -1047,7 +1047,7 @@
     },
     {
       "id": "PERFC-44abd4394a5490a8",
-      "source_line": 249,
+      "source_line": 245,
       "anchor_digest": "019f0faab5604daf0884149e7546e852432ca4a8d85a56d834b51071e5df4654",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "JS/WASM and ecosystem packages",
@@ -1068,7 +1068,7 @@
     },
     {
       "id": "PERFC-44c8dad868e7a121",
-      "source_line": 26,
+      "source_line": 22,
       "anchor_digest": "f33f8be756b1bf1cf58498633a8d7054c7dad405430b840875a1f0ec97ac0c8d",
       "section": "1. Top-Level Product Surface",
       "feature": "Python package `stim`",
@@ -1089,7 +1089,7 @@
     },
     {
       "id": "PERFC-45e92e84c9cb919e",
-      "source_line": 172,
+      "source_line": 168,
       "anchor_digest": "03c57b01eebbe9e617955c2103826ef9ad1d92e2817b9939e51c381f9a0309c1",
       "section": "11. Command-Line API",
       "feature": "`stim analyze_errors`",
@@ -1121,7 +1121,7 @@
     },
     {
       "id": "PERFC-480241ef68b60fba",
-      "source_line": 41,
+      "source_line": 37,
       "anchor_digest": "3efd86eb4cc19c9b55cccc9ff314895d92abcbf3204aec700ae706c001298bc2",
       "section": "2. File Formats And IO Contracts",
       "feature": "Full semantic execution of every legal circuit operation",
@@ -1206,7 +1206,7 @@
     },
     {
       "id": "PERFC-4846f2fef3985a73",
-      "source_line": 39,
+      "source_line": 35,
       "anchor_digest": "78c1420ef30dde70ac111dfea3977747cc6372b7743cc320d9495dc961f3eb5d",
       "section": "2. File Formats And IO Contracts",
       "feature": "Target kinds",
@@ -1315,7 +1315,7 @@
     },
     {
       "id": "PERFC-498524e36d0f0bbd",
-      "source_line": 197,
+      "source_line": 193,
       "anchor_digest": "b4d5f7a06100269c40e7b434c3c3edfc793ec3fe89bc2382995a5379fad05117",
       "section": "13. JavaScript And WASM API",
       "feature": "Crumble browser editor",
@@ -1336,7 +1336,7 @@
     },
     {
       "id": "PERFC-4a1660948ea63fb7",
-      "source_line": 184,
+      "source_line": 180,
       "anchor_digest": "ca670a7512f6696ff8eccf2bcd9b014b1bcf9efab90515034aaa224af0e27310",
       "section": "12. Python API",
       "feature": "Top-level `stim` functions",
@@ -1357,7 +1357,7 @@
     },
     {
       "id": "PERFC-4b8adb25ed1ec85c",
-      "source_line": 186,
+      "source_line": 182,
       "anchor_digest": "2a843b83de3177149573c07f221423b6f6f8ceecd432f62ae6b75f81c0554113",
       "section": "12. Python API",
       "feature": "`stim.DetectorErrorModel` class",
@@ -1378,7 +1378,7 @@
     },
     {
       "id": "PERFC-4cf55ad84dd71d04",
-      "source_line": 28,
+      "source_line": 24,
       "anchor_digest": "431e4d1fa971fe95acb6df04687e02eed2a52b6f553ddae3ba751dfebf024f63",
       "section": "1. Top-Level Product Surface",
       "feature": "Ecosystem integrations",
@@ -1399,7 +1399,7 @@
     },
     {
       "id": "PERFC-4f5163dc1aa08da7",
-      "source_line": 87,
+      "source_line": 83,
       "anchor_digest": "e351bc9c2f45aa9b12786cb6c3d4a02e8509f5b2f67367b236fbf6500d77322b",
       "section": "4. Core Circuit Features",
       "feature": "Reference samples and determined measurements",
@@ -1429,7 +1429,7 @@
     },
     {
       "id": "PERFC-51cbbc11754eceb4",
-      "source_line": 241,
+      "source_line": 237,
       "anchor_digest": "dafdaa9dd08e317abb39c24602a80b9f4300ecf2a0eb4c1ab73ed3afb46be058",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full circuit transform API parity",
@@ -1459,7 +1459,7 @@
     },
     {
       "id": "PERFC-5305d67db48c7e91",
-      "source_line": 99,
+      "source_line": 95,
       "anchor_digest": "b773c5dce0ef34bc12ba514df92dcef76f16b9ee533a227155aca46f17e6c897",
       "section": "5. Detector Error Model Features",
       "feature": "Streaming DEM sampling",
@@ -1489,8 +1489,8 @@
     },
     {
       "id": "PERFC-55676fc3004b7fd2",
-      "source_line": 229,
-      "anchor_digest": "bc8e447814c7dbcc350b5395863f98dfb496b83212c9d182dcee14b9eb49432d",
+      "source_line": 225,
+      "anchor_digest": "ec12df7dcda0db535d5a3d02fbb58014f36124caebb1d680d41e46e6f702f989",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Reopened",
@@ -1510,7 +1510,7 @@
     },
     {
       "id": "PERFC-56ceb30ebbb1ac8e",
-      "source_line": 161,
+      "source_line": 157,
       "anchor_digest": "5bdcc44a3b4d77fdc4c623ea28b789056f40b0d36ddc5df9b4c038a89dae82cf",
       "section": "10. Built-In Circuit Generation",
       "feature": "Python `stim.Circuit.generated`",
@@ -1531,7 +1531,7 @@
     },
     {
       "id": "PERFC-5ce01b23bf3372ce",
-      "source_line": 160,
+      "source_line": 156,
       "anchor_digest": "35f5317f5867d2d1535defa44d6d8922a6c1e8116f0cbd218456d752eabad1d7",
       "section": "10. Built-In Circuit Generation",
       "feature": "Generator parameters and noise knobs",
@@ -1561,7 +1561,7 @@
     },
     {
       "id": "PERFC-5d7bb0d4dff1956c",
-      "source_line": 244,
+      "source_line": 240,
       "anchor_digest": "14da4dbce62718afca1fa6dfb0d90c015ff5ab44c77d9bba5611444bacb96b03",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full feedback-inlining transform parity",
@@ -1644,7 +1644,7 @@
     },
     {
       "id": "PERFC-5f2145ca0e3328b5",
-      "source_line": 230,
+      "source_line": 226,
       "anchor_digest": "a5e666130cc41a62e03eb00df8c3d1461b7b230ae9cc711653859232255a9063",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
@@ -1665,7 +1665,7 @@
     },
     {
       "id": "PERFC-607d1f7a2cf1834a",
-      "source_line": 27,
+      "source_line": 23,
       "anchor_digest": "09ab0b4ae7caf4e4fd2eb9ea3d7cb83c66334dc194e4ecfa70742cd859127b0c",
       "section": "1. Top-Level Product Surface",
       "feature": "JavaScript/WASM API",
@@ -1686,7 +1686,7 @@
     },
     {
       "id": "PERFC-62e1399a85e9a96e",
-      "source_line": 82,
+      "source_line": 78,
       "anchor_digest": "6235172d00917d1729b29285997f13adec685382ca6d81985dc5da3d85007d6c",
       "section": "4. Core Circuit Features",
       "feature": "Programmatic mutation",
@@ -1716,7 +1716,7 @@
     },
     {
       "id": "PERFC-62f74c38edc28d0a",
-      "source_line": 123,
+      "source_line": 119,
       "anchor_digest": "2c97203f5d7ef0e4b228ea8ceb033e453fb81d7758c3adf81562594621ff1633",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Error explanation value objects",
@@ -1746,7 +1746,7 @@
     },
     {
       "id": "PERFC-6316a8cb3a98fc44",
-      "source_line": 37,
+      "source_line": 33,
       "anchor_digest": "318296cb8a196505b05506a914af9acd09031585f9ac4358a29fca0a2471ef20",
       "section": "2. File Formats And IO Contracts",
       "feature": "Line-based `.stim` parsing, comments, tags, args, targets, and repeat blocks",
@@ -1776,7 +1776,7 @@
     },
     {
       "id": "PERFC-63dc29187590a0fa",
-      "source_line": 62,
+      "source_line": 58,
       "anchor_digest": "f9f5c221e182098d5b8fbad07ca9a901c383d0e4d7575820fb49e31b2d514e0c",
       "section": "2. File Formats And IO Contracts",
       "feature": "Format conversion command coverage",
@@ -1808,7 +1808,7 @@
     },
     {
       "id": "PERFC-655f504f7896dbf0",
-      "source_line": 203,
+      "source_line": 199,
       "anchor_digest": "e9a8a5b2bc8f57fbb63ca07ec9cc7dee923b23f9920749a05ab494ffa6f90093",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimcirq`",
@@ -1829,7 +1829,7 @@
     },
     {
       "id": "PERFC-65df8aff7c5d8168",
-      "source_line": 56,
+      "source_line": 52,
       "anchor_digest": "75d86743d17a5092ad22b2c9233e76aa2e5674d58376a0b786c6f16c5ca58fef",
       "section": "2. File Formats And IO Contracts",
       "feature": "`01` dense text",
@@ -1859,7 +1859,7 @@
     },
     {
       "id": "PERFC-675e4e7fa68ba3b9",
-      "source_line": 218,
+      "source_line": 214,
       "anchor_digest": "d39e9219f8f102da3a787224400dd8a2b01f2ab2dd6adf2b979e8cb26aad9f36",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Generated API docs",
@@ -1880,7 +1880,7 @@
     },
     {
       "id": "PERFC-677831f83967b163",
-      "source_line": 114,
+      "source_line": 110,
       "anchor_digest": "a4d1c7af6fa0c7ce76ca6a6de3530c3a73782026dd777a8fc9bdce367190000b",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Batched flip-frame simulator",
@@ -1901,7 +1901,7 @@
     },
     {
       "id": "PERFC-68d7456b8df6bd93",
-      "source_line": 205,
+      "source_line": 201,
       "anchor_digest": "becd68d7ad621a12610737b1e0109bfff8240f162984b4b694769b8572d7881e",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "Crumble",
@@ -1922,7 +1922,7 @@
     },
     {
       "id": "PERFC-6931d59b7e752dfd",
-      "source_line": 159,
+      "source_line": 155,
       "anchor_digest": "63ff548e2d05dd3890100100cffcdd3597ac9d8406664109195879d82a086f72",
       "section": "10. Built-In Circuit Generation",
       "feature": "`color_code:memory_xyz`",
@@ -1952,7 +1952,7 @@
     },
     {
       "id": "PERFC-6c45d9f27cd36d16",
-      "source_line": 121,
+      "source_line": 117,
       "anchor_digest": "bedbe2e817a90616103b60a67147dc33bf36798326179599b3e1012cdf77e55d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Circuit-to-DEM analysis",
@@ -1982,7 +1982,7 @@
     },
     {
       "id": "PERFC-7b93f3312f66a603",
-      "source_line": 58,
+      "source_line": 54,
       "anchor_digest": "09e61a969027fd66d9b68619ca6f6dedcc797fca3bfc8ad5364d3501f7461a35",
       "section": "2. File Formats And IO Contracts",
       "feature": "`r8` sparse binary",
@@ -2012,7 +2012,7 @@
     },
     {
       "id": "PERFC-7cc38b462a082718",
-      "source_line": 139,
+      "source_line": 135,
       "anchor_digest": "a73f79a4a46eb2a8984f4473e6d39fb1a8e8cfe7b083cc46bb58797e6c728970",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Public borrowed Pauli string refs",
@@ -2033,7 +2033,7 @@
     },
     {
       "id": "PERFC-7d5dca89c9553856",
-      "source_line": 233,
+      "source_line": 229,
       "anchor_digest": "4f2dce9c57383122510c2cbb567c447fcccedfea2085f18cec2086486f7514fe",
       "section": "16. Test And Benchmark Surface",
       "feature": "Tests for deferred Python, JS, diagrams, and ecosystem packages",
@@ -2054,7 +2054,7 @@
     },
     {
       "id": "PERFC-82f45ef6fddc12f8",
-      "source_line": 63,
+      "source_line": 59,
       "anchor_digest": "7560bf57586305cc65b80cbbc568d4f0619e80374e9d1a57956db985f417a144",
       "section": "2. File Formats And IO Contracts",
       "feature": "Streaming IO for large implemented CLI paths",
@@ -2084,7 +2084,7 @@
     },
     {
       "id": "PERFC-83a09d1335d9c916",
-      "source_line": 122,
+      "source_line": 118,
       "anchor_digest": "a7515c8c7970503b17033c0a8b34fb3f18613493cabb2b2281b531402b198ff7",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
@@ -2114,7 +2114,7 @@
     },
     {
       "id": "PERFC-884dc647874f360d",
-      "source_line": 156,
+      "source_line": 152,
       "anchor_digest": "e0f7771e5a457271c32c91256f6ff382a9571e47357baf7fa304f37532533768",
       "section": "10. Built-In Circuit Generation",
       "feature": "`repetition_code:memory`",
@@ -2144,7 +2144,7 @@
     },
     {
       "id": "PERFC-88ab8542a3bfd441",
-      "source_line": 245,
+      "source_line": 241,
       "anchor_digest": "fefd53b8075742c0802e5ecf8224d54ca72bd47d79ef2f44bc310f4c2a98390f",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full ErrorMatcher provenance and `explain_errors` CLI",
@@ -2165,7 +2165,7 @@
     },
     {
       "id": "PERFC-88e03fd088b06849",
-      "source_line": 100,
+      "source_line": 96,
       "anchor_digest": "d29c9831aa61513de19a25774bb908b898239a910b5d85d0997c02feee7f7ec8",
       "section": "5. Detector Error Model Features",
       "feature": "DEM analysis and shortest graphlike error",
@@ -2195,7 +2195,7 @@
     },
     {
       "id": "PERFC-89a73d0b1559b081",
-      "source_line": 140,
+      "source_line": 136,
       "anchor_digest": "213b9d2cac77703a110739618fdd05e687f568a4b4a3c936e6307608a2c5338d",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Conversion to or from numpy, state vectors, and arbitrary unitaries",
@@ -2216,7 +2216,7 @@
     },
     {
       "id": "PERFC-8ac4d4b2d32da162",
-      "source_line": 133,
+      "source_line": 129,
       "anchor_digest": "66e8e733c22cf201a7a5c3950b89ebe1609499b0181275d09c2b1ec92f79febc",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Owned Pauli strings",
@@ -2246,7 +2246,7 @@
     },
     {
       "id": "PERFC-8b0fe82d816e26f2",
-      "source_line": 81,
+      "source_line": 77,
       "anchor_digest": "da84a83372c7d21870055112e66ed5a8be4f88983d923b3fa3b1d72d2093c213",
       "section": "4. Core Circuit Features",
       "feature": "Circuit construction from parsed text",
@@ -2276,7 +2276,7 @@
     },
     {
       "id": "PERFC-8c644079a9eeab7f",
-      "source_line": 141,
+      "source_line": 137,
       "anchor_digest": "c97e076e51e4a2c866d7606fa1da12e6a7b915bb76335afb77502bf4a6d00fe4",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Graph simulator and vector simulator public APIs",
@@ -2297,7 +2297,7 @@
     },
     {
       "id": "PERFC-90e17eacafaae97d",
-      "source_line": 215,
+      "source_line": 211,
       "anchor_digest": "f56f07472f2fddca5ebd8e8bee606fc67d10823fa7897293b56dc4ce9642cd76",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Operational command surface",
@@ -2318,7 +2318,7 @@
     },
     {
       "id": "PERFC-91a871904dcf3356",
-      "source_line": 188,
+      "source_line": 184,
       "anchor_digest": "4e62e2ddc4565ec4314aaf87d35f894fc1d4ec3bcba7ef04e3512445aac51e97",
       "section": "12. Python API",
       "feature": "Error explanation classes",
@@ -2339,7 +2339,7 @@
     },
     {
       "id": "PERFC-933e7f6e900d13cb",
-      "source_line": 196,
+      "source_line": 192,
       "anchor_digest": "9fbe18a00ddbe3ee924c7fd70535eabfc04dfb11210c2430908a80c95c70ec55",
       "section": "13. JavaScript And WASM API",
       "feature": "JS `Circuit`, `Tableau`, `PauliString`, and `TableauSimulator`",
@@ -2360,7 +2360,7 @@
     },
     {
       "id": "PERFC-93fad12b1d302b96",
-      "source_line": 189,
+      "source_line": 185,
       "anchor_digest": "69b1964ab6695fb116bb49de092e1547e96d9db996fe7f1dbb5e790ab2753ccf",
       "section": "12. Python API",
       "feature": "Stabilizer, gate metadata, and simulator classes",
@@ -2381,7 +2381,7 @@
     },
     {
       "id": "PERFC-94bd1a1c7045a109",
-      "source_line": 168,
+      "source_line": 164,
       "anchor_digest": "57f2adf25f502e78930f02a59aa0110f3ff5d8bcfcb7381d0acd351222a6c0b7",
       "section": "11. Command-Line API",
       "feature": "`stim convert`",
@@ -2413,7 +2413,7 @@
     },
     {
       "id": "PERFC-95415ea91dc5604a",
-      "source_line": 70,
+      "source_line": 66,
       "anchor_digest": "60d02bc23dd94116dd91855144ea8130582a04e5d6d6baa7e39a69f679134ec7",
       "section": "3. Gate And Instruction Surface",
       "feature": "Parser aliases",
@@ -2443,7 +2443,7 @@
     },
     {
       "id": "PERFC-9a88cdc79b333bc3",
-      "source_line": 89,
+      "source_line": 85,
       "anchor_digest": "f6c15dfffc759bb2d67960c6b53f921f7d518e4b6b32edba95eaec8a81324b9e",
       "section": "4. Core Circuit Features",
       "feature": "Built-in circuit generation",
@@ -2473,7 +2473,7 @@
     },
     {
       "id": "PERFC-9de448bddb421bc8",
-      "source_line": 158,
+      "source_line": 154,
       "anchor_digest": "41d795b9f5a2fb8a9ce32fed2ea0331ff3b1d179f6f162742040443f4af1178d",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:unrotated_memory_x` and `surface_code:unrotated_memory_z`",
@@ -2503,7 +2503,7 @@
     },
     {
       "id": "PERFC-9ecb45672878e7e2",
-      "source_line": 219,
+      "source_line": 215,
       "anchor_digest": "30a2f1b90e44f809c415661d92b95ed655ae16afa144df8cf223cae76a643f9b",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Feature and roadmap docs",
@@ -2524,7 +2524,7 @@
     },
     {
       "id": "PERFC-a05af5fd1c471d2e",
-      "source_line": 115,
+      "source_line": 111,
       "anchor_digest": "7c7aaded39b067994dfa140e6efe18d42fbfe50243d7ea05cf8e7692bfbf9cac",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Exact random-stream parity with Stim",
@@ -2545,7 +2545,7 @@
     },
     {
       "id": "PERFC-a06287237513c901",
-      "source_line": 88,
+      "source_line": 84,
       "anchor_digest": "d0ad1ed5a434093ba07ce0ad12971922941d22a1cc8b6bfe79eede23aa1360a2",
       "section": "4. Core Circuit Features",
       "feature": "Circuit exports",
@@ -2566,7 +2566,7 @@
     },
     {
       "id": "PERFC-a1d4bc5bbe9a861d",
-      "source_line": 243,
+      "source_line": 239,
       "anchor_digest": "697a3d78b0167639ec7df4bd620b99ebad8bd2a4f0f2caecee02c760bbb43e00",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Broader sweep-conditioned simulator and analysis parity",
@@ -2635,7 +2635,7 @@
     },
     {
       "id": "PERFC-a4e48e46d463de4c",
-      "source_line": 195,
+      "source_line": 191,
       "anchor_digest": "098c0dfb3b771f85bd3a3559e5a50b34f17c5dd022aad2363bedae390ffda347",
       "section": "13. JavaScript And WASM API",
       "feature": "WASM build and JS package",
@@ -2656,7 +2656,7 @@
     },
     {
       "id": "PERFC-a650fd6ccb22f00f",
-      "source_line": 175,
+      "source_line": 171,
       "anchor_digest": "14816f986478ef1961dc0622a8061c021e471e4bc1529f5a439ef4ae26d516cf",
       "section": "11. Command-Line API",
       "feature": "`stim explain_errors`",
@@ -2677,7 +2677,7 @@
     },
     {
       "id": "PERFC-a8a7e6dd54bc6357",
-      "source_line": 171,
+      "source_line": 167,
       "anchor_digest": "9549f38c3bb427aaa2c9871dc1dbd3737eccf461549c502d65ab0152df91b387",
       "section": "11. Command-Line API",
       "feature": "`stim m2d`",
@@ -2709,7 +2709,7 @@
     },
     {
       "id": "PERFC-a8cae7083ce5c6f0",
-      "source_line": 25,
+      "source_line": 21,
       "anchor_digest": "0a08684ff36c970112445af97e9881ebd2b800306d08bd641987bbaf1c84e1fb",
       "section": "1. Top-Level Product Surface",
       "feature": "`.stim`, `.dem`, and result-format compatibility",
@@ -2805,7 +2805,7 @@
     },
     {
       "id": "PERFC-a8f9b0776f6cb1e6",
-      "source_line": 49,
+      "source_line": 45,
       "anchor_digest": "392ef4943f2d0c51bd98a175a376f287d448c9d49ca51c75241ad4a99f076542",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM detector shifts, observables, coordinates, and counts",
@@ -2835,7 +2835,7 @@
     },
     {
       "id": "PERFC-abe3a7cb6042a8df",
-      "source_line": 57,
+      "source_line": 53,
       "anchor_digest": "29233cd9331ce29b1a49c13729c1445ab9c5854e4cb87e7ed0a68aa4f16b2861",
       "section": "2. File Formats And IO Contracts",
       "feature": "`b8` dense binary",
@@ -2865,7 +2865,7 @@
     },
     {
       "id": "PERFC-ad2012543fb57e70",
-      "source_line": 83,
+      "source_line": 79,
       "anchor_digest": "1989e81e9d47de3f53ba902fb6d317064183658f23681fc2ca12c8c666604685",
       "section": "4. Core Circuit Features",
       "feature": "Core introspection",
@@ -2895,7 +2895,7 @@
     },
     {
       "id": "PERFC-b3ff07112043c802",
-      "source_line": 242,
+      "source_line": 238,
       "anchor_digest": "b1a1b176338715f7f3dd0ca49217153faf93e5815062e770acd30b0483346bfa",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full DEM public API parity",
@@ -2925,7 +2925,7 @@
     },
     {
       "id": "PERFC-ba7551d3078c0efc",
-      "source_line": 40,
+      "source_line": 36,
       "anchor_digest": "9d3366a8de2114e5562975311a097334f18135168b21f1fae6af541d74c9b353",
       "section": "2. File Formats And IO Contracts",
       "feature": "Broadcast and validation behavior",
@@ -2955,7 +2955,7 @@
     },
     {
       "id": "PERFC-badcbed4e03681fa",
-      "source_line": 176,
+      "source_line": 172,
       "anchor_digest": "a9b9071eb4875805acf98f24656efd51c8e0bd5825e4f2c9ab150ed9f1a9eaf8",
       "section": "11. Command-Line API",
       "feature": "`stim repl`",
@@ -2976,7 +2976,7 @@
     },
     {
       "id": "PERFC-bcb7981e583f0db1",
-      "source_line": 247,
+      "source_line": 243,
       "anchor_digest": "c79d4f690b38795ca8fee657cab68b6ff4999201499823fa8e3ca57ec9d6fcb5",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Diagrams and visualization",
@@ -2997,7 +2997,7 @@
     },
     {
       "id": "PERFC-bee7b774029de282",
-      "source_line": 207,
+      "source_line": 203,
       "anchor_digest": "37e720e4dc4a712855c554d0992f2466e2cf1b05ee51beaf332c53422154fffe",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "ZX and lattice-surgery glue",
@@ -3018,7 +3018,7 @@
     },
     {
       "id": "PERFC-c6090c35e680bc21",
-      "source_line": 246,
+      "source_line": 242,
       "anchor_digest": "5b0f5a032b3b8e5c3ebe116d0d0b06701d13fc5c46f4ab38cb6c84b3d4d32f5e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Public interactive `TableauSimulator` and `FlipSimulator` APIs",
@@ -3039,7 +3039,7 @@
     },
     {
       "id": "PERFC-c6e68a57b705e397",
-      "source_line": 135,
+      "source_line": 131,
       "anchor_digest": "4c26a2b93cc7d12be35ae35d2358dcead0cef18469f15149c7f614ee1f8a64ae",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Clifford strings",
@@ -3069,7 +3069,7 @@
     },
     {
       "id": "PERFC-ca130061d952e60f",
-      "source_line": 127,
+      "source_line": 123,
       "anchor_digest": "33dea12f5089e0a7b3f5ef357261de9058a902b8bc066e0074c40dca6a8642a3",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Sparse reverse detector-frame tracking",
@@ -3099,7 +3099,7 @@
     },
     {
       "id": "PERFC-ca86e3c10de8ab0e",
-      "source_line": 136,
+      "source_line": 132,
       "anchor_digest": "89264fe996ff2d5f269ad43239fd67bcde30d2d756c38125ebbd59a56cf1bded",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Tableaux and tableau iterators",
@@ -3129,7 +3129,7 @@
     },
     {
       "id": "PERFC-cbba6f2c91904807",
-      "source_line": 157,
+      "source_line": 153,
       "anchor_digest": "00d5e51dbd4be28240923aacdc8e18f11692ee694747db03148a84351de59a57",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:rotated_memory_x` and `surface_code:rotated_memory_z`",
@@ -3159,7 +3159,7 @@
     },
     {
       "id": "PERFC-cccae489f6a07220",
-      "source_line": 231,
+      "source_line": 227,
       "anchor_digest": "96ce6825c47bb8b05821b430e1a517ae5d2711e7242ca77012c7c29d62450147",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
@@ -3180,7 +3180,7 @@
     },
     {
       "id": "PERFC-cfa671aed2cf20dc",
-      "source_line": 137,
+      "source_line": 133,
       "anchor_digest": "af90d08388029ebbf1dccd2e757ef7a2601605f371a6bc45ff5f6a17020db8a1",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Algebra resource admission",
@@ -3210,7 +3210,7 @@
     },
     {
       "id": "PERFC-d2900a60b520f035",
-      "source_line": 84,
+      "source_line": 80,
       "anchor_digest": "252602a83d8beaa67886dfcd7471437f5edd8d584f851240acd87437baf61bcf",
       "section": "4. Core Circuit Features",
       "feature": "Circuit coordinate queries",
@@ -3240,7 +3240,7 @@
     },
     {
       "id": "PERFC-d2d203c23e3ef634",
-      "source_line": 23,
+      "source_line": 19,
       "anchor_digest": "5c35a980d35ef29ab7ca679500d9c9f67ac4722d6ed19b75999136edad503cf5",
       "section": "1. Top-Level Product Surface",
       "feature": "Rust core library equivalent for core Stim semantics",
@@ -3298,7 +3298,7 @@
     },
     {
       "id": "PERFC-d454e10c3855a359",
-      "source_line": 177,
+      "source_line": 173,
       "anchor_digest": "e40a238928d8825251b816ed39227cbaba0c103e66ee3e5e64f9e7838d2aa25a",
       "section": "11. Command-Line API",
       "feature": "`stim help` command",
@@ -3328,7 +3328,7 @@
     },
     {
       "id": "PERFC-d4815fc182943ad8",
-      "source_line": 38,
+      "source_line": 34,
       "anchor_digest": "dab11246b75e0f3a282cfc7b7acd4bc4349de4a3fc06a8ec709498d33f10f421",
       "section": "2. File Formats And IO Contracts",
       "feature": "Canonical `.stim` printing",
@@ -3358,7 +3358,7 @@
     },
     {
       "id": "PERFC-d4b49459a03a9bb6",
-      "source_line": 185,
+      "source_line": 181,
       "anchor_digest": "d29b211ab65358154d7c3e28b537c3b1d12547c772f7caec92b324efe98e383a",
       "section": "12. Python API",
       "feature": "`stim.Circuit` class",
@@ -3379,7 +3379,7 @@
     },
     {
       "id": "PERFC-d5c4a8400325bab2",
-      "source_line": 208,
+      "source_line": 204,
       "anchor_digest": "2d79363cc5ab1c29e346ab4d5b1846cca0a74090376b36acd99151734084c713",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "QASM and Quirk exports",
@@ -3400,7 +3400,7 @@
     },
     {
       "id": "PERFC-d96593c4523940ed",
-      "source_line": 250,
+      "source_line": 246,
       "anchor_digest": "7b5c77801a6717cb5fc8a86f94d45a1f3ed9572665da58c1aa96cd77a4bda73e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Generated feature/status matrix tooling",
@@ -3421,7 +3421,7 @@
     },
     {
       "id": "PERFC-db434c9ff1984af2",
-      "source_line": 69,
+      "source_line": 65,
       "anchor_digest": "283504ba4f2114ded01791f7a091770bc4b5f4b4ed30db8c79d120f123f147a8",
       "section": "3. Gate And Instruction Surface",
       "feature": "81 canonical Stim v1.16.0 gates",
@@ -3451,7 +3451,7 @@
     },
     {
       "id": "PERFC-dbb63f4fc43af7f7",
-      "source_line": 95,
+      "source_line": 91,
       "anchor_digest": "09f2c157da4976535abeb2c97104dd325910370633960e3677ab449a0621bc3b",
       "section": "5. Detector Error Model Features",
       "feature": "DEM construction and mutation",
@@ -3481,7 +3481,7 @@
     },
     {
       "id": "PERFC-dbdd023fd3d2ad04",
-      "source_line": 173,
+      "source_line": 169,
       "anchor_digest": "ed73f693ec55c7e66fac46078602910437bdb1bc4875c82b3616f248c07c1bad",
       "section": "11. Command-Line API",
       "feature": "`stim sample_dem`",
@@ -3513,7 +3513,7 @@
     },
     {
       "id": "PERFC-de7b7cb4361bc371",
-      "source_line": 113,
+      "source_line": 109,
       "anchor_digest": "53406935eeafd7e4407e3f1369c7dfbda165ef5fba486e7a43d145335d809a61",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Single-shot interactive tableau simulator",
@@ -3534,7 +3534,7 @@
     },
     {
       "id": "PERFC-df6a905ca1763242",
-      "source_line": 138,
+      "source_line": 134,
       "anchor_digest": "993de8cc76d1d0b462c66068001b3e2348172f1f24acd827ba88ba0ddcbcdf86",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flows",
@@ -3564,7 +3564,7 @@
     },
     {
       "id": "PERFC-df75e03063fd3fc3",
-      "source_line": 204,
+      "source_line": 200,
       "anchor_digest": "2f9725f6bf654cee8c7ddd4041daa4b1e7c20ebc96f2dc262e4f7271883deb11",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`sinter`",
@@ -3585,7 +3585,7 @@
     },
     {
       "id": "PERFC-e298c35e6daabf7c",
-      "source_line": 147,
+      "source_line": 143,
       "anchor_digest": "0bac94c5b0ee4195af813b45f607c8a6193335dfeba74c941dd66e86b61d82de",
       "section": "9. Diagrams And Visualization",
       "feature": "Circuit timeline diagrams",
@@ -3606,7 +3606,7 @@
     },
     {
       "id": "PERFC-e506fabb116fcd08",
-      "source_line": 24,
+      "source_line": 20,
       "anchor_digest": "74bc299f60867ee37cc3d5216a18aad692c30d7a90047d98ad929698e92597a1",
       "section": "1. Top-Level Product Surface",
       "feature": "CLI binary",
@@ -3636,7 +3636,7 @@
     },
     {
       "id": "PERFC-e78daef9f77f3f2a",
-      "source_line": 169,
+      "source_line": 165,
       "anchor_digest": "5e57a3460a4437b641bbf4fd0d1f46846151c9b5b1ad034169973254c1e2ed32",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
@@ -3668,7 +3668,7 @@
     },
     {
       "id": "PERFC-e9ea7ae3015ccb24",
-      "source_line": 167,
+      "source_line": 163,
       "anchor_digest": "d315a6f3374c95dbe937e2192167f620583dc216bf860f180ef0ead2530f76be",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
@@ -3700,7 +3700,7 @@
     },
     {
       "id": "PERFC-ec64113cdae0cd99",
-      "source_line": 134,
+      "source_line": 130,
       "anchor_digest": "1536b5d7e0c2104c100f62b2234aec61d5a765f0beb6a3e043c73efca03d5e1a",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flexible Pauli strings",
@@ -3730,7 +3730,7 @@
     },
     {
       "id": "PERFC-ecd5f55662178652",
-      "source_line": 50,
+      "source_line": 46,
       "anchor_digest": "e9b0cbb866efc8f615a0c4cfb6145f093382638e08050f3c33dd11dfcbc23520",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM flattening and large repeat traversal",
@@ -3760,7 +3760,7 @@
     },
     {
       "id": "PERFC-f1c2cb6679495a26",
-      "source_line": 112,
+      "source_line": 108,
       "anchor_digest": "47621c511a823d8516a84439d35c9810191293b353cf808722497896fdef35f3",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "DEM sampling",
@@ -3790,7 +3790,7 @@
     },
     {
       "id": "PERFC-f291ccb446656fb5",
-      "source_line": 72,
+      "source_line": 68,
       "anchor_digest": "5021b640ba854eb010877b24e69c70bb5665c396c871f1025b1923f2c26fa497",
       "section": "3. Gate And Instruction Surface",
       "feature": "Gate semantic execution",
@@ -3820,7 +3820,7 @@
     },
     {
       "id": "PERFC-f652be46399d9e30",
-      "source_line": 206,
+      "source_line": 202,
       "anchor_digest": "779160519301ef8ae83b5a77954e6d74bf4d24b39ab9d4c6022bff4b7cac324c",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimflow`",
@@ -3841,7 +3841,7 @@
     },
     {
       "id": "PERFC-f94f299efef1806b",
-      "source_line": 187,
+      "source_line": 183,
       "anchor_digest": "b00da9477657a5bd0d4d3ad651d2b2ffd32d25e5333955aec9ca06f2d256aa49",
       "section": "12. Python API",
       "feature": "Sampler and converter classes",
@@ -3862,7 +3862,7 @@
     },
     {
       "id": "PERFC-fcd1419d4f264ace",
-      "source_line": 111,
+      "source_line": 107,
       "anchor_digest": "90efad3a0f37baad1eb0976a6a2a79fc77c50cea296e476fd35221eeec3300ec",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Detector-analysis utility APIs",
@@ -3892,7 +3892,7 @@
     },
     {
       "id": "PERFC-fdf0cb5af29e8578",
-      "source_line": 216,
+      "source_line": 212,
       "anchor_digest": "6a946fbf8d724cdea3a1c887fa120e737c155899b2c51ee35568142f79711cad",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Python packaging",
@@ -3913,7 +3913,7 @@
     },
     {
       "id": "PERFC-fe506130e24c0ab7",
-      "source_line": 148,
+      "source_line": 144,
       "anchor_digest": "309e7a33382302c4634c6b3b8e122af8df5ea2712dd3aacb778d48da6fa18d27",
       "section": "9. Diagrams And Visualization",
       "feature": "Detector-slice diagrams",
@@ -3934,7 +3934,7 @@
     },
     {
       "id": "PERFC-ff83372101a84615",
-      "source_line": 149,
+      "source_line": 145,
       "anchor_digest": "91cd6e00076f404b397929b4d2ff1b823ba4ef51d875826fa85802d773c7df2c",
       "section": "9. Diagrams And Visualization",
       "feature": "DEM match-graph diagrams",
@@ -28159,6 +28159,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim analyze_errors decompose_errors CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -28220,6 +28222,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim analyze_errors fold_loops CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -28281,6 +28285,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "high repeat loop analyzer folding CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -28329,47 +28335,128 @@
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-0908c21b917526e3"
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-2f6a06e3fffcf5c0",
+        "cq-evidence-qualification-966ab53fd109b7b3",
+        "cq-evidence-qualification-ae2cf29058be84b0"
       ],
       "correctness_binding": "exact-cases",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "dem-model-cycle-v1"
+          "id": "dem-model-families-v2"
         },
         "source": "src/stim/dem/detector_error_model.test.cc",
-        "deterministic_seed": "none; exact-eight-item-cycle; complete-cycles-only",
+        "deterministic_seed": "none; exact source-owned family cycles",
         "scales": [
           {
-            "id": "small",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=64; cycle_items=8; max_items=524288",
+            "id": "flat-errors-small",
+            "family_id": "flat-errors",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=64",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 1776
+              "bytes": 1368
             },
             "semantic_work": 64,
-            "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+            "input_digest": "ac17cebf0983e626775012a7bab634d136669f36d706b3842b73a66b1c5684c5"
           },
           {
-            "id": "medium",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=4096; cycle_items=8; max_items=524288",
+            "id": "flat-errors-medium",
+            "family_id": "flat-errors",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=4096",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 113664
+              "bytes": 87552
             },
             "semantic_work": 4096,
-            "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+            "input_digest": "4c2832178c6c44c8ef895a7cc8a8043699d096f678f6c624039ae126e4541b60"
           },
           {
-            "id": "large",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=65536; cycle_items=8; max_items=524288",
+            "id": "flat-errors-large",
+            "family_id": "flat-errors",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=65536",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 1818624
+              "bytes": 1400832
             },
             "semantic_work": 65536,
-            "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
+            "input_digest": "756997bdca11be9e8d5f4e9470bea059ec516daf218e1a0b3b6c421dbb229de0"
+          },
+          {
+            "id": "coordinate-sparse-small",
+            "family_id": "coordinate-sparse",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=64",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1816
+            },
+            "semantic_work": 64,
+            "input_digest": "1065bcd0f102d45a035aa841c27717cfb4e02ea6ea600bb833e3eb8c80f40780"
+          },
+          {
+            "id": "coordinate-sparse-medium",
+            "family_id": "coordinate-sparse",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 116224
+            },
+            "semantic_work": 4096,
+            "input_digest": "f2d6a6395d630dae37ea9ef42f94604fbd42e6f98537390230f5f63173074fbb"
+          },
+          {
+            "id": "coordinate-sparse-large",
+            "family_id": "coordinate-sparse",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1859584
+            },
+            "semantic_work": 65536,
+            "input_digest": "5a15e24913a40f53a1a10e7760009b3e68be8114a76e9f18a3d831ee1f4addc1"
+          },
+          {
+            "id": "folded-repeats-small",
+            "family_id": "folded-repeats",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=64",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 8320
+            },
+            "semantic_work": 64,
+            "input_digest": "c484e6f7c587a0b7edf9e3572ee745d2268ccde4f6d3d444d186b7cff5ae8db6"
+          },
+          {
+            "id": "folded-repeats-medium",
+            "family_id": "folded-repeats",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 532480
+            },
+            "semantic_work": 4096,
+            "input_digest": "0a0ac94bf0297b57a62e400c64ccce954519c051b4ef482c9af05babd9ee17c2"
+          },
+          {
+            "id": "folded-repeats-large",
+            "family_id": "folded-repeats",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 8519680
+            },
+            "semantic_work": 65536,
+            "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
           }
         ]
       },
@@ -28381,11 +28468,11 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
-            "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+            "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
           }
         ]
       },
@@ -28402,11 +28489,17 @@
       "memory_policy": {
         "method": "process-rss",
         "scale_ids": [
-          "small",
-          "medium",
-          "large"
+          "flat-errors-small",
+          "flat-errors-medium",
+          "flat-errors-large",
+          "coordinate-sparse-small",
+          "coordinate-sparse-medium",
+          "coordinate-sparse-large",
+          "folded-repeats-small",
+          "folded-repeats-medium",
+          "folded-repeats-large"
         ],
-        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance."
+        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are reported independently for each family and size. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation."
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust direct DEM text parsing with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts.",
@@ -28425,47 +28518,128 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-0908c21b917526e3"
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-2f6a06e3fffcf5c0",
+        "cq-evidence-qualification-966ab53fd109b7b3",
+        "cq-evidence-qualification-ae2cf29058be84b0"
       ],
       "correctness_binding": "exact-cases",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "dem-model-cycle-v1"
+          "id": "dem-model-families-v2"
         },
         "source": "src/stim/dem/detector_error_model.test.cc",
-        "deterministic_seed": "none; exact-eight-item-cycle; complete-cycles-only",
+        "deterministic_seed": "none; exact source-owned family cycles",
         "scales": [
           {
-            "id": "small",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=64; cycle_items=8; max_items=524288",
+            "id": "flat-errors-small",
+            "family_id": "flat-errors",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=64",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 1776
+              "bytes": 1368
             },
             "semantic_work": 64,
-            "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+            "input_digest": "ac17cebf0983e626775012a7bab634d136669f36d706b3842b73a66b1c5684c5"
           },
           {
-            "id": "medium",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=4096; cycle_items=8; max_items=524288",
+            "id": "flat-errors-medium",
+            "family_id": "flat-errors",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=4096",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 113664
+              "bytes": 87552
             },
             "semantic_work": 4096,
-            "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+            "input_digest": "4c2832178c6c44c8ef895a7cc8a8043699d096f678f6c624039ae126e4541b60"
           },
           {
-            "id": "large",
-            "parameters": "generator=dem-model-cycle-v1; top_level_items=65536; cycle_items=8; max_items=524288",
+            "id": "flat-errors-large",
+            "family_id": "flat-errors",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=flat-errors; top_level_items=65536",
             "input_bytes": {
               "kind": "exact",
-              "bytes": 1818624
+              "bytes": 1400832
             },
             "semantic_work": 65536,
-            "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
+            "input_digest": "756997bdca11be9e8d5f4e9470bea059ec516daf218e1a0b3b6c421dbb229de0"
+          },
+          {
+            "id": "coordinate-sparse-small",
+            "family_id": "coordinate-sparse",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=64",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1816
+            },
+            "semantic_work": 64,
+            "input_digest": "1065bcd0f102d45a035aa841c27717cfb4e02ea6ea600bb833e3eb8c80f40780"
+          },
+          {
+            "id": "coordinate-sparse-medium",
+            "family_id": "coordinate-sparse",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 116224
+            },
+            "semantic_work": 4096,
+            "input_digest": "f2d6a6395d630dae37ea9ef42f94604fbd42e6f98537390230f5f63173074fbb"
+          },
+          {
+            "id": "coordinate-sparse-large",
+            "family_id": "coordinate-sparse",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=coordinate-sparse; top_level_items=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1859584
+            },
+            "semantic_work": 65536,
+            "input_digest": "5a15e24913a40f53a1a10e7760009b3e68be8114a76e9f18a3d831ee1f4addc1"
+          },
+          {
+            "id": "folded-repeats-small",
+            "family_id": "folded-repeats",
+            "size_class": "small",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=64",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 8320
+            },
+            "semantic_work": 64,
+            "input_digest": "c484e6f7c587a0b7edf9e3572ee745d2268ccde4f6d3d444d186b7cff5ae8db6"
+          },
+          {
+            "id": "folded-repeats-medium",
+            "family_id": "folded-repeats",
+            "size_class": "medium",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 532480
+            },
+            "semantic_work": 4096,
+            "input_digest": "0a0ac94bf0297b57a62e400c64ccce954519c051b4ef482c9af05babd9ee17c2"
+          },
+          {
+            "id": "folded-repeats-large",
+            "family_id": "folded-repeats",
+            "size_class": "large",
+            "parameters": "generator=dem-model-families-v2; family=folded-repeats; top_level_items=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 8519680
+            },
+            "semantic_work": 65536,
+            "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
           }
         ]
       },
@@ -28477,11 +28651,11 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
-            "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+            "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
           }
         ]
       },
@@ -28498,11 +28672,17 @@
       "memory_policy": {
         "method": "process-rss",
         "scale_ids": [
-          "small",
-          "medium",
-          "large"
+          "flat-errors-small",
+          "flat-errors-medium",
+          "flat-errors-large",
+          "coordinate-sparse-small",
+          "coordinate-sparse-medium",
+          "coordinate-sparse-large",
+          "folded-repeats-small",
+          "folded-repeats-medium",
+          "folded-repeats-large"
         ],
-        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance."
+        "expected_growth": "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are reported independently for each family and size. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation."
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust direct canonical DEM serialization with exact CQ2, fixture, output, scale, timing, hostile-boundary, and receipt contracts.",
@@ -28533,6 +28713,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "circuit to detector error model analyzer workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -28592,6 +28774,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "error decomposition utility workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -28651,6 +28835,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "graphlike logical error search workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -28710,6 +28896,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "compiled DEM sampler throughput workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -28770,6 +28958,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim sample_dem CLI throughput workload",
             "input_bytes": {
               "kind": "exact",
@@ -28831,6 +29021,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "dense DEM sample_dem CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -28892,6 +29084,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "high detector count DEM sample_dem CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -28953,6 +29147,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repeated DEM sample_dem CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -29014,6 +29210,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "sparse DEM sample_dem CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -29074,6 +29272,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "compare every M4 through M11 benchmark contract before performance hardening",
             "input_bytes": {
               "kind": "not-applicable"
@@ -29136,6 +29336,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=64",
             "input_bytes": {
               "kind": "exact",
@@ -29146,6 +29348,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=4096",
             "input_bytes": {
               "kind": "exact",
@@ -29156,6 +29360,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=65536",
             "input_bytes": {
               "kind": "exact",
@@ -29223,6 +29429,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=64",
             "input_bytes": {
               "kind": "exact",
@@ -29233,6 +29441,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=4096",
             "input_bytes": {
               "kind": "exact",
@@ -29243,6 +29453,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=circuit-parse-cycle-v1; instructions=65536",
             "input_bytes": {
               "kind": "exact",
@@ -29309,6 +29521,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=1",
             "input_bytes": {
               "kind": "exact",
@@ -29319,6 +29533,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=64",
             "input_bytes": {
               "kind": "exact",
@@ -29329,6 +29545,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=4096",
             "input_bytes": {
               "kind": "exact",
@@ -29399,6 +29617,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=256; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29409,6 +29629,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=2048; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29419,6 +29641,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=16384; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29437,7 +29661,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -29499,6 +29723,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=256; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29509,6 +29735,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=2048; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29519,6 +29747,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=16384; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
               "kind": "exact",
@@ -29537,7 +29767,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -29593,6 +29823,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "bit table transpose baseline plus Stab row-XOR and transpose contract-smoke rates",
             "input_bytes": {
               "kind": "not-applicable"
@@ -29655,6 +29887,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=splitmix64-xor-pair-v1; bits=4096; alignment_bits=256",
             "input_bytes": {
               "kind": "exact",
@@ -29665,6 +29899,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=splitmix64-xor-pair-v1; bits=262144; alignment_bits=256",
             "input_bytes": {
               "kind": "exact",
@@ -29675,6 +29911,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=splitmix64-xor-pair-v1; bits=16777216; alignment_bits=256",
             "input_bytes": {
               "kind": "exact",
@@ -29693,7 +29931,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -29752,6 +29990,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=zero",
             "input_bytes": {
               "kind": "exact",
@@ -29762,6 +30002,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=zero",
             "input_bytes": {
               "kind": "exact",
@@ -29772,6 +30014,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=zero",
             "input_bytes": {
               "kind": "exact",
@@ -29790,7 +30034,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -29849,6 +30093,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=early",
             "input_bytes": {
               "kind": "exact",
@@ -29859,6 +30105,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=early",
             "input_bytes": {
               "kind": "exact",
@@ -29869,6 +30117,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=early",
             "input_bytes": {
               "kind": "exact",
@@ -29887,7 +30137,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -29946,6 +30196,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=late",
             "input_bytes": {
               "kind": "exact",
@@ -29956,6 +30208,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=late",
             "input_bytes": {
               "kind": "exact",
@@ -29966,6 +30220,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=late",
             "input_bytes": {
               "kind": "exact",
@@ -29984,7 +30240,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -30044,6 +30300,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=splitmix64-word-v1; bits=4096; alignment_bits=256; toggle_bit=300",
             "input_bytes": {
               "kind": "exact",
@@ -30054,6 +30312,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=splitmix64-word-v1; bits=262144; alignment_bits=256; toggle_bit=300",
             "input_bytes": {
               "kind": "exact",
@@ -30064,6 +30324,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=splitmix64-word-v1; bits=16777216; alignment_bits=256; toggle_bit=300",
             "input_bytes": {
               "kind": "exact",
@@ -30082,7 +30344,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -30140,6 +30402,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=1; rows=1000; actual_row_xors_per_callback=1997",
             "input_bytes": {
               "kind": "exact",
@@ -30150,6 +30414,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=64; rows=1000; actual_row_xors_per_callback=1997",
             "input_bytes": {
               "kind": "exact",
@@ -30160,6 +30426,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=4096; rows=1000; actual_row_xors_per_callback=1997",
             "input_bytes": {
               "kind": "exact",
@@ -30178,7 +30446,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -30236,6 +30504,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=1; toggles_per_callback=7",
             "input_bytes": {
               "kind": "exact",
@@ -30246,6 +30516,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=64; toggles_per_callback=7",
             "input_bytes": {
               "kind": "exact",
@@ -30256,6 +30528,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=4096; toggles_per_callback=7",
             "input_bytes": {
               "kind": "exact",
@@ -30274,7 +30548,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -30335,6 +30609,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=10000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30345,6 +30621,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=100000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30355,6 +30633,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=1000000; marker=3550043079824723011; canonical_gates=24; right_cycle=0; complete_span=0; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30373,7 +30653,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -30437,6 +30717,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=10000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30447,6 +30729,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=100000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30457,6 +30741,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=pq2-clifford-string-vectors-v1; width=1000000; marker=3551455952266415171; canonical_gates=24; right_cycle=23; complete_span=552; public_cap=1048576",
             "input_bytes": {
               "kind": "exact",
@@ -30475,7 +30761,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -30542,6 +30828,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=5; min_weight=2; max_weight=5; axes=XZ; outputs=232; marker=6",
             "input_bytes": {
               "kind": "exact",
@@ -30552,6 +30840,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=11; min_weight=2; max_weight=5; axes=XZ; outputs=21604; marker=6",
             "input_bytes": {
               "kind": "exact",
@@ -30562,6 +30852,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=22; min_weight=2; max_weight=5; axes=XZ; outputs=972972; marker=6",
             "input_bytes": {
               "kind": "exact",
@@ -30580,7 +30872,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -30640,6 +30932,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=1000; min_weight=1; max_weight=1; axes=XYZ; outputs=3000; marker=7",
             "input_bytes": {
               "kind": "exact",
@@ -30650,6 +30944,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=32000; min_weight=1; max_weight=1; axes=XYZ; outputs=96000; marker=7",
             "input_bytes": {
               "kind": "exact",
@@ -30660,6 +30956,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=1000000; min_weight=1; max_weight=1; axes=XYZ; outputs=3000000; marker=7",
             "input_bytes": {
               "kind": "exact",
@@ -30678,7 +30976,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -30740,6 +31038,8 @@
         "scales": [
           {
             "id": "small",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=10000; marker=5; left_sign=plus; right_sign=minus",
             "input_bytes": {
               "kind": "exact",
@@ -30750,6 +31050,8 @@
           },
           {
             "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
             "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=100000; marker=5; left_sign=plus; right_sign=minus",
             "input_bytes": {
               "kind": "exact",
@@ -30760,6 +31062,8 @@
           },
           {
             "id": "large",
+            "family_id": "default",
+            "size_class": "large",
             "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=1000000; marker=5; left_sign=plus; right_sign=minus",
             "input_bytes": {
               "kind": "exact",
@@ -30778,7 +31082,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+            "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
@@ -30834,6 +31138,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stabilizer conversion workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -30893,6 +31199,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "tableau construction and gate workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -30952,6 +31260,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "tableau iterator workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31011,6 +31321,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "namespaced CLI dispatch and sample command workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31071,6 +31383,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "01 text to b8 packed result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31131,6 +31445,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "01 text to ptb64 result conversion CLI workload without a pinned Stim output baseline",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31191,6 +31507,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "b8 packed to 01 text result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31252,6 +31570,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "wide b8 packed round-trip result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31313,6 +31633,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "b8 packed to dets typed text result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31374,6 +31696,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "circuit layout detection and observable side-output conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31435,6 +31759,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "DEM layout dets typed text to 01 result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31496,6 +31822,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "dets typed text to b8 packed result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31557,6 +31885,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "ptb64 to 01 text result conversion CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -31617,6 +31947,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "Stab canonical .stim convert throughput contract",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31676,6 +32008,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "color code d5 r5 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31735,6 +32069,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d17 r17 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31794,6 +32130,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d17 r170 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31853,6 +32191,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d3 r3 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31912,6 +32252,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d3 r30 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -31971,6 +32313,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d5 r5 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32030,6 +32374,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d5 r50 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32089,6 +32435,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d9 r9 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32148,6 +32496,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition code d9 r90 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32207,6 +32557,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d17 r17 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32266,6 +32618,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d17 r170 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32325,6 +32679,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d3 r3 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32384,6 +32740,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d3 r30 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32443,6 +32801,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d5 r5 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32502,6 +32862,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d5 r50 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32561,6 +32923,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d9 r9 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32620,6 +32984,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface code d9 r90 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32679,6 +33045,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d3 r3 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32738,6 +33106,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d3 r30 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32797,6 +33167,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d5 r5 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32856,6 +33228,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d5 r50 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32915,6 +33289,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d9 r9 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -32974,6 +33350,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface code d9 r90 generation workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33033,6 +33411,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "Stim perf harness source and baseline metadata anchor",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33092,6 +33472,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "frame simulator analysis and batch sampling workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33151,6 +33533,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "01 text result reader throughput across dense and sparse Stim filters",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33210,6 +33594,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "b8 bit-packed result reader throughput across dense and sparse Stim filters",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33269,6 +33655,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "dets text result reader throughput across dense and sparse Stim filters",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33328,6 +33716,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "hits text result reader throughput across dense and sparse Stim filters",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33387,6 +33777,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "ptb64 result reader throughput contract without a pinned Stim perf filter",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33446,6 +33838,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "r8 byte-packed result reader throughput across dense and sparse Stim filters",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33505,6 +33899,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "biased random probability utility throughput",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33564,6 +33960,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "reference sample tree workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -33624,6 +34022,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim sample single shot analysis workload",
             "input_bytes": {
               "kind": "exact",
@@ -33685,6 +34085,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "high repeat loop sampling CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -33746,6 +34148,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "repetition primary matrix sampling CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -33807,6 +34211,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "rotated surface primary matrix sampling CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -33868,6 +34274,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "unrotated surface primary matrix sampling CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -33929,6 +34337,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim sample million shot throughput workload",
             "input_bytes": {
               "kind": "exact",
@@ -33990,6 +34400,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim sample 1024 shot throughput workload",
             "input_bytes": {
               "kind": "exact",
@@ -34050,6 +34462,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "tableau simulator single-shot latency workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -34110,6 +34524,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "measurement-to-dets CLI throughput through the implemented circuit plus --types convert layout",
             "input_bytes": {
               "kind": "exact",
@@ -34171,6 +34587,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim detect bit-packed output throughput workload",
             "input_bytes": {
               "kind": "exact",
@@ -34232,6 +34650,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "detect primary matrix bit-packed CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34293,6 +34713,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "stim detect text output throughput workload",
             "input_bytes": {
               "kind": "exact",
@@ -34353,6 +34775,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "report-only Rust detecting-regions utility batch for the simple H CX MXX case",
             "input_bytes": {
               "kind": "not-applicable"
@@ -34412,6 +34836,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "report-only Rust feedback-inlining utility batch for the supported MPP case",
             "input_bytes": {
               "kind": "not-applicable"
@@ -34472,6 +34898,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "measurement to detection bit-packed output CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34533,6 +34961,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "m2d primary matrix bit-packed CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34594,6 +35024,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "m2d feedback-inlining CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34655,6 +35087,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "m2d sweep-conditioned text CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34716,6 +35150,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "m2d sweep-conditioned packed b8 CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34777,6 +35213,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "m2d sweep-conditioned observable side-output CLI workload",
             "input_bytes": {
               "kind": "exact",
@@ -34838,6 +35276,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "measurement to detection text conversion workload",
             "input_bytes": {
               "kind": "exact",
@@ -34898,6 +35338,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "report-only Rust missing-detectors utility batch for the owned basic corpus",
             "input_bytes": {
               "kind": "not-applicable"
@@ -34957,6 +35399,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF1 Rust circuit count and coordinate query workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35016,6 +35460,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF1 Rust DEM count and coordinate query workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35075,6 +35521,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF1 Rust DEM recursive tag-stripping workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35134,6 +35582,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF1 Rust gate metadata accessor workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35193,6 +35643,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::decomposed MPP SPP pair-measurement workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35252,6 +35704,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::flattened repeat transform workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35311,6 +35765,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::without_noise transform workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35370,6 +35826,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::with_inlined_feedback scoped MPP bounded repeat-loop and XCZ/YCZ feedback transform workloads with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35429,6 +35887,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::time_reversed_for_flows scoped unitary workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35488,6 +35948,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF2 Rust Circuit::time_reversed_for_flows historical pinned measurement-rich gate-family corpus with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35547,6 +36009,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF3 analyzer sweep-control and CZ classical-only no-op workload plus low and maximum sweep-ID allocation evidence",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35606,6 +36070,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF3 Rust non-frame and frame-path sweep-conditioned detection sampling workload with omitted all-false sweep bits",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35665,6 +36131,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF3 representative fixed-tableau measurement Pauli-product noise channel herald annotation classical-control repeat sampler reference conversion detection analyzer and flow execution workload",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35724,6 +36192,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF3 public m2d sweep-conditioned packed b8 workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35783,6 +36253,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF3 public m2d sweep-conditioned ptb64 input workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35842,6 +36314,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 Rust DEM coordinate-map selected-coordinate flat and nested sparse-overlap plus many-selected flat-overlap workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35901,6 +36375,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 Rust DetectorErrorModel::flattened repeat transform workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -35960,6 +36436,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 shared folded-visitor graphlike collection workload covering bounded shifted traversal zero-probability repeat skipping detector-touching and detectorless logical-only zero-shift folding and no-target repeat skipping with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36019,6 +36497,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 shared folded-visitor hypergraph and SAT collection workload plus source-owned analyzer and ErrorMatcher circuit traversal caps zero-probability repeat skipping zero-shift repeat folding weighted SAT probability folding and shifted active-repeat complexity rejection with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36078,6 +36558,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected flat detectorless logical-only zero-shift hypergraph repeat folding workload with report-only runner coverage; broader hypergraph folded traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36137,6 +36619,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected flat no-target zero-shift hypergraph repeat skipping workload with report-only runner coverage; broader hypergraph folded traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36196,6 +36680,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 Rust DetectorErrorModel::rounded probability transform workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36255,6 +36741,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 folded DEM sampler compile stochastic direct-sampling zero-probability repeat-skip deterministic zero-shift repeat parity-folding selected direct detection-event single-stochastic zero-shift repeat parity-folding selected direct detection-event flat stochastic zero-shift repeat parity-folding and selected direct detection-event nested zero-shift stochastic repeat parity-folding workload with report-only runner coverage while sampled-error materialization replay paths and non-selected excessive stochastic repeated-error work remain capped",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36314,6 +36802,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected SAT/WCNF flat and nested zero-shift repeat folding workload for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT with report-only runner coverage; broader shifted non-flat and dense-target SAT folded traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36373,6 +36863,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected flat annotation-bearing graphlike and hypergraph repeat folding workload with report-only runner coverage; broader shifted and non-annotation mixed-instruction search traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36432,6 +36924,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected mixed zero-probability plus active zero-shift graphlike and hypergraph repeat folding workload with report-only runner coverage; broader shifted non-flat and non-search traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36491,6 +36985,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected nested zero-detector-shift graphlike and hypergraph repeat folding workload with report-only runner coverage; broader shifted nested and non-flat search traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36550,6 +37046,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected flat zero-detector-shift graphlike and hypergraph repeat folding workload with report-only runner coverage; broader shifted and mixed-instruction search traversal remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36609,6 +37107,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected ErrorMatcher filter DEM flat and nested annotation-bearing zero-shift repeat folding workload with report-only runner coverage; neutral annotation-only bodies are skipped while broader active mixed-instruction bodies shifted repeats circuit-repeat provenance full ErrorMatcher provenance and explain_errors CLI behavior remain capped or deferred",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36668,6 +37168,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding workload with report-only runner coverage; detectorless logical-observable-only filter repeats are covered by pf4-error-matcher-filter-logical-repeat while broader shifted mixed-instruction circuit-repeat provenance full ErrorMatcher provenance and explain_errors CLI behavior remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36727,6 +37229,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected ErrorMatcher filter DEM flat and nested detectorless logical-observable-only zero-shift repeat folding workload with report-only runner coverage; neutral annotation-only bodies are skipped while shifted active mixed-instruction circuit-repeat provenance full ErrorMatcher provenance and explain_errors CLI behavior remain capped or deferred",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36786,6 +37290,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF4 selected ErrorMatcher filter DEM nested detector-touching zero-shift repeat folding workload with report-only runner coverage; detectorless logical-observable-only filter repeats are covered by pf4-error-matcher-filter-logical-repeat while broader shifted circuit-repeat provenance full ErrorMatcher provenance and explain_errors CLI behavior remains pending",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36845,6 +37351,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 promoted representative single-qubit and fixed two-qubit Clifford detecting-regions workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36904,6 +37412,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 generated repetition-code detecting-regions workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -36963,6 +37473,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 selected generated rotated surface-code detecting-regions workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37022,6 +37534,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 bounded detecting-regions repeat traversal workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37081,6 +37595,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 detector and logical-observable target-filter detecting-regions workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37140,6 +37656,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust flow-generator workload for pinned Python multi-target measurement and MPP examples",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37199,6 +37717,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust flow-generator workload for scoped measurement reset inverted-measure-reset pair-measurement nonconstant and constant MPP variable-target SPP selected unitary-mixed composed-measurement all-operation no-op annotation and ordinary-noise traversal composed SPP decomposition bounded-repeat feedback selected sweep-controlled Pauli MPAD and single- and multi-target heralded-noise MPP circuits",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37258,6 +37778,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust solve_for_flow_measurements workload for pinned Python measured-idle multi-target and fewer-measurements examples",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37317,6 +37839,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust solve_for_flow_measurements workload for promoted MX and repetition-code examples",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37376,6 +37900,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust unsigned has_all_flow helper workload for measurement-record observable-dependency and false-flow batches with runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37435,6 +37961,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust missing-detectors generated-code workload for the promoted honeycomb and toric suffix cases",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37494,6 +38022,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust missing-detectors workload for MPAD measurement-pad records",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37553,6 +38083,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF5 report-only Rust missing-detectors workload for MPP row reduction and observable-row cases",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37612,6 +38144,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF6 loop-folded error decomposition workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37671,6 +38205,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF6 sparse reverse frame unitary-repeat high-idle-width unitary-repeat and shifted measurement-repeat folding workloads with report-only runner and allocation coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37730,6 +38266,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF7 public CLI analyze_errors decomposition workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37789,6 +38327,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF7 public CLI generated-circuit analyze_errors workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37848,6 +38388,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF7 accepted legacy --gen dispatch startup workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37907,6 +38449,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF7 public CLI m2d feedback-inlining workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -37966,6 +38510,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PF7 public CLI m2d sweep packed b8 workload with report-only runner coverage",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38025,6 +38571,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B1 no-repeat distance matrix of rotated-memory-X reverse-flow workloads with source generation repeat rejection and compact instruction counts outside timed samples",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38084,6 +38632,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B1 folded unitary-repeat count and body-state-size matrix with transform-normalized work",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38143,6 +38693,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B1 MPAD semantic matrix plus 1 8 and 64 independent record-flow scaling workloads",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38202,6 +38754,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B1 low-versus-million unitary qubit-index reversal with a nonempty low-width validation flow",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38261,6 +38815,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B3 shared folded DEM traversal workload with flat-equivalent 4096-compact-instruction count summaries nested-large-repeat 3-compact-instruction summaries representing 3000000000000000000 instructions sparse-selected-coordinate lookup across two compact declarations representing 4000000 iterations and a 128-level 4096-coordinate-dimension model proving coordinate-free count traversal; allocation peak-live-byte resident and resident-delta evidence is recorded when memory tracking is enabled",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38320,6 +38876,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B4 end-to-end public solve_for_flow_measurements GF2 workload with deterministic measurement-rich scrambled dense 32x64 and 128x256 Pauli bases carrying exact 7 and 24 singleton measurement-signature sets plus a 512x1024 high-qubit Pauli basis carrying an exact 12 singleton measurement-signature set scrambled within exactly 32 sparse active qubits each circuit containing a mixed classical-feedback and plain-quantum controlled-Pauli instruction that forced the removed fallback 17 65 and 33 three-row-composed nonempty-parity queries validation outside timing overall and active-submatrix density assertions exact active-support checks literal production-contract tests query-inclusive-input-bit and solved-query rates allocation peak-live-byte resident and resident-delta evidence",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38379,6 +38937,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 generic transient short-period long-period nested gauge and coordinate loop-folding matrix with production diagnostics",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38438,6 +38998,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 repetition r100000 and rotated-surface d11/r100000000 compact analyzer workloads with production diagnostics",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38497,6 +39059,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 generated rotated-memory-X d11/r1000 graphlike search matching pinned Stim setup",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38556,6 +39120,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 generated rotated-memory-X d25/r25 graphlike search matching pinned Stim setup",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38615,6 +39181,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 direct sparse-ID graphlike search with touched-node allocation and exact minimum distance",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38674,6 +39242,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 direct bounded four-detector hypergraph workload with sparse irrelevant components",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38733,6 +39303,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 generated rotated-memory-X hypergraph search workload with detector-node observations",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38792,6 +39364,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 direct shortest and weighted WCNF workload with exact variable and clause observations",
             "input_bytes": {
               "kind": "not-applicable"
@@ -38851,6 +39425,8 @@
         "scales": [
           {
             "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
             "parameters": "PFM-B5 generated QEC shortest and weighted WCNF workload with exact variable and clause observations",
             "input_bytes": {
               "kind": "not-applicable"

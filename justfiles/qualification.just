@@ -32,3 +32,8 @@ correctness-report *args:
 [working-directory: '..']
 correctness-preflight *args:
     cargo run -q -p stab-oracle -- qualification correctness preflight {{args}}
+
+# Generate or check the consolidated correctness and performance qualification dashboard.
+[working-directory: '..']
+status *args:
+    cargo run -q -p stab-bench -- qualification-status {{args}}

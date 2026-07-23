@@ -8,7 +8,7 @@ use super::protocol::{
     InputDigest, ProtocolId, RAW_WORK_TIMING_BOUNDARY, Sha256Digest, TimingBoundary,
 };
 use super::run::ClaimClass;
-use crate::qualification::model::TimingBatchPolicy;
+use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
 mod comparators;
@@ -16,7 +16,7 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 6;
+const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 7;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_RELEASE_GROUPS: usize = 40;
@@ -33,7 +33,7 @@ const COMPARATOR_SOURCE_PREFIX: &str = "benchmarks/stim_adapter/";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum BaselineEligibility {
+pub(super) enum ParityEligibility {
     ReportOnly,
     ThresholdEligible,
 }
@@ -43,7 +43,7 @@ pub(super) enum BaselineEligibility {
 pub(super) struct GroupContract {
     pub(super) id: ProtocolId,
     pub(super) claim_class: ClaimClass,
-    pub(super) baseline_eligibility: BaselineEligibility,
+    pub(super) parity_eligibility: ParityEligibility,
     pub(super) timing_batch_policy: TimingBatchPolicy,
     pub(super) workload_id: ProtocolId,
     pub(super) measurement_ids: Vec<ProtocolId>,
@@ -144,6 +144,8 @@ impl<'de> Deserialize<'de> for ProfilerNotePath {
 #[serde(deny_unknown_fields)]
 pub(super) struct ScaleContract {
     pub(super) id: ProtocolId,
+    pub(super) family_id: ProtocolId,
+    pub(super) size_class: SizeClass,
     pub(super) work_items: NonZeroU64,
     pub(super) input_bytes: u64,
     pub(super) input_digest: InputDigest,
@@ -291,6 +293,8 @@ fn validate_inventory_contracts(
             .zip(&group.workload_family.scales)
             .all(|(contract, inventory)| {
                 contract.id.to_string() == inventory.id
+                    && contract.family_id.to_string() == inventory.family_id
+                    && contract.size_class == inventory.size_class
                     && inventory.semantic_work == Some(contract.work_items.get())
                     && inventory.input_bytes
                         == InputByteCount::Exact {
@@ -485,10 +489,7 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         let expected_comparator_paths = comparators::expected_paths(group.id.to_string().as_str());
         if measurement_ids.len() != group.measurement_ids.len()
             || scale_ids.len() != group.scales.len()
-            || !group
-                .scales
-                .windows(2)
-                .all(|pair| matches!(pair, [left, right] if left.work_items < right.work_items))
+            || !valid_scale_families(&group.scales)
             || correctness_case_ids.len() != group.correctness_case_ids.len()
             || !group
                 .correctness_case_ids
@@ -502,10 +503,10 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         {
             return Err(GroupError::InvalidGroup(group.id.to_string()));
         }
-        match (group.claim_class, group.baseline_eligibility) {
-            (ClaimClass::DiagnosticInfrastructure, BaselineEligibility::ReportOnly)
+        match (group.claim_class, group.parity_eligibility) {
+            (ClaimClass::DiagnosticInfrastructure, ParityEligibility::ReportOnly)
                 if group.correctness_case_ids.is_empty() => {}
-            (ClaimClass::PromotablePerformance, BaselineEligibility::ThresholdEligible)
+            (ClaimClass::PromotablePerformance, ParityEligibility::ThresholdEligible)
                 if !group.correctness_case_ids.is_empty() => {}
             _ => return Err(GroupError::InvalidGroup(group.id.to_string())),
         }
@@ -521,6 +522,27 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         return Err(GroupError::UnsupportedRuntimeShape(group.id.to_string()));
     }
     Ok(())
+}
+
+fn valid_scale_families(scales: &[ScaleContract]) -> bool {
+    let mut families = std::collections::BTreeMap::<&ProtocolId, Vec<&ScaleContract>>::new();
+    for scale in scales {
+        families.entry(&scale.family_id).or_default().push(scale);
+    }
+    families.into_values().all(|family| {
+        let mut seen_classes = BTreeSet::new();
+        family
+            .iter()
+            .all(|scale| seen_classes.insert(scale.size_class))
+            && family.windows(2).all(|pair| {
+                matches!(
+                    pair,
+                    [left, right]
+                        if left.size_class < right.size_class
+                            && left.work_items < right.work_items
+                )
+            })
+    })
 }
 
 fn valid_case_id(value: &str) -> bool {

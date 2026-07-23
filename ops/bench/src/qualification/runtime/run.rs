@@ -23,7 +23,7 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::TimingBatchPolicy;
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 34;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 35;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -109,7 +109,7 @@ pub(super) struct QualificationReport {
     pub(super) scale_id: String,
     pub(super) group_contract_sha256: String,
     pub(super) claim_class: ClaimClass,
-    pub(super) baseline_eligibility: super::group::BaselineEligibility,
+    pub(super) parity_eligibility: super::group::ParityEligibility,
     pub(super) owner: String,
     pub(super) profiler_note: Option<super::group::ProfilerNoteContract>,
     pub(super) tier: QualificationTier,
@@ -293,7 +293,12 @@ pub(super) fn run_with_repository(
     let mut host_guard = HostGuard::prepare(source_root, args.allow_unverified_host)?;
     let toolchain = super::toolchain::collect(source_root)?;
     live_repository.require_current(root)?;
-    let mut workers = PreparedWorkers::prepare(source_root, &repository_before.commit, &toolchain)?;
+    let mut workers = PreparedWorkers::prepare(
+        source_root,
+        &repository_before.commit,
+        &toolchain,
+        performance_inventory_sha256,
+    )?;
     live_repository.require_current(root)?;
     workers.pin_to_cpu(host_guard.selected_cpu());
 
@@ -472,7 +477,7 @@ pub(super) fn run_with_repository(
         scale_id: scale_id.to_string(),
         group_contract_sha256: resolved_group.source_sha256,
         claim_class,
-        baseline_eligibility: resolved_group.contract.baseline_eligibility,
+        parity_eligibility: resolved_group.contract.parity_eligibility,
         owner: resolved_group.contract.owner.to_string(),
         profiler_note: resolved_group.contract.profiler_note.clone(),
         tier: args.tier,

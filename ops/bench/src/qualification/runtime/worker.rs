@@ -15,7 +15,7 @@ use sha2::{Digest as _, Sha256};
 
 mod bits;
 pub(super) mod clifford_string;
-mod dem_model;
+pub(in crate::qualification::runtime) mod dem_model;
 mod error;
 mod not_zero;
 mod pauli;
@@ -128,6 +128,10 @@ pub(crate) struct WorkerArgs {
     #[arg(long)]
     input_descriptor_hex: Option<CliffordDescriptor>,
 
+    /// Source-owned generated input family for workloads with multiple fixture families.
+    #[arg(long, value_enum)]
+    input_family: Option<dem_model::DemFamily>,
+
     /// Whether this invocation produces contract, timing, or separately instrumented memory evidence.
     #[arg(long, value_enum, default_value = "timing")]
     evidence_mode: WorkerEvidenceMode,
@@ -161,6 +165,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let mut prepared = PreparedWorkload::prepare(
         args.workload,
         args.input_descriptor_hex,
+        args.input_family,
         args.iterations.get(),
         args.work_items.get(),
         work_count,
@@ -584,6 +589,7 @@ mod tests {
             iterations: NonZeroU64::new(iterations).expect("positive iterations"),
             work_items: NonZeroU64::new(work_items).expect("positive work items"),
             input_descriptor_hex: None,
+            input_family: Some(dem_model::DemFamily::FlatErrors),
             evidence_mode: WorkerEvidenceMode::Timing,
             start_barrier: false,
             expected_cpu: None,
@@ -606,6 +612,26 @@ mod tests {
                 dem_model::DEM_CYCLE_ITEMS,
             )),
             Err(WorkerError::WorkOverflow)
+        ));
+    }
+
+    #[test]
+    fn dem_family_is_required_only_by_dem_workloads() {
+        assert!(dem_model::DemFamily::from_str("unknown-family", true).is_err());
+        assert!(matches!(
+            PreparedWorkload::prepare(WorkerWorkload::DemParse, None, None, 1, 64, 64,),
+            Err(WorkerError::MissingDemFamily)
+        ));
+        assert!(matches!(
+            PreparedWorkload::prepare(
+                WorkerWorkload::ProtocolSmoke,
+                None,
+                Some(dem_model::DemFamily::FlatErrors),
+                1,
+                64,
+                64,
+            ),
+            Err(WorkerError::UnexpectedDemFamily)
         ));
     }
 

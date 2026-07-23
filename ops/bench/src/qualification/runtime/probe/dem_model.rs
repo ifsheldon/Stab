@@ -9,21 +9,14 @@ use super::super::protocol::{
     SemanticDigest, parse_worker_json_lines,
 };
 use super::super::worker::WorkerIdentity;
+use super::super::worker::dem_model::{DEM_CYCLE_ITEMS, DemFamily, DemFixture, parse, serialize};
 use super::{ProbeError, ProbeGroup, checked_process, probe_environment, probe_limits};
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
-pub(super) const CYCLE_ITEMS: u64 = 8;
 pub(super) const MEDIUM_ITEMS: u64 = 4_096;
-pub(super) const MAX_ITEMS: u64 = 524_288;
 const SMALL_ITEMS: u64 = 64;
-const SMALL_INPUT_BYTES: u64 = 1_776;
-const MAX_INPUT_BYTES: u64 = 14_548_992;
-const SMALL_INPUT_DIGEST: &str = "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773";
-const MAX_INPUT_DIGEST: &str = "127e88c725aa88acdea3be1aed5369af43166e27365e1dbd11dbe89c8e807789";
-const SMALL_OUTPUT_DIGEST: &str =
-    "02ad6cd3910a69ae416bdaadeb16126fdf813aba8154bb682bf75a01c609093f";
-const MAX_OUTPUT_DIGEST: &str = "5bd41410a3ee8859fa7589abe6a20fa61d4e5c06e08105f60a5f3aa474d478b2";
+const LARGE_ITEMS: u64 = 65_536;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DemProbeKind {
@@ -57,13 +50,25 @@ impl DemProbeKind {
 
 pub(super) fn validate_work_items(group: ProbeGroup, items: u64) -> Result<(), ProbeError> {
     if kind(group).is_some()
-        && (items == 0 || items > MAX_ITEMS || !items.is_multiple_of(CYCLE_ITEMS))
+        && (items == 0
+            || items > DemFamily::FlatErrors.maximum_items()
+            || !items.is_multiple_of(DEM_CYCLE_ITEMS))
     {
         return Err(ProbeError::Contract(format!(
-            "DEM model probe work count {items} is not a positive complete eight-item cycle through {MAX_ITEMS} items"
+            "DEM model probe work count {items} is not a positive complete flat-errors cycle through {} items",
+            DemFamily::FlatErrors.maximum_items()
         )));
     }
     Ok(())
+}
+
+pub(super) fn append_default_family_arguments(group: ProbeGroup, arguments: &mut Vec<OsString>) {
+    if kind(group).is_some() {
+        arguments.extend([
+            OsString::from("--input-family"),
+            OsString::from(DemFamily::FlatErrors.id()),
+        ]);
+    }
 }
 
 pub(super) fn validate_boundaries(
@@ -76,44 +81,81 @@ pub(super) fn validate_boundaries(
     let Some(kind) = kind(group) else {
         return Ok(());
     };
-    for (iterations, items, input_bytes, input_digest, output_digest) in [
-        (
-            1,
-            SMALL_ITEMS,
-            SMALL_INPUT_BYTES,
-            SMALL_INPUT_DIGEST,
-            SMALL_OUTPUT_DIGEST,
-        ),
-        (
-            2,
-            SMALL_ITEMS,
-            SMALL_INPUT_BYTES,
-            SMALL_INPUT_DIGEST,
-            SMALL_OUTPUT_DIGEST,
-        ),
-        (
-            1,
-            MAX_ITEMS,
-            MAX_INPUT_BYTES,
-            MAX_INPUT_DIGEST,
-            MAX_OUTPUT_DIGEST,
-        ),
-    ] {
-        validate_accepted(
+    for family in DemFamily::ALL {
+        for items in [SMALL_ITEMS, MEDIUM_ITEMS, LARGE_ITEMS] {
+            validate_accepted_fixture(
+                root,
+                kind,
+                family,
+                adapter,
+                worker_program,
+                worker_identity,
+                1,
+                items,
+            )?;
+        }
+        validate_accepted_fixture(
             root,
             kind,
+            family,
             adapter,
             worker_program,
             worker_identity,
-            iterations,
-            items,
-            input_bytes,
-            input_digest,
-            output_digest,
+            2,
+            SMALL_ITEMS,
         )?;
+        validate_accepted_fixture(
+            root,
+            kind,
+            family,
+            adapter,
+            worker_program,
+            worker_identity,
+            1,
+            family.maximum_items(),
+        )?;
+        validate_guard_rejections(root, kind, family, adapter, worker_program)?;
+        validate_first_rejection(root, kind, family, adapter, worker_program)?;
     }
-    validate_guard_rejections(root, kind, adapter, worker_program)?;
-    validate_first_rejection(root, kind, adapter, worker_program)
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the exact worker protocol receipt is intentionally explicit"
+)]
+fn validate_accepted_fixture(
+    root: &RepoRoot,
+    kind: DemProbeKind,
+    family: DemFamily,
+    adapter: &AdapterExecutable,
+    worker_program: &Path,
+    worker_identity: &WorkerIdentity,
+    iterations: u64,
+    items: u64,
+) -> Result<(), ProbeError> {
+    let fixture = DemFixture::prepare(family, items)
+        .map_err(|error| ProbeError::Contract(error.to_string()))?;
+    let model = parse(1, &fixture).map_err(|error| ProbeError::Contract(error.to_string()))?;
+    let canonical = serialize(1, &model);
+    let output_digest = fixture
+        .validate_canonical(&canonical)
+        .map_err(|error| ProbeError::Contract(error.to_string()))?;
+    validate_accepted(
+        root,
+        kind,
+        family,
+        adapter,
+        worker_program,
+        worker_identity,
+        iterations,
+        items,
+        fixture
+            .input_bytes()
+            .map_err(|error| ProbeError::Contract(error.to_string()))?,
+        &fixture.input_digest(),
+        &output_digest,
+    )
 }
 
 #[allow(
@@ -123,6 +165,7 @@ pub(super) fn validate_boundaries(
 fn validate_accepted(
     root: &RepoRoot,
     kind: DemProbeKind,
+    family: DemFamily,
     adapter: &AdapterExecutable,
     worker_program: &Path,
     worker_identity: &WorkerIdentity,
@@ -145,6 +188,7 @@ fn validate_accepted(
                 adapter,
                 worker_program,
                 kind,
+                family,
                 kind.measurement(),
                 iterations,
                 items,
@@ -191,29 +235,34 @@ fn validate_accepted(
 fn validate_guard_rejections(
     root: &RepoRoot,
     kind: DemProbeKind,
+    family: DemFamily,
     adapter: &AdapterExecutable,
     worker_program: &Path,
 ) -> Result<(), ProbeError> {
     for implementation in [Implementation::Stim, Implementation::Stab] {
-        for class in [
+        let mut classes = vec![
             DemGuardRejection::Zero,
-            DemGuardRejection::IncompleteCycle,
             DemGuardRejection::WrongMeasurement,
             DemGuardRejection::WorkOverflow,
-        ] {
-            let (measurement, iterations, items) = guard_request(kind, class);
+        ];
+        if family.cycle_items() > 1 {
+            classes.push(DemGuardRejection::IncompleteCycle);
+        }
+        for class in classes {
+            let (measurement, iterations, items) = guard_request(kind, family, class);
             let output = run_bounded_process(&request(
                 root,
                 implementation,
                 adapter,
                 worker_program,
                 kind,
+                family,
                 measurement,
                 iterations,
                 items,
                 true,
             ))?;
-            verify_guard_rejection(&output, implementation, kind, class)?;
+            verify_guard_rejection(&output, implementation, kind, family, class)?;
         }
     }
     Ok(())
@@ -222,6 +271,7 @@ fn validate_guard_rejections(
 fn validate_first_rejection(
     root: &RepoRoot,
     kind: DemProbeKind,
+    family: DemFamily,
     adapter: &AdapterExecutable,
     worker_program: &Path,
 ) -> Result<(), ProbeError> {
@@ -232,12 +282,13 @@ fn validate_first_rejection(
             adapter,
             worker_program,
             kind,
+            family,
             kind.measurement(),
             1,
-            MAX_ITEMS + 1,
+            family.maximum_items() + 1,
             true,
         ))?;
-        verify_rejection(&output, implementation)?;
+        verify_rejection(&output, implementation, family)?;
     }
     Ok(())
 }
@@ -252,6 +303,7 @@ fn request(
     adapter: &AdapterExecutable,
     worker_program: &Path,
     kind: DemProbeKind,
+    family: DemFamily,
     measurement: &str,
     iterations: u64,
     items: u64,
@@ -270,6 +322,8 @@ fn request(
         OsString::from(iterations.to_string()),
         OsString::from("--work-items"),
         OsString::from(items.to_string()),
+        OsString::from("--input-family"),
+        OsString::from(family.id()),
         OsString::from("--evidence-mode"),
         OsString::from("timing"),
         OsString::from("--start-barrier"),
@@ -289,12 +343,16 @@ fn request(
     }
 }
 
-fn guard_request(kind: DemProbeKind, class: DemGuardRejection) -> (&'static str, u64, u64) {
+fn guard_request(
+    kind: DemProbeKind,
+    family: DemFamily,
+    class: DemGuardRejection,
+) -> (&'static str, u64, u64) {
     match class {
         DemGuardRejection::Zero => (kind.measurement(), 1, 0),
-        DemGuardRejection::IncompleteCycle => (kind.measurement(), 1, 65),
+        DemGuardRejection::IncompleteCycle => (kind.measurement(), 1, family.cycle_items() + 1),
         DemGuardRejection::WrongMeasurement => ("wrong", 1, SMALL_ITEMS),
-        DemGuardRejection::WorkOverflow => (kind.measurement(), u64::MAX, CYCLE_ITEMS),
+        DemGuardRejection::WorkOverflow => (kind.measurement(), u64::MAX, family.cycle_items() * 2),
     }
 }
 
@@ -302,9 +360,10 @@ fn verify_guard_rejection(
     output: &ProcessResult,
     implementation: Implementation,
     kind: DemProbeKind,
+    family: DemFamily,
     class: DemGuardRejection,
 ) -> Result<(), ProbeError> {
-    let (expected_status, expected_stderr) = guard_expectation(implementation, kind, class);
+    let (expected_status, expected_stderr) = guard_expectation(implementation, kind, family, class);
     if output.status == Some(expected_status)
         && output.stdout.is_empty()
         && output.stderr == expected_stderr.as_bytes()
@@ -323,6 +382,7 @@ fn verify_guard_rejection(
 fn guard_expectation(
     implementation: Implementation,
     kind: DemProbeKind,
+    family: DemFamily,
     class: DemGuardRejection,
 ) -> (i32, String) {
     let message = match (implementation, class) {
@@ -340,7 +400,11 @@ fn guard_expectation(
             "DEM model work count is not a positive complete fixture cycle".to_string()
         }
         (Implementation::Stab, DemGuardRejection::IncompleteCycle) => {
-            "DEM model work count 65 is not a positive multiple of 8".to_string()
+            format!(
+                "DEM model work count {} is not a positive multiple of {}",
+                family.cycle_items() + 1,
+                family.cycle_items()
+            )
         }
         (Implementation::Stim, DemGuardRejection::WrongMeasurement) => {
             "adapter workload and measurement are not a registered pair".to_string()
@@ -372,26 +436,32 @@ fn guard_expectation(
 fn verify_rejection(
     output: &ProcessResult,
     implementation: Implementation,
+    family: DemFamily,
 ) -> Result<(), ProbeError> {
-    let expected = match implementation {
-        Implementation::Stim => {
-            b"stim qualification adapter: DEM model work count exceeds the source-owned limit\n"
-                .as_slice()
-        }
-        Implementation::Stab => b"[stab-bench] ERROR: performance qualification validation failed:\nDEM model work count 524289 exceeds maximum 524288\n".as_slice(),
-    };
-    let expected_status = match implementation {
-        Implementation::Stim => 2,
-        Implementation::Stab => 1,
+    let (expected_status, expected) = match implementation {
+        Implementation::Stim => (
+            2,
+            "stim qualification adapter: DEM model work count exceeds the source-owned limit\n"
+                .to_string(),
+        ),
+        Implementation::Stab => (
+            1,
+            format!(
+                "[stab-bench] ERROR: performance qualification validation failed:\nDEM model work count {} exceeds maximum {}\n",
+                family.maximum_items() + 1,
+                family.maximum_items()
+            ),
+        ),
     };
     if output.status == Some(expected_status)
         && output.stdout.is_empty()
-        && output.stderr == expected
+        && output.stderr == expected.as_bytes()
     {
         Ok(())
     } else {
         Err(ProbeError::Contract(format!(
-            "{implementation} did not reject the first unsupported DEM item count before the start barrier; status={:?}; stdout={:?}; stderr={:?}",
+            "{implementation} did not reject the first unsupported {} DEM item count before the start barrier; status={:?}; stdout={:?}; stderr={:?}",
+            family.id(),
             output.status,
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
@@ -424,10 +494,22 @@ mod tests {
     #[test]
     fn probe_width_validation_requires_complete_bounded_cycles() {
         assert!(validate_work_items(ProbeGroup::DemParseAdapter, MEDIUM_ITEMS).is_ok());
-        assert!(validate_work_items(ProbeGroup::DemCanonicalPrintAdapter, MAX_ITEMS).is_ok());
+        assert!(
+            validate_work_items(
+                ProbeGroup::DemCanonicalPrintAdapter,
+                DemFamily::FlatErrors.maximum_items(),
+            )
+            .is_ok()
+        );
         assert!(validate_work_items(ProbeGroup::DemParseAdapter, 0).is_err());
         assert!(validate_work_items(ProbeGroup::DemParseAdapter, 65).is_err());
-        assert!(validate_work_items(ProbeGroup::DemParseAdapter, MAX_ITEMS + 1).is_err());
+        assert!(
+            validate_work_items(
+                ProbeGroup::DemParseAdapter,
+                DemFamily::FlatErrors.maximum_items() + 1,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -437,7 +519,7 @@ mod tests {
         let args = super::super::ProbeArgs {
             group: ProbeGroup::DemParseAdapter,
             iterations: std::num::NonZeroU64::new(u64::MAX).expect("positive iterations"),
-            work_items: std::num::NonZeroU64::new(CYCLE_ITEMS),
+            work_items: std::num::NonZeroU64::new(DEM_CYCLE_ITEMS),
             evidence_mode: super::super::ProbeEvidenceMode::Timing,
         };
         assert!(matches!(
@@ -462,12 +544,17 @@ mod tests {
                 DemGuardRejection::WrongMeasurement,
                 DemGuardRejection::WorkOverflow,
             ] {
-                let (status, stderr) =
-                    guard_expectation(implementation, DemProbeKind::Parse, class);
+                let (status, stderr) = guard_expectation(
+                    implementation,
+                    DemProbeKind::Parse,
+                    DemFamily::FlatErrors,
+                    class,
+                );
                 verify_guard_rejection(
                     &output(status, stderr),
                     implementation,
                     DemProbeKind::Parse,
+                    DemFamily::FlatErrors,
                     class,
                 )
                 .expect("exact guard rejection");
@@ -482,6 +569,7 @@ mod tests {
                 ),
                 Implementation::Stim,
                 DemProbeKind::Parse,
+                DemFamily::FlatErrors,
                 DemGuardRejection::IncompleteCycle,
             ),
             Err(ProbeError::Contract(_))

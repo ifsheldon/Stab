@@ -1,0 +1,220 @@
+{
+  "schema_version": 2,
+  "performance_inventory_sha256": "7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0",
+  "groups": [
+    {
+      "group_id": "pq1-adapter-protocol-smoke",
+      "parity_eligibility": "report-only",
+      "measurements": []
+    },
+    {
+      "group_id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "serialize",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M4-CIRCUIT-PARSE",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "parse",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M4-GATE-LOOKUP",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "hash-all-names",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "xor-complete-vector",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-WORD",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "toggle-popcount",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SPARSE-XOR",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "row-xor",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SPARSE-XOR-ITEM",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "xor-item",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "in-place-transpose",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "allocating-transpose",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-STRING",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-in-place",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-ITER",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "construct-and-iterate-borrowed",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "construct-and-iterate-borrowed",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-CLIFFORD-STRING",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-identity",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-non-identity",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M10-DEM-PARSE-CONTRACT",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "parse",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M10-DEM-PRINT-CONTRACT",
+      "parity_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "serialize",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    }
+  ]
+}

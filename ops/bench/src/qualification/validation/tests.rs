@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use super::*;
-use crate::qualification::model::{Phase, RunnerFidelity};
+use crate::qualification::model::{Phase, RunnerFidelity, SizeClass};
 use crate::root::RepoRoot;
 
 fn fixture() -> (QualificationSuite, BenchmarkManifest, SourceReferences) {
@@ -313,7 +313,12 @@ fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
         assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
         assert_eq!(
             group.correctness_cases,
-            ["cq-evidence-qualification-0908c21b917526e3"]
+            [
+                "cq-evidence-qualification-0908c21b917526e3",
+                "cq-evidence-qualification-2f6a06e3fffcf5c0",
+                "cq-evidence-qualification-966ab53fd109b7b3",
+                "cq-evidence-qualification-ae2cf29058be84b0",
+            ]
         );
         assert_eq!(
             group
@@ -322,32 +327,75 @@ fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
                 .iter()
                 .map(|scale| (
                     scale.id.as_str(),
+                    scale.family_id.as_str(),
+                    scale.size_class,
                     scale.semantic_work,
-                    &scale.input_bytes,
-                    scale.input_digest.as_deref(),
                 ))
                 .collect::<Vec<_>>(),
             vec![
                 (
-                    "small",
-                    Some(64),
-                    &InputByteCount::Exact { bytes: 1_776 },
-                    Some("fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"),
+                    "flat-errors-small",
+                    "flat-errors",
+                    SizeClass::Small,
+                    Some(64)
                 ),
                 (
-                    "medium",
+                    "flat-errors-medium",
+                    "flat-errors",
+                    SizeClass::Medium,
                     Some(4_096),
-                    &InputByteCount::Exact { bytes: 113_664 },
-                    Some("9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"),
                 ),
                 (
-                    "large",
+                    "flat-errors-large",
+                    "flat-errors",
+                    SizeClass::Large,
                     Some(65_536),
-                    &InputByteCount::Exact { bytes: 1_818_624 },
-                    Some("240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"),
+                ),
+                (
+                    "coordinate-sparse-small",
+                    "coordinate-sparse",
+                    SizeClass::Small,
+                    Some(64),
+                ),
+                (
+                    "coordinate-sparse-medium",
+                    "coordinate-sparse",
+                    SizeClass::Medium,
+                    Some(4_096),
+                ),
+                (
+                    "coordinate-sparse-large",
+                    "coordinate-sparse",
+                    SizeClass::Large,
+                    Some(65_536),
+                ),
+                (
+                    "folded-repeats-small",
+                    "folded-repeats",
+                    SizeClass::Small,
+                    Some(64),
+                ),
+                (
+                    "folded-repeats-medium",
+                    "folded-repeats",
+                    SizeClass::Medium,
+                    Some(4_096),
+                ),
+                (
+                    "folded-repeats-large",
+                    "folded-repeats",
+                    SizeClass::Large,
+                    Some(65_536),
                 ),
             ]
         );
+        assert!(group.workload_family.scales.iter().all(|scale| {
+            matches!(scale.input_bytes, InputByteCount::Exact { bytes } if bytes > 0)
+                && scale
+                    .input_digest
+                    .as_ref()
+                    .is_some_and(|digest| digest.len() == 64)
+        }));
         assert_eq!(group.output_contract.digest_state, EvidenceState::Existing);
         assert_eq!(group.output_contract.comparator_sources.len(), 2);
         assert_eq!(

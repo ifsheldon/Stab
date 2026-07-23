@@ -8,27 +8,31 @@ use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessPreflightStatus};
-use super::group::{BaselineEligibility, GroupContract, ProfilerNoteContract, ScaleContract};
+use super::group::{GroupContract, ParityEligibility, ProfilerNoteContract, ScaleContract};
 use super::invocation::WorkerIdentityEvidence;
+use super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
 use super::run::{
     ClaimClass, QualificationReport, QualificationTier, RepositoryEvidence, sha256_hex,
 };
 use super::statistics::GateOutcome;
 use crate::config::{STIM_COMMIT, STIM_TAG};
+use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
+mod render;
 mod repository;
 
+use render::{preflight, render_json, render_markdown};
 use repository::require_current_producer;
 #[cfg(test)]
 use repository::require_current_producer_state;
 
-const ROLLUP_SCHEMA_VERSION: u32 = 4;
+const ROLLUP_SCHEMA_VERSION: u32 = 5;
 const ROLLUP_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/rollup-latest";
-const MAX_ROLLUP_REPORT_BYTES: usize = 4 << 20;
-const MAX_ROLLUP_PREFLIGHT_BYTES: usize = 1 << 20;
-const MAX_ROLLUP_MARKDOWN_BYTES: usize = 4 << 20;
+pub(super) const MAX_ROLLUP_REPORT_BYTES: usize = 4 << 20;
+pub(super) const MAX_ROLLUP_PREFLIGHT_BYTES: usize = 1 << 20;
+pub(super) const MAX_ROLLUP_MARKDOWN_BYTES: usize = 4 << 20;
 const MAX_SCALE_REPORTS: usize = 64;
 
 #[derive(Clone, Debug, Args)]
@@ -77,7 +81,7 @@ struct SharedIdentity {
     group_id: String,
     group_contract_sha256: String,
     claim_class: ClaimClass,
-    baseline_eligibility: BaselineEligibility,
+    parity_eligibility: ParityEligibility,
     owner: String,
     profiler_note: Option<ProfilerNoteContract>,
     tier: QualificationTier,
@@ -147,7 +151,7 @@ struct RollupReport {
     group_id: String,
     group_contract_sha256: String,
     claim_class: ClaimClass,
-    baseline_eligibility: BaselineEligibility,
+    parity_eligibility: ParityEligibility,
     owner: String,
     profiler_note: Option<ProfilerNoteContract>,
     tier: QualificationTier,
@@ -180,6 +184,8 @@ struct RollupReport {
 #[serde(deny_unknown_fields)]
 struct RollupScale {
     scale_id: String,
+    family_id: String,
+    size_class: SizeClass,
     work_items: u64,
     input_bytes: u64,
     input_digest: String,
@@ -202,15 +208,15 @@ struct RollupMeasurement {
     outcome: GateOutcome,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-struct RollupMemory {
-    stim_setup_rss_bytes: u64,
-    stim_peak_rss_bytes: u64,
-    stim_parent_observed_peak_rss_bytes: Option<u64>,
-    stab_setup_rss_bytes: u64,
-    stab_peak_rss_bytes: u64,
-    stab_parent_observed_peak_rss_bytes: Option<u64>,
+pub(super) struct RollupMemory {
+    pub(super) stim_setup_rss_bytes: u64,
+    pub(super) stim_peak_rss_bytes: u64,
+    pub(super) stim_parent_observed_peak_rss_bytes: Option<u64>,
+    pub(super) stab_setup_rss_bytes: u64,
+    pub(super) stab_peak_rss_bytes: u64,
+    pub(super) stab_parent_observed_peak_rss_bytes: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -238,27 +244,58 @@ pub(super) struct RollupSourceEvidence {
     pub(super) path: PathBuf,
     pub(super) report_sha256: String,
     pub(super) preflight_sha256: String,
+    pub(super) markdown_sha256: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(super) struct RollupReplayEvidence {
     pub(super) output: PathBuf,
     pub(super) report_sha256: String,
     pub(super) preflight_sha256: String,
     pub(super) markdown_sha256: String,
     pub(super) group_id: String,
+    pub(super) group_contract_sha256: String,
     pub(super) tier: QualificationTier,
+    pub(super) performance_inventory_sha256: String,
     pub(super) stab_commit: String,
+    pub(super) stim_commit: String,
     pub(super) host_policy_sha256: String,
     pub(super) host_profile_id: String,
+    pub(super) operating_system: String,
     pub(super) architecture: String,
     pub(super) cpu_identity: String,
+    pub(super) rust_toolchain: String,
     pub(super) target_triple: String,
     pub(super) toolchain_sha256: String,
+    pub(super) timing_boundary: TimingBoundary,
+    pub(super) workload_id: String,
+    pub(super) timing_batch_policy: TimingBatchPolicy,
+    pub(super) comparator_sources: Vec<(String, String)>,
     pub(super) workers: WorkerIdentityEvidence,
     pub(super) correctness_preflight: CorrectnessPreflightEvidence,
+    pub(super) correctness_bindings: Vec<Arc<super::correctness::CorrectnessArtifactBinding>>,
     pub(super) overall_outcome: GateOutcome,
     pub(super) sources: Vec<RollupSourceEvidence>,
+    pub(super) scales: Vec<RollupRegressionScale>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct RollupRegressionScale {
+    pub(super) scale_id: String,
+    pub(super) family_id: String,
+    pub(super) size_class: SizeClass,
+    pub(super) work_items: u64,
+    pub(super) input_digest: String,
+    pub(super) measurements: Vec<RollupRegressionMeasurement>,
+    pub(super) memory: RollupMemory,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct RollupRegressionMeasurement {
+    pub(super) measurement_id: String,
+    pub(super) median_ratio: f64,
+    pub(super) confidence_interval_upper: f64,
+    pub(super) outcome: GateOutcome,
 }
 
 pub(super) fn run_with_repository(
@@ -471,33 +508,88 @@ pub(super) fn replay_with_repository(
         )?;
         require_current_correctness(&loaded)
     })?;
+    let regression_scales = reconstructed
+        .scales
+        .iter()
+        .map(|scale| RollupRegressionScale {
+            scale_id: scale.scale_id.clone(),
+            family_id: scale.family_id.clone(),
+            size_class: scale.size_class,
+            work_items: scale.work_items,
+            input_digest: scale.input_digest.clone(),
+            measurements: scale
+                .measurements
+                .iter()
+                .map(|measurement| RollupRegressionMeasurement {
+                    measurement_id: measurement.measurement_id.clone(),
+                    median_ratio: measurement.median_ratio,
+                    confidence_interval_upper: measurement.confidence_interval_upper,
+                    outcome: measurement.outcome,
+                })
+                .collect(),
+            memory: scale.memory.clone(),
+        })
+        .collect();
+    let comparator_sources = resolved
+        .contract
+        .comparator_sources
+        .iter()
+        .map(|source| {
+            (
+                source.path.as_str().to_string(),
+                source.sha256.as_str().to_string(),
+            )
+        })
+        .collect();
     Ok(RollupReplayEvidence {
         output: output_path.into_path_buf(),
         report_sha256: sha256_hex(&report_json),
         preflight_sha256: sha256_hex(&preflight_json),
         markdown_sha256: sha256_hex(markdown.as_bytes()),
         group_id: reconstructed.group_id,
+        group_contract_sha256: reconstructed.group_contract_sha256,
         tier: reconstructed.tier,
+        performance_inventory_sha256: reconstructed.performance_inventory_sha256,
         stab_commit: reconstructed.stab_commit,
+        stim_commit: reconstructed.stim_commit,
         host_policy_sha256: reconstructed.host_policy_sha256,
         host_profile_id: reconstructed.host_profile_id,
+        operating_system: reconstructed.operating_system,
         architecture: reconstructed.architecture,
         cpu_identity: reconstructed.cpu_identity,
+        rust_toolchain: reconstructed.rust_toolchain,
         target_triple: reconstructed.target_triple,
         toolchain_sha256: reconstructed.toolchain_sha256,
+        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
+        workload_id: resolved.contract.workload_id.to_string(),
+        timing_batch_policy: resolved.contract.timing_batch_policy,
+        comparator_sources,
         workers: reconstructed.workers,
         correctness_preflight: reconstructed.correctness_preflight,
+        correctness_bindings: loaded
+            .iter()
+            .map(|candidate| Arc::clone(&candidate.correctness_binding))
+            .collect(),
         overall_outcome: reconstructed.overall_outcome,
+        scales: regression_scales,
         sources: reconstructed
             .scales
             .into_iter()
-            .map(|scale| RollupSourceEvidence {
-                scale_id: scale.scale_id,
-                path: PathBuf::from(scale.source.path),
-                report_sha256: scale.source.report_sha256,
-                preflight_sha256: scale.source.preflight_sha256,
+            .map(|scale| {
+                let markdown_sha256 = loaded
+                    .iter()
+                    .find(|candidate| candidate.candidate.scale_id == scale.scale_id)
+                    .map(|candidate| candidate.markdown_sha256.clone())
+                    .ok_or_else(|| RollupError::ScaleContract(scale.scale_id.clone()))?;
+                Ok(RollupSourceEvidence {
+                    scale_id: scale.scale_id,
+                    path: PathBuf::from(scale.source.path),
+                    report_sha256: scale.source.report_sha256,
+                    preflight_sha256: scale.source.preflight_sha256,
+                    markdown_sha256,
+                })
             })
-            .collect(),
+            .collect::<Result<Vec<_>, RollupError>>()?,
     })
 }
 
@@ -725,7 +817,7 @@ impl Candidate {
                 group_id: report.group_id,
                 group_contract_sha256: report.group_contract_sha256,
                 claim_class: report.claim_class,
-                baseline_eligibility: report.baseline_eligibility,
+                parity_eligibility: report.parity_eligibility,
                 owner: report.owner,
                 profiler_note: report.profiler_note,
                 tier: report.tier,
@@ -789,7 +881,7 @@ fn assemble(
     } = context;
     require_promotable_tier(tier)?;
     if contract.claim_class != ClaimClass::PromotablePerformance
-        || contract.baseline_eligibility != BaselineEligibility::ThresholdEligible
+        || contract.parity_eligibility != ParityEligibility::ThresholdEligible
     {
         return Err(RollupError::GroupDisposition(contract.id.to_string()));
     }
@@ -846,6 +938,8 @@ fn assemble(
         validate_scale(&candidate, scale, &expected_measurements)?;
         scales.push(RollupScale {
             scale_id,
+            family_id: scale.family_id.to_string(),
+            size_class: scale.size_class,
             work_items: scale.work_items.get(),
             input_bytes: scale.input_bytes,
             input_digest: scale.input_digest.as_str().to_string(),
@@ -894,7 +988,7 @@ fn assemble(
         group_id: shared.group_id,
         group_contract_sha256: shared.group_contract_sha256,
         claim_class: shared.claim_class,
-        baseline_eligibility: shared.baseline_eligibility,
+        parity_eligibility: shared.parity_eligibility,
         owner: shared.owner,
         profiler_note: shared.profiler_note,
         tier: shared.tier,
@@ -935,7 +1029,7 @@ fn validate_shared(
     if identity.group_id != contract.id.to_string()
         || identity.group_contract_sha256 != group_contract_sha256
         || identity.claim_class != contract.claim_class
-        || identity.baseline_eligibility != contract.baseline_eligibility
+        || identity.parity_eligibility != contract.parity_eligibility
         || identity.owner != contract.owner.to_string()
         || identity.profiler_note != contract.profiler_note
         || identity.tier != tier
@@ -1006,110 +1100,6 @@ fn require_promotable_tier(tier: QualificationTier) -> Result<(), RollupError> {
         QualificationTier::Full | QualificationTier::Soak => Ok(()),
         QualificationTier::Pr => Err(RollupError::NonPromotableTier),
     }
-}
-
-fn render_json(value: &impl Serialize) -> Result<Vec<u8>, RollupError> {
-    let mut bytes = serde_json::to_vec_pretty(value)?;
-    bytes.push(b'\n');
-    Ok(bytes)
-}
-
-fn preflight(report: &RollupReport, report_json: &[u8]) -> RollupPreflight {
-    RollupPreflight {
-        schema_version: ROLLUP_PREFLIGHT_SCHEMA_VERSION,
-        report_sha256: sha256_hex(report_json),
-        output: report.output.clone(),
-        group_id: report.group_id.clone(),
-        tier: report.tier,
-        performance_inventory_sha256: report.performance_inventory_sha256.clone(),
-        correctness_inventory_sha256: report.correctness_inventory_sha256.clone(),
-        stab_commit: report.stab_commit.clone(),
-        producer_repository: report.producer_repository.clone(),
-        architecture: report.architecture.clone(),
-        target_triple: report.target_triple.clone(),
-        required_scales: report
-            .scales
-            .iter()
-            .map(|scale| scale.scale_id.clone())
-            .collect(),
-        source_reports: report
-            .scales
-            .iter()
-            .map(|scale| scale.source.clone())
-            .collect(),
-        overall_outcome: report.overall_outcome,
-    }
-}
-
-fn render_markdown(report: &RollupReport, report_sha256: &str) -> String {
-    let profiler_note = report
-        .profiler_note
-        .as_ref()
-        .map_or("none", |note| note.path.as_str());
-    let group_id = super::markdown::inline_code(&report.group_id);
-    let owner = super::markdown::inline_code(&report.owner);
-    let profiler_note = super::markdown::inline_code(profiler_note);
-    let stab_commit = super::markdown::inline_code(&report.stab_commit);
-    let stim_commit = super::markdown::inline_code(&report.stim_commit);
-    let architecture = super::markdown::inline_code(&report.architecture);
-    let target_triple = super::markdown::inline_code(&report.target_triple);
-    let host_profile_id = super::markdown::inline_code(&report.host_profile_id);
-    let cpu_identity = super::markdown::inline_code(&report.cpu_identity);
-    let contract_preflight =
-        super::markdown::inline_code(&report.workers.contract_preflight_sha256);
-    let report_sha256 = super::markdown::inline_code(report_sha256);
-    let mut markdown = format!(
-        "# Performance Qualification Scale-Family Rollup\n\n- Group: {}\n- Tier: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Stab commit: {}\n- Stim commit: {}\n- Worker contract preflight: {}\n- Architecture: {} ({})\n- Host profile: {}\n- CPU: {}\n- Required scales: `{}`\n- Passed measurements: `{}`\n- Failed measurements: `{}`\n- Noisy measurements: `{}`\n- Overall outcome: `{:?}`\n- Rollup report SHA-256: {}\n\n## Timing\n\n| Scale | Work items | Measurement | Pairs | Median Stab/Stim | Upper 95% bound | Ratio rMAD | Outcome |\n| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |\n",
-        group_id,
-        report.tier,
-        owner,
-        profiler_note,
-        stab_commit,
-        stim_commit,
-        contract_preflight,
-        architecture,
-        target_triple,
-        host_profile_id,
-        cpu_identity,
-        report.required_scale_count,
-        report.passed_measurements,
-        report.failed_measurements,
-        report.noisy_measurements,
-        report.overall_outcome,
-        report_sha256,
-    );
-    for scale in &report.scales {
-        for measurement in &scale.measurements {
-            let scale_id = super::markdown::inline_code(&scale.scale_id);
-            let measurement_id = super::markdown::inline_code(&measurement.measurement_id);
-            markdown.push_str(&format!(
-                "| {} | {} | {} | {} | {:.6} | {:.6} | {:.6} | `{:?}` |\n",
-                scale_id,
-                scale.work_items,
-                measurement_id,
-                measurement.pair_count,
-                measurement.median_ratio,
-                measurement.confidence_interval_upper,
-                measurement.ratio_relative_mad,
-                measurement.outcome,
-            ));
-        }
-    }
-    markdown.push_str("\n## Memory\n\n| Scale | Stim setup RSS | Stim peak RSS | Stab setup RSS | Stab peak RSS | Source report |\n| --- | ---: | ---: | ---: | ---: | --- |\n");
-    for scale in &report.scales {
-        let scale_id = super::markdown::inline_code(&scale.scale_id);
-        let source_path = super::markdown::inline_code(&scale.source.path);
-        markdown.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} |\n",
-            scale_id,
-            scale.memory.stim_setup_rss_bytes,
-            scale.memory.stim_peak_rss_bytes,
-            scale.memory.stab_setup_rss_bytes,
-            scale.memory.stab_peak_rss_bytes,
-            source_path,
-        ));
-    }
-    markdown
 }
 
 #[derive(Debug, Error)]

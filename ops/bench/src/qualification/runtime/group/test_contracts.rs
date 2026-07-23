@@ -1,7 +1,7 @@
 use std::num::NonZeroU64;
 
 use super::{
-    BaselineEligibility, ComparatorSourceContract, ComparatorSourcePath, GroupContract,
+    ComparatorSourceContract, ComparatorSourcePath, GroupContract, ParityEligibility,
     ScaleContract, comparators,
 };
 use crate::qualification::runtime::protocol::{InputDigest, ProtocolId, Sha256Digest};
@@ -12,21 +12,39 @@ pub(super) fn pauli_contract() -> GroupContract {
         id: ProtocolId::try_new(super::super::invocation::PAULI_STRING_MULTIPLY_GROUP_ID)
             .expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new("pauli-string-right-multiply").expect("workload id"),
         measurement_ids: vec![
             ProtocolId::try_new("right-multiply-in-place").expect("measurement id"),
         ],
-        scales: [("small", 10_000), ("medium", 100_000), ("large", 1_000_000)]
-            .into_iter()
-            .map(|(id, work_items)| ScaleContract {
-                id: ProtocolId::try_new(id).expect("scale id"),
-                work_items: NonZeroU64::new(work_items).expect("positive work"),
-                input_bytes: 8,
-                input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
-            })
-            .collect(),
+        scales: [
+            (
+                "small",
+                crate::qualification::model::SizeClass::Small,
+                10_000,
+            ),
+            (
+                "medium",
+                crate::qualification::model::SizeClass::Medium,
+                100_000,
+            ),
+            (
+                "large",
+                crate::qualification::model::SizeClass::Large,
+                1_000_000,
+            ),
+        ]
+        .into_iter()
+        .map(|(id, size_class, work_items)| ScaleContract {
+            id: ProtocolId::try_new(id).expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class,
+            work_items: NonZeroU64::new(work_items).expect("positive work"),
+            input_bytes: 8,
+            input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
+        })
+        .collect(),
         correctness_case_ids: vec![
             "cq-evidence-qualification-3bab0f51237445f6".to_string(),
             "cq-evidence-qualification-489e6445120743c2".to_string(),
@@ -51,7 +69,7 @@ pub(super) fn pauli_iter_contract(
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![
@@ -59,6 +77,8 @@ pub(super) fn pauli_iter_contract(
         ],
         scales: vec![ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(work_items).expect("positive work"),
             input_bytes: 64,
             input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
@@ -84,7 +104,7 @@ pub(super) fn clifford_contract(
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: if group_id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID {
             crate::qualification::model::TimingBatchPolicy::IndependentThroughput
         } else {
@@ -94,6 +114,8 @@ pub(super) fn clifford_contract(
         measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
         scales: vec![ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(10_000).expect("positive work"),
             input_bytes: 64,
             input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
@@ -131,20 +153,47 @@ pub(super) fn dem_contracts() -> [GroupContract; 2] {
 }
 
 fn dem_contract(group_id: &str, workload_id: &str, measurement_id: &str) -> GroupContract {
+    let scales = ["flat-errors", "coordinate-sparse", "folded-repeats"]
+        .into_iter()
+        .flat_map(|family_id| {
+            [
+                ("small", crate::qualification::model::SizeClass::Small, 64),
+                (
+                    "medium",
+                    crate::qualification::model::SizeClass::Medium,
+                    4_096,
+                ),
+                (
+                    "large",
+                    crate::qualification::model::SizeClass::Large,
+                    65_536,
+                ),
+            ]
+            .into_iter()
+            .map(move |(size, size_class, work_items)| ScaleContract {
+                id: ProtocolId::try_new(format!("{family_id}-{size}")).expect("scale id"),
+                family_id: ProtocolId::try_new(family_id).expect("family id"),
+                size_class,
+                work_items: NonZeroU64::new(work_items).expect("positive work"),
+                input_bytes: work_items,
+                input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
+            })
+        })
+        .collect();
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
-        scales: vec![ScaleContract {
-            id: ProtocolId::try_new("small").expect("scale id"),
-            work_items: NonZeroU64::new(64).expect("positive work"),
-            input_bytes: 1_776,
-            input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
-        }],
-        correctness_case_ids: vec!["cq-evidence-qualification-0908c21b917526e3".to_string()],
+        scales,
+        correctness_case_ids: vec![
+            "cq-evidence-qualification-0908c21b917526e3".to_string(),
+            "cq-evidence-qualification-2f6a06e3fffcf5c0".to_string(),
+            "cq-evidence-qualification-966ab53fd109b7b3".to_string(),
+            "cq-evidence-qualification-ae2cf29058be84b0".to_string(),
+        ],
         owner: ProtocolId::try_new("stab-core/dem-model").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::DEM_MODEL
@@ -162,7 +211,7 @@ fn runtime_contract_requires_an_explicit_timing_policy() {
     let value = serde_json::json!({
         "id": "group",
         "claim_class": "promotable-performance",
-        "baseline_eligibility": "threshold-eligible",
+        "parity_eligibility": "threshold-eligible",
         "workload_id": "workload",
         "measurement_ids": ["main"],
         "scales": [{

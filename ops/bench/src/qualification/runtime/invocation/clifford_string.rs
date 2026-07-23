@@ -1,27 +1,13 @@
-use std::collections::BTreeSet;
 use std::ffi::OsString;
 
-use super::super::clifford_vectors::{
-    CliffordRequestResult, CliffordRequestVector, checked_file, request_for_runtime,
-};
-use super::super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
-use super::super::protocol::{
-    EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
-    SemanticDigest, parse_worker_json_lines,
-};
+use super::super::clifford_vectors::{CliffordRequestVector, checked_file, request_for_runtime};
+use super::super::process::ProcessResult;
+use super::super::protocol::Implementation;
 use super::super::worker::clifford_string::{
-    CLIFFORD_DESCRIPTOR_BYTES, CLIFFORD_FIXTURE_SCHEMA, CLIFFORD_GATE_COUNT,
-    CLIFFORD_NON_IDENTITY_CYCLE, CLIFFORD_PUBLIC_CAP, CliffordDescriptor, CliffordWorkloadKind,
+    CLIFFORD_FIXTURE_SCHEMA, CLIFFORD_GATE_COUNT, CLIFFORD_NON_IDENTITY_CYCLE, CLIFFORD_PUBLIC_CAP,
+    CliffordDescriptor, CliffordWorkloadKind,
 };
-use super::preflight::{
-    WorkerContractProbeEvidence, accepted_probe, expected_accepted_probe, expected_rejected_probe,
-    rejected_probe,
-};
-use super::{
-    CAP_REJECTION_TIMEOUT, IDENTITY_PROBE_TIMEOUT, InvocationError, PROTOCOL_OUTPUT_LIMIT,
-    PreparedWorkers, checked_process, worker_environment,
-};
-use crate::config::STIM_COMMIT;
+use super::InvocationError;
 
 pub(in crate::qualification::runtime) const CLIFFORD_IDENTITY_GROUP_ID: &str =
     "PERFQ-M6-CLIFFORD-STRING";
@@ -40,178 +26,6 @@ pub(super) fn runtime_descriptor(
     let request = request_for_runtime(file, workload, width)
         .map_err(InvocationError::CliffordVectorContract)?;
     Ok(Some(request.descriptor_hex.clone()))
-}
-
-pub(super) fn expected_clifford_probes() -> Result<Vec<WorkerContractProbeEvidence>, InvocationError>
-{
-    let file = checked_file().map_err(InvocationError::CliffordVectorContract)?;
-    let mut probes = Vec::with_capacity(72);
-    for implementation in [Implementation::Stab, Implementation::Stim] {
-        for request in &file.requests {
-            match request.result {
-                CliffordRequestResult::Accepted => {
-                    let output_digest = request.output_sha256.as_deref().ok_or_else(|| {
-                        InvocationError::CliffordVectorContract(format!(
-                            "accepted Clifford request {} lacks output_sha256",
-                            request.id
-                        ))
-                    })?;
-                    probes.push(expected_accepted_probe(
-                        &request.id,
-                        implementation,
-                        request.iterations,
-                        request
-                            .iterations
-                            .checked_mul(request.work_items)
-                            .ok_or(InvocationError::WorkOverflow)?,
-                        CLIFFORD_DESCRIPTOR_BYTES,
-                        &request.input_sha256,
-                        output_digest,
-                    )?);
-                }
-                CliffordRequestResult::Rejected => {
-                    let (status, stderr) = clifford_rejection_expectation(implementation, request)?;
-                    probes.push(expected_rejected_probe(
-                        &request.id,
-                        implementation,
-                        status,
-                        &stderr,
-                    )?);
-                }
-            }
-        }
-    }
-    Ok(probes)
-}
-
-impl PreparedWorkers {
-    pub(super) fn invoke_clifford_contract_probes(
-        &self,
-    ) -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-        let file = checked_file().map_err(InvocationError::CliffordVectorContract)?;
-        let mut probes = Vec::with_capacity(72);
-        for implementation in [Implementation::Stab, Implementation::Stim] {
-            for request in &file.requests {
-                probes.push(match request.result {
-                    CliffordRequestResult::Accepted => {
-                        self.invoke_clifford_acceptance(implementation, request)?
-                    }
-                    CliffordRequestResult::Rejected => {
-                        self.invoke_clifford_rejection(implementation, request)?
-                    }
-                });
-            }
-        }
-        if probes.len() != 72 {
-            return Err(InvocationError::CliffordVectorContract(format!(
-                "Clifford preflight produced {} receipts, expected 72",
-                probes.len()
-            )));
-        }
-        Ok(probes)
-    }
-
-    fn invoke_clifford_acceptance(
-        &self,
-        implementation: Implementation,
-        request: &CliffordRequestVector,
-    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let mut arguments = clifford_arguments(request);
-        let (program, source_digest, build_fingerprint) = match implementation {
-            Implementation::Stim => (
-                self.adapter.path.clone(),
-                self.adapter.source_digest.clone(),
-                self.adapter.build_fingerprint.clone(),
-            ),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                (
-                    self.worker.program(),
-                    self.worker.identity().source_digest.clone(),
-                    self.worker.identity().build_fingerprint.clone(),
-                )
-            }
-        };
-        let process = run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: vec![b'\n'],
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 1,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout: IDENTITY_PROBE_TIMEOUT,
-            },
-        })?;
-        let process = checked_process(process, implementation)?;
-        let rows = parse_worker_json_lines(&process.stdout)?;
-        let output_digest = request.output_sha256.as_deref().ok_or_else(|| {
-            InvocationError::CliffordVectorContract(format!(
-                "accepted Clifford request {} lacks output_sha256",
-                request.id
-            ))
-        })?;
-        ProtocolExpectation {
-            implementation,
-            evidence_mode: EvidenceMode::Contract,
-            workload_id: ProtocolId::try_new(request.workload.clone())?,
-            measurement_ids: BTreeSet::from([ProtocolId::try_new(request.measurement_id.clone())?]),
-            iteration_count: request.iterations,
-            expected_work_count: request
-                .iterations
-                .checked_mul(request.work_items)
-                .ok_or(InvocationError::WorkOverflow)?,
-            expected_input_bytes: CLIFFORD_DESCRIPTOR_BYTES,
-            expected_input_digest: InputDigest::try_new(request.input_sha256.clone())?,
-            expected_output_digest: Some(SemanticDigest::try_new(output_digest.to_string())?),
-            affinity_cpu: None,
-            stim_commit: GitCommit::try_new(STIM_COMMIT)?,
-            source_digest,
-            build_fingerprint,
-        }
-        .validate(&rows)?;
-        let row = rows
-            .into_iter()
-            .next()
-            .ok_or(InvocationError::MissingMeasurement)?;
-        accepted_probe(&request.id, &row)
-    }
-
-    fn invoke_clifford_rejection(
-        &self,
-        implementation: Implementation,
-        request: &CliffordRequestVector,
-    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let mut arguments = clifford_arguments(request);
-        let program = match implementation {
-            Implementation::Stim => self.adapter.path.clone(),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                self.worker.program()
-            }
-        };
-        let output = run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: Vec::new(),
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 0,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout: CAP_REJECTION_TIMEOUT,
-            },
-        })?;
-        checked_clifford_rejection(&output, implementation, request)?;
-        rejected_probe(&request.id, implementation, &output)
-    }
 }
 
 pub(in crate::qualification::runtime) fn clifford_arguments(
@@ -391,6 +205,7 @@ fn field_message(name: &str, actual: u64, expected: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::clifford_vectors::CliffordRequestResult;
     use super::*;
 
     #[test]

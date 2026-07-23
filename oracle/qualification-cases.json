@@ -322,6 +322,96 @@
       ]
     },
     {
+      "id": "cq2-dem-qualification-flat-errors-family",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_qualification_flat_errors_family_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact flat error-heavy qualification family proves varied probabilities, detector and observable targets, separators, and canonical output."
+      },
+      "negative_axes": [
+        "probability-out-of-range",
+        "raw-numeric-target",
+        "doubled-separator"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-dem-qualification-coordinate-sparse-family",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_qualification_coordinate_sparse_family_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact coordinate and sparse-ID qualification family proves tags, coordinate shifts, and high detector and observable identifiers."
+      },
+      "negative_axes": [
+        "unterminated-tag",
+        "malformed-coordinate",
+        "target-overflow"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-dem-qualification-folded-repeats-family",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_qualification_folded_repeat_family_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact folded-repeat qualification family proves nested tagged repeat blocks remain compact while preserving large semantic shifts."
+      },
+      "negative_axes": [
+        "malformed-repeat-count",
+        "unterminated-repeat-block",
+        "repeat-count-overflow"
+      ],
+      "standalone": true
+    },
+    {
       "id": "cq2-dem-model-value-mutation-repeat-contract",
       "feature_id": "CQ-DEM-FORMAT",
       "comparator": "canonical",

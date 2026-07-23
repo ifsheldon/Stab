@@ -175,40 +175,32 @@ impl ProbeGroup {
         }
     }
 
+    #[cfg(test)]
     fn for_runtime_group(group_id: &str) -> Option<Self> {
-        match group_id {
-            ADAPTER_PROBE_ID => Some(Self::AdapterProtocol),
-            CIRCUIT_PARSE_RUNTIME_GROUP_ID => Some(Self::CircuitParseAdapter),
-            CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID => Some(Self::CircuitCanonicalPrintAdapter),
-            GATE_NAME_HASH_RUNTIME_GROUP_ID => Some(Self::GateNameHashAdapter),
-            SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID => Some(Self::SimdWordPopcountAdapter),
-            SIMD_BITS_XOR_RUNTIME_GROUP_ID => Some(Self::SimdBitsXorAdapter),
-            SIMD_BITS_NOT_ZERO_EARLY_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroEarlyAdapter),
-            SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID => {
-                Some(Self::SimdBitsNotZeroAllZeroAdapter)
-            }
-            SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroLateAdapter),
-            SPARSE_XOR_ROW_RUNTIME_GROUP_ID => Some(Self::SparseXorRowAdapter),
-            SPARSE_XOR_ITEM_RUNTIME_GROUP_ID => Some(Self::SparseXorItemAdapter),
-            BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID => {
-                Some(Self::BitMatrixTransposeInPlaceAdapter)
-            }
-            BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID => {
-                Some(Self::BitMatrixTransposeAllocatingAdapter)
-            }
-            PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID => Some(Self::PauliStringMultiplyAdapter),
-            PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID => Some(Self::PauliStringIterRangeAdapter),
-            PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID => {
-                Some(Self::PauliStringIterSingletonAdapter)
-            }
-            clifford_string::IDENTITY_RUNTIME_GROUP_ID => Some(Self::CliffordStringIdentityAdapter),
-            clifford_string::NON_IDENTITY_RUNTIME_GROUP_ID => {
-                Some(Self::CliffordStringNonIdentityAdapter)
-            }
-            DEM_PARSE_RUNTIME_GROUP_ID => Some(Self::DemParseAdapter),
-            DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID => Some(Self::DemCanonicalPrintAdapter),
-            _ => None,
-        }
+        [
+            Self::AdapterProtocol,
+            Self::CircuitParseAdapter,
+            Self::CircuitCanonicalPrintAdapter,
+            Self::GateNameHashAdapter,
+            Self::SimdWordPopcountAdapter,
+            Self::SimdBitsXorAdapter,
+            Self::SimdBitsNotZeroEarlyAdapter,
+            Self::SimdBitsNotZeroAllZeroAdapter,
+            Self::SimdBitsNotZeroLateAdapter,
+            Self::SparseXorRowAdapter,
+            Self::SparseXorItemAdapter,
+            Self::BitMatrixTransposeInPlaceAdapter,
+            Self::BitMatrixTransposeAllocatingAdapter,
+            Self::PauliStringMultiplyAdapter,
+            Self::PauliStringIterRangeAdapter,
+            Self::PauliStringIterSingletonAdapter,
+            Self::CliffordStringIdentityAdapter,
+            Self::CliffordStringNonIdentityAdapter,
+            Self::DemParseAdapter,
+            Self::DemCanonicalPrintAdapter,
+        ]
+        .into_iter()
+        .find(|group| group.runtime_group_id() == Some(group_id))
     }
 }
 
@@ -299,24 +291,6 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::DemParseAdapter
         | ProbeGroup::DemCanonicalPrintAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
-}
-
-pub(super) fn run_source_owned_adapter_probe(
-    root: &RepoRoot,
-    runtime_group_id: &str,
-) -> Result<AdapterProbeReceipt, ProbeError> {
-    let group = ProbeGroup::for_runtime_group(runtime_group_id)
-        .ok_or_else(|| ProbeError::MissingRuntimeGroup(runtime_group_id.to_string()))?;
-    let iterations = NonZeroU64::new(4)
-        .ok_or_else(|| ProbeError::Contract("probe iteration count must be nonzero".to_string()))?;
-    let args = ProbeArgs {
-        group,
-        iterations,
-        work_items: None,
-        evidence_mode: ProbeEvidenceMode::Timing,
-    };
-    validate_probe_work_items(args.group, probe_work_items(&args))?;
-    run_adapter_probe(root, args)
 }
 
 fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
@@ -477,6 +451,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         probe_work_items(&args),
         &mut common_arguments,
     )?;
+    dem_model::append_default_family_arguments(args.group, &mut common_arguments);
     let adapter_request = ProcessRequest {
         program: adapter.path.clone(),
         args: common_arguments.clone(),
@@ -846,8 +821,6 @@ pub(super) enum ProbeError {
     WorkerIdentityChanged,
     #[error("qualification probe semantic work count overflows u64")]
     WorkOverflow,
-    #[error("runtime group {0} has no source-owned adapter probe")]
-    MissingRuntimeGroup(String),
     #[error("qualification probe contract failed: {0}")]
     Contract(String),
 }

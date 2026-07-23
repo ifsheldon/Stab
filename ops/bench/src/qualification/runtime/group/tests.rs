@@ -5,12 +5,14 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
             claim_class: ClaimClass::DiagnosticInfrastructure,
-            baseline_eligibility: BaselineEligibility::ReportOnly,
+            parity_eligibility: ParityEligibility::ReportOnly,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("default").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(4096).expect("positive work"),
                 input_bytes: 0,
                 input_digest: InputDigest::try_new(
@@ -27,12 +29,14 @@ fn valid_contract_file() -> GroupContractFile {
             id: ProtocolId::try_new(super::super::invocation::CIRCUIT_CANONICAL_PRINT_GROUP_ID)
                 .expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
-            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("circuit-canonical-print").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("serialize").expect("measurement id")],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(64).expect("positive work"),
                 input_bytes: 64,
                 input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
@@ -46,12 +50,14 @@ fn valid_contract_file() -> GroupContractFile {
             id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
                 .expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
-            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("circuit-parse").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(64).expect("positive work"),
                 input_bytes: 64,
                 input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
@@ -71,12 +77,14 @@ fn valid_contract_file() -> GroupContractFile {
             id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
                 .expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
-            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("gate-name-hash").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("hash-all-names").expect("measurement id")],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(82).expect("positive work"),
                 input_bytes: 0,
                 input_digest: InputDigest::try_new(
@@ -93,7 +101,7 @@ fn valid_contract_file() -> GroupContractFile {
             id: ProtocolId::try_new(super::super::invocation::SIMD_BITS_XOR_GROUP_ID)
                 .expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
-            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("simd-bits-xor").expect("workload id"),
             measurement_ids: vec![
@@ -101,6 +109,8 @@ fn valid_contract_file() -> GroupContractFile {
             ],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(4_096).expect("positive work"),
                 input_bytes: 1_024,
                 input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
@@ -121,12 +131,14 @@ fn valid_contract_file() -> GroupContractFile {
             id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
                 .expect("group id"),
             claim_class: ClaimClass::PromotablePerformance,
-            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
             workload_id: ProtocolId::try_new("simd-word-popcount").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("toggle-popcount").expect("measurement id")],
             scales: vec![ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(4_096).expect("positive work"),
                 input_bytes: 512,
                 input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
@@ -214,12 +226,14 @@ fn not_zero_contract(group_id: &str, workload_id: &str) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new("not-zero").expect("measurement id")],
         scales: vec![ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(10_000).expect("positive work"),
             input_bytes: 1_256,
             input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
@@ -246,12 +260,14 @@ fn sparse_xor_contract(
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
         scales: vec![ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(work_items).expect("positive work"),
             input_bytes: 8,
             input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
@@ -273,12 +289,14 @@ fn transpose_contract(group_id: &str, workload_id: &str, measurement_id: &str) -
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
         scales: vec![ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(65_536).expect("positive work"),
             input_bytes: 8_208,
             input_digest: InputDigest::try_new("c".repeat(64)).expect("input digest"),
@@ -309,7 +327,7 @@ fn diagnostic_groups_are_report_only_and_have_no_correctness_cases() {
         .groups
         .first_mut()
         .expect("one group")
-        .baseline_eligibility = BaselineEligibility::ThresholdEligible;
+        .parity_eligibility = ParityEligibility::ThresholdEligible;
     assert!(matches!(
         validate(&thresholded, &"a".repeat(64)),
         Err(GroupError::InvalidGroup(_))
@@ -348,12 +366,16 @@ fn source_contract_rejects_duplicate_and_zero_scales() {
         .scales = vec![
         ScaleContract {
             id: ProtocolId::try_new("same").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(1).expect("positive work"),
             input_bytes: 1,
             input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
         },
         ScaleContract {
             id: ProtocolId::try_new("same").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(2).expect("positive work"),
             input_bytes: 2,
             input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
@@ -370,7 +392,7 @@ fn source_contract_rejects_duplicate_and_zero_scales() {
         "groups": [{
             "id": "group",
             "claim_class": "diagnostic-infrastructure",
-            "baseline_eligibility": "report-only",
+            "parity_eligibility": "report-only",
             "workload_id": "protocol-smoke",
             "measurement_ids": ["main"],
             "scales": [{
@@ -394,12 +416,16 @@ fn source_contract_rejects_duplicate_and_zero_scales() {
         .scales = vec![
         ScaleContract {
             id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(2).expect("positive work"),
             input_bytes: 2,
             input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
         },
         ScaleContract {
             id: ProtocolId::try_new("large").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
             work_items: NonZeroU64::new(1).expect("positive work"),
             input_bytes: 1,
             input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),

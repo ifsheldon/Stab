@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use super::bits::{DenseXorFixture, PopcountFixture};
 use super::clifford_string::{CliffordDescriptor, CliffordStringFixture};
-use super::dem_model::{self, DemFixture};
+use super::dem_model::{self, DemFamily, DemFixture};
 use super::not_zero::NotZeroFixture;
 use super::pauli::PauliMultiplyFixture;
 use super::pauli_iter::PauliIterFixture;
@@ -57,6 +57,7 @@ impl PreparedWorkload {
     pub(super) fn prepare(
         workload: WorkerWorkload,
         descriptor: Option<CliffordDescriptor>,
+        family: Option<DemFamily>,
         iterations: u64,
         work_items: u64,
         work_count: u64,
@@ -65,6 +66,15 @@ impl PreparedWorkload {
         match (clifford_kind, descriptor) {
             (Some(_), None) => return Err(WorkerError::MissingCliffordDescriptor),
             (None, Some(_)) => return Err(WorkerError::UnexpectedCliffordDescriptor),
+            _ => {}
+        }
+        let dem_workload = matches!(
+            workload,
+            WorkerWorkload::DemParse | WorkerWorkload::DemCanonicalPrint
+        );
+        match (dem_workload, family) {
+            (true, None) => return Err(WorkerError::MissingDemFamily),
+            (false, Some(_)) => return Err(WorkerError::UnexpectedDemFamily),
             _ => {}
         }
 
@@ -78,9 +88,13 @@ impl PreparedWorkload {
                 let circuit = stab_core::Circuit::from_stim_str(&input)?;
                 PreparedState::CircuitCanonicalPrint { input, circuit }
             }
-            WorkerWorkload::DemParse => PreparedState::DemParse(DemFixture::prepare(work_items)?),
+            WorkerWorkload::DemParse => PreparedState::DemParse(DemFixture::prepare(
+                family.ok_or(WorkerError::MissingDemFamily)?,
+                work_items,
+            )?),
             WorkerWorkload::DemCanonicalPrint => {
-                let fixture = DemFixture::prepare(work_items)?;
+                let fixture =
+                    DemFixture::prepare(family.ok_or(WorkerError::MissingDemFamily)?, work_items)?;
                 let model = stab_core::DetectorErrorModel::from_dem_str(fixture.text())?;
                 PreparedState::DemCanonicalPrint { fixture, model }
             }

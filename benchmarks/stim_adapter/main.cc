@@ -57,6 +57,7 @@ struct Arguments {
     bool start_barrier = false;
     std::optional<uint32_t> expected_cpu;
     std::optional<std::string> input_descriptor_hex;
+    std::optional<std::string> input_family;
 };
 
 enum class NotZeroPattern {
@@ -141,6 +142,8 @@ Arguments parse_arguments(int argc, const char **argv) {
             result.expected_cpu = static_cast<uint32_t>(cpu);
         } else if (name == "--input-descriptor-hex") {
             result.input_descriptor_hex = std::string(value);
+        } else if (name == "--input-family") {
+            result.input_family = std::string(value);
         } else {
             throw std::invalid_argument("unknown adapter option " + std::string(name));
         }
@@ -152,6 +155,7 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool dem_parse = result.workload == "dem-parse" && result.measurement_id == "parse";
     const bool dem_canonical_print =
         result.workload == "dem-canonical-print" && result.measurement_id == "serialize";
+    const bool dem_model = dem_parse || dem_canonical_print;
     const bool gate_name_hash =
         result.workload == "gate-name-hash" && result.measurement_id == "hash-all-names";
     const bool simd_word_popcount =
@@ -193,6 +197,11 @@ Arguments parse_arguments(int argc, const char **argv) {
     if (result.evidence_mode != "contract" && result.evidence_mode != "timing" &&
         result.evidence_mode != "memory") {
         throw std::invalid_argument("evidence-mode must be contract, timing, or memory");
+    }
+    if (dem_model != result.input_family.has_value()) {
+        throw std::invalid_argument(
+            dem_model ? "DEM model workload requires --input-family"
+                      : "--input-family is only valid for DEM model workloads");
     }
     return result;
 }
@@ -878,6 +887,8 @@ int main(int argc, const char **argv) {
             stab_qualification::is_dem_model_workload(arguments.workload);
         const std::string dem_fixture = dem_model_workload
                                             ? stab_qualification::dem_model_fixture(
+                                                  stab_qualification::dem_family(
+                                                      arguments.input_family.value()),
                                                   arguments.work_items)
                                             : std::string{};
         const std::optional<stim::DetectorErrorModel> dem_print_model =

@@ -4,6 +4,12 @@ Owners: `stab-core/dem-parser` for `PERFQ-M10-DEM-PARSE-CONTRACT` and `stab-core
 
 Status: clean revisions `f23386bdc12258eab97b9997b3f478841caa050c` and `d8de73d50fbeb4e001ea38c784d1fdcfc76dad76` produced and replayed faithful parse/small/full reports under their exact source inventories. Their stable median failures were respectively `1.773450x` and `1.372971x`; neither was noisy or rerun from the same revision. Clean inventory-bound revision `ca9fd68d3856e9cac9cc6da16433947d056e8848` then passed parse/small/full and parse/medium/full, but its first parse/large/full report failed stably because the bootstrap confidence upper bound was `1.263920x`. Clean implementation commit `430428ea93a40af25a352746acc2bc517e7ad1fd` applies a third source-owned optimization, but it has no formal timing evidence yet. The fixture, semantic-work denominator, comparator, output obligations, scales, common-iteration policy, and `1.25x` threshold remain unchanged and unwaived.
 
+## Representative Families
+
+The repaired release contract replaces the former repeated mixed cycle with three deterministic workload families at 64, 4,096, and 65,536 compact work items. `flat-errors` measures flat error-heavy throughput with varied probabilities, detector and observable targets, and separators. `coordinate-sparse` measures tags, coordinate declarations and shifts, plus sparse high detector and observable identifiers. `folded-repeats` measures nested compact repeat blocks with large repeat counts that must remain folded.
+
+Rust and C++ generate each family independently and must agree on exact input bytes, input digest, canonical output bytes, and semantic output digest before timing is promotable. Scale monotonicity is evaluated within a family, never between unrelated families. The accepted maximum is 524,288 compact items for `flat-errors` and `coordinate-sparse`, and 262,144 compact items for `folded-repeats`.
+
 ## Initial Diagnosis
 
 Dominant cost: per-instruction allocation and generic string processing are confirmed material costs, although post-fix formal closure is not yet proven. Before optimization, parsing the 4,096-item qualification family performed 14,859 allocation calls, approximately 29 per eight-item cycle. Stab allocated a lowercase instruction name, argument vector, and target vector on common instructions and repeatedly grew the top-level and spill-sized target vectors. Pinned Stim parses bytes directly and commits argument, target, and tag payloads into monotonic buffers. The frozen workload intentionally repeats tags, numeric arguments, separators, detector and observable targets, shifts, and nested blocks, so removing any of those features to improve the ratio would invalidate the comparison.
@@ -52,7 +58,7 @@ Next owner action: bind this updated note, its digest, and the regenerated corre
 2. Inspect retained raw samples, calibration decisions, paired-ratio relative MAD, confidence bounds, setup and peak RSS, and Stab allocation behavior before accepting the optimization.
 3. If parse still fails the gate, diagnose the retained post-fix report independently and change production code only when new evidence identifies the remaining cost.
 4. If print fails or is noisy in formal evidence despite its diagnostic probe, diagnose it independently; do not average parse and print or transfer evidence between the groups.
-5. After any parser, printer, worker, adapter, note, schema, or runtime-contract change, regenerate the affected source-owned contracts and rerun correctness, reproducibility, probes, full and soak reports, regressions, rollups, and completion receipts from the fix revision.
+5. After any parser, printer, worker, adapter, note, schema, or runtime-contract change, regenerate the affected source-owned contracts and rerun correctness, reproducibility, probes, full and soak reports, parity checks, rollups, and the revision completion manifest from the fix revision.
 
 Current acceptance still requires both the median paired ratio and bootstrap 95 percent upper bound to be at most `1.25x` at all three scales, with no waiver path. Failed, noisy, host-rejected, and controller-rejected attempts remain visible in the progress report and cannot be replaced by favorable reruns.
 

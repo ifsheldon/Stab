@@ -88,6 +88,9 @@ enum Command {
         check: bool,
     },
 
+    /// Generate or check the consolidated qualification status dashboard.
+    QualificationStatus(qualification::StatusArgs),
+
     /// Regenerate or check the frozen Clifford-string qualification vectors.
     #[command(hide = true)]
     QualificationCliffordVectors {
@@ -108,14 +111,24 @@ enum Command {
     /// Validate a paired qualification report and regenerate derived artifacts.
     QualificationReport(qualification::ReportArgs),
 
-    /// Execute and bind every machine-checkable milestone closure operation.
+    /// Publish one architecture/revision completion manifest from source-owned rollups.
     QualificationCompletion(qualification::CompletionArgs),
 
-    /// Replay a milestone completion receipt from its exact source evidence.
+    /// Reconstruct a completion manifest offline from its exact rollups and reports.
     QualificationCompletionReport(qualification::CompletionReportArgs),
 
-    /// Check promotable qualification evidence against source-owned thresholds.
-    QualificationRegression(qualification::RegressionArgs),
+    /// Check promotable qualification evidence against source-owned Stim parity thresholds.
+    QualificationParity(qualification::ParityArgs),
+
+    /// Deprecated alias for `qualification-parity`.
+    #[command(hide = true)]
+    QualificationRegression(qualification::ParityArgs),
+
+    /// Check current accepted evidence against Stab's architecture-specific baseline.
+    QualificationSelfRegression(qualification::SelfRegressionArgs),
+
+    /// Generate an immutable Stab self-regression baseline candidate.
+    QualificationBaselineCandidate(qualification::BaselineCandidateArgs),
 
     /// Bind one complete architecture-scoped scale family into a rollup.
     QualificationRollup(qualification::RollupArgs),
@@ -277,6 +290,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             let manifest = checked_manifest(&root)?;
             qualification::regenerate(&root, &manifest, check)?;
         }
+        Command::QualificationStatus(args) => {
+            qualification::status(&root, args)?;
+        }
         Command::QualificationCliffordVectors { check } => {
             qualification::regenerate_clifford_vectors(&root, check)?;
         }
@@ -298,8 +314,14 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         Command::QualificationCompletionReport(args) => {
             qualification::completion_report(&root, args)?;
         }
-        Command::QualificationRegression(args) => {
-            qualification::regression(&root, args)?;
+        Command::QualificationParity(args) | Command::QualificationRegression(args) => {
+            qualification::parity(&root, args)?;
+        }
+        Command::QualificationSelfRegression(args) => {
+            qualification::self_regression(&root, args)?;
+        }
+        Command::QualificationBaselineCandidate(args) => {
+            qualification::regression_baseline_candidate(&root, args)?;
         }
         Command::QualificationRollup(args) => {
             qualification::rollup(&root, args)?;

@@ -1,0 +1,294 @@
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use clap::Args;
+use serde::Deserialize;
+
+use super::model::{ChecklistScope, PerformanceDisposition, QualificationSuite};
+use crate::config::PREFIX;
+use crate::error::BenchError;
+use crate::root::RepoRoot;
+
+const STATUS_PATH: &str = "docs/qualification-status.md";
+const RUNTIME_GROUPS_PATH: &str = "benchmarks/qualification-runtime-groups.json";
+const REGRESSION_BASELINES_PATH: &str = "benchmarks/qualification-regression-baselines.json";
+const COMPLETION_CHECKPOINT_PATH: &str = "benchmarks/qualification-completion-checkpoint.json";
+const MAX_SOURCE_BYTES: usize = 32 << 20;
+
+#[derive(Clone, Debug, Args)]
+pub(crate) struct StatusArgs {
+    /// Compare the generated dashboard with the checked file instead of writing it.
+    #[arg(long)]
+    check: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct CorrectnessInventory {
+    semantic_digest: String,
+    evidence_cases: Vec<CorrectnessCase>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CorrectnessCase {
+    status: CorrectnessStatus,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(rename_all = "kebab-case")]
+enum CorrectnessStatus {
+    Implemented,
+    EvidenceClose,
+    Planned,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeContracts {
+    schema_version: u32,
+    performance_inventory_sha256: String,
+    groups: Vec<RuntimeGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeGroup {
+    claim_class: RuntimeClaimClass,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(rename_all = "kebab-case")]
+enum RuntimeClaimClass {
+    DiagnosticInfrastructure,
+    PromotablePerformance,
+}
+
+#[derive(Debug, Deserialize)]
+struct RegressionBaselines {
+    performance_inventory_sha256: String,
+    entries: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompletionCheckpoint {
+    schema_version: u32,
+    current: Option<CurrentCompletion>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CurrentCompletion {
+    scope_id: String,
+    path: String,
+    report_sha256: String,
+    stab_commit: String,
+    architecture: String,
+    performance_inventory_sha256: String,
+    correctness_inventory_sha256: String,
+    parity_outcome: String,
+    regression_outcome: String,
+}
+
+struct StatusData {
+    correctness_digest: String,
+    performance_digest: String,
+    correctness_counts: BTreeMap<CorrectnessStatus, usize>,
+    deferred_checklist_surfaces: usize,
+    release_groups: usize,
+    diagnostic_groups: usize,
+    future_candidates: usize,
+    regression_seeded: usize,
+    completion: Option<CurrentCompletion>,
+}
+
+pub(crate) fn run(root: &RepoRoot, args: StatusArgs) -> Result<(), BenchError> {
+    let suite = super::read(root)?;
+    let data = collect(root, &suite)?;
+    let rendered = render(&data);
+    let path = root.path.join(STATUS_PATH);
+    if args.check {
+        let checked = read(root, &path)?;
+        if checked != rendered.as_bytes() {
+            return Err(BenchError::Qualification(
+                "generated qualification dashboard differs from docs/qualification-status.md"
+                    .to_string(),
+            ));
+        }
+        println!("[{PREFIX}] generated qualification status is clean");
+    } else {
+        super::atomic_write(root, &path, rendered.as_bytes())?;
+        println!("[{PREFIX}] wrote {STATUS_PATH}");
+    }
+    Ok(())
+}
+
+fn collect(root: &RepoRoot, suite: &QualificationSuite) -> Result<StatusData, BenchError> {
+    let correctness: CorrectnessInventory =
+        parse(root, &root.correctness_manifest(), "correctness inventory")?;
+    if correctness.semantic_digest != suite.correctness_digest {
+        return Err(BenchError::Qualification(
+            "qualification status found mismatched correctness and performance inventories"
+                .to_string(),
+        ));
+    }
+    let runtime: RuntimeContracts = parse(
+        root,
+        &root.path.join(RUNTIME_GROUPS_PATH),
+        "runtime contracts",
+    )?;
+    if runtime.schema_version != 7 || runtime.performance_inventory_sha256 != suite.semantic_digest
+    {
+        return Err(BenchError::Qualification(
+            "qualification status found stale runtime contracts".to_string(),
+        ));
+    }
+    let baselines: RegressionBaselines = parse(
+        root,
+        &root.path.join(REGRESSION_BASELINES_PATH),
+        "regression baselines",
+    )?;
+    if baselines.performance_inventory_sha256 != suite.semantic_digest {
+        return Err(BenchError::Qualification(
+            "qualification status found stale regression baselines".to_string(),
+        ));
+    }
+    let checkpoint: CompletionCheckpoint = parse(
+        root,
+        &root.path.join(COMPLETION_CHECKPOINT_PATH),
+        "completion checkpoint",
+    )?;
+    if checkpoint.schema_version != 1 {
+        return Err(BenchError::Qualification(
+            "qualification completion checkpoint schema is unsupported".to_string(),
+        ));
+    }
+    if let Some(current) = &checkpoint.current
+        && (current.performance_inventory_sha256 != suite.semantic_digest
+            || current.correctness_inventory_sha256 != suite.correctness_digest)
+    {
+        return Err(BenchError::Qualification(
+            "qualification completion checkpoint is stale".to_string(),
+        ));
+    }
+
+    let checklist_source = read(root, &root.feature_checklist())?;
+    let checklist_text = std::str::from_utf8(&checklist_source).map_err(|error| {
+        BenchError::Qualification(format!("feature checklist is not UTF-8: {error}"))
+    })?;
+    let checklist = super::checklist::parse(checklist_text)?;
+    let deferred_checklist_surfaces = checklist
+        .iter()
+        .filter(|item| item.scope == ChecklistScope::Deferred || item.deferred_remainder)
+        .count();
+    let correctness_counts = counts(correctness.evidence_cases.iter().map(|case| case.status));
+    let release_groups = runtime
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == RuntimeClaimClass::PromotablePerformance)
+        .count();
+    let diagnostic_groups = runtime.groups.len().saturating_sub(release_groups);
+    let future_candidates = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| group.disposition == PerformanceDisposition::FutureCandidate)
+        .count();
+    Ok(StatusData {
+        correctness_digest: suite.correctness_digest.clone(),
+        performance_digest: suite.semantic_digest.clone(),
+        correctness_counts,
+        deferred_checklist_surfaces,
+        release_groups,
+        diagnostic_groups,
+        future_candidates,
+        regression_seeded: baselines.entries.len(),
+        completion: checkpoint.current,
+    })
+}
+
+fn counts<T: Ord>(values: impl IntoIterator<Item = T>) -> BTreeMap<T, usize> {
+    let mut result = BTreeMap::new();
+    for value in values {
+        *result.entry(value).or_default() += 1;
+    }
+    result
+}
+
+fn render(data: &StatusData) -> String {
+    let implemented = data
+        .correctness_counts
+        .get(&CorrectnessStatus::Implemented)
+        .copied()
+        .unwrap_or_default();
+    let evidence_close = data
+        .correctness_counts
+        .get(&CorrectnessStatus::EvidenceClose)
+        .copied()
+        .unwrap_or_default();
+    let planned = data
+        .correctness_counts
+        .get(&CorrectnessStatus::Planned)
+        .copied()
+        .unwrap_or_default();
+    let checkpoint = data.completion.as_ref().map_or_else(
+        || {
+            "Formal repaired-contract completion: **not started**. Historical reports remain historical under their recorded source identities.".to_string()
+        },
+        |current| {
+            format!(
+                "Formal repaired-contract completion: scope `{}` at `{}` on `{}` (`{}`), report `{}`, Stim parity `{}`, Stab regression `{}`.",
+                current.scope_id,
+                current.stab_commit,
+                current.architecture,
+                current.path,
+                current.report_sha256,
+                current.parity_outcome,
+                current.regression_outcome,
+            )
+        },
+    );
+    format!(
+        "<!-- Generated by `just qualification::status`. Do not edit by hand. -->\n# Qualification Status\n\nThis dashboard is generated from the checked correctness inventory, performance inventory, runtime contracts, regression baselines, feature checklist, and completion checkpoint.\n\n## Current Checkpoint\n\n{checkpoint}\n\n## Inventory\n\n| Category | Count |\n| --- | ---: |\n| Implemented correctness evidence parents | {implemented} |\n| Evidence-close correctness parents | {evidence_close} |\n| Planned correctness parents | {planned} |\n| Deferred checklist surfaces or remainders | {} |\n| Release runtime groups | {} |\n| Diagnostic runtime groups | {} |\n| Future performance candidates | {} |\n| Seeded self-regression identities | {} |\n\n## Contract Identities\n\n- Correctness inventory: `{}`\n- Performance inventory: `{}`\n- Stim parity policy: paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.\n- Stab self-regression: architecture-specific accepted baselines use the source-owned tolerance policy; missing identities are unseeded, never passing.\n\n## Interpretation\n\nImplementation, correctness qualification, Stim parity, Stab self-regression, environment validity, and memory/scaling evidence are separate conclusions. Shared-host scheduled timing is diagnostic and is not authoritative release evidence.\n",
+        data.deferred_checklist_surfaces,
+        data.release_groups,
+        data.diagnostic_groups,
+        data.future_candidates,
+        data.regression_seeded,
+        data.correctness_digest,
+        data.performance_digest,
+    )
+}
+
+fn parse<T: for<'de> Deserialize<'de>>(
+    root: &RepoRoot,
+    path: &Path,
+    description: &str,
+) -> Result<T, BenchError> {
+    let bytes = read(root, path)?;
+    serde_json::from_slice(&bytes)
+        .map_err(|error| BenchError::Qualification(format!("invalid {description} JSON: {error}")))
+}
+
+fn read(root: &RepoRoot, path: &Path) -> Result<Vec<u8>, BenchError> {
+    crate::source_file::read_repo_regular_file_bounded(root, path, MAX_SOURCE_BYTES)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_status_is_derived_from_cross_checked_source_contracts() {
+        let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+            .expect("repository root");
+        let suite = super::super::read(&root).expect("performance inventory");
+        let data = collect(&root, &suite).expect("status data");
+        let rendered = render(&data);
+
+        assert_eq!(
+            data.release_groups + data.diagnostic_groups,
+            20,
+            "every runtime contract is classified"
+        );
+        assert!(data.correctness_counts.values().sum::<usize>() > 1_000);
+        assert!(rendered.contains("Formal repaired-contract completion: **not started**"));
+        assert!(rendered.contains(&data.performance_digest));
+    }
+}

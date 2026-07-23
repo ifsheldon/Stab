@@ -19,7 +19,7 @@ fn contract() -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new("product-group").expect("group id"),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
         workload_id: ProtocolId::try_new("workload").expect("workload id"),
         measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
@@ -27,6 +27,8 @@ fn contract() -> GroupContract {
             .into_iter()
             .map(|(id, work)| ScaleContract {
                 id: ProtocolId::try_new(id).expect("scale id"),
+                family_id: ProtocolId::try_new("default").expect("family id"),
+                size_class: crate::qualification::model::SizeClass::Small,
                 work_items: NonZeroU64::new(work).expect("positive work"),
                 input_bytes: work,
                 input_digest: InputDigest::try_new(digest(char::from(
@@ -47,7 +49,7 @@ fn shared() -> SharedIdentity {
         group_id: "product-group".to_string(),
         group_contract_sha256: digest('a'),
         claim_class: ClaimClass::PromotablePerformance,
-        baseline_eligibility: BaselineEligibility::ThresholdEligible,
+        parity_eligibility: ParityEligibility::ThresholdEligible,
         owner: "owner".to_string(),
         profiler_note: None,
         tier: QualificationTier::Full,

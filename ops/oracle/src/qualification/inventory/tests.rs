@@ -213,7 +213,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
         .filter(|case| case.source_id.starts_with("cq2-dem-"))
         .collect::<Vec<_>>();
-    assert_eq!(dem_qualification_cases.len(), 17);
+    assert_eq!(dem_qualification_cases.len(), 20);
     assert!(
         dem_qualification_cases
             .iter()
@@ -280,7 +280,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
         .filter(|case| case.source_id.starts_with("cq2-result-"))
         .collect::<Vec<_>>();
-    assert_eq!(result_qualification_cases.len(), 40);
+    assert_eq!(result_qualification_cases.len(), 39);
     assert!(
         result_qualification_cases
             .iter()
@@ -296,8 +296,8 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
 
     let sample_format_parent = result_qualification_cases
         .iter()
-        .find(|case| case.source_id == "cq2-result-sample-format-value-contract")
-        .expect("SampleFormat qualification parent");
+        .find(|case| case.source_id == "cq2-result-writer-exact-format-contract")
+        .expect("SampleFormat writer-byte qualification parent");
     let result_api_items = manifest
         .public_api_items
         .iter()

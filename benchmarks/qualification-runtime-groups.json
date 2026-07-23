@@ -1,18 +1,22 @@
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "e7deb06a6d0de98266f64d77e48e027eba4a93233a40fbdb2b0ea676a31660ad",
+  "performance_inventory_sha256": "7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
       "claim_class": "diagnostic-infrastructure",
-      "baseline_eligibility": "report-only",
+      "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
       "workload_id": "protocol-smoke",
-      "measurement_ids": ["main"],
+      "measurement_ids": [
+        "main"
+      ],
       "scales": [
         {
           "id": "default",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 4096,
           "input_bytes": 0,
           "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
@@ -25,25 +29,33 @@
     {
       "id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "circuit-canonical-print",
-      "measurement_ids": ["serialize"],
+      "measurement_ids": [
+        "serialize"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 64,
           "input_bytes": 429,
           "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 4096,
           "input_bytes": 27981,
           "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 65536,
           "input_bytes": 447821,
           "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
@@ -59,25 +71,33 @@
     {
       "id": "PERFQ-M4-CIRCUIT-PARSE",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "circuit-parse",
-      "measurement_ids": ["parse"],
+      "measurement_ids": [
+        "parse"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 64,
           "input_bytes": 429,
           "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 4096,
           "input_bytes": 27981,
           "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 65536,
           "input_bytes": 447821,
           "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
@@ -96,38 +116,48 @@
     {
       "id": "PERFQ-M4-GATE-LOOKUP",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "gate-name-hash",
-      "measurement_ids": ["hash-all-names"],
+      "measurement_ids": [
+        "hash-all-names"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 82,
           "input_bytes": 0,
           "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 5248,
           "input_bytes": 0,
           "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 335872,
           "input_bytes": 0,
           "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
         }
       ],
-      "correctness_case_ids": ["cq-evidence-qualification-bd20a013e903a05f"],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-bd20a013e903a05f"
+      ],
       "owner": "stab-core/gates",
       "profiler_note": null
     },
     {
       "id": "PERFQ-M5-SIMD-BITS",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-xor",
       "measurement_ids": [
@@ -136,18 +166,24 @@
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 4096,
           "input_bytes": 1024,
           "input_digest": "d7fbfcc618ad7e3fd8a616be64f8b41949214afbbca6b58514d40fa5ea7ac498"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 262144,
           "input_bytes": 65536,
           "input_digest": "7f2b0610db451711e538c7bea04e7cdbead09cc41c088ebfeb3da0788d53ca46"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 16777216,
           "input_bytes": 4194304,
           "input_digest": "43fe5c79be45a459124be3bd00a45b65dbc886a6915fe19b3a173d37abc088ee"
@@ -162,7 +198,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -173,25 +209,33 @@
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-zero",
-      "measurement_ids": ["not-zero"],
+      "measurement_ids": [
+        "not-zero"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 1256,
           "input_digest": "b6286dfe1dca80e14e17bbc6a371565900665697e8f4f2b22d30a303f804b537"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 640000,
           "input_bytes": 80000,
           "input_digest": "60aace21d864e2176a3f43edcd21a970c401e36a0223c24d09a8d482e075aae0"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 40960000,
           "input_bytes": 5120000,
           "input_digest": "080543f5fd6fe5ca816fbfc568988f74eb08c7477f433ccbdecbc16d62790ec8"
@@ -206,7 +250,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -217,25 +261,33 @@
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-early",
-      "measurement_ids": ["not-zero"],
+      "measurement_ids": [
+        "not-zero"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 1256,
           "input_digest": "652aebf153201450c8fe9d3707aed8cb0ee9fee8f5332d88e2001c56cfd0838f"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 640000,
           "input_bytes": 80000,
           "input_digest": "f2af8de388713368d12e7bf4188e96c030bf1c3e2906250672e2f2eee9370aa8"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 40960000,
           "input_bytes": 5120000,
           "input_digest": "84118644943bed7c2aa82daafc7e8b8f2358d0e38ab07fd140c8aba466fb3ba4"
@@ -250,7 +302,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -261,25 +313,33 @@
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "simd-bits-not-zero-late",
-      "measurement_ids": ["not-zero"],
+      "measurement_ids": [
+        "not-zero"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 1256,
           "input_digest": "76618d8f234d913b3b6f99be0c83fca1e8a6eb3c5cdb6f622c06dccc7aaa2cc0"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 640000,
           "input_bytes": 80000,
           "input_digest": "61aace21da17e2176a3f445b0d21a9b0c41d536a0223c24deda8d482e075aae6"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 40960000,
           "input_bytes": 5120000,
           "input_digest": "0b0543f60288e5ca816fc551a8988eb4e96d37477f433ccbe2cbc16d62790f06"
@@ -294,7 +354,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -305,7 +365,7 @@
     {
       "id": "PERFQ-M5-SIMD-WORD",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "simd-word-popcount",
       "measurement_ids": [
@@ -314,18 +374,24 @@
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 4096,
           "input_bytes": 512,
           "input_digest": "101e05fc22ce0676c277e9b16363a38750079d12e0b93f3c687ed95457b79d1c"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 262144,
           "input_bytes": 32768,
           "input_digest": "b33ad442a544ef4b367ab3b2e9a47d65676791ed7661ad7fa2529b5249bfea77"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 16777216,
           "input_bytes": 2097152,
           "input_digest": "b1e7afd7d73691441ea033a9eb9496d02fa12bc4d3bcf059856c089112dae368"
@@ -341,7 +407,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -352,7 +418,7 @@
     {
       "id": "PERFQ-M5-SPARSE-XOR",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "sparse-xor-row",
       "measurement_ids": [
@@ -361,18 +427,24 @@
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 1997,
           "input_bytes": 28008,
           "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 127808,
           "input_bytes": 28008,
           "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 8179712,
           "input_bytes": 28008,
           "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
@@ -386,7 +458,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -397,7 +469,7 @@
     {
       "id": "PERFQ-M5-SPARSE-XOR-ITEM",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "sparse-xor-item",
       "measurement_ids": [
@@ -406,18 +478,24 @@
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 7,
           "input_bytes": 36,
           "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 448,
           "input_bytes": 36,
           "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 28672,
           "input_bytes": 36,
           "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
@@ -431,7 +509,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -442,25 +520,33 @@
     {
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "bit-matrix-transpose-in-place",
-      "measurement_ids": ["in-place-transpose"],
+      "measurement_ids": [
+        "in-place-transpose"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 65536,
           "input_bytes": 8208,
           "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 4194304,
           "input_bytes": 524304,
           "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 268435456,
           "input_bytes": 33554448,
           "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
@@ -475,7 +561,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -486,25 +572,33 @@
     {
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "bit-matrix-transpose-allocating",
-      "measurement_ids": ["allocating-transpose"],
+      "measurement_ids": [
+        "allocating-transpose"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 65536,
           "input_bytes": 8208,
           "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 4194304,
           "input_bytes": 524304,
           "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 268435456,
           "input_bytes": 33554448,
           "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
@@ -519,7 +613,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -530,25 +624,33 @@
     {
       "id": "PERFQ-M6-PAULI-STRING",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-right-multiply",
-      "measurement_ids": ["right-multiply-in-place"],
+      "measurement_ids": [
+        "right-multiply-in-place"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 5056,
           "input_digest": "401b897ceb9c02fec1c57b15f76cdc45045fd551354c3dc5ae499e791aef22f4"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 100000,
           "input_bytes": 50048,
           "input_digest": "51b8460e6069c3590ce2e25ee912a0ef92dfe1000a28aa4a1aa3b644ba0d402f"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 1000000,
           "input_bytes": 500032,
           "input_digest": "5babb5f0de800c6ed6c644d103b7a0d01ab22fa7696a363e9120c7cac8157fd9"
@@ -563,7 +665,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
@@ -574,25 +676,33 @@
     {
       "id": "PERFQ-M6-PAULI-ITER",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-iter-range",
-      "measurement_ids": ["construct-and-iterate-borrowed"],
+      "measurement_ids": [
+        "construct-and-iterate-borrowed"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 232,
           "input_bytes": 64,
           "input_digest": "315732711c88257f9f4b2be3dfc3dd01785be01b86bdb7338e663945a90070d5"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 21604,
           "input_bytes": 64,
           "input_digest": "d5c711573168f39a388aa386b1fb66b4b9d063f2a070610cd4543442548f4102"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 972972,
           "input_bytes": 64,
           "input_digest": "85017fcee6d99c399676aac24ff1945f03363f316352eb10d707b51c66f506bc"
@@ -608,7 +718,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -619,25 +729,33 @@
     {
       "id": "PERFQ-M6-PAULI-ITER-SINGLETON",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "pauli-string-iter-singleton",
-      "measurement_ids": ["construct-and-iterate-borrowed"],
+      "measurement_ids": [
+        "construct-and-iterate-borrowed"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 3000,
           "input_bytes": 64,
           "input_digest": "d8d6b42d21392b7ab593f2b09cb9673e261381aa2d93c8f15b8c4ac52a97235b"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 96000,
           "input_bytes": 64,
           "input_digest": "802dc4fd7b6e4d21c2eef73174aa24ee6cb81bc00be978d223a4e4c2242d89f9"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 3000000,
           "input_bytes": 64,
           "input_digest": "394634d1a0abfaace26d4f3c07b81fe797d60c474314e625fd7f02f64d25fd0d"
@@ -653,7 +771,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -664,25 +782,33 @@
     {
       "id": "PERFQ-M6-CLIFFORD-STRING",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "independent-throughput",
       "workload_id": "clifford-string-right-multiply-identity",
-      "measurement_ids": ["right-multiply-identity"],
+      "measurement_ids": [
+        "right-multiply-identity"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 64,
           "input_digest": "8daac0ca1000f1d8cb6545d611d5f3e7b289bf403d8d5dcf529af28e7b573329"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 100000,
           "input_bytes": 64,
           "input_digest": "5fc473c86b0d3bb66e1994ecff910a324cb705666c4b032b74bace09fdf2e90a"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 1000000,
           "input_bytes": 64,
           "input_digest": "cfc386ccbfc3a9220c49b2b17fab281350c2b26c669893e6e3a0beba1b6675aa"
@@ -701,7 +827,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -712,25 +838,33 @@
     {
       "id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "clifford-string-right-multiply-non-identity",
-      "measurement_ids": ["right-multiply-non-identity"],
+      "measurement_ids": [
+        "right-multiply-non-identity"
+      ],
       "scales": [
         {
           "id": "small",
+          "family_id": "default",
+          "size_class": "small",
           "work_items": 10000,
           "input_bytes": 64,
           "input_digest": "6e9792d9f06e4a183bd73eeba556cd4cbc87b0c176bf4cb90a54849120cac96d"
         },
         {
           "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
           "work_items": 100000,
           "input_bytes": 64,
           "input_digest": "0427b1f905f1fce379ca809029cbc6f90aae1a56f7fbb3acdeeb96bfee576b44"
         },
         {
           "id": "large",
+          "family_id": "default",
+          "size_class": "large",
           "work_items": 1000000,
           "input_bytes": 64,
           "input_digest": "e47454166c98afb2c2bc19b2701b346c097bd9ea04481e250361b2e15faf1ce6"
@@ -749,7 +883,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -760,88 +894,210 @@
     {
       "id": "PERFQ-M10-DEM-PARSE-CONTRACT",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "dem-parse",
-      "measurement_ids": ["parse"],
+      "measurement_ids": [
+        "parse"
+      ],
       "scales": [
         {
-          "id": "small",
+          "id": "flat-errors-small",
+          "family_id": "flat-errors",
+          "size_class": "small",
           "work_items": 64,
-          "input_bytes": 1776,
-          "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+          "input_bytes": 1368,
+          "input_digest": "ac17cebf0983e626775012a7bab634d136669f36d706b3842b73a66b1c5684c5"
         },
         {
-          "id": "medium",
+          "id": "flat-errors-medium",
+          "family_id": "flat-errors",
+          "size_class": "medium",
           "work_items": 4096,
-          "input_bytes": 113664,
-          "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+          "input_bytes": 87552,
+          "input_digest": "4c2832178c6c44c8ef895a7cc8a8043699d096f678f6c624039ae126e4541b60"
         },
         {
-          "id": "large",
+          "id": "flat-errors-large",
+          "family_id": "flat-errors",
+          "size_class": "large",
           "work_items": 65536,
-          "input_bytes": 1818624,
-          "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
+          "input_bytes": 1400832,
+          "input_digest": "756997bdca11be9e8d5f4e9470bea059ec516daf218e1a0b3b6c421dbb229de0"
+        },
+        {
+          "id": "coordinate-sparse-small",
+          "family_id": "coordinate-sparse",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 1816,
+          "input_digest": "1065bcd0f102d45a035aa841c27717cfb4e02ea6ea600bb833e3eb8c80f40780"
+        },
+        {
+          "id": "coordinate-sparse-medium",
+          "family_id": "coordinate-sparse",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 116224,
+          "input_digest": "f2d6a6395d630dae37ea9ef42f94604fbd42e6f98537390230f5f63173074fbb"
+        },
+        {
+          "id": "coordinate-sparse-large",
+          "family_id": "coordinate-sparse",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 1859584,
+          "input_digest": "5a15e24913a40f53a1a10e7760009b3e68be8114a76e9f18a3d831ee1f4addc1"
+        },
+        {
+          "id": "folded-repeats-small",
+          "family_id": "folded-repeats",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 8320,
+          "input_digest": "c484e6f7c587a0b7edf9e3572ee745d2268ccde4f6d3d444d186b7cff5ae8db6"
+        },
+        {
+          "id": "folded-repeats-medium",
+          "family_id": "folded-repeats",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 532480,
+          "input_digest": "0a0ac94bf0297b57a62e400c64ccce954519c051b4ef482c9af05babd9ee17c2"
+        },
+        {
+          "id": "folded-repeats-large",
+          "family_id": "folded-repeats",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 8519680,
+          "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
         }
       ],
-      "correctness_case_ids": ["cq-evidence-qualification-0908c21b917526e3"],
+  "correctness_case_ids": [
+    "cq-evidence-qualification-0908c21b917526e3",
+    "cq-evidence-qualification-2f6a06e3fffcf5c0",
+    "cq-evidence-qualification-966ab53fd109b7b3",
+    "cq-evidence-qualification-ae2cf29058be84b0"
+      ],
       "owner": "stab-core/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "176a683c798e2d519a10eb8bf877fa00f279e3b99b4405dd9ac402810c0e3481"
+        "sha256": "b01ff9879f21c5b8576469712e07d756f05d106b78c3538afb7d0b5ddf093bbf"
       },
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/dem_model_contract.h",
-          "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+          "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
         }
       ]
     },
     {
       "id": "PERFQ-M10-DEM-PRINT-CONTRACT",
       "claim_class": "promotable-performance",
-      "baseline_eligibility": "threshold-eligible",
+      "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
       "workload_id": "dem-canonical-print",
-      "measurement_ids": ["serialize"],
+      "measurement_ids": [
+        "serialize"
+      ],
       "scales": [
         {
-          "id": "small",
+          "id": "flat-errors-small",
+          "family_id": "flat-errors",
+          "size_class": "small",
           "work_items": 64,
-          "input_bytes": 1776,
-          "input_digest": "fe2dab309c0d63109124cbaae8fadfe7b72ec523bd1c2252e1a7fc20f1b0d773"
+          "input_bytes": 1368,
+          "input_digest": "ac17cebf0983e626775012a7bab634d136669f36d706b3842b73a66b1c5684c5"
         },
         {
-          "id": "medium",
+          "id": "flat-errors-medium",
+          "family_id": "flat-errors",
+          "size_class": "medium",
           "work_items": 4096,
-          "input_bytes": 113664,
-          "input_digest": "9de340076c00f2c1cae6130f3393c556e8d892d2dc25519b0b93cda239d0e01c"
+          "input_bytes": 87552,
+          "input_digest": "4c2832178c6c44c8ef895a7cc8a8043699d096f678f6c624039ae126e4541b60"
         },
         {
-          "id": "large",
+          "id": "flat-errors-large",
+          "family_id": "flat-errors",
+          "size_class": "large",
           "work_items": 65536,
-          "input_bytes": 1818624,
-          "input_digest": "240d4c9e8e0d7a24e5ad6dea5421fe19906942430c4d994c9b1fcf55fa939716"
+          "input_bytes": 1400832,
+          "input_digest": "756997bdca11be9e8d5f4e9470bea059ec516daf218e1a0b3b6c421dbb229de0"
+        },
+        {
+          "id": "coordinate-sparse-small",
+          "family_id": "coordinate-sparse",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 1816,
+          "input_digest": "1065bcd0f102d45a035aa841c27717cfb4e02ea6ea600bb833e3eb8c80f40780"
+        },
+        {
+          "id": "coordinate-sparse-medium",
+          "family_id": "coordinate-sparse",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 116224,
+          "input_digest": "f2d6a6395d630dae37ea9ef42f94604fbd42e6f98537390230f5f63173074fbb"
+        },
+        {
+          "id": "coordinate-sparse-large",
+          "family_id": "coordinate-sparse",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 1859584,
+          "input_digest": "5a15e24913a40f53a1a10e7760009b3e68be8114a76e9f18a3d831ee1f4addc1"
+        },
+        {
+          "id": "folded-repeats-small",
+          "family_id": "folded-repeats",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 8320,
+          "input_digest": "c484e6f7c587a0b7edf9e3572ee745d2268ccde4f6d3d444d186b7cff5ae8db6"
+        },
+        {
+          "id": "folded-repeats-medium",
+          "family_id": "folded-repeats",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 532480,
+          "input_digest": "0a0ac94bf0297b57a62e400c64ccce954519c051b4ef482c9af05babd9ee17c2"
+        },
+        {
+          "id": "folded-repeats-large",
+          "family_id": "folded-repeats",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 8519680,
+          "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
         }
       ],
-      "correctness_case_ids": ["cq-evidence-qualification-0908c21b917526e3"],
+  "correctness_case_ids": [
+    "cq-evidence-qualification-0908c21b917526e3",
+    "cq-evidence-qualification-2f6a06e3fffcf5c0",
+    "cq-evidence-qualification-966ab53fd109b7b3",
+    "cq-evidence-qualification-ae2cf29058be84b0"
+      ],
       "owner": "stab-core/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "176a683c798e2d519a10eb8bf877fa00f279e3b99b4405dd9ac402810c0e3481"
+        "sha256": "b01ff9879f21c5b8576469712e07d756f05d106b78c3538afb7d0b5ddf093bbf"
       },
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
+          "sha256": "f19ec0dee02429199b42c950c9c7d31eb8e37bb376d76d3534da3a1429a321ff"
         },
         {
           "path": "benchmarks/stim_adapter/dem_model_contract.h",
-          "sha256": "cde36718fab242db51c5662363b63dc6f04792265a962874d2b2bee5ade0592d"
+          "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
         }
       ]
     }

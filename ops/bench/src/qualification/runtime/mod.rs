@@ -3,6 +3,7 @@ mod artifact;
 mod calibration;
 mod clifford_vectors;
 mod completion;
+#[cfg(test)]
 mod contract;
 mod correctness;
 mod executable;
@@ -11,12 +12,13 @@ mod group;
 mod host;
 mod invocation;
 mod markdown;
+mod parity;
 mod probe;
 mod protocol;
-mod regression;
 mod report;
 mod rollup;
 mod run;
+mod self_regression;
 mod stab_build;
 mod statistics;
 mod toolchain;
@@ -25,11 +27,12 @@ mod worker;
 pub(super) use crate::process;
 
 pub(crate) use completion::{CompletionArgs, CompletionReportArgs};
+pub(crate) use parity::ParityArgs;
 pub(crate) use probe::ProbeArgs;
-pub(crate) use regression::RegressionArgs;
 pub(crate) use report::ReportArgs;
 pub(crate) use rollup::{RollupArgs, RollupReportArgs};
 pub(crate) use run::RunArgs;
+pub(crate) use self_regression::{BaselineCandidateArgs, SelfRegressionArgs};
 pub(crate) use worker::WorkerArgs;
 
 pub(super) struct QualificationSession {
@@ -110,9 +113,13 @@ pub(crate) fn regenerate_clifford_vectors(
 
 pub(crate) fn verify_worker_reproducibility(
     session: &QualificationSession,
+    performance_inventory_sha256: &str,
 ) -> Result<(String, String), String> {
-    let identity = invocation::verify_private_worker_reproducibility(&session.source_root)
-        .map_err(|error| error.to_string())?;
+    let identity = invocation::verify_private_worker_reproducibility(
+        &session.source_root,
+        performance_inventory_sha256,
+    )
+    .map_err(|error| error.to_string())?;
     Ok((identity.stim_binary_sha256, identity.stab_binary_sha256))
 }
 
@@ -158,6 +165,7 @@ pub(crate) fn run_completion(
 ) -> Result<std::path::PathBuf, String> {
     completion::run_with_repository(
         &session.root,
+        &session.source_root,
         &session.repository,
         inventory_digest,
         correctness_digest,
@@ -174,6 +182,7 @@ pub(crate) fn run_completion_report(
 ) -> Result<std::path::PathBuf, String> {
     completion::run_report_with_repository(
         &session.root,
+        &session.source_root,
         &session.repository,
         inventory_digest,
         correctness_digest,
@@ -182,13 +191,47 @@ pub(crate) fn run_completion_report(
     .map_err(|error| error.to_string())
 }
 
-pub(crate) fn run_regression(
+pub(crate) fn run_parity(
     session: &QualificationSession,
     inventory_digest: &str,
     correctness_digest: &str,
-    args: RegressionArgs,
-) -> Result<regression::RegressionSummary, String> {
-    regression::run_args_with_repository(
+    args: ParityArgs,
+) -> Result<parity::ParitySummary, String> {
+    parity::run_args_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn run_self_regression(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: SelfRegressionArgs,
+) -> Result<self_regression::SelfRegressionSummary, String> {
+    self_regression::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn generate_regression_baseline_candidate(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: BaselineCandidateArgs,
+) -> Result<std::path::PathBuf, String> {
+    self_regression::candidate_with_repository(
         &session.root,
         &session.source_root,
         &session.repository,
@@ -240,7 +283,8 @@ pub(crate) fn check_contracts(
 ) -> Result<(), String> {
     host::check_policy(root).map_err(|error| error.to_string())?;
     group::check(root, inventory_digest, suite).map_err(|error| error.to_string())?;
-    regression::check_baseline(root, inventory_digest).map_err(|error| error.to_string())
+    parity::check_policy(root, inventory_digest).map_err(|error| error.to_string())?;
+    self_regression::check_sources(root, inventory_digest).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

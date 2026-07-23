@@ -92,74 +92,6 @@ pub(crate) enum InvocationError {
         stderr: String,
     },
     #[error(
-        "{implementation} did not reject an unaligned simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PopcountAlignmentRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject a below-minimum simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PopcountMinimumRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} simd-bits-xor width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    DenseXorWidthRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} simd-bits-not-zero width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    NotZeroWidthRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} sparse-XOR work count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    SparseXorWorkRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} bit-matrix transpose work count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    BitMatrixTransposeWorkRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} Pauli multiplication invocation before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PauliWorkRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
         "{implementation} did not reject the {class} {workload} invocation before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
     )]
     PauliIterWorkRejection {
@@ -176,16 +108,6 @@ pub(crate) enum InvocationError {
     CliffordWorkRejection {
         implementation: Implementation,
         case_id: String,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the first unsupported {workload} item count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    DemWorkRejection {
-        implementation: Implementation,
-        workload: &'static str,
         status: Option<i32>,
         stdout: String,
         stderr: String,

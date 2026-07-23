@@ -16,15 +16,17 @@ mod io;
 mod migration;
 mod model;
 mod runtime;
+mod status;
 mod validation;
 
 pub(crate) use runtime::{
-    CompletionArgs, CompletionReportArgs, ProbeArgs, RegressionArgs, ReportArgs, RollupArgs,
-    RollupReportArgs, RunArgs, WorkerArgs,
+    BaselineCandidateArgs, CompletionArgs, CompletionReportArgs, ParityArgs, ProbeArgs, ReportArgs,
+    RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs, WorkerArgs,
 };
+pub(crate) use status::StatusArgs;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "e7deb06a6d0de98266f64d77e48e027eba4a93233a40fbdb2b0ea676a31660ad";
+    "7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -49,7 +51,8 @@ pub(crate) fn regenerate_clifford_vectors(root: &RepoRoot, check: bool) -> Resul
 pub(crate) fn worker_reproducibility(root: &RepoRoot) -> Result<(), BenchError> {
     with_checked_formal_session(root, |session| {
         let (stim_binary_sha256, stab_binary_sha256) =
-            runtime::verify_worker_reproducibility(session).map_err(BenchError::Qualification)?;
+            runtime::verify_worker_reproducibility(session, EXPECTED_FROZEN_DIGEST)
+                .map_err(BenchError::Qualification)?;
         println!(
             "[{PREFIX}] private qualification workers are reproducible: stim={} stab={}",
             stim_binary_sha256, stab_binary_sha256
@@ -105,7 +108,7 @@ pub(crate) fn completion(root: &RepoRoot, args: CompletionArgs) -> Result<(), Be
         )
         .map_err(BenchError::Qualification)?;
         println!(
-            "[{PREFIX}] published performance qualification completion receipt at {}",
+            "[{PREFIX}] published performance qualification completion manifest at {}",
             output.display()
         );
         Ok(())
@@ -126,17 +129,17 @@ pub(crate) fn completion_report(
         )
         .map_err(BenchError::Qualification)?;
         println!(
-            "[{PREFIX}] replayed performance qualification completion receipt at {}",
+            "[{PREFIX}] reconstructed performance qualification completion manifest at {}",
             output.display()
         );
         Ok(())
     })
 }
 
-pub(crate) fn regression(root: &RepoRoot, args: RegressionArgs) -> Result<(), BenchError> {
+pub(crate) fn parity(root: &RepoRoot, args: ParityArgs) -> Result<(), BenchError> {
     with_checked_formal_session(root, |session| {
         let checked = read(session.source_root())?;
-        let summary = runtime::run_regression(
+        let summary = runtime::run_parity(
             session,
             EXPECTED_FROZEN_DIGEST,
             &checked.correctness_digest,
@@ -144,8 +147,50 @@ pub(crate) fn regression(root: &RepoRoot, args: RegressionArgs) -> Result<(), Be
         )
         .map_err(BenchError::Qualification)?;
         println!(
-            "[{PREFIX}] qualification regression group={} checked={} report_only={}",
+            "[{PREFIX}] qualification Stim parity group={} checked={} report_only={}",
             summary.group_id, summary.checked_measurements, summary.report_only
+        );
+        Ok(())
+    })
+}
+
+pub(crate) fn self_regression(root: &RepoRoot, args: SelfRegressionArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let summary = runtime::run_self_regression(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] Stab self-regression group={} checked={} unseeded={} outcome={:?}",
+            summary.group_id,
+            summary.checked_measurements,
+            summary.unseeded_measurements,
+            summary.outcome
+        );
+        Ok(())
+    })
+}
+
+pub(crate) fn regression_baseline_candidate(
+    root: &RepoRoot,
+    args: BaselineCandidateArgs,
+) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::generate_regression_baseline_candidate(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published Stab self-regression baseline candidate at {}",
+            output.display()
         );
         Ok(())
     })
@@ -296,6 +341,10 @@ pub(crate) fn regenerate(
         );
     }
     Ok(())
+}
+
+pub(crate) fn status(root: &RepoRoot, args: StatusArgs) -> Result<(), BenchError> {
+    status::run(root, args)
 }
 
 fn ensure_frozen() -> Result<(), BenchError> {

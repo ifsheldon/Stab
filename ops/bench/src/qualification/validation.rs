@@ -26,7 +26,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "607ea33291a36f2b87d853eccde590db75752956e1c30652ce7661da5b5aa903";
+const CORRECTNESS_DIGEST: &str = "ffd01a5462de888077369a0f3780754ce65a755fe885e9738c043d8db4cddd80";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
@@ -735,10 +735,25 @@ fn validate_groups(
             }
         }
         let mut scale_ids = BTreeSet::new();
+        let mut family_tail = BTreeMap::new();
         for scale in &group.workload_family.scales {
             validate_identifier("scale", &scale.id, issues);
+            validate_identifier("scale family", &scale.family_id, issues);
             if !scale_ids.insert(scale.id.as_str()) {
                 issues.push(format!("group {} repeats scale {}", group.id, scale.id));
+            }
+            if let Some((previous_class, previous_work)) = family_tail.insert(
+                scale.family_id.as_str(),
+                (scale.size_class, scale.semantic_work),
+            ) && (previous_class >= scale.size_class
+                || previous_work
+                    .zip(scale.semantic_work)
+                    .is_some_and(|(left, right)| left >= right))
+            {
+                issues.push(format!(
+                    "group {} scale family {} is not monotonic by size class and semantic work",
+                    group.id, scale.family_id
+                ));
             }
             validate_text("scale parameters", &scale.parameters, issues);
             if group.status != QualificationStatus::Planned {
