@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(super) const SCHEMA_VERSION: u32 = 2;
+pub(super) const SCHEMA_VERSION: u32 = 3;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -84,6 +84,7 @@ pub(super) struct ApiDisposition {
 pub(super) enum PerformanceDisposition {
     Measured,
     CoveredByParent,
+    FutureCandidate,
     NotPerformanceRelevant,
     NoFaithfulStimComparator,
 }

@@ -8,6 +8,10 @@ use super::super::model::{
 use crate::error::BenchError;
 use crate::root::RepoRoot;
 
+mod curated;
+
+pub(super) use curated::groups as curated_api_groups;
+
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";

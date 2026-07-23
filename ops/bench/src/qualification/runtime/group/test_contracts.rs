@@ -222,3 +222,48 @@ fn runtime_contract_binds_clifford_identity_timing_policy() {
             if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
     ));
 }
+
+#[test]
+fn runtime_contract_enforces_release_and_diagnostic_caps() {
+    let root = crate::root::RepoRoot::resolve(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
+    )
+    .expect("repository root");
+    let bytes =
+        std::fs::read(root.path.join(super::GROUP_CONTRACT_PATH)).expect("runtime group contract");
+    let source: super::GroupContractFile =
+        serde_json::from_slice(&bytes).expect("parse runtime group contract");
+
+    for (claim_class, count) in [
+        (
+            ClaimClass::PromotablePerformance,
+            super::MAX_RELEASE_GROUPS + 1,
+        ),
+        (
+            ClaimClass::DiagnosticInfrastructure,
+            super::MAX_DIAGNOSTIC_GROUPS + 1,
+        ),
+    ] {
+        let mut file: super::GroupContractFile =
+            serde_json::from_slice(&bytes).expect("fresh runtime group contract");
+        let template = source
+            .groups
+            .iter()
+            .find(|group| group.claim_class == claim_class)
+            .expect("claim-class template");
+        file.groups.retain(|group| group.claim_class != claim_class);
+        for index in 0..count {
+            let mut group = template.clone();
+            group.id = ProtocolId::try_new(
+                format!("cap-probe-{claim_class:?}-{index}").to_ascii_lowercase(),
+            )
+            .expect("unique group id");
+            file.groups.push(group);
+        }
+
+        assert!(matches!(
+            super::validate(&file, &file.performance_inventory_sha256),
+            Err(super::GroupError::MatrixCap { .. })
+        ));
+    }
+}

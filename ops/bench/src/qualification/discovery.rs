@@ -6,12 +6,11 @@ use sha2::{Digest, Sha256};
 
 use super::checklist::{RawChecklistItem, parse as parse_checklist, parse_inventory_counts};
 use super::model::{
-    ChecklistItem, ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator,
-    InputByteCount, ManifestRowDisposition, MeasurementPair, MemoryMethod, MemoryPolicy,
-    OutputContract, PerformanceDisposition, PerformanceFeature, Phase, QualificationGroup,
-    QualificationStatus, QualificationSuite, RowClassification, RowDecision, RowOrigin,
-    RunnerFidelity, SCHEMA_VERSION, ScalePoint, ThresholdPolicy, TimingPolicy, UpstreamPerfSource,
-    WaiverDisposition, WaiverReason, WorkloadFamily,
+    ChecklistItem, ChecklistScope, CorrectnessBinding, EvidenceState, ManifestRowDisposition,
+    MeasurementPair, MemoryMethod, MemoryPolicy, OutputContract, PerformanceDisposition,
+    PerformanceFeature, QualificationGroup, QualificationStatus, QualificationSuite,
+    RowClassification, RowDecision, RowOrigin, SCHEMA_VERSION, ThresholdPolicy, TimingPolicy,
+    UpstreamPerfSource, WaiverDisposition, WaiverReason,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -414,21 +413,18 @@ pub(super) fn generate(
             status: QualificationStatus::Planned,
         };
         graduation::apply(root, &mut group)?;
+        if group.status != QualificationStatus::Implemented {
+            group.disposition = PerformanceDisposition::FutureCandidate;
+            group.threshold_policy = ThresholdPolicy::ReportOnly;
+            group.reason = format!(
+                "Legacy workload {} remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
+                row.id
+            );
+        }
         groups.push(group);
     }
     groups.extend(graduation::additional_groups(root, &groups)?);
-    groups.push(resource_boundary_group());
-    let mut api_groups = api::qualification_groups(&correctness);
-    for group in &mut api_groups {
-        graduation::apply(root, group)?;
-    }
-    let existing_group_ids = groups
-        .iter()
-        .map(|group| group.id.as_str())
-        .collect::<BTreeSet<_>>();
-    api_groups.retain(|group| !existing_group_ids.contains(group.id.as_str()));
-    groups.extend(api_groups);
-    groups.extend(checklist_qualification_groups(&raw_checklist));
+    groups.extend(graduation::curated_api_groups(root, &groups)?);
     groups.sort_by(|left, right| left.id.cmp(&right.id));
     row_dispositions.sort_by(|left, right| left.id.cmp(&right.id));
 
@@ -461,30 +457,37 @@ pub(super) fn generate(
 
     let performance_features = PERFORMANCE_FEATURE_IDS
         .iter()
-        .map(|feature_id| PerformanceFeature {
-            id: (*feature_id).to_string(),
-            correctness_features: correctness
-                .features
-                .iter()
-                .filter(|feature| {
-                    feature
-                        .performance_groups
-                        .iter()
-                        .any(|group| group == feature_id)
-                })
-                .map(|feature| feature.id.clone())
-                .collect(),
-            disposition: PerformanceDisposition::Measured,
-            group_ids: groups
+        .map(|feature_id| {
+            let group_ids = groups
                 .iter()
                 .filter(|group| {
                     group.performance_feature == *feature_id
                         && group.disposition == PerformanceDisposition::Measured
                 })
                 .map(|group| group.id.clone())
-                .collect(),
-            reason: "Implemented selected operations have variable-size or public latency work in this qualification domain."
-                .to_string(),
+                .collect::<Vec<_>>();
+            PerformanceFeature {
+                id: (*feature_id).to_string(),
+                correctness_features: correctness
+                    .features
+                    .iter()
+                    .filter(|feature| {
+                        feature
+                            .performance_groups
+                            .iter()
+                            .any(|group| group == feature_id)
+                    })
+                    .map(|feature| feature.id.clone())
+                    .collect(),
+                disposition: if group_ids.is_empty() {
+                    PerformanceDisposition::FutureCandidate
+                } else {
+                    PerformanceDisposition::Measured
+                },
+                group_ids,
+                reason: "Only curated executable release workloads are measured; other relevant operations remain visible as future candidates."
+                    .to_string(),
+            }
         })
         .collect();
 
@@ -529,207 +532,6 @@ fn default_timing_policy() -> TimingPolicy {
     }
 }
 
-fn resource_boundary_group() -> QualificationGroup {
-    QualificationGroup {
-        id: "PERFQ-RESOURCE-BOUNDARIES".to_string(),
-        manifest_row: "pq-resource-boundaries".to_string(),
-        row_origin: RowOrigin::Planned,
-        performance_feature: "PERF-RESOURCE-BOUNDARIES".to_string(),
-        checklist_anchors: Vec::new(),
-        checklist_child_ids: Vec::new(),
-        public_api_items: Vec::new(),
-        disposition: PerformanceDisposition::Measured,
-        phase: Phase::EndToEnd,
-        runner_fidelity: RunnerFidelity::AdapterLibrary,
-        correctness_cases: Vec::new(),
-        correctness_binding: CorrectnessBinding::Unresolved,
-        planned_correctness_case_id: Some("CQPLANNED-PERFQ-RESOURCE-BOUNDARIES".to_string()),
-        workload_family: WorkloadFamily {
-            fixture: FixtureLocator::Generated {
-                id: "resource-boundary-matrix".to_string(),
-            },
-            source: "benchmarks/stim-qualification-suite.json".to_string(),
-            deterministic_seed: "resource-boundary-v1".to_string(),
-            scales: [
-                (
-                    "small",
-                    "generator=resource-boundary-matrix-v1; seed=resource-boundary-v1; input_bytes=1024; records=64; search_states=1024; boundary_probe=declared-cap-and-cap-plus-one-outside-timing",
-                    1_024,
-                ),
-                (
-                    "medium",
-                    "generator=resource-boundary-matrix-v1; seed=resource-boundary-v1; input_bytes=1048576; records=4096; search_states=100000; boundary_probe=declared-cap-and-cap-plus-one-outside-timing",
-                    1_048_576,
-                ),
-                (
-                    "large",
-                    "generator=resource-boundary-matrix-v1; seed=resource-boundary-v1; input_bytes=67108864; records=1000000; search_states=1000000; boundary_probe=declared-cap-and-cap-plus-one-outside-timing",
-                    67_108_864,
-                ),
-            ]
-            .into_iter()
-            .map(|(id, parameters, input_bytes)| ScalePoint {
-                id: id.to_string(),
-                parameters: parameters.to_string(),
-                input_bytes: InputByteCount::Exact { bytes: input_bytes },
-                semantic_work: None,
-                input_digest: None,
-            })
-                .collect(),
-        },
-        work_unit: "admission-checks".to_string(),
-        output_contract: OutputContract {
-            expected_shape: "Exact accept/reject status, bounded-failure latency class, peak RSS, and allocation or active-state growth for each named resource contract."
-                .to_string(),
-            digest_state: EvidenceState::Planned,
-            sink_policy: "Resource evidence is reported per contract and scale; heterogeneous contracts never produce an aggregate timing ratio."
-                .to_string(),
-            comparator_sources: Vec::new(),
-        },
-        timing_policy: default_timing_policy(),
-        memory_policy: MemoryPolicy {
-            method: MemoryMethod::ProcessRss,
-            scale_ids: vec!["small".to_string(), "medium".to_string(), "large".to_string()],
-            expected_growth: "contract-specific constant, linear-width, linear-active-state, bounded-materialization, or capped-search class"
-                .to_string(),
-        },
-        threshold_policy: ThresholdPolicy::ReportOnly,
-        reason: "The inherited M12 row is policy metadata, so PQ6 owns a new measured resource-boundary matrix instead of timing the metadata row."
-            .to_string(),
-        owner: "ops/bench".to_string(),
-        status: QualificationStatus::Planned,
-    }
-}
-
-fn checklist_qualification_groups(items: &[RawChecklistItem]) -> Vec<QualificationGroup> {
-    items
-        .iter()
-        .filter(|item| item.scope == ChecklistScope::Selected)
-        .flat_map(|item| {
-            item.performance_features
-                .iter()
-                .map(move |feature| checklist_qualification_group(item, feature))
-        })
-        .collect()
-}
-
-fn checklist_qualification_group(item: &RawChecklistItem, feature: &str) -> QualificationGroup {
-    let group_id = checklist_group_id(item, feature);
-    let public_cli = item.section.starts_with("11.");
-    let child_ids = item
-        .selected_child_ownership
-        .iter()
-        .filter(|ownership| {
-            ownership
-                .performance_features
-                .iter()
-                .any(|candidate| candidate == feature)
-        })
-        .map(|ownership| ownership.child_id.clone())
-        .collect::<Vec<_>>();
-    QualificationGroup {
-        id: group_id.clone(),
-        manifest_row: group_id.to_ascii_lowercase(),
-        row_origin: RowOrigin::Planned,
-        performance_feature: feature.to_string(),
-        checklist_anchors: vec![item.id.clone()],
-        checklist_child_ids: child_ids.clone(),
-        public_api_items: Vec::new(),
-        disposition: PerformanceDisposition::Measured,
-        phase: Phase::EndToEnd,
-        runner_fidelity: if public_cli {
-            RunnerFidelity::ProcessCli
-        } else {
-            RunnerFidelity::AdapterLibrary
-        },
-        correctness_cases: Vec::new(),
-        correctness_binding: CorrectnessBinding::Unresolved,
-        planned_correctness_case_id: Some(format!("CQPLANNED-{group_id}")),
-        workload_family: WorkloadFamily {
-            fixture: FixtureLocator::Generated {
-                id: format!("checklist-small-medium-large-17-{group_id}"),
-            },
-            source: "docs/stab-feature-checklist.md".to_string(),
-            deterministic_seed: "17".to_string(),
-            scales: [("small", 1_u64), ("medium", 64), ("large", 4_096)]
-                .into_iter()
-                .map(|(id, semantic_items)| ScalePoint {
-                    id: id.to_string(),
-                    parameters: format!(
-                        "generator=checklist-child-v1; {}={semantic_items}; seed=17; fixture_group={group_id}",
-                        work_unit(feature)
-                    ),
-                    input_bytes: if work_unit(feature) == "bytes" {
-                        InputByteCount::Exact {
-                            bytes: semantic_items,
-                        }
-                    } else {
-                        InputByteCount::NotApplicable
-                    },
-                    semantic_work: None,
-                    input_digest: None,
-                })
-                .collect(),
-        },
-        work_unit: work_unit(feature).to_string(),
-        output_contract: OutputContract {
-            expected_shape: format!(
-                "Exact named submeasurements for selected checklist child ids [{}] ({:?}) in {feature}; unlike phases or operations must never be aggregated into one ratio.",
-                child_ids.join(","),
-                item.selected_child.as_deref().unwrap_or(&item.feature),
-            ),
-            digest_state: EvidenceState::Planned,
-            sink_policy: if public_cli {
-                "Built Stim and Stab processes fully consume equivalent output after an untimed exact-output preflight."
-                    .to_string()
-            } else {
-                "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
-                    .to_string()
-            },
-            comparator_sources: Vec::new(),
-        },
-        timing_policy: default_timing_policy(),
-        memory_policy: MemoryPolicy {
-            method: if public_cli {
-                MemoryMethod::ProcessRss
-            } else {
-                MemoryMethod::StabAllocations
-            },
-            scale_ids: vec!["small".to_string(), "medium".to_string(), "large".to_string()],
-            expected_growth: checklist_expected_growth(feature).to_string(),
-        },
-        threshold_policy: ThresholdPolicy::ReportOnly,
-        reason: "This exact selected checklist child has no truthful inherited parent for every promised operation; the owning PQ milestone must implement every named submeasurement or explicitly narrow the child."
-            .to_string(),
-        owner: owner(feature).to_string(),
-        status: QualificationStatus::Planned,
-    }
-}
-
-fn checklist_expected_growth(feature: &str) -> &'static str {
-    match feature {
-        "PERF-SEARCH-AND-MATCHING" => "bounded search state with explicit explored-node counter",
-        "PERF-SAMPLING" | "PERF-DETECTION" | "PERF-DEM-SAMPLING" => {
-            "linear in active state and output record width"
-        }
-        "PERF-RESULT-IO" | "PERF-BIT-KERNELS" => "linear in record or bit width",
-        "PERF-CLI-STARTUP-AND-ERRORS" | "PERF-CONVERT-CLI" | "PERF-GENERATION" => {
-            "constant startup plus linear accepted input or generated output"
-        }
-        _ => {
-            "linear in semantic work unless the selected checklist child declares bounded materialization"
-        }
-    }
-}
-
-fn checklist_group_id(item: &RawChecklistItem, feature: &str) -> String {
-    format!(
-        "PERFQ-CHECKLIST-{}-{}",
-        item.id.trim_start_matches("PERFC-"),
-        feature.trim_start_matches("PERF-")
-    )
-}
-
 fn group_reason(decision: RowDecision) -> &'static str {
     match decision {
         RowDecision::Retained => {
@@ -751,16 +553,11 @@ fn group_reason(decision: RowDecision) -> &'static str {
 }
 
 fn make_checklist_item(item: RawChecklistItem) -> ChecklistItem {
-    let parent_group_ids = item
-        .performance_features
-        .iter()
-        .map(|feature| checklist_group_id(&item, feature))
-        .collect::<Vec<_>>();
     let disposition =
         if item.scope == ChecklistScope::Deferred || item.performance_features.is_empty() {
             PerformanceDisposition::NotPerformanceRelevant
         } else {
-            PerformanceDisposition::CoveredByParent
+            PerformanceDisposition::FutureCandidate
         };
     let reason = match (item.scope, disposition) {
         (ChecklistScope::Deferred, _) => {
@@ -771,8 +568,9 @@ fn make_checklist_item(item: RawChecklistItem) -> ChecklistItem {
             "This row describes packaging, documentation, or evidence infrastructure instead of product runtime work."
                 .to_string()
         }
-        _ => "The implemented child is assigned to the listed measured workload families; any deferred remainder stays outside executable qualification."
+        (_, PerformanceDisposition::FutureCandidate) => "The selected child remains visible as a future workload candidate without creating a speculative benchmark product."
             .to_string(),
+        _ => "The selected child is covered by an explicit curated workload.".to_string(),
     };
     ChecklistItem {
         id: item.id,
@@ -790,7 +588,7 @@ fn make_checklist_item(item: RawChecklistItem) -> ChecklistItem {
         selected_child_ownership: item.selected_child_ownership,
         performance_features: item.performance_features,
         disposition,
-        parent_group_ids,
+        parent_group_ids: Vec::new(),
         reason,
     }
 }
@@ -1002,6 +800,7 @@ fn read_repo_json_bounded<T: for<'de> Deserialize<'de>>(
 mod tests {
     use super::*;
     use crate::comparability::ComparabilityClass;
+    use crate::qualification::model::FixtureLocator;
 
     #[test]
     fn benchmark_symbol_extraction_is_exact() {

@@ -1,7 +1,7 @@
 {
   "schema_version": 6,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358",
+  "performance_inventory_sha256": "e7deb06a6d0de98266f64d77e48e027eba4a93233a40fbdb2b0ea676a31660ad",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",

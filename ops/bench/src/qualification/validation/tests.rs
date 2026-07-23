@@ -79,11 +79,11 @@ fn validation_rejects_unknown_feature_manifest_threshold_and_waiver_ids() {
 #[test]
 fn validation_rejects_nonmeasured_parents_and_false_no_comparator_waivers() {
     let (mut suite, manifest, references) = fixture();
-    let removed_group = suite
+    let inactive_group = suite
         .qualification_groups
         .iter()
-        .find(|group| group.disposition == PerformanceDisposition::NotPerformanceRelevant)
-        .expect("removed group")
+        .find(|group| group.disposition == PerformanceDisposition::FutureCandidate)
+        .expect("future candidate")
         .id
         .clone();
     let api = suite
@@ -91,7 +91,7 @@ fn validation_rejects_nonmeasured_parents_and_false_no_comparator_waivers() {
         .iter_mut()
         .find(|item| item.disposition == PerformanceDisposition::CoveredByParent)
         .expect("covered API");
-    api.parent_group_ids = vec![removed_group];
+    api.parent_group_ids = vec![inactive_group];
     suite
         .waiver_rows
         .first_mut()
@@ -730,26 +730,24 @@ fn validation_rejects_measured_group_without_primary_row_or_correctness_dependen
 #[test]
 fn validation_rejects_planned_scales_without_generator_or_seed() {
     let (mut suite, manifest, references) = fixture();
-    let group = suite
+    let template = suite
         .qualification_groups
-        .iter_mut()
-        .find(|group| group.row_origin == RowOrigin::Planned)
-        .expect("planned qualification group");
-    group
-        .workload_family
-        .scales
-        .first_mut()
-        .expect("planned scale")
-        .parameters = "semantic_items=1".to_string();
+        .iter()
+        .find(|group| group.disposition == PerformanceDisposition::Measured)
+        .expect("release group")
+        .clone();
+    for index in 0..=MAX_RELEASE_GROUPS {
+        let mut group = template.clone();
+        group.id = format!("PERFQ-CAP-PROBE-{index}");
+        group.manifest_row = format!("perfq-cap-probe-{index}");
+        group.row_origin = RowOrigin::Planned;
+        suite.qualification_groups.push(group);
+    }
 
     let error = validate(&suite, &manifest, &references, "UNFROZEN")
-        .expect_err("planned scale without generator and seed must fail");
+        .expect_err("release groups over the finite cap must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("unregistered generator, mismatched seed, or placeholder value")
-    );
+    assert!(error.to_string().contains("release matrix"));
 }
 
 #[test]
@@ -793,8 +791,8 @@ fn validation_rejects_unproved_no_comparator_group() {
     suite
         .qualification_groups
         .iter_mut()
-        .find(|group| group.id == "PERFQ-RESOURCE-BOUNDARIES")
-        .expect("resource-boundary group")
+        .find(|group| group.disposition == PerformanceDisposition::FutureCandidate)
+        .expect("future candidate")
         .disposition = PerformanceDisposition::NoFaithfulStimComparator;
 
     let error = validate(&suite, &manifest, &references, "UNFROZEN")
@@ -853,38 +851,58 @@ fn validation_rejects_duplicate_global_child_domain_owner() {
 }
 
 #[test]
-fn validation_rejects_fake_api_fixture_and_extra_generator_key() {
+fn validation_rejects_future_candidate_with_active_parent() {
     let (mut suite, manifest, references) = fixture();
-    let group = suite
+    let active_parent = suite
         .qualification_groups
+        .iter()
+        .find(|group| group.disposition == PerformanceDisposition::Measured)
+        .expect("release group")
+        .id
+        .clone();
+    let item = suite
+        .public_api_items
         .iter_mut()
-        .find(|group| group.id.starts_with("PERFQ-API-"))
-        .expect("planned API group");
-    let scale = group
-        .workload_family
-        .scales
-        .first_mut()
-        .expect("planned API scale");
-    scale.parameters = scale
-        .parameters
-        .split(';')
-        .map(str::trim)
-        .map(|part| {
-            if part.starts_with("fixture_group=") {
-                "fixture_group=cq-api-item-fake".to_string()
-            } else {
-                part.to_string()
-            }
-        })
-        .chain(std::iter::once("mode=anything".to_string()))
-        .collect::<Vec<_>>()
-        .join("; ");
+        .find(|item| item.disposition == PerformanceDisposition::FutureCandidate)
+        .expect("future API candidate");
+    item.parent_group_ids.push(active_parent);
 
     let error = validate(&suite, &manifest, &references, "UNFROZEN")
-        .expect_err("fake API fixture and extra generator key must fail");
-    let message = error.to_string();
-    assert!(message.contains("parameter keys"));
-    assert!(message.contains("lacks an exact CQ API fixture group"));
+        .expect_err("future candidates cannot silently become active");
+    assert!(error.to_string().contains("future-candidate API"));
+}
+
+#[test]
+fn generated_inventory_has_a_finite_executable_matrix() {
+    let (suite, manifest, references) = fixture();
+    let release = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| group.disposition == PerformanceDisposition::Measured)
+        .count();
+
+    assert_eq!(release, 19);
+    assert!(release <= MAX_RELEASE_GROUPS);
+    assert!(
+        suite
+            .qualification_groups
+            .iter()
+            .all(|group| !group.id.starts_with("PERFQ-API-")
+                && !group.id.starts_with("PERFQ-CHECKLIST-"))
+    );
+    assert!(suite.qualification_groups.iter().all(|group| {
+        group.disposition != PerformanceDisposition::FutureCandidate
+            || group.threshold_policy == ThresholdPolicy::ReportOnly
+    }));
+    assert!(
+        suite
+            .public_api_items
+            .iter()
+            .any(|item| item.disposition == PerformanceDisposition::FutureCandidate)
+    );
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("finite executable matrix validates");
 }
 
 #[test]

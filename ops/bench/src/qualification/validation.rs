@@ -11,6 +11,7 @@ use crate::error::BenchError;
 use crate::manifest::BenchmarkManifest;
 
 mod counts;
+mod features;
 mod issues;
 mod planned;
 mod replacements;
@@ -25,7 +26,9 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0";
+const CORRECTNESS_DIGEST: &str = "607ea33291a36f2b87d853eccde590db75752956e1c30652ce7661da5b5aa903";
+const MAX_RELEASE_GROUPS: usize = 40;
+const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
 const EXPECTED_PUBLIC_API_ITEMS: usize = 2_065;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
@@ -41,7 +44,7 @@ pub(super) fn validate(
 ) -> Result<(), BenchError> {
     let mut issues = Issues::default();
     validate_header(suite, manifest, &mut issues);
-    validate_features(suite, &mut issues);
+    features::validate(suite, &mut issues);
     validate_checklist(suite, &mut issues);
     validate_apis(suite, references, &mut issues);
     validate_groups(suite, manifest, references, &mut issues);
@@ -114,47 +117,6 @@ fn validate_header(suite: &QualificationSuite, manifest: &BenchmarkManifest, iss
         if actual != expected {
             issues.push(format!("{label} has {actual} rows, expected {expected}"));
         }
-    }
-}
-
-fn validate_features(suite: &QualificationSuite, issues: &mut Issues) {
-    let expected = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
-    let mut seen = BTreeSet::new();
-    let group_ids = suite
-        .qualification_groups
-        .iter()
-        .map(|group| group.id.as_str())
-        .collect::<BTreeSet<_>>();
-    for feature in &suite.performance_features {
-        validate_identifier("performance feature", &feature.id, issues);
-        validate_text("feature reason", &feature.reason, issues);
-        if !seen.insert(feature.id.as_str()) {
-            issues.push(format!("duplicate performance feature {}", feature.id));
-        }
-        if !expected.contains(feature.id.as_str()) {
-            issues.push(format!("unknown performance feature {}", feature.id));
-        }
-        let mut local_groups = BTreeSet::new();
-        for group in &feature.group_ids {
-            if !local_groups.insert(group) {
-                issues.push(format!("feature {} repeats group {group}", feature.id));
-            }
-            if !group_ids.contains(group.as_str()) {
-                issues.push(format!(
-                    "feature {} references unknown group {group}",
-                    feature.id
-                ));
-            }
-        }
-        if feature.disposition == PerformanceDisposition::Measured && feature.group_ids.is_empty() {
-            issues.push(format!(
-                "measured feature {} has no measured groups",
-                feature.id
-            ));
-        }
-    }
-    for missing in expected.difference(&seen) {
-        issues.push(format!("missing performance feature {missing}"));
     }
 }
 
@@ -491,6 +453,14 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
                     ));
                 }
             }
+            PerformanceDisposition::FutureCandidate => {
+                if !item.parent_group_ids.is_empty() {
+                    issues.push(format!(
+                        "future-candidate API {} has an active parent group",
+                        item.id
+                    ));
+                }
+            }
             other => issues.push(format!(
                 "PQ0 public API {} has unsupported disposition {other:?}",
                 item.id
@@ -547,6 +517,29 @@ fn validate_groups(
     let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
     let mut ids = BTreeSet::new();
     let mut primary_rows = BTreeSet::new();
+    let release_groups = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| group.disposition == PerformanceDisposition::Measured)
+        .count();
+    let diagnostic_groups = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| {
+            group.disposition == PerformanceDisposition::FutureCandidate
+                && group.runner_fidelity == super::model::RunnerFidelity::StabReportOnly
+        })
+        .count();
+    if release_groups > MAX_RELEASE_GROUPS {
+        issues.push(format!(
+            "release matrix has {release_groups} groups, maximum is {MAX_RELEASE_GROUPS}"
+        ));
+    }
+    if diagnostic_groups > MAX_DIAGNOSTIC_GROUPS {
+        issues.push(format!(
+            "diagnostic matrix has {diagnostic_groups} groups, maximum is {MAX_DIAGNOSTIC_GROUPS}"
+        ));
+    }
     for group in &suite.qualification_groups {
         validate_identifier("qualification group", &group.id, issues);
         if !ids.insert(group.id.as_str()) {
@@ -634,6 +627,14 @@ fn validate_groups(
         if group.disposition == PerformanceDisposition::NoFaithfulStimComparator {
             issues.push(format!(
                 "PQ0 group {} claims no faithful Stim comparator despite a declared runner or adapter path",
+                group.id
+            ));
+        }
+        if group.disposition == PerformanceDisposition::FutureCandidate
+            && group.threshold_policy != ThresholdPolicy::ReportOnly
+        {
+            issues.push(format!(
+                "future-candidate group {} has an active qualification threshold",
                 group.id
             ));
         }

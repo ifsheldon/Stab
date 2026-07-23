@@ -24,7 +24,7 @@ pub(crate) use runtime::{
 };
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358";
+    "e7deb06a6d0de98266f64d77e48e027eba4a93233a40fbdb2b0ea676a31660ad";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -402,13 +402,17 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
         count_classification(&rows, RowClassification::UnmatchedSubmeasurement)
     );
     println!(
-        "[{PREFIX}] group-dispositions measured={} covered-by-parent={} not-performance-relevant={} no-faithful-comparator={}",
+        "[{PREFIX}] group-dispositions measured={} covered-by-parent={} future-candidate={} not-performance-relevant={} no-faithful-comparator={}",
         dispositions
             .get(&format!("{:?}", PerformanceDisposition::Measured))
             .copied()
             .unwrap_or(0),
         dispositions
             .get(&format!("{:?}", PerformanceDisposition::CoveredByParent))
+            .copied()
+            .unwrap_or(0),
+        dispositions
+            .get(&format!("{:?}", PerformanceDisposition::FutureCandidate))
             .copied()
             .unwrap_or(0),
         dispositions
@@ -453,7 +457,7 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
             .sum::<usize>()
     );
     println!(
-        "[{PREFIX}] item-dispositions checklist-covered={} checklist-not-performance={} api-covered={} api-not-performance={}",
+        "[{PREFIX}] item-dispositions checklist-covered={} checklist-future={} checklist-not-performance={} api-covered={} api-future={} api-not-performance={}",
         suite
             .checklist_items
             .iter()
@@ -463,6 +467,17 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
                         .iter()
                         .any(|candidate| candidate == value)
                 }) && item.disposition == PerformanceDisposition::CoveredByParent
+            })
+            .count(),
+        suite
+            .checklist_items
+            .iter()
+            .filter(|item| {
+                feature.is_none_or(|value| {
+                    item.performance_features
+                        .iter()
+                        .any(|candidate| candidate == value)
+                }) && item.disposition == PerformanceDisposition::FutureCandidate
             })
             .count(),
         suite
@@ -487,6 +502,19 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
                             .iter()
                             .any(|candidate| candidate == value)
                 }) && item.disposition == PerformanceDisposition::CoveredByParent
+            })
+            .count(),
+        suite
+            .public_api_items
+            .iter()
+            .filter(|item| {
+                feature.is_none_or(|value| {
+                    item.performance_feature == value
+                        || item
+                            .supporting_performance_features
+                            .iter()
+                            .any(|candidate| candidate == value)
+                }) && item.disposition == PerformanceDisposition::FutureCandidate
             })
             .count(),
         suite

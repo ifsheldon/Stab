@@ -19,6 +19,8 @@ const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json"
 const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 6;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
+const MAX_RELEASE_GROUPS: usize = 40;
+const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
 const MAX_CORRECTNESS_CASES_PER_GROUP: usize = 4096;
 const MAX_SCALES_PER_GROUP: usize = 64;
@@ -439,6 +441,24 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
     if file.groups.is_empty() || file.groups.len() > MAX_GROUPS {
         return Err(GroupError::GroupCount(file.groups.len()));
     }
+    let release_groups = file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::PromotablePerformance)
+        .count();
+    let diagnostic_groups = file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::DiagnosticInfrastructure)
+        .count();
+    if release_groups > MAX_RELEASE_GROUPS || diagnostic_groups > MAX_DIAGNOSTIC_GROUPS {
+        return Err(GroupError::MatrixCap {
+            release: release_groups,
+            release_max: MAX_RELEASE_GROUPS,
+            diagnostic: diagnostic_groups,
+            diagnostic_max: MAX_DIAGNOSTIC_GROUPS,
+        });
+    }
     let mut group_ids = BTreeSet::new();
     for group in &file.groups {
         if !group_ids.insert(group.id.clone())
@@ -532,6 +552,15 @@ pub(super) enum GroupError {
     Inventory { actual: String, expected: String },
     #[error("runtime group contract has an invalid group count: {0}")]
     GroupCount(usize),
+    #[error(
+        "runtime group matrix exceeds its cap: release={release}/{release_max}, diagnostic={diagnostic}/{diagnostic_max}"
+    )]
+    MatrixCap {
+        release: usize,
+        release_max: usize,
+        diagnostic: usize,
+        diagnostic_max: usize,
+    },
     #[error("runtime group contract group is invalid: {0}")]
     InvalidGroup(String),
     #[error("runtime group contract does not define group {0}")]

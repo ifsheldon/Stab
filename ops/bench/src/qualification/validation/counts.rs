@@ -19,6 +19,11 @@ pub(super) fn validate_parent_disposition(
         PerformanceDisposition::NotPerformanceRelevant if !parents.is_empty() => {
             issues.push(format!("{label} {id} is non-performance but has parents"));
         }
+        PerformanceDisposition::FutureCandidate if !parents.is_empty() => {
+            issues.push(format!(
+                "{label} {id} is a future candidate but has active parents"
+            ));
+        }
         PerformanceDisposition::Measured | PerformanceDisposition::NoFaithfulStimComparator => {
             issues.push(format!(
                 "{label} {id} has invalid PQ0 disposition {disposition:?}"
