@@ -8,7 +8,7 @@ Status: clean revisions `f23386bdc12258eab97b9997b3f478841caa050c` and `d8de73d5
 
 The repaired release contract replaces the former repeated mixed cycle with three deterministic workload families at 64, 4,096, and 65,536 compact work items. `flat-errors` measures flat error-heavy throughput with varied probabilities, detector and observable targets, and separators. `coordinate-sparse` measures tags, coordinate declarations and shifts, plus sparse high detector and observable identifiers. `folded-repeats` measures nested compact repeat blocks with large repeat counts that must remain folded.
 
-Rust and C++ generate each family independently and must agree on exact input bytes, input digest, canonical output bytes, and semantic output digest before timing is promotable. Scale monotonicity is evaluated within a family, never between unrelated families. The accepted maximum is 524,288 compact items for `flat-errors` and `coordinate-sparse`, and 262,144 compact items for `folded-repeats`.
+Rust and C++ generate each family independently and must agree on exact input bytes, input digest, canonical output bytes, and semantic output digest before timing is promotable. Scale monotonicity is evaluated within a family, never between unrelated families. The accepted maximum is 524,288 compact items for `flat-errors` and `coordinate-sparse`, and 131,072 compact items for `folded-repeats`; the folded cap keeps its six-line cycle within Stab's public one-million-line DEM parser boundary.
 
 ## Initial Diagnosis
 

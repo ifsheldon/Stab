@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ffd01a5462de888077369a0f3780754ce65a755fe885e9738c043d8db4cddd80",
-  "semantic_digest": "7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0",
+  "semantic_digest": "99a58f3d722c67edb233b034faf06cbd9d4c31d4197c8ab6ebb4c0978e7b1ee9",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -28472,7 +28472,7 @@
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
-            "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
+            "sha256": "6c01c0649b4c92648f4af89bfede30cbfba0da49aba16be37cbefbf4aa046c08"
           }
         ]
       },
@@ -28655,7 +28655,7 @@
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
-            "sha256": "b705e540148ed7ce00185424907c130471b72ad6018e17add87e1ce20632f71c"
+            "sha256": "6c01c0649b4c92648f4af89bfede30cbfba0da49aba16be37cbefbf4aa046c08"
           }
         ]
       },

@@ -7,7 +7,7 @@ use super::{WorkerError, byte_digest, semantic_digest};
 
 pub(in crate::qualification::runtime) const DEM_CYCLE_ITEMS: u64 = 8;
 pub(in crate::qualification::runtime) const DEM_MAX_ITEMS: u64 = 524_288;
-pub(in crate::qualification::runtime) const DEM_FOLDED_MAX_ITEMS: u64 = 262_144;
+pub(in crate::qualification::runtime) const DEM_FOLDED_MAX_ITEMS: u64 = 131_072;
 
 const FLAT_ERRORS_CYCLE_TEXT: &str = concat!(
     "error(0.125) D0\n",
@@ -253,6 +253,15 @@ mod tests {
             DemFixture::prepare(DemFamily::FoldedRepeats, DEM_FOLDED_MAX_ITEMS + 1),
             Err(WorkerError::DemItemLimit { .. })
         ));
+    }
+
+    #[test]
+    fn accepted_maximum_fixtures_parse_through_the_public_dem_boundary() {
+        for family in DemFamily::ALL {
+            let fixture =
+                DemFixture::prepare(family, family.maximum_items()).expect("maximum fixture");
+            parse(1, &fixture).expect("accepted maximum must be valid public DEM input");
+        }
     }
 
     #[test]

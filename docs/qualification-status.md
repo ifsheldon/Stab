@@ -23,10 +23,10 @@ Formal repaired-contract completion: **not started**. Historical reports remain 
 ## Contract Identities
 
 - Correctness inventory: `ffd01a5462de888077369a0f3780754ce65a755fe885e9738c043d8db4cddd80`
-- Performance inventory: `7f0bc3d9baf40e92f3b6006283d5ba7b20834bd7300b58172ed19288f4bbc4e0`
-- Stim parity policy: `0b508b7b20005edb3888f41e06620637608a80535bd65f3005a5958aec8a8165`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
+- Performance inventory: `99a58f3d722c67edb233b034faf06cbd9d4c31d4197c8ab6ebb4c0978e7b1ee9`
+- Stim parity policy: `c14ca77a11920f9b7489fbed0caad6e405d7fecfd7f308d0e8229d20fabd6ff6`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `5de90e3d2d414f56faa1098f79fa809a9f2d9d0c5c127457dad38ae7dd23ea74`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `7fdc6adaa4cf445bb0b1c26bcc0e59dbdfab64d196c033d9cc6daabfdfde9a82`; missing identities are unseeded, never passing.
 
 ## Interpretation
 

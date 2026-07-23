@@ -72,7 +72,7 @@ Keep two runtime groups, DEM parse and DEM print, with nine scales each. Each op
 - `coordinate-sparse`: tags, coordinates, shifts, and sparse high detector and observable identifiers.
 - `folded-repeats`: nested compact repeats with large repeat counts that remain folded.
 
-Use deterministic independent Rust and C++ generators, exact input digests, and exact semantic-output comparison with only the documented terminal-newline normalization. Use 64, 4,096, and 65,536 compact work items. Accepted maxima are 524,288 for flat and coordinate families and 262,144 for folded repeats.
+Use deterministic independent Rust and C++ generators, exact input digests, and exact semantic-output comparison with only the documented terminal-newline normalization. Use 64, 4,096, and 65,536 compact work items. Accepted maxima are 524,288 for flat and coordinate families and 131,072 for folded repeats so the six-line folded cycle remains below Stab's public one-million-line DEM parser boundary.
 
 Acceptance requires six operation/family workloads with correctness prerequisites, executable contracts, parity rules, profiler notes, cross-worker fixture checks, boundary tests, and family-local monotonic scales.
 

@@ -17,7 +17,7 @@ namespace stab_qualification {
 
 constexpr uint64_t DEM_CYCLE_ITEMS = 8;
 constexpr uint64_t DEM_MAX_ITEMS = 524288;
-constexpr uint64_t DEM_FOLDED_MAX_ITEMS = 262144;
+constexpr uint64_t DEM_FOLDED_MAX_ITEMS = 131072;
 constexpr std::string_view DEM_FLAT_ERRORS_CYCLE_TEXT =
     "error(0.125) D0\n"
     "error(0.25) D1 D2\n"

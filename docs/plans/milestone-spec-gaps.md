@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-23 - Q5/Q8: Folded DEM Maximum Versus Public Parser Limit
+
+Status: Resolved
+Revealed by: the first controlled accepted-maximum DEM memory probe after all 36 timing reports passed.
+Current text: Q5 required the six-line `folded-repeats` cycle to accept 262,144 compact work items while preserving Stab's existing public parser limits.
+Gap: 262,144 folded cycles contain 1,572,864 physical lines, so the source-owned accepted maximum was not valid input under Stab's public one-million-line DEM parser boundary. The plan did not require the benchmark maximum itself to pass the product resource boundary before formal timing began.
+Proposed amendment: cap `folded-repeats` at 131,072 compact work items, retain 524,288 for the one-line flat and coordinate families, require every accepted maximum to parse through the public API in a focused test, and run accepted-maximum probes before formal timing publication.
+Resolution: both independent generators now use the 131,072 folded cap, a focused test parses every family maximum through `DetectorErrorModel`, the adapter probe retains first-over-cap rejection, and the failed 262,144-item memory-probe path plus the preceding 36-report timing chain remain historical rather than being promoted.
+
 ## 2026-07-23 - R1: Active File Roles And Non-Regular Outputs
 
 Status: Resolved
