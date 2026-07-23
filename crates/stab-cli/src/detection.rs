@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::fs::File;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::PathBuf;
 
@@ -12,13 +11,14 @@ use stab_core::{
 };
 
 use crate::{
-    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg, parse_circuit_bytes,
-    read_limited_input,
+    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
+    input::{read_limited_input_file, read_limited_line, read_limited_stdin},
+    io_plan::{FileRole, InputFile, PendingIo},
+    parse_circuit_bytes,
     streaming::{
         FileOutputSink, OutputSink, detection_record_bits, write_detection_record,
         write_observable_record, write_ptb64_group,
     },
-    write_empty_observables, write_output,
 };
 
 const MAX_M2D_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -124,6 +124,15 @@ where
     W: Write,
     E: Write,
 {
+    validate_detect_observable_routing(&args)?;
+    validate_detect_ptb64_shots(&args)?;
+    let mut io = PendingIo::preflight(
+        [(FileRole::Input, args.input.as_deref())],
+        [
+            (FileRole::Output, args.output.as_deref()),
+            (FileRole::ObservableOutput, args.obs_output.as_deref()),
+        ],
+    )?;
     if args.prepend_observables {
         writeln!(
             stderr,
@@ -131,27 +140,33 @@ where
         )
         .map_err(CliError::WriteOutput)?;
     }
-    validate_detect_observable_routing(&args)?;
-    validate_detect_ptb64_shots(&args)?;
     if args.shots == 0 {
-        write_output(args.output.as_ref(), stdout, &[])?;
-        return write_empty_observables(args.obs_output.as_ref(), stdout);
+        let mut outputs = io.activate()?;
+        let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+        primary_output.write_with(|writer| writer.write_all(&[]))?;
+        if let Some(output) = outputs.take(FileRole::ObservableOutput) {
+            let mut output = FileOutputSink::from_output(output);
+            output.write_with(|writer| writer.write_all(&[]))?;
+        }
+        return Ok(());
     }
-    let input_bytes = read_limited_input(
-        args.input.as_ref(),
-        input,
-        MAX_CIRCUIT_INPUT_BYTES,
-        "detect circuit input",
-    )?;
+    let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
+        read_limited_input_file(
+            &mut input_file,
+            MAX_CIRCUIT_INPUT_BYTES,
+            "detect circuit input",
+        )?
+    } else {
+        read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "detect circuit input")?
+    };
     let circuit = parse_circuit_bytes(&input_bytes)?;
     validate_detection_sampling_circuit(&circuit)?;
     let observable_mode = detect_observable_output_mode(&args);
-    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
-    let mut observable_output = args
-        .obs_output
-        .as_ref()
-        .map(FileOutputSink::create)
-        .transpose()?;
+    let mut outputs = io.activate()?;
+    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let mut observable_output = outputs
+        .take(FileRole::ObservableOutput)
+        .map(FileOutputSink::from_output);
     let mut state = DetectionStreamState::default();
     try_for_each_sampled_detection_event(&circuit, args.shots, args.seed, |record| {
         write_detect_stream_record(
@@ -173,9 +188,24 @@ where
     W: Write,
 {
     validate_m2d_output_formats(&args)?;
-    let circuit_bytes = read_limited_input(
-        Some(&args.circuit),
-        input,
+    let mut io = PendingIo::preflight(
+        [
+            (FileRole::Circuit, Some(args.circuit.as_path())),
+            (FileRole::Input, args.input.as_deref()),
+            (FileRole::Sweep, args.sweep.as_deref()),
+        ],
+        [
+            (FileRole::Output, args.output.as_deref()),
+            (FileRole::ObservableOutput, args.obs_output.as_deref()),
+        ],
+    )?;
+    let mut circuit_file = io
+        .take_input(FileRole::Circuit)
+        .ok_or(CliError::IoPlanInvariant {
+            message: "m2d preflight omitted its required circuit input",
+        })?;
+    let circuit_bytes = read_limited_input_file(
+        &mut circuit_file,
         MAX_CIRCUIT_INPUT_BYTES,
         "m2d circuit input",
     )?;
@@ -185,19 +215,14 @@ where
     } else {
         circuit
     };
-    let measurement_input = open_m2d_path_or_stdin(args.input.as_ref(), input)?;
+    let measurement_input = open_m2d_input_or_stdin(io.take_input(FileRole::Input), input);
     let observable_mode = observable_output_mode(args.append_observables);
-    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
-    let sweep_input = args
-        .sweep
-        .as_ref()
-        .map(|sweep_path| open_m2d_path(sweep_path))
-        .transpose()?;
-    let mut observable_output = args
-        .obs_output
-        .as_ref()
-        .map(FileOutputSink::create)
-        .transpose()?;
+    let sweep_input = io.take_input(FileRole::Sweep).map(open_m2d_input);
+    let mut outputs = io.activate()?;
+    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let mut observable_output = outputs
+        .take(FileRole::ObservableOutput)
+        .map(FileOutputSink::from_output);
     let converter = CompiledDetectionConverter::compile(
         &circuit,
         DetectionConversionOptions {
@@ -356,39 +381,28 @@ struct M2dOpenInput<'a> {
     input_path: Option<PathBuf>,
 }
 
-fn open_m2d_path_or_stdin<'a, R>(
-    input_path: Option<&PathBuf>,
+fn open_m2d_input_or_stdin<'a, R>(
+    input_file: Option<InputFile>,
     stdin: &'a mut R,
-) -> Result<M2dOpenInput<'a>, CliError>
+) -> M2dOpenInput<'a>
 where
     R: Read + 'a,
 {
-    let Some(path) = input_path else {
-        return Ok(M2dOpenInput {
+    let Some(input_file) = input_file else {
+        return M2dOpenInput {
             reader: Box::new(BufReader::new(stdin)),
             input_path: None,
-        });
+        };
     };
-    Ok(M2dOpenInput {
-        reader: Box::new(BufReader::new(File::open(path).map_err(|source| {
-            CliError::ReadPath {
-                path: path.clone(),
-                source,
-            }
-        })?)),
-        input_path: Some(path.clone()),
-    })
+    open_m2d_input(input_file)
 }
 
-fn open_m2d_path(input_path: &PathBuf) -> Result<M2dOpenInput<'static>, CliError> {
-    let file = File::open(input_path).map_err(|source| CliError::ReadPath {
-        path: input_path.clone(),
-        source,
-    })?;
-    Ok(M2dOpenInput {
-        reader: Box::new(BufReader::new(file)),
-        input_path: Some(input_path.clone()),
-    })
+fn open_m2d_input(input_file: InputFile) -> M2dOpenInput<'static> {
+    let input_path = input_file.path().to_path_buf();
+    M2dOpenInput {
+        reader: Box::new(BufReader::new(input_file)),
+        input_path: Some(input_path),
+    }
 }
 
 impl<'a> M2dRecordStream<'a> {
@@ -442,17 +456,31 @@ impl<'a> M2dRecordStream<'a> {
 
     fn next_text_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
         loop {
-            let Some(line) = read_m2d_line(&mut self.reader, self.input_path.as_ref(), self.kind)?
+            let Some(line) = read_limited_line(
+                &mut self.reader,
+                self.input_path.as_deref(),
+                MAX_M2D_TEXT_RECORD_BYTES,
+                self.kind,
+            )?
             else {
                 return Ok(None);
             };
-            if self.format == RecordFormatArg::Dets && is_m2d_blank_dets_line(&line) {
-                continue;
-            }
             validate_m2d_text_record_terminator(&line, self.format, self.kind)?;
             let sample_format = self.format.sample_format()?;
-            return decode_single_m2d_record(&line, sample_format, self.bits_per_record, self.kind)
-                .map(Some);
+            let records = read_measurement_records(&line, sample_format, self.bits_per_record)?;
+            if self.format == RecordFormatArg::Dets && records.is_empty() {
+                continue;
+            }
+            let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
+                CircuitError::InvalidResultFormat {
+                    message: format!(
+                        "{} record decoded into {} records",
+                        self.kind,
+                        records.len()
+                    ),
+                }
+            })?;
+            return Ok(Some(record));
         }
     }
 
@@ -533,34 +561,6 @@ impl<'a> M2dRecordStream<'a> {
             RecordRead::EofBeforeRecord => Ok(None),
         }
     }
-}
-
-fn read_m2d_line<R>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    kind: &'static str,
-) -> Result<Option<Vec<u8>>, CliError>
-where
-    R: BufRead + ?Sized,
-{
-    let mut line = Vec::new();
-    let bytes = reader
-        .read_until(b'\n', &mut line)
-        .map_err(|source| read_error(input_path, source))?;
-    if bytes == 0 {
-        return Ok(None);
-    }
-    if line.len() > MAX_M2D_TEXT_RECORD_BYTES {
-        return Err(CliError::InputTooLarge {
-            kind,
-            limit: u64::try_from(MAX_M2D_TEXT_RECORD_BYTES).unwrap_or(u64::MAX),
-        });
-    }
-    Ok(Some(line))
-}
-
-fn is_m2d_blank_dets_line(line: &[u8]) -> bool {
-    line.iter().all(u8::is_ascii_whitespace)
 }
 
 fn validate_m2d_text_record_terminator(

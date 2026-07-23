@@ -2130,6 +2130,10 @@ name = "stab-cli"
 version = "0.1.1"
 dependencies = [
  "clap",
+ "hex",
+ "same-file",
+ "serde",
+ "serde_json",
  "stab-core",
  "tempfile",
  "thiserror",

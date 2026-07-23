@@ -1,29 +1,19 @@
-use std::fs::File;
 use std::io::{self, Write};
-use std::path::PathBuf;
 
 use stab_core::{
     DetectionEventRecord, DetectionObservableOutputMode, SampleFormat,
     result_formats::MeasureRecordWriter,
 };
 
-use crate::CliError;
+use crate::{CliError, io_plan::OutputFile};
 
 pub(crate) struct FileOutputSink {
-    path: PathBuf,
-    file: File,
+    file: OutputFile,
 }
 
 impl FileOutputSink {
-    pub(crate) fn create(path: &PathBuf) -> Result<Self, CliError> {
-        let file = File::create(path).map_err(|source| CliError::WritePath {
-            path: path.clone(),
-            source,
-        })?;
-        Ok(Self {
-            path: path.clone(),
-            file,
-        })
+    pub(crate) fn from_output(file: OutputFile) -> Self {
+        Self { file }
     }
 
     pub(crate) fn write_with(
@@ -31,7 +21,7 @@ impl FileOutputSink {
         write: impl FnOnce(&mut dyn Write) -> io::Result<()>,
     ) -> Result<(), CliError> {
         write(&mut self.file).map_err(|source| CliError::WritePath {
-            path: self.path.clone(),
+            path: self.file.path().to_path_buf(),
             source,
         })
     }
@@ -49,11 +39,11 @@ impl<'a, W> OutputSink<'a, W>
 where
     W: Write,
 {
-    pub(crate) fn create(path: Option<&PathBuf>, stdout: &'a mut W) -> Result<Self, CliError> {
-        if let Some(path) = path {
-            return Ok(Self::File(FileOutputSink::create(path)?));
+    pub(crate) fn from_output(output: Option<OutputFile>, stdout: &'a mut W) -> Self {
+        match output {
+            Some(output) => Self::File(FileOutputSink::from_output(output)),
+            None => Self::Stdout(stdout),
         }
-        Ok(Self::Stdout(stdout))
     }
 
     pub(crate) fn write_with(

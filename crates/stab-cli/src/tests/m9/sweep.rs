@@ -508,7 +508,7 @@ fn m2d_rejects_missing_and_malformed_sweep_input() {
     assert!(
         String::from_utf8(malformed_stderr)
             .unwrap()
-            .contains("01 record expected 1 bits, got 2")
+            .contains("01 data did not end with a newline")
     );
 }
 

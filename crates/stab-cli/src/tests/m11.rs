@@ -139,6 +139,8 @@ fn sample_dem_dets_output_keeps_observables_separate_like_upstream() {
 
 #[test]
 fn sample_dem_rejects_conflicting_observable_routes() {
+    let dir = tempdir().expect("tempdir");
+    let obs_path = dir.path().join("obs.01");
     for args in [
         vec![
             OsString::from("stab"),
@@ -151,14 +153,14 @@ fn sample_dem_rejects_conflicting_observable_routes() {
             OsString::from("sample_dem"),
             OsString::from("--append_observables"),
             OsString::from("--obs_out"),
-            OsString::from("obs.01"),
+            obs_path.clone().into_os_string(),
         ],
         vec![
             OsString::from("stab"),
             OsString::from("sample_dem"),
             OsString::from("--prepend_observables"),
             OsString::from("--obs_out"),
-            OsString::from("obs.01"),
+            obs_path.clone().into_os_string(),
         ],
     ] {
         let mut stdout = Vec::new();
@@ -172,6 +174,7 @@ fn sample_dem_rejects_conflicting_observable_routes() {
 
         assert_eq!(status, 1);
         assert_eq!(String::from_utf8(stdout).unwrap(), "");
+        assert!(!obs_path.exists());
         assert!(
             String::from_utf8(stderr).unwrap().contains(
                 "cannot combine --prepend_observables, --append_observables, or --obs_out"
@@ -312,6 +315,33 @@ fn sample_dem_replays_error_records_into_detector_and_observable_streams() {
         "0\n1\n0,1\n"
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_hits_replay_sets_duplicate_error_indices() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.hits");
+    std::fs::write(&replay_path, "0,0\n1,1\n").expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format=hits"),
+        OsString::from("--shots=2"),
+        OsString::from("--seed=0"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(0.25) D0\nerror(0.25) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0, "{}", String::from_utf8_lossy(&stderr));
+    assert_eq!(stdout, b"10\n01\n");
 }
 
 #[test]
@@ -509,10 +539,19 @@ fn sample_dem_rejects_truncated_ptb64_replay_input() {
 
 #[test]
 fn sample_dem_rejects_ptb64_shots_that_are_not_multiple_of_64() {
+    let dir = tempdir().expect("tempdir");
+    let output_path = dir.path().join("out.ptb64");
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "sample_dem", "--out_format=ptb64", "--shots=63"],
+        [
+            "stab",
+            "sample_dem",
+            "--out_format=ptb64",
+            "--shots=63",
+            "--out",
+            output_path.to_str().expect("utf-8 path"),
+        ],
         b"error(1) D0\n".as_slice(),
         &mut stdout,
         &mut stderr,
@@ -520,6 +559,7 @@ fn sample_dem_rejects_ptb64_shots_that_are_not_multiple_of_64() {
 
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(!output_path.exists());
     assert!(
         String::from_utf8(stderr)
             .unwrap()

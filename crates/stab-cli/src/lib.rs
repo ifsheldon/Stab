@@ -18,6 +18,7 @@ mod convert;
 mod detection;
 mod help;
 mod input;
+mod io_plan;
 mod sample_dem;
 mod streaming;
 
@@ -27,7 +28,8 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use convert::{ConvertArgs, run_convert};
 use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
 use help::{HelpArgs, run_help};
-pub(crate) use input::read_limited_input;
+use input::{read_limited_input_file, read_limited_stdin};
+use io_plan::{FileRole, PendingIo};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
     Circuit, CircuitItem, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask,
@@ -277,6 +279,15 @@ pub(crate) enum CliError {
         source: std::io::Error,
     },
 
+    #[error("file roles {first} and {second} refer to the same file")]
+    ConflictingFileRoles {
+        first: &'static str,
+        second: &'static str,
+    },
+
+    #[error("internal CLI I/O plan invariant failed: {message}")]
+    IoPlanInvariant { message: &'static str },
+
     #[error("{0}")]
     Circuit(#[from] stab_core::CircuitError),
 
@@ -295,6 +306,9 @@ pub(crate) enum CliError {
         "unsupported conversion; supported conversions are result formats 01, b8, r8, hits, dets, and ptb64 with explicit layout information, plus stim input to stim output"
     )]
     UnsupportedConversion,
+
+    #[error("{flag} is not valid for stim-to-stim conversion")]
+    UnsupportedStimConversionOption { flag: &'static str },
 
     #[error("format {format} is not supported for detection data")]
     UnsupportedDetectionFormat { format: &'static str },
@@ -728,6 +742,13 @@ where
     W: Write,
     E: Write,
 {
+    if args.out_format == SampleOutFormatArg::Ptb64 {
+        validate_ptb64_shot_count(args.shots)?;
+    }
+    let mut io = PendingIo::preflight(
+        [(FileRole::Input, args.input.as_deref())],
+        [(FileRole::Output, args.output.as_deref())],
+    )?;
     if args.frame0 {
         writeln!(
             stderr,
@@ -735,12 +756,15 @@ where
         )
         .map_err(CliError::WriteOutput)?;
     }
-    let input_bytes = read_limited_input(
-        args.input.as_ref(),
-        input,
-        MAX_CIRCUIT_INPUT_BYTES,
-        "sample circuit input",
-    )?;
+    let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
+        read_limited_input_file(
+            &mut input_file,
+            MAX_CIRCUIT_INPUT_BYTES,
+            "sample circuit input",
+        )?
+    } else {
+        read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "sample circuit input")?
+    };
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
@@ -750,15 +774,8 @@ where
     } else {
         None
     };
-    if args.out_format == SampleOutFormatArg::Ptb64 {
-        validate_ptb64_shot_count(args.shots)?;
-    }
-    if let Some(output_path) = args.output.as_ref() {
-        let mut output =
-            std::fs::File::create(output_path).map_err(|source| CliError::WritePath {
-                path: output_path.clone(),
-                source,
-            })?;
+    let mut outputs = io.activate()?;
+    if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(
             &sampler,
             args.shots,
@@ -769,7 +786,7 @@ where
             &mut output,
         )
         .map_err(|source| CliError::WritePath {
-            path: output_path.clone(),
+            path: output.path().to_path_buf(),
             source,
         });
     }
@@ -923,16 +940,6 @@ where
     )?;
     debug_assert!(group.is_empty());
     Ok(())
-}
-
-fn write_empty_observables<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let Some(output_path) = output_path else {
-        return Ok(());
-    };
-    write_output(Some(output_path), stdout, &[])
 }
 
 #[cfg(test)]

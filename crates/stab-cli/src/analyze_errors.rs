@@ -6,7 +6,8 @@ use stab_core::{ErrorAnalyzerOptions, Probability, circuit_to_detector_error_mod
 
 use crate::{
     CliError,
-    input::{open_limited_input_path, read_limited_open_path, read_limited_stdin},
+    input::{read_limited_input_file, read_limited_stdin},
+    io_plan::{FileRole, PendingIo},
     parse_circuit_bytes,
     streaming::OutputSink,
 };
@@ -62,29 +63,25 @@ where
     R: Read,
     W: Write,
 {
-    let input_bytes: Vec<u8>;
-    let mut output = if let Some(input_path) = args.input.as_ref() {
-        let mut input_file = open_limited_input_path(
-            input_path,
+    let mut io = PendingIo::preflight(
+        [(FileRole::Input, args.input.as_deref())],
+        [(FileRole::Output, args.output.as_deref())],
+    )?;
+    let mut input_file = io.take_input(FileRole::Input);
+    let mut outputs = io.activate()?;
+    let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let input_bytes = if let Some(input_file) = input_file.as_mut() {
+        read_limited_input_file(
+            input_file,
             MAX_ANALYZE_ERRORS_INPUT_BYTES,
             "analyze_errors input",
-        )?;
-        let output = OutputSink::create(args.output.as_ref(), stdout)?;
-        input_bytes = read_limited_open_path(
-            input_path,
-            &mut input_file,
-            MAX_ANALYZE_ERRORS_INPUT_BYTES,
-            "analyze_errors input",
-        )?;
-        output
+        )?
     } else {
-        let output = OutputSink::create(args.output.as_ref(), stdout)?;
-        input_bytes = read_limited_stdin(
+        read_limited_stdin(
             input,
             MAX_ANALYZE_ERRORS_INPUT_BYTES,
             "analyze_errors input",
-        )?;
-        output
+        )?
     };
     let circuit = parse_circuit_bytes(&input_bytes)?;
     let dem = circuit_to_detector_error_model(

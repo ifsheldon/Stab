@@ -329,7 +329,7 @@ fn pf7_m2d_cli_rejects_selected_format_width_and_writer_failures() {
     assert!(
         bad_dets
             .stderr
-            .contains("measurement dets input cannot contain D tokens")
+            .contains("DETS token D0 exceeds namespace width 0")
     );
 
     let mut stdout = FailingWriter;

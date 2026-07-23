@@ -284,6 +284,7 @@ fn detect_rejects_conflicting_observable_routes() {
 
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
+    assert!(!obs_path.exists());
     assert!(
         String::from_utf8(stderr)
             .unwrap()
@@ -360,10 +361,19 @@ fn detect_writes_ptb64_detector_and_observable_outputs() {
 
 #[test]
 fn detect_rejects_ptb64_shots_that_are_not_multiple_of_64() {
+    let temp_dir = tempdir().expect("temp dir");
+    let output_path = temp_dir.path().join("out.ptb64");
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "detect", "--shots=63", "--out_format=ptb64"],
+        [
+            "stab",
+            "detect",
+            "--shots=63",
+            "--out_format=ptb64",
+            "--out",
+            output_path.to_str().expect("utf-8 path"),
+        ],
         "M 0\nDETECTOR rec[-1]\n".as_bytes(),
         &mut stdout,
         &mut stderr,
@@ -371,6 +381,7 @@ fn detect_rejects_ptb64_shots_that_are_not_multiple_of_64() {
 
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
+    assert!(!output_path.exists());
     assert!(
         String::from_utf8(stderr)
             .unwrap()
@@ -1124,7 +1135,7 @@ fn m2d_dets_input_accepts_measurement_tokens_only() {
     assert!(
         String::from_utf8(bad_stderr)
             .unwrap()
-            .contains("measurement dets input cannot contain D tokens")
+            .contains("DETS token D0 exceeds namespace width 0")
     );
 }
 

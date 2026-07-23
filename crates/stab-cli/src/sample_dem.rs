@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::io::{BufReader, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
@@ -7,15 +6,17 @@ use stab_core::{
     CircuitError, CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
     DetectorErrorModel, SampleFormat,
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
+    result_streaming::for_each_sparse_record,
 };
 
 use super::{
-    CliError, SampleOutFormatArg, read_limited_input,
+    CliError, SampleOutFormatArg,
+    input::{read_limited_input_file, read_limited_line, read_limited_stdin},
+    io_plan::{FileRole, InputFile, PendingIo},
     streaming::{
         FileOutputSink, OutputSink, detection_record_bits, write_bits_record,
         write_detection_record, write_observable_record, write_ptb64_group,
     },
-    write_empty_observables, write_output,
 };
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -116,23 +117,47 @@ where
 {
     validate_observable_routing(&args)?;
     validate_ptb64_routing(&args)?;
-    if args.shots == 0 {
-        validate_zero_shot_input_paths(&args)?;
-        write_output(args.output.as_ref(), stdout, &[])?;
-        write_empty_observables(args.obs_output.as_ref(), stdout)?;
-        return write_empty_errors(args.error_output.as_ref(), stdout);
-    }
-    let input_bytes = read_limited_input(
-        args.input.as_ref(),
-        input,
-        MAX_SAMPLE_DEM_INPUT_BYTES,
-        "sample_dem input",
+    let mut io = PendingIo::preflight(
+        [
+            (FileRole::Input, args.input.as_deref()),
+            (
+                FileRole::ReplayErrorInput,
+                args.replay_error_input.as_deref(),
+            ),
+        ],
+        [
+            (FileRole::Output, args.output.as_deref()),
+            (FileRole::ObservableOutput, args.obs_output.as_deref()),
+            (FileRole::ErrorOutput, args.error_output.as_deref()),
+        ],
     )?;
+    if args.shots == 0 {
+        let mut outputs = io.activate()?;
+        let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+        primary_output.write_with(|writer| writer.write_all(&[]))?;
+        for role in [FileRole::ObservableOutput, FileRole::ErrorOutput] {
+            if let Some(output) = outputs.take(role) {
+                let mut output = FileOutputSink::from_output(output);
+                output.write_with(|writer| writer.write_all(&[]))?;
+            }
+        }
+        return Ok(());
+    }
+    let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
+        read_limited_input_file(
+            &mut input_file,
+            MAX_SAMPLE_DEM_INPUT_BYTES,
+            "sample_dem input",
+        )?
+    } else {
+        read_limited_stdin(input, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
+    };
     let dem = parse_dem_bytes(&input_bytes)?;
     let sampler = CompiledDemSampler::compile(&dem)?;
-    if let Some(replay_path) = args.replay_error_input.as_ref() {
+    let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
+    if let Some(replay_input) = replay_input.as_mut() {
         validate_replay_prefix(
-            replay_path,
+            replay_input,
             args.replay_err_in_format,
             sampler.error_count(),
             args.shots,
@@ -140,21 +165,18 @@ where
     }
     let observable_mode = observable_output_mode(&args);
     let stream_formats = SampleDemStreamFormats::from_args(&args, observable_mode);
-    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
-    let mut observable_output = args
-        .obs_output
-        .as_ref()
-        .map(FileOutputSink::create)
-        .transpose()?;
-    let mut error_output = args
-        .error_output
-        .as_ref()
-        .map(FileOutputSink::create)
-        .transpose()?;
+    let mut outputs = io.activate()?;
+    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let mut observable_output = outputs
+        .take(FileRole::ObservableOutput)
+        .map(FileOutputSink::from_output);
+    let mut error_output = outputs
+        .take(FileRole::ErrorOutput)
+        .map(FileOutputSink::from_output);
     let mut stream_state = SampleDemStreamState::default();
-    if let Some(replay_path) = args.replay_error_input.as_ref() {
+    if let Some(replay_input) = replay_input.as_mut() {
         for_each_replay_error_record(
-            replay_path,
+            replay_input,
             args.replay_err_in_format,
             sampler.error_count(),
             args.shots,
@@ -240,27 +262,8 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-fn validate_zero_shot_input_paths(args: &SampleDemArgs) -> Result<(), CliError> {
-    if let Some(path) = args.input.as_ref() {
-        ensure_readable_path(path)?;
-    }
-    if let Some(path) = args.replay_error_input.as_ref() {
-        ensure_readable_path(path)?;
-    }
-    Ok(())
-}
-
-fn ensure_readable_path(path: &Path) -> Result<(), CliError> {
-    std::fs::File::open(path)
-        .map(|_| ())
-        .map_err(|source| CliError::ReadPath {
-            path: path.to_path_buf(),
-            source,
-        })
-}
-
 fn for_each_replay_error_record<F>(
-    path: &Path,
+    input: &mut InputFile,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
@@ -271,33 +274,34 @@ where
 {
     match format {
         SampleDemRecordFormatArg::Ptb64 => {
-            for_each_ptb64_replay_error_record(path, error_count, expected_shots, visit)
+            for_each_ptb64_replay_error_record(input, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::B8 => {
-            for_each_b8_replay_error_record(path, error_count, expected_shots, visit)
+            for_each_b8_replay_error_record(input, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::R8 => {
-            for_each_r8_replay_error_record(path, error_count, expected_shots, visit)
+            for_each_r8_replay_error_record(input, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::ZeroOne
         | SampleDemRecordFormatArg::Hits
         | SampleDemRecordFormatArg::Dets => {
-            for_each_line_replay_error_record(path, format, error_count, expected_shots, visit)
+            for_each_line_replay_error_record(input, format, error_count, expected_shots, visit)
         }
     }
 }
 
 fn validate_replay_prefix(
-    path: &Path,
+    input: &mut InputFile,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
 ) -> Result<(), CliError> {
-    for_each_replay_error_record(path, format, error_count, expected_shots, |_record| Ok(()))
+    for_each_replay_error_record(input, format, error_count, expected_shots, |_record| Ok(()))?;
+    input.rewind()
 }
 
 fn for_each_ptb64_replay_error_record<F>(
-    path: &Path,
+    input: &mut InputFile,
     error_count: usize,
     expected_shots: usize,
     mut visit: F,
@@ -305,6 +309,7 @@ fn for_each_ptb64_replay_error_record<F>(
 where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
+    let path = input.path().to_path_buf();
     if expected_shots == 0 {
         return Ok(());
     }
@@ -319,16 +324,12 @@ where
     let expected_bytes = bytes_per_group
         .checked_mul(expected_shots / 64)
         .ok_or(CliError::MeasurementCountOverflow)?;
-    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
-        path: path.to_path_buf(),
-        source,
-    })?;
     let mut group_bytes = vec![0u8; bytes_per_group];
     let mut bytes_read = 0usize;
     for _ in 0..(expected_shots / 64) {
         read_exact_ptb64_replay_group(
-            path,
-            &mut file,
+            &path,
+            input,
             &mut group_bytes,
             &mut bytes_read,
             expected_bytes,
@@ -394,7 +395,7 @@ fn read_exact_ptb64_replay_group(
 }
 
 fn for_each_b8_replay_error_record<F>(
-    path: &Path,
+    input: &mut InputFile,
     error_count: usize,
     expected_shots: usize,
     mut visit: F,
@@ -402,16 +403,13 @@ fn for_each_b8_replay_error_record<F>(
 where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
+    let path = input.path().to_path_buf();
     let bytes_per_record = error_count.div_ceil(8);
     if bytes_per_record == 0 && expected_shots > 0 {
         return Err(invalid_result_format(
             "b8 input cannot represent zero-width records",
         ));
     }
-    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
-        path: path.to_path_buf(),
-        source,
-    })?;
     let mut record_bytes = vec![0u8; bytes_per_record];
     for records_read in 0..expected_shots {
         let mut offset = 0usize;
@@ -419,7 +417,7 @@ where
             let remaining = record_bytes
                 .get_mut(offset..)
                 .ok_or_else(|| invalid_result_format("b8 replay byte cursor was out of range"))?;
-            match file.read(remaining) {
+            match input.read(remaining) {
                 Ok(0) if offset == 0 => {
                     return Err(CliError::ReplayErrorRecordCountMismatch {
                         expected: expected_shots,
@@ -434,7 +432,7 @@ where
                 Ok(count) => offset += count,
                 Err(source) => {
                     return Err(CliError::ReadPath {
-                        path: path.to_path_buf(),
+                        path: path.clone(),
                         source,
                     });
                 }
@@ -452,7 +450,7 @@ where
 }
 
 fn for_each_line_replay_error_record<F>(
-    path: &Path,
+    input: &mut InputFile,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
@@ -462,26 +460,33 @@ where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
     let sample_format = format.sample_format()?;
-    let file = File::open(path).map_err(|source| CliError::ReadPath {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let mut reader = BufReader::new(file);
+    let path = input.path().to_path_buf();
+    let mut reader = BufReader::new(input);
     let mut records_read = 0usize;
     let mut skipped_dets_blank_bytes = 0usize;
     while records_read < expected_shots {
-        let Some(line) = read_replay_line(path, &mut reader)? else {
+        let Some(line) = read_limited_line(
+            &mut reader,
+            Some(&path),
+            MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES,
+            "sample_dem replay text record",
+        )?
+        else {
             return Err(CliError::ReplayErrorRecordCountMismatch {
                 expected: expected_shots,
                 actual: records_read,
             });
         };
-        if format == SampleDemRecordFormatArg::Dets && is_blank_dets_replay_line(&line) {
+        let parsed = if format == SampleDemRecordFormatArg::Hits {
+            vec![read_hits_replay_record(&line, error_count)?]
+        } else {
+            read_measurement_records(&line, sample_format, error_count)?
+        };
+        if format == SampleDemRecordFormatArg::Dets && parsed.is_empty() {
             skipped_dets_blank_bytes =
                 checked_text_replay_scan_bytes(skipped_dets_blank_bytes, line.len())?;
             continue;
         }
-        let parsed = read_measurement_records(&line, sample_format, error_count)?;
         let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
             CircuitError::InvalidResultFormat {
                 message: format!("replay record decoded into {} records", records.len()),
@@ -494,8 +499,34 @@ where
     Ok(())
 }
 
-fn is_blank_dets_replay_line(line: &[u8]) -> bool {
-    line.iter().all(|byte| byte.is_ascii_whitespace())
+fn read_hits_replay_record(input: &[u8], error_count: usize) -> Result<Vec<bool>, CliError> {
+    let mut record = None;
+    for_each_sparse_record(input, SampleFormat::Hits, error_count, |hits| {
+        if record.is_some() {
+            return Err(CircuitError::InvalidResultFormat {
+                message: "HITS replay line decoded into multiple records".to_string(),
+            });
+        }
+        let mut decoded = vec![false; error_count];
+        for hit in hits {
+            let index = usize::try_from(*hit).map_err(|_| CircuitError::InvalidResultFormat {
+                message: format!("HITS replay index {hit} does not fit usize"),
+            })?;
+            let bit = decoded
+                .get_mut(index)
+                .ok_or_else(|| CircuitError::InvalidResultFormat {
+                    message: format!("HITS replay index {index} exceeds error count {error_count}"),
+                })?;
+            *bit = true;
+        }
+        record = Some(decoded);
+        Ok(())
+    })?;
+    record.ok_or_else(|| {
+        CliError::from(CircuitError::InvalidResultFormat {
+            message: "HITS replay line did not contain one record".to_string(),
+        })
+    })
 }
 
 fn checked_text_replay_scan_bytes(current: usize, added: usize) -> Result<usize, CliError> {
@@ -509,55 +540,8 @@ fn checked_text_replay_scan_bytes(current: usize, added: usize) -> Result<usize,
     Ok(updated)
 }
 
-fn read_replay_line(path: &Path, reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, CliError> {
-    let mut line = Vec::new();
-    loop {
-        let (consumed, found_newline) = {
-            let available = reader.fill_buf().map_err(|source| CliError::ReadPath {
-                path: path.to_path_buf(),
-                source,
-            })?;
-            if available.is_empty() {
-                return if line.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(line))
-                };
-            }
-            let consumed = available
-                .iter()
-                .position(|byte| *byte == b'\n')
-                .map_or(available.len(), |index| index + 1);
-            if line.len().saturating_add(consumed) > MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES {
-                return Err(CliError::InputTooLarge {
-                    kind: "sample_dem replay text record",
-                    limit: u64::try_from(MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES)
-                        .unwrap_or(u64::MAX),
-                });
-            }
-            let chunk = available.get(..consumed).ok_or_else(|| {
-                CliError::from(CircuitError::InvalidResultFormat {
-                    message: "replay line byte range was out of bounds".to_string(),
-                })
-            })?;
-            line.extend_from_slice(chunk);
-            (
-                consumed,
-                consumed
-                    .checked_sub(1)
-                    .and_then(|index| available.get(index))
-                    .is_some_and(|byte| *byte == b'\n'),
-            )
-        };
-        reader.consume(consumed);
-        if found_newline {
-            return Ok(Some(line));
-        }
-    }
-}
-
 fn for_each_r8_replay_error_record<F>(
-    path: &Path,
+    input: &mut InputFile,
     error_count: usize,
     expected_shots: usize,
     mut visit: F,
@@ -565,12 +549,9 @@ fn for_each_r8_replay_error_record<F>(
 where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
-    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let path = input.path().to_path_buf();
     for records_read in 0..expected_shots {
-        let Some(record) = read_r8_replay_record(path, &mut file, error_count)? else {
+        let Some(record) = read_r8_replay_record(&path, input, error_count)? else {
             return Err(CliError::ReplayErrorRecordCountMismatch {
                 expected: expected_shots,
                 actual: records_read,
@@ -821,16 +802,6 @@ fn write_ptb64_file_stream_record(
         ptb64_records.clear();
     }
     Ok(())
-}
-
-fn write_empty_errors<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let Some(output_path) = output_path else {
-        return Ok(());
-    };
-    write_output(Some(output_path), stdout, &[])
 }
 
 fn observable_output_mode(args: &SampleDemArgs) -> DetectionObservableOutputMode {

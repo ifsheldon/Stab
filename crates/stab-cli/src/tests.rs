@@ -8,7 +8,9 @@ mod legacy;
 mod m10;
 mod m11;
 mod m9;
+mod path_alias;
 mod resource;
+mod result_text_compat;
 
 #[cfg(unix)]
 #[test]
@@ -18,7 +20,7 @@ fn read_limited_input_rejects_special_file_after_limit() {
         return;
     }
     let mut stdin = std::io::empty();
-    let error = crate::read_limited_input(Some(&path), &mut stdin, 1024, "test input")
+    let error = crate::input::read_limited_input(Some(&path), &mut stdin, 1024, "test input")
         .expect_err("special file should be limited while reading");
 
     assert!(
@@ -834,10 +836,19 @@ fn sample_writes_ptb64_format_like_stim() {
 
 #[test]
 fn sample_rejects_ptb64_shots_that_are_not_multiple_of_64() {
+    let dir = tempdir().expect("tempdir");
+    let output_path = dir.path().join("out.ptb64");
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "sample", "--out_format", "ptb64"],
+        [
+            "stab",
+            "sample",
+            "--out_format",
+            "ptb64",
+            "--out",
+            output_path.to_str().expect("utf-8 path"),
+        ],
         "M 0\n".as_bytes(),
         &mut stdout,
         &mut stderr,
@@ -845,6 +856,7 @@ fn sample_rejects_ptb64_shots_that_are_not_multiple_of_64() {
 
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(!output_path.exists());
     assert!(
         String::from_utf8(stderr)
             .unwrap()

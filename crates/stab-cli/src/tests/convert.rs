@@ -95,7 +95,7 @@ fn convert_measurements_with_circuit_types_m_to_dets() {
 }
 
 #[test]
-fn convert_sparse_duplicate_tokens_toggle_typed_bits() {
+fn convert_sparse_duplicate_tokens_set_typed_bits() {
     assert_eq!(
         run_ok(
             &[
@@ -110,8 +110,59 @@ fn convert_sparse_duplicate_tokens_toggle_typed_bits() {
             ],
             b"shot M1 M1\n",
         ),
-        b"00\n"
+        b"01\n"
     );
+}
+
+#[test]
+fn convert_dets_uses_distinct_namespaces_and_strict_separators() {
+    assert_eq!(
+        run_ok(
+            &[
+                "stab",
+                "convert",
+                "--in_format",
+                "dets",
+                "--out_format",
+                "01",
+                "--num_measurements",
+                "1",
+                "--num_detectors",
+                "1",
+                "--num_observables",
+                "1",
+            ],
+            b"shot M0 D0 L0\n",
+        ),
+        b"111\n"
+    );
+
+    for malformed in [
+        b"shotM0\n".as_slice(),
+        b"shot  M0\n",
+        b"shot M0 \n",
+        b"shot\tM0\n",
+        b"shot M0\tD0\n",
+    ] {
+        let (status, stdout, stderr) = run_cli(
+            &[
+                "stab",
+                "convert",
+                "--in_format",
+                "dets",
+                "--out_format",
+                "01",
+                "--num_measurements",
+                "1",
+                "--num_detectors",
+                "1",
+            ],
+            malformed,
+        );
+        assert_eq!(status, 1, "input: {malformed:?}");
+        assert_eq!(stdout, Vec::<u8>::new(), "input: {malformed:?}");
+        assert!(!stderr.is_empty(), "input: {malformed:?}");
+    }
 }
 
 #[test]
@@ -465,7 +516,7 @@ fn convert_rejects_layout_and_format_failures() {
                 "2",
             ],
             b"shot L0\n",
-            "not included",
+            "namespace width 0",
         ),
     ];
 
@@ -546,4 +597,59 @@ fn legacy_convert_alias_dispatches_and_conflicts_with_other_legacy_modes() {
     assert_eq!(status, 1);
     assert_eq!(stdout, Vec::<u8>::new());
     assert!(stderr.contains("--sample"));
+}
+
+#[test]
+fn stim_extension_rejects_irrelevant_roles_without_touching_them() {
+    let directory = tempdir().expect("temp dir");
+    let observable_output = directory.path().join("observables.01");
+    std::fs::write(&observable_output, "keep\n").expect("seed observable output");
+    let observable_output = observable_output.to_str().expect("utf-8 path");
+
+    let (status, stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "convert",
+            "--in_format=stim",
+            "--out_format=stim",
+            "--obs_out",
+            observable_output,
+        ],
+        b"H 0\n",
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, Vec::<u8>::new());
+    assert!(stderr.contains("--obs_out"), "{stderr}");
+    assert_eq!(
+        std::fs::read_to_string(observable_output).expect("read observable output"),
+        "keep\n"
+    );
+
+    let missing_circuit = directory.path().join("missing.stim");
+    let missing_circuit = missing_circuit.to_str().expect("utf-8 path");
+    let (status, stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "convert",
+            "--in_format=stim",
+            "--out_format=stim",
+            "--circuit",
+            missing_circuit,
+        ],
+        b"H 0\n",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, Vec::<u8>::new());
+    assert!(stderr.contains("--circuit"), "{stderr}");
+    assert!(!stderr.contains("failed to read"), "{stderr}");
+}
+
+#[test]
+fn convert_preserves_successful_record_prefix_before_later_parse_error() {
+    let (status, stdout, stderr) = run_cli(&["stab", "convert", "--bits_per_shot=3"], b"101\n1");
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"101\n");
+    assert!(!stderr.is_empty());
 }

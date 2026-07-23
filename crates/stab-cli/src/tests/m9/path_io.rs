@@ -211,7 +211,7 @@ fn m2d_path_io_opens_paths_before_converter_setup() {
 }
 
 #[test]
-fn m2d_path_io_matches_stim_open_precedence_for_sweep_and_observable_outputs() {
+fn m2d_path_io_opens_all_inputs_before_outputs_and_preflights_output_batch() {
     let dir = tempdir().expect("temp dir");
     let circuit_path = dir.path().join("input.stim");
     let measurement_path = dir.path().join("measurements.01");
@@ -248,14 +248,15 @@ fn m2d_path_io_matches_stim_open_precedence_for_sweep_and_observable_outputs() {
     assert_eq!(output_status, 1);
     assert_eq!(String::from_utf8(output_stdout).unwrap(), "");
     let output_error = String::from_utf8(output_stderr).unwrap();
-    assert!(output_error.contains("failed to write"), "{output_error}");
-    assert!(output_error.contains("output.01"), "{output_error}");
-    assert!(!output_error.contains("missing-sweep"), "{output_error}");
+    assert!(output_error.contains("failed to read"), "{output_error}");
+    assert!(output_error.contains("missing-sweep"), "{output_error}");
+    assert!(!output_error.contains("output.01"), "{output_error}");
 
     let sweep_path = dir.path().join("sweep.01");
     let output_path = dir.path().join("output.01");
     let unwritable_obs = dir.path().join("missing-obs-dir").join("obs.01");
     std::fs::write(&sweep_path, "0\n").expect("write sweep");
+    std::fs::write(&output_path, "keep\n").expect("seed primary output");
     let mut obs_stdout = Vec::new();
     let mut obs_stderr = Vec::new();
     let obs_status = run_from(
@@ -287,7 +288,7 @@ fn m2d_path_io_matches_stim_open_precedence_for_sweep_and_observable_outputs() {
     assert!(obs_error.contains("failed to write"), "{obs_error}");
     assert!(obs_error.contains("obs.01"), "{obs_error}");
     assert_eq!(
-        std::fs::read_to_string(output_path).expect("read truncated m2d output"),
-        ""
+        std::fs::read_to_string(output_path).expect("read preserved m2d output"),
+        "keep\n"
     );
 }
