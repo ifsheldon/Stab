@@ -2,7 +2,7 @@
 
 ## Status
 
-Machine evidence complete; milestone audit and independent review pending as of 2026-07-23.
+Machine evidence and milestone audit complete; independent review pending as of 2026-07-23.
 
 The source-current post-migration implementation inventory is performance digest `a3be3a7404d6dbc4bcffae0e3dea52e6b93797102dc5b08a776323044efdabcf` and correctness digest `fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, worker-protocol schema version 4, contract-preflight schema version 14 with 228 ordered receipts, and qualification report schema version 33.
@@ -358,4 +358,37 @@ The print completion published and independently replayed at `target/benchmarks/
 
 Peak RSS remains report-only. Across parse reports, observed pinned-Stim parent peaks range from 3,776,512 through 27,594,752 bytes and Stab peaks range from 4,669,440 through 32,964,608 bytes. Across print reports, pinned-Stim peaks range from 3,887,104 through 21,999,616 bytes and Stab peaks range from 5,005,312 through 23,527,424 bytes. These observations do not establish a cross-scale growth rule and do not replace PQ6 memory qualification.
 
-This chain closes every machine-checkable twelfth-slice operation at the source-current revision. Final acceptance still requires milestone audit, the five independent GPT-5.6/max full-code-review lanes, resolution and regeneration for any confirmed issue, synchronized final documentation, full repository verification, restored swap, and a clean committed worktree.
+Milestone audit found that the accepted-maximum execution contract had passed but its setup and peak RSS observations had not been recorded. The existing source-owned probes close that evidence gap without changing worker, fixture, comparator, timing, threshold, or completion contracts. From clean documentation revision `dade78f7aa91af98e2f79441ec9695c37436a21c`, `just bench::qualification-probe --group pq2-dem-parse-adapter-smoke --iterations 1 --work-items 524288 --evidence-mode memory` passed exact input, output, boundary, and group-isolation checks and reported Stim setup/peak RSS of 18,161,664 / 127,889,408 bytes and Stab setup/peak RSS of 19,148,800 / 124,170,240 bytes. The corresponding canonical-print command reported Stim setup/peak RSS of 96,497,664 / 127,696,896 bytes and Stab setup/peak RSS of 124,116,992 / 139,063,296 bytes. These are report-only accepted-maximum observations and do not alter or strengthen the PQ6 memory-growth claim.
+
+## Milestone Audit
+
+The 2026-07-23 milestone audit found no DEM product-correctness, public-lifecycle, comparator-fidelity, fixture-identity, timing-boundary, threshold, migration, artifact-publication, or retained-memory-baseline defect. It found and closed three evidence or documentation findings:
+
+- Accepted-maximum setup and peak RSS had been executed but not reported. The two clean source-owned memory probes above now record all four implementation and lifecycle values.
+- Twelfth-slice task 12 still named pre-fix contract-preflight schema version 13 and report schema version 32. The task now names worker protocol version 4, contract-preflight version 14, report version 33, and the exact `contract` elapsed-time rule that resolved the retained `7c3e553` failure.
+- The PQ0 progress report still described four current no-ratio waivers including DEM serialization. It now matches the checked three-row waiver file and identifies the reviewed DEM print migration as the retirement authority.
+
+| Requirement | Audit status | Direct evidence |
+| --- | --- | --- |
+| 1. Independent parse and serialize groups | Satisfied | `benchmarks/qualification-runtime-groups.json`; twelve distinct `9497df0` reports |
+| 2. Exact CQ prerequisite | Satisfied | `target/qualification/pq2-dem-cq-full-9497df0`; replayed request, report, completion, and preflight hashes above |
+| 3. Frozen eight-item cycle | Satisfied | `runtime/worker/dem_model.rs`; `stim_adapter/dem_model_contract.h`; exact input digests |
+| 4. Three scales and semantic work | Satisfied | Runtime-group inventory and twelve report work counts above |
+| 5. Accepted maximum and pre-barrier guards | Satisfied | Sixteen contract receipts; focused zero, incomplete, over-cap, wrong-measurement, and overflow probe tests |
+| 6. Owned parse lifecycle | Satisfied | Rust and C++ direct constructor loops, optimizer barriers, retained final model, and post-timing canonical digest |
+| 7. Owned serialize lifecycle | Satisfied | Rust and C++ direct canonical-printer loops, per-iteration owned strings, optimizer barriers, and retained final string |
+| 8. Single terminal-newline normalization | Satisfied | Independent normalizers, exact four-scale output digests, and nonterminal-difference rejection test |
+| 9. Dedicated bounded modules | Satisfied | Dedicated Rust worker, invocation, and probe modules plus C++ header; every named source remains below 1,200 lines |
+| 10. Worker and fixture tests | Satisfied | `cargo test -p stab-bench dem_model --quiet`; eleven passing focused tests plus formal cross-worker receipts |
+| 11. Sixteen ordered DEM receipts | Satisfied | Canonical 228-receipt preflight SHA-256 `5887cda9...`; exact-order and failure-shape tests |
+| 12. Schemas, sources, and drift rejection | Satisfied | Build 6, adapter 12, protocol 4, preflight 14, report 33; zero-elapsed contract and receipt-drift tests |
+| 13. Source-owned adapter probes | Satisfied | Parse and print timing probes at `9497df0`; accepted-maximum memory probes at `dade78f` |
+| 14. Scale and accepted-maximum RSS | Satisfied | Twelve formal memory sections and the two accepted-maximum observations above; both legacy memory baselines retained |
+| 15. Independent `1.25x` gates | Satisfied | Twelve first-attempt passing medians and bootstrap upper bounds; worst upper bound `1.150114x` |
+| 16. Focused legacy migration | Satisfied | Schema-version-2 migration ledger, pre-migration completions, three current waivers, and both retained memory rows |
+| 17. Complete post-migration chain | Satisfied | One clean revision, twelve report replays and regressions, four rollup replays, and two completion replays |
+| 18. Audit, review, and progress report | Partially satisfied | Milestone audit is closed and this report contains exact evidence; five independent GPT-5.6/max review lanes remain pending |
+
+No new milestone under-specification was revealed. The earlier contract-preflight elapsed-time loophole is already recorded as resolved in `docs/plans/milestone-spec-gaps.md`; the audit did not reopen it or identify another gap.
+
+The source-current machine chain and accepted-maximum observations close every machine-checkable twelfth-slice operation and the milestone audit. Final acceptance still requires the five independent GPT-5.6/max full-code-review lanes, resolution and regeneration for any confirmed issue, synchronized final documentation, full repository verification, restored swap, and a clean committed worktree.
