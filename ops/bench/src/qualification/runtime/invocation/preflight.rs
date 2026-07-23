@@ -7,7 +7,8 @@ use super::super::contract::{
 };
 use super::super::process::ProcessResult;
 use super::super::protocol::{
-    Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
+    EvidenceMode, Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest,
+    WorkerMeasurement,
 };
 use super::clifford_string::expected_clifford_probes;
 use super::dem_model::expected_dem_model_probes;
@@ -96,6 +97,7 @@ pub(super) enum WorkerContractProbeEvidence {
     Accepted {
         case_id: ProtocolId,
         implementation: Implementation,
+        evidence_mode: EvidenceMode,
         iteration_count: u64,
         work_count: u64,
         input_bytes: u64,
@@ -105,6 +107,7 @@ pub(super) enum WorkerContractProbeEvidence {
     Rejected {
         case_id: ProtocolId,
         implementation: Implementation,
+        evidence_mode: EvidenceMode,
         exit_status: i32,
         stdout_sha256: Sha256Digest,
         stderr_sha256: Sha256Digest,
@@ -624,6 +627,7 @@ pub(super) fn expected_accepted_probe(
     Ok(WorkerContractProbeEvidence::Accepted {
         case_id: ProtocolId::try_new(case_id)?,
         implementation,
+        evidence_mode: EvidenceMode::Contract,
         iteration_count,
         work_count,
         input_bytes,
@@ -641,6 +645,7 @@ pub(super) fn expected_rejected_probe(
     Ok(WorkerContractProbeEvidence::Rejected {
         case_id: ProtocolId::try_new(case_id)?,
         implementation,
+        evidence_mode: EvidenceMode::Contract,
         exit_status,
         stdout_sha256: Sha256Digest::try_new(sha256_hex_bytes(&[])?)?,
         stderr_sha256: Sha256Digest::try_new(sha256_hex_bytes(stderr.as_bytes())?)?,
@@ -654,6 +659,7 @@ pub(super) fn accepted_probe(
     Ok(WorkerContractProbeEvidence::Accepted {
         case_id: ProtocolId::try_new(case_id)?,
         implementation: row.implementation,
+        evidence_mode: row.evidence_mode,
         iteration_count: row.iteration_count,
         work_count: row.work_count,
         input_bytes: row.input_bytes,
@@ -670,6 +676,7 @@ pub(super) fn rejected_probe(
     Ok(WorkerContractProbeEvidence::Rejected {
         case_id: ProtocolId::try_new(case_id)?,
         implementation,
+        evidence_mode: EvidenceMode::Contract,
         exit_status: output
             .status
             .ok_or(InvocationError::ContractPreflightDefinition)?,

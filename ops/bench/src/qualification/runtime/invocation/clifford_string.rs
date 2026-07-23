@@ -157,7 +157,7 @@ impl PreparedWorkers {
         })?;
         ProtocolExpectation {
             implementation,
-            evidence_mode: EvidenceMode::Timing,
+            evidence_mode: EvidenceMode::Contract,
             workload_id: ProtocolId::try_new(request.workload.clone())?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new(request.measurement_id.clone())?]),
             iteration_count: request.iterations,
@@ -229,7 +229,7 @@ pub(in crate::qualification::runtime) fn clifford_arguments(
         OsString::from("--input-descriptor-hex"),
         OsString::from(&request.descriptor_hex),
         OsString::from("--evidence-mode"),
-        OsString::from("timing"),
+        OsString::from("contract"),
         OsString::from("--start-barrier"),
         OsString::from("true"),
     ]

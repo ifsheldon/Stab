@@ -425,7 +425,10 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
     if !valid_sha256(expected_inventory_sha256)
         || file.performance_inventory_sha256 != expected_inventory_sha256
     {
-        return Err(GroupError::Inventory);
+        return Err(GroupError::Inventory {
+            actual: file.performance_inventory_sha256.clone(),
+            expected: expected_inventory_sha256.to_string(),
+        });
     }
     if file.groups.is_empty() || file.groups.len() > MAX_GROUPS {
         return Err(GroupError::GroupCount(file.groups.len()));
@@ -517,8 +520,8 @@ pub(super) enum GroupError {
     Json(serde_json::Error),
     #[error("runtime group contract schema is {actual}, expected {expected}")]
     SchemaVersion { actual: u32, expected: u32 },
-    #[error("runtime group contract has a stale performance inventory digest")]
-    Inventory,
+    #[error("runtime group contract performance inventory digest is {actual}, expected {expected}")]
+    Inventory { actual: String, expected: String },
     #[error("runtime group contract has an invalid group count: {0}")]
     GroupCount(usize),
     #[error("runtime group contract group is invalid: {0}")]

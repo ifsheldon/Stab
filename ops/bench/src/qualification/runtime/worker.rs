@@ -92,6 +92,7 @@ pub(super) struct WorkerIdentity {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub(crate) enum WorkerEvidenceMode {
+    Contract,
     Timing,
     Memory,
 }
@@ -99,6 +100,7 @@ pub(crate) enum WorkerEvidenceMode {
 impl From<WorkerEvidenceMode> for EvidenceMode {
     fn from(value: WorkerEvidenceMode) -> Self {
         match value {
+            WorkerEvidenceMode::Contract => Self::Contract,
             WorkerEvidenceMode::Timing => Self::Timing,
             WorkerEvidenceMode::Memory => Self::Memory,
         }
@@ -127,7 +129,7 @@ pub(crate) struct WorkerArgs {
     #[arg(long)]
     input_descriptor_hex: Option<CliffordDescriptor>,
 
-    /// Whether this invocation produces timing or separately instrumented memory evidence.
+    /// Whether this invocation produces contract, timing, or separately instrumented memory evidence.
     #[arg(long, value_enum, default_value = "timing")]
     evidence_mode: WorkerEvidenceMode,
 
@@ -174,7 +176,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
 
     let (output, elapsed_seconds) =
         measure_workload(|| prepared.execute(args.iterations.get(), args.work_items.get()))?;
-    if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
+    let evidence_mode: EvidenceMode = args.evidence_mode.into();
+    if !evidence_mode.accepts_elapsed(elapsed_seconds) {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
     }
     let peak_rss_bytes = peak_rss_bytes()?.max(current_rss_bytes()?);
@@ -187,7 +190,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let row = WorkerMeasurement {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
-        evidence_mode: args.evidence_mode.into(),
+        evidence_mode,
         workload_id,
         measurement_id,
         iteration_count: args.iterations.get(),

@@ -33,7 +33,7 @@ impl PreparedWorkers {
             OsString::from("--work-items"),
             OsString::from(contract.work_items.to_string()),
             OsString::from("--evidence-mode"),
-            OsString::from("timing"),
+            OsString::from("contract"),
             OsString::from("--start-barrier"),
             OsString::from("true"),
         ];
@@ -71,7 +71,7 @@ impl PreparedWorkers {
         let rows = parse_worker_json_lines(&process.stdout)?;
         ProtocolExpectation {
             implementation,
-            evidence_mode: EvidenceMode::Timing,
+            evidence_mode: EvidenceMode::Contract,
             workload_id: ProtocolId::try_new(contract.workload)?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new(contract.measurement)?]),
             iteration_count: contract.iterations,

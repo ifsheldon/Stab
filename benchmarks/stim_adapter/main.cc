@@ -7,6 +7,7 @@
 #include <bit>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -188,8 +189,9 @@ Arguments parse_arguments(int argc, const char **argv) {
     if (result.iterations == 0 || result.work_items == 0) {
         throw std::invalid_argument("adapter requires --iterations and --work-items");
     }
-    if (result.evidence_mode != "timing" && result.evidence_mode != "memory") {
-        throw std::invalid_argument("evidence-mode must be timing or memory");
+    if (result.evidence_mode != "contract" && result.evidence_mode != "timing" &&
+        result.evidence_mode != "memory") {
+        throw std::invalid_argument("evidence-mode must be contract, timing, or memory");
     }
     return result;
 }
@@ -1117,13 +1119,16 @@ int main(int argc, const char **argv) {
                                                          arguments.iterations,
                                                          work_count)
                                                    : semantic_digest(digest_state);
-        if (!(elapsed_seconds > 0)) {
-            throw std::runtime_error("adapter measured a non-positive duration");
+        const bool elapsed_is_valid =
+            std::isfinite(elapsed_seconds) &&
+            (arguments.evidence_mode == "contract" ? elapsed_seconds >= 0 : elapsed_seconds > 0);
+        if (!elapsed_is_valid) {
+            throw std::runtime_error("adapter measured an invalid duration for the evidence mode");
         }
         const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
 
         std::cout << std::setprecision(17)
-                  << "{\"schema_version\":3,\"implementation\":\"stim\","
+                  << "{\"schema_version\":4,\"implementation\":\"stim\","
                   << "\"evidence_mode\":\"" << arguments.evidence_mode << "\","
                   << "\"workload_id\":\"" << arguments.workload << "\","
                   << "\"measurement_id\":\"" << arguments.measurement_id << "\","

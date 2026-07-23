@@ -23,7 +23,7 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::TimingBatchPolicy;
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 32;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 33;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);

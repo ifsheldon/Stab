@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-23 - PQ1/PQ2: Contract Preflight Elapsed-Time Semantics
+
+Status: Resolved
+Revealed by: independent replay of the post-migration DEM parse completion at clean revision `7c3e55301b3f098497613d7dad2d624dc08a4dda`.
+Current text: the qualification protocol required every worker row to report a finite positive elapsed duration, while the same timing evidence mode was reused for the 228 semantic acceptance and rejection probes executed during worker contract preflight.
+Gap: contract preflight consumes exact status, input, output, work, and identity evidence but never consumes elapsed time as a statistic. A one-iteration protocol-smoke probe could therefore complete within one clock tick and legitimately report zero seconds, causing worker reproducibility or completion replay to fail nondeterministically even though every semantic receipt matched. The plan did not distinguish non-statistical contract evidence from formal timing or memory evidence.
+Proposed amendment: add a distinct `contract` evidence mode to both sealed workers and the JSON Lines protocol; require every accepted and rejected contract-preflight receipt to bind that mode; allow finite zero elapsed time only for contract receipts; preserve finite positive elapsed-time requirements for timing and memory; and keep all timing statistics, reports, and regression paths closed to contract rows.
+Resolution: worker protocol schema version 4 adds `contract`, contract-preflight schema version 14 records that mode on all 228 ordered receipts, and qualification report schema version 33 rejects stale protocol evidence. Rust and C++ workers accept finite zero only in contract mode; timing and memory remain strictly positive; protocol tests cover zero, negative, and mode drift; source-owned runtime groups and performance inventory digest `a3be3a7404d6dbc4bcffae0e3dea52e6b93797102dc5b08a776323044efdabcf` bind the changed adapter. The `7c3e553` chain remains review-rejected, and acceptance requires a complete post-fix chain from one later clean revision.
+
 ## 2026-07-20 - PQ1/PQ2: Live Repository Root During Publication
 
 Status: Resolved

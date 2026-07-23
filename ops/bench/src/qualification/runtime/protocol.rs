@@ -4,7 +4,7 @@ use std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 3;
+pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 4;
 const MAX_PROTOCOL_BYTES: usize = 1 << 20;
 const MAX_PROTOCOL_LINE_BYTES: usize = 16 << 10;
 const MAX_PROTOCOL_ROWS: usize = 64;
@@ -29,8 +29,19 @@ impl fmt::Display for Implementation {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum EvidenceMode {
+    Contract,
     Timing,
     Memory,
+}
+
+impl EvidenceMode {
+    pub(super) fn accepts_elapsed(self, elapsed_seconds: f64) -> bool {
+        elapsed_seconds.is_finite()
+            && match self {
+                Self::Contract => elapsed_seconds >= 0.0,
+                Self::Timing | Self::Memory => elapsed_seconds > 0.0,
+            }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -227,7 +238,7 @@ impl WorkerMeasurement {
                 measurement: self.measurement_id.clone(),
             });
         }
-        if !self.elapsed_seconds.is_finite() || self.elapsed_seconds <= 0.0 {
+        if !self.evidence_mode.accepts_elapsed(self.elapsed_seconds) {
             return Err(ProtocolError::InvalidElapsed {
                 measurement: self.measurement_id.clone(),
                 value: self.elapsed_seconds,
@@ -557,6 +568,38 @@ mod tests {
         assert!(matches!(
             parse_worker_json_lines(lines.as_bytes()),
             Err(ProtocolError::TooManyRows { .. })
+        ));
+    }
+
+    #[test]
+    fn contract_rows_allow_zero_elapsed_without_weakening_timing_or_memory() {
+        let row_with = |mode: &str, elapsed_seconds: f64| {
+            let mut row: serde_json::Value =
+                serde_json::from_str(&valid_line()).expect("valid fixture JSON");
+            let object = row.as_object_mut().expect("fixture is a JSON object");
+            object.insert("evidence_mode".to_string(), serde_json::json!(mode));
+            object.insert(
+                "elapsed_seconds".to_string(),
+                serde_json::json!(elapsed_seconds),
+            );
+            format!("{}\n", row)
+        };
+
+        let contract = parse_worker_json_lines(row_with("contract", 0.0).as_bytes())
+            .expect("zero-duration contract receipt");
+        assert_eq!(
+            contract.first().map(|row| row.evidence_mode),
+            Some(EvidenceMode::Contract)
+        );
+        for mode in ["timing", "memory"] {
+            assert!(matches!(
+                parse_worker_json_lines(row_with(mode, 0.0).as_bytes()),
+                Err(ProtocolError::InvalidElapsed { .. })
+            ));
+        }
+        assert!(matches!(
+            parse_worker_json_lines(row_with("contract", -0.001).as_bytes()),
+            Err(ProtocolError::InvalidElapsed { .. })
         ));
     }
 

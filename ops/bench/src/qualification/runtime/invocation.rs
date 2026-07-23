@@ -85,7 +85,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 13;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 14;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -385,6 +385,7 @@ impl PreparedWorkers {
             OsString::from(scale.work_items.get().to_string()),
             OsString::from("--evidence-mode"),
             OsString::from(match evidence_mode {
+                EvidenceMode::Contract => "contract",
                 EvidenceMode::Timing => "timing",
                 EvidenceMode::Memory => "memory",
             }),
@@ -619,7 +620,7 @@ impl PreparedWorkers {
             OsString::from("--work-items"),
             OsString::from(PROTOCOL_SMOKE_WORK_ITEMS.to_string()),
             OsString::from("--evidence-mode"),
-            OsString::from("timing"),
+            OsString::from("contract"),
             OsString::from("--start-barrier"),
             OsString::from("true"),
         ];
@@ -657,7 +658,7 @@ impl PreparedWorkers {
         let rows = parse_worker_json_lines(&process.stdout)?;
         ProtocolExpectation {
             implementation,
-            evidence_mode: EvidenceMode::Timing,
+            evidence_mode: EvidenceMode::Contract,
             workload_id: ProtocolId::try_new("protocol-smoke")?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new("main")?]),
             iteration_count: PROTOCOL_SMOKE_ITERATIONS,
@@ -694,7 +695,7 @@ impl PreparedWorkers {
             OsString::from("--work-items"),
             OsString::from(FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS),
             OsString::from("--evidence-mode"),
-            OsString::from("timing"),
+            OsString::from("contract"),
             OsString::from("--start-barrier"),
             OsString::from("true"),
         ];
@@ -738,7 +739,7 @@ impl PreparedWorkers {
             OsString::from("--work-items"),
             OsString::from(FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS),
             OsString::from("--evidence-mode"),
-            OsString::from("timing"),
+            OsString::from("contract"),
             OsString::from("--start-barrier"),
             OsString::from("true"),
         ];
@@ -838,7 +839,7 @@ impl PreparedWorkers {
             OsString::from("--work-items"),
             OsString::from(work_items),
             OsString::from("--evidence-mode"),
-            OsString::from("timing"),
+            OsString::from("contract"),
             OsString::from("--start-barrier"),
             OsString::from("true"),
         ];

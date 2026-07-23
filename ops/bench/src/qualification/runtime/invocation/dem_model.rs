@@ -124,7 +124,7 @@ impl PreparedWorkers {
             .ok_or(InvocationError::WorkOverflow)?;
         ProtocolExpectation {
             implementation,
-            evidence_mode: EvidenceMode::Timing,
+            evidence_mode: EvidenceMode::Contract,
             workload_id: ProtocolId::try_new(kind.workload())?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new(kind.measurement())?]),
             iteration_count: iterations,
@@ -234,7 +234,7 @@ fn dem_arguments(
         OsString::from("--work-items"),
         OsString::from(items.to_string()),
         OsString::from("--evidence-mode"),
-        OsString::from("timing"),
+        OsString::from("contract"),
         OsString::from("--start-barrier"),
         OsString::from(start_barrier.to_string()),
     ]

@@ -42,6 +42,12 @@ fn report_identity(
 #[test]
 fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
+    assert!(probes.iter().all(|probe| match probe {
+        WorkerContractProbeEvidence::Accepted { evidence_mode, .. }
+        | WorkerContractProbeEvidence::Rejected { evidence_mode, .. } => {
+            *evidence_mode == EvidenceMode::Contract
+        }
+    }));
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
     assert_eq!(evidence.probe_count(), 228);
@@ -82,6 +88,24 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
         worker_contract_preflight_digest(&refingerprinted.worker_identity, &refingerprinted.probes)
             .expect("tampered digest");
     assert!(!refingerprinted.validates_source_contract());
+
+    let mut wrong_mode = WorkerContractPreflightEvidence::from_actual_probes(
+        contract_identity(),
+        expected_contract_preflight_probes().expect("source-owned probes"),
+    )
+    .expect("valid contract evidence");
+    assert!(!wrong_mode.probes.is_empty());
+    if let Some(
+        WorkerContractProbeEvidence::Accepted { evidence_mode, .. }
+        | WorkerContractProbeEvidence::Rejected { evidence_mode, .. },
+    ) = wrong_mode.probes.first_mut()
+    {
+        *evidence_mode = EvidenceMode::Timing;
+    }
+    wrong_mode.sha256 =
+        worker_contract_preflight_digest(&wrong_mode.worker_identity, &wrong_mode.probes)
+            .expect("wrong-mode digest");
+    assert!(!wrong_mode.validates_source_contract());
 }
 
 #[test]
