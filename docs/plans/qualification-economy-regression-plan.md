@@ -6,7 +6,7 @@ Active qualification contract as of 2026-07-23.
 
 This plan supersedes the R6 evidence-production procedure in [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) before formal repaired-contract evidence began. The R0 through R5 implementation remains accepted source work. Historical and failed artifacts retain their original schema, source revision, and status.
 
-Implementation checkpoint: Q0 through Q7 are implemented in source and undergoing final contract validation, milestone audit, and code review. Q8 formal timing and completion evidence has not started.
+Implementation checkpoint: Q0 through Q7 are implemented, reviewed, and committed. The pre-evidence milestone audit and full code review repaired parity-ceiling, stale-regression-target, semantic workload-identity, exact rollup-parity, completion-boundary, generated-status, accepted-maximum memory-publication, dead-test, and source-file-size findings before formal timing. Q8 formal timing and completion evidence has not started.
 
 ## Objective
 
@@ -98,7 +98,7 @@ Acceptance requires checked-in status drift to fail CI and shared-host timing to
 
 Commit Q0 through Q7 in focused changes, run milestone audit and full code review, fix confirmed findings, regenerate contracts from a clean revision, and then run reopened correctness PR, full, and soak tiers plus the live result-format corpus.
 
-Run legacy primary timing and memory checks as diagnostics. On the controlled AArch64 host, disable swap immediately before formal timing and restore the exact prior configuration on every exit. Produce 36 DEM reports, four rollups, one completion manifest, one offline replay, and accepted-maximum memory evidence using unique paths.
+Run legacy primary timing and memory checks as diagnostics. On the controlled AArch64 host, disable swap immediately before formal timing and restore the exact prior configuration on every exit. Produce 36 DEM reports, four rollups, one completion manifest, one offline replay, and two immutable accepted-maximum memory receipts using unique paths. The parse and print receipts each contain all three DEM families and remain report-only.
 
 Generate the first AArch64 self-regression baseline candidate in a separate reviewed commit. Keep x86-64 unseeded until controlled native evidence exists. Finish with milestone audit, full code review, standard workspace checks, oracle checks, qualification checks, benchmark smoke, pre-commit, restored host state, and a clean worktree.
 
