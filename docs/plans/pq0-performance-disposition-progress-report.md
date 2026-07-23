@@ -57,8 +57,8 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows | 3 |
 | Groups bound to exact CQ0 API owners | 246 |
-| Groups with stable planned CQ preflight ids | 286 |
-| Groups with implemented exact CQ case bindings | 17 |
+| Groups with stable planned CQ preflight ids | 284 |
+| Groups with implemented exact CQ case bindings | 19 |
 | Exact inherited threshold measurement pairs | 21 |
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
@@ -86,21 +86,21 @@ Every scale point stores either an exact input-byte count or an explicit not-app
 | Decision | Count | Meaning |
 | --- | ---: | --- |
 | Retained | 9 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
-| Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
+| Reworked | 133 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
-| Superseded | 11 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
+| Superseded | 13 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
 
-The eleven superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m6-clifford-string`, `m6-pauli-iter`, `m6-pauli-string`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
+The thirteen superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m6-clifford-string`, `m6-pauli-iter`, `m6-pauli-string`, `m10-analyze-errors-fold-cli`, `m10-dem-parse-contract`, `m10-dem-print-contract`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
 The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical`, `m7-convert-01-to-ptb64`, and `pf3-gate-semantic-wide`.
 
 ## Unresolved Work Frozen For Later Milestones
 
 | Classification | Rows | Owning follow-up |
 | --- | ---: | --- |
-| Proxy workload | 10 | PQ2 through PQ5 exact workload replacement |
+| Proxy workload | 11 | PQ2 through PQ5 exact workload replacement |
 | Stale metadata row | 2 | PQ1 manifest migration |
-| Duplicate workload | 11 | PQ1 manifest migration |
+| Duplicate workload | 13 | PQ1 manifest migration |
 | Missing scale family | 123 | PQ2 through PQ6 |
 | Missing qualification correctness preflight | 158 | PQ1 plus dependent CQ milestones |
 | Missing semantic output digest | 158 | PQ1 |
