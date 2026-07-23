@@ -4,9 +4,10 @@
 
 In progress as of 2026-07-23.
 
-The source-current implementation inventory is performance digest `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a` and correctness digest `fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0`.
+The source-current post-migration implementation inventory is performance digest `3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d` and correctness digest `fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0`.
 It contains independent `PERFQ-M10-DEM-PARSE-CONTRACT` and `PERFQ-M10-DEM-PRINT-CONTRACT` groups, private Stab build-receipt schema version 6, adapter receipt schema version 12, contract-preflight schema version 13 with 228 ordered receipts, and qualification report schema version 32.
-Parse has passing full evidence at small and medium scale under the preceding inventories, but its retained large-scale report failed; print has no formal timing evidence, and neither group has legacy-migration authorization yet.
+Clean pre-migration revision `d9e2405d18cfff05d9b5d908525394476b0edcbc` passed and replayed the complete parse and print full and soak matrix, all regressions, four rollups, and both completion receipts under performance digest `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a`.
+Focused migration commit `1cfecd64cde4a5effdf07fdaabdbe51017e25a4a` retired only the exact legacy DEM timing guards, preserved both legacy memory baselines, and produced the current performance digest. The source-current post-migration machine chain has not run yet, so the pre-migration ratios authorize migration but are not relabeled as source-current evidence.
 Both groups bind the source-owned diagnosis at `benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md`, whose new SHA-256 is `0af72ac0d94b9fc0f9a4dcf6011a4c7061cd9b7c782aedcdcd4cb809fd6a6bc4`, so future failed or noisy formal reports can be retained and audited.
 
 ## Retained Attempts
@@ -192,3 +193,64 @@ The regression suite covers the model-layout ceiling, maximum and overflowing un
 Five dirty-tree direct-worker diagnostics over the large 31-iteration shape improved from `0.458354964` through `0.465637638` seconds and approximately 34.7 MiB peak RSS before this optimization to `0.426247111` through `0.431028809` seconds and approximately 33.0 MiB peak RSS afterward. Dirty-tree exact-parity probes reported parse diagnostic ratio `1.137073x` and print diagnostic ratio `0.588801x`. These are optimization guidance only and cannot satisfy the gate.
 
 The next source-contract commit must bind the updated profiler-note digest and regenerated correctness and performance inventories. The clean Git revision, private Cargo build, sealed Stab binary digest, and worker identity bind the new private tag module; comparator sources remain the pinned-Stim comparator implementation. From that clean revision, repeat both adapter probes, worker reproducibility, the exact focused CQ producer, replay, and preflight before restarting append-only formal full and soak evidence at every parse and print scale. No `ca9fd68d` report may be rerun.
+
+## Clean Third-Optimization Pre-Migration Checkpoint At `d9e2405d`
+
+Clean revision `d9e2405d18cfff05d9b5d908525394476b0edcbc` bound performance inventory `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a` and correctness inventory `fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0` with `local_modifications=false`.
+
+- Both exact adapter probes passed the fixture, output, accepted-maximum, first-rejection, odd/even, and group-isolation contracts.
+- Two isolated private-worker builds reproduced byte-for-byte. The pinned-Stim binary SHA-256 was `cb484542faaeba73156a1ba5d7a1f35104b697320847ad33994b9bb1f33b67d4`, and the Stab binary SHA-256 was `eaa49b9cf69909072f66ca716f033226d594452c140fd1b1f6b0f956f0963920`.
+- The exact focused one-case CQ full prerequisite passed and replayed at `target/qualification/pq2-dem-cq-full-d9e2405`.
+- The correctness request SHA-256 was `9aa534dcc4462f2cba04d1847a99a1c9348261cf25baff5c2675ff5475fbd5e1`, report SHA-256 was `4eb8082b480801880da8b475197306bcee3cdee0fc661e379d04cc7333aa9cac`, completion SHA-256 was `4924900528ac342998dc92e37d99153cfb745f84a1329d9c3d5b1deb0645efec`, preflight SHA-256 was `90491440f7ac38aafe375379f8639ebb700163048f317397d0eeb9ac82f0d9b8`, and Markdown SHA-256 was `4cc7a4d8dad1f11acd5a2af2225a54fc3e135c52842cfb418bbc6037e1d3a044`.
+
+All twelve formal reports were first attempts, passed the independent `1.25x` median and bootstrap-upper-bound gates, replayed byte-for-byte, and passed regression. No noisy rerun was used.
+
+| Measurement | Tier | Scale | Median ratio | Bootstrap 95 percent interval | Paired rMAD | Common iterations | Work per sample |
+| --- | --- | --- | ---: | --- | ---: | ---: | ---: |
+| Parse | Full | Small | `1.102449x` | `[1.097206x, 1.126126x]` | `0.007552` | 29,457 | 1,885,248 |
+| Parse | Full | Medium | `1.125210x` | `[1.114810x, 1.137153x]` | `0.005516` | 481 | 1,970,176 |
+| Parse | Full | Large | `1.153484x` | `[1.143317x, 1.167830x]` | `0.008724` | 30 | 1,966,080 |
+| Parse | Soak | Small | `1.105525x` | `[1.099588x, 1.114671x]` | `0.005371` | 29,504 | 1,888,256 |
+| Parse | Soak | Medium | `1.119705x` | `[1.115279x, 1.122029x]` | `0.003275` | 481 | 1,970,176 |
+| Parse | Soak | Large | `1.159075x` | `[1.154724x, 1.165342x]` | `0.004423` | 30 | 1,966,080 |
+| Print | Full | Small | `0.578301x` | `[0.575003x, 0.582326x]` | `0.005656` | 15,048 | 963,072 |
+| Print | Full | Medium | `0.565507x` | `[0.562219x, 0.570063x]` | `0.005816` | 244 | 999,424 |
+| Print | Full | Large | `0.561637x` | `[0.557170x, 0.573558x]` | `0.007954` | 16 | 1,048,576 |
+| Print | Soak | Small | `0.580445x` | `[0.579638x, 0.585548x]` | `0.006093` | 15,088 | 965,632 |
+| Print | Soak | Medium | `0.564138x` | `[0.562188x, 0.575506x]` | `0.004866` | 242 | 991,232 |
+| Print | Soak | Large | `0.559351x` | `[0.554981x, 0.562265x]` | `0.005209` | 15 | 983,040 |
+
+The parse medians range from `1.102449x` through `1.159075x`, with worst confidence-interval upper bound `1.167830x`. The print medians range from `0.559351x` through `0.580445x`, with worst upper bound `0.585548x`.
+
+The exact report, preflight, and Markdown SHA-256 triples are:
+
+- Parse small full: `09577461f638408cefc8992cbf5a38dc9c096bfbc615c2625c1ff2a3214df5c1`, `3c6a8e3644993f4e0c39f74bd80aafb01640faa88f0cd0bbab57a0ebc64b16aa`, and `b9f87eca451984e8799a1383edaa5027b665d1647162a969b3643811d6058fc7`.
+- Parse medium full: `13f8f5813378a9b13de058d5d935279b254b4b8da3dbd741985383eb01269ca3`, `66e37f9830a5731f08100c6357ab3955d33ffce895552d7a1953bc3afbbe58fc`, and `e0a65550914a4ee9e8c56243c9f640842d5873055d28f19054342c73d0230cb9`.
+- Parse large full: `ecf2ef44dbde23b323dee4c5408bcf31bfb01c3cae412845eaf04e35a154687f`, `c11197296d42d67e5ef81d96d7d10c8922393dae0d81503b2ac9dea4db71ee15`, and `32c916a172c189d11a9ad0dc7fadeb9355f30566eb1361373160cadd17f36eb7`.
+- Parse small soak: `17ad6c88a6393c71cec646c4480718fbbe14aab4ab89f039d29da5686becbe11`, `1555703d2869cb77ff2aaceecbe271de9f2b557f0a95f77228a83bbf3173dd4f`, and `77b287e9f3ebad6cdb1e74682f06d7ac89dbb8b2526dcc89191890d9835b50c9`.
+- Parse medium soak: `7b806e976a26ba207069cf0e1a5d424c5040b082fd117a35fa505cd5e78a9107`, `68cb459d4c1b61f370b6789f70b59ffdb356517ebca51a44bc46a627ed8ff28b`, and `ea917121c42ce10825bb495ce034dab4680e853795740791081ec69a6b2fde68`.
+- Parse large soak: `cf270015028b52dd5d268ce23da02dcda1680d429c01901231c5513d21134efd`, `eb2964969240f0e304ebae5eafc6c91c569161a5811ca75d5e8b74407088fb4c`, and `9e05fc63327d708136a375250123f3e4beba26a91cd5e239cfbc24838e751ea1`.
+- Print small full: `4fa61cb4ce4a137c43a584d1cc2d064867307ca3c4d6d4375648aa22f87e8bf2`, `c28dfbbd4f31896645f766a74f978a10a19a6a60876a1c326731fee31333837b`, and `b6f0f7a1ae6cbec2ccf6a0116b5c73f33caa1c8d015f81cb83956b77b92b8cda`.
+- Print medium full: `3c46c87e5c25ed995c1ba57e2fbf9de92c3af5730a1b5a3af0325f2c7fe6a5ed`, `51c2709594e447667f301756a752281381bf74915cf46699d51ec4ef83983241`, and `cc951137c10c61410c33d59f8b945c697788eb45071bb06cca7b9760d52121ae`.
+- Print large full: `53cf2e645e6bd801b32c0c7e12636a2d2828206c24ada4ccd6633d45392670a5`, `02a7a4c7d88e10d61c89e46ebc95429f7422a1ab1a62d067c30d5752d6d300b2`, and `9e4fdc641adfa979b4a7a87e7aac09d71702cbd7fd70fabab8345536b2724645`.
+- Print small soak: `de6ede1b7f0de6746fede1d595e4d293db895d56f899096dd3b31455672a7872`, `8835bee04c65f597a6ff657d3d26f25860087be7c7e5a7a63edb973a82996930`, and `10863d46cfca807a45c126a314a15544f07e331c5eb0a80c54802f02c3eb1e1d`.
+- Print medium soak: `62e1756f39c9542d210fc9b3a037a365e18a90164911bd53905fa34af3a4a9db`, `52136515c6b5f6c318364b2edfd5cdfd6371958a1e85d0ca51588cc6805868e0`, and `005a49df5aed4602e044ee3d496668b6ba1abb55c38e3194481c8d23c0fdc466`.
+- Print large soak: `709de684865abc75633a6c16b2a00a220caba7187c8b632332c9b5aae56aeaef`, `57e605ec8a84251db468349572791f645a8cc5d4410063b2aa794838a2979af7`, and `a46bc5fe102f48b84d1f9dfcf3ab73d71b447b97d35bc9f923b587ee1920467a`.
+
+The parse full and soak rollups published and replayed at `target/benchmarks/qualification/pq2-dem-d9e2405-parse-full-rollup` and `target/benchmarks/qualification/pq2-dem-d9e2405-parse-soak-rollup`; their report and preflight SHA-256 pairs were `475debeef6b263cba6840384b463db414b921a5d74edad3cbdcdcb48bcbd9e50` with `276ba8dfe60283ff7de33db17cdbbc35d9d8e2797d6258a02744ad4e0445e15f`, and `d94e76163d5eb1fde76b4756747e57623ba89248499521bc91fd2b9abc92781a` with `7b0e2410fa7e2be308ea283ef306fc3b8eb34dace87a66c3ae1d9a31dc45c462`.
+
+The print full and soak rollups published and replayed at `target/benchmarks/qualification/pq2-dem-d9e2405-print-full-rollup` and `target/benchmarks/qualification/pq2-dem-d9e2405-print-soak-rollup`; their report and preflight SHA-256 pairs were `2beea68abb17ee988fee0b9302432a160d16480bf2bc35b69c120bce9ee7ffba` with `4c231c9cd26c180973e2458aeee0ef3752cb3e6c661daf42101c68d900efd146`, and `370ad0acfe9ea6b4ecbbe0238cdfa25e2e0c4b3b931b0a2f81a56f8a9eb3cd26` with `34017e760d3dd8684ed087f23bff24b61152b4de5f47964a3b1c60660918cbc2`.
+
+The parse completion published and independently replayed at `target/benchmarks/qualification/pq2-dem-d9e2405-parse-completion`, with report SHA-256 `3445c71b5453c7b1c31906bf0021e905271f317320333ecaf7592df5864e31e9`, preflight SHA-256 `62a6124b861d95865245199dc90b0d80c51703323a4e59ad7c34fda742c0972d`, and Markdown SHA-256 `7bc94e666fa71222dd83507a64a4a03c171d7bc7e48a06c70826c7446ea87422`.
+
+The print completion published and independently replayed at `target/benchmarks/qualification/pq2-dem-d9e2405-print-completion`, with report SHA-256 `4597e10933cf211a5f7984de377b8946a1ab4f1f4569a77983e86df22e67c38b`, preflight SHA-256 `2b2a8c2691a4caba611e0a2a18f8bdd78f584b5ae221966abbc4621a949a33f9`, and Markdown SHA-256 `281cc6429dba5f7ce276eef7870d776eb7d8f2917c923cf9e719df12890840c3`.
+
+Peak RSS remained report-only. Across the formal scale matrix, observed pinned-Stim versus Stab parent peaks ranged from 3,903,488 versus 5,201,920 bytes at parse small full through 27,594,752 versus 33,153,024 bytes at parse large soak, and from 3,903,488 versus 5,464,064 bytes at print small full through 21,835,776 versus 23,928,832 bytes at print large soak. These observations do not replace PQ6 growth evidence.
+
+## Focused Legacy Migration
+
+Commit `1cfecd64cde4a5effdf07fdaabdbe51017e25a4a` used the replayed pre-migration completions to retire only the legacy `m10-dem-parse-contract` timing threshold and `m10-dem-print-contract` no-ratio waiver. It marked both legacy rows `non-primary-report-only` and `superseded/duplicate`, removed their replacement mappings, preserved both entries in `benchmarks/m12-primary-memory-baseline.json`, and regenerated performance inventory digest `3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d`.
+
+Schema-version-2 `benchmarks/qualification-threshold-migrations.json` binds parse as a whole-family `timing-threshold` migration with the exact legacy measurement pair and binds print as a whole-family `no-ratio-waiver` migration with null legacy measurements. Both records bind revision `d9e2405d18cfff05d9b5d908525394476b0edcbc`, pre-migration inventory `a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a`, the exact completion report and preflight hashes above, migration revision `1cfecd64cde4a5effdf07fdaabdbe51017e25a4a`, current inventory `3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d`, the exact executable runtime measurement, and the retained memory baselines. Validator tests reject an altered reviewed record, an invented print timing pair, a missing runtime measurement, a single-scale DEM family migration, an unreviewed extra migration, a reopened legacy row, or a missing retained memory baseline.
+
+The next promotable work is one complete post-migration chain from one clean revision: both adapter probes, worker reproducibility, the exact focused CQ producer and replay, all twelve full and soak scale reports with immediate replay and regression, four rollups and replays, and two completion receipts with independent replay. Until that chain passes, the ratios above remain migration authorization rather than source-current timing evidence.

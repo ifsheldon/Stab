@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "migrations": [
     {
       "id": "m6-clifford-string-identity-small",
+      "legacy_guard_kind": "timing-threshold",
       "legacy_row_id": "m6-clifford-string",
       "legacy_stim_measurement": "CliffordString_multiplication_10K",
       "legacy_stab_measurement": "stab_clifford_string_multiplication_10K",
@@ -17,6 +18,42 @@
       "migration_revision": "91f62d0a78659da2e8e264a6968b3c6cd32456de",
       "migration_performance_inventory_sha256": "a76090c996ad404c1cb8bfa85066e286c6f40b32754b3750e984375f7ca90025",
       "retained_memory_baseline_id": "m6-clifford-string"
+    },
+    {
+      "id": "m10-dem-parse-scale-family",
+      "legacy_guard_kind": "timing-threshold",
+      "legacy_row_id": "m10-dem-parse-contract",
+      "legacy_stim_measurement": "m10-dem-parse-contract",
+      "legacy_stab_measurement": "stab_dem_parse_sample",
+      "replacement_group_id": "PERFQ-M10-DEM-PARSE-CONTRACT",
+      "replacement_measurement_id": "parse",
+      "replacement_scale_id": null,
+      "authorization_revision": "d9e2405d18cfff05d9b5d908525394476b0edcbc",
+      "authorization_performance_inventory_sha256": "a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a",
+      "authorization_completion_path": "target/benchmarks/qualification/pq2-dem-d9e2405-parse-completion",
+      "authorization_completion_report_sha256": "3445c71b5453c7b1c31906bf0021e905271f317320333ecaf7592df5864e31e9",
+      "authorization_completion_preflight_sha256": "62a6124b861d95865245199dc90b0d80c51703323a4e59ad7c34fda742c0972d",
+      "migration_revision": "1cfecd64cde4a5effdf07fdaabdbe51017e25a4a",
+      "migration_performance_inventory_sha256": "3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d",
+      "retained_memory_baseline_id": "m10-dem-parse-contract"
+    },
+    {
+      "id": "m10-dem-print-scale-family",
+      "legacy_guard_kind": "no-ratio-waiver",
+      "legacy_row_id": "m10-dem-print-contract",
+      "legacy_stim_measurement": null,
+      "legacy_stab_measurement": null,
+      "replacement_group_id": "PERFQ-M10-DEM-PRINT-CONTRACT",
+      "replacement_measurement_id": "serialize",
+      "replacement_scale_id": null,
+      "authorization_revision": "d9e2405d18cfff05d9b5d908525394476b0edcbc",
+      "authorization_performance_inventory_sha256": "a98f57cf194f3a021d321266656cf688c9f7780fb39fa337475e8132411eb88a",
+      "authorization_completion_path": "target/benchmarks/qualification/pq2-dem-d9e2405-print-completion",
+      "authorization_completion_report_sha256": "4597e10933cf211a5f7984de377b8946a1ab4f1f4569a77983e86df22e67c38b",
+      "authorization_completion_preflight_sha256": "2b2a8c2691a4caba611e0a2a18f8bdd78f584b5ae221966abbc4621a949a33f9",
+      "migration_revision": "1cfecd64cde4a5effdf07fdaabdbe51017e25a4a",
+      "migration_performance_inventory_sha256": "3f51801b592b0cb8dc3b340cced3dc3b7644b913168073c7d4106188e444d83d",
+      "retained_memory_baseline_id": "m10-dem-print-contract"
     }
   ]
 }

@@ -66,6 +66,36 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), String> {
     worker::run(args).map_err(|error| error.to_string())
 }
 
+pub(super) fn validate_migration_target(
+    root: &crate::root::RepoRoot,
+    inventory_digest: &str,
+    group_id: &str,
+    measurement_id: &str,
+    scale_id: Option<&str>,
+) -> Result<(), String> {
+    let resolved =
+        group::load_group(root, inventory_digest, group_id).map_err(|error| error.to_string())?;
+    let measurement_exists = resolved
+        .contract
+        .measurement_ids
+        .iter()
+        .any(|measurement| measurement.to_string() == measurement_id);
+    let scale_exists = scale_id.is_none_or(|expected| {
+        resolved
+            .contract
+            .scales
+            .iter()
+            .any(|scale| scale.id.to_string() == expected)
+    });
+    if measurement_exists && scale_exists && !resolved.contract.scales.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "threshold migration target {group_id}/{measurement_id} does not exist at the requested scale"
+        ))
+    }
+}
+
 pub(crate) fn run_probe(session: &QualificationSession, args: ProbeArgs) -> Result<(), String> {
     probe::run(&session.source_root, args).map_err(|error| error.to_string())
 }
