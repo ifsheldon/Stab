@@ -2,7 +2,7 @@
 
 ## Status
 
-Source remediation and dirty-tree diagnostic verification are complete as of 2026-07-23. R0 through R5 are implemented. R6 is blocked by its deliberate clean-commit prerequisite, not by an implementation defect. The dirty-tree portion of R7 is complete; final evidence, repeat audits, and clean-worktree acceptance remain downstream of R6.
+Source remediation, focused commits, and diagnostic verification are complete as of 2026-07-23. R0 through R5 are implemented and committed. R6 is ready but has not started. The pre-evidence portion of R7 is complete; final evidence, repeat audits, and release acceptance remain downstream of R6.
 
 This report follows [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) and [GOAL.md](GOAL.md). It does not promote dirty-tree output as qualification evidence.
 
@@ -10,7 +10,8 @@ This report follows [post-review-compatibility-evidence-repair.md](post-review-c
 
 - Compatibility target: Stim v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 - Current branch: `main`.
-- Current worktree: modified; therefore not eligible for promotable evidence.
+- Current worktree: clean after this state-only checkpoint is committed.
+- Focused implementation series: `daf536f` for core result formats, `65b0cee` for CLI filesystem safety, `e7e8bac` for correctness ownership, `5945b52` for benchmark integrity, and `aa68234` for synchronized documentation.
 - Correctness inventory digest: `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`.
 - Performance inventory digest: `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358`.
 - Public API inventory: 2,065 items.
@@ -25,7 +26,7 @@ This report follows [post-review-compatibility-evidence-repair.md](post-review-c
 
 No unresolved implementation or milestone-specification finding has been confirmed in R0 through R5.
 
-R6 is blocked by an explicit prerequisite in the plan: promotable evidence may be generated only after the user authorizes focused commits and the source revision is clean and unchanged. Running the formal suite now would violate the evidence contract.
+The focused-commit prerequisite is now satisfied. R6 remains incomplete because no source-current formal artifact has been produced yet; it must run from the final clean unchanged checkpoint revision.
 
 The first workspace-test pass found that `m2d` opened a requested observable-output path before rejecting its unsupported `ptb64` format. The existing regression test required the path to remain absent. Static output-format validation now runs before the I/O preflight, and the focused test passes. This finding was fixed before continuing the audit.
 
@@ -35,9 +36,9 @@ The otherwise passing broad run also exposed an untracked empty `obs.01` created
 
 ### Milestone Status
 
-Status: Blocked
+Status: Incomplete
 
-Rationale: the implementation milestones are satisfied on the dirty worktree, but the complete remediation cannot be accepted until R6 produces fresh correctness and `raw-work-v2` performance evidence from one clean committed revision. This is an intentional provenance gate, not permission to weaken or bypass R6.
+Rationale: the implementation milestones and their pre-evidence review are satisfied, but the complete remediation cannot be accepted until R6 produces fresh correctness and `raw-work-v2` performance evidence from the clean checkpoint revision.
 
 ### Completion Matrix
 
@@ -49,7 +50,7 @@ Rationale: the implementation milestones are satisfied on the dirty worktree, bu
 | R3 oracle and qualification ownership | Satisfied | `oracle/result-format-corpus.json`; `ops/oracle/src/result_format_corpus.rs`; `oracle/qualification-manifest.json` | The checked corpus contains 62 pinned cases and corrected behaviors have independently selectable owners. |
 | R4 shared bounded process supervisor | Satisfied | `ops/bench/src/process.rs`; `ops/bench/src/process/tests.rs`; `target/benchmarks/post-review-process-baseline-20260723/baseline.json` | Baseline and qualification callers use one supervisor; the adversarial process probe, benchmark smoke, pinned Stim build, and a real CLI baseline pass; the legacy runner and direct `wait-timeout` dependency are removed. |
 | R5 corrected timer boundary | Satisfied | `ops/bench/src/qualification/runtime/group.rs`; `ops/bench/src/qualification/runtime/worker.rs`; `benchmarks/stim_adapter/main.cc` | Both workers identify `raw-work-v2`; schema and adversarial checks reject stale or mismatched identities. Formal worker reproducibility belongs to R6. |
-| R6 rebuild correctness and performance evidence | Blocked | Clean-commit prerequisite in the active plan | No formal artifact has been generated or promoted from the dirty worktree. No artifact path has been reused. |
+| R6 rebuild correctness and performance evidence | Missing | Clean checkpoint revision and active plan | No source-current formal artifact has been generated or promoted. No artifact path has been reused. |
 | R7 documentation, audit, review, and closure | Partially satisfied | This report and synchronized public documentation | Dirty-tree documentation, audit, review, and broad verification are complete; revision-bound evidence, repeat audits, and clean-worktree acceptance depend on R6. |
 
 ### Specification Gaps
@@ -129,16 +130,13 @@ No unresolved confirmed P0 through P3 finding is currently recorded. No non-gene
 - accepted-maximum memory probes;
 - swap changes.
 
-These operations are R6 outputs and require an explicitly authorized clean source commit. The absence of those artifacts is not converted into a waiver or a current performance claim.
+These operations are R6 outputs and must now run from the clean checkpoint revision. Their absence is not converted into a waiver or a current performance claim.
 
-## R6 Handoff
+## R6 Execution
 
-After the user authorizes focused commits:
-
-1. Commit source behavior, tests and corpus, process/timing contracts, generated inventories, and documentation in reviewable focused commits.
-2. Verify `local_modifications=false` and record the unchanged source revision.
-3. Allocate fresh artifact paths that have never held failed or historical output.
-4. Record the current swap configuration, disable swap only immediately before formal timing, and restore the exact prior configuration on every exit path.
-5. Execute every R6 correctness, legacy benchmark, DEM report, replay, regression, rollup, completion, and memory command.
-6. Update this report with revision-bound paths and outcomes.
-7. Repeat milestone audit, full code review, final verification, process cleanup, and swap verification.
+1. Verify `local_modifications=false` and record the unchanged checkpoint revision.
+2. Allocate fresh artifact paths that have never held failed or historical output.
+3. Record the current swap configuration, disable swap only immediately before formal timing, and restore the exact prior configuration on every exit path.
+4. Execute every R6 correctness, legacy benchmark, DEM report, replay, regression, rollup, completion, and memory command.
+5. Update this report with revision-bound paths and outcomes.
+6. Repeat milestone audit, full code review, final verification, process cleanup, and swap verification.

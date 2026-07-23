@@ -8,11 +8,11 @@ The complete task specification is [post-review-compatibility-evidence-repair.md
 
 ## Implementation Checkpoint
 
-The R0 through R5 source, test, schema, inventory, and documentation changes are implemented on the current dirty worktree. The checked correctness inventory now has digest `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`; the checked performance inventory has digest `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358`. Both inventories contain 2,065 public API items, and the performance gates remain unchanged at `1.25x`.
+The R0 through R5 source, test, schema, inventory, and documentation changes are committed in a focused source series. The checked correctness inventory has digest `592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0`; the checked performance inventory has digest `33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358`. Both inventories contain 2,065 public API items, and the performance gates remain unchanged at `1.25x`.
 
-R6 has not started. Its formal correctness, timing, memory, DEM, rollup, and completion artifacts require one clean committed revision, but the repository instructions prohibit creating those focused commits until the user explicitly requests them. Dirty-tree checks are diagnostic and must not be promoted.
+Commit authorization was received and the clean-source prerequisite is satisfied after this checkpoint commit. R6 has not started; its formal correctness, timing, memory, DEM, rollup, and completion artifacts must use the final clean unchanged `HEAD`, bind `local_modifications=false`, and use new artifact paths.
 
-R7 source review and verification are tracked in [post-review-compatibility-evidence-repair-progress-report.md](post-review-compatibility-evidence-repair-progress-report.md). After commit authorization, create focused source and contract commits, verify a clean worktree, and execute R6 with new artifact paths from that unchanged revision.
+R7 source review and verification are tracked in [post-review-compatibility-evidence-repair-progress-report.md](post-review-compatibility-evidence-repair-progress-report.md). Execute R6 next from the clean checkpoint revision, then repeat the audits and final verification against the resulting evidence.
 
 ## Mission
 
