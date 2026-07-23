@@ -2,7 +2,7 @@
 
 ## Status
 
-Active remediation plan as of 2026-07-23.
+R0 through R5 are implemented. The R6 and R7 execution procedure in this document was superseded before formal repaired-contract evidence began by [qualification-economy-regression-plan.md](qualification-economy-regression-plan.md). This document remains the historical contract for the completed compatibility repair and must not be rewritten to imply that its original evidence procedure ran.
 
 This plan supersedes the current-acceptance interpretation of the DEM evidence produced at revision `80fb5405fb077c694a8a8a18e64a3a5831e20a5e`. Those artifacts remain immutable historical `raw-work-v1` evidence, but independent review found a result-format compatibility defect, destructive CLI path-alias behavior, an unsafe legacy benchmark process runner, public status drift, and a qualification timing-boundary defect. No affected correctness or performance claim may be promoted until this plan closes.
 
