@@ -24,9 +24,9 @@ fn dem_model_layout_stays_bounded_for_large_parse_workloads() {
 #[test]
 fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
     let input = concat!(
-        "ErRoR[edge\\Ctag](0.25) d0\u{2003}D1 ^ l2 D3 D4\n",
-        " \u{2003}DeTeCtOr( \u{2003}1, 2, 3, 4\u{2003} ) D7\u{2003}  # trailing comment\n",
-        "detector \u{2003}[tag#value] D8 # hash inside the tag is not a comment\n",
+        "ErRoR[edge\\Ctag](0.25) d0 D1 ^ l2 D3 D4\n",
+        " \tDeTeCtOr( \t1, 2, 3, 4\t ) D7\t  # trailing comment\n",
+        "detector[tag#value] D8 # hash inside the tag is not a comment\n",
         "LoGiCaL_ObSeRvAbLe l3\n",
         "ShIfT_DeTeCtOrS(1, 2, 3) 9\n",
         "error[this-tag-is-longer-than-inline](0.5) D9\n",
@@ -54,16 +54,19 @@ fn generic_dem_parser_preserves_case_whitespace_comments_tags_and_spills() {
 #[test]
 fn fast_target_parser_preserves_numeric_boundaries_and_rejections() {
     let maximum = DetectorErrorModel::from_dem_str(
-        "shift_detectors 18446744073709551615\nerror(0.25) d0 l1\n",
+        "shift_detectors 1152921504606846975\nerror(0.25) d0 l1\n",
     )
-    .expect("parse maximum numeric target and lowercase typed targets");
+    .expect("parse maximum textual integer and lowercase typed targets");
     assert_eq!(
         maximum.to_dem_string(),
-        "shift_detectors 18446744073709551615\nerror(0.25) D0 L1\n"
+        "shift_detectors 1152921504606846975\nerror(0.25) D0 L1\n"
     );
 
     for invalid in [
+        "shift_detectors 1152921504606846976\n",
         "shift_detectors 18446744073709551616\n",
+        "error(0.25) D1152921504606846976\n",
+        "repeat 1152921504606846976 {\n}\n",
         "error(0.25) D\n",
         "error(0.25) L\n",
         "error(0.25) 1D\n",
@@ -71,6 +74,22 @@ fn fast_target_parser_preserves_numeric_boundaries_and_rejections() {
         assert!(
             DetectorErrorModel::from_dem_str(invalid).is_err(),
             "accepted invalid DEM target in {invalid:?}"
+        );
+    }
+}
+
+#[test]
+fn generic_dem_parser_rejects_unicode_separators_and_detached_modifiers() {
+    for invalid in [
+        "error(0.25) D0\u{2003}D1\n",
+        "\u{2003}error(0.25) D0\n",
+        "detector [tag] D0\n",
+        "detector (1) D0\n",
+        "repeat [tag] 2 {\n}\n",
+    ] {
+        assert!(
+            DetectorErrorModel::from_dem_str(invalid).is_err(),
+            "accepted non-Stim DEM whitespace in {invalid:?}"
         );
     }
 }

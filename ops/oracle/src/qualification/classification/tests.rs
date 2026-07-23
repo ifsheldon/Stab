@@ -57,6 +57,14 @@ fn classifications_distinguish_selected_execution_domains() {
         ),
         Some(FeatureId::FlowUtils)
     );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/ids.rs"),
+            "stab_core::DemRepeatCount",
+        ),
+        Some(FeatureId::DemFormat)
+    );
 
     let unknown = classify_public_api_source(
         "stab_core",

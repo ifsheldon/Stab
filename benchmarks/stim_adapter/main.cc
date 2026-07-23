@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "stim/circuit/circuit.h"
@@ -811,6 +812,23 @@ double measure_workload(CALLBACK callback) {
     return std::chrono::duration<double>(finished - started).count();
 }
 
+template <typename OUTPUT>
+struct MeasuredOutput {
+    OUTPUT output;
+    double elapsed_seconds;
+};
+
+template <typename CALLBACK>
+auto measure_output_workload(CALLBACK callback) {
+    const auto started = std::chrono::steady_clock::now();
+    auto output = callback();
+    const auto finished = std::chrono::steady_clock::now();
+    return MeasuredOutput<decltype(output)>{
+        std::move(output),
+        std::chrono::duration<double>(finished - started).count(),
+    };
+}
+
 }  // namespace
 
 int main(int argc, const char **argv) {
@@ -978,45 +996,58 @@ int main(int argc, const char **argv) {
         uint64_t not_zero_checksum = 0;
         double elapsed_seconds = 0;
         if (arguments.workload == "protocol-smoke") {
-            elapsed_seconds = measure_workload(
-                [&]() { digest_state = protocol_smoke(arguments.iterations, arguments.work_items); });
+            auto measured = measure_output_workload(
+                [&]() { return protocol_smoke(arguments.iterations, arguments.work_items); });
+            digest_state = measured.output;
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "circuit-parse") {
-            elapsed_seconds = measure_workload(
-                [&]() { parsed = circuit_parse(arguments.iterations, circuit_fixture); });
+            auto measured = measure_output_workload(
+                [&]() { return circuit_parse(arguments.iterations, circuit_fixture); });
+            parsed = std::move(measured.output);
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "circuit-canonical-print") {
             const auto &prepared_circuit = canonical_print_circuit.value();
-            elapsed_seconds = measure_workload([&]() {
-                canonical = circuit_canonical_print(arguments.iterations, prepared_circuit);
+            auto measured = measure_output_workload([&]() {
+                return circuit_canonical_print(arguments.iterations, prepared_circuit);
             });
+            canonical = std::move(measured.output);
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "dem-parse") {
-            elapsed_seconds = measure_workload([&]() {
-                parsed_dem = stab_qualification::dem_model_parse(
-                    arguments.iterations, dem_fixture);
+            auto measured = measure_output_workload([&]() {
+                return stab_qualification::dem_model_parse(arguments.iterations, dem_fixture);
             });
+            parsed_dem = std::move(measured.output);
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "dem-canonical-print") {
             const auto &prepared_model = dem_print_model.value();
-            elapsed_seconds = measure_workload([&]() {
-                canonical_dem = stab_qualification::dem_model_serialize(
+            auto measured = measure_output_workload([&]() {
+                return stab_qualification::dem_model_serialize(
                     arguments.iterations, prepared_model);
             });
+            canonical_dem = std::move(measured.output);
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "gate-name-hash") {
             const uint64_t prepared_sweeps = gate_sweeps.value();
             const auto &prepared_names = gate_names.value();
             const uint64_t prepared_digest = gate_digest.value();
-            elapsed_seconds = measure_workload([&]() {
-                digest_state = gate_name_hash(
+            auto measured = measure_output_workload([&]() {
+                return gate_name_hash(
                     arguments.iterations,
                     arguments.work_items,
                     prepared_sweeps,
                     prepared_names,
                     prepared_digest);
             });
+            digest_state = measured.output;
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "simd-word-popcount") {
             auto &prepared_popcount = popcount.value();
-            elapsed_seconds = measure_workload([&]() {
-                popcount_checksum = stab_qualification::simd_word_popcount_contract(
+            auto measured = measure_output_workload([&]() {
+                return stab_qualification::simd_word_popcount_contract(
                     arguments.iterations, prepared_popcount.bits);
             });
+            popcount_checksum = measured.output;
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (arguments.workload == "simd-bits-xor") {
             auto &prepared_xor = dense_xor.value();
             elapsed_seconds = measure_workload([&]() {
@@ -1025,10 +1056,12 @@ int main(int argc, const char **argv) {
             });
         } else if (prepared_not_zero_pattern.has_value()) {
             const auto &prepared_not_zero = not_zero.value();
-            elapsed_seconds = measure_workload([&]() {
-                not_zero_checksum = stab_qualification::simd_bits_not_zero_contract(
+            auto measured = measure_output_workload([&]() {
+                return stab_qualification::simd_bits_not_zero_contract(
                     arguments.iterations, prepared_not_zero.bits);
             });
+            not_zero_checksum = measured.output;
+            elapsed_seconds = measured.elapsed_seconds;
         } else if (prepared_sparse_xor_kind == SparseXorKind::ROW) {
             auto &prepared_sparse_xor = sparse_xor.value();
             elapsed_seconds = measure_workload([&]() {
@@ -1072,6 +1105,7 @@ int main(int argc, const char **argv) {
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
+        const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
         if (arguments.workload == "circuit-parse") {
             digest_state = byte_digest(parsed.str());
         } else if (arguments.workload == "circuit-canonical-print") {
@@ -1125,8 +1159,6 @@ int main(int argc, const char **argv) {
         if (!elapsed_is_valid) {
             throw std::runtime_error("adapter measured an invalid duration for the evidence mode");
         }
-        const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
-
         std::cout << std::setprecision(17)
                   << "{\"schema_version\":4,\"implementation\":\"stim\","
                   << "\"evidence_mode\":\"" << arguments.evidence_mode << "\","

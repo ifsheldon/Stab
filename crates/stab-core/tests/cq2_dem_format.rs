@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use stab_core::{
     CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
-    DemRepeatBlock, DemTarget, DetectorErrorModel, Probability, RepeatCount,
+    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Probability,
 };
 
 #[test]
@@ -64,6 +64,12 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
             .to_dem_string(),
         "shift_detectors 10\n"
     );
+    assert_eq!(
+        "D1152921504606846975"
+            .parse::<DemTarget>()
+            .expect("maximum textual detector target"),
+        DemTarget::relative_detector((1_u64 << 60) - 1).expect("maximum textual detector target")
+    );
 
     assert!(DemDetectorId::try_new((1_u64 << 62) - 1).is_ok());
     assert!(DemDetectorId::try_new(1_u64 << 62).is_err());
@@ -72,9 +78,13 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
     for rejected in [
         "",
         "5",
+        "d5",
+        "l6",
         "D-1",
         "L-1",
         "X5",
+        "D1152921504606846976",
+        "L1152921504606846976",
         "D4611686018427387904",
         "L4294967296",
     ] {
@@ -277,6 +287,49 @@ fn cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim() {
         DetectorErrorModel::new()
     );
 
+    let empty_arguments =
+        DetectorErrorModel::from_dem_str("error() D0\ndetector() D1\nshift_detectors() 2\n")
+            .expect("parse Stim-compatible empty argument tokens");
+    assert_eq!(
+        empty_arguments.to_dem_string(),
+        "error(0) D0\ndetector(0) D1\nshift_detectors(0) 2\n"
+    );
+
+    let zero_repeat_source = concat!(
+        "repeat 0 {\n",
+        "    error(1) D9 L7\n",
+        "    shift_detectors(2) 10\n",
+        "    detector(3) D0\n",
+        "    logical_observable L7\n",
+        "}\n",
+    );
+    let zero_repeat = DetectorErrorModel::from_dem_str(zero_repeat_source)
+        .expect("Stim accepts zero-count DEM repeats");
+    assert_eq!(zero_repeat.to_dem_string(), zero_repeat_source);
+    assert_eq!(zero_repeat.total_detector_shift(), Ok(0));
+    assert_eq!(zero_repeat.count_detectors(), Ok(0));
+    assert_eq!(zero_repeat.count_observables(), Ok(8));
+    assert_eq!(zero_repeat.count_errors(), Ok(0));
+    assert_eq!(zero_repeat.final_coordinate_shift(), Ok(vec![0.0]));
+    assert_eq!(
+        zero_repeat
+            .flattened()
+            .expect("flatten zero-count repeat")
+            .to_dem_string(),
+        ""
+    );
+
+    let max_text_integer = (1_u64 << 60) - 1;
+    let maximum_text = format!(
+        "shift_detectors {max_text_integer}\nerror(0.25) D{max_text_integer}\nrepeat {max_text_integer} {{\n}}\n"
+    );
+    assert_eq!(
+        DetectorErrorModel::from_dem_str(&maximum_text)
+            .expect("parse Stim's maximum textual DEM integer")
+            .to_dem_string(),
+        maximum_text
+    );
+
     for rejected in [
         "unknown D0\n",
         "error D0\n",
@@ -284,8 +337,15 @@ fn cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim() {
         "detector D0 D1\n",
         "logical_observable L0 L1\n",
         "shift_detectors D0\n",
-        "repeat 0 {\n}\n",
         "repeat nope {\n}\n",
+        "logical_observable() L0\n",
+        "shift_detectors 1152921504606846976\n",
+        "error(0.25) D1152921504606846976\n",
+        "repeat 1152921504606846976 {\n}\n",
+        "detector [tag] D0\n",
+        "detector (1) D0\n",
+        "error(0.25) D0\u{2003}D1\n",
+        "\u{2003}error(0.25) D0\n",
         "error[tag\n](0.25) D0\n",
         "}\n",
     ] {
@@ -304,7 +364,7 @@ fn cq2_dem_model_value_mutation_and_repeat_contract_matches_stim() {
             .expect("body shift"),
     );
     let repeat = DemRepeatBlock::new(
-        RepeatCount::try_new(5).expect("repeat count"),
+        DemRepeatCount::new(5),
         body.clone(),
         Some("loop".to_string()),
     );
@@ -313,6 +373,20 @@ fn cq2_dem_model_value_mutation_and_repeat_contract_matches_stim() {
     assert_eq!(repeat.tag(), Some("loop"));
     assert_eq!(repeat, repeat.clone());
     assert!(!format!("{repeat:?}").is_empty());
+
+    let zero_repeat_count = DemRepeatCount::new(0);
+    assert_eq!(zero_repeat_count.get(), 0);
+    let zero_repeat = DemRepeatBlock::new(zero_repeat_count, body.clone(), None);
+    assert_eq!(zero_repeat.repeat_count(), zero_repeat_count);
+    assert_eq!(
+        DetectorErrorModel::from_dem_str("repeat 0 {\n    shift_detectors[step] 3\n}\n")
+            .expect("parse zero repeat"),
+        {
+            let mut expected = DetectorErrorModel::new();
+            expected.push_repeat_block(zero_repeat);
+            expected
+        }
+    );
 
     let mut model = DetectorErrorModel::default();
     assert_eq!(model, DetectorErrorModel::new());
@@ -387,10 +461,13 @@ fn cq2_dem_counts_and_shift_contract_matches_stim() {
         vec![6.0, 9.0]
     );
 
-    let overflow = DetectorErrorModel::from_dem_str(
-        "shift_detectors 18446744073709551615\nshift_detectors 1\n",
-    )
-    .expect("parse overflowing shifts");
+    let mut overflow = DetectorErrorModel::new();
+    for shift in [u64::MAX, 1] {
+        overflow.push_instruction(
+            DemInstruction::shift_detectors(Vec::new(), shift, None)
+                .expect("construct programmatic high shift"),
+        );
+    }
     assert!(overflow.total_detector_shift().is_err());
 }
 

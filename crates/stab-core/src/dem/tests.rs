@@ -62,9 +62,10 @@ fn first_dem_instruction(dem: &DetectorErrorModel) -> &DemInstruction {
 #[test]
 fn dem_instruction_targets_parse_stim_limits() {
     assert_eq!(
-        "D4611686018427387903".parse::<DemTarget>().unwrap(),
-        DemTarget::relative_detector(4_611_686_018_427_387_903).unwrap()
+        "D1152921504606846975".parse::<DemTarget>().unwrap(),
+        DemTarget::relative_detector(1_152_921_504_606_846_975).unwrap()
     );
+    assert!(DemTarget::relative_detector(4_611_686_018_427_387_903).is_ok());
     assert_eq!(
         "L4294967295".parse::<DemTarget>().unwrap(),
         DemTarget::logical_observable(4_294_967_295).unwrap()
@@ -78,7 +79,7 @@ fn dem_instruction_targets_parse_stim_limits() {
         "shift_detectors 10\n"
     );
 
-    assert!("D4611686018427387904".parse::<DemTarget>().is_err());
+    assert!("D1152921504606846976".parse::<DemTarget>().is_err());
     assert!("L4294967296".parse::<DemTarget>().is_err());
     assert!("D-1".parse::<DemTarget>().is_err());
     assert!("Da".parse::<DemTarget>().is_err());

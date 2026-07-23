@@ -433,6 +433,9 @@ fn compile_block(source: &FoldedDemBlock<'_>) -> CircuitResult<DemSampleBlock> {
             }
             FoldedDemItem::Repeat { repeat, body } => {
                 let repeat_count = repeat.repeat_count().get();
+                if repeat_count == 0 {
+                    continue;
+                }
                 let body = compile_block(body)?;
                 let repeat_start_shift = current_shift;
                 let repeated_shift =

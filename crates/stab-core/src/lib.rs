@@ -96,7 +96,8 @@ pub use gate::{
     GateUnitaryMatrix,
 };
 pub use ids::{
-    CircuitDetectorId, MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount,
+    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
+    RepeatCount,
 };
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,

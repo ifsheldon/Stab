@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use stab_core::{DemDetectorId, DemRepeatBlock, DetectorErrorModel, RepeatCount};
+use stab_core::{DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -172,7 +172,7 @@ fn wide_coordinate_fixture() -> Result<DetectorErrorModel, stab_core::CircuitErr
         DetectorErrorModel::from_dem_str(&format!("shift_detectors({coordinates}) 0\n"))?;
     for _ in 0..WIDE_COORDINATE_REPEAT_DEPTH {
         let mut outer = DetectorErrorModel::new();
-        outer.push_repeat_block(DemRepeatBlock::new(RepeatCount::try_new(1)?, model, None));
+        outer.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(1), model, None));
         model = outer;
     }
     Ok(model)

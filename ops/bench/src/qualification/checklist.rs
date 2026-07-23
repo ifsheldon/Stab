@@ -840,26 +840,26 @@ mod tests {
 
     const COUNTS: &str = concat!(
         "<!-- qualification-inventory-counts ",
-        r#"{"public_api_items":1974,"algebra_api_items":656}"#,
+        r#"{"public_api_items":1986,"algebra_api_items":656}"#,
         " -->\n",
-        "Qualification inventory counts: **1,974** default-feature public Rust API items and **656** Algebra API items."
+        "Qualification inventory counts: **1,986** default-feature public Rust API items and **656** Algebra API items."
     );
 
     #[test]
     fn advertised_inventory_counts_are_exact_and_fail_closed() {
         let counts = parse_inventory_counts(COUNTS).expect("parse counts");
-        counts.validate(1_974, 656).expect("matching counts");
+        counts.validate(1_986, 656).expect("matching counts");
         counts
             .validate_rendered_summary(COUNTS)
             .expect("matching rendered counts");
-        assert!(counts.validate(1_975, 656).is_err());
-        assert!(counts.validate(1_974, 655).is_err());
+        assert!(counts.validate(1_987, 656).is_err());
+        assert!(counts.validate(1_986, 655).is_err());
     }
 
     #[test]
     fn rendered_inventory_counts_reject_visible_only_drift() {
         let counts = parse_inventory_counts(COUNTS).expect("parse counts");
-        let stale = COUNTS.replace("**1,974**", "**1,973**");
+        let stale = COUNTS.replace("**1,986**", "**1,985**");
         assert!(counts.validate_rendered_summary(&stale).is_err());
         assert!(
             counts
@@ -874,7 +874,7 @@ mod tests {
         assert!(parse_inventory_counts(&format!("{COUNTS}\n{COUNTS}")).is_err());
         assert!(
             parse_inventory_counts(
-                "<!-- qualification-inventory-counts {\"public_api_items\":1974,\"algebra_api_items\":656,\"extra\":1} -->"
+                "<!-- qualification-inventory-counts {\"public_api_items\":1986,\"algebra_api_items\":656,\"extra\":1} -->"
             )
             .is_err()
         );

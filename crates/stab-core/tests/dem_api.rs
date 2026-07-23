@@ -10,8 +10,8 @@ use std::ops::Bound;
 use stab_core::__circuit_to_detector_error_model_with_diagnostics;
 use stab_core::{
     CircuitResult, CodeDistance, DemDetectorId, DemInstruction, DemInstructionKind, DemItem,
-    DemRepeatBlock, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RepeatCount,
-    RoundCount, SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
+    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions,
+    Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
     generate_surface_code_circuit,
 };
 
@@ -84,7 +84,7 @@ fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
         .expect("error instruction"),
     );
     dem.push_repeat_block(DemRepeatBlock::new(
-        RepeatCount::try_new(2).expect("repeat count"),
+        DemRepeatCount::new(2),
         body,
         Some("loop".to_string()),
     ));
@@ -318,10 +318,13 @@ fn pf4_dem_public_validation_rejects_high_ids_and_unsupported_ranges() {
         "{observable_error}"
     );
 
-    let shift_overflow = DetectorErrorModel::from_dem_str(
-        "shift_detectors 18446744073709551615\nshift_detectors 1\n",
-    )
-    .expect("parse high shifts");
+    let mut shift_overflow = DetectorErrorModel::new();
+    for shift in [u64::MAX, 1] {
+        shift_overflow.push_instruction(
+            DemInstruction::shift_detectors(Vec::new(), shift, None)
+                .expect("construct programmatic high shift"),
+        );
+    }
     let error = shift_overflow
         .total_detector_shift()
         .expect_err("reject shift overflow")
@@ -810,7 +813,7 @@ fn pf4_dem_coordinates_nested_sparse_repeat_hole_uses_declared_bounds() {
 #[test]
 fn pf4_dem_coordinates_huge_flat_repeat_does_not_overvalidate_far_endpoint() {
     let dem = DetectorErrorModel::from_dem_str(
-        "repeat 4611686018427387905 {\n\
+        "repeat 1152921504606846975 {\n\
              detector(5) D0\n\
              shift_detectors(1) 1\n\
          }\n",

@@ -92,7 +92,7 @@ impl DemFlattenedInstructionIter<'_> {
                     }
                 },
                 DemItem::RepeatBlock(repeat) => {
-                    if !repeat.body().items().is_empty() {
+                    if repeat.repeat_count().get() > 0 && !repeat.body().items().is_empty() {
                         self.stack.push(DemFlattenFrame::new_repeated(
                             repeat.body().items(),
                             repeat.repeat_count().get(),

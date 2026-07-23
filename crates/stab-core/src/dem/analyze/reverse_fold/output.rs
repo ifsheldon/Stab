@@ -17,6 +17,10 @@ pub(super) fn unreverse_model(
                 unreverse_instruction(instruction, base_detector_id, seen, &mut output)?;
             }
             DemItem::RepeatBlock(repeat) => {
+                if repeat.repeat_count().get() == 0 {
+                    output.push_repeat_block(repeat.clone());
+                    continue;
+                }
                 let old_base = *base_detector_id;
                 let body = unreverse_model(repeat.body(), base_detector_id, seen)?;
                 output.push_repeat_block(DemRepeatBlock::new(

@@ -23,9 +23,9 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "fbaa2bdf8bc0eea01b2aca385a4e537de11c3b35099671cca0e2775950c2fbb0";
+const CORRECTNESS_DIGEST: &str = "17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_PUBLIC_API_ITEMS: usize = 1_974;
+const EXPECTED_PUBLIC_API_ITEMS: usize = 1_986;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
@@ -514,9 +514,9 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
         ("enum", 33),
         ("field", 202),
         ("function", 70),
-        ("method", 614),
-        ("struct", 83),
-        ("trait-impl", 708),
+        ("method", 616),
+        ("struct", 84),
+        ("trait-impl", 717),
         ("type-alias", 7),
         ("variant", 256),
     ]);

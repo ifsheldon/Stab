@@ -4,9 +4,8 @@
 )]
 
 use stab_core::{
-    CircuitError, CompiledDemSampler, DemRepeatBlock, DetectionEventRecord,
-    DetectionObservableOutputMode, DetectorErrorModel, RepeatCount, SampleFormat,
-    write_detection_records,
+    CircuitError, CompiledDemSampler, DemRepeatBlock, DemRepeatCount, DetectionEventRecord,
+    DetectionObservableOutputMode, DetectorErrorModel, SampleFormat, write_detection_records,
 };
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
@@ -933,11 +932,7 @@ fn pf4_dem_sampler_rejects_programmatic_deep_repeat_nesting() {
     let mut model = DetectorErrorModel::new();
     for _ in 0..257 {
         let mut outer = DetectorErrorModel::new();
-        outer.push_repeat_block(DemRepeatBlock::new(
-            RepeatCount::try_new(1).expect("repeat count"),
-            model,
-            None,
-        ));
+        outer.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(1), model, None));
         model = outer;
     }
 

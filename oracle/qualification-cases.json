@@ -342,11 +342,12 @@
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "A three-item model proves default and explicit construction, value semantics, instruction and repeat insertion, item access and ranges, atomic text append, clear, repeat accessors, and canonical rendering."
+        "detail": "A bounded model proves default and explicit construction, value semantics, instruction and zero/nonzero DEM-repeat insertion, item access and ranges, atomic text append, clear, repeat accessors, canonical rendering, and the distinction between DEM and circuit repeat-count domains."
       },
       "negative_axes": [
         "non-atomic-append",
-        "repeat-in-instruction-range"
+        "repeat-in-instruction-range",
+        "dem-repeat-count-domain-confusion"
       ],
       "upstream_owners": [
         {
@@ -450,6 +451,18 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::DemRepeatBlock::tag"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatCount"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatCount::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatCount::get"
         }
       ]
     },

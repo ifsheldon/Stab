@@ -206,6 +206,9 @@ impl<'a> FoldedDemBlock<'a> {
                     state.apply_instruction(instruction, expansion)?;
                 }
                 FoldedDemItem::Repeat { repeat, body } => {
+                    if repeat.repeat_count().get() == 0 {
+                        continue;
+                    }
                     let selection = visitor.enter_repeat(repeat, body, state)?;
                     if visit_repeat_selection(repeat, body, selection, visitor, state, expansion)?
                         .is_break()
@@ -593,7 +596,7 @@ fn summarize_detector_count(items: &[FoldedDemItem<'_>]) -> CircuitResult<u64> {
                 let repeat_count = repeat.repeat_count().get();
                 let body_shift = body.summary().detector_shift()?;
                 let body_count = body.summary().detector_count()?;
-                if body_count > 0 {
+                if repeat_count > 0 && body_count > 0 {
                     count = count.max(
                         body_shift
                             .checked_mul(repeat_count.saturating_sub(1))
@@ -715,7 +718,9 @@ fn summarize_detector_declaration_bounds(
             FoldedDemItem::Repeat { repeat, body } => {
                 let repeat_count = repeat.repeat_count().get();
                 let body_shift = body.summary().detector_shift()?;
-                if let Some(body_bounds) = body.summary().detector_declaration_bounds()? {
+                if repeat_count > 0
+                    && let Some(body_bounds) = body.summary().detector_declaration_bounds()?
+                {
                     let last_offset = body_shift
                         .checked_mul(repeat_count.saturating_sub(1))
                         .and_then(|shift| offset.checked_add(shift))
@@ -752,7 +757,9 @@ fn has_nonzero_probability_error(items: &[FoldedDemItem<'_>]) -> bool {
             instruction.kind() == DemInstructionKind::Error
                 && instruction.args().first().copied().unwrap_or(0.0) != 0.0
         }
-        FoldedDemItem::Repeat { body, .. } => body.summary().has_nonzero_probability_error(),
+        FoldedDemItem::Repeat { repeat, body } => {
+            repeat.repeat_count().get() > 0 && body.summary().has_nonzero_probability_error()
+        }
     })
 }
 
@@ -805,7 +812,10 @@ fn summarize_compact_search_error_count(items: &[FoldedDemItem<'_>]) -> CircuitR
                 DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
                 DemInstructionKind::ShiftDetectors => return Ok(None),
             },
-            FoldedDemItem::Repeat { body, .. } => {
+            FoldedDemItem::Repeat { repeat, body } => {
+                if repeat.repeat_count().get() == 0 {
+                    continue;
+                }
                 let Some(child_count) = body.summary().compact_search_error_count()? else {
                     return Ok(None);
                 };
@@ -845,7 +855,10 @@ fn summarize_compact_filter_error_count(items: &[FoldedDemItem<'_>]) -> CircuitR
                 DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
                 DemInstructionKind::ShiftDetectors => return Ok(None),
             },
-            FoldedDemItem::Repeat { body, .. } => {
+            FoldedDemItem::Repeat { repeat, body } => {
+                if repeat.repeat_count().get() == 0 {
+                    continue;
+                }
                 if body.summary().detector_shift()? != 0 {
                     return Ok(None);
                 }

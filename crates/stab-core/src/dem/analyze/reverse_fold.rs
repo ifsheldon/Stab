@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstruction,
-    DemRepeatBlock, DemTarget, DetectorErrorModel, Pauli, Probability, RepeatCount, Target,
+    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Pauli, Probability, RepeatCount,
+    Target,
     sparse_rev_frame_tracker::{
         AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
         search_shifted_recurrence,
@@ -826,7 +827,7 @@ impl ReverseFoldAnalyzer {
 
         self.reversed_model = outer_reversed;
         self.reversed_model.push_repeat_block(DemRepeatBlock::new(
-            RepeatCount::try_new(period_repetitions)?,
+            DemRepeatCount::new(period_repetitions),
             period_body,
             tag.map(ToOwned::to_owned),
         ));

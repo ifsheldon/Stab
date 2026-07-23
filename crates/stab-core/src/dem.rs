@@ -33,12 +33,13 @@ pub(crate) use traversal::{
     FoldedDemVisitor,
 };
 
-use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
+use crate::{CircuitError, CircuitResult, DemRepeatCount, Probability};
 use tag::DemTag;
 type DemArgVec = SmallVec<[f64; 2]>;
 type DemTargetVec = SmallVec<[DemTarget; 1]>;
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
+const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
 const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
@@ -131,6 +132,9 @@ impl DetectorErrorModel {
                 }
                 DemItem::RepeatBlock(repeat) => {
                     let repeat_count = repeat.repeat_count.get();
+                    if repeat_count == 0 {
+                        continue;
+                    }
                     if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
                         return Err(CircuitError::invalid_detector_error_model(format!(
                             "DEM {context} currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
@@ -230,18 +234,22 @@ impl DemItem {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DemRepeatBlock {
-    repeat_count: RepeatCount,
+    repeat_count: DemRepeatCount,
     body: DetectorErrorModel,
     tag: Option<DemTag>,
 }
 
 impl DemRepeatBlock {
-    pub fn new(repeat_count: RepeatCount, body: DetectorErrorModel, tag: Option<String>) -> Self {
+    pub fn new(
+        repeat_count: DemRepeatCount,
+        body: DetectorErrorModel,
+        tag: Option<String>,
+    ) -> Self {
         Self::from_parts(repeat_count, body, normalize_tag(tag))
     }
 
     fn from_parts(
-        repeat_count: RepeatCount,
+        repeat_count: DemRepeatCount,
         body: DetectorErrorModel,
         tag: Option<DemTag>,
     ) -> Self {
@@ -252,7 +260,7 @@ impl DemRepeatBlock {
         }
     }
 
-    pub fn repeat_count(&self) -> RepeatCount {
+    pub fn repeat_count(&self) -> DemRepeatCount {
         self.repeat_count
     }
 
@@ -529,14 +537,14 @@ impl FromStr for DemTarget {
         if raw == "^" {
             return Ok(Self::Separator);
         }
-        if let Some(value) = raw.strip_prefix('D').or_else(|| raw.strip_prefix('d')) {
-            return Self::relative_detector(parse_unsigned_dem_value(
+        if let Some(value) = raw.strip_prefix('D') {
+            return Self::relative_detector(parse_unsigned_dem_text_value(
                 value,
                 "relative detector target",
             )?);
         }
-        if let Some(value) = raw.strip_prefix('L').or_else(|| raw.strip_prefix('l')) {
-            return Self::logical_observable(parse_unsigned_dem_value(
+        if let Some(value) = raw.strip_prefix('L') {
+            return Self::logical_observable(parse_unsigned_dem_text_value(
                 value,
                 "logical observable target",
             )?);
@@ -756,7 +764,9 @@ impl<'a> DemParser<'a> {
             ));
         }
         let (tag, rest) = parse_optional_tag(line_number, rest)?;
-        let mut parts = rest.split_whitespace();
+        let mut parts = rest
+            .split([' ', '\t', '\r'])
+            .filter(|part| !part.is_empty());
         let count = parts
             .next()
             .ok_or_else(|| CircuitError::parse_line(line_number, "missing repeat count"))?;
@@ -766,12 +776,11 @@ impl<'a> DemParser<'a> {
                 "repeat blocks must be written as repeat <count> {",
             ));
         }
-        let count = count
-            .parse::<u64>()
-            .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
+        let count = parse_unsigned_dem_text_value(count, "repeat count")
+            .map_err(|error| wrap_line(line_number, error))?;
         let body = self.parse_block(true, parent_depth + 1)?;
         Ok(DemRepeatBlock::from_parts(
-            RepeatCount::try_new(count)?,
+            DemRepeatCount::new(count),
             body,
             tag,
         ))
@@ -830,7 +839,6 @@ fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
 }
 
 fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<DemTag>, &str)> {
-    let rest = trim_dem_start(rest);
     let Some(mut body) = rest.strip_prefix('[') else {
         return Ok((None, rest));
     };
@@ -885,7 +893,6 @@ fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<D
 }
 
 fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgVec, &str)> {
-    let rest = trim_dem_start(rest);
     let Some(body) = rest.strip_prefix('(') else {
         return Ok((DemArgVec::new(), rest));
     };
@@ -900,21 +907,22 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(DemArgV
         .strip_prefix(')')
         .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
     let mut args = DemArgVec::new();
-    let raw_args = trim_dem(raw_args);
-    if !raw_args.is_empty() {
-        for arg in raw_args.split(',') {
-            let arg = trim_dem(arg);
-            args.push(arg.parse::<f64>().map_err(|_| {
+    for arg in raw_args.split(',') {
+        let arg = trim_dem_inline(arg);
+        args.push(if arg.is_empty() {
+            0.0
+        } else {
+            arg.parse::<f64>().map_err(|_| {
                 CircuitError::parse_line(line_number, format!("invalid argument {arg}"))
-            })?);
-        }
+            })?
+        });
     }
     Ok((args, tail))
 }
 
 fn parse_dem_targets(rest: &str) -> CircuitResult<DemTargetVec> {
     let mut targets = DemTargetVec::new();
-    for raw in rest.split_whitespace() {
+    for raw in rest.split([' ', '\t', '\r']).filter(|raw| !raw.is_empty()) {
         if targets.len() == 1 {
             targets.reserve(4);
         }
@@ -933,16 +941,16 @@ fn parse_dem_target_token(raw: &str) -> CircuitResult<DemTarget> {
         CircuitError::invalid_detector_error_model(format!("invalid DEM target {raw:?}"))
     })?;
     match prefix {
-        b'D' | b'd' => DemTarget::relative_detector(parse_unsigned_dem_value(
+        b'D' | b'd' => DemTarget::relative_detector(parse_unsigned_dem_text_value(
             value,
             "relative detector target",
         )?),
-        b'L' | b'l' => DemTarget::logical_observable(parse_unsigned_dem_value(
+        b'L' | b'l' => DemTarget::logical_observable(parse_unsigned_dem_text_value(
             value,
             "logical observable target",
         )?),
         b'^' if value.is_empty() => Ok(DemTarget::separator()),
-        b'0'..=b'9' => Ok(DemTarget::numeric(parse_unsigned_dem_value(
+        b'0'..=b'9' => Ok(DemTarget::numeric(parse_unsigned_dem_text_value(
             raw,
             "numeric DEM target",
         )?)),
@@ -950,6 +958,16 @@ fn parse_dem_target_token(raw: &str) -> CircuitResult<DemTarget> {
             "invalid DEM target {raw:?}"
         ))),
     }
+}
+
+fn parse_unsigned_dem_text_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
+    let value = parse_unsigned_dem_value(text, kind)?;
+    if value > MAX_DEM_TEXT_INTEGER {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "{kind} {value} exceeds {MAX_DEM_TEXT_INTEGER}"
+        )));
+    }
+    Ok(value)
 }
 
 fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
@@ -1005,33 +1023,19 @@ fn split_first_char(text: &str) -> Option<(char, &str)> {
 }
 
 fn trim_dem_start(text: &str) -> &str {
-    let trimmed = text.trim_ascii_start();
-    if trimmed
-        .as_bytes()
-        .first()
-        .is_some_and(|byte| !byte.is_ascii())
-    {
-        trimmed.trim_start()
-    } else {
-        trimmed
-    }
+    text.trim_ascii_start()
 }
 
 fn trim_dem_end(text: &str) -> &str {
-    let trimmed = text.trim_ascii_end();
-    if trimmed
-        .as_bytes()
-        .last()
-        .is_some_and(|byte| !byte.is_ascii())
-    {
-        trimmed.trim_end()
-    } else {
-        trimmed
-    }
+    text.trim_ascii_end()
 }
 
 fn trim_dem(text: &str) -> &str {
     trim_dem_end(trim_dem_start(text))
+}
+
+fn trim_dem_inline(text: &str) -> &str {
+    text.trim_matches([' ', '\t'])
 }
 
 fn write_indent(out: &mut String, indent: usize) {

@@ -323,7 +323,9 @@ pub(super) fn classify_public_api_source(
     }
 
     if value == "crates/stab-core/src/ids.rs" {
-        if api_lower.contains("probability") {
+        if api_lower.contains("demrepeatcount") {
+            return Some(FeatureId::DemFormat);
+        } else if api_lower.contains("probability") {
             return Some(FeatureId::Sampling);
         } else if api_lower.contains("measurerecordoffset") {
             return Some(FeatureId::StimFormat);

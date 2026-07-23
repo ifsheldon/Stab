@@ -150,7 +150,7 @@ fn apply_dem_model(
             .collect::<Result<_, _>>()?,
     };
     group.memory_policy = circuit_memory_policy(
-        "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance.",
+        "The generated text and selected setup model remain live as applicable, and setup and peak process RSS are report-only at every scale. Both workers capture peak RSS immediately after timed dispatch and before post-timing serialization, digest construction, or validation. Both public APIs intentionally return owned allocations; PQ6 owns parser-model and canonical-output cross-scale growth acceptance.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
     group.owner = if serialize {

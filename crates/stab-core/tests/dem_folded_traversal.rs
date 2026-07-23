@@ -6,7 +6,7 @@
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_core::{
-    Circuit, CompiledDemSampler, DemDetectorId, DemRepeatBlock, DetectorErrorModel, RepeatCount,
+    Circuit, CompiledDemSampler, DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel,
     explain_errors_from_circuit, find_undetectable_logical_error, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
@@ -445,7 +445,7 @@ fn pfm_b3_folded_traversal_counts() {
 
     run_generated_folded_differential_corpus();
 
-    let overflow = dem("repeat 5 {\n    shift_detectors 4611686018427387903\n}\n")
+    let overflow = dem("repeat 17 {\n    shift_detectors 1152921504606846975\n}\n")
         .total_detector_shift()
         .expect_err("checked repeat shift overflow");
     assert!(overflow.to_string().contains("overflowed"), "{overflow}");
@@ -467,7 +467,7 @@ fn pfm_b3_folded_traversal_counts() {
     for _ in 0..256 {
         let mut outer = DetectorErrorModel::new();
         outer.push_repeat_block(DemRepeatBlock::new(
-            RepeatCount::try_new(1).expect("repeat count"),
+            DemRepeatCount::new(1),
             deep_coordinate,
             None,
         ));
@@ -544,7 +544,7 @@ fn pfm_b3_folded_traversal_coordinates() {
     );
 
     let declaration_overflow = dem(
-        "error(0) D1\nrepeat 2 {\n    repeat 2 {\n        repeat 18446744073709551615 {\n            detector(5) D0\n        }\n    }\n}\n",
+        "error(0) D1\nrepeat 5 {\n    repeat 5 {\n        repeat 1152921504606846975 {\n            detector(5) D0\n        }\n    }\n}\n",
     );
     assert_eq!(declaration_overflow.count_detectors(), Ok(2));
     assert_eq!(
@@ -607,7 +607,7 @@ fn pfm_b3_folded_traversal_transforms() {
     for _ in 0..257 {
         let mut outer = DetectorErrorModel::new();
         outer.push_repeat_block(DemRepeatBlock::new(
-            RepeatCount::try_new(1).expect("repeat count"),
+            DemRepeatCount::new(1),
             deep,
             Some("nested".to_string()),
         ));
