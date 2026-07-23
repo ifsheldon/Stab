@@ -85,7 +85,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 14;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 15;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -422,12 +422,12 @@ impl PreparedWorkers {
             args: arguments,
             stdin: vec![b'\n'],
             working_directory: self.root.clone(),
-            environment: worker_environment(),
+            environment: worker_environment().into(),
             affinity_cpu: Some(cpu),
             limits: ProcessLimits {
                 stdin_bytes: 1,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
+                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+                stderr: (64 << 10).into(),
                 regular_file_bytes: None,
                 timeout,
             },
@@ -644,12 +644,12 @@ impl PreparedWorkers {
             args: arguments,
             stdin: vec![b'\n'],
             working_directory: self.root.clone(),
-            environment: worker_environment(),
+            environment: worker_environment().into(),
             affinity_cpu: None,
             limits: ProcessLimits {
                 stdin_bytes: 1,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
+                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+                stderr: (64 << 10).into(),
                 regular_file_bytes: None,
                 timeout: IDENTITY_PROBE_TIMEOUT,
             },
@@ -711,12 +711,12 @@ impl PreparedWorkers {
             args: arguments,
             stdin: Vec::new(),
             working_directory: self.root.clone(),
-            environment: worker_environment(),
+            environment: worker_environment().into(),
             affinity_cpu: None,
             limits: ProcessLimits {
                 stdin_bytes: 0,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
+                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+                stderr: (64 << 10).into(),
                 regular_file_bytes: None,
                 timeout: CAP_REJECTION_TIMEOUT,
             },
@@ -755,12 +755,12 @@ impl PreparedWorkers {
             args: arguments,
             stdin: Vec::new(),
             working_directory: self.root.clone(),
-            environment: worker_environment(),
+            environment: worker_environment().into(),
             affinity_cpu: None,
             limits: ProcessLimits {
                 stdin_bytes: 0,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
+                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+                stderr: (64 << 10).into(),
                 regular_file_bytes: None,
                 timeout: CAP_REJECTION_TIMEOUT,
             },
@@ -855,12 +855,12 @@ impl PreparedWorkers {
             args: arguments,
             stdin: Vec::new(),
             working_directory: self.root.clone(),
-            environment: worker_environment(),
+            environment: worker_environment().into(),
             affinity_cpu: None,
             limits: ProcessLimits {
                 stdin_bytes: 0,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
+                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+                stderr: (64 << 10).into(),
                 regular_file_bytes: None,
                 timeout: CAP_REJECTION_TIMEOUT,
             },

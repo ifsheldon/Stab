@@ -371,7 +371,8 @@ pub(crate) enum StatisticsError {
 mod tests {
     use super::*;
     use crate::qualification::runtime::protocol::{
-        GitCommit, InputDigest, PROTOCOL_SCHEMA_VERSION, SemanticDigest, Sha256Digest,
+        GitCommit, InputDigest, PROTOCOL_SCHEMA_VERSION, RAW_WORK_TIMING_BOUNDARY, SemanticDigest,
+        Sha256Digest,
     };
 
     fn row(implementation: Implementation, elapsed_seconds: f64) -> WorkerMeasurement {
@@ -379,6 +380,7 @@ mod tests {
             schema_version: PROTOCOL_SCHEMA_VERSION,
             implementation,
             evidence_mode: EvidenceMode::Timing,
+            timing_boundary: RAW_WORK_TIMING_BOUNDARY,
             workload_id: ProtocolId::try_new("synthetic").expect("workload id"),
             measurement_id: ProtocolId::try_new("main").expect("measurement id"),
             iteration_count: 1,

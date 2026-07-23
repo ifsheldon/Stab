@@ -1160,8 +1160,9 @@ int main(int argc, const char **argv) {
             throw std::runtime_error("adapter measured an invalid duration for the evidence mode");
         }
         std::cout << std::setprecision(17)
-                  << "{\"schema_version\":4,\"implementation\":\"stim\","
+                  << "{\"schema_version\":5,\"implementation\":\"stim\","
                   << "\"evidence_mode\":\"" << arguments.evidence_mode << "\","
+                  << "\"timing_boundary\":\"raw-work-v2\","
                   << "\"workload_id\":\"" << arguments.workload << "\","
                   << "\"measurement_id\":\"" << arguments.measurement_id << "\","
                   << "\"iteration_count\":" << arguments.iterations << ','

@@ -2122,7 +2122,6 @@ dependencies = [
  "stab-core",
  "tempfile",
  "thiserror",
- "wait-timeout",
 ]
 
 [[package]]

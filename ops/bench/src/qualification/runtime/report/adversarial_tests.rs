@@ -1,4 +1,6 @@
-use super::super::protocol::{GitCommit, PROTOCOL_SCHEMA_VERSION, Sha256Digest, WorkerMeasurement};
+use super::super::protocol::{
+    GitCommit, PROTOCOL_SCHEMA_VERSION, RAW_WORK_TIMING_BOUNDARY, Sha256Digest, WorkerMeasurement,
+};
 use super::super::run::{
     CalibrationEvidence, CalibrationProbeEvidence, CommonBatchMode, ImplementationCalibration,
     MemoryEvidence,
@@ -23,6 +25,7 @@ fn measurement(
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation,
         evidence_mode,
+        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
         measurement_id: ProtocolId::try_new("main").expect("measurement id"),
         iteration_count: iterations,

@@ -12,7 +12,6 @@ mod host;
 mod invocation;
 mod markdown;
 mod probe;
-mod process;
 mod protocol;
 mod regression;
 mod report;
@@ -22,6 +21,8 @@ mod stab_build;
 mod statistics;
 mod toolchain;
 mod worker;
+
+pub(super) use crate::process;
 
 pub(crate) use completion::{CompletionArgs, CompletionReportArgs};
 pub(crate) use probe::ProbeArgs;

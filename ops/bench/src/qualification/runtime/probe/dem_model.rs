@@ -283,7 +283,7 @@ fn request(
         args,
         stdin: Vec::new(),
         working_directory: root.path.clone(),
-        environment: probe_environment(),
+        environment: probe_environment().into(),
         affinity_cpu: None,
         limits: probe_limits(),
     }

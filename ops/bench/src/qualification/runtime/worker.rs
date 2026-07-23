@@ -4,11 +4,10 @@ use std::io::Read as _;
 use std::io::Write as _;
 use std::num::NonZeroU64;
 use std::sync::atomic::{Ordering, compiler_fence};
-use std::time::Instant;
 
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, PROTOCOL_SCHEMA_VERSION, ProtocolId,
-    SemanticDigest, Sha256Digest, WorkerMeasurement,
+    RAW_WORK_TIMING_BOUNDARY, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use crate::config::STIM_COMMIT;
 use clap::{Args, ValueEnum};
@@ -175,7 +174,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let setup_rss_bytes = current_rss_bytes()?;
 
     let (output, elapsed_seconds) =
-        measure_workload(|| prepared.execute(args.iterations.get(), args.work_items.get()))?;
+        prepared.measure(args.iterations.get(), args.work_items.get())?;
     let evidence_mode: EvidenceMode = args.evidence_mode.into();
     if !evidence_mode.accepts_elapsed(elapsed_seconds) {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -191,6 +190,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
         evidence_mode,
+        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         workload_id,
         measurement_id,
         iteration_count: args.iterations.get(),
@@ -304,14 +304,6 @@ impl WorkloadOutput {
 fn canonical_circuit_digest(canonical: &str) -> String {
     let canonical = canonical.strip_suffix('\n').unwrap_or(canonical);
     semantic_digest(byte_digest(canonical.as_bytes()))
-}
-
-fn measure_workload<T>(
-    operation: impl FnOnce() -> Result<T, WorkerError>,
-) -> Result<(T, f64), WorkerError> {
-    let started = Instant::now();
-    let output = operation()?;
-    Ok((output, started.elapsed().as_secs_f64()))
 }
 
 fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {

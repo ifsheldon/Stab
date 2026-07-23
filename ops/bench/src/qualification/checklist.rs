@@ -142,7 +142,10 @@ pub(super) fn parse(source: &str) -> Result<Vec<RawChecklistItem>, BenchError> {
         }
         let scope = if status.starts_with("Deferred") {
             ChecklistScope::Deferred
-        } else if status.starts_with("Done") || status.starts_with("Partial") {
+        } else if status.starts_with("Done")
+            || status.starts_with("Reopened")
+            || status.starts_with("Partial")
+        {
             ChecklistScope::Selected
         } else {
             return Err(BenchError::Qualification(format!(
@@ -180,7 +183,7 @@ pub(super) fn parse(source: &str) -> Result<Vec<RawChecklistItem>, BenchError> {
 type ChecklistChildren = (Option<String>, Option<String>, Vec<String>, Vec<String>);
 
 fn children(feature: &str, status: &str, row_id: &str) -> Result<ChecklistChildren, BenchError> {
-    if status.starts_with("Done") {
+    if status.starts_with("Done") || status.starts_with("Reopened") {
         return Ok((
             Some(
                 "The implemented row exactly as bounded by its checklist evidence column."
@@ -342,7 +345,7 @@ fn child_ownership(
     if status.starts_with("Deferred") {
         return Ok(Vec::new());
     }
-    if status.starts_with("Done") {
+    if status.starts_with("Done") || status.starts_with("Reopened") {
         if performance_features.is_empty() {
             return Ok(Vec::new());
         }
@@ -840,26 +843,26 @@ mod tests {
 
     const COUNTS: &str = concat!(
         "<!-- qualification-inventory-counts ",
-        r#"{"public_api_items":1986,"algebra_api_items":656}"#,
+        r#"{"public_api_items":2065,"algebra_api_items":656}"#,
         " -->\n",
-        "Qualification inventory counts: **1,986** default-feature public Rust API items and **656** Algebra API items."
+        "Qualification inventory counts: **2,065** default-feature public Rust API items and **656** Algebra API items."
     );
 
     #[test]
     fn advertised_inventory_counts_are_exact_and_fail_closed() {
         let counts = parse_inventory_counts(COUNTS).expect("parse counts");
-        counts.validate(1_986, 656).expect("matching counts");
+        counts.validate(2_065, 656).expect("matching counts");
         counts
             .validate_rendered_summary(COUNTS)
             .expect("matching rendered counts");
-        assert!(counts.validate(1_987, 656).is_err());
-        assert!(counts.validate(1_986, 655).is_err());
+        assert!(counts.validate(2_066, 656).is_err());
+        assert!(counts.validate(2_065, 655).is_err());
     }
 
     #[test]
     fn rendered_inventory_counts_reject_visible_only_drift() {
         let counts = parse_inventory_counts(COUNTS).expect("parse counts");
-        let stale = COUNTS.replace("**1,986**", "**1,985**");
+        let stale = COUNTS.replace("**2,065**", "**2,064**");
         assert!(counts.validate_rendered_summary(&stale).is_err());
         assert!(
             counts
@@ -874,7 +877,7 @@ mod tests {
         assert!(parse_inventory_counts(&format!("{COUNTS}\n{COUNTS}")).is_err());
         assert!(
             parse_inventory_counts(
-                "<!-- qualification-inventory-counts {\"public_api_items\":1986,\"algebra_api_items\":656,\"extra\":1} -->"
+                "<!-- qualification-inventory-counts {\"public_api_items\":2065,\"algebra_api_items\":656,\"extra\":1} -->"
             )
             .is_err()
         );

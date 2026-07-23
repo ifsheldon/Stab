@@ -42,7 +42,6 @@ statrs = { version = "0.18.0", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
-wait-timeout = "0.2.1"
 
 [workspace.lints.rust]
 let_underscore_drop = "warn"

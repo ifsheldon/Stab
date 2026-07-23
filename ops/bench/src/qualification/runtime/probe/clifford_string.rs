@@ -178,12 +178,12 @@ fn request(
             Vec::new()
         },
         working_directory: root.path.clone(),
-        environment: probe_environment(),
+        environment: probe_environment().into(),
         affinity_cpu: None,
         limits: ProcessLimits {
             stdin_bytes: usize::from(release_barrier),
-            stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-            stderr_bytes: 64 << 10,
+            stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+            stderr: (64 << 10).into(),
             regular_file_bytes: None,
             timeout: Duration::from_secs(30),
         },

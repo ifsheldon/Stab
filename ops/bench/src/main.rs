@@ -19,7 +19,7 @@ mod config;
 mod error;
 mod manifest;
 mod memory_gate;
-mod process;
+pub(crate) mod process;
 #[cfg(test)]
 mod profile_evidence;
 mod qualification;

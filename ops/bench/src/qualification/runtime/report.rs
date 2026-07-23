@@ -38,7 +38,7 @@ pub(super) fn render_markdown(
     markdown::render(report, report_sha256)
 }
 
-const PREFLIGHT_SCHEMA_VERSION: u32 = 5;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 6;
 const EXPECTED_WARMUPS: usize = 3;
 const EXPECTED_MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 

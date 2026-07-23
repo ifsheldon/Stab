@@ -7,8 +7,8 @@ use super::super::contract::{
 };
 use super::super::process::ProcessResult;
 use super::super::protocol::{
-    EvidenceMode, Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest,
-    WorkerMeasurement,
+    EvidenceMode, Implementation, InputDigest, ProtocolId, RAW_WORK_TIMING_BOUNDARY,
+    SemanticDigest, Sha256Digest, TimingBoundary, WorkerMeasurement,
 };
 use super::clifford_string::expected_clifford_probes;
 use super::dem_model::expected_dem_model_probes;
@@ -98,6 +98,7 @@ pub(super) enum WorkerContractProbeEvidence {
         case_id: ProtocolId,
         implementation: Implementation,
         evidence_mode: EvidenceMode,
+        timing_boundary: TimingBoundary,
         iteration_count: u64,
         work_count: u64,
         input_bytes: u64,
@@ -628,6 +629,7 @@ pub(super) fn expected_accepted_probe(
         case_id: ProtocolId::try_new(case_id)?,
         implementation,
         evidence_mode: EvidenceMode::Contract,
+        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         iteration_count,
         work_count,
         input_bytes,
@@ -660,6 +662,7 @@ pub(super) fn accepted_probe(
         case_id: ProtocolId::try_new(case_id)?,
         implementation: row.implementation,
         evidence_mode: row.evidence_mode,
+        timing_boundary: row.timing_boundary,
         iteration_count: row.iteration_count,
         work_count: row.work_count,
         input_bytes: row.input_bytes,

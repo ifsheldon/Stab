@@ -124,6 +124,9 @@ pub(crate) enum BenchError {
     #[error("performance qualification validation failed:\n{0}")]
     Qualification(String),
 
+    #[error(transparent)]
+    Process(#[from] crate::process::ProcessError),
+
     #[error("{action}; qualification session validation also failed: {session}")]
     QualificationSession {
         action: Box<BenchError>,
@@ -137,27 +140,6 @@ pub(crate) enum BenchError {
 
     #[error("performance qualification inventory digest is not frozen in source code")]
     QualificationUnfrozen,
-
-    #[error("failed to start {program}: {source}")]
-    Spawn {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("failed to write stdin for {program}: {source}")]
-    WriteStdin {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("failed to wait for {program}: {source}")]
-    Wait {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("{program} timed out after {seconds}s")]
-    TimedOut { program: String, seconds: u64 },
 
     #[error("{program} failed with status {status}\nstderr:\n{stderr}")]
     CommandFailed {

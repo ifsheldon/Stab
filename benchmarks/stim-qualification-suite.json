@@ -2,8 +2,8 @@
   "schema_version": 2,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942",
-  "semantic_digest": "30e9df3e8004b59e43716dbb9e7aa847f472811e0adba74c43ef6bc7b243d498",
+  "correctness_digest": "592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0",
+  "semantic_digest": "33b796a2eda59429fcccc43a3db8dc715608e5dffabd9cfe1b756c4d40529358",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -104,18 +104,24 @@
       "disposition": "measured",
       "group_ids": [
         "PERFQ-API-06d3c650927d4ca7",
+        "PERFQ-API-12ded0a626d911e5",
         "PERFQ-API-160eff0bdaf3f15c",
+        "PERFQ-API-402b5bbe5de3690a",
         "PERFQ-API-40856afc6b0ada54",
         "PERFQ-API-49a9272d7e1e99a7",
         "PERFQ-API-56c3371c946aaed3",
         "PERFQ-API-79ce23b35670733d",
+        "PERFQ-API-875cc56ee3c41945",
         "PERFQ-API-b869754e35879cf6",
         "PERFQ-API-cf12cfbaf2bac626",
         "PERFQ-API-cf38ba2626d7ae25",
+        "PERFQ-API-d91823e4cf620038",
+        "PERFQ-API-da78618f21baae58",
         "PERFQ-API-dff4fb0279ca0724",
         "PERFQ-API-e4a9a673e2f057d3",
         "PERFQ-API-f526d6dd698da2fe",
         "PERFQ-API-f6f41f7098affbcd",
+        "PERFQ-API-ff80289083da3157",
         "PERFQ-CHECKLIST-08b4d0f23d652b86-RESULT-IO",
         "PERFQ-CHECKLIST-161a6a005e05b3e9-RESULT-IO",
         "PERFQ-CHECKLIST-3793c1cfc265b1fc-RESULT-IO",
@@ -356,16 +362,22 @@
       "group_ids": [
         "PERFQ-API-0b42dac0c951fd2f",
         "PERFQ-API-0e25a23b17d14998",
+        "PERFQ-API-13361603d85fc1eb",
         "PERFQ-API-2ff22d5cd54eb00e",
         "PERFQ-API-317c4060cf999134",
+        "PERFQ-API-3940b15050a59c32",
         "PERFQ-API-407f516bb14dd915",
         "PERFQ-API-46da51902b8dfe89",
+        "PERFQ-API-4abbd244caaf2253",
         "PERFQ-API-5237b206903246c8",
         "PERFQ-API-61d7840f711fb424",
         "PERFQ-API-9c25b8c923c8e45f",
         "PERFQ-API-adbf894cca85957a",
         "PERFQ-API-b0ff706b45336149",
         "PERFQ-API-b6ae18b3d6e014f9",
+        "PERFQ-API-c2997a9595acd953",
+        "PERFQ-API-c9476de2f2bc0dd0",
+        "PERFQ-API-f82347a927f9a915",
         "PERFQ-API-fc10c13fed12b455",
         "PERFQ-CHECKLIST-63dc29187590a0fa-CONVERT-CLI",
         "PERFQ-CHECKLIST-94bd1a1c7045a109-CONVERT-CLI",
@@ -722,7 +734,7 @@
   "checklist_items": [
     {
       "id": "PERFC-03468f2932803ac9",
-      "source_line": 85,
+      "source_line": 86,
       "anchor_digest": "5f621685fa7f080b46760b965319c6705e42b9a6c9efc4d5e78b287a743fea14",
       "section": "4. Core Circuit Features",
       "feature": "Circuit transforms",
@@ -754,7 +766,7 @@
     },
     {
       "id": "PERFC-03d7d6a50d2629d8",
-      "source_line": 177,
+      "source_line": 178,
       "anchor_digest": "3e058d65ddac267c048f82e210a979c40a7a1c5a1b772c4553f0a557e166a6d1",
       "section": "11. Command-Line API",
       "feature": "Legacy top-level command flags",
@@ -786,7 +798,7 @@
     },
     {
       "id": "PERFC-08246ed23f9cca9b",
-      "source_line": 231,
+      "source_line": 232,
       "anchor_digest": "cbbc566e294631e3a912d202cac37d6fc73c19d447bc647c03e799d2051d5fad",
       "section": "16. Test And Benchmark Surface",
       "feature": "Current beta performance gate",
@@ -807,7 +819,7 @@
     },
     {
       "id": "PERFC-08b4d0f23d652b86",
-      "source_line": 109,
+      "source_line": 110,
       "anchor_digest": "36ded272ab84d6fd7bcb6f71e06bdc239eb85d99cb9ec08410950c97adb8e384",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Measurement-to-detection conversion",
@@ -893,7 +905,7 @@
     },
     {
       "id": "PERFC-0ab482a0514e2c0b",
-      "source_line": 70,
+      "source_line": 71,
       "anchor_digest": "556f8ac60878bfe93254655ee7d097990dcc611519c69327f1ba90c493881e8c",
       "section": "3. Gate And Instruction Surface",
       "feature": "Gate validation flags and categories",
@@ -925,7 +937,7 @@
     },
     {
       "id": "PERFC-127d570dfdbd69f2",
-      "source_line": 96,
+      "source_line": 97,
       "anchor_digest": "d33152e0bb01c250f757eca940bd5e6d497a0aad4e4fe4e67790d15f9cf2418d",
       "section": "5. Detector Error Model Features",
       "feature": "DEM transforms",
@@ -957,7 +969,7 @@
     },
     {
       "id": "PERFC-138c3b361a186e58",
-      "source_line": 97,
+      "source_line": 98,
       "anchor_digest": "f7086c7532c8b983a86ad36784b6f1b53de2753fb99fa168edde4a815e414e9a",
       "section": "5. Detector Error Model Features",
       "feature": "DEM sampling",
@@ -989,7 +1001,7 @@
     },
     {
       "id": "PERFC-1451be08d4caacb8",
-      "source_line": 106,
+      "source_line": 107,
       "anchor_digest": "195e2eee8bf477ffa8fbdb83d370f8c356194e13ffffbdaa73f5d478d1c07b52",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Compiled measurement sampling",
@@ -1021,7 +1033,7 @@
     },
     {
       "id": "PERFC-147257abd12fe8fa",
-      "source_line": 123,
+      "source_line": 124,
       "anchor_digest": "b9ed1ade1c737eb050cb0ba800dc78a52159d5d2007d9671da11b52b4370c882",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`stim explain_errors` CLI",
@@ -1042,11 +1054,11 @@
     },
     {
       "id": "PERFC-161a6a005e05b3e9",
-      "source_line": 58,
-      "anchor_digest": "ad928f633abf44b7767b00795823c87b6059f16b93b69f16e70034b683e80157",
+      "source_line": 59,
+      "anchor_digest": "0c6affe85ac43f8970bc06f25bfa419731b9075521992caf866106cc865c0018",
       "section": "2. File Formats And IO Contracts",
       "feature": "`hits` sparse text or binary sparse index format",
-      "raw_status": "Done for selected Rust and CLI scope",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -1074,7 +1086,7 @@
     },
     {
       "id": "PERFC-1644aae3e8f22a7d",
-      "source_line": 125,
+      "source_line": 126,
       "anchor_digest": "c5f9eff7814a3e9d6518dfefe5a14754475fd79bf1f081c77353704ef0885b09",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "SAT or WCNF encoding",
@@ -1106,7 +1118,7 @@
     },
     {
       "id": "PERFC-1f7f9ad4fc536624",
-      "source_line": 124,
+      "source_line": 125,
       "anchor_digest": "67e4ea544dfd480e9a38d6966e4162824f62d281c240219b80d1490f2b00639d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Shortest graphlike and hypergraph logical-error search",
@@ -1138,7 +1150,7 @@
     },
     {
       "id": "PERFC-1ff33ed84805b2cc",
-      "source_line": 173,
+      "source_line": 174,
       "anchor_digest": "5d8c064325ef0d448833457b5973a7377bb799e9acd454e25c43c5971a5e534e",
       "section": "11. Command-Line API",
       "feature": "`stim diagram`",
@@ -1159,7 +1171,7 @@
     },
     {
       "id": "PERFC-2315c193520be282",
-      "source_line": 46,
+      "source_line": 47,
       "anchor_digest": "693f93a95da38caf42a6893a86409eacaaae8a0919cec14d974edcd796ac1ab2",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM parser and canonical printer",
@@ -1191,7 +1203,7 @@
     },
     {
       "id": "PERFC-29677000e90bf328",
-      "source_line": 149,
+      "source_line": 150,
       "anchor_digest": "6e791c95fe34c5086facb1a4ccd82a1e7ad5d45c43aeb18700940e5aa3f02c7a",
       "section": "9. Diagrams And Visualization",
       "feature": "Interactive HTML and Crumble diagram surfaces",
@@ -1212,7 +1224,7 @@
     },
     {
       "id": "PERFC-2daba248ab94a6e8",
-      "source_line": 84,
+      "source_line": 85,
       "anchor_digest": "6a1657e4cff9598bd0586aa37cb2109efcd659addec2e3a7dccb3ccedc954a5e",
       "section": "4. Core Circuit Features",
       "feature": "Repeat handling",
@@ -1311,7 +1323,7 @@
     },
     {
       "id": "PERFC-31c3e098ded9689f",
-      "source_line": 247,
+      "source_line": 248,
       "anchor_digest": "2ae94fe1fc5a88c26f90ec4b2cb2c6ce55028682cb9da9ee518c504d80e25a77",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Python bindings",
@@ -1332,7 +1344,7 @@
     },
     {
       "id": "PERFC-32f5951f3b880cdf",
-      "source_line": 169,
+      "source_line": 170,
       "anchor_digest": "3b3c663f266690c6d499924297aee84f03dfb2efe46df07f86bede24cca1e1f5",
       "section": "11. Command-Line API",
       "feature": "`stim detect`",
@@ -1367,7 +1379,7 @@
     },
     {
       "id": "PERFC-331008ea534a9350",
-      "source_line": 47,
+      "source_line": 48,
       "anchor_digest": "bb9321a54a0da1a71c5b403a0597c0851c8beb22472e10715738ccae0043eb43",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM instruction types",
@@ -1399,7 +1411,7 @@
     },
     {
       "id": "PERFC-3793c1cfc265b1fc",
-      "source_line": 60,
+      "source_line": 61,
       "anchor_digest": "6afa0e360909d824522ea563dad4b8838b685b9e4078fb0fbda9b21de85a9413",
       "section": "2. File Formats And IO Contracts",
       "feature": "`ptb64` transposed packed format",
@@ -1431,7 +1443,7 @@
     },
     {
       "id": "PERFC-3883f38fcee402eb",
-      "source_line": 216,
+      "source_line": 217,
       "anchor_digest": "f84c9addf8a8601d0b0ec81f1bdd9da56c7d8f74b1721825c583081088912730",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "JS packaging",
@@ -1452,7 +1464,7 @@
     },
     {
       "id": "PERFC-399173601ec6dbac",
-      "source_line": 213,
+      "source_line": 214,
       "anchor_digest": "76bf69678f23d972b931021fd00e27c0a106f5e815f710ea0a1ab3691b8f4182",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Cargo workspace",
@@ -1473,7 +1485,7 @@
     },
     {
       "id": "PERFC-3c34a55ffcf32e43",
-      "source_line": 107,
+      "source_line": 108,
       "anchor_digest": "5b97c81dd8117f154ab5368ec8182493efbc8c6872730f58212249f457c9b3d4",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Measurement-sampler Python API parity",
@@ -1494,7 +1506,7 @@
     },
     {
       "id": "PERFC-3e79dd61ca387b04",
-      "source_line": 95,
+      "source_line": 96,
       "anchor_digest": "fb223c6be26ee6e6fca96840834cba530e1fb796b3f0edc7189c0a976665359b",
       "section": "5. Detector Error Model Features",
       "feature": "DEM introspection",
@@ -1526,11 +1538,11 @@
     },
     {
       "id": "PERFC-40a806b1bb064311",
-      "source_line": 59,
-      "anchor_digest": "257874ba7ce2b0c586d76efb2feb63cfe50373c5ca1335aba66f0749c00b6974",
+      "source_line": 60,
+      "anchor_digest": "c4f63b64453703ce2384ae548f58d41eee3cb773346e5ff39a57e8d6f65bbaab",
       "section": "2. File Formats And IO Contracts",
       "feature": "`dets` sparse text",
-      "raw_status": "Done for selected Rust and CLI scope",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -1558,7 +1570,7 @@
     },
     {
       "id": "PERFC-40c76b4240bbf849",
-      "source_line": 108,
+      "source_line": 109,
       "anchor_digest": "0977b4264f87998f12d94ba753ed84945517d46fce5e250d0dd811b5bfc333c4",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Detector sampling",
@@ -1590,7 +1602,7 @@
     },
     {
       "id": "PERFC-413ac90cec749df6",
-      "source_line": 100,
+      "source_line": 101,
       "anchor_digest": "5b5d26dfe36f838c497daf30efa3f094f685aeadc5bc4b5492c8bb8a44a42a90",
       "section": "5. Detector Error Model Features",
       "feature": "DEM diagrams",
@@ -1611,7 +1623,7 @@
     },
     {
       "id": "PERFC-42edeb6afd2b02fb",
-      "source_line": 28,
+      "source_line": 29,
       "anchor_digest": "242769af1c4e35d4a8f1f25251f77482fa2f19f1b1ad0fbed01491c064d8b2da",
       "section": "1. Top-Level Product Surface",
       "feature": "GPU backend",
@@ -1632,7 +1644,7 @@
     },
     {
       "id": "PERFC-44abd4394a5490a8",
-      "source_line": 248,
+      "source_line": 249,
       "anchor_digest": "019f0faab5604daf0884149e7546e852432ca4a8d85a56d834b51071e5df4654",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "JS/WASM and ecosystem packages",
@@ -1653,7 +1665,7 @@
     },
     {
       "id": "PERFC-44c8dad868e7a121",
-      "source_line": 25,
+      "source_line": 26,
       "anchor_digest": "f33f8be756b1bf1cf58498633a8d7054c7dad405430b840875a1f0ec97ac0c8d",
       "section": "1. Top-Level Product Surface",
       "feature": "Python package `stim`",
@@ -1674,7 +1686,7 @@
     },
     {
       "id": "PERFC-45e92e84c9cb919e",
-      "source_line": 171,
+      "source_line": 172,
       "anchor_digest": "03c57b01eebbe9e617955c2103826ef9ad1d92e2817b9939e51c381f9a0309c1",
       "section": "11. Command-Line API",
       "feature": "`stim analyze_errors`",
@@ -1709,7 +1721,7 @@
     },
     {
       "id": "PERFC-480241ef68b60fba",
-      "source_line": 40,
+      "source_line": 41,
       "anchor_digest": "3efd86eb4cc19c9b55cccc9ff314895d92abcbf3204aec700ae706c001298bc2",
       "section": "2. File Formats And IO Contracts",
       "feature": "Full semantic execution of every legal circuit operation",
@@ -1803,7 +1815,7 @@
     },
     {
       "id": "PERFC-4846f2fef3985a73",
-      "source_line": 38,
+      "source_line": 39,
       "anchor_digest": "78c1420ef30dde70ac111dfea3977747cc6372b7743cc320d9495dc961f3eb5d",
       "section": "2. File Formats And IO Contracts",
       "feature": "Target kinds",
@@ -1918,7 +1930,7 @@
     },
     {
       "id": "PERFC-498524e36d0f0bbd",
-      "source_line": 196,
+      "source_line": 197,
       "anchor_digest": "b4d5f7a06100269c40e7b434c3c3edfc793ec3fe89bc2382995a5379fad05117",
       "section": "13. JavaScript And WASM API",
       "feature": "Crumble browser editor",
@@ -1939,7 +1951,7 @@
     },
     {
       "id": "PERFC-4a1660948ea63fb7",
-      "source_line": 183,
+      "source_line": 184,
       "anchor_digest": "ca670a7512f6696ff8eccf2bcd9b014b1bcf9efab90515034aaa224af0e27310",
       "section": "12. Python API",
       "feature": "Top-level `stim` functions",
@@ -1960,7 +1972,7 @@
     },
     {
       "id": "PERFC-4b8adb25ed1ec85c",
-      "source_line": 185,
+      "source_line": 186,
       "anchor_digest": "2a843b83de3177149573c07f221423b6f6f8ceecd432f62ae6b75f81c0554113",
       "section": "12. Python API",
       "feature": "`stim.DetectorErrorModel` class",
@@ -1981,7 +1993,7 @@
     },
     {
       "id": "PERFC-4cf55ad84dd71d04",
-      "source_line": 27,
+      "source_line": 28,
       "anchor_digest": "431e4d1fa971fe95acb6df04687e02eed2a52b6f553ddae3ba751dfebf024f63",
       "section": "1. Top-Level Product Surface",
       "feature": "Ecosystem integrations",
@@ -2002,7 +2014,7 @@
     },
     {
       "id": "PERFC-4f5163dc1aa08da7",
-      "source_line": 86,
+      "source_line": 87,
       "anchor_digest": "e351bc9c2f45aa9b12786cb6c3d4a02e8509f5b2f67367b236fbf6500d77322b",
       "section": "4. Core Circuit Features",
       "feature": "Reference samples and determined measurements",
@@ -2034,7 +2046,7 @@
     },
     {
       "id": "PERFC-51cbbc11754eceb4",
-      "source_line": 240,
+      "source_line": 241,
       "anchor_digest": "dafdaa9dd08e317abb39c24602a80b9f4300ecf2a0eb4c1ab73ed3afb46be058",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full circuit transform API parity",
@@ -2066,7 +2078,7 @@
     },
     {
       "id": "PERFC-5305d67db48c7e91",
-      "source_line": 98,
+      "source_line": 99,
       "anchor_digest": "b773c5dce0ef34bc12ba514df92dcef76f16b9ee533a227155aca46f17e6c897",
       "section": "5. Detector Error Model Features",
       "feature": "Streaming DEM sampling",
@@ -2098,11 +2110,11 @@
     },
     {
       "id": "PERFC-55676fc3004b7fd2",
-      "source_line": 228,
-      "anchor_digest": "66bf8c2e6ca700f76dabacf5e607793fff4af1d008b370097b2c83c224472031",
+      "source_line": 229,
+      "anchor_digest": "bc8e447814c7dbcc350b5395863f98dfb496b83212c9d182dcee14b9eb49432d",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
-      "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2119,7 +2131,7 @@
     },
     {
       "id": "PERFC-56ceb30ebbb1ac8e",
-      "source_line": 160,
+      "source_line": 161,
       "anchor_digest": "5bdcc44a3b4d77fdc4c623ea28b789056f40b0d36ddc5df9b4c038a89dae82cf",
       "section": "10. Built-In Circuit Generation",
       "feature": "Python `stim.Circuit.generated`",
@@ -2140,7 +2152,7 @@
     },
     {
       "id": "PERFC-5ce01b23bf3372ce",
-      "source_line": 159,
+      "source_line": 160,
       "anchor_digest": "35f5317f5867d2d1535defa44d6d8922a6c1e8116f0cbd218456d752eabad1d7",
       "section": "10. Built-In Circuit Generation",
       "feature": "Generator parameters and noise knobs",
@@ -2172,7 +2184,7 @@
     },
     {
       "id": "PERFC-5d7bb0d4dff1956c",
-      "source_line": 243,
+      "source_line": 244,
       "anchor_digest": "14da4dbce62718afca1fa6dfb0d90c015ff5ab44c77d9bba5611444bacb96b03",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full feedback-inlining transform parity",
@@ -2260,7 +2272,7 @@
     },
     {
       "id": "PERFC-5f2145ca0e3328b5",
-      "source_line": 229,
+      "source_line": 230,
       "anchor_digest": "a5e666130cc41a62e03eb00df8c3d1461b7b230ae9cc711653859232255a9063",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
@@ -2281,7 +2293,7 @@
     },
     {
       "id": "PERFC-607d1f7a2cf1834a",
-      "source_line": 26,
+      "source_line": 27,
       "anchor_digest": "09ab0b4ae7caf4e4fd2eb9ea3d7cb83c66334dc194e4ecfa70742cd859127b0c",
       "section": "1. Top-Level Product Surface",
       "feature": "JavaScript/WASM API",
@@ -2302,7 +2314,7 @@
     },
     {
       "id": "PERFC-62e1399a85e9a96e",
-      "source_line": 81,
+      "source_line": 82,
       "anchor_digest": "6235172d00917d1729b29285997f13adec685382ca6d81985dc5da3d85007d6c",
       "section": "4. Core Circuit Features",
       "feature": "Programmatic mutation",
@@ -2334,7 +2346,7 @@
     },
     {
       "id": "PERFC-62f74c38edc28d0a",
-      "source_line": 122,
+      "source_line": 123,
       "anchor_digest": "2c97203f5d7ef0e4b228ea8ceb033e453fb81d7758c3adf81562594621ff1633",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Error explanation value objects",
@@ -2366,7 +2378,7 @@
     },
     {
       "id": "PERFC-6316a8cb3a98fc44",
-      "source_line": 36,
+      "source_line": 37,
       "anchor_digest": "318296cb8a196505b05506a914af9acd09031585f9ac4358a29fca0a2471ef20",
       "section": "2. File Formats And IO Contracts",
       "feature": "Line-based `.stim` parsing, comments, tags, args, targets, and repeat blocks",
@@ -2398,11 +2410,11 @@
     },
     {
       "id": "PERFC-63dc29187590a0fa",
-      "source_line": 61,
-      "anchor_digest": "8fa3838b2690013fb4a32d0d181c84456790dc35bbdb8a4ee4a4c6f4263467f9",
+      "source_line": 62,
+      "anchor_digest": "f9f5c221e182098d5b8fbad07ca9a901c383d0e4d7575820fb49e31b2d514e0c",
       "section": "2. File Formats And IO Contracts",
       "feature": "Format conversion command coverage",
-      "raw_status": "Done for selected result-format CLI parity",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2433,7 +2445,7 @@
     },
     {
       "id": "PERFC-655f504f7896dbf0",
-      "source_line": 202,
+      "source_line": 203,
       "anchor_digest": "e9a8a5b2bc8f57fbb63ca07ec9cc7dee923b23f9920749a05ab494ffa6f90093",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimcirq`",
@@ -2454,11 +2466,11 @@
     },
     {
       "id": "PERFC-65df8aff7c5d8168",
-      "source_line": 55,
-      "anchor_digest": "da3c24c24f32f1606ce08dbdc92620057c74044c799fc8012a6143939d2e6c1b",
+      "source_line": 56,
+      "anchor_digest": "75d86743d17a5092ad22b2c9233e76aa2e5674d58376a0b786c6f16c5ca58fef",
       "section": "2. File Formats And IO Contracts",
       "feature": "`01` dense text",
-      "raw_status": "Done for selected Rust and CLI scope",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2486,7 +2498,7 @@
     },
     {
       "id": "PERFC-675e4e7fa68ba3b9",
-      "source_line": 217,
+      "source_line": 218,
       "anchor_digest": "d39e9219f8f102da3a787224400dd8a2b01f2ab2dd6adf2b979e8cb26aad9f36",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Generated API docs",
@@ -2507,7 +2519,7 @@
     },
     {
       "id": "PERFC-677831f83967b163",
-      "source_line": 113,
+      "source_line": 114,
       "anchor_digest": "a4d1c7af6fa0c7ce76ca6a6de3530c3a73782026dd777a8fc9bdce367190000b",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Batched flip-frame simulator",
@@ -2528,7 +2540,7 @@
     },
     {
       "id": "PERFC-68d7456b8df6bd93",
-      "source_line": 204,
+      "source_line": 205,
       "anchor_digest": "becd68d7ad621a12610737b1e0109bfff8240f162984b4b694769b8572d7881e",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "Crumble",
@@ -2549,7 +2561,7 @@
     },
     {
       "id": "PERFC-6931d59b7e752dfd",
-      "source_line": 158,
+      "source_line": 159,
       "anchor_digest": "63ff548e2d05dd3890100100cffcdd3597ac9d8406664109195879d82a086f72",
       "section": "10. Built-In Circuit Generation",
       "feature": "`color_code:memory_xyz`",
@@ -2581,7 +2593,7 @@
     },
     {
       "id": "PERFC-6c45d9f27cd36d16",
-      "source_line": 120,
+      "source_line": 121,
       "anchor_digest": "bedbe2e817a90616103b60a67147dc33bf36798326179599b3e1012cdf77e55d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Circuit-to-DEM analysis",
@@ -2613,7 +2625,7 @@
     },
     {
       "id": "PERFC-7b93f3312f66a603",
-      "source_line": 57,
+      "source_line": 58,
       "anchor_digest": "09e61a969027fd66d9b68619ca6f6dedcc797fca3bfc8ad5364d3501f7461a35",
       "section": "2. File Formats And IO Contracts",
       "feature": "`r8` sparse binary",
@@ -2645,7 +2657,7 @@
     },
     {
       "id": "PERFC-7cc38b462a082718",
-      "source_line": 138,
+      "source_line": 139,
       "anchor_digest": "a73f79a4a46eb2a8984f4473e6d39fb1a8e8cfe7b083cc46bb58797e6c728970",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Public borrowed Pauli string refs",
@@ -2666,7 +2678,7 @@
     },
     {
       "id": "PERFC-7d5dca89c9553856",
-      "source_line": 232,
+      "source_line": 233,
       "anchor_digest": "4f2dce9c57383122510c2cbb567c447fcccedfea2085f18cec2086486f7514fe",
       "section": "16. Test And Benchmark Surface",
       "feature": "Tests for deferred Python, JS, diagrams, and ecosystem packages",
@@ -2687,7 +2699,7 @@
     },
     {
       "id": "PERFC-82f45ef6fddc12f8",
-      "source_line": 62,
+      "source_line": 63,
       "anchor_digest": "7560bf57586305cc65b80cbbc568d4f0619e80374e9d1a57956db985f417a144",
       "section": "2. File Formats And IO Contracts",
       "feature": "Streaming IO for large implemented CLI paths",
@@ -2719,7 +2731,7 @@
     },
     {
       "id": "PERFC-83a09d1335d9c916",
-      "source_line": 121,
+      "source_line": 122,
       "anchor_digest": "a7515c8c7970503b17033c0a8b34fb3f18613493cabb2b2281b531402b198ff7",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
@@ -2751,7 +2763,7 @@
     },
     {
       "id": "PERFC-884dc647874f360d",
-      "source_line": 155,
+      "source_line": 156,
       "anchor_digest": "e0f7771e5a457271c32c91256f6ff382a9571e47357baf7fa304f37532533768",
       "section": "10. Built-In Circuit Generation",
       "feature": "`repetition_code:memory`",
@@ -2783,7 +2795,7 @@
     },
     {
       "id": "PERFC-88ab8542a3bfd441",
-      "source_line": 244,
+      "source_line": 245,
       "anchor_digest": "fefd53b8075742c0802e5ecf8224d54ca72bd47d79ef2f44bc310f4c2a98390f",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full ErrorMatcher provenance and `explain_errors` CLI",
@@ -2804,7 +2816,7 @@
     },
     {
       "id": "PERFC-88e03fd088b06849",
-      "source_line": 99,
+      "source_line": 100,
       "anchor_digest": "d29c9831aa61513de19a25774bb908b898239a910b5d85d0997c02feee7f7ec8",
       "section": "5. Detector Error Model Features",
       "feature": "DEM analysis and shortest graphlike error",
@@ -2836,7 +2848,7 @@
     },
     {
       "id": "PERFC-89a73d0b1559b081",
-      "source_line": 139,
+      "source_line": 140,
       "anchor_digest": "213b9d2cac77703a110739618fdd05e687f568a4b4a3c936e6307608a2c5338d",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Conversion to or from numpy, state vectors, and arbitrary unitaries",
@@ -2857,7 +2869,7 @@
     },
     {
       "id": "PERFC-8ac4d4b2d32da162",
-      "source_line": 132,
+      "source_line": 133,
       "anchor_digest": "66e8e733c22cf201a7a5c3950b89ebe1609499b0181275d09c2b1ec92f79febc",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Owned Pauli strings",
@@ -2889,7 +2901,7 @@
     },
     {
       "id": "PERFC-8b0fe82d816e26f2",
-      "source_line": 80,
+      "source_line": 81,
       "anchor_digest": "da84a83372c7d21870055112e66ed5a8be4f88983d923b3fa3b1d72d2093c213",
       "section": "4. Core Circuit Features",
       "feature": "Circuit construction from parsed text",
@@ -2921,7 +2933,7 @@
     },
     {
       "id": "PERFC-8c644079a9eeab7f",
-      "source_line": 140,
+      "source_line": 141,
       "anchor_digest": "c97e076e51e4a2c866d7606fa1da12e6a7b915bb76335afb77502bf4a6d00fe4",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Graph simulator and vector simulator public APIs",
@@ -2942,7 +2954,7 @@
     },
     {
       "id": "PERFC-90e17eacafaae97d",
-      "source_line": 214,
+      "source_line": 215,
       "anchor_digest": "f56f07472f2fddca5ebd8e8bee606fc67d10823fa7897293b56dc4ce9642cd76",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Operational command surface",
@@ -2963,7 +2975,7 @@
     },
     {
       "id": "PERFC-91a871904dcf3356",
-      "source_line": 187,
+      "source_line": 188,
       "anchor_digest": "4e62e2ddc4565ec4314aaf87d35f894fc1d4ec3bcba7ef04e3512445aac51e97",
       "section": "12. Python API",
       "feature": "Error explanation classes",
@@ -2984,7 +2996,7 @@
     },
     {
       "id": "PERFC-933e7f6e900d13cb",
-      "source_line": 195,
+      "source_line": 196,
       "anchor_digest": "9fbe18a00ddbe3ee924c7fd70535eabfc04dfb11210c2430908a80c95c70ec55",
       "section": "13. JavaScript And WASM API",
       "feature": "JS `Circuit`, `Tableau`, `PauliString`, and `TableauSimulator`",
@@ -3005,7 +3017,7 @@
     },
     {
       "id": "PERFC-93fad12b1d302b96",
-      "source_line": 188,
+      "source_line": 189,
       "anchor_digest": "69b1964ab6695fb116bb49de092e1547e96d9db996fe7f1dbb5e790ab2753ccf",
       "section": "12. Python API",
       "feature": "Stabilizer, gate metadata, and simulator classes",
@@ -3026,11 +3038,11 @@
     },
     {
       "id": "PERFC-94bd1a1c7045a109",
-      "source_line": 167,
-      "anchor_digest": "c24fa789e9603f7ee8a77a5eba3dfaf22d0f351ca7954632789fd2364de7bf1e",
+      "source_line": 168,
+      "anchor_digest": "57f2adf25f502e78930f02a59aa0110f3ff5d8bcfcb7381d0acd351222a6c0b7",
       "section": "11. Command-Line API",
       "feature": "`stim convert`",
-      "raw_status": "Done for result-format CLI parity plus Stab `.stim` extension",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3061,7 +3073,7 @@
     },
     {
       "id": "PERFC-95415ea91dc5604a",
-      "source_line": 69,
+      "source_line": 70,
       "anchor_digest": "60d02bc23dd94116dd91855144ea8130582a04e5d6d6baa7e39a69f679134ec7",
       "section": "3. Gate And Instruction Surface",
       "feature": "Parser aliases",
@@ -3093,7 +3105,7 @@
     },
     {
       "id": "PERFC-9a88cdc79b333bc3",
-      "source_line": 88,
+      "source_line": 89,
       "anchor_digest": "f6c15dfffc759bb2d67960c6b53f921f7d518e4b6b32edba95eaec8a81324b9e",
       "section": "4. Core Circuit Features",
       "feature": "Built-in circuit generation",
@@ -3125,7 +3137,7 @@
     },
     {
       "id": "PERFC-9de448bddb421bc8",
-      "source_line": 157,
+      "source_line": 158,
       "anchor_digest": "41d795b9f5a2fb8a9ce32fed2ea0331ff3b1d179f6f162742040443f4af1178d",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:unrotated_memory_x` and `surface_code:unrotated_memory_z`",
@@ -3157,7 +3169,7 @@
     },
     {
       "id": "PERFC-9ecb45672878e7e2",
-      "source_line": 218,
+      "source_line": 219,
       "anchor_digest": "30a2f1b90e44f809c415661d92b95ed655ae16afa144df8cf223cae76a643f9b",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Feature and roadmap docs",
@@ -3178,7 +3190,7 @@
     },
     {
       "id": "PERFC-a05af5fd1c471d2e",
-      "source_line": 114,
+      "source_line": 115,
       "anchor_digest": "7c7aaded39b067994dfa140e6efe18d42fbfe50243d7ea05cf8e7692bfbf9cac",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Exact random-stream parity with Stim",
@@ -3199,7 +3211,7 @@
     },
     {
       "id": "PERFC-a06287237513c901",
-      "source_line": 87,
+      "source_line": 88,
       "anchor_digest": "d0ad1ed5a434093ba07ce0ad12971922941d22a1cc8b6bfe79eede23aa1360a2",
       "section": "4. Core Circuit Features",
       "feature": "Circuit exports",
@@ -3220,7 +3232,7 @@
     },
     {
       "id": "PERFC-a1d4bc5bbe9a861d",
-      "source_line": 242,
+      "source_line": 243,
       "anchor_digest": "697a3d78b0167639ec7df4bd620b99ebad8bd2a4f0f2caecee02c760bbb43e00",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Broader sweep-conditioned simulator and analysis parity",
@@ -3295,7 +3307,7 @@
     },
     {
       "id": "PERFC-a4e48e46d463de4c",
-      "source_line": 194,
+      "source_line": 195,
       "anchor_digest": "098c0dfb3b771f85bd3a3559e5a50b34f17c5dd022aad2363bedae390ffda347",
       "section": "13. JavaScript And WASM API",
       "feature": "WASM build and JS package",
@@ -3316,7 +3328,7 @@
     },
     {
       "id": "PERFC-a650fd6ccb22f00f",
-      "source_line": 174,
+      "source_line": 175,
       "anchor_digest": "14816f986478ef1961dc0622a8061c021e471e4bc1529f5a439ef4ae26d516cf",
       "section": "11. Command-Line API",
       "feature": "`stim explain_errors`",
@@ -3337,7 +3349,7 @@
     },
     {
       "id": "PERFC-a8a7e6dd54bc6357",
-      "source_line": 170,
+      "source_line": 171,
       "anchor_digest": "9549f38c3bb427aaa2c9871dc1dbd3737eccf461549c502d65ab0152df91b387",
       "section": "11. Command-Line API",
       "feature": "`stim m2d`",
@@ -3372,11 +3384,11 @@
     },
     {
       "id": "PERFC-a8cae7083ce5c6f0",
-      "source_line": 24,
-      "anchor_digest": "0cc5e0166aad01adf314ac21546788fecfb72260efcdd5c4e0e1707d3146bc0b",
+      "source_line": 25,
+      "anchor_digest": "0a08684ff36c970112445af97e9881ebd2b800306d08bd641987bbaf1c84e1fb",
       "section": "1. Top-Level Product Surface",
       "feature": "`.stim`, `.dem`, and result-format compatibility",
-      "raw_status": "Partial",
+      "raw_status": "Partial, result-format qualification reopened",
       "scope": "selected",
       "deferred_remainder": true,
       "selected_child": "Implemented format, gate, DEM, analyzer, sampler, search, SAT/WCNF, and filter-key surfaces named by the checklist.",
@@ -3482,7 +3494,7 @@
     },
     {
       "id": "PERFC-a8f9b0776f6cb1e6",
-      "source_line": 48,
+      "source_line": 49,
       "anchor_digest": "392ef4943f2d0c51bd98a175a376f287d448c9d49ca51c75241ad4a99f076542",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM detector shifts, observables, coordinates, and counts",
@@ -3514,7 +3526,7 @@
     },
     {
       "id": "PERFC-abe3a7cb6042a8df",
-      "source_line": 56,
+      "source_line": 57,
       "anchor_digest": "29233cd9331ce29b1a49c13729c1445ab9c5854e4cb87e7ed0a68aa4f16b2861",
       "section": "2. File Formats And IO Contracts",
       "feature": "`b8` dense binary",
@@ -3546,7 +3558,7 @@
     },
     {
       "id": "PERFC-ad2012543fb57e70",
-      "source_line": 82,
+      "source_line": 83,
       "anchor_digest": "1989e81e9d47de3f53ba902fb6d317064183658f23681fc2ca12c8c666604685",
       "section": "4. Core Circuit Features",
       "feature": "Core introspection",
@@ -3578,7 +3590,7 @@
     },
     {
       "id": "PERFC-b3ff07112043c802",
-      "source_line": 241,
+      "source_line": 242,
       "anchor_digest": "b1a1b176338715f7f3dd0ca49217153faf93e5815062e770acd30b0483346bfa",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full DEM public API parity",
@@ -3610,7 +3622,7 @@
     },
     {
       "id": "PERFC-ba7551d3078c0efc",
-      "source_line": 39,
+      "source_line": 40,
       "anchor_digest": "9d3366a8de2114e5562975311a097334f18135168b21f1fae6af541d74c9b353",
       "section": "2. File Formats And IO Contracts",
       "feature": "Broadcast and validation behavior",
@@ -3642,7 +3654,7 @@
     },
     {
       "id": "PERFC-badcbed4e03681fa",
-      "source_line": 175,
+      "source_line": 176,
       "anchor_digest": "a9b9071eb4875805acf98f24656efd51c8e0bd5825e4f2c9ab150ed9f1a9eaf8",
       "section": "11. Command-Line API",
       "feature": "`stim repl`",
@@ -3663,7 +3675,7 @@
     },
     {
       "id": "PERFC-bcb7981e583f0db1",
-      "source_line": 246,
+      "source_line": 247,
       "anchor_digest": "c79d4f690b38795ca8fee657cab68b6ff4999201499823fa8e3ca57ec9d6fcb5",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Diagrams and visualization",
@@ -3684,7 +3696,7 @@
     },
     {
       "id": "PERFC-bee7b774029de282",
-      "source_line": 206,
+      "source_line": 207,
       "anchor_digest": "37e720e4dc4a712855c554d0992f2466e2cf1b05ee51beaf332c53422154fffe",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "ZX and lattice-surgery glue",
@@ -3705,7 +3717,7 @@
     },
     {
       "id": "PERFC-c6090c35e680bc21",
-      "source_line": 245,
+      "source_line": 246,
       "anchor_digest": "5b0f5a032b3b8e5c3ebe116d0d0b06701d13fc5c46f4ab38cb6c84b3d4d32f5e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Public interactive `TableauSimulator` and `FlipSimulator` APIs",
@@ -3726,7 +3738,7 @@
     },
     {
       "id": "PERFC-c6e68a57b705e397",
-      "source_line": 134,
+      "source_line": 135,
       "anchor_digest": "4c26a2b93cc7d12be35ae35d2358dcead0cef18469f15149c7f614ee1f8a64ae",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Clifford strings",
@@ -3758,7 +3770,7 @@
     },
     {
       "id": "PERFC-ca130061d952e60f",
-      "source_line": 126,
+      "source_line": 127,
       "anchor_digest": "33dea12f5089e0a7b3f5ef357261de9058a902b8bc066e0074c40dca6a8642a3",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Sparse reverse detector-frame tracking",
@@ -3790,7 +3802,7 @@
     },
     {
       "id": "PERFC-ca86e3c10de8ab0e",
-      "source_line": 135,
+      "source_line": 136,
       "anchor_digest": "89264fe996ff2d5f269ad43239fd67bcde30d2d756c38125ebbd59a56cf1bded",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Tableaux and tableau iterators",
@@ -3822,7 +3834,7 @@
     },
     {
       "id": "PERFC-cbba6f2c91904807",
-      "source_line": 156,
+      "source_line": 157,
       "anchor_digest": "00d5e51dbd4be28240923aacdc8e18f11692ee694747db03148a84351de59a57",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:rotated_memory_x` and `surface_code:rotated_memory_z`",
@@ -3854,7 +3866,7 @@
     },
     {
       "id": "PERFC-cccae489f6a07220",
-      "source_line": 230,
+      "source_line": 231,
       "anchor_digest": "96ce6825c47bb8b05821b430e1a517ae5d2711e7242ca77012c7c29d62450147",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
@@ -3875,7 +3887,7 @@
     },
     {
       "id": "PERFC-cfa671aed2cf20dc",
-      "source_line": 136,
+      "source_line": 137,
       "anchor_digest": "af90d08388029ebbf1dccd2e757ef7a2601605f371a6bc45ff5f6a17020db8a1",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Algebra resource admission",
@@ -3907,7 +3919,7 @@
     },
     {
       "id": "PERFC-d2900a60b520f035",
-      "source_line": 83,
+      "source_line": 84,
       "anchor_digest": "252602a83d8beaa67886dfcd7471437f5edd8d584f851240acd87437baf61bcf",
       "section": "4. Core Circuit Features",
       "feature": "Circuit coordinate queries",
@@ -3939,7 +3951,7 @@
     },
     {
       "id": "PERFC-d2d203c23e3ef634",
-      "source_line": 22,
+      "source_line": 23,
       "anchor_digest": "5c35a980d35ef29ab7ca679500d9c9f67ac4722d6ed19b75999136edad503cf5",
       "section": "1. Top-Level Product Surface",
       "feature": "Rust core library equivalent for core Stim semantics",
@@ -4013,7 +4025,7 @@
     },
     {
       "id": "PERFC-d454e10c3855a359",
-      "source_line": 176,
+      "source_line": 177,
       "anchor_digest": "e40a238928d8825251b816ed39227cbaba0c103e66ee3e5e64f9e7838d2aa25a",
       "section": "11. Command-Line API",
       "feature": "`stim help` command",
@@ -4045,7 +4057,7 @@
     },
     {
       "id": "PERFC-d4815fc182943ad8",
-      "source_line": 37,
+      "source_line": 38,
       "anchor_digest": "dab11246b75e0f3a282cfc7b7acd4bc4349de4a3fc06a8ec709498d33f10f421",
       "section": "2. File Formats And IO Contracts",
       "feature": "Canonical `.stim` printing",
@@ -4077,7 +4089,7 @@
     },
     {
       "id": "PERFC-d4b49459a03a9bb6",
-      "source_line": 184,
+      "source_line": 185,
       "anchor_digest": "d29b211ab65358154d7c3e28b537c3b1d12547c772f7caec92b324efe98e383a",
       "section": "12. Python API",
       "feature": "`stim.Circuit` class",
@@ -4098,7 +4110,7 @@
     },
     {
       "id": "PERFC-d5c4a8400325bab2",
-      "source_line": 207,
+      "source_line": 208,
       "anchor_digest": "2d79363cc5ab1c29e346ab4d5b1846cca0a74090376b36acd99151734084c713",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "QASM and Quirk exports",
@@ -4119,7 +4131,7 @@
     },
     {
       "id": "PERFC-d96593c4523940ed",
-      "source_line": 249,
+      "source_line": 250,
       "anchor_digest": "7b5c77801a6717cb5fc8a86f94d45a1f3ed9572665da58c1aa96cd77a4bda73e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Generated feature/status matrix tooling",
@@ -4140,7 +4152,7 @@
     },
     {
       "id": "PERFC-db434c9ff1984af2",
-      "source_line": 68,
+      "source_line": 69,
       "anchor_digest": "283504ba4f2114ded01791f7a091770bc4b5f4b4ed30db8c79d120f123f147a8",
       "section": "3. Gate And Instruction Surface",
       "feature": "81 canonical Stim v1.16.0 gates",
@@ -4172,7 +4184,7 @@
     },
     {
       "id": "PERFC-dbb63f4fc43af7f7",
-      "source_line": 94,
+      "source_line": 95,
       "anchor_digest": "09f2c157da4976535abeb2c97104dd325910370633960e3677ab449a0621bc3b",
       "section": "5. Detector Error Model Features",
       "feature": "DEM construction and mutation",
@@ -4204,7 +4216,7 @@
     },
     {
       "id": "PERFC-dbdd023fd3d2ad04",
-      "source_line": 172,
+      "source_line": 173,
       "anchor_digest": "ed73f693ec55c7e66fac46078602910437bdb1bc4875c82b3616f248c07c1bad",
       "section": "11. Command-Line API",
       "feature": "`stim sample_dem`",
@@ -4239,7 +4251,7 @@
     },
     {
       "id": "PERFC-de7b7cb4361bc371",
-      "source_line": 112,
+      "source_line": 113,
       "anchor_digest": "53406935eeafd7e4407e3f1369c7dfbda165ef5fba486e7a43d145335d809a61",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Single-shot interactive tableau simulator",
@@ -4260,7 +4272,7 @@
     },
     {
       "id": "PERFC-df6a905ca1763242",
-      "source_line": 137,
+      "source_line": 138,
       "anchor_digest": "993de8cc76d1d0b462c66068001b3e2348172f1f24acd827ba88ba0ddcbcdf86",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flows",
@@ -4292,7 +4304,7 @@
     },
     {
       "id": "PERFC-df75e03063fd3fc3",
-      "source_line": 203,
+      "source_line": 204,
       "anchor_digest": "2f9725f6bf654cee8c7ddd4041daa4b1e7c20ebc96f2dc262e4f7271883deb11",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`sinter`",
@@ -4313,7 +4325,7 @@
     },
     {
       "id": "PERFC-e298c35e6daabf7c",
-      "source_line": 146,
+      "source_line": 147,
       "anchor_digest": "0bac94c5b0ee4195af813b45f607c8a6193335dfeba74c941dd66e86b61d82de",
       "section": "9. Diagrams And Visualization",
       "feature": "Circuit timeline diagrams",
@@ -4334,7 +4346,7 @@
     },
     {
       "id": "PERFC-e506fabb116fcd08",
-      "source_line": 23,
+      "source_line": 24,
       "anchor_digest": "74bc299f60867ee37cc3d5216a18aad692c30d7a90047d98ad929698e92597a1",
       "section": "1. Top-Level Product Surface",
       "feature": "CLI binary",
@@ -4366,7 +4378,7 @@
     },
     {
       "id": "PERFC-e78daef9f77f3f2a",
-      "source_line": 168,
+      "source_line": 169,
       "anchor_digest": "5e57a3460a4437b641bbf4fd0d1f46846151c9b5b1ad034169973254c1e2ed32",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
@@ -4401,7 +4413,7 @@
     },
     {
       "id": "PERFC-e9ea7ae3015ccb24",
-      "source_line": 166,
+      "source_line": 167,
       "anchor_digest": "d315a6f3374c95dbe937e2192167f620583dc216bf860f180ef0ead2530f76be",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
@@ -4436,7 +4448,7 @@
     },
     {
       "id": "PERFC-ec64113cdae0cd99",
-      "source_line": 133,
+      "source_line": 134,
       "anchor_digest": "1536b5d7e0c2104c100f62b2234aec61d5a765f0beb6a3e043c73efca03d5e1a",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flexible Pauli strings",
@@ -4468,7 +4480,7 @@
     },
     {
       "id": "PERFC-ecd5f55662178652",
-      "source_line": 49,
+      "source_line": 50,
       "anchor_digest": "e9b0cbb866efc8f615a0c4cfb6145f093382638e08050f3c33dd11dfcbc23520",
       "section": "2. File Formats And IO Contracts",
       "feature": "DEM flattening and large repeat traversal",
@@ -4500,7 +4512,7 @@
     },
     {
       "id": "PERFC-f1c2cb6679495a26",
-      "source_line": 111,
+      "source_line": 112,
       "anchor_digest": "47621c511a823d8516a84439d35c9810191293b353cf808722497896fdef35f3",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "DEM sampling",
@@ -4532,7 +4544,7 @@
     },
     {
       "id": "PERFC-f291ccb446656fb5",
-      "source_line": 71,
+      "source_line": 72,
       "anchor_digest": "5021b640ba854eb010877b24e69c70bb5665c396c871f1025b1923f2c26fa497",
       "section": "3. Gate And Instruction Surface",
       "feature": "Gate semantic execution",
@@ -4564,7 +4576,7 @@
     },
     {
       "id": "PERFC-f652be46399d9e30",
-      "source_line": 205,
+      "source_line": 206,
       "anchor_digest": "779160519301ef8ae83b5a77954e6d74bf4d24b39ab9d4c6022bff4b7cac324c",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimflow`",
@@ -4585,7 +4597,7 @@
     },
     {
       "id": "PERFC-f94f299efef1806b",
-      "source_line": 186,
+      "source_line": 187,
       "anchor_digest": "b00da9477657a5bd0d4d3ad651d2b2ffd32d25e5333955aec9ca06f2d256aa49",
       "section": "12. Python API",
       "feature": "Sampler and converter classes",
@@ -4606,7 +4618,7 @@
     },
     {
       "id": "PERFC-fcd1419d4f264ace",
-      "source_line": 110,
+      "source_line": 111,
       "anchor_digest": "90efad3a0f37baad1eb0976a6a2a79fc77c50cea296e476fd35221eeec3300ec",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Detector-analysis utility APIs",
@@ -4638,7 +4650,7 @@
     },
     {
       "id": "PERFC-fdf0cb5af29e8578",
-      "source_line": 215,
+      "source_line": 216,
       "anchor_digest": "6a946fbf8d724cdea3a1c887fa120e737c155899b2c51ee35568142f79711cad",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Python packaging",
@@ -4659,7 +4671,7 @@
     },
     {
       "id": "PERFC-fe506130e24c0ab7",
-      "source_line": 147,
+      "source_line": 148,
       "anchor_digest": "309e7a33382302c4634c6b3b8e122af8df5ea2712dd3aacb778d48da6fa18d27",
       "section": "9. Diagrams And Visualization",
       "feature": "Detector-slice diagrams",
@@ -4680,7 +4692,7 @@
     },
     {
       "id": "PERFC-ff83372101a84615",
-      "source_line": 148,
+      "source_line": 149,
       "anchor_digest": "91cd6e00076f404b397929b4d2ff1b823ba4ef51d875826fa85802d773c7df2c",
       "section": "9. Diagrams And Visualization",
       "feature": "DEM match-graph diagrams",
@@ -12604,6 +12616,544 @@
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-04662b5f4b0a412f"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-7f12917bdf9efc13",
+      "path": "stab_core::DetsLayout",
+      "kind": "struct",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-cb658c8dfe68e228",
+      "path": "stab_core::DetsLayout as Clone for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-856a3cec4b877642",
+      "path": "stab_core::DetsLayout as Copy for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-b808bc8f53f2df50",
+      "path": "stab_core::DetsLayout as Debug for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-14cec69346a5b89b",
+      "path": "stab_core::DetsLayout as Eq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-1342a3735360d9fe",
+      "path": "stab_core::DetsLayout as Hash for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-cce476d44c9e8f68",
+      "path": "stab_core::DetsLayout as PartialEq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-3770214a9035f280",
+      "path": "stab_core::DetsLayout as StructuralPartialEq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-5da5200baf042f59",
+      "path": "stab_core::DetsLayout::detectors",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-6b64fc74bb490b15",
+      "path": "stab_core::DetsLayout::measurement_only",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-0aa67fb3bb3a4bba",
+      "path": "stab_core::DetsLayout::measurements",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-12977d9ab4624638",
+      "path": "stab_core::DetsLayout::observables",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-c26eb6bee94acfec",
+      "path": "stab_core::DetsLayout::total_bits",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-e2056d31ebf779b6",
+      "path": "stab_core::DetsLayout::try_new",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-ff80289083da3157",
+        "PERFQ-API-c9476de2f2bc0dd0"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-6f2dc98b011c56c7",
+      "path": "stab_core::DetsResultType",
+      "kind": "enum",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-fa029ea7f0b58418",
+      "path": "stab_core::DetsResultType as Clone for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-875cc56ee3c41945",
+        "PERFQ-API-13361603d85fc1eb"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-8efc03ba007361de",
+      "path": "stab_core::DetsResultType as Copy for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-660a784e72fadfb7",
+      "path": "stab_core::DetsResultType as Debug for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-08496094e9229c84",
+      "path": "stab_core::DetsResultType as Eq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-0ea89225d097d71e",
+      "path": "stab_core::DetsResultType as Hash for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-875cc56ee3c41945",
+        "PERFQ-API-13361603d85fc1eb"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-eeee4e9dcc9d4774",
+      "path": "stab_core::DetsResultType as PartialEq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-875cc56ee3c41945",
+        "PERFQ-API-13361603d85fc1eb"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-97b761a498514e2a",
+      "path": "stab_core::DetsResultType as StructuralPartialEq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-b049dc038789977d",
+      "path": "stab_core::DetsResultType::Detector",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-07265c5b51c42e00",
+      "path": "stab_core::DetsResultType::Measurement",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-c73199adeaa5d356",
+      "path": "stab_core::DetsResultType::Observable",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-309ea607e5297089",
+      "path": "stab_core::DetsResultType::prefix",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-875cc56ee3c41945",
+        "PERFQ-API-13361603d85fc1eb"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-0e9a5840c8282f96",
+      "path": "stab_core::DetsToken",
+      "kind": "struct",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-1605d1447510ee4a",
+      "path": "stab_core::DetsToken as Clone for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-291fb7cdacd33a87",
+      "path": "stab_core::DetsToken as Copy for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-aa01c1406b8e26e0",
+      "path": "stab_core::DetsToken as Debug for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-44da8a3d2418dc0b",
+      "path": "stab_core::DetsToken as Eq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-44b5a045eb36fea3",
+      "path": "stab_core::DetsToken as Hash for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-61bac5b03989d3d0",
+      "path": "stab_core::DetsToken as PartialEq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-75bd000e878a9e9d",
+      "path": "stab_core::DetsToken as StructuralPartialEq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-54b0376fdba93c2a",
+      "path": "stab_core::DetsToken::index",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-1bfd85f62d570656",
+      "path": "stab_core::DetsToken::new",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-9a3a2f95620693e2",
+      "path": "stab_core::DetsToken::result_type",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-12ded0a626d911e5",
+        "PERFQ-API-c2997a9595acd953"
       ],
       "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
     },
@@ -24904,6 +25454,544 @@
       "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
     },
     {
+      "id": "cq-api-item-2c19b2e9f76717e1",
+      "path": "stab_core::result_formats::DetsLayout",
+      "kind": "struct",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-45222310d07dd8ca",
+      "path": "stab_core::result_formats::DetsLayout as Clone for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-dfa35828199107d7",
+      "path": "stab_core::result_formats::DetsLayout as Copy for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8c39493c67499c4c",
+      "path": "stab_core::result_formats::DetsLayout as Debug for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8c0afc731d29d188",
+      "path": "stab_core::result_formats::DetsLayout as Eq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-ec53e2e01ec1b91e",
+      "path": "stab_core::result_formats::DetsLayout as Hash for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-0ce0eff88ea6873c",
+      "path": "stab_core::result_formats::DetsLayout as PartialEq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-eee7c940e2adc738",
+      "path": "stab_core::result_formats::DetsLayout as StructuralPartialEq for@a57f44bd4aef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-dd468615f73503ac",
+      "path": "stab_core::result_formats::DetsLayout::detectors",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-1f280db47bdd1512",
+      "path": "stab_core::result_formats::DetsLayout::measurement_only",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-d5bf7fd8a8f80f63",
+      "path": "stab_core::result_formats::DetsLayout::measurements",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-df2517f8b8ae4200",
+      "path": "stab_core::result_formats::DetsLayout::observables",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-ffede0003ad4ca3f",
+      "path": "stab_core::result_formats::DetsLayout::total_bits",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-25d23f1f089b3778",
+      "path": "stab_core::result_formats::DetsLayout::try_new",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-402b5bbe5de3690a",
+        "PERFQ-API-f82347a927f9a915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-8e70d6bbe849bfd2",
+      "path": "stab_core::result_formats::DetsResultType",
+      "kind": "enum",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-3162e20b507c1d9a",
+      "path": "stab_core::result_formats::DetsResultType as Clone for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-d91823e4cf620038",
+        "PERFQ-API-3940b15050a59c32"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-062d4ab6c49ee1da",
+      "path": "stab_core::result_formats::DetsResultType as Copy for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-b6d7f8af227eeaf3",
+      "path": "stab_core::result_formats::DetsResultType as Debug for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-6c395b3ed8158760",
+      "path": "stab_core::result_formats::DetsResultType as Eq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-66b10e6ee66e538a",
+      "path": "stab_core::result_formats::DetsResultType as Hash for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-d91823e4cf620038",
+        "PERFQ-API-3940b15050a59c32"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-c265614872cd6360",
+      "path": "stab_core::result_formats::DetsResultType as PartialEq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-d91823e4cf620038",
+        "PERFQ-API-3940b15050a59c32"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-83ef60426ca6706c",
+      "path": "stab_core::result_formats::DetsResultType as StructuralPartialEq for@38f0381f48e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-5a29ec83ea8ca919",
+      "path": "stab_core::result_formats::DetsResultType::Detector",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8403d572c740e36d",
+      "path": "stab_core::result_formats::DetsResultType::Measurement",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-68a746d9029be353",
+      "path": "stab_core::result_formats::DetsResultType::Observable",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8fa4cf14efe1fae8",
+      "path": "stab_core::result_formats::DetsResultType::prefix",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-d91823e4cf620038",
+        "PERFQ-API-3940b15050a59c32"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-ca400cc66b67707d",
+      "path": "stab_core::result_formats::DetsToken",
+      "kind": "struct",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-1577007ae832e05d",
+      "path": "stab_core::result_formats::DetsToken as Clone for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-dbcf32b1888fc11d",
+      "path": "stab_core::result_formats::DetsToken as Copy for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-bc50cd9168a514fc",
+      "path": "stab_core::result_formats::DetsToken as Debug for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-090efe383789a1c7",
+      "path": "stab_core::result_formats::DetsToken as Eq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-a3a4522965e66fb6",
+      "path": "stab_core::result_formats::DetsToken as Hash for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-9cce49692ba0169b",
+      "path": "stab_core::result_formats::DetsToken as PartialEq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-c5caa9e583052961",
+      "path": "stab_core::result_formats::DetsToken as StructuralPartialEq for@9d60e83e1ef0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-05a944f1f9d4d263",
+      "path": "stab_core::result_formats::DetsToken::index",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-d688805db107c1a5",
+      "path": "stab_core::result_formats::DetsToken::new",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-97d6e44f1a34d3e5",
+      "path": "stab_core::result_formats::DetsToken::result_type",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-cab459a2f5110e87",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-da78618f21baae58",
+        "PERFQ-API-4abbd244caaf2253"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
       "id": "cq-api-item-3d321f99337a2147",
       "path": "stab_core::result_formats::MeasureRecord",
       "kind": "struct",
@@ -25960,6 +27048,22 @@
       "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
     },
     {
+      "id": "cq-api-item-0591188804ab11c8",
+      "path": "stab_core::result_formats::read_dets_records",
+      "kind": "function",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-160eff0bdaf3f15c",
+        "PERFQ-API-407f516bb14dd915"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
       "id": "cq-api-item-cf32c53cb2e71e55",
       "path": "stab_core::result_formats::read_measurement_records",
       "kind": "function",
@@ -26068,6 +27172,70 @@
       "parent_group_ids": [
         "PERFQ-API-f526d6dd698da2fe",
         "PERFQ-API-46da51902b8dfe89"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-4b373af45f69ad32",
+      "path": "stab_core::result_streaming::for_each_dets_packed_record",
+      "kind": "function",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-79ce23b35670733d",
+        "PERFQ-API-61d7840f711fb424"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-7362265b91388628",
+      "path": "stab_core::result_streaming::for_each_dets_record",
+      "kind": "function",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-79ce23b35670733d",
+        "PERFQ-API-61d7840f711fb424"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-7bd570ebff8db958",
+      "path": "stab_core::result_streaming::for_each_dets_sparse_shot",
+      "kind": "function",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-56c3371c946aaed3",
+        "PERFQ-API-5237b206903246c8"
+      ],
+      "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
+    },
+    {
+      "id": "cq-api-item-f8ef8805006444de",
+      "path": "stab_core::result_streaming::for_each_dets_token_record",
+      "kind": "function",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-79ce23b35670733d",
+        "PERFQ-API-61d7840f711fb424"
       ],
       "reason": "Behavioral operation is assigned to its exact measured parent; the parent status and evidence state determine whether the workload is planned, implemented, or qualified."
     },
@@ -31659,6 +32827,175 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-12ded0a626d911e5",
+      "manifest_row": "perfq-api-12ded0a626d911e5",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsToken as Clone for@9d60e83e1ef0",
+        "stab_core::DetsToken as Hash for@9d60e83e1ef0",
+        "stab_core::DetsToken as PartialEq for@9d60e83e1ef0",
+        "stab_core::DetsToken::index",
+        "stab_core::DetsToken::new",
+        "stab_core::DetsToken::result_type"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-12ded0a626d911e5"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsToken with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsToken in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-13361603d85fc1eb",
+      "manifest_row": "perfq-api-13361603d85fc1eb",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsResultType as Clone for@38f0381f48e9",
+        "stab_core::DetsResultType as Hash for@38f0381f48e9",
+        "stab_core::DetsResultType as PartialEq for@38f0381f48e9",
+        "stab_core::DetsResultType::prefix"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-13361603d85fc1eb"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsResultType with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsResultType in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-142a7c41d515eac4",
       "manifest_row": "perfq-api-142a7c41d515eac4",
       "row_origin": "planned",
@@ -31837,6 +33174,7 @@
       "checklist_child_ids": [],
       "public_api_items": [
         "stab_core::result_formats::ptb64_record_count",
+        "stab_core::result_formats::read_dets_records",
         "stab_core::result_formats::read_measurement_records",
         "stab_core::result_formats::read_ptb64_records",
         "stab_core::result_formats::read_ptb64_records_all",
@@ -34228,6 +35566,91 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-3940b15050a59c32",
+      "manifest_row": "perfq-api-3940b15050a59c32",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsResultType as Clone for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType as Hash for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType as PartialEq for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType::prefix"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-3940b15050a59c32"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsResultType with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsResultType in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-39dd2d7c44e7dac8",
       "manifest_row": "perfq-api-39dd2d7c44e7dac8",
       "row_origin": "planned",
@@ -34807,6 +36230,93 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-402b5bbe5de3690a",
+      "manifest_row": "perfq-api-402b5bbe5de3690a",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsLayout as Clone for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout as Hash for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout as PartialEq for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout::detectors",
+        "stab_core::result_formats::DetsLayout::measurement_only",
+        "stab_core::result_formats::DetsLayout::measurements",
+        "stab_core::result_formats::DetsLayout::observables",
+        "stab_core::result_formats::DetsLayout::total_bits",
+        "stab_core::result_formats::DetsLayout::try_new"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-402b5bbe5de3690a"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsLayout with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsLayout in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-405e503f03f03da3",
       "manifest_row": "perfq-api-405e503f03f03da3",
       "row_origin": "planned",
@@ -34895,6 +36405,7 @@
       "checklist_child_ids": [],
       "public_api_items": [
         "stab_core::result_formats::ptb64_record_count",
+        "stab_core::result_formats::read_dets_records",
         "stab_core::result_formats::read_measurement_records",
         "stab_core::result_formats::read_ptb64_records",
         "stab_core::result_formats::read_ptb64_records_all",
@@ -36136,6 +37647,93 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-4abbd244caaf2253",
+      "manifest_row": "perfq-api-4abbd244caaf2253",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsToken as Clone for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken as Hash for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken as PartialEq for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken::index",
+        "stab_core::result_formats::DetsToken::new",
+        "stab_core::result_formats::DetsToken::result_type"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-4abbd244caaf2253"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsToken with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsToken in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-4af502d278e2586a",
       "manifest_row": "perfq-api-4af502d278e2586a",
       "row_origin": "planned",
@@ -37090,12 +38688,14 @@
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
+        "stab_core::result_streaming::for_each_dets_sparse_shot",
         "stab_core::result_streaming::for_each_sparse_record"
       ],
       "disposition": "measured",
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
+        "cq-evidence-qualification-26a553fce110f2b7",
         "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
@@ -37505,12 +39105,14 @@
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
+        "stab_core::result_streaming::for_each_dets_sparse_shot",
         "stab_core::result_streaming::for_each_sparse_record"
       ],
       "disposition": "measured",
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
+        "cq-evidence-qualification-26a553fce110f2b7",
         "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
@@ -38777,6 +40379,9 @@
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
+        "stab_core::result_streaming::for_each_dets_packed_record",
+        "stab_core::result_streaming::for_each_dets_record",
+        "stab_core::result_streaming::for_each_dets_token_record",
         "stab_core::result_streaming::for_each_packed_record",
         "stab_core::result_streaming::for_each_ptb64_record",
         "stab_core::result_streaming::for_each_ptb64_record_all",
@@ -38787,6 +40392,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
+        "cq-evidence-qualification-26a553fce110f2b7",
         "cq-evidence-qualification-9b04b26a9da1b3cc",
         "cq-evidence-qualification-db7d4cd87fe69099"
       ],
@@ -40302,6 +41908,9 @@
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
+        "stab_core::result_streaming::for_each_dets_packed_record",
+        "stab_core::result_streaming::for_each_dets_record",
+        "stab_core::result_streaming::for_each_dets_token_record",
         "stab_core::result_streaming::for_each_packed_record",
         "stab_core::result_streaming::for_each_ptb64_record",
         "stab_core::result_streaming::for_each_ptb64_record_all",
@@ -40312,6 +41921,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
+        "cq-evidence-qualification-26a553fce110f2b7",
         "cq-evidence-qualification-9b04b26a9da1b3cc",
         "cq-evidence-qualification-db7d4cd87fe69099"
       ],
@@ -41357,6 +42967,88 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::DetectorErrorModel in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-875cc56ee3c41945",
+      "manifest_row": "perfq-api-875cc56ee3c41945",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsResultType as Clone for@38f0381f48e9",
+        "stab_core::DetsResultType as Hash for@38f0381f48e9",
+        "stab_core::DetsResultType as PartialEq for@38f0381f48e9",
+        "stab_core::DetsResultType::prefix"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-875cc56ee3c41945"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0ea89225d097d71e",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsResultType with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsResultType in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
       "status": "planned"
     },
     {
@@ -45886,6 +47578,93 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-c2997a9595acd953",
+      "manifest_row": "perfq-api-c2997a9595acd953",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsToken as Clone for@9d60e83e1ef0",
+        "stab_core::DetsToken as Hash for@9d60e83e1ef0",
+        "stab_core::DetsToken as PartialEq for@9d60e83e1ef0",
+        "stab_core::DetsToken::index",
+        "stab_core::DetsToken::new",
+        "stab_core::DetsToken::result_type"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-c2997a9595acd953"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-1605d1447510ee4a",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsToken with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsToken in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-c45a159f33a04d54",
       "manifest_row": "perfq-api-c45a159f33a04d54",
       "row_origin": "planned",
@@ -46222,6 +48001,96 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::RepetitionCodeTask in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core/generation",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-c9476de2f2bc0dd0",
+      "manifest_row": "perfq-api-c9476de2f2bc0dd0",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsLayout as Clone for@a57f44bd4aef",
+        "stab_core::DetsLayout as Hash for@a57f44bd4aef",
+        "stab_core::DetsLayout as PartialEq for@a57f44bd4aef",
+        "stab_core::DetsLayout::detectors",
+        "stab_core::DetsLayout::measurement_only",
+        "stab_core::DetsLayout::measurements",
+        "stab_core::DetsLayout::observables",
+        "stab_core::DetsLayout::total_bits",
+        "stab_core::DetsLayout::try_new"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-c9476de2f2bc0dd0"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsLayout with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsLayout in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
       "status": "planned"
     },
     {
@@ -47198,6 +49067,88 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-d91823e4cf620038",
+      "manifest_row": "perfq-api-d91823e4cf620038",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsResultType as Clone for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType as Hash for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType as PartialEq for@38f0381f48e9",
+        "stab_core::result_formats::DetsResultType::prefix"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-d91823e4cf620038"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-3162e20b507c1d9a",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsResultType with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsResultType in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-da2577c75491f817",
       "manifest_row": "perfq-api-da2577c75491f817",
       "row_origin": "planned",
@@ -47278,6 +49229,90 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::Circuit in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-da78618f21baae58",
+      "manifest_row": "perfq-api-da78618f21baae58",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsToken as Clone for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken as Hash for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken as PartialEq for@9d60e83e1ef0",
+        "stab_core::result_formats::DetsToken::index",
+        "stab_core::result_formats::DetsToken::new",
+        "stab_core::result_formats::DetsToken::result_type"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-da78618f21baae58"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-05a944f1f9d4d263",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsToken with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsToken in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
       "status": "planned"
     },
     {
@@ -50258,6 +52293,96 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-f82347a927f9a915",
+      "manifest_row": "perfq-api-f82347a927f9a915",
+      "row_origin": "planned",
+      "performance_feature": "PERF-CONVERT-CLI",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::result_formats::DetsLayout as Clone for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout as Hash for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout as PartialEq for@a57f44bd4aef",
+        "stab_core::result_formats::DetsLayout::detectors",
+        "stab_core::result_formats::DetsLayout::measurement_only",
+        "stab_core::result_formats::DetsLayout::measurements",
+        "stab_core::result_formats::DetsLayout::observables",
+        "stab_core::result_formats::DetsLayout::total_bits",
+        "stab_core::result_formats::DetsLayout::try_new"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-f82347a927f9a915"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0ce0eff88ea6873c",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4096
+            }
+          }
+        ]
+      },
+      "work_unit": "bytes",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::result_formats::DetsLayout with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::result_formats::DetsLayout in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-f889046cdd5fce8c",
       "manifest_row": "perfq-api-f889046cdd5fce8c",
       "row_origin": "planned",
@@ -51201,6 +53326,93 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::bits::SparseXorVec in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core/bits",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-ff80289083da3157",
+      "manifest_row": "perfq-api-ff80289083da3157",
+      "row_origin": "planned",
+      "performance_feature": "PERF-RESULT-IO",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::DetsLayout as Clone for@a57f44bd4aef",
+        "stab_core::DetsLayout as Hash for@a57f44bd4aef",
+        "stab_core::DetsLayout as PartialEq for@a57f44bd4aef",
+        "stab_core::DetsLayout::detectors",
+        "stab_core::DetsLayout::measurement_only",
+        "stab_core::DetsLayout::measurements",
+        "stab_core::DetsLayout::observables",
+        "stab_core::DetsLayout::total_bits",
+        "stab_core::DetsLayout::try_new"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-cab459a2f5110e87"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-ff80289083da3157"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0aa67fb3bb3a4bba",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::DetsLayout with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::DetsLayout in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/result-formats",
       "status": "planned"
     },
     {
@@ -62047,7 +64259,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
@@ -62143,7 +64355,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/dem_model_contract.h",
@@ -63103,7 +65315,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -63203,7 +65415,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -63359,7 +65571,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -63456,7 +65668,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63553,7 +65765,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63650,7 +65862,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63748,7 +65960,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63844,7 +66056,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63940,7 +66152,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -64039,7 +66251,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -64141,7 +66353,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/clifford_string_contract.h",
@@ -64246,7 +66458,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -64344,7 +66556,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
@@ -64444,7 +66656,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "696617e1738c4621158354d921d7fd003932d0af80fd2871f425b7b6362e1ed9"
+            "sha256": "218c986a6cfb2a165fb06d4088d0367db52c7b52c142e2a8365e8a395939a2fd"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",

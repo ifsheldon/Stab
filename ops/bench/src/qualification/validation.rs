@@ -11,55 +11,27 @@ use crate::error::BenchError;
 use crate::manifest::BenchmarkManifest;
 
 mod counts;
+mod issues;
 mod planned;
 mod replacements;
 mod source;
 mod values;
 
 use counts::{validate_classification_count, validate_decision_count, validate_parent_disposition};
+use issues::Issues;
 use planned::validate_planned_workload;
 use values::{
     filter_matches_any, filter_selects_symbol, is_digest, validate_digest,
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "17d736fcbeed5b98e6ef04c1d5dee75dfde833259cd345bf40efd44ed2961942";
+const CORRECTNESS_DIGEST: &str = "592934174f3cf248553d3df67078ec00563e48acfd4c5ddf15cef44fd9b49fd0";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_PUBLIC_API_ITEMS: usize = 1_986;
+const EXPECTED_PUBLIC_API_ITEMS: usize = 2_065;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
 const EXPECTED_WAIVERS: usize = 3;
-const MAX_ISSUES: usize = 256;
-
-#[derive(Default)]
-struct Issues {
-    messages: Vec<String>,
-    omitted: usize,
-}
-
-impl Issues {
-    fn push(&mut self, message: impl Into<String>) {
-        if self.messages.len() < MAX_ISSUES {
-            self.messages.push(message.into());
-        } else {
-            self.omitted = self.omitted.saturating_add(1);
-        }
-    }
-
-    fn finish(mut self) -> Result<(), BenchError> {
-        if self.messages.is_empty() {
-            return Ok(());
-        }
-        if self.omitted != 0 {
-            self.messages.push(format!(
-                "{} additional qualification issues omitted",
-                self.omitted
-            ));
-        }
-        Err(BenchError::Qualification(self.messages.join("\n")))
-    }
-}
 
 pub(super) fn validate(
     suite: &QualificationSuite,
@@ -190,6 +162,7 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
     let mut ids = BTreeSet::new();
     let mut anchors = BTreeSet::new();
     let mut done = 0;
+    let mut reopened = 0;
     let mut partial = 0;
     let mut deferred = 0;
     let mut global_child_domains = BTreeSet::new();
@@ -231,6 +204,21 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
                 {
                     issues.push(format!(
                         "done checklist item {} has an invalid split",
+                        item.id
+                    ));
+                }
+            }
+            value if value.starts_with("Reopened") => {
+                reopened += 1;
+                if item.scope != ChecklistScope::Selected
+                    || item.selected_child.is_none()
+                    || item.deferred_child.is_some()
+                    || item.deferred_remainder
+                    || item.selected_child_ids.is_empty()
+                    || !item.deferred_child_ids.is_empty()
+                {
+                    issues.push(format!(
+                        "reopened checklist item {} has an invalid split",
                         item.id
                     ));
                 }
@@ -393,9 +381,9 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
             issues,
         );
     }
-    if (done, partial, deferred) != (74, 7, 46) {
+    if (done, reopened, partial, deferred) != (68, 6, 7, 46) {
         issues.push(format!(
-            "checklist status counts are done={done} partial={partial} deferred={deferred}, expected 74/7/46"
+            "checklist status counts are done={done} reopened={reopened} partial={partial} deferred={deferred}, expected 68/6/7/46"
         ));
     }
 }
@@ -511,14 +499,14 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
     }
     let expected = BTreeMap::from([
         ("constant", 1),
-        ("enum", 33),
+        ("enum", 35),
         ("field", 202),
-        ("function", 70),
-        ("method", 616),
-        ("struct", 84),
-        ("trait-impl", 717),
+        ("function", 75),
+        ("method", 636),
+        ("struct", 88),
+        ("trait-impl", 759),
         ("type-alias", 7),
-        ("variant", 256),
+        ("variant", 262),
     ]);
     if kinds != expected {
         issues.push(format!("public API kind counts are stale: {kinds:?}"));

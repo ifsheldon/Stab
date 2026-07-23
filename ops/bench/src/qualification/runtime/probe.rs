@@ -328,7 +328,7 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         args: worker_arguments(&args),
         stdin: Vec::new(),
         working_directory: root.path.clone(),
-        environment: probe_environment(),
+        environment: probe_environment().into(),
         affinity_cpu: None,
         limits: probe_limits(),
     };
@@ -482,7 +482,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         args: common_arguments.clone(),
         stdin: Vec::new(),
         working_directory: root.path.clone(),
-        environment: probe_environment(),
+        environment: probe_environment().into(),
         affinity_cpu: None,
         limits: probe_limits(),
     };
@@ -493,7 +493,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         args: worker_arguments,
         stdin: Vec::new(),
         working_directory: root.path.clone(),
-        environment: probe_environment(),
+        environment: probe_environment().into(),
         affinity_cpu: None,
         limits: probe_limits(),
     };
@@ -805,8 +805,8 @@ fn checked_process(output: ProcessResult, name: &'static str) -> Result<ProcessR
 fn probe_limits() -> ProcessLimits {
     ProcessLimits {
         stdin_bytes: 0,
-        stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-        stderr_bytes: 64 << 10,
+        stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
+        stderr: (64 << 10).into(),
         regular_file_bytes: None,
         timeout: Duration::from_secs(30),
     }
@@ -860,8 +860,8 @@ mod tests {
     fn probe_limits_bound_every_protocol_stream() {
         let limits = probe_limits();
         assert_eq!(limits.stdin_bytes, 0);
-        assert_eq!(limits.stdout_bytes, PROTOCOL_OUTPUT_LIMIT);
-        assert!(limits.stderr_bytes > 0);
+        assert_eq!(limits.stdout, PROTOCOL_OUTPUT_LIMIT.into());
+        assert_eq!(limits.stderr, (64 << 10).into());
         assert!(limits.timeout > Duration::ZERO);
     }
 

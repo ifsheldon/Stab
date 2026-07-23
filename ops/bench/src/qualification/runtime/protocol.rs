@@ -4,7 +4,7 @@ use std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 4;
+pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 5;
 const MAX_PROTOCOL_BYTES: usize = 1 << 20;
 const MAX_PROTOCOL_LINE_BYTES: usize = 16 << 10;
 const MAX_PROTOCOL_ROWS: usize = 64;
@@ -33,6 +33,14 @@ pub(crate) enum EvidenceMode {
     Timing,
     Memory,
 }
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) enum TimingBoundary {
+    #[serde(rename = "raw-work-v2")]
+    RawWorkV2,
+}
+
+pub(super) const RAW_WORK_TIMING_BOUNDARY: TimingBoundary = TimingBoundary::RawWorkV2;
 
 impl EvidenceMode {
     pub(super) fn accepts_elapsed(self, elapsed_seconds: f64) -> bool {
@@ -209,6 +217,7 @@ pub(crate) struct WorkerMeasurement {
     pub(super) schema_version: u32,
     pub(super) implementation: Implementation,
     pub(super) evidence_mode: EvidenceMode,
+    pub(super) timing_boundary: TimingBoundary,
     pub(super) workload_id: ProtocolId,
     pub(super) measurement_id: ProtocolId,
     pub(super) iteration_count: u64,
@@ -463,6 +472,7 @@ mod tests {
             "schema_version": PROTOCOL_SCHEMA_VERSION,
             "implementation": "stab",
             "evidence_mode": "timing",
+            "timing_boundary": "raw-work-v2",
             "workload_id": "protocol-smoke",
             "measurement_id": "main",
             "iteration_count": 4,
@@ -506,6 +516,31 @@ mod tests {
         assert!(parse_worker_json_lines(format!("{unknown}\n").as_bytes()).is_err());
         assert!(parse_worker_json_lines(valid_line().as_bytes()).is_err());
         assert!(parse_worker_json_lines(format!("{}\n\n", valid_line()).as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_stale_and_mismatched_timing_boundaries() {
+        let valid: serde_json::Value =
+            serde_json::from_str(&valid_line()).expect("valid fixture JSON");
+
+        let mut missing = valid.clone();
+        missing
+            .as_object_mut()
+            .expect("fixture is an object")
+            .remove("timing_boundary");
+        assert!(parse_worker_json_lines(format!("{missing}\n").as_bytes()).is_err());
+
+        for invalid in ["raw-work-v1", "raw-work-v2 "] {
+            let mut mismatched = valid.clone();
+            mismatched
+                .as_object_mut()
+                .expect("fixture is an object")
+                .insert("timing_boundary".to_string(), serde_json::json!(invalid));
+            assert!(
+                parse_worker_json_lines(format!("{mismatched}\n").as_bytes()).is_err(),
+                "accepted invalid timing boundary {invalid:?}"
+            );
+        }
     }
 
     #[test]

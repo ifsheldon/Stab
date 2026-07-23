@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use super::bits::{DenseXorFixture, PopcountFixture};
 use super::clifford_string::{CliffordDescriptor, CliffordStringFixture};
 use super::dem_model::{self, DemFixture};
@@ -163,66 +165,127 @@ impl PreparedWorkload {
         }
     }
 
-    pub(super) fn execute(
+    pub(super) fn measure(
         &mut self,
         iterations: u64,
         work_items: u64,
-    ) -> Result<TimedWorkloadOutput, WorkerError> {
+    ) -> Result<(TimedWorkloadOutput, f64), WorkerError> {
+        let mut clock = MonotonicClock;
+        self.measure_with_clock(iterations, work_items, &mut clock)
+    }
+
+    fn measure_with_clock(
+        &mut self,
+        iterations: u64,
+        work_items: u64,
+        clock: &mut impl TimingClock,
+    ) -> Result<(TimedWorkloadOutput, f64), WorkerError> {
         match &mut self.state {
-            PreparedState::ProtocolSmoke => Ok(TimedWorkloadOutput::Complete(
-                WorkloadOutput::DigestState(protocol_smoke(iterations, work_items)),
-            )),
-            PreparedState::CircuitParse(fixture) => circuit_parse(iterations, fixture)
-                .map(WorkloadOutput::Circuit)
-                .map(TimedWorkloadOutput::Complete),
-            PreparedState::CircuitCanonicalPrint { circuit, .. } => Ok(
-                TimedWorkloadOutput::Complete(WorkloadOutput::CanonicalCircuitText(
-                    circuit_canonical_print(iterations, circuit),
-                )),
-            ),
-            PreparedState::DemParse(fixture) => {
-                dem_model::parse(iterations, fixture).map(TimedWorkloadOutput::DemParsed)
+            PreparedState::ProtocolSmoke => {
+                let measured =
+                    measure_output(clock, || Ok(protocol_smoke(iterations, work_items)))?;
+                Ok((
+                    TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(measured.output)),
+                    measured.elapsed_seconds,
+                ))
             }
-            PreparedState::DemCanonicalPrint { model, .. } => Ok(
-                TimedWorkloadOutput::DemSerialized(dem_model::serialize(iterations, model)),
-            ),
+            PreparedState::CircuitParse(fixture) => {
+                let measured = measure_output(clock, || circuit_parse(iterations, fixture))?;
+                Ok((
+                    TimedWorkloadOutput::Complete(WorkloadOutput::Circuit(measured.output)),
+                    measured.elapsed_seconds,
+                ))
+            }
+            PreparedState::CircuitCanonicalPrint { circuit, .. } => {
+                let measured =
+                    measure_output(clock, || Ok(circuit_canonical_print(iterations, circuit)))?;
+                Ok((
+                    TimedWorkloadOutput::Complete(WorkloadOutput::CanonicalCircuitText(
+                        measured.output,
+                    )),
+                    measured.elapsed_seconds,
+                ))
+            }
+            PreparedState::DemParse(fixture) => {
+                let measured = measure_output(clock, || dem_model::parse(iterations, fixture))?;
+                Ok((
+                    TimedWorkloadOutput::DemParsed(measured.output),
+                    measured.elapsed_seconds,
+                ))
+            }
+            PreparedState::DemCanonicalPrint { model, .. } => {
+                let measured =
+                    measure_output(clock, || Ok(dem_model::serialize(iterations, model)))?;
+                Ok((
+                    TimedWorkloadOutput::DemSerialized(measured.output),
+                    measured.elapsed_seconds,
+                ))
+            }
             PreparedState::GateNameHash {
                 names,
                 sweeps,
                 table_digest,
-            } => Ok(TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(
-                gate_name_hash(iterations, work_items, *sweeps, names, *table_digest),
-            ))),
+            } => {
+                let measured = measure_output(clock, || {
+                    Ok(gate_name_hash(
+                        iterations,
+                        work_items,
+                        *sweeps,
+                        names,
+                        *table_digest,
+                    ))
+                })?;
+                Ok((
+                    TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(measured.output)),
+                    measured.elapsed_seconds,
+                ))
+            }
             PreparedState::SimdWordPopcount {
                 fixture,
                 toggle_state,
-            } => simd_word_popcount(iterations, fixture, toggle_state)
-                .map(TimedWorkloadOutput::PopcountChecksum),
-            PreparedState::SimdBitsXor(fixture) => {
-                dense_xor(iterations, fixture).map(|()| TimedWorkloadOutput::DenseXorComplete)
+            } => {
+                let measured = measure_output(clock, || {
+                    simd_word_popcount(iterations, fixture, toggle_state)
+                })?;
+                Ok((
+                    TimedWorkloadOutput::PopcountChecksum(measured.output),
+                    measured.elapsed_seconds,
+                ))
             }
-            PreparedState::SimdBitsNotZero(fixture) => Ok(TimedWorkloadOutput::NotZeroChecksum(
-                simd_bits_not_zero(iterations, fixture),
-            )),
+            PreparedState::SimdBitsXor(fixture) => {
+                let elapsed_seconds = measure_mutation(clock, || dense_xor(iterations, fixture))?;
+                Ok((TimedWorkloadOutput::DenseXorComplete, elapsed_seconds))
+            }
+            PreparedState::SimdBitsNotZero(fixture) => {
+                let measured =
+                    measure_output(clock, || Ok(simd_bits_not_zero(iterations, fixture)))?;
+                Ok((
+                    TimedWorkloadOutput::NotZeroChecksum(measured.output),
+                    measured.elapsed_seconds,
+                ))
+            }
             PreparedState::SparseXor(fixture) => {
-                fixture.execute(iterations);
-                Ok(TimedWorkloadOutput::SparseXorComplete)
+                let elapsed_seconds = measure_mutation(clock, || {
+                    fixture.execute(iterations);
+                    Ok(())
+                })?;
+                Ok((TimedWorkloadOutput::SparseXorComplete, elapsed_seconds))
             }
             PreparedState::Transpose(fixture) => {
-                fixture.execute(iterations)?;
-                Ok(TimedWorkloadOutput::TransposeComplete)
+                let elapsed_seconds = measure_mutation(clock, || fixture.execute(iterations))?;
+                Ok((TimedWorkloadOutput::TransposeComplete, elapsed_seconds))
             }
             PreparedState::PauliMultiply(fixture) => {
-                fixture.execute(iterations)?;
-                Ok(TimedWorkloadOutput::PauliMultiplyComplete)
+                let elapsed_seconds = measure_mutation(clock, || fixture.execute(iterations))?;
+                Ok((TimedWorkloadOutput::PauliMultiplyComplete, elapsed_seconds))
             }
             PreparedState::PauliIter(fixture) => {
-                fixture.execute(iterations)?;
-                Ok(TimedWorkloadOutput::PauliIterComplete)
+                let elapsed_seconds = measure_mutation(clock, || fixture.execute(iterations))?;
+                Ok((TimedWorkloadOutput::PauliIterComplete, elapsed_seconds))
             }
             PreparedState::CliffordString(fixture) => {
-                fixture.execute(iterations)?;
-                Ok(TimedWorkloadOutput::CliffordStringComplete)
+                let elapsed_seconds = measure_mutation(clock, || fixture.execute(iterations))?;
+                Ok((TimedWorkloadOutput::CliffordStringComplete, elapsed_seconds))
             }
         }
     }
@@ -291,6 +354,55 @@ impl PreparedWorkload {
     }
 }
 
+struct MeasuredOutput<T> {
+    output: T,
+    elapsed_seconds: f64,
+}
+
+trait TimingClock {
+    type Mark;
+
+    fn start(&mut self) -> Self::Mark;
+    fn finish_seconds(&mut self, started: Self::Mark) -> f64;
+}
+
+struct MonotonicClock;
+
+impl TimingClock for MonotonicClock {
+    type Mark = Instant;
+
+    fn start(&mut self) -> Self::Mark {
+        Instant::now()
+    }
+
+    fn finish_seconds(&mut self, started: Self::Mark) -> f64 {
+        let finished = Instant::now();
+        finished.duration_since(started).as_secs_f64()
+    }
+}
+
+fn measure_output<T>(
+    clock: &mut impl TimingClock,
+    operation: impl FnOnce() -> Result<T, WorkerError>,
+) -> Result<MeasuredOutput<T>, WorkerError> {
+    let started = clock.start();
+    let output = operation()?;
+    let elapsed_seconds = clock.finish_seconds(started);
+    Ok(MeasuredOutput {
+        output,
+        elapsed_seconds,
+    })
+}
+
+fn measure_mutation(
+    clock: &mut impl TimingClock,
+    operation: impl FnOnce() -> Result<(), WorkerError>,
+) -> Result<f64, WorkerError> {
+    let started = clock.start();
+    operation()?;
+    Ok(clock.finish_seconds(started))
+}
+
 fn input_evidence(state: &PreparedState) -> Result<(u64, InputDigest), WorkerError> {
     let (input_bytes, digest) = match state {
         PreparedState::ProtocolSmoke | PreparedState::GateNameHash { .. } => {
@@ -331,4 +443,75 @@ fn input_evidence(state: &PreparedState) -> Result<(u64, InputDigest), WorkerErr
         }
     };
     Ok((input_bytes, InputDigest::try_new(digest)?))
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use super::*;
+
+    struct FakeClock {
+        events: Rc<RefCell<Vec<&'static str>>>,
+    }
+
+    impl TimingClock for FakeClock {
+        type Mark = ();
+
+        fn start(&mut self) -> Self::Mark {
+            self.events.borrow_mut().push("start");
+        }
+
+        fn finish_seconds(&mut self, (): Self::Mark) -> f64 {
+            self.events.borrow_mut().push("finish");
+            0.25
+        }
+    }
+
+    #[test]
+    fn output_timer_samples_finish_before_protocol_wrapping() {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let mut clock = FakeClock {
+            events: Rc::clone(&events),
+        };
+
+        let measured = measure_output(&mut clock, || {
+            events.borrow_mut().push("raw-output-return");
+            Ok(String::from("result"))
+        })
+        .expect("timed output");
+        events.borrow_mut().push("protocol-wrap");
+        let wrapped = TimedWorkloadOutput::DemSerialized(measured.output);
+
+        assert_eq!(
+            *events.borrow(),
+            ["start", "raw-output-return", "finish", "protocol-wrap"]
+        );
+        assert_eq!(measured.elapsed_seconds, 0.25);
+        assert!(matches!(wrapped, TimedWorkloadOutput::DemSerialized(_)));
+    }
+
+    #[test]
+    fn mutation_timer_samples_finish_immediately_after_raw_work() {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let mut clock = FakeClock {
+            events: Rc::clone(&events),
+        };
+
+        let elapsed_seconds = measure_mutation(&mut clock, || {
+            events.borrow_mut().push("raw-mutation-return");
+            Ok(())
+        })
+        .expect("timed mutation");
+        events.borrow_mut().push("marker-wrap");
+        let marker = TimedWorkloadOutput::DenseXorComplete;
+
+        assert_eq!(
+            *events.borrow(),
+            ["start", "raw-mutation-return", "finish", "marker-wrap"]
+        );
+        assert_eq!(elapsed_seconds, 0.25);
+        assert!(matches!(marker, TimedWorkloadOutput::DenseXorComplete));
+    }
 }
