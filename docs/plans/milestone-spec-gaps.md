@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-23 - Q7/Q8: Evidence Closure Versus Checklist Inventory Identity
+
+Status: Resolved
+Revealed by: publishing the first clean completion checkpoint after all repaired correctness and DEM evidence passed.
+Current text: Q7 required the feature checklist to link to generated status instead of duplicating volatile evidence state, while Q8 required documentation synchronization after formal evidence.
+Gap: the checked performance inventory included checklist source lines, row anchors, and raw `Reopened` status in its semantic digest. Changing a successfully qualified row to `Done` therefore invalidated the exact performance inventory whose evidence authorized that transition, requiring an otherwise identical second formal run.
+Proposed amendment: treat evidence prose, source lines, row anchors, and `Done` versus `Reopened` for an unchanged whole selected row as presentation state; keep selected, partial, and deferred child ownership in the semantic performance inventory.
+Resolution: qualification check and regeneration preserve the frozen presentation fields when comparing the checked inventory, while the generated dashboard parses current checklist status directly. Focused tests prove a presentation-only transition retains the checked digest and a partial-scope ownership change still produces qualification drift.
+
 ## 2026-07-23 - Q5/Q8: Folded DEM Maximum Versus Public Parser Limit
 
 Status: Resolved

@@ -123,10 +123,6 @@ fn validate_header(suite: &QualificationSuite, manifest: &BenchmarkManifest, iss
 fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
     let mut ids = BTreeSet::new();
     let mut anchors = BTreeSet::new();
-    let mut done = 0;
-    let mut reopened = 0;
-    let mut partial = 0;
-    let mut deferred = 0;
     let mut global_child_domains = BTreeSet::new();
     let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
     let group_ids = suite
@@ -156,7 +152,6 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
         }
         match item.raw_status.as_str() {
             value if value.starts_with("Done") => {
-                done += 1;
                 if item.scope != ChecklistScope::Selected
                     || item.selected_child.is_none()
                     || item.deferred_child.is_some()
@@ -171,7 +166,6 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
                 }
             }
             value if value.starts_with("Reopened") => {
-                reopened += 1;
                 if item.scope != ChecklistScope::Selected
                     || item.selected_child.is_none()
                     || item.deferred_child.is_some()
@@ -186,7 +180,6 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
                 }
             }
             value if value.starts_with("Partial") => {
-                partial += 1;
                 if item.scope != ChecklistScope::Selected
                     || item.selected_child.is_none()
                     || item.deferred_child.is_none()
@@ -201,7 +194,6 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
                 }
             }
             value if value.starts_with("Deferred") => {
-                deferred += 1;
                 if item.scope != ChecklistScope::Deferred
                     || item.selected_child.is_some()
                     || item.deferred_child.is_none()
@@ -342,11 +334,6 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
             &item.parent_group_ids,
             issues,
         );
-    }
-    if (done, reopened, partial, deferred) != (68, 6, 7, 46) {
-        issues.push(format!(
-            "checklist status counts are done={done} reopened={reopened} partial={partial} deferred={deferred}, expected 68/6/7/46"
-        ));
     }
 }
 

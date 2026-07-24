@@ -269,7 +269,9 @@ pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(),
     let checked_bytes = read_bytes(root, &root.performance_qualification())?;
     let checked: QualificationSuite = serde_json::from_slice(&checked_bytes)?;
     validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
-    let generated = discovery::generate(root, manifest)?;
+    let mut generated = discovery::generate(root, manifest)?;
+    validation::validate(&generated, manifest, &references, "UNFROZEN")?;
+    preserve_checked_checklist_presentation(&mut generated, &checked)?;
     validation::validate(&generated, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
     if checked_bytes != render(&generated)? {
         return Err(BenchError::QualificationDrift);
@@ -308,26 +310,31 @@ pub(crate) fn regenerate(
 ) -> Result<(), BenchError> {
     let generated = discovery::generate(root, manifest)?;
     let references = discovery::load_source_references(root)?;
-    validation::validate(
-        &generated,
-        manifest,
-        &references,
-        if check {
-            EXPECTED_FROZEN_DIGEST
-        } else {
-            "UNFROZEN"
-        },
-    )?;
-    migration::check(root, &generated)?;
-    let bytes = render(&generated)?;
+    validation::validate(&generated, manifest, &references, "UNFROZEN")?;
+    let checked_path = root.performance_qualification();
+    let checked_bytes = read_bytes(root, &checked_path)?;
+    let checked: QualificationSuite = serde_json::from_slice(&checked_bytes)?;
+    validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
+    let mut normalized = generated.clone();
+    preserve_checked_checklist_presentation(&mut normalized, &checked)?;
+    let normalized_bytes = render(&normalized)?;
     if check {
         ensure_frozen()?;
-        if read_bytes(root, &root.performance_qualification())? != bytes {
+        validation::validate(&normalized, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
+        if checked_bytes != normalized_bytes {
             return Err(BenchError::QualificationDrift);
         }
+        migration::check(root, &checked)?;
         println!("[{PREFIX}] performance qualification regeneration is clean");
+    } else if checked_bytes == normalized_bytes {
+        migration::check(root, &checked)?;
+        println!(
+            "[{PREFIX}] performance qualification semantics are unchanged; retained frozen checklist presentation"
+        );
     } else {
-        atomic_write(root, &root.performance_qualification(), &bytes)?;
+        migration::check(root, &generated)?;
+        let bytes = render(&generated)?;
+        atomic_write(root, &checked_path, &bytes)?;
         println!(
             "[{PREFIX}] wrote {} checklist rows, {} public API items, {} groups, and {} manifest decisions",
             generated.checklist_items.len(),
@@ -340,6 +347,26 @@ pub(crate) fn regenerate(
             generated.semantic_digest
         );
     }
+    Ok(())
+}
+
+fn preserve_checked_checklist_presentation(
+    generated: &mut QualificationSuite,
+    checked: &QualificationSuite,
+) -> Result<(), BenchError> {
+    let checked_items = checked
+        .checklist_items
+        .iter()
+        .map(|item| (item.id.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    for item in &mut generated.checklist_items {
+        if let Some(checked_item) = checked_items.get(item.id.as_str()) {
+            item.source_line = checked_item.source_line;
+            item.anchor_digest.clone_from(&checked_item.anchor_digest);
+            item.raw_status.clone_from(&checked_item.raw_status);
+        }
+    }
+    generated.semantic_digest = discovery::semantic_digest(generated)?;
     Ok(())
 }
 
@@ -598,6 +625,56 @@ fn count_classification(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    fn checked_suite() -> QualificationSuite {
+        serde_json::from_str(include_str!(
+            "../../../../benchmarks/stim-qualification-suite.json"
+        ))
+        .expect("checked performance qualification suite")
+    }
+
+    #[test]
+    fn checklist_presentation_changes_do_not_refingerprint_performance_semantics() {
+        let checked = checked_suite();
+        let mut generated = checked.clone();
+        let item = generated
+            .checklist_items
+            .iter_mut()
+            .find(|item| item.raw_status.starts_with("Reopened"))
+            .expect("reopened checklist item");
+        item.source_line += 17;
+        item.anchor_digest = "a".repeat(64);
+        item.raw_status = "Done for selected scope".to_string();
+        generated.semantic_digest =
+            discovery::semantic_digest(&generated).expect("generated digest");
+
+        preserve_checked_checklist_presentation(&mut generated, &checked)
+            .expect("normalize presentation");
+
+        assert_eq!(generated, checked);
+    }
+
+    #[test]
+    fn checklist_scope_changes_remain_performance_semantic_changes() {
+        let checked = checked_suite();
+        let mut generated = checked.clone();
+        let item = generated
+            .checklist_items
+            .iter_mut()
+            .find(|item| item.raw_status.starts_with("Partial"))
+            .expect("partial checklist item");
+        item.raw_status = "Done for selected scope".to_string();
+        item.deferred_remainder = false;
+        item.deferred_child = None;
+        item.deferred_child_ids.clear();
+        generated.semantic_digest =
+            discovery::semantic_digest(&generated).expect("generated digest");
+
+        preserve_checked_checklist_presentation(&mut generated, &checked)
+            .expect("normalize presentation");
+
+        assert_ne!(generated, checked);
+    }
 
     #[cfg(unix)]
     #[test]
