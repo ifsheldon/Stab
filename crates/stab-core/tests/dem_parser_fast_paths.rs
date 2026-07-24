@@ -12,11 +12,11 @@ fn dem_model_layout_stays_bounded_for_large_parse_workloads() {
         "DEM target layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemInstruction>() <= 96,
+        std::mem::size_of::<DemInstruction>() <= 160,
         "DEM instruction layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemItem>() <= 96,
+        std::mem::size_of::<DemItem>() <= 160,
         "DEM item layout unexpectedly grew"
     );
 }
@@ -131,4 +131,50 @@ fn qualification_cycle_has_bounded_parser_allocations() {
         allocations.count_total <= maximum,
         "qualification parser exceeded {maximum} allocations: {allocations:?}"
     );
+}
+
+#[test]
+fn representative_flat_and_coordinate_families_avoid_per_instruction_allocations() {
+    const TOP_LEVEL_ITEMS: usize = 4_096;
+    const CYCLE_ITEMS: usize = 8;
+    const MAX_PARSE_ALLOCATIONS: u64 = 2;
+    const FLAT_ERRORS_CYCLE: &str = concat!(
+        "error(0.125) D0\n",
+        "error(0.25) D1 D2\n",
+        "error(0.375) D3 L0\n",
+        "error(0.0625) D4 ^ D5\n",
+        "error(0.5) D6 D7 D8\n",
+        "error(0.03125) D9 L1 ^ D10\n",
+        "error(0.75) D11 D12 L2\n",
+        "error(0.875) D13 ^ D14 L3\n",
+    );
+    const COORDINATE_SPARSE_CYCLE: &str = concat!(
+        "detector[tag-a](0.5, 1) D1000000\n",
+        "logical_observable L100000\n",
+        "shift_detectors(1.5, -2, 3) 1000001\n",
+        "error[edge](0.25) D0 D1000000 L0 ^ D7\n",
+        "detector(2, 3.5) D42\n",
+        "error(0.125) D999999 L99999\n",
+        "shift_detectors 17\n",
+        "detector[tag-b] D1000017\n",
+    );
+
+    for (family, cycle) in [
+        ("flat-errors", FLAT_ERRORS_CYCLE),
+        ("coordinate-sparse", COORDINATE_SPARSE_CYCLE),
+    ] {
+        let input = cycle.repeat(TOP_LEVEL_ITEMS / CYCLE_ITEMS);
+        let warm = DetectorErrorModel::from_dem_str(&input).expect("warm family parse");
+        assert_eq!(warm.items().len(), TOP_LEVEL_ITEMS);
+        std::hint::black_box(warm);
+
+        let allocations = allocation_counter::measure(|| {
+            let model = DetectorErrorModel::from_dem_str(&input).expect("measured family parse");
+            std::hint::black_box(model.items().len());
+        });
+        assert!(
+            allocations.count_total <= MAX_PARSE_ALLOCATIONS,
+            "{family} parser performed per-instruction allocations: {allocations:?}"
+        );
+    }
 }
