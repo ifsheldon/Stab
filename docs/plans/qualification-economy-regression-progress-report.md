@@ -8,6 +8,8 @@ The source evidence revision is `68d107a42f655254f31628f0cbedc55479f6c0f3`. Its 
 
 The original completion manifest correctly records Stab self-regression as `unseeded`. The reviewed baselines were created and committed afterward, so the first run seeds future comparisons and cannot retroactively become a self-regression pass.
 
+The post-evidence audit and full code review completed against clean revision `f465b6f6c4b2ef9ab543bca76e6d9b399f600032`. Both seeded self-regression checks consumed the sealed full and soak rollups successfully: DEM parse passed 9 of 9 identities and DEM print passed 9 of 9 identities.
+
 ## Source Changes
 
 The qualification simplification landed in focused commits covering the documentation freeze, shared compatibility corpus, curated performance matrix, separate parity and regression policies, reduced worker preflight, representative DEM families, simplified completion manifest, contract CI, generated status, and review fixes.
@@ -17,6 +19,7 @@ Two publication defects were found only after the formal evidence existed:
 - `f9633840c257af4bab478d5c19451433e94a29a3` allows the descriptor-safe artifact publisher to create the documented `candidate.json` baseline artifact.
 - `d9c9368384c80dfb738eed7dc7f006edc40970fe` lets baseline generation and self-regression inspect sealed historical rollups read-only from a newer clean review commit while keeping explicit rollup replay revision-bound.
 - `c0019590eed2c0f7f4293a5bd4cc9494dd024528` fixes the publication cycle where `Reopened -> Done` checklist presentation was treated as workload drift. The checker now preserves frozen presentation fields while validating live structural scope; `Partial`, `Deferred`, and whole selected ownership changes remain semantic.
+- `f465b6f6c4b2ef9ab543bca76e6d9b399f600032` makes runtime-contract tests consume the checked frozen inventory and makes generated-status tests validate the published checkpoint instead of the obsolete pre-evidence state.
 
 The formal parser optimization is `68d107a42f655254f31628f0cbedc55479f6c0f3`. It keeps common DEM payloads inline, preserves generic fallbacks, adds fixed-allocation regression coverage, and leaves the workload and `1.25x` threshold unchanged.
 
@@ -72,13 +75,25 @@ Each accepted baseline takes the worse full-or-soak median and the worse full-or
 
 ## Legacy Diagnostics
 
-The legacy primary suite remains diagnostic compatibility coverage rather than the formal DEM release evidence:
+The legacy primary suite remains diagnostic compatibility coverage rather than the formal DEM release evidence. A fresh run from clean revision `f465b6f6c4b2ef9ab543bca76e6d9b399f600032` recorded:
 
 - Timing thresholds: 68 configured rows passed, 15 rows were not configured, and 3 rows retained source-owned no-ratio waivers.
 - Beta summary: 77 rows passed, 3 non-comparable rows were waived, and 6 report-only rows could not prove a Stim ratio.
-- Memory summary: 79 rows passed, 3 allocation rows failed their legacy baselines, and 4 rows had no baseline.
+- Memory summary: 78 rows passed, 4 allocation rows failed their legacy baselines, and 4 rows had no baseline.
 
-These diagnostic gaps were not converted into waivers and do not weaken the completed DEM parity result.
+The pre-existing memory failures are the DETS reader and two high-repeat analyzer rows. The newly visible graphlike-search failure records the parser layout tradeoff made by the qualified DEM optimization: peak allocation count fell from 814 to 557 while peak allocated bytes rose from 178,456 to 216,280 because five common targets now stay inline. The formal accepted-maximum DEM memory probes passed, the legacy memory baseline was not moved, and no waiver was added.
+
+The final diagnostic artifacts use unique paths under `target/benchmarks/q8-final-f465b6f-primary-{baseline,beta,timing,memory}`. The beta and memory commands intentionally returned nonzero because their report-only and failed or missing-baseline rows prevent a false all-pass claim.
+
+## Post-Evidence Audit
+
+The milestone audit and full code review found no unresolved compatibility, filesystem-safety, process-supervision, timing-boundary, parity-policy, self-regression, evidence-publication, or CI-contract defect.
+
+The audit did find that several runtime-contract tests regenerated live checklist presentation and therefore no longer matched the frozen evidence inventory after the checklist was closed. It also found that the generated-status integration test still expected the pre-evidence `not started` message. Commit `f465b6f6c4b2ef9ab543bca76e6d9b399f600032` fixed both without weakening semantic drift detection.
+
+Explicit completion replay remains revision-bound by design. Replaying the `68d107a` completion requires its recorded source revision, which restores the exact unseeded regression policy identity; newer clean revisions may inspect sealed rollups for self-regression and baseline generation but cannot relabel the historical completion.
+
+No new milestone under-specification was found. Qualification Rust sources remain below the 1,200-line repository limit, no tracked operational shell script was introduced, swap is restored, and no qualification process remains.
 
 ## Historical Evidence
 
@@ -86,7 +101,7 @@ Failed and review-rejected chains remain preserved under their exact revisions a
 
 ## Verification
 
-The final source state must continue to pass:
+The complete verification set passed against the closure source state:
 
 ```text
 cargo fmt --all --check

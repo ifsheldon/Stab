@@ -17,11 +17,11 @@ The original completion correctly reports self-regression as `unseeded`; the bas
 
 Stop if these sources disagree. Fix the source and regenerate derived state instead of choosing the easiest interpretation.
 
-## Current Work
+## Completion State
 
 1. The reviewed AArch64 baselines, completion checkpoint, generated dashboard, and synchronized evidence report are committed.
-2. Run the post-evidence milestone audit and full code review; fix every confirmed implementation, test, benchmark, or documentation defect.
-3. Run the complete verification set from the final committed contract and leave a clean worktree.
+2. The post-evidence milestone audit and full code review are complete. Their stale published-state test fixtures were fixed in `f465b6f6c4b2ef9ab543bca76e6d9b399f600032`; no blocking implementation or contract finding remains.
+3. The complete verification set passed against the closure source state, including the live 62-case pinned-Stim corpus, checked inventory regeneration, generated status, benchmark smoke, and staged pre-commit policy.
 
 x86-64 controlled evidence and all intentionally deferred Stim surfaces remain future work, not blockers for this goal.
 
@@ -59,4 +59,4 @@ just maintenance::pre-commit
 
 ## Completion
 
-The goal completes when the post-evidence audits have no unresolved confirmed findings, the verification set passes, the dashboard agrees with checked evidence, swap remains restored, no qualification process remains, and the worktree is clean.
+This goal is complete. The post-evidence audits have no unresolved confirmed findings, the verification set passes, the dashboard agrees with checked evidence, swap remains restored, and no qualification process remains.
