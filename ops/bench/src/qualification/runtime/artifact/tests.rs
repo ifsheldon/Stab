@@ -73,6 +73,24 @@ fn output_path_rejects_escape_and_shallow_targets() {
 }
 
 #[test]
+fn baseline_candidate_is_a_source_owned_qualification_artifact() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let output = Path::new("target/benchmarks/qualification/baseline-candidate");
+
+    let mut publication = begin_new_output(&root, output).expect("begin candidate publication");
+    publication
+        .write("candidate.json", b"{\"entries\":[]}\n")
+        .expect("write candidate");
+    publication.commit_new().expect("publish candidate");
+
+    assert_eq!(
+        read_output_artifact(&root, output, "candidate.json").expect("read candidate"),
+        b"{\"entries\":[]}\n"
+    );
+}
+
+#[test]
 fn atomically_replaces_known_artifacts_without_leaving_staging_directories() {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("resolve repository");

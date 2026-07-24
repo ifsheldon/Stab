@@ -25,7 +25,12 @@ const PUBLICATION_LOCK: &str = ".publication.lock";
 const MAX_ARTIFACT_BYTES: usize = 64 << 20;
 const MAX_DIRECTORY_ENTRIES: usize = 16;
 const MAX_DIRECT_ARTIFACT_NAME_BYTES: usize = 128;
-const ARTIFACT_NAMES: [&str; 3] = ["preflight.json", "report.json", "report.md"];
+const ARTIFACT_NAMES: [&str; 4] = [
+    "candidate.json",
+    "preflight.json",
+    "report.json",
+    "report.md",
+];
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct DirectQualificationArtifactPath(PathBuf);
