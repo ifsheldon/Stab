@@ -6,7 +6,7 @@ Active qualification contract as of 2026-07-23.
 
 This plan supersedes the R6 evidence-production procedure in [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) before formal repaired-contract evidence began. The R0 through R5 implementation remains accepted source work. Historical and failed artifacts retain their original schema, source revision, and status.
 
-Implementation checkpoint: Q0 through Q7 are implemented, reviewed, and committed. The pre-evidence milestone audit and full code review repaired parity-ceiling, stale-regression-target, semantic workload-identity, exact rollup-parity, completion-boundary, generated-status, accepted-maximum memory-publication, dead-test, and source-file-size findings before formal timing. Q8 formal timing and completion evidence has not started.
+Completion checkpoint: Q0 through Q8 are implemented. The pre-evidence milestone audit and full code review repaired parity-ceiling, stale-regression-target, semantic workload-identity, exact rollup-parity, completion-boundary, generated-status, accepted-maximum memory-publication, dead-test, and source-file-size findings before formal timing. Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed the repaired correctness tiers and all 36 representative DEM reports under the unchanged `1.25x` gate. The first 18 AArch64 self-regression identities were seeded afterward and therefore do not retroactively change that completion's `unseeded` regression result. Exact evidence is recorded in [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md).
 
 ## Objective
 
@@ -28,7 +28,7 @@ No Stab product API or CLI behavior changes are part of this plan. Stim v1.16.0 
 
 Log this plan, make `GOAL.md` the short execution contract, mark the old R6 procedure superseded, preserve historical artifacts, and reduce active documentation to the goal, two normative qualification contracts, and a generated status dashboard.
 
-Acceptance requires every current document to state that repaired-contract formal evidence has not started and that this plan owns the next evidence run.
+Acceptance required every current document to state that repaired-contract formal evidence had not started before Q8 and that this plan owned the next evidence run. That freeze prevented historical or failed artifacts from being promoted into the replacement program.
 
 ## Q1: Improve Test Economy
 
@@ -94,6 +94,8 @@ Generate `docs/qualification-status.md` from checked inventories, runtime contra
 
 Acceptance requires checked-in status drift to fail CI and shared-host timing to be clearly non-authoritative.
 
+Publication clarification: checklist evidence prose, source lines, anchors, and a whole selected row's transition from `Reopened` to `Done` are presentation state, not benchmark workload identity. The performance checker preserves those frozen fields when comparing the checked inventory while the generated dashboard reads the live checklist. Changes among whole selected, partial, and deferred scope remain semantic because they alter child ownership and still require inventory regeneration.
+
 ## Q8: Freeze And Produce Formal Evidence
 
 Commit Q0 through Q7 in focused changes, run milestone audit and full code review, fix confirmed findings, regenerate contracts from a clean revision, and then run reopened correctness PR, full, and soak tiers plus the live result-format corpus.
@@ -101,6 +103,8 @@ Commit Q0 through Q7 in focused changes, run milestone audit and full code revie
 Run legacy primary timing and memory checks as diagnostics. On the controlled AArch64 host, disable swap immediately before formal timing and restore the exact prior configuration on every exit. Produce 36 DEM reports, four rollups, one completion manifest, one offline replay, and two immutable accepted-maximum memory receipts using unique paths. The parse and print receipts each contain all three DEM families and remain report-only.
 
 Generate the first AArch64 self-regression baseline candidate in a separate reviewed commit. Keep x86-64 unseeded until controlled native evidence exists. Finish with milestone audit, full code review, standard workspace checks, oracle checks, qualification checks, benchmark smoke, pre-commit, restored host state, and a clean worktree.
+
+Completion evidence and the separately seeded regression baseline are recorded in [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md). The original completion remains `unseeded`, as required for the first baseline-producing run.
 
 ## Assumptions
 

@@ -12,7 +12,7 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 
 ## Documentation Policy
 
-- CQ1 and PQ1 harness acceptance is recorded in `plans/cq1-correctness-harness-progress-report.md` and `plans/pq1-performance-harness-progress-report.md`; CQ2 is active at `plans/cq2-deterministic-qualification-progress-report.md`, and any later correctness or performance inventory digest change makes its clean refresh historical until the affected tiers are rerun from a clean committed revision.
+- CQ1 and PQ1 harness acceptance is recorded in `plans/cq1-correctness-harness-progress-report.md` and `plans/pq1-performance-harness-progress-report.md`; CQ2 history remains at `plans/cq2-deterministic-qualification-progress-report.md`, and the current repaired-contract checkpoint is recorded in `plans/qualification-economy-regression-progress-report.md`. Any later correctness or performance inventory digest change makes current evidence historical until the affected tiers are rerun from a clean committed revision.
 - When changing planned scope, milestone order, compatibility targets, public CLI behavior, or benchmark acceptance gates, update the matching plan document in the same change set.
 - Use `.agents/skills/milestone-audit` when auditing whether a milestone implementation satisfies its objective, tasks, linked tests, benchmarks, and done criteria, or when implementation reveals milestone loopholes or under-specified scope.
 

@@ -1,12 +1,10 @@
-# Goal: Simplify And Complete Qualification
+# Goal: Close Qualification Simplification
 
 ## Status
 
-Active execution contract as of 2026-07-23.
+Q0 through Q8 are implemented. Clean source revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed repaired correctness qualification and all 36 controlled AArch64 DEM parity reports. Eighteen reviewed AArch64 self-regression identities are now seeded for future runs.
 
-Follow [qualification-economy-regression-plan.md](qualification-economy-regression-plan.md). The R0 through R5 compatibility repair is committed. Its old R6 evidence procedure was superseded before formal repaired-contract evidence began.
-
-Q0 through Q7 are implemented, reviewed, and committed. Formal repaired-contract evidence has not started and must be produced from the clean documentation-synchronized revision that closes this source freeze.
+The original completion correctly reports self-regression as `unseeded`; the baseline was created afterward and cannot retroactively pass the first run. Exact evidence lives in [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md).
 
 ## Sources Of Truth
 
@@ -14,18 +12,18 @@ Q0 through Q7 are implemented, reviewed, and committed. Formal repaired-contract
 - Performance contract: [comprehensive-stim-performance-qualification-plan.md](comprehensive-stim-performance-qualification-plan.md)
 - Execution plan: [qualification-economy-regression-plan.md](qualification-economy-regression-plan.md)
 - Generated state: [../qualification-status.md](../qualification-status.md)
+- Evidence report: [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md)
 - Project lessons: [lessons-learned.md](lessons-learned.md)
 
 Stop if these sources disagree. Fix the source and regenerate derived state instead of choosing the easiest interpretation.
 
 ## Current Work
 
-1. Completed source work: Q0 documentation freeze, Q1 corpus/test economy, Q2 curated matrix, Q3 parity and self-regression separation, Q4 representative worker preflight, Q5 DEM families, Q6 revision manifest, and Q7 contract CI plus generated status.
-2. The pre-evidence milestone audit and full code review repaired parity-ceiling, stale-regression-target, semantic workload-identity, exact rollup-parity, completion-boundary, generated-status, accepted-maximum memory-publication, dead-test, and source-file-size findings.
-3. No Q0 through Q7 implementation or specification blocker remains.
-4. Next: Q8 reopened correctness evidence, diagnostic legacy benchmarks, controlled AArch64 DEM timing and memory evidence, two accepted-maximum memory receipts, four rollups, one completion manifest and replay, then a separately reviewed self-regression baseline candidate.
+1. The reviewed AArch64 baselines, completion checkpoint, generated dashboard, and synchronized evidence report are committed.
+2. Run the post-evidence milestone audit and full code review; fix every confirmed implementation, test, benchmark, or documentation defect.
+3. Run the complete verification set from the final committed contract and leave a clean worktree.
 
-Do not begin Q8 from a dirty tree or reuse any prior artifact path.
+x86-64 controlled evidence and all intentionally deferred Stim surfaces remain future work, not blockers for this goal.
 
 ## Non-Negotiable Rules
 
@@ -41,24 +39,24 @@ Do not begin Q8 from a dirty tree or reuse any prior artifact path.
 
 ## Acceptance Loop
 
-For Q0 through Q7, add meaningful focused tests, implement the complete contract, run targeted checks, and keep documentation and generated state synchronized. Before Q8, run milestone audit and full code review once across the complete source contract and fix every confirmed finding.
+Run milestone audit and full code review against the completed evidence and generated status. Log only genuine under-specification in `milestone-spec-gaps.md`; fix implementation, test, benchmark, and documentation defects directly.
 
-After Q8 evidence, repeat milestone audit and full code review against the reports and generated status. Log only genuine under-specification in `milestone-spec-gaps.md`; fix implementation, test, benchmark, and documentation defects directly.
-
-## Next Commands
-
-During source work, use targeted Cargo tests plus:
+Then run:
 
 ```text
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+just oracle::result-formats --check
 just qualification::correctness-check
 just qualification::correctness-regenerate --check
 just bench::qualification-check
 just bench::qualification-regenerate --check
-just oracle::result-formats --check
+just qualification::status --check
+just bench::smoke
+just maintenance::pre-commit
 ```
-
-Before the Q8 source freeze, run formatting, workspace Clippy, all workspace tests, generated status checks, benchmark smoke, and pre-commit.
 
 ## Completion
 
-The goal completes only when Q0 through Q8 meet their acceptance criteria, the generated dashboard agrees with checked inventories and evidence, controlled AArch64 parity passes without weakened gates, the first reviewed self-regression baseline is seeded, host state is restored, no qualification process remains, and the worktree is clean.
+The goal completes when the post-evidence audits have no unresolved confirmed findings, the verification set passes, the dashboard agrees with checked evidence, swap remains restored, no qualification process remains, and the worktree is clean.
