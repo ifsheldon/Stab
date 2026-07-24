@@ -5,7 +5,7 @@ This dashboard is generated from the checked correctness inventory, performance 
 
 ## Current Checkpoint
 
-Formal repaired-contract completion: **not started**. Historical reports remain historical under their recorded source identities.
+Formal repaired-contract completion: scope `dem-r6` at `68d107a42f655254f31628f0cbedc55479f6c0f3` on `aarch64` (`target/benchmarks/qualification/q8-68d107a-dem-r6-completion`), report `48b858ddced6f6f77f4d57c5f985ce11fd1dcd88133b0c5ab70f52832472c967`, Stim parity `passed`, Stab regression `unseeded`.
 
 ## Inventory
 
@@ -18,7 +18,7 @@ Formal repaired-contract completion: **not started**. Historical reports remain 
 | Release runtime groups | 19 |
 | Diagnostic runtime groups | 1 |
 | Future performance candidates | 150 |
-| Seeded self-regression identities | 0 |
+| Seeded self-regression identities | 18 |
 
 ## Contract Identities
 
@@ -26,7 +26,7 @@ Formal repaired-contract completion: **not started**. Historical reports remain 
 - Performance inventory: `2ff0f012fa9d17b272e2afeecbe69fded8f38b099647a6e9191dbfe21e1d6776`
 - Stim parity policy: `d7717f759135a29053e7ee62abf431b399663c7a9f5ebeb3651594847dcbe59e`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `857093cbe58a279a343393761a382e66319057fe8c8bb0e2fc18e3deba83ed02`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `b39962aa7adae87eeb179c327a703b2609c51bf7e81aa635afc1662061b4bc6c`; missing identities are unseeded, never passing.
 
 ## Interpretation
 
