@@ -152,7 +152,7 @@ pub(super) fn run_with_repository(
     expected_correctness_inventory_sha256: &str,
     args: SelfRegressionArgs,
 ) -> Result<SelfRegressionSummary, SelfRegressionError> {
-    let (full, soak) = replay_pair(
+    let (full, soak) = inspect_pair(
         root,
         source_root,
         repository,
@@ -188,7 +188,7 @@ pub(super) fn candidate_with_repository(
 ) -> Result<PathBuf, SelfRegressionError> {
     let output_path = DirectQualificationArtifactPath::try_new(&args.out)?;
     QualificationOutput::require_absent_with_repository(root, repository, &output_path)?;
-    let (full, soak) = replay_pair(
+    let (full, soak) = inspect_pair(
         root,
         source_root,
         repository,
@@ -414,7 +414,7 @@ fn source_sha256(
     Ok(super::run::sha256_hex(&bytes))
 }
 
-fn replay_pair(
+fn inspect_pair(
     root: &RepoRoot,
     source_root: &RepoRoot,
     repository: &RepositoryBinding,
@@ -423,7 +423,7 @@ fn replay_pair(
     full: &Path,
     soak: &Path,
 ) -> Result<(RollupReplayEvidence, RollupReplayEvidence), SelfRegressionError> {
-    let full = super::rollup::replay_with_repository(
+    let full = super::rollup::inspect_with_repository(
         root,
         source_root,
         repository,
@@ -431,7 +431,7 @@ fn replay_pair(
         expected_correctness_inventory_sha256,
         DirectQualificationArtifactPath::try_new(full)?,
     )?;
-    let soak = super::rollup::replay_with_repository(
+    let soak = super::rollup::inspect_with_repository(
         root,
         source_root,
         repository,

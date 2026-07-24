@@ -10,7 +10,7 @@ use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, Repo
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessPreflightStatus};
 use super::group::{GroupContract, ParityEligibility, ProfilerNoteContract, ScaleContract};
 use super::invocation::WorkerIdentityEvidence;
-use super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
+use super::protocol::TimingBoundary;
 use super::run::{
     ClaimClass, QualificationReport, QualificationTier, RepositoryEvidence, sha256_hex,
 };
@@ -19,9 +19,12 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
+mod inspection;
 mod render;
 mod repository;
 
+use inspection::build_replay_evidence;
+pub(super) use inspection::inspect_with_repository;
 use render::{preflight, render_json, render_markdown};
 use repository::require_current_producer;
 #[cfg(test)]
@@ -508,89 +511,15 @@ pub(super) fn replay_with_repository(
         )?;
         require_current_correctness(&loaded)
     })?;
-    let regression_scales = reconstructed
-        .scales
-        .iter()
-        .map(|scale| RollupRegressionScale {
-            scale_id: scale.scale_id.clone(),
-            family_id: scale.family_id.clone(),
-            size_class: scale.size_class,
-            work_items: scale.work_items,
-            input_digest: scale.input_digest.clone(),
-            measurements: scale
-                .measurements
-                .iter()
-                .map(|measurement| RollupRegressionMeasurement {
-                    measurement_id: measurement.measurement_id.clone(),
-                    median_ratio: measurement.median_ratio,
-                    confidence_interval_upper: measurement.confidence_interval_upper,
-                    outcome: measurement.outcome,
-                })
-                .collect(),
-            memory: scale.memory.clone(),
-        })
-        .collect();
-    let comparator_sources = resolved
-        .contract
-        .comparator_sources
-        .iter()
-        .map(|source| {
-            (
-                source.path.as_str().to_string(),
-                source.sha256.as_str().to_string(),
-            )
-        })
-        .collect();
-    Ok(RollupReplayEvidence {
-        output: output_path.into_path_buf(),
-        report_sha256: sha256_hex(&report_json),
-        preflight_sha256: sha256_hex(&preflight_json),
-        markdown_sha256: sha256_hex(markdown.as_bytes()),
-        group_id: reconstructed.group_id,
-        group_contract_sha256: reconstructed.group_contract_sha256,
-        tier: reconstructed.tier,
-        performance_inventory_sha256: reconstructed.performance_inventory_sha256,
-        stab_commit: reconstructed.stab_commit,
-        stim_commit: reconstructed.stim_commit,
-        host_policy_sha256: reconstructed.host_policy_sha256,
-        host_profile_id: reconstructed.host_profile_id,
-        operating_system: reconstructed.operating_system,
-        architecture: reconstructed.architecture,
-        cpu_identity: reconstructed.cpu_identity,
-        rust_toolchain: reconstructed.rust_toolchain,
-        target_triple: reconstructed.target_triple,
-        toolchain_sha256: reconstructed.toolchain_sha256,
-        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
-        workload_id: resolved.contract.workload_id.to_string(),
-        timing_batch_policy: resolved.contract.timing_batch_policy,
-        comparator_sources,
-        workers: reconstructed.workers,
-        correctness_preflight: reconstructed.correctness_preflight,
-        correctness_bindings: loaded
-            .iter()
-            .map(|candidate| Arc::clone(&candidate.correctness_binding))
-            .collect(),
-        overall_outcome: reconstructed.overall_outcome,
-        scales: regression_scales,
-        sources: reconstructed
-            .scales
-            .into_iter()
-            .map(|scale| {
-                let markdown_sha256 = loaded
-                    .iter()
-                    .find(|candidate| candidate.candidate.scale_id == scale.scale_id)
-                    .map(|candidate| candidate.markdown_sha256.clone())
-                    .ok_or_else(|| RollupError::ScaleContract(scale.scale_id.clone()))?;
-                Ok(RollupSourceEvidence {
-                    scale_id: scale.scale_id,
-                    path: PathBuf::from(scale.source.path),
-                    report_sha256: scale.source.report_sha256,
-                    preflight_sha256: scale.source.preflight_sha256,
-                    markdown_sha256,
-                })
-            })
-            .collect::<Result<Vec<_>, RollupError>>()?,
-    })
+    build_replay_evidence(
+        output_path,
+        reconstructed,
+        &resolved.contract,
+        &loaded,
+        &report_json,
+        &preflight_json,
+        markdown.as_bytes(),
+    )
 }
 
 fn collect_input_paths<'a>(

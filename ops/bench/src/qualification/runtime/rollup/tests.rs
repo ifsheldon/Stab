@@ -368,6 +368,32 @@ fn rollup_producer_must_be_clean_unchanged_and_match_source_commit() {
 }
 
 #[test]
+fn historical_inspection_uses_the_recorded_clean_evidence_revision() {
+    let recorded = RepositoryEvidence {
+        commit_before: "d".repeat(40),
+        commit_after: "d".repeat(40),
+        local_modifications_before: false,
+        local_modifications_after: false,
+    };
+    assert_eq!(
+        super::inspection::validate_recorded_producer(&recorded, &"d".repeat(40))
+            .expect("recorded producer"),
+        recorded
+    );
+
+    let mut dirty = recorded.clone();
+    dirty.local_modifications_after = true;
+    assert!(matches!(
+        super::inspection::validate_recorded_producer(&dirty, &"d".repeat(40)),
+        Err(RollupError::DirtyProducer)
+    ));
+    assert!(matches!(
+        super::inspection::validate_recorded_producer(&recorded, &"e".repeat(40)),
+        Err(RollupError::ProducerCommit { .. })
+    ));
+}
+
+#[test]
 fn offline_rollup_replay_rejects_noncanonical_preflight_and_tampered_fields() {
     let output = DirectQualificationArtifactPath::try_new(Path::new(
         "target/benchmarks/qualification/rollup",
