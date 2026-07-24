@@ -507,9 +507,7 @@ fn private_worker_builds_are_byte_reproducible() {
     let source_root = repository
         .descriptor_root(&root)
         .expect("descriptor-root view");
-    let manifest = crate::manifest::BenchmarkManifest::read(&source_root).expect("manifest");
-    let suite = crate::qualification::discovery::generate(&source_root, &manifest)
-        .expect("performance inventory");
+    let suite = crate::qualification::read(&source_root).expect("checked performance inventory");
     verify_private_worker_reproducibility(&source_root, &suite.semantic_digest)
         .expect("reproducible private workers");
 }

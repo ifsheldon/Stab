@@ -366,7 +366,17 @@ mod tests {
             "every runtime contract is classified"
         );
         assert!(data.correctness_counts.values().sum::<usize>() > 1_000);
-        assert!(rendered.contains("Formal repaired-contract completion: **not started**"));
+        let completion = data.completion.as_ref().expect("current DEM completion");
+        assert_eq!(completion.scope_id, COMPLETION_SCOPE);
+        assert!(rendered.contains(&format!(
+            "Stim parity `{}`",
+            completion.parity_outcome.as_str()
+        )));
+        assert!(rendered.contains(&format!(
+            "Stab regression `{}`",
+            completion.regression_outcome.as_str()
+        )));
+        assert!(!rendered.contains("Formal repaired-contract completion: **not started**"));
         assert!(rendered.contains(&data.performance_digest));
         assert!(rendered.contains(&data.parity_policy_sha256));
         assert!(rendered.contains(&data.regression_policy_sha256));

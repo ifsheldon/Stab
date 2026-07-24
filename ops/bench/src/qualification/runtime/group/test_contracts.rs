@@ -236,9 +236,7 @@ fn runtime_contract_binds_clifford_identity_timing_policy() {
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
     )
     .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (mut file, _) = super::load(&root, &suite.semantic_digest).expect("runtime contract");
     super::validate_inventory_contracts(&file, &suite).expect("matching ledgers");
 
@@ -258,8 +256,7 @@ fn runtime_contract_binds_clifford_identity_timing_policy() {
             if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
     ));
 
-    let suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
     file.groups
         .iter_mut()
         .find(|group| group.id.to_string() == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID)

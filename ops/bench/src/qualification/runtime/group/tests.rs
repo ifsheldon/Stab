@@ -456,9 +456,7 @@ fn scale_lookup_is_exact_and_fail_closed() {
 fn runtime_contract_rejects_inventory_scale_drift() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     validate_inventory_contracts(&file, &suite).expect("matching ledgers");
 
@@ -476,8 +474,7 @@ fn runtime_contract_rejects_inventory_scale_drift() {
             if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
     ));
 
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let scale = suite
         .qualification_groups
         .iter_mut()
@@ -496,9 +493,7 @@ fn runtime_contract_rejects_inventory_scale_drift() {
 fn runtime_contract_rejects_stale_replacement_measurement() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     suite
         .manifest_rows
@@ -523,9 +518,7 @@ fn runtime_contract_rejects_stale_replacement_measurement() {
 fn runtime_contract_rejects_stale_replacement_scale() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     suite
         .manifest_rows
@@ -550,9 +543,7 @@ fn runtime_contract_rejects_stale_replacement_scale() {
 fn runtime_contract_rejects_inventory_groups_without_runtime_owners() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let mut suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     let mut orphan = suite
         .qualification_groups
@@ -588,9 +579,7 @@ fn runtime_contract_rejects_inventory_groups_without_runtime_owners() {
 fn runtime_contract_rejects_stale_profiler_note_digest() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (mut file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     file.groups
         .iter_mut()
@@ -610,9 +599,7 @@ fn runtime_contract_rejects_stale_profiler_note_digest() {
 fn runtime_contract_rejects_stale_comparator_source_digest() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
-    let suite = super::super::super::discovery::generate(&root, &manifest)
-        .expect("generated performance inventory");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
     let (mut file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     file.groups
         .iter_mut()
