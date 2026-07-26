@@ -183,31 +183,6 @@ impl DetectorErrorModel {
         Ok(())
     }
 
-    pub fn without_tags(&self) -> Self {
-        Self {
-            items: self.items.iter().map(DemItem::without_tags).collect(),
-        }
-    }
-
-    pub fn flattened(&self) -> CircuitResult<Self> {
-        self.validate_flattening_budget("flattened")?;
-        let mut flattened = Self::new();
-        for instruction in self.iter_flattened_instructions() {
-            flattened.push_instruction(instruction?);
-        }
-        Ok(flattened)
-    }
-
-    pub fn rounded(&self, digits: u8) -> CircuitResult<Self> {
-        Ok(Self {
-            items: self
-                .items
-                .iter()
-                .map(|item| item.rounded(digits))
-                .collect::<CircuitResult<Vec<_>>>()?,
-        })
-    }
-
     pub fn final_coordinate_shift(&self) -> CircuitResult<Vec<f64>> {
         coordinate_shift_of(self)
     }
@@ -307,29 +282,6 @@ impl DemItem {
             Self::RepeatBlock(repeat) => Some(repeat),
         }
     }
-
-    fn without_tags(&self) -> Self {
-        match self {
-            Self::Instruction(instruction) => {
-                let mut instruction = instruction.clone();
-                instruction.tag = None;
-                Self::Instruction(instruction)
-            }
-            Self::RepeatBlock(repeat) => {
-                let mut repeat = repeat.clone();
-                repeat.tag = None;
-                repeat.body = repeat.body.without_tags();
-                Self::RepeatBlock(repeat)
-            }
-        }
-    }
-
-    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
-        match self {
-            Self::Instruction(instruction) => Ok(Self::Instruction(instruction.rounded(digits)?)),
-            Self::RepeatBlock(repeat) => Ok(Self::RepeatBlock(repeat.rounded(digits)?)),
-        }
-    }
 }
 
 pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
@@ -337,31 +289,12 @@ pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<V
 }
 
 impl DemInstruction {
-    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
-        if self.kind() != DemInstructionKind::Error {
-            return Ok(self.clone());
-        }
-        let args = self
-            .args()
-            .iter()
-            .map(|arg| rounded_probability_arg(*arg, digits))
-            .collect::<Vec<_>>();
-        Self::new(
-            self.kind(),
-            args,
-            self.targets().to_vec(),
-            self.tag().map(ToOwned::to_owned),
-        )
-    }
-}
-
-impl DemRepeatBlock {
-    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
-        Ok(Self {
-            repeat_count: self.repeat_count,
-            body: self.body.rounded(digits)?,
-            tag: self.tag.clone(),
-        })
+    /// Removes this instruction's tag without changing its validated semantic fields.
+    ///
+    /// This is a crate-private model primitive used by analysis transforms. Recursive tag
+    /// stripping remains owned by the analysis layer.
+    pub(crate) fn clear_tag(&mut self) {
+        self.tag = None;
     }
 }
 
@@ -821,14 +754,6 @@ pub(super) fn add_detector_shift_mul(
 fn ceil_div(numerator: u64, denominator: u64) -> u64 {
     debug_assert!(denominator > 0);
     (numerator / denominator) + u64::from(!numerator.is_multiple_of(denominator))
-}
-
-fn rounded_probability_arg(value: f64, digits: u8) -> f64 {
-    let mut scale = 1.0;
-    for _ in 0..digits {
-        scale *= 10.0;
-    }
-    (value * scale).round() / scale
 }
 
 fn count_errors_in(model: &DetectorErrorModel) -> CircuitResult<u64> {

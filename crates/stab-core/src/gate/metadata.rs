@@ -1,8 +1,4 @@
-use super::{ArgRule, Gate, GateCategory, GateUnitaryMatrix, TargetRule};
-use crate::{
-    CircuitError, CircuitResult, Flow, GateDecomposition, PauliBasis, PauliSign, PauliString,
-    StabilizerError,
-};
+use super::{ArgRule, Gate, GateCategory, TargetRule};
 
 /// Public argument validation shape for a Stim gate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -273,114 +269,9 @@ impl Gate {
         self.best_candidate_inverse()
     }
 
-    /// Returns the local Clifford tableau metadata for gates with known tableau data.
-    pub fn tableau(self) -> crate::CircuitResult<crate::Tableau> {
-        crate::circuit_tableau::gate_tableau(self.info.name)
-    }
-
-    /// Returns true when `tableau` can produce local Clifford tableau metadata for this gate.
-    pub fn has_tableau(self) -> bool {
-        crate::circuit_tableau::gate_has_tableau(self.info.name)
-    }
-
-    /// Returns Stim v1.16.0 gate-table stabilizer flow metadata.
-    ///
-    /// This includes tableau-backed unitary gates plus the representative measurement-rich and
-    /// variable-target metadata that Stim exposes through `GateData.flows`.
-    /// Execution support is still tracked separately; metadata for gates such as `SPP` does not
-    /// imply sampler, detector-conversion, or analyzer execution support.
-    pub fn flows(self) -> CircuitResult<Vec<Flow>> {
-        if let Some(flows) = crate::gate::flows::gate_flow_metadata(self.info.name) {
-            return flows;
-        }
-        if !self.has_flows() {
-            return Err(CircuitError::invalid_tableau_conversion(format!(
-                "gate {} does not have flow metadata",
-                self.info.name
-            )));
-        }
-        let tableau = self.tableau()?;
-        let mut flows = Vec::with_capacity(tableau.len() * 2);
-        for index in 0..tableau.len() {
-            flows.push(Flow::from_paulis(
-                single_pauli(tableau.len(), index, PauliBasis::X),
-                tableau
-                    .x_output(index)
-                    .map_err(stabilizer_to_circuit_error)?
-                    .clone(),
-            ));
-            flows.push(Flow::from_paulis(
-                single_pauli(tableau.len(), index, PauliBasis::Z),
-                tableau
-                    .z_output(index)
-                    .map_err(stabilizer_to_circuit_error)?
-                    .clone(),
-            ));
-        }
-        Ok(flows)
-    }
-
-    /// Returns true when `flows` can produce Stim v1.16.0 gate-table flow metadata.
-    pub fn has_flows(self) -> bool {
-        self.has_tableau() || crate::gate::flows::gate_has_flow_metadata(self.info.name)
-    }
-
-    /// Returns Stim v1.16.0's fixed-shape one- or two-qubit unitary matrix metadata.
-    ///
-    /// Variable-target unitary gate families, such as `SPP` and `SPP_DAG`, do not have fixed
-    /// matrix metadata in Stim's gate table and are rejected here.
-    pub fn unitary_matrix(self) -> CircuitResult<GateUnitaryMatrix> {
-        crate::gate::unitary::gate_unitary_matrix(self.info.name).ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(format!(
-                "gate {} does not have fixed-shape unitary matrix data",
-                self.info.name
-            ))
-        })
-    }
-
-    /// Returns true when `unitary_matrix` can produce fixed-shape unitary metadata.
-    pub fn has_unitary_matrix(self) -> bool {
-        crate::gate::unitary::gate_has_unitary_matrix(self.info.name)
-    }
-
-    /// Returns Stim v1.16.0's H/S/CX/M/R decomposition metadata for this gate.
-    ///
-    /// This exposes the static gate-table metadata only. Full circuit decomposition is owned by
-    /// the circuit transform milestones and is not implied by this accessor.
-    pub fn h_s_cx_m_r_decomposition(self) -> CircuitResult<GateDecomposition> {
-        crate::gate::decomposition::gate_decomposition(self.info.name).ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(format!(
-                "gate {} does not have H/S/CX/M/R decomposition data",
-                self.info.name
-            ))
-        })
-    }
-
-    /// Returns true when `h_s_cx_m_r_decomposition` can produce gate-table metadata.
-    pub fn has_h_s_cx_m_r_decomposition(self) -> bool {
-        crate::gate::decomposition::gate_has_decomposition(self.info.name)
-    }
-
     pub fn can_fuse(self) -> bool {
         self.info.can_fuse
     }
-}
-
-fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    PauliString::from_bases_unchecked(
-        PauliSign::Plus,
-        (0..len).map(|candidate| {
-            if candidate == index {
-                basis
-            } else {
-                PauliBasis::I
-            }
-        }),
-    )
-}
-
-fn stabilizer_to_circuit_error(error: StabilizerError) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(error.to_string())
 }
 
 impl From<ArgRule> for GateArgumentRule {

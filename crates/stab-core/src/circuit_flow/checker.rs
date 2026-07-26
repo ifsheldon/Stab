@@ -15,7 +15,7 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
         return Vec::new();
     }
     if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = circuit.to_tableau(false, false, false)
+        && let Ok(tableau) = crate::analysis::circuit_to_tableau(circuit, false, false, false)
     {
         return flows
             .iter()
@@ -112,7 +112,7 @@ pub fn check_unsigned_stabilizer_flows_with_diagnostics(
         return Vec::new();
     }
     if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = circuit.to_tableau(false, false, false)
+        && let Ok(tableau) = crate::analysis::circuit_to_tableau(circuit, false, false, false)
     {
         return check_unsigned_flows_with_tableau(&tableau, flows);
     }

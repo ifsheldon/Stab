@@ -273,7 +273,7 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         &mut blocker_evidence,
     )?);
     evidence_cases.extend(blocker_evidence);
-    qualification_cases::apply(
+    let public_api_aliases = qualification_cases::apply(
         root,
         &stim.tag,
         &stim.commit,
@@ -309,6 +309,7 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         features,
         upstream_cases,
         public_api_items,
+        public_api_aliases,
         evidence_cases,
     };
     manifest.semantic_digest = semantic_digest(&manifest)?;

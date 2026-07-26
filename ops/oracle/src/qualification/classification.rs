@@ -363,7 +363,9 @@ pub(super) fn classify_public_api_source(
     }
     if matches!(
         value.as_str(),
-        "crates/stab-core/src/dem.rs" | "crates/stab-core/src/dem/api.rs"
+        "crates/stab-core/src/analysis/dem_adapters.rs"
+            | "crates/stab-core/src/dem.rs"
+            | "crates/stab-core/src/dem/api.rs"
     ) {
         return Some(FeatureId::DemFormat);
     }
@@ -385,6 +387,9 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::Algebra);
     }
+    if value == "crates/stab-core/src/analysis/gate_adapters.rs" {
+        return Some(FeatureId::GateContract);
+    }
     if value.starts_with("crates/stab-core/src/result_format")
         || value.starts_with("crates/stab-core/src/result_stream")
     {
@@ -393,15 +398,20 @@ pub(super) fn classify_public_api_source(
     if value.starts_with("crates/stab-core/src/sampling")
         || matches!(
             value.as_str(),
-            "crates/stab-core/src/probability_util.rs"
-                | "crates/stab-core/src/reference_sample_tree.rs"
+            "crates/stab-core/src/execution/circuit_adapters.rs"
+                | "crates/stab-core/src/execution/reference_sample_tree.rs"
+                | "crates/stab-core/src/probability_util.rs"
         )
     {
         return Some(FeatureId::Sampling);
     }
+    if value == "crates/stab-core/src/execution/sampled_flow.rs" {
+        return Some(FeatureId::FlowUtils);
+    }
     if matches!(
         value.as_str(),
-        "crates/stab-core/src/circuit.rs"
+        "crates/stab-core/src/analysis/circuit_adapters.rs"
+            | "crates/stab-core/src/circuit.rs"
             | "crates/stab-core/src/circuit/api.rs"
             | "crates/stab-core/src/circuit/counts.rs"
             | "crates/stab-core/src/circuit/iter.rs"

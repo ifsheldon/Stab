@@ -5,88 +5,62 @@ use crate::{
 
 const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
 
-impl Circuit {
-    /// Returns this circuit with repeat blocks unrolled and coordinate shifts applied.
-    ///
-    /// `SHIFT_COORDS` instructions are absorbed into subsequent `QUBIT_COORDS` and `DETECTOR`
-    /// instructions, matching Stim's materialized `flattened` transform. Because this returns an
-    /// owned circuit, expansions above one million operations are rejected; use the lazy flattened
-    /// iterators for raw repeat traversal when materialization is not required.
-    pub fn flattened(&self) -> CircuitResult<Self> {
-        validate_flattened_operation_limit(self)?;
-        let mut result = Self::new();
-        visit_flattened_operations(self, &mut Vec::new(), |instruction| {
-            result.append_instruction(instruction);
-            Ok(())
-        })?;
-        Ok(result)
-    }
+/// Returns a circuit with repeat blocks unrolled and coordinate shifts applied.
+///
+/// `SHIFT_COORDS` instructions are absorbed into subsequent `QUBIT_COORDS` and `DETECTOR`
+/// instructions, matching Stim's materialized `flattened` transform. Because this returns an
+/// owned circuit, expansions above one million operations are rejected; use the lazy flattened
+/// iterators for raw repeat traversal when materialization is not required.
+pub fn flattened_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
+    validate_flattened_operation_limit(circuit)?;
+    let mut result = Circuit::new();
+    visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
+        result.append_instruction(instruction);
+        Ok(())
+    })?;
+    Ok(result)
+}
 
-    /// Returns owned flattened instructions without Stim-style adjacent-instruction fusion.
-    ///
-    /// This is the Rust transform counterpart to Stim's deprecated `flattened_operations`
-    /// surface. It applies coordinate shifts and unrolls repeats, but preserves each yielded
-    /// operation as an independent instruction.
-    pub fn flattened_operations(&self) -> CircuitResult<Vec<CircuitInstruction>> {
-        validate_flattened_operation_limit(self)?;
-        let count = flattened_operation_count(self)?;
-        let capacity = usize::try_from(count).map_err(|_| flattened_operation_count_error())?;
-        let mut result = Vec::with_capacity(capacity);
-        visit_flattened_operations(self, &mut Vec::new(), |instruction| {
-            result.push(instruction);
-            Ok(())
-        })?;
-        Ok(result)
-    }
+/// Returns owned flattened instructions without Stim-style adjacent-instruction fusion.
+///
+/// This is the Rust transform counterpart to Stim's deprecated `flattened_operations` surface.
+/// It applies coordinate shifts and unrolls repeats, but preserves each yielded operation as an
+/// independent instruction.
+pub fn flattened_circuit_operations(circuit: &Circuit) -> CircuitResult<Vec<CircuitInstruction>> {
+    validate_flattened_operation_limit(circuit)?;
+    let count = flattened_operation_count(circuit)?;
+    let capacity = usize::try_from(count).map_err(|_| flattened_operation_count_error())?;
+    let mut result = Vec::with_capacity(capacity);
+    visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
+        result.push(instruction);
+        Ok(())
+    })?;
+    Ok(result)
+}
 
-    /// Returns a copy of this circuit with noisy behavior removed while preserving records.
-    ///
-    /// Ordinary noise instructions are dropped. Noisy measurement probabilities are stripped, and
-    /// heralded noise instructions become deterministic zero `MPAD` results so measurement-record
-    /// indexing stays unchanged.
-    pub fn without_noise(&self) -> CircuitResult<Self> {
-        let mut result = Self::new();
-        for item in self.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    append_noiseless_instruction(&mut result, instruction)?
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    let body = repeat.body().without_noise()?;
-                    result.append_repeat_block(RepeatBlock::new(
-                        repeat.repeat_count(),
-                        body,
-                        repeat.tag().map(str::to_owned),
-                    ));
-                }
+/// Returns a copy of a circuit with noisy behavior removed while preserving records.
+///
+/// Ordinary noise instructions are dropped. Noisy measurement probabilities are stripped, and
+/// heralded noise instructions become deterministic zero `MPAD` results so measurement-record
+/// indexing stays unchanged.
+pub fn circuit_without_noise(circuit: &Circuit) -> CircuitResult<Circuit> {
+    let mut result = Circuit::new();
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                append_noiseless_instruction(&mut result, instruction)?
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let body = circuit_without_noise(repeat.body())?;
+                result.append_repeat_block(RepeatBlock::new(
+                    repeat.repeat_count(),
+                    body,
+                    repeat.tag().map(str::to_owned),
+                ));
             }
         }
-        Ok(result)
     }
-
-    /// Returns the currently supported H/S/CX/M/R decomposition.
-    ///
-    /// This is Stab's Rust counterpart to Stim's `Circuit.decomposed()` surface for the current
-    /// RPF2-owned gate families. It decomposes supported single-qubit, two-qubit, pair-measurement,
-    /// MPP, SPP, and SPP_DAG operations while preserving noise, annotations, `MPAD`, repeat
-    /// structure, and selected measurement-rich flow-generator semantics for decomposed MPP and
-    /// pair-measurement cases.
-    pub fn decomposed(&self) -> CircuitResult<Self> {
-        crate::decomposed_circuit(self)
-    }
-
-    /// Returns the currently supported transform with measurement feedback inlined.
-    ///
-    /// This is Stab's scoped Rust counterpart to Stim's feedback-removal transform. The current
-    /// implementation handles top-level single-control Pauli feedback, including the supported MPP
-    /// measurement case, selected `XCZ`/`YCZ` measurement-record feedback, selected bounded
-    /// repeat-loop refolding, and a selected nested bounded-repeat detector-parity feedback case,
-    /// and rejects excessive repeat work or
-    /// unsupported classical controlled gates with precise domain errors instead of claiming full
-    /// feedback-transform parity.
-    pub fn with_inlined_feedback(&self) -> CircuitResult<Self> {
-        crate::circuit_with_inlined_feedback(self)
-    }
+    Ok(result)
 }
 
 fn validate_flattened_operation_limit(circuit: &Circuit) -> CircuitResult<()> {

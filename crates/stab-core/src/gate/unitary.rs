@@ -1,66 +1,10 @@
-use num_complex::Complex32;
-
-/// Fixed-shape unitary matrix metadata for a one- or two-qubit Stim gate.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GateUnitaryMatrix {
-    One([[Complex32; 2]; 2]),
-    Two([[Complex32; 4]; 4]),
-}
-
-impl GateUnitaryMatrix {
-    /// Returns the matrix width and height.
-    pub fn dimension(self) -> usize {
-        match self {
-            Self::One(_) => 2,
-            Self::Two(_) => 4,
-        }
-    }
-
-    /// Returns the number of qubits acted on by this unitary.
-    pub fn num_qubits(self) -> usize {
-        match self {
-            Self::One(_) => 1,
-            Self::Two(_) => 2,
-        }
-    }
-
-    /// Returns the number of complex matrix entries.
-    pub fn entry_count(self) -> usize {
-        let dimension = self.dimension();
-        dimension * dimension
-    }
-
-    /// Materializes the fixed-shape matrix as nested rows for generic matrix consumers.
-    pub fn to_vecs(self) -> Vec<Vec<Complex32>> {
-        match self {
-            Self::One(rows) => rows.into_iter().map(Vec::from).collect(),
-            Self::Two(rows) => rows.into_iter().map(Vec::from).collect(),
-        }
-    }
-
-    fn from_rows(rows: GateUnitaryRows) -> Self {
-        match rows {
-            GateUnitaryRows::One(rows) => Self::One(matrix_from_rows(rows)),
-            GateUnitaryRows::Two(rows) => Self::Two(matrix_from_rows(rows)),
-        }
-    }
-}
-
-pub(crate) fn gate_unitary_matrix(gate_name: &str) -> Option<GateUnitaryMatrix> {
-    gate_unitary_rows(gate_name).map(GateUnitaryMatrix::from_rows)
-}
-
-pub(crate) fn gate_has_unitary_matrix(gate_name: &str) -> bool {
-    gate_unitary_rows(gate_name).is_some()
-}
-
 #[derive(Clone, Copy)]
-enum GateUnitaryRows {
+pub(crate) enum GateUnitaryRows {
     One([[(f32, f32); 2]; 2]),
     Two([[(f32, f32); 4]; 4]),
 }
 
-fn gate_unitary_rows(gate_name: &str) -> Option<GateUnitaryRows> {
+pub(crate) fn gate_unitary_rows(gate_name: &str) -> Option<GateUnitaryRows> {
     let h = f32::sqrt(0.5);
     Some(match gate_name {
         "I" => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (1.0, 0.0)]]),
@@ -195,10 +139,6 @@ fn gate_unitary_rows(gate_name: &str) -> Option<GateUnitaryRows> {
         ]),
         _ => return None,
     })
-}
-
-fn matrix_from_rows<const N: usize>(rows: [[(f32, f32); N]; N]) -> [[Complex32; N]; N] {
-    rows.map(|row| row.map(|(real, imag)| Complex32::new(real, imag)))
 }
 
 fn swap_unitary() -> [[(f32, f32); 4]; 4] {

@@ -1,3 +1,15 @@
+//! Model-owned traversal over compact detector error models.
+//!
+//! This module is the advanced crate-internal boundary shared by DEM analysis and execution. It
+//! builds a checked tree proportional to the compact model and leaves repeat handling to an
+//! explicit visitor policy. Consumers can therefore skip, inspect, fold, selectively visit, or
+//! boundedly expand repeats without maintaining independent recursion or silently materializing
+//! the represented instruction stream.
+//!
+//! The boundary is deliberately not public. The current visitor exposes internal summaries and
+//! execution-oriented tree views that may evolve when the logical components become physical
+//! crates. Public callers should use operation-specific DEM APIs instead.
+
 use std::ops::ControlFlow;
 
 use super::{
@@ -21,6 +33,11 @@ impl DemDetectorBounds {
     }
 }
 
+/// Checked scalar facts about one compact DEM block.
+///
+/// Each fallible metric retains its own error so an overflow in an unrelated query does not make
+/// the whole folded tree unusable. Coordinate vectors are not cached here; coordinate-aware
+/// consumers opt into their separate bounded traversal state.
 #[derive(Clone, Debug)]
 pub(crate) struct DemBlockSummary {
     detector_shift: CircuitResult<u64>,
@@ -29,9 +46,6 @@ pub(crate) struct DemBlockSummary {
     error_count: CircuitResult<u64>,
     detector_declaration_count: Option<u64>,
     detector_declaration_bounds: CircuitResult<Option<DemDetectorBounds>>,
-    compact_search_error_count: CircuitResult<Option<u64>>,
-    compact_filter_error_count: CircuitResult<Option<u64>>,
-    has_nonzero_probability_error: bool,
     max_repeat_depth: usize,
 }
 
@@ -60,39 +74,41 @@ impl DemBlockSummary {
         self.detector_declaration_bounds.clone()
     }
 
-    pub(super) fn compact_search_error_count(&self) -> CircuitResult<Option<u64>> {
-        self.compact_search_error_count.clone()
-    }
-
-    pub(crate) fn compact_filter_error_count(&self) -> CircuitResult<Option<u64>> {
-        self.compact_filter_error_count.clone()
-    }
-
-    pub(super) const fn has_nonzero_probability_error(&self) -> bool {
-        self.has_nonzero_probability_error
-    }
-
     pub(crate) const fn max_repeat_depth(&self) -> usize {
         self.max_repeat_depth
     }
 }
 
+/// Checked folded representation of a [`DetectorErrorModel`].
+///
+/// Construction creates one node per compact model item and performs work proportional to compact
+/// structure. Repeat counts affect checked summaries, but do not duplicate body nodes. Analysis
+/// and execution share this representation instead of implementing consumer-specific repeat
+/// recursion.
 #[derive(Clone, Debug)]
 pub(crate) struct FoldedDemTraversal<'a> {
     root: FoldedDemBlock<'a>,
 }
 
 impl<'a> FoldedDemTraversal<'a> {
+    /// Builds a folded tree without expanding repeat bodies.
     pub(crate) fn new(model: &'a DetectorErrorModel) -> CircuitResult<Self> {
+        let mut next_block_id = 0;
         Ok(Self {
-            root: FoldedDemBlock::new(model)?,
+            root: FoldedDemBlock::new(model, &mut next_block_id)?,
         })
     }
 
+    /// Returns the compact root block and its checked summaries.
     pub(crate) const fn root(&self) -> &FoldedDemBlock<'a> {
         &self.root
     }
 
+    /// Traverses the model with coordinate-free state.
+    ///
+    /// Visitor errors and [`ControlFlow::Break`] propagate immediately. Repeat expansion occurs
+    /// only when the visitor explicitly returns [`DemRepeatSelection::Expand`], whose cumulative
+    /// iteration limit is enforced by the traversal.
     pub(crate) fn try_visit<V>(&self, visitor: &mut V) -> CircuitResult<ControlFlow<()>>
     where
         V: FoldedDemVisitor,
@@ -102,6 +118,11 @@ impl<'a> FoldedDemTraversal<'a> {
         self.root.visit(visitor, &mut state, &mut expansion)
     }
 
+    /// Traverses the model with opt-in coordinate-shift state.
+    ///
+    /// Coordinate updates have a separate aggregate scalar-work limit. Consumers that do not need
+    /// coordinates must use [`Self::try_visit`] so wide coordinate annotations cannot inflate
+    /// their retained state or work.
     pub(super) fn try_visit_with_coordinates<V>(
         &self,
         visitor: &mut V,
@@ -114,6 +135,10 @@ impl<'a> FoldedDemTraversal<'a> {
         self.root.visit(visitor, &mut state, &mut expansion)
     }
 
+    /// Applies a consumer-owned repeat-depth admission limit.
+    ///
+    /// Depth validation is not part of construction because compact model queries and consumers
+    /// historically have different accepted depth contracts.
     pub(crate) fn validate_repeat_depth(&self, context: &'static str) -> CircuitResult<()> {
         let depth = self.root.summary().max_repeat_depth();
         if depth > MAX_DEM_REPEAT_NESTING {
@@ -125,32 +150,57 @@ impl<'a> FoldedDemTraversal<'a> {
     }
 }
 
+/// One compact block in a folded traversal tree.
+///
+/// Blocks borrow instructions and repeat declarations from the source model. Their child vectors
+/// mirror compact syntax and never contain one entry per represented repeat iteration.
 #[derive(Clone, Debug)]
 pub(crate) struct FoldedDemBlock<'a> {
+    compact_id: usize,
     items: Vec<FoldedDemItem<'a>>,
     summary: DemBlockSummary,
 }
 
 impl<'a> FoldedDemBlock<'a> {
-    fn new(model: &'a DetectorErrorModel) -> CircuitResult<Self> {
+    fn new(model: &'a DetectorErrorModel, next_block_id: &mut usize) -> CircuitResult<Self> {
+        let compact_id = *next_block_id;
+        *next_block_id = next_block_id.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "DEM compact folded-block identifier overflowed",
+            )
+        })?;
         let mut items = Vec::with_capacity(model.items().len());
         for item in model.items() {
             items.push(match item {
                 DemItem::Instruction(instruction) => FoldedDemItem::Instruction(instruction),
                 DemItem::RepeatBlock(repeat) => FoldedDemItem::Repeat {
                     repeat,
-                    body: Box::new(Self::new(repeat.body())?),
+                    body: Box::new(Self::new(repeat.body(), next_block_id)?),
                 },
             });
         }
         let summary = summarize(&items);
-        Ok(Self { items, summary })
+        Ok(Self {
+            compact_id,
+            items,
+            summary,
+        })
     }
 
+    /// Returns the traversal-local identity of this compact block.
+    ///
+    /// IDs are assigned in deterministic pre-order and remain stable for the lifetime of the
+    /// folded tree. They identify compact structure only and are not persistent model IDs.
+    pub(crate) const fn compact_id(&self) -> usize {
+        self.compact_id
+    }
+
+    /// Returns compact child items in source order.
     pub(crate) fn items(&self) -> &[FoldedDemItem<'a>] {
         &self.items
     }
 
+    /// Returns checked scalar facts for this compact block.
     pub(crate) const fn summary(&self) -> &DemBlockSummary {
         &self.summary
     }
@@ -226,6 +276,7 @@ impl<'a> FoldedDemBlock<'a> {
     }
 }
 
+/// Borrowed compact item exposed to advanced analysis and execution consumers.
 #[derive(Clone, Debug)]
 pub(crate) enum FoldedDemItem<'a> {
     Instruction(&'a DemInstruction),
@@ -235,6 +286,11 @@ pub(crate) enum FoldedDemItem<'a> {
     },
 }
 
+/// Semantic position supplied to folded traversal callbacks.
+///
+/// The state describes the position immediately before the current instruction or repeat. Detector
+/// shifts are applied after an instruction callback continues. Folded depth and multiplicity are
+/// nontrivial only inside bodies selected with [`DemRepeatSelection::FoldOnce`].
 #[derive(Clone, Debug)]
 pub(crate) struct DemTraversalState {
     detector_offset: u64,
@@ -262,6 +318,7 @@ impl DemTraversalState {
         }
     }
 
+    /// Returns the absolute detector offset at the current compact position.
     pub(crate) const fn detector_offset(&self) -> u64 {
         self.detector_offset
     }
@@ -274,6 +331,7 @@ impl DemTraversalState {
         })
     }
 
+    /// Returns the number of enclosing repeats represented through one folded body visit.
     pub(crate) const fn folded_repeat_depth(&self) -> usize {
         self.folded_repeat_depth
     }
@@ -380,25 +438,53 @@ impl DemTraversalState {
     }
 }
 
+/// Policy chosen by a visitor when entering a nonempty repeat block.
+///
+/// Every selection controls body callbacks only. When the selected body visits and
+/// [`FoldedDemVisitor::exit_repeat`] complete with [`ControlFlow::Continue`], traversal advances
+/// outer detector and coordinate state by the repeat's full semantic effect. An error or
+/// [`ControlFlow::Break`] stops before that internal state update.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DemRepeatSelection {
+    /// Do not visit the body.
     Skip,
+    /// Visit the first structural body once without marking it as folded.
     StructuralOnce,
+    /// Visit a zero-detector-shift body once with folded depth and multiplicity in the state.
     FoldOnce,
+    /// Visit every represented iteration under a cumulative traversal-owned limit.
     Expand {
+        /// Maximum total expanded iterations across all `Expand` selections in this traversal.
         max_total_iterations: u64,
+        /// Operation name included in a resource-limit error.
         context: &'static str,
     },
+    /// Visit selected iteration indexes in the supplied order.
+    ///
+    /// The traversal rejects indexes that are out of range or not strictly increasing. The visitor
+    /// owns any admission policy for constructing this selection.
     Selected(Vec<u64>),
 }
 
+/// Advanced policy interface for checked folded DEM traversal.
+///
+/// Callbacks borrow model-owned values and may stop immediately with an error or
+/// [`ControlFlow::Break`]. `visit_instruction` observes pre-instruction state. `enter_repeat` and
+/// `exit_repeat` observe the outer state; zero-count repeats produce neither callback. Consumers
+/// choose repeat handling explicitly through [`DemRepeatSelection`] and must preserve their own
+/// output-size or algorithmic-work limits in addition to traversal-owned arithmetic checks.
+///
+/// This trait is crate-private by design. It is the shared model boundary for analysis and
+/// execution implementations, not a stable downstream cursor API.
 pub(crate) trait FoldedDemVisitor {
+    /// Visits one instruction with semantic state immediately before that instruction.
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> CircuitResult<ControlFlow<()>>;
 
+    /// Chooses how a nonempty repeat body is visited.
     fn enter_repeat(
         &mut self,
         _repeat: &DemRepeatBlock,
@@ -408,6 +494,7 @@ pub(crate) trait FoldedDemVisitor {
         Ok(DemRepeatSelection::StructuralOnce)
     }
 
+    /// Observes completion of the selected body visits before outer state advances.
     fn exit_repeat(
         &mut self,
         _repeat: &DemRepeatBlock,
@@ -536,9 +623,6 @@ fn summarize(items: &[FoldedDemItem<'_>]) -> DemBlockSummary {
         error_count: summarize_error_count(items),
         detector_declaration_count: summarize_detector_declaration_count(items),
         detector_declaration_bounds: summarize_detector_declaration_bounds(items),
-        compact_search_error_count: summarize_compact_search_error_count(items),
-        compact_filter_error_count: summarize_compact_filter_error_count(items),
-        has_nonzero_probability_error: has_nonzero_probability_error(items),
         max_repeat_depth: summarize_max_repeat_depth(items),
     }
 }
@@ -751,18 +835,6 @@ fn summarize_detector_declaration_bounds(
     Ok(bounds)
 }
 
-fn has_nonzero_probability_error(items: &[FoldedDemItem<'_>]) -> bool {
-    items.iter().any(|item| match item {
-        FoldedDemItem::Instruction(instruction) => {
-            instruction.kind() == DemInstructionKind::Error
-                && instruction.args().first().copied().unwrap_or(0.0) != 0.0
-        }
-        FoldedDemItem::Repeat { repeat, body } => {
-            repeat.repeat_count().get() > 0 && body.summary().has_nonzero_probability_error()
-        }
-    })
-}
-
 fn summarize_max_repeat_depth(items: &[FoldedDemItem<'_>]) -> usize {
     items
         .iter()
@@ -774,106 +846,6 @@ fn summarize_max_repeat_depth(items: &[FoldedDemItem<'_>]) -> usize {
         })
         .max()
         .unwrap_or(0)
-}
-
-fn summarize_compact_search_error_count(items: &[FoldedDemItem<'_>]) -> CircuitResult<Option<u64>> {
-    let mut count = 0_u64;
-    for item in items {
-        match item {
-            FoldedDemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Error => {
-                    if instruction.args().first().copied().unwrap_or(0.0) == 0.0 {
-                        continue;
-                    }
-                    let mut has_any_target = false;
-                    let mut has_search_target = false;
-                    for target in instruction.targets() {
-                        has_any_target = true;
-                        match target {
-                            DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
-                                has_search_target = true;
-                            }
-                            DemTarget::Numeric(_) => return Ok(None),
-                            DemTarget::Separator => {}
-                        }
-                    }
-                    if !has_search_target && has_any_target {
-                        return Ok(None);
-                    }
-                    if has_search_target {
-                        count = count.checked_add(1).ok_or_else(|| {
-                            detector_summary_error(
-                                "DEM search compact-repeat error count overflowed",
-                            )
-                        })?;
-                    }
-                }
-                DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
-                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-                DemInstructionKind::ShiftDetectors => return Ok(None),
-            },
-            FoldedDemItem::Repeat { repeat, body } => {
-                if repeat.repeat_count().get() == 0 {
-                    continue;
-                }
-                let Some(child_count) = body.summary().compact_search_error_count()? else {
-                    return Ok(None);
-                };
-                if body.summary().detector_shift()? != 0 {
-                    return Ok(None);
-                }
-                count = count.checked_add(child_count).ok_or_else(|| {
-                    detector_summary_error("DEM search compact-repeat error count overflowed")
-                })?;
-            }
-        }
-    }
-    Ok(Some(count))
-}
-
-fn summarize_compact_filter_error_count(items: &[FoldedDemItem<'_>]) -> CircuitResult<Option<u64>> {
-    let mut count = 0_u64;
-    for item in items {
-        match item {
-            FoldedDemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Error => {
-                    for target in instruction.targets() {
-                        match target {
-                            DemTarget::RelativeDetector(_)
-                            | DemTarget::LogicalObservable(_)
-                            | DemTarget::Separator => {}
-                            DemTarget::Numeric(_) => return Ok(None),
-                        }
-                    }
-                    count = count.checked_add(1).ok_or_else(|| {
-                        detector_summary_error(
-                            "DEM ErrorMatcher filter compact-repeat error count overflowed",
-                        )
-                    })?;
-                }
-                DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
-                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-                DemInstructionKind::ShiftDetectors => return Ok(None),
-            },
-            FoldedDemItem::Repeat { repeat, body } => {
-                if repeat.repeat_count().get() == 0 {
-                    continue;
-                }
-                if body.summary().detector_shift()? != 0 {
-                    return Ok(None);
-                }
-                let Some(child_count) = body.summary().compact_filter_error_count()? else {
-                    return Ok(None);
-                };
-                count = count.checked_add(child_count).ok_or_else(|| {
-                    detector_summary_error(
-                        "DEM ErrorMatcher filter compact-repeat error count overflowed",
-                    )
-                })?;
-            }
-        }
-    }
-    Ok(Some(count))
 }
 
 fn include_bound(bounds: &mut Option<DemDetectorBounds>, detector: u64) {
@@ -989,7 +961,6 @@ mod tests {
             summary.detector_declaration_bounds().unwrap(),
             Some(DemDetectorBounds { min: 2, max: 14 })
         );
-        assert!(summary.has_nonzero_probability_error());
     }
 
     #[test]

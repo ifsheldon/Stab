@@ -1,9 +1,5 @@
-use std::str::FromStr;
-
-use crate::{CircuitError, CircuitResult, Flow};
-
-pub(crate) fn gate_flow_metadata(name: &str) -> Option<CircuitResult<Vec<Flow>>> {
-    let texts = match name {
+pub(crate) fn gate_flow_descriptors(name: &str) -> Option<&'static [&'static str]> {
+    Some(match name {
         "M" => &["Z -> rec[-1]", "Z -> Z"][..],
         "MX" => &["X -> rec[-1]", "X -> X"],
         "MY" => &["Y -> rec[-1]", "Y -> Y"],
@@ -45,37 +41,5 @@ pub(crate) fn gate_flow_metadata(name: &str) -> Option<CircuitResult<Vec<Flow>>>
             "__Z -> __Z",
         ],
         _ => return None,
-    };
-    Some(
-        texts
-            .iter()
-            .map(|text| {
-                Flow::from_str(text).map_err(|error| {
-                    CircuitError::invalid_tableau_conversion(format!(
-                        "gate {name} flow metadata is invalid: {error}"
-                    ))
-                })
-            })
-            .collect(),
-    )
-}
-
-pub(crate) fn gate_has_flow_metadata(name: &str) -> bool {
-    matches!(
-        name,
-        "M" | "MX"
-            | "MY"
-            | "R"
-            | "RX"
-            | "RY"
-            | "MR"
-            | "MRX"
-            | "MRY"
-            | "MXX"
-            | "MYY"
-            | "MZZ"
-            | "MPP"
-            | "SPP"
-            | "SPP_DAG"
-    )
+    })
 }

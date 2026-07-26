@@ -1,4 +1,7 @@
-use crate::{Circuit, CircuitResult, CompiledSampler};
+//! Compact deterministic reference samples owned by the execution layer.
+
+use super::CompiledSampler;
+use crate::{Circuit, CircuitResult};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceSampleTree {

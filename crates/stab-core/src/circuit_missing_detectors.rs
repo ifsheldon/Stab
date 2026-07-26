@@ -103,8 +103,8 @@ impl MissingDetectorFinder {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
-        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
-            .map_err(|error| {
+        let decomposed =
+            crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
                 CircuitError::invalid_detector_error_model(format!(
                     "{} cannot be analyzed via decomposition for missing detectors: {error}",
                     instruction.gate().canonical_name()
@@ -115,7 +115,7 @@ impl MissingDetectorFinder {
 
     fn process_unitary_tableau(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let gate_name = instruction.gate().canonical_name();
-        let tableau = instruction.gate().tableau().map_err(|error| {
+        let tableau = crate::analysis::gate_tableau(instruction.gate()).map_err(|error| {
             CircuitError::invalid_detector_error_model(format!(
                 "failed to get tableau data for {gate_name} during missing-detector analysis: {error}"
             ))
@@ -499,7 +499,7 @@ fn direct_instruction_work_units(instruction: &CircuitInstruction) -> CircuitRes
 
 fn decomposed_instruction_work_units(instruction: &CircuitInstruction) -> CircuitResult<u64> {
     let decomposed =
-        crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+        crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
             CircuitError::invalid_detector_error_model(format!(
                 "{} cannot be analyzed via decomposition for missing detectors: {error}",
                 instruction.gate().canonical_name()

@@ -298,13 +298,14 @@ impl SparseReverseFrameTracker {
                 if instruction.gate().is_two_qubit_gate() {
                     self.undo_two_qubit_tableau(instruction, instruction.gate().canonical_name())
                 } else {
-                    let clifford = crate::single_qubit_clifford_for_gate(instruction.gate())
-                        .map_err(|_| {
-                            CircuitError::invalid_detector_error_model(format!(
-                                "sparse reverse frame tracker does not support tableau gate {}",
-                                instruction.gate().canonical_name()
-                            ))
-                        })?;
+                    let clifford =
+                        crate::analysis::single_qubit_clifford_for_gate(instruction.gate())
+                            .map_err(|_| {
+                                CircuitError::invalid_detector_error_model(format!(
+                                    "sparse reverse frame tracker does not support tableau gate {}",
+                                    instruction.gate().canonical_name()
+                                ))
+                            })?;
                     self.undo_single_qubit_clifford(instruction, clifford)
                 }
             }
@@ -1082,7 +1083,7 @@ fn two_qubit_inverse_tableau(
             "{gate_name} does not have a unitary inverse for sparse reverse tracking"
         ))
     })?;
-    let inverse_tableau = inverse.tableau().map_err(|error| {
+    let inverse_tableau = crate::analysis::gate_tableau(inverse).map_err(|error| {
         CircuitError::invalid_detector_error_model(format!(
             "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
         ))

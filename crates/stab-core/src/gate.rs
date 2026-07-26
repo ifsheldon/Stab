@@ -5,11 +5,13 @@ mod semantic_contract;
 mod unitary;
 
 pub use decomposition::GateDecomposition;
+pub(crate) use decomposition::gate_decomposition_text;
+pub(crate) use flows::gate_flow_descriptors;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use semantic_contract::{GateContractStatisticalBucket, GateContractStatisticalPlan};
-pub use unitary::GateUnitaryMatrix;
+pub(crate) use unitary::{GateUnitaryRows, gate_unitary_rows};
 
 use crate::{CircuitError, CircuitResult, Probability, Target};
 use semantic_contract::{

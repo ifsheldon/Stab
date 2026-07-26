@@ -1,5 +1,3 @@
-use crate::{Circuit, CircuitResult};
-
 /// Stim v1.16.0 gate decomposition metadata into the H/S/CX/M/R basis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GateDecomposition {
@@ -15,11 +13,6 @@ impl GateDecomposition {
     pub fn as_stim_str(self) -> &'static str {
         self.stim_text
     }
-
-    /// Parses the decomposition text into a Stab circuit.
-    pub fn to_circuit(self) -> CircuitResult<Circuit> {
-        Circuit::from_stim_str(self.stim_text)
-    }
 }
 
 impl AsRef<str> for GateDecomposition {
@@ -28,83 +21,83 @@ impl AsRef<str> for GateDecomposition {
     }
 }
 
-pub(crate) fn gate_decomposition(gate_name: &str) -> Option<GateDecomposition> {
+pub(crate) fn gate_decomposition_text(gate_name: &str) -> Option<&'static str> {
     match gate_name {
-        "MX" => Some(GateDecomposition::new(
+        "MX" => Some(
             r#"
 H 0
 M 0
 H 0
 "#,
-        )),
-        "MY" => Some(GateDecomposition::new(
-            r#"
-S 0
-S 0
-S 0
-H 0
-M 0
-H 0
-S 0
-"#,
-        )),
-        "M" => Some(GateDecomposition::new(
-            r#"
-M 0
-"#,
-        )),
-        "MRX" => Some(GateDecomposition::new(
-            r#"
-H 0
-M 0
-R 0
-H 0
-"#,
-        )),
-        "MRY" => Some(GateDecomposition::new(
+        ),
+        "MY" => Some(
             r#"
 S 0
 S 0
 S 0
 H 0
 M 0
+H 0
+S 0
+"#,
+        ),
+        "M" => Some(
+            r#"
+M 0
+"#,
+        ),
+        "MRX" => Some(
+            r#"
+H 0
+M 0
+R 0
+H 0
+"#,
+        ),
+        "MRY" => Some(
+            r#"
+S 0
+S 0
+S 0
+H 0
+M 0
 R 0
 H 0
 S 0
 "#,
-        )),
-        "MR" => Some(GateDecomposition::new(
+        ),
+        "MR" => Some(
             r#"
 M 0
 R 0
 "#,
-        )),
-        "RX" => Some(GateDecomposition::new(
+        ),
+        "RX" => Some(
             r#"
 R 0
 H 0
 "#,
-        )),
-        "RY" => Some(GateDecomposition::new(
+        ),
+        "RY" => Some(
             r#"
 R 0
 H 0
 S 0
 "#,
-        )),
-        "R" => Some(GateDecomposition::new(
+        ),
+        "R" => Some(
             r#"
 R 0
 "#,
-        )),
-        "XCX" => Some(GateDecomposition::new(
+        ),
+        "XCX" => Some(
             r#"
 H 0
 CNOT 0 1
 H 0
 "#,
-        )),
-        "XCY" => Some(GateDecomposition::new(
+        ),
+        "XCY" => Some(
             r#"
 H 0
 S 1
@@ -114,13 +107,13 @@ CNOT 0 1
 H 0
 S 1
 "#,
-        )),
-        "XCZ" => Some(GateDecomposition::new(
+        ),
+        "XCZ" => Some(
             r#"
 CNOT 1 0
 "#,
-        )),
-        "YCX" => Some(GateDecomposition::new(
+        ),
+        "YCX" => Some(
             r#"
 S 0
 S 0
@@ -130,8 +123,8 @@ CNOT 1 0
 S 0
 H 1
 "#,
-        )),
-        "YCY" => Some(GateDecomposition::new(
+        ),
+        "YCY" => Some(
             r#"
 S 0
 S 0
@@ -145,8 +138,8 @@ H 0
 S 0
 S 1
 "#,
-        )),
-        "YCZ" => Some(GateDecomposition::new(
+        ),
+        "YCZ" => Some(
             r#"
 S 0
 S 0
@@ -154,13 +147,13 @@ S 0
 CNOT 1 0
 S 0
 "#,
-        )),
-        "CX" => Some(GateDecomposition::new(
+        ),
+        "CX" => Some(
             r#"
 CNOT 0 1
 "#,
-        )),
-        "CY" => Some(GateDecomposition::new(
+        ),
+        "CY" => Some(
             r#"
 S 1
 S 1
@@ -168,20 +161,20 @@ S 1
 CNOT 0 1
 S 1
 "#,
-        )),
-        "CZ" => Some(GateDecomposition::new(
+        ),
+        "CZ" => Some(
             r#"
 H 1
 CNOT 0 1
 H 1
 "#,
-        )),
-        "H" => Some(GateDecomposition::new(
+        ),
+        "H" => Some(
             r#"
 H 0
 "#,
-        )),
-        "H_XY" => Some(GateDecomposition::new(
+        ),
+        "H_XY" => Some(
             r#"
 H 0
 S 0
@@ -189,35 +182,35 @@ S 0
 H 0
 S 0
 "#,
-        )),
-        "H_YZ" => Some(GateDecomposition::new(
+        ),
+        "H_YZ" => Some(
             r#"
 H 0
-S 0
-H 0
-S 0
-S 0
-"#,
-        )),
-        "H_NXY" => Some(GateDecomposition::new(
-            r#"
-S 0
-H 0
-S 0
-S 0
-H 0
-"#,
-        )),
-        "H_NXZ" => Some(GateDecomposition::new(
-            r#"
-S 0
 S 0
 H 0
 S 0
 S 0
 "#,
-        )),
-        "H_NYZ" => Some(GateDecomposition::new(
+        ),
+        "H_NXY" => Some(
+            r#"
+S 0
+H 0
+S 0
+S 0
+H 0
+"#,
+        ),
+        "H_NXZ" => Some(
+            r#"
+S 0
+S 0
+H 0
+S 0
+S 0
+"#,
+        ),
+        "H_NYZ" => Some(
             r#"
 S 0
 S 0
@@ -225,8 +218,8 @@ H 0
 S 0
 H 0
 "#,
-        )),
-        "MXX" => Some(GateDecomposition::new(
+        ),
+        "MXX" => Some(
             r#"
 CX 0 1
 H 0
@@ -234,8 +227,8 @@ M 0
 H 0
 CX 0 1
 "#,
-        )),
-        "MYY" => Some(GateDecomposition::new(
+        ),
+        "MYY" => Some(
             r#"
 S 0 1
 CX 0 1
@@ -246,28 +239,28 @@ H 0
 CX 0 1
 S 0 1
 "#,
-        )),
-        "MZZ" => Some(GateDecomposition::new(
+        ),
+        "MZZ" => Some(
             r#"
 CX 0 1
 M 1
 CX 0 1
 "#,
-        )),
-        "I" => Some(GateDecomposition::new(
+        ),
+        "I" => Some(
             r#"
 # (no operations)
 "#,
-        )),
-        "X" => Some(GateDecomposition::new(
+        ),
+        "X" => Some(
             r#"
 H 0
 S 0
 S 0
 H 0
 "#,
-        )),
-        "Y" => Some(GateDecomposition::new(
+        ),
+        "Y" => Some(
             r#"
 S 0
 S 0
@@ -276,14 +269,14 @@ S 0
 S 0
 H 0
 "#,
-        )),
-        "Z" => Some(GateDecomposition::new(
+        ),
+        "Z" => Some(
             r#"
 S 0
 S 0
 "#,
-        )),
-        "MPP" => Some(GateDecomposition::new(
+        ),
+        "MPP" => Some(
             r#"
 S 1 1 1
 H 0 1 3 4
@@ -293,8 +286,8 @@ CX 2 0 1 0 4 3
 H 0 1 3 4
 S 1
 "#,
-        )),
-        "SPP" => Some(GateDecomposition::new(
+        ),
+        "SPP" => Some(
             r#"
 CX 2 1
 CX 1 0
@@ -304,8 +297,8 @@ H 1
 CX 1 0
 CX 2 1
 "#,
-        )),
-        "SPP_DAG" => Some(GateDecomposition::new(
+        ),
+        "SPP_DAG" => Some(
             r#"
 CX 2 1
 CX 1 0
@@ -315,16 +308,16 @@ S 1
 CX 1 0
 CX 2 1
 "#,
-        )),
-        "C_XYZ" => Some(GateDecomposition::new(
+        ),
+        "C_XYZ" => Some(
             r#"
 S 0
 S 0
 S 0
 H 0
 "#,
-        )),
-        "C_NXYZ" => Some(GateDecomposition::new(
+        ),
+        "C_NXYZ" => Some(
             r#"
 S 0
 S 0
@@ -333,98 +326,98 @@ H 0
 S 0
 S 0
 "#,
-        )),
-        "C_XNYZ" => Some(GateDecomposition::new(
+        ),
+        "C_XNYZ" => Some(
             r#"
 S 0
 H 0
 "#,
-        )),
-        "C_XYNZ" => Some(GateDecomposition::new(
+        ),
+        "C_XYNZ" => Some(
             r#"
 S 0
 H 0
 S 0
 S 0
 "#,
-        )),
-        "C_ZYX" => Some(GateDecomposition::new(
+        ),
+        "C_ZYX" => Some(
             r#"
 H 0
 S 0
 "#,
-        )),
-        "C_ZYNX" => Some(GateDecomposition::new(
-            r#"
-S 0
-S 0
-H 0
-S 0
-"#,
-        )),
-        "C_ZNYX" => Some(GateDecomposition::new(
-            r#"
-H 0
-S 0
-S 0
-S 0
-"#,
-        )),
-        "C_NZYX" => Some(GateDecomposition::new(
+        ),
+        "C_ZYNX" => Some(
             r#"
 S 0
 S 0
 H 0
 S 0
+"#,
+        ),
+        "C_ZNYX" => Some(
+            r#"
+H 0
+S 0
 S 0
 S 0
 "#,
-        )),
-        "SQRT_X" => Some(GateDecomposition::new(
+        ),
+        "C_NZYX" => Some(
+            r#"
+S 0
+S 0
+H 0
+S 0
+S 0
+S 0
+"#,
+        ),
+        "SQRT_X" => Some(
             r#"
 H 0
 S 0
 H 0
 "#,
-        )),
-        "SQRT_X_DAG" => Some(GateDecomposition::new(
+        ),
+        "SQRT_X_DAG" => Some(
             r#"
 S 0
 H 0
 S 0
 "#,
-        )),
-        "SQRT_Y" => Some(GateDecomposition::new(
+        ),
+        "SQRT_Y" => Some(
             r#"
 S 0
 S 0
 H 0
 "#,
-        )),
-        "SQRT_Y_DAG" => Some(GateDecomposition::new(
+        ),
+        "SQRT_Y_DAG" => Some(
             r#"
 H 0
 S 0
 S 0
 "#,
-        )),
-        "S" => Some(GateDecomposition::new(
+        ),
+        "S" => Some(
             r#"
 S 0
 "#,
-        )),
-        "S_DAG" => Some(GateDecomposition::new(
+        ),
+        "S_DAG" => Some(
             r#"
 S 0
 S 0
 S 0
 "#,
-        )),
-        "II" => Some(GateDecomposition::new(
+        ),
+        "II" => Some(
             r#"
 "#,
-        )),
-        "SQRT_XX" => Some(GateDecomposition::new(
+        ),
+        "SQRT_XX" => Some(
             r#"
 H 0
 CNOT 0 1
@@ -434,8 +427,8 @@ S 1
 H 0
 H 1
 "#,
-        )),
-        "SQRT_XX_DAG" => Some(GateDecomposition::new(
+        ),
+        "SQRT_XX_DAG" => Some(
             r#"
 H 0
 CNOT 0 1
@@ -449,31 +442,14 @@ S 1
 H 0
 H 1
 "#,
-        )),
-        "SQRT_YY" => Some(GateDecomposition::new(
+        ),
+        "SQRT_YY" => Some(
             r#"
 S 0
 S 0
 S 0
 S 1
 S 1
-S 1
-H 0
-CNOT 0 1
-H 1
-S 0
-S 1
-H 0
-H 1
-S 0
-S 1
-"#,
-        )),
-        "SQRT_YY_DAG" => Some(GateDecomposition::new(
-            r#"
-S 0
-S 0
-S 0
 S 1
 H 0
 CNOT 0 1
@@ -484,87 +460,100 @@ H 0
 H 1
 S 0
 S 1
-S 1
-S 1
 "#,
-        )),
-        "SQRT_ZZ" => Some(GateDecomposition::new(
+        ),
+        "SQRT_YY_DAG" => Some(
             r#"
-H 1
-CNOT 0 1
-H 1
-S 0
-S 1
-"#,
-        )),
-        "SQRT_ZZ_DAG" => Some(GateDecomposition::new(
-            r#"
-H 1
-CNOT 0 1
-H 1
 S 0
 S 0
 S 0
 S 1
-S 1
-S 1
-"#,
-        )),
-        "SWAP" => Some(GateDecomposition::new(
-            r#"
-CNOT 0 1
-CNOT 1 0
-CNOT 0 1
-"#,
-        )),
-        "ISWAP" => Some(GateDecomposition::new(
-            r#"
 H 0
 CNOT 0 1
-CNOT 1 0
 H 1
-S 1
-S 0
-"#,
-        )),
-        "ISWAP_DAG" => Some(GateDecomposition::new(
-            r#"
-S 0
-S 0
 S 0
 S 1
-S 1
-S 1
-H 1
-CNOT 1 0
-CNOT 0 1
 H 0
+H 1
+S 0
+S 1
+S 1
+S 1
 "#,
-        )),
-        "CXSWAP" => Some(GateDecomposition::new(
+        ),
+        "SQRT_ZZ" => Some(
             r#"
-CNOT 1 0
+H 1
 CNOT 0 1
+H 1
+S 0
+S 1
 "#,
-        )),
-        "SWAPCX" => Some(GateDecomposition::new(
+        ),
+        "SQRT_ZZ_DAG" => Some(
+            r#"
+H 1
+CNOT 0 1
+H 1
+S 0
+S 0
+S 0
+S 1
+S 1
+S 1
+"#,
+        ),
+        "SWAP" => Some(
             r#"
 CNOT 0 1
 CNOT 1 0
+CNOT 0 1
 "#,
-        )),
-        "CZSWAP" => Some(GateDecomposition::new(
+        ),
+        "ISWAP" => Some(
+            r#"
+H 0
+CNOT 0 1
+CNOT 1 0
+H 1
+S 1
+S 0
+"#,
+        ),
+        "ISWAP_DAG" => Some(
+            r#"
+S 0
+S 0
+S 0
+S 1
+S 1
+S 1
+H 1
+CNOT 1 0
+CNOT 0 1
+H 0
+"#,
+        ),
+        "CXSWAP" => Some(
+            r#"
+CNOT 1 0
+CNOT 0 1
+"#,
+        ),
+        "SWAPCX" => Some(
+            r#"
+CNOT 0 1
+CNOT 1 0
+"#,
+        ),
+        "CZSWAP" => Some(
             r#"
 H 0
 CX 0 1
 CX 1 0
 H 1
 "#,
-        )),
+        ),
         _ => None,
     }
-}
-
-pub(crate) fn gate_has_decomposition(gate_name: &str) -> bool {
-    gate_decomposition(gate_name).is_some()
 }

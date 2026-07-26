@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use serde::de::{Error as _, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub(super) const SCHEMA_VERSION: u32 = 3;
+pub(super) const SCHEMA_VERSION: u32 = 4;
 
 const MAX_CASE_ID_BYTES: usize = 128;
 const MAX_API_PATH_BYTES: usize = 1_024;
@@ -360,8 +360,19 @@ pub(super) struct QualificationManifest {
     pub(super) upstream_cases: Vec<UpstreamCase>,
     #[serde(deserialize_with = "deserialize_vec_8192")]
     pub(super) public_api_items: Vec<PublicApiItem>,
+    #[serde(deserialize_with = "deserialize_vec_512")]
+    pub(super) public_api_aliases: Vec<PublicApiAlias>,
     #[serde(deserialize_with = "deserialize_vec_8192")]
     pub(super) evidence_cases: Vec<EvidenceCase>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PublicApiAlias {
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) crate_name: String,
+    pub(super) alias_path: ApiPath,
+    pub(super) canonical_path: ApiPath,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -845,6 +856,14 @@ where
     T: Deserialize<'de>,
 {
     deserialize_bounded_vec::<D, T, 64>(deserializer)
+}
+
+fn deserialize_vec_512<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    deserialize_bounded_vec::<D, T, 512>(deserializer)
 }
 
 fn deserialize_vec_8192<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>

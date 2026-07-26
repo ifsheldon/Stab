@@ -1,6 +1,7 @@
+use super::CompiledSampler;
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler, Flow,
-    Gate, MeasureRecordOffset, PauliBasis, PauliSign, PauliString, QubitId, RepeatBlock, Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, Gate,
+    MeasureRecordOffset, PauliBasis, PauliSign, PauliString, QubitId, RepeatBlock, Target,
     circuit_flow::flow_record_index,
 };
 
@@ -20,7 +21,7 @@ pub fn sample_if_circuit_has_stabilizer_flows(
     sample_count: usize,
     seed: Option<u64>,
 ) -> CircuitResult<Vec<bool>> {
-    let noiseless = circuit.without_noise()?;
+    let noiseless = crate::analysis::circuit_without_noise(circuit)?;
     let measurement_count = usize::try_from(noiseless.count_measurements()?).map_err(|_| {
         CircuitError::invalid_detector_error_model(
             "circuit measurement count does not fit usize during sampled flow checking",

@@ -28,6 +28,11 @@ pub use analyze::{
 };
 pub use api::DemFlattenedInstructionIter;
 pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
+/// Crate-internal advanced boundary for traversing compact DEM structure.
+///
+/// This boundary stays owned by the DEM model: analysis and execution consumers may inspect the
+/// checked folded tree or implement its visitor policy, but it is not part of Stab's stable public
+/// API. Consumers must not replace it with independent repeat expansion.
 pub(crate) use traversal::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
     FoldedDemVisitor,

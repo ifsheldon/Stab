@@ -327,7 +327,7 @@ fn validate_supported_subset_inner(
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    if crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
+    if crate::analysis::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
         return validate_single_plain_qubit_targets(instruction);
     }
     if is_feedback_capable_controlled_pauli(instruction.gate().canonical_name()) {

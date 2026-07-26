@@ -133,6 +133,122 @@ fn validation_rejects_stale_public_api_owner() {
 }
 
 #[test]
+fn validation_requires_exact_public_api_alias_ownership() {
+    let mut missing = repository_manifest();
+    let removed_index =
+        missing
+            .public_api_aliases
+            .iter()
+            .position(|alias| {
+                let Some(item) = missing.public_api_items.iter().find(|item| {
+                    item.crate_name == alias.crate_name && item.path == alias.alias_path
+                }) else {
+                    return false;
+                };
+                missing.evidence_cases.iter().any(|case| {
+                    case.id == item.owner_case_id
+                        && case.provenance == EvidenceProvenance::PublicRustApi
+                        && api_path_is_owned_by(&case.source_id, alias.canonical_path.as_str())
+                        && !api_path_is_owned_by(&case.source_id, alias.alias_path.as_str())
+                })
+            })
+            .expect("repository alias required for exact public API ownership");
+    let removed = missing
+        .public_api_aliases
+        .get(removed_index)
+        .expect("selected repository alias")
+        .alias_path
+        .clone();
+    missing.public_api_aliases.remove(removed_index);
+    refresh_digest(&mut missing);
+    let error = validate(&missing, "UNFROZEN").expect_err("missing alias must fail");
+    assert!(error.to_string().contains(removed.as_str()), "{error}");
+
+    let mut self_referential = repository_manifest();
+    let alias = self_referential
+        .public_api_aliases
+        .first_mut()
+        .expect("repository alias");
+    alias.canonical_path = alias.alias_path.clone();
+    refresh_digest(&mut self_referential);
+    let error =
+        validate(&self_referential, "UNFROZEN").expect_err("self-referential alias must fail");
+    assert!(error.to_string().contains("self-referential"), "{error}");
+}
+
+#[test]
+fn parent_public_api_alias_cannot_authorize_an_undeclared_child_owner() {
+    let mut manifest = repository_manifest();
+    let (child_index, parent_index) = manifest
+        .public_api_aliases
+        .iter()
+        .enumerate()
+        .find_map(|(child_index, child)| {
+            manifest
+                .public_api_aliases
+                .iter()
+                .enumerate()
+                .find(|(_, parent)| {
+                    child.crate_name == parent.crate_name
+                        && child
+                            .alias_path
+                            .as_str()
+                            .strip_prefix(parent.alias_path.as_str())
+                            .is_some_and(|suffix| suffix.starts_with("::"))
+                        && manifest
+                            .public_api_items
+                            .iter()
+                            .find(|item| {
+                                item.crate_name == parent.crate_name
+                                    && item.path == parent.alias_path
+                            })
+                            .and_then(|item| {
+                                manifest
+                                    .evidence_cases
+                                    .iter()
+                                    .find(|case| case.id == item.owner_case_id)
+                            })
+                            .is_some_and(|case| {
+                                case.provenance == EvidenceProvenance::PublicRustApi
+                            })
+                })
+                .map(|(parent_index, _)| (child_index, parent_index))
+        })
+        .expect("repository parent and child aliases");
+    let child = manifest
+        .public_api_aliases
+        .get(child_index)
+        .expect("selected child alias")
+        .clone();
+    let parent = manifest
+        .public_api_aliases
+        .get(parent_index)
+        .expect("selected parent alias");
+    let parent_owner = manifest
+        .public_api_items
+        .iter()
+        .find(|item| item.crate_name == parent.crate_name && item.path == parent.alias_path)
+        .expect("parent alias item")
+        .owner_case_id
+        .clone();
+    manifest
+        .public_api_items
+        .iter_mut()
+        .find(|item| item.crate_name == child.crate_name && item.path == child.alias_path)
+        .expect("child alias item")
+        .owner_case_id = parent_owner;
+    manifest.public_api_aliases.remove(child_index);
+    refresh_digest(&mut manifest);
+
+    let error =
+        validate(&manifest, "UNFROZEN").expect_err("undeclared child alias ownership must fail");
+    assert!(
+        error.to_string().contains(child.alias_path.as_str()),
+        "{error}"
+    );
+}
+
+#[test]
 fn public_api_ownership_is_component_delimited() {
     assert!(api_path_is_owned_by(
         "stab_core::Foo",
@@ -181,6 +297,19 @@ fn manifest_schema_rejects_missing_required_fields() {
     let error = serde_json::from_value::<QualificationManifest>(value)
         .expect_err("missing required field must fail");
     assert!(error.to_string().contains("missing field `upstream_cases`"));
+
+    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
+    value
+        .as_object_mut()
+        .expect("manifest object")
+        .remove("public_api_aliases");
+    let error = serde_json::from_value::<QualificationManifest>(value)
+        .expect_err("missing aliases must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("missing field `public_api_aliases`")
+    );
 }
 
 #[test]

@@ -126,7 +126,7 @@ fn feature_filter_rejects_unknown_values_and_deduplicates_known_values() {
 #[test]
 fn case_filter_rejects_missing_ids() {
     let manifest: QualificationManifest = serde_json::from_str(
-        r#"{"schema_version":3,"stim_version":"v1.16.0","stim_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","rust_toolchain":"nightly","python_ast_version":"3.13","semantic_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","features":[],"upstream_cases":[],"public_api_items":[],"evidence_cases":[]}"#,
+        r#"{"schema_version":4,"stim_version":"v1.16.0","stim_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","rust_toolchain":"nightly","python_ast_version":"3.13","semantic_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","features":[],"upstream_cases":[],"public_api_items":[],"public_api_aliases":[],"evidence_cases":[]}"#,
     )
     .expect("empty manifest shape");
 

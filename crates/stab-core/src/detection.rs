@@ -596,8 +596,8 @@ impl ConversionPlan {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
-        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
-            .map_err(|error| {
+        let decomposed =
+            crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
                 CircuitError::invalid_sampler_compilation(format!(
                     "{} cannot be converted via decomposition: {error}",
                     instruction.gate().canonical_name()

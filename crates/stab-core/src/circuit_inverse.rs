@@ -263,7 +263,9 @@ impl FlowValidation {
             return Ok(Self::SparseFolded);
         }
         if within_tableau_budget {
-            return Ok(Self::Tableau(circuit.to_tableau(false, false, false)?));
+            return Ok(Self::Tableau(crate::analysis::circuit_to_tableau(
+                circuit, false, false, false,
+            )?));
         }
         if sparse_tracker_can_validate_without_unbounded_unroll(circuit) {
             return Ok(Self::SparseFolded);
@@ -319,7 +321,7 @@ fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
 }
 
 fn sparse_tracker_supports_folded_instruction(instruction: &CircuitInstruction) -> bool {
-    crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok()
+    crate::analysis::single_qubit_clifford_for_gate(instruction.gate()).is_ok()
         || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
 }
 

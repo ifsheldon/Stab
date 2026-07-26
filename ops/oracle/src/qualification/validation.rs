@@ -6,8 +6,8 @@ use thiserror::Error;
 use super::inventory;
 use super::model::{
     BehavioralSurface, Comparator, EvidenceCase, EvidenceProvenance, EvidenceSelector,
-    EvidenceState, EvidenceStatus, FeatureId, Parameterization, QualificationManifest,
-    SCHEMA_VERSION, SelectorKind, UpstreamDisposition,
+    EvidenceState, EvidenceStatus, FeatureId, Parameterization, PublicApiAlias, PublicApiItem,
+    QualificationManifest, SCHEMA_VERSION, SelectorKind, UpstreamDisposition,
 };
 use crate::blocker_ledger::selector::CargoTestSelector;
 
@@ -17,6 +17,7 @@ const RUST_TOOLCHAIN: &str = "nightly-2026-06-20";
 const PYTHON_AST_VERSION: &str = "3.14.6";
 const MAX_UPSTREAM_CASES: usize = 8_192;
 const MAX_PUBLIC_API_ITEMS: usize = 8_192;
+const MAX_PUBLIC_API_ALIASES: usize = 512;
 const MAX_EVIDENCE_CASES: usize = 8_192;
 const MAX_TEXT_BYTES: usize = 2_048;
 const MAX_IDENTIFIER_BYTES: usize = 128;
@@ -71,6 +72,7 @@ pub(super) fn validate(
     validate_upstream_cases(manifest, &mut violations);
     validate_evidence_cases(manifest, &mut violations);
     super::public_api_validation::validate(manifest, &mut violations);
+    validate_public_api_aliases(manifest, &mut violations);
     validate_cross_references(manifest, &mut violations);
     super::resource::validate_inventory(manifest, &mut violations);
     if !violations.is_empty() {
@@ -120,6 +122,12 @@ fn validate_header(manifest: &QualificationManifest, violations: &mut Validation
         "public API items",
         manifest.public_api_items.len(),
         MAX_PUBLIC_API_ITEMS,
+        violations,
+    );
+    validate_limit(
+        "public API aliases",
+        manifest.public_api_aliases.len(),
+        MAX_PUBLIC_API_ALIASES,
         violations,
     );
     validate_limit(
@@ -442,6 +450,101 @@ fn validate_evidence_cases(manifest: &QualificationManifest, violations: &mut Va
     }
 }
 
+fn validate_public_api_aliases(
+    manifest: &QualificationManifest,
+    violations: &mut ValidationIssues,
+) {
+    let alias_paths = manifest
+        .public_api_aliases
+        .iter()
+        .map(|alias| (alias.crate_name.as_str(), alias.alias_path.as_str()))
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    let mut previous = None;
+
+    for alias in &manifest.public_api_aliases {
+        let key = (
+            alias.crate_name.as_str(),
+            alias.alias_path.as_str(),
+            alias.canonical_path.as_str(),
+        );
+        if previous.is_some_and(|previous| previous > key) {
+            violations.push("public API aliases are not in deterministic path order".to_string());
+        }
+        previous = Some(key);
+        if !seen.insert((alias.crate_name.as_str(), alias.alias_path.as_str())) {
+            violations.push(format!(
+                "duplicate public API alias {}::{}",
+                alias.crate_name, alias.alias_path
+            ));
+        }
+        validate_text("public API alias crate", &alias.crate_name, violations);
+        validate_text(
+            "public API alias path",
+            alias.alias_path.as_str(),
+            violations,
+        );
+        validate_text(
+            "public API canonical path",
+            alias.canonical_path.as_str(),
+            violations,
+        );
+
+        let crate_prefix = format!("{}::", alias.crate_name);
+        if !alias.alias_path.as_str().starts_with(&crate_prefix)
+            || !alias.canonical_path.as_str().starts_with(&crate_prefix)
+        {
+            violations.push(format!(
+                "public API alias {} -> {} is not rooted in crate {}",
+                alias.alias_path, alias.canonical_path, alias.crate_name
+            ));
+        }
+        if alias.alias_path == alias.canonical_path {
+            violations.push(format!(
+                "public API alias {}::{} is self-referential",
+                alias.crate_name, alias.alias_path
+            ));
+        }
+        if alias_paths.contains(&(alias.crate_name.as_str(), alias.canonical_path.as_str())) {
+            violations.push(format!(
+                "public API alias {}::{} uses another alias as canonical path {}",
+                alias.crate_name, alias.alias_path, alias.canonical_path
+            ));
+        }
+
+        let alias_items = manifest
+            .public_api_items
+            .iter()
+            .filter(|item| item.crate_name == alias.crate_name && item.path == alias.alias_path)
+            .collect::<Vec<_>>();
+        let canonical_items = manifest
+            .public_api_items
+            .iter()
+            .filter(|item| item.crate_name == alias.crate_name && item.path == alias.canonical_path)
+            .collect::<Vec<_>>();
+        let ([alias_item], [canonical_item]) = (alias_items.as_slice(), canonical_items.as_slice())
+        else {
+            violations.push(format!(
+                "public API alias {}::{} -> {} resolves {} alias and {} canonical items",
+                alias.crate_name,
+                alias.alias_path,
+                alias.canonical_path,
+                alias_items.len(),
+                canonical_items.len()
+            ));
+            continue;
+        };
+        if alias_item.feature_id != canonical_item.feature_id
+            || alias_item.owner_case_id != canonical_item.owner_case_id
+        {
+            violations.push(format!(
+                "public API alias {}::{} -> {} does not share one feature and semantic owner",
+                alias.crate_name, alias.alias_path, alias.canonical_path
+            ));
+        }
+    }
+}
+
 fn validate_cross_references(manifest: &QualificationManifest, violations: &mut ValidationIssues) {
     let evidence = manifest
         .evidence_cases
@@ -476,7 +579,15 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
             Some(owner)
                 if owner.feature_id == item.feature_id
                     && ((owner.provenance == EvidenceProvenance::PublicRustApi
-                        && api_path_is_owned_by(&owner.source_id, item.path.as_str()))
+                        && (api_path_is_owned_by(&owner.source_id, item.path.as_str())
+                            || manifest.public_api_aliases.iter().any(|alias| {
+                                public_api_alias_owns_item(
+                                    manifest,
+                                    alias,
+                                    item,
+                                    &owner.source_id,
+                                )
+                            })))
                     || owner.provenance == EvidenceProvenance::QualificationPlan
                     || is_reusable_existing_parent(owner)) => {}
             Some(owner) => violations.push(format!(
@@ -588,6 +699,33 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
             EvidenceProvenance::UpstreamSemanticCase | EvidenceProvenance::PublicRustApi => {}
         }
     }
+}
+
+fn public_api_alias_owns_item(
+    manifest: &QualificationManifest,
+    alias: &PublicApiAlias,
+    item: &PublicApiItem,
+    owner_source: &str,
+) -> bool {
+    if alias.crate_name != item.crate_name
+        || !api_path_is_owned_by(alias.alias_path.as_str(), item.path.as_str())
+    {
+        return false;
+    }
+    let Some(suffix) = item.path.as_str().strip_prefix(alias.alias_path.as_str()) else {
+        return false;
+    };
+    let canonical_item_path = format!("{}{}", alias.canonical_path, suffix);
+    let mut canonical_items = manifest.public_api_items.iter().filter(|candidate| {
+        candidate.crate_name == item.crate_name && candidate.path.as_str() == canonical_item_path
+    });
+    let Some(canonical_item) = canonical_items.next() else {
+        return false;
+    };
+    canonical_items.next().is_none()
+        && canonical_item.feature_id == item.feature_id
+        && canonical_item.owner_case_id == item.owner_case_id
+        && api_path_is_owned_by(owner_source, &canonical_item_path)
 }
 
 fn is_reusable_existing_parent(owner: &EvidenceCase) -> bool {

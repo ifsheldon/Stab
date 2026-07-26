@@ -12,6 +12,11 @@ use num_complex::Complex32;
 use stab_core::{
     Circuit, CircuitItem, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
     ErrorAnalyzerOptions, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    analysis::{
+        gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
+        gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
+        gate_unitary_matrix,
+    },
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
     convert_measurements_to_detection_events, unitary_to_tableau,
 };
@@ -201,10 +206,10 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
 fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc tableau and unitary inverse checks.
     let h = Gate::from_name("H").expect("H");
-    let h_tableau = h.tableau().expect("H tableau");
+    let h_tableau = gate_tableau(h).expect("H tableau");
     assert_eq!(h_tableau.x_output(0).expect("H X").to_string(), "+Z");
     assert_eq!(h_tableau.z_output(0).expect("H Z").to_string(), "+X");
-    assert!(h.has_tableau());
+    assert!(gate_has_tableau(h));
 
     let cx = Gate::from_name("CX").expect("CX");
     let cx_tableau = cx.tableau().expect("CX tableau");
@@ -260,9 +265,9 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
 fn gate_flow_metadata_matches_owned_unitary_gate_data() {
     // Adapted from Stim v1.16.0 GateData flow examples and gate_data stabilizer-flow checks.
     let h = Gate::from_name("H").expect("H");
-    assert!(h.has_flows());
+    assert!(gate_has_flows(h));
     assert_eq!(
-        flow_texts(h.flows().expect("H flows")),
+        flow_texts(gate_flows(h).expect("H flows")),
         ["X -> Z", "Z -> X"].map(String::from).to_vec()
     );
 
@@ -378,8 +383,8 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
     // Adapted from Stim v1.16.0 GateData unitary matrix examples and inverse consistency checks.
     let h = Gate::from_name("H").expect("H");
     let h_scale = f32::sqrt(0.5);
-    assert!(h.has_unitary_matrix());
-    let h_matrix = h.unitary_matrix().expect("H unitary");
+    assert!(gate_has_unitary_matrix(h));
+    let h_matrix = gate_unitary_matrix(h).expect("H unitary");
     assert_matrix_close(
         &h_matrix.to_vecs(),
         &[
@@ -482,17 +487,15 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
 fn gate_decomposition_metadata_matches_owned_gate_data() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc and gate_data_*.cc decomposition metadata.
     let h = Gate::from_name("H").expect("H");
-    assert!(h.has_h_s_cx_m_r_decomposition());
+    assert!(gate_has_h_s_cx_m_r_decomposition(h));
     assert_eq!(
-        h.h_s_cx_m_r_decomposition()
+        gate_h_s_cx_m_r_decomposition(h)
             .expect("H decomposition")
             .as_stim_str(),
         "\nH 0\n"
     );
     assert_eq!(
-        h.h_s_cx_m_r_decomposition()
-            .expect("H decomposition")
-            .to_circuit()
+        gate_decomposition_to_circuit(gate_h_s_cx_m_r_decomposition(h).expect("H decomposition"),)
             .expect("parse H decomposition")
             .to_stim_string(),
         "H 0\n"

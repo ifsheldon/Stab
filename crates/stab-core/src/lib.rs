@@ -19,13 +19,12 @@ mod dem_sampler;
 mod detection;
 mod error;
 mod error_matcher;
-mod execution;
+pub mod execution;
 mod gate;
 mod ids;
 mod matched_error;
 mod mbqc_decomposition;
 mod probability_util;
-mod reference_sample_tree;
 pub mod result_formats;
 pub mod result_streaming;
 mod result_text;
@@ -34,7 +33,13 @@ mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
 
-pub use analysis::single_qubit_clifford_for_gate;
+pub use analysis::{
+    GateUnitaryMatrix, InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
+    circuit_inverse_qec_with_options, circuit_inverse_unitary, circuit_time_reversed_for_flows,
+    circuit_time_reversed_for_flows_with_options, circuit_to_tableau,
+    circuit_with_inlined_feedback, decomposed_circuit, simplified_circuit,
+    single_qubit_clifford_for_gate,
+};
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
@@ -45,7 +50,6 @@ pub use circuit_detecting_regions::{
     DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
-pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
@@ -58,14 +62,7 @@ pub use circuit_generation::{
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
-pub use circuit_inverse::{
-    InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
-    circuit_inverse_qec_with_options, circuit_inverse_unitary, circuit_time_reversed_for_flows,
-    circuit_time_reversed_for_flows_with_options,
-};
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
-pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
-pub use circuit_tableau::circuit_to_tableau;
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use dem::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
@@ -88,7 +85,10 @@ pub use detection::{
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
-pub use execution::sample_if_circuit_has_stabilizer_flows;
+pub use execution::{
+    CompiledSampler, ReferenceSampleTree, count_determined_measurements,
+    sample_if_circuit_has_stabilizer_flows,
+};
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use gate::{
@@ -98,7 +98,6 @@ pub use gate::{
 };
 pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
-    GateUnitaryMatrix,
 };
 pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
@@ -110,9 +109,7 @@ pub use matched_error::{
 };
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use probability_util::biased_randomize_bits;
-pub use reference_sample_tree::ReferenceSampleTree;
 pub use result_formats::{DetsLayout, DetsResultType, DetsToken, SampleFormat};
-pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
     PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,

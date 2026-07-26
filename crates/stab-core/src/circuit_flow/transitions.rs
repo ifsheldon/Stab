@@ -69,7 +69,7 @@ pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> Rever
         "CX" | "XCZ" => Transition::ControlledPauli(PauliBasis::X),
         "CY" | "YCZ" => Transition::ControlledPauli(PauliBasis::Y),
         "CZ" => Transition::ControlledPauli(PauliBasis::Z),
-        name if crate::circuit_tableau::gate_has_tableau(name) => Transition::Tableau,
+        _ if crate::analysis::gate_has_tableau(instruction.gate()) => Transition::Tableau,
         _ if matches!(
             instruction.gate().category(),
             GateCategory::Annotation | GateCategory::Noise

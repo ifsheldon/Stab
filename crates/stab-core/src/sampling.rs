@@ -535,10 +535,10 @@ fn compile_instruction(
             compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y)
         }
         "CZ" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Z),
-        _ if crate::single_qubit_clifford_for_gate(gate).is_ok() => {
+        _ if crate::analysis::single_qubit_clifford_for_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
         }
-        _ if crate::circuit_tableau::gate_tableau(gate.canonical_name()).is_ok() => {
+        _ if crate::analysis::gate_has_tableau(gate) => {
             compile_unitary_tableau(instruction, operations)
         }
         "X_ERROR" => compile_single_qubit_pauli_channel(
@@ -645,7 +645,7 @@ fn compile_decomposed_instruction(
     state: &mut CompileState,
 ) -> CircuitResult<()> {
     let decomposed =
-        crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+        crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
             CircuitError::invalid_sampler_compilation(format!(
                 "{} cannot be executed via decomposition: {error}",
                 instruction.gate().canonical_name()
@@ -977,7 +977,7 @@ fn compile_single_qubit_clifford(
         return Ok(());
     }
 
-    let clifford = crate::single_qubit_clifford_for_gate(instruction.gate())
+    let clifford = crate::analysis::single_qubit_clifford_for_gate(instruction.gate())
         .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
     let transform = LocalTableauTransform::from_tableau(&clifford.tableau())?;
     for target in instruction.targets() {
@@ -1018,7 +1018,7 @@ fn compile_unitary_tableau_group(
         return Ok(());
     }
 
-    let tableau = crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?;
+    let tableau = crate::analysis::gate_tableau(instruction.gate())?;
     let transform = LocalTableauTransform::from_tableau(&tableau)?;
     if targets.len() != transform.target_count() {
         return Err(unsupported_sampler_instruction(instruction));

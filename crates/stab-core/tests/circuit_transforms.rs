@@ -5,6 +5,7 @@
 
 use stab_core::{
     Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions,
+    analysis::{circuit_without_noise, flattened_circuit, flattened_circuit_operations},
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
     circuit_to_detector_error_model, circuit_with_inlined_feedback, decomposed_circuit,
 };
@@ -67,15 +68,13 @@ fn assert_no_product_measurement_gates(circuit: &Circuit) {
 #[test]
 fn flattened_matches_pinned_stim_basic_cases() {
     assert_eq!(
-        Circuit::new()
-            .flattened()
+        flattened_circuit(&Circuit::new())
             .expect("flatten")
             .to_stim_string(),
         ""
     );
     assert_eq!(
-        circuit("SHIFT_COORDS(1, 2)\n")
-            .flattened()
+        flattened_circuit(&circuit("SHIFT_COORDS(1, 2)\n"))
             .expect("flatten")
             .to_stim_string(),
         ""
@@ -163,7 +162,7 @@ H[test2] 0 0
 
 #[test]
 fn flattened_operations_unrolls_without_fusing() {
-    let operations = circuit(
+    let operations = flattened_circuit_operations(&circuit(
         "
         H 0
         REPEAT 3 {
@@ -173,8 +172,7 @@ fn flattened_operations_unrolls_without_fusing() {
         M 0 !1
         DETECTOR rec[-1]
     ",
-    )
-    .flattened_operations()
+    ))
     .expect("flatten operations");
 
     let lines = operations
@@ -240,7 +238,7 @@ fn flattened_folds_shift_only_large_repeats() {
 
 #[test]
 fn without_noise_matches_pinned_stim_basic_cases() {
-    let noiseless = circuit(
+    let noiseless = circuit_without_noise(&circuit(
         "
         H 0
         X_ERROR(0.1) 0
@@ -252,8 +250,7 @@ fn without_noise_matches_pinned_stim_basic_cases() {
             MPP(0.1) X0*X1 Z0 Z1
         }
     ",
-    )
-    .without_noise()
+    ))
     .expect("without noise");
 
     assert_eq!(

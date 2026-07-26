@@ -10,7 +10,7 @@ use crate::blocker_ledger::selector::CargoTestSelector;
 use crate::qualification::model::{
     ApiPath, CaseId, Comparator, EvidenceCase, EvidenceProvenance, EvidenceSelector, EvidenceState,
     EvidenceStatus, FeatureId, PropertyExecutionMode, PropertyExecutionPlan,
-    PropertyPersistencePolicy, PropertyPlanRef, PropertyPlanSource, PublicApiItem,
+    PropertyPersistencePolicy, PropertyPlanRef, PropertyPlanSource, PublicApiAlias, PublicApiItem,
     RelativeSourcePath, ResourceContract, SelectorKind, SemanticDigest, StableCaseDomain,
     UpstreamCase, UpstreamDisposition,
 };
@@ -19,8 +19,9 @@ mod owner_expansion;
 
 use owner_expansion::{MAX_OWNERS_PER_CASE, OwnerEntryKind, expand_upstream_owners};
 
-const LEDGER_SCHEMA_VERSION: u32 = 2;
+const LEDGER_SCHEMA_VERSION: u32 = 3;
 const MAX_LEDGER_CASES: usize = 4_096;
+const MAX_PUBLIC_API_ALIASES: usize = 512;
 const MAX_LEDGER_TEXT_BYTES: usize = 2_048;
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +33,8 @@ struct QualificationCaseLedger {
     cases: Vec<QualificationCaseSpec>,
     #[serde(default)]
     existing_parent_mappings: Vec<ExistingParentMappingSpec>,
+    #[serde(default)]
+    public_api_aliases: Vec<PublicApiAliasSpec>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +87,14 @@ struct PublicApiOwnerSpec {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct PublicApiAliasSpec {
+    crate_name: String,
+    alias_owner_path: ApiPath,
+    canonical_owner_path: ApiPath,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExistingParentMappingSpec {
     id: String,
     feature_id: FeatureId,
@@ -120,7 +131,7 @@ pub(super) fn apply(
     upstream_cases: &mut [UpstreamCase],
     public_api_items: &mut [PublicApiItem],
     evidence_cases: &mut Vec<EvidenceCase>,
-) -> Result<(), InventoryError> {
+) -> Result<Vec<PublicApiAlias>, InventoryError> {
     let ledger = load(root)?;
     validate_header(&ledger, stim_version, stim_commit)?;
 
@@ -337,9 +348,25 @@ pub(super) fn apply(
         )?;
     }
 
+    apply_public_api_aliases(
+        &ledger.public_api_aliases,
+        public_api_items,
+        evidence_cases,
+        &qualification_cases,
+        &mut claimed_evidence,
+    )?;
+
     evidence_cases.retain(|case| !claimed_evidence.contains(&case.id));
     evidence_cases.extend(qualification_cases);
-    Ok(())
+    Ok(ledger
+        .public_api_aliases
+        .into_iter()
+        .map(|alias| PublicApiAlias {
+            crate_name: alias.crate_name,
+            alias_path: alias.alias_owner_path,
+            canonical_path: alias.canonical_owner_path,
+        })
+        .collect())
 }
 
 fn load(root: &RepoRoot) -> Result<QualificationCaseLedger, InventoryError> {
@@ -375,6 +402,13 @@ fn validate_header(
             "case count {} exceeds {}",
             ledger.cases.len(),
             MAX_LEDGER_CASES
+        ));
+    }
+    if ledger.public_api_aliases.len() > MAX_PUBLIC_API_ALIASES {
+        return invalid(format!(
+            "public API alias count {} exceeds {}",
+            ledger.public_api_aliases.len(),
+            MAX_PUBLIC_API_ALIASES
         ));
     }
     Ok(())
@@ -722,6 +756,184 @@ fn apply_existing_parent_mapping(
     Ok(())
 }
 
+fn apply_public_api_aliases(
+    aliases: &[PublicApiAliasSpec],
+    public_api_items: &mut [PublicApiItem],
+    evidence_cases: &[EvidenceCase],
+    qualification_cases: &[EvidenceCase],
+    claimed_evidence: &mut BTreeSet<CaseId>,
+) -> Result<(), InventoryError> {
+    let mut alias_paths = BTreeSet::new();
+    for alias in aliases {
+        validate_public_api_alias_shape(alias)?;
+        if !alias_paths.insert((alias.crate_name.as_str(), alias.alias_owner_path.as_str())) {
+            return invalid(format!(
+                "public API alias {}::{} is duplicated",
+                alias.crate_name, alias.alias_owner_path
+            ));
+        }
+    }
+
+    for alias in aliases {
+        if alias_paths.contains(&(
+            alias.crate_name.as_str(),
+            alias.canonical_owner_path.as_str(),
+        )) {
+            return invalid(format!(
+                "public API alias {}::{} uses another alias as its canonical owner",
+                alias.crate_name, alias.alias_owner_path
+            ));
+        }
+
+        let (alias_feature, alias_owner) = exact_public_api_owner(
+            "alias",
+            &alias.crate_name,
+            &alias.alias_owner_path,
+            public_api_items,
+        )?;
+        let (canonical_feature, canonical_owner) = exact_public_api_owner(
+            "canonical",
+            &alias.crate_name,
+            &alias.canonical_owner_path,
+            public_api_items,
+        )?;
+        if alias_feature != canonical_feature {
+            return invalid(format!(
+                "public API alias {}::{} has feature {}, but canonical owner {} has feature {}",
+                alias.crate_name,
+                alias.alias_owner_path,
+                alias_feature.as_str(),
+                alias.canonical_owner_path,
+                canonical_feature.as_str()
+            ));
+        }
+
+        let alias_evidence = evidence_cases
+            .iter()
+            .filter(|case| {
+                case.provenance == EvidenceProvenance::PublicRustApi
+                    && case.source_id == alias.alias_owner_path.as_str()
+            })
+            .collect::<Vec<_>>();
+        let [alias_evidence] = alias_evidence.as_slice() else {
+            return invalid(format!(
+                "public API alias {}::{} resolved {} API evidence records",
+                alias.crate_name,
+                alias.alias_owner_path,
+                alias_evidence.len()
+            ));
+        };
+        if alias_evidence.id != alias_owner {
+            return invalid(format!(
+                "public API alias {}::{} no longer owns its planned API evidence",
+                alias.crate_name, alias.alias_owner_path
+            ));
+        }
+        claim_planned_evidence(
+            alias.alias_owner_path.as_str(),
+            alias_feature,
+            &alias_owner,
+            EvidenceProvenance::PublicRustApi,
+            evidence_cases,
+            claimed_evidence,
+        )?;
+
+        let canonical_parents = evidence_cases
+            .iter()
+            .chain(qualification_cases)
+            .filter(|case| case.id == canonical_owner)
+            .collect::<Vec<_>>();
+        let [canonical_parent] = canonical_parents.as_slice() else {
+            return invalid(format!(
+                "public API alias {}::{} canonical owner {} resolved {} parent records",
+                alias.crate_name,
+                alias.alias_owner_path,
+                alias.canonical_owner_path,
+                canonical_parents.len()
+            ));
+        };
+        if claimed_evidence.contains(&canonical_owner)
+            || canonical_parent.feature_id != canonical_feature
+            || !matches!(
+                canonical_parent.status,
+                EvidenceStatus::Planned
+                    | EvidenceStatus::Implemented
+                    | EvidenceStatus::EvidenceClose
+            )
+        {
+            return invalid(format!(
+                "public API alias {}::{} canonical parent {} is stale or incompatible",
+                alias.crate_name, alias.alias_owner_path, canonical_parent.id
+            ));
+        }
+
+        for item in public_api_items
+            .iter_mut()
+            .filter(|item| item.crate_name == alias.crate_name && item.owner_case_id == alias_owner)
+        {
+            item.owner_case_id = canonical_owner.clone();
+        }
+    }
+    Ok(())
+}
+
+fn validate_public_api_alias_shape(alias: &PublicApiAliasSpec) -> Result<(), InventoryError> {
+    validate_text("public API alias crate", &alias.crate_name)?;
+    if alias.alias_owner_path == alias.canonical_owner_path {
+        return invalid(format!(
+            "public API alias {}::{} is self-referential",
+            alias.crate_name, alias.alias_owner_path
+        ));
+    }
+    if alias.crate_name != "stab_core"
+        || !(alias
+            .alias_owner_path
+            .as_str()
+            .starts_with("stab_core::analysis::")
+            || alias
+                .alias_owner_path
+                .as_str()
+                .starts_with("stab_core::execution::"))
+        || !alias
+            .canonical_owner_path
+            .as_str()
+            .starts_with("stab_core::")
+        || alias
+            .canonical_owner_path
+            .as_str()
+            .starts_with("stab_core::analysis::")
+        || alias
+            .canonical_owner_path
+            .as_str()
+            .starts_with("stab_core::execution::")
+    {
+        return invalid(format!(
+            "public API alias {}::{} -> {} is outside the A1 namespace/root contract",
+            alias.crate_name, alias.alias_owner_path, alias.canonical_owner_path
+        ));
+    }
+    Ok(())
+}
+
+fn exact_public_api_owner(
+    role: &str,
+    crate_name: &str,
+    owner_path: &ApiPath,
+    public_api_items: &[PublicApiItem],
+) -> Result<(FeatureId, CaseId), InventoryError> {
+    let matches = public_api_items
+        .iter()
+        .filter(|item| item.crate_name == crate_name && item.path == *owner_path)
+        .collect::<Vec<_>>();
+    let [item] = matches.as_slice() else {
+        return invalid(format!(
+            "public API alias {role} {crate_name}::{owner_path} resolved {} API items",
+            matches.len()
+        ));
+    };
+    Ok((item.feature_id, item.owner_case_id.clone()))
+}
+
 fn claim_planned_evidence(
     mapping_id: &str,
     feature_id: FeatureId,
@@ -901,243 +1113,4 @@ fn invalid<T>(message: String) -> Result<T, InventoryError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn case_shape_rejects_non_exact_and_cross_mode_selectors() {
-        let mut spec = test_spec();
-        spec.primary_selector.value.pop();
-        assert!(validate_case_shape(&spec).is_err());
-
-        let mut spec = test_spec();
-        spec.primary_selector.kind = SelectorKind::OracleFixture;
-        assert!(validate_case_shape(&spec).is_err());
-
-        let mut spec = test_spec();
-        spec.comparator = Comparator::Statistical;
-        assert!(validate_case_shape(&spec).is_err());
-    }
-
-    #[test]
-    fn claiming_evidence_allows_exact_comparator_refinement_but_rejects_wrong_feature_and_duplicate_owner()
-     {
-        let spec = test_spec();
-        let id = CaseId::try_new("cq-evidence-upstream-test".to_string()).expect("case id");
-        let evidence = vec![EvidenceCase {
-            id: id.clone(),
-            feature_id: FeatureId::StimFormat,
-            behavioral_surface: crate::qualification::model::BehavioralSurface::FileFormat,
-            provenance: EvidenceProvenance::UpstreamSemanticCase,
-            source_id: "source".to_string(),
-            comparator: Comparator::Canonical,
-            execution: super::super::super::execution_contract::for_status(EvidenceStatus::Planned),
-            statistical_plan: None,
-            property_plan: None,
-            primary_selector: EvidenceSelector {
-                state: EvidenceState::Planned,
-                kind: SelectorKind::CargoTest,
-                value: vec![
-                    "cargo".to_string(),
-                    "test".to_string(),
-                    "-p".to_string(),
-                    "stab-core".to_string(),
-                    "planned".to_string(),
-                    "--quiet".to_string(),
-                    "--exact".to_string(),
-                ],
-            },
-            supporting_selectors: Vec::new(),
-            resource_contract: super::super::evidence::semantic_only_resource_contract(),
-            negative_axes: Vec::new(),
-            performance_groups: vec!["PERF-CIRCUIT-MODEL".to_string()],
-            deferred_product: None,
-            status: EvidenceStatus::Planned,
-        }];
-        let mut claimed = BTreeSet::new();
-        claim_planned_evidence(
-            &spec.id,
-            spec.feature_id,
-            &id,
-            EvidenceProvenance::UpstreamSemanticCase,
-            &evidence,
-            &mut claimed,
-        )
-        .expect("first claim");
-        assert!(
-            claim_planned_evidence(
-                &spec.id,
-                spec.feature_id,
-                &id,
-                EvidenceProvenance::UpstreamSemanticCase,
-                &evidence,
-                &mut claimed,
-            )
-            .is_err()
-        );
-
-        let mut wrong = test_spec();
-        wrong.feature_id = FeatureId::DemFormat;
-        assert!(
-            claim_planned_evidence(
-                &wrong.id,
-                wrong.feature_id,
-                &id,
-                EvidenceProvenance::UpstreamSemanticCase,
-                &evidence,
-                &mut BTreeSet::new(),
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn claiming_exact_oracle_fixture_requires_the_same_primary_selector() {
-        let spec = test_spec();
-        let id = CaseId::try_new("cq-evidence-oracle-test".to_string()).expect("case id");
-        let evidence = EvidenceCase {
-            id: id.clone(),
-            feature_id: spec.feature_id,
-            behavioral_surface: crate::qualification::model::BehavioralSurface::FileFormat,
-            provenance: EvidenceProvenance::OracleFixture,
-            source_id: "fixture".to_string(),
-            comparator: Comparator::Structural,
-            execution: super::super::super::execution_contract::for_status(
-                EvidenceStatus::Implemented,
-            ),
-            statistical_plan: None,
-            property_plan: None,
-            primary_selector: spec.primary_selector.clone(),
-            supporting_selectors: Vec::new(),
-            resource_contract: super::super::evidence::semantic_only_resource_contract(),
-            negative_axes: Vec::new(),
-            performance_groups: vec!["PERF-CIRCUIT-MODEL".to_string()],
-            deferred_product: None,
-            status: EvidenceStatus::Implemented,
-        };
-        let mut claimed = BTreeSet::new();
-        claim_oracle_fixture_evidence(
-            &spec.id,
-            spec.feature_id,
-            &id,
-            &spec.primary_selector,
-            std::slice::from_ref(&evidence),
-            &mut claimed,
-        )
-        .expect("matching exact fixture claim");
-        assert!(
-            claim_oracle_fixture_evidence(
-                &spec.id,
-                spec.feature_id,
-                &id,
-                &spec.primary_selector,
-                std::slice::from_ref(&evidence),
-                &mut claimed,
-            )
-            .is_err()
-        );
-
-        let mut mismatched = evidence;
-        mismatched.primary_selector.value.insert(
-            mismatched.primary_selector.value.len().saturating_sub(2),
-            "different-test".to_string(),
-        );
-        assert!(
-            claim_oracle_fixture_evidence(
-                &spec.id,
-                spec.feature_id,
-                &id,
-                &spec.primary_selector,
-                std::slice::from_ref(&mismatched),
-                &mut BTreeSet::new(),
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn existing_parent_mapping_shape_requires_owned_supported_parent_kind() {
-        let mapping = ExistingParentMappingSpec {
-            id: "cq2-existing-parent-map".to_string(),
-            feature_id: FeatureId::GateContract,
-            parent: ExistingParentSpec {
-                provenance: EvidenceProvenance::BlockerLedger,
-                source_id: "pfm3-contract-fixed-tableau".to_string(),
-            },
-            upstream_owners: vec![UpstreamOwnerSpec {
-                path: RelativeSourcePath::try_new(
-                    "src/stim/simulators/tableau_simulator.test.cc".into(),
-                )
-                .expect("path"),
-                symbol: "TableauSimulator.unitary_gates_consistent_with_tableau_data_64"
-                    .to_string(),
-                subcase: None,
-            }],
-            upstream_word_size_families: Vec::new(),
-            public_api_owners: Vec::new(),
-            oracle_fixture_owners: Vec::new(),
-        };
-        validate_existing_parent_mapping_shape(&mapping).expect("valid mapping");
-
-        let mut empty = mapping;
-        empty.upstream_owners.clear();
-        assert!(validate_existing_parent_mapping_shape(&empty).is_err());
-        empty.upstream_owners.push(UpstreamOwnerSpec {
-            path: RelativeSourcePath::try_new("src/stim/gates/gates.test.cc".into()).expect("path"),
-            symbol: "gate_data.lookup".to_string(),
-            subcase: None,
-        });
-        empty.parent.provenance = EvidenceProvenance::QualificationPlan;
-        assert!(validate_existing_parent_mapping_shape(&empty).is_err());
-    }
-
-    #[test]
-    fn expanded_word_size_families_count_toward_case_owner_limit() {
-        let mut spec = test_spec();
-        let path =
-            RelativeSourcePath::try_new("src/stim/simulators/frame_simulator.test.cc".into())
-                .expect("path");
-        spec.upstream_word_size_families = (0..=MAX_OWNERS_PER_CASE / 3)
-            .map(|index| UpstreamWordSizeFamilySpec {
-                path: path.clone(),
-                symbol_base: format!("FrameSimulator.family_{index}"),
-                word_sizes: vec![64, 128, 256],
-            })
-            .collect();
-        assert!(matches!(
-            validate_case_shape(&spec),
-            Err(InventoryError::InvalidQualificationCases(message)) if message.contains("has 2049 owners")
-        ));
-    }
-
-    fn test_spec() -> QualificationCaseSpec {
-        QualificationCaseSpec {
-            id: "cq2-test-case".to_string(),
-            feature_id: FeatureId::StimFormat,
-            comparator: Comparator::Canonical,
-            primary_selector: EvidenceSelector {
-                state: EvidenceState::Existing,
-                kind: SelectorKind::CargoTest,
-                value: vec![
-                    "cargo".to_string(),
-                    "test".to_string(),
-                    "-p".to_string(),
-                    "stab-core".to_string(),
-                    "--test".to_string(),
-                    "stim_format".to_string(),
-                    "parses_and_prints_basic_m4_fixture".to_string(),
-                    "--quiet".to_string(),
-                    "--exact".to_string(),
-                ],
-            },
-            resource_contract: super::super::evidence::semantic_only_resource_contract(),
-            negative_axes: Vec::new(),
-            upstream_owners: Vec::new(),
-            upstream_word_size_families: Vec::new(),
-            public_api_owners: Vec::new(),
-            oracle_fixture_owners: Vec::new(),
-            static_property_plan: None,
-            standalone: true,
-        }
-    }
-}
+mod tests;

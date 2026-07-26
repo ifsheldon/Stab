@@ -85,82 +85,6 @@ impl Circuit {
         CircuitFlattenedInstructionRevIter::new(self)
     }
 
-    /// Converts the currently supported Clifford circuit subset into a tableau.
-    ///
-    /// M6 supports unitary Clifford operations, plus explicit ignore flags for noise,
-    /// measurements, and resets. Measurement feedback, detector semantics, and
-    /// simulator-backed tableau extraction are outside this helper's current contract.
-    pub fn to_tableau(
-        &self,
-        ignore_noise: bool,
-        ignore_measurement: bool,
-        ignore_reset: bool,
-    ) -> CircuitResult<crate::Tableau> {
-        crate::circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
-    }
-
-    /// Returns the inverse of a unitary Clifford circuit.
-    ///
-    /// Non-unitary operations such as measurements, resets, detectors, and noise
-    /// return an error instead of being rewritten.
-    pub fn inverse_unitary(&self) -> CircuitResult<Self> {
-        crate::circuit_inverse_unitary(self)
-    }
-
-    /// Returns the currently supported QEC inverse subset.
-    ///
-    /// This includes `inverse_unitary` plus selected reset-measure-detector,
-    /// two-to-one detector-flow, selected `m_det`, selected MPP
-    /// identity-parity detector-flow, selected MPAD record-tail, selected noisy
-    /// MZZ detector-flow, noisy measurement-only, noisy measure-reset-only,
-    /// exact noisy measure-reset detector-flow, selected observable Pauli
-    /// include, and measure-reset pass-through rewrites for one detector.
-    /// Stim's broader measurement, detector, observable, feedback, and noise
-    /// rewrites remain active follow-up work.
-    pub fn inverse_qec(&self) -> CircuitResult<Self> {
-        crate::circuit_inverse_qec(self)
-    }
-
-    /// Returns the currently implemented QEC inverse subset with explicit options.
-    ///
-    /// See [`crate::InverseQecOptions`] for the currently selected exact option scope.
-    pub fn inverse_qec_with_options(
-        &self,
-        options: crate::InverseQecOptions,
-    ) -> CircuitResult<Self> {
-        crate::circuit_inverse_qec_with_options(self, options)
-    }
-
-    /// Returns the supported tracker-driven time reversal for unsigned flows.
-    ///
-    /// Supports the selected Clifford, measurement, reset, measure-reset,
-    /// detector, observable, MPAD, coordinate, and ordinary-noise families.
-    /// Pure unitary repeats stay folded, measurement-rich expansion is bounded,
-    /// and feedback, heralded records, and duplicate collapse targets fail closed.
-    pub fn time_reversed_for_flows(
-        &self,
-        flows: &[crate::Flow],
-    ) -> CircuitResult<(Self, Vec<crate::Flow>)> {
-        crate::circuit_time_reversed_for_flows(self, flows)
-    }
-
-    /// Returns the selected time-reversal subset with explicit options.
-    pub fn time_reversed_for_flows_with_options(
-        &self,
-        flows: &[crate::Flow],
-        options: crate::TimeReversedForFlowsOptions,
-    ) -> CircuitResult<(Self, Vec<crate::Flow>)> {
-        crate::circuit_time_reversed_for_flows_with_options(self, flows, options)
-    }
-
-    /// Returns a circuit rewritten into the current base-gate simplification subset.
-    ///
-    /// M6 decomposes supported single-qubit Clifford gates and selected two-qubit
-    /// Clifford gates. Unsupported gates are preserved verbatim.
-    pub fn simplified(&self) -> CircuitResult<Self> {
-        crate::simplified_circuit(self)
-    }
-
     /// Appends an instruction, fusing it into the previous instruction when Stim formatting allows it.
     pub fn append_instruction(&mut self, instruction: CircuitInstruction) {
         self.push_instruction(instruction);
@@ -177,11 +101,8 @@ impl Circuit {
         out
     }
 
-    /// Returns a copy of this circuit with all instruction and repeat-block tags removed.
-    pub fn without_tags(&self) -> Self {
-        Self {
-            items: self.items.iter().map(CircuitItem::without_tags).collect(),
-        }
+    pub(crate) fn from_items(items: Vec<CircuitItem>) -> Self {
+        Self { items }
     }
 
     fn push(&mut self, item: CircuitItem) {
@@ -240,13 +161,6 @@ impl CircuitItem {
         match self {
             Self::Instruction(_) => None,
             Self::RepeatBlock(repeat) => Some(repeat),
-        }
-    }
-
-    fn without_tags(&self) -> Self {
-        match self {
-            Self::Instruction(instruction) => Self::Instruction(instruction.without_tag()),
-            Self::RepeatBlock(repeat) => Self::RepeatBlock(repeat.without_tags()),
         }
     }
 
@@ -453,7 +367,7 @@ impl CircuitInstruction {
         segments
     }
 
-    fn without_tag(&self) -> Self {
+    pub(crate) fn without_tag(&self) -> Self {
         Self {
             gate: self.gate,
             args: self.args.clone(),
@@ -561,14 +475,6 @@ impl RepeatBlock {
     /// Returns the non-empty tag attached to this `REPEAT` block.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
-    }
-
-    fn without_tags(&self) -> Self {
-        Self {
-            repeat_count: self.repeat_count,
-            body: self.body.without_tags(),
-            tag: None,
-        }
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {

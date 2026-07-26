@@ -120,7 +120,9 @@ impl GaugeTracker {
             "SPP" | "SPP_DAG" => self.undo_spp(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => {
-                if let Ok(clifford) = crate::single_qubit_clifford_for_gate(instruction.gate()) {
+                if let Ok(clifford) =
+                    crate::analysis::single_qubit_clifford_for_gate(instruction.gate())
+                {
                     self.undo_single_qubit_clifford(instruction, clifford)
                 } else {
                     Ok(())

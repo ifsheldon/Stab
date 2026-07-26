@@ -1,8 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
 use super::traversal::{
-    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemTraversal, FoldedDemVisitor,
+    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
+    FoldedDemVisitor,
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
@@ -47,10 +48,12 @@ where
     F: FnMut(&DemInstruction, u64) -> CircuitResult<()>,
 {
     traversal.validate_repeat_depth(context)?;
+    let block_policies = SearchBlockPolicies::new(traversal.root());
     let mut visitor = SearchErrorVisitor {
         context,
         visited_error_mechanisms: 0,
         visited_target_occurrences: 0,
+        block_policies,
         visit_error,
     };
     let _ = traversal.try_visit(&mut visitor)?;
@@ -61,6 +64,7 @@ struct SearchErrorVisitor<F> {
     context: &'static str,
     visited_error_mechanisms: u64,
     visited_target_occurrences: usize,
+    block_policies: SearchBlockPolicies,
     visit_error: F,
 }
 
@@ -117,10 +121,11 @@ where
         body: &FoldedDemBlock<'_>,
         _state: &DemTraversalState,
     ) -> CircuitResult<DemRepeatSelection> {
-        if !body.summary().has_nonzero_probability_error() {
+        let policy = self.block_policies.policy_for(body)?;
+        if !policy.has_nonzero_probability_error {
             return Ok(DemRepeatSelection::Skip);
         }
-        if body.summary().compact_search_error_count()?.is_some() {
+        if policy.compact_error_count.clone()?.is_some() {
             return Ok(DemRepeatSelection::FoldOnce);
         }
         let repeat_count = repeat.repeat_count().get();
@@ -134,6 +139,135 @@ where
             max_total_iterations: MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
             context: self.context,
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SearchBlockPolicy {
+    has_nonzero_probability_error: bool,
+    compact_error_count: CircuitResult<Option<u64>>,
+}
+
+#[derive(Debug)]
+struct SearchBlockPolicies {
+    by_block: HashMap<usize, SearchBlockPolicy>,
+}
+
+impl SearchBlockPolicies {
+    fn new(root: &FoldedDemBlock<'_>) -> Self {
+        let mut by_block = HashMap::new();
+        summarize_search_block_policy(root, &mut by_block);
+        Self { by_block }
+    }
+
+    fn policy_for(&self, block: &FoldedDemBlock<'_>) -> CircuitResult<&SearchBlockPolicy> {
+        self.by_block.get(&block.compact_id()).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "DEM search compact policy is missing a folded block",
+            )
+        })
+    }
+}
+
+fn summarize_search_block_policy(
+    block: &FoldedDemBlock<'_>,
+    by_block: &mut HashMap<usize, SearchBlockPolicy>,
+) -> SearchBlockPolicy {
+    let mut has_nonzero_probability_error = false;
+    let mut compact_error_count = Ok(Some(0_u64));
+
+    for item in block.items() {
+        match item {
+            FoldedDemItem::Instruction(instruction) => {
+                if instruction.kind() == DemInstructionKind::Error
+                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0
+                {
+                    has_nonzero_probability_error = true;
+                }
+                let Some(count) = active_compact_count(&compact_error_count) else {
+                    continue;
+                };
+                compact_error_count = update_search_instruction_count(count, instruction);
+            }
+            FoldedDemItem::Repeat { repeat, body } => {
+                let child = summarize_search_block_policy(body, by_block);
+                if repeat.repeat_count().get() > 0 {
+                    has_nonzero_probability_error |= child.has_nonzero_probability_error;
+                }
+                let Some(count) = active_compact_count(&compact_error_count) else {
+                    continue;
+                };
+                if repeat.repeat_count().get() == 0 {
+                    continue;
+                }
+                compact_error_count = child.compact_error_count.clone().and_then(|child_count| {
+                    let Some(child_count) = child_count else {
+                        return Ok(None);
+                    };
+                    if body.summary().detector_shift()? != 0 {
+                        return Ok(None);
+                    }
+                    count.checked_add(child_count).map(Some).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM search compact-repeat error count overflowed",
+                        )
+                    })
+                });
+            }
+        }
+    }
+
+    let policy = SearchBlockPolicy {
+        has_nonzero_probability_error,
+        compact_error_count,
+    };
+    by_block.insert(block.compact_id(), policy.clone());
+    policy
+}
+
+fn active_compact_count(count: &CircuitResult<Option<u64>>) -> Option<u64> {
+    match count {
+        Ok(Some(count)) => Some(*count),
+        Ok(None) | Err(_) => None,
+    }
+}
+
+fn update_search_instruction_count(
+    count: u64,
+    instruction: &DemInstruction,
+) -> CircuitResult<Option<u64>> {
+    match instruction.kind() {
+        DemInstructionKind::Error => {
+            if instruction.args().first().copied().unwrap_or(0.0) == 0.0 {
+                return Ok(Some(count));
+            }
+            let mut has_any_target = false;
+            let mut has_search_target = false;
+            for target in instruction.targets() {
+                has_any_target = true;
+                match target {
+                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
+                        has_search_target = true;
+                    }
+                    DemTarget::Numeric(_) => return Ok(None),
+                    DemTarget::Separator => {}
+                }
+            }
+            if !has_search_target && has_any_target {
+                return Ok(None);
+            }
+            if !has_search_target {
+                return Ok(Some(count));
+            }
+            count.checked_add(1).map(Some).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "DEM search compact-repeat error count overflowed",
+                )
+            })
+        }
+        DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => Ok(Some(count)),
+        DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => Ok(Some(count)),
+        DemInstructionKind::ShiftDetectors => Ok(None),
     }
 }
 
@@ -413,5 +547,24 @@ mod tests {
             .to_string();
         assert!(error.contains("at most 10000 total target occurrences"));
         assert!(!error.contains("at most 10000 expanded nonzero error mechanisms"));
+    }
+
+    #[test]
+    fn search_policy_cache_scales_with_compact_nested_repeats() {
+        let model = DetectorErrorModel::from_dem_str(
+            "repeat 1000000000 {\n    repeat 1000000000 {\n        error(0.1) D0 L0\n        shift_detectors 0\n    }\n}\n",
+        )
+        .unwrap();
+        let traversal = FoldedDemTraversal::new(&model).unwrap();
+        let policies = SearchBlockPolicies::new(traversal.root());
+        assert_eq!(policies.by_block.len(), 3);
+
+        let mut visited = 0;
+        visit_search_graph_errors(&traversal, "test search", |_, _| {
+            visited += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(visited, 1);
     }
 }

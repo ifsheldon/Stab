@@ -38,7 +38,7 @@ pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
 }
 
 fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
-    let tableau = circuit.to_tableau(true, false, false)?;
+    let tableau = crate::analysis::circuit_to_tableau(circuit, true, false, false)?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
     for index in (0..tableau.len()).rev() {
         flows.push(Flow::from_paulis(
@@ -415,7 +415,7 @@ fn flattened_measurement_generator_instructions(
         .iter()
         .any(|item| matches!(item, CircuitItem::RepeatBlock(_)))
     {
-        circuit.flattened_operations()
+        crate::analysis::flattened_circuit_operations(circuit)
     } else {
         Ok(circuit
             .items()
@@ -798,10 +798,9 @@ impl MeasurementFeedbackFlowSolver {
         let Some(targets) = plain_tableau_targets(group) else {
             return Ok(false);
         };
-        let local_inverse =
-            crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?
-                .inverse()
-                .map_err(stabilizer_to_circuit_error)?;
+        let local_inverse = crate::analysis::gate_tableau(instruction.gate())?
+            .inverse()
+            .map_err(stabilizer_to_circuit_error)?;
         if local_inverse.len() != targets.len() {
             return Ok(false);
         }
@@ -827,7 +826,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<bool> {
-        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)?;
+        let decomposed = crate::analysis::decomposed_single_instruction(instruction)?;
         for item in decomposed.items().iter().rev() {
             let CircuitItem::Instruction(instruction) = item else {
                 return Ok(false);

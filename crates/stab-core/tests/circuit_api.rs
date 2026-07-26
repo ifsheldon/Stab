@@ -15,7 +15,11 @@ use std::{
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CompiledSampler,
-    QubitId, RepeatBlock, detection_record_width, measurement_record_count,
+    QubitId, RepeatBlock, detection_record_width,
+    execution::{
+        circuit_reference_sample, circuit_reference_sample_tree, count_determined_measurements,
+    },
+    measurement_record_count,
 };
 
 const OVERSIZED_CIRCUIT_FILE_BYTES: u64 = 64 * 1024 * 1024 + 1;
@@ -831,9 +835,7 @@ fn pf1_circuit_insert_pop_pop_item_removes_without_fusing_neighbors() {
 fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() {
     let empty_measurement_circuit = Circuit::from_stim_str("H 0\nCX 0 1\n").expect("parse");
     assert_eq!(
-        empty_measurement_circuit
-            .reference_sample()
-            .expect("reference sample"),
+        circuit_reference_sample(&empty_measurement_circuit).expect("reference sample"),
         Vec::<bool>::new()
     );
 
@@ -891,9 +893,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
 #[test]
 fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference_sample() {
     let circuit = Circuit::from_stim_str("M 0\nX 0\nM 0\n").expect("parse circuit");
-    let tree = circuit
-        .reference_sample_tree()
-        .expect("reference sample tree");
+    let tree = circuit_reference_sample_tree(&circuit).expect("reference sample tree");
 
     assert_eq!(
         tree.decompress(),
@@ -932,9 +932,7 @@ fn pf1_circuit_reference_determined_count_determined_measurements_matches_public
     )
     .expect("parse tagged circuit");
     assert_eq!(
-        tagged
-            .count_determined_measurements(false)
-            .expect("count determined"),
+        count_determined_measurements(&tagged, false).expect("count determined"),
         1
     );
 

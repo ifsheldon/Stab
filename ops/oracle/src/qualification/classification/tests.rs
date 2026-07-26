@@ -68,6 +68,46 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
+            Path::new("crates/stab-core/src/analysis/gate_adapters.rs"),
+            "stab_core::analysis::gate_unitary_matrix",
+        ),
+        Some(FeatureId::GateContract)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/analysis/circuit_adapters.rs"),
+            "stab_core::Circuit::flattened",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/analysis/dem_adapters.rs"),
+            "stab_core::DetectorErrorModel::flattened",
+        ),
+        Some(FeatureId::DemFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/execution/reference_sample_tree.rs"),
+            "stab_core::ReferenceSampleTree",
+        ),
+        Some(FeatureId::Sampling)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/execution/sampled_flow.rs"),
+            "stab_core::sample_if_circuit_has_stabilizer_flows",
+        ),
+        Some(FeatureId::FlowUtils)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
             Path::new("crates/stab-core/src/ids.rs"),
             "stab_core::DemRepeatCount",
         ),

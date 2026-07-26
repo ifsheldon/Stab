@@ -123,7 +123,7 @@ fn apply_instruction_to_tableau(
         }
         GateCategory::PauliProduct if !gate.is_unitary() => Ok(()),
         GateCategory::PauliProduct => {
-            let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
+            let decomposed = crate::analysis::decomposed_single_instruction(instruction)
                 .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
             apply_circuit_to_tableau(
                 &decomposed,
@@ -235,7 +235,7 @@ fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> CircuitResult<Vec<Qu
 
 pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
     if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && let Ok(clifford) = crate::single_qubit_clifford_for_gate(gate)
+        && let Ok(clifford) = crate::analysis::single_qubit_clifford_for_gate(gate)
     {
         return Ok(clifford.tableau());
     }
@@ -250,7 +250,7 @@ pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
 
 pub(crate) fn gate_has_tableau(gate_name: &str) -> bool {
     if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && crate::single_qubit_clifford_for_gate(gate).is_ok()
+        && crate::analysis::single_qubit_clifford_for_gate(gate).is_ok()
     {
         return true;
     }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
 use super::{
@@ -6,7 +6,7 @@ use super::{
     DetectorErrorModel, MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
     MAX_DEM_FLATTEN_REPEAT_UNROLL,
     traversal::{
-        DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemTraversal,
+        DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
         FoldedDemVisitor, shifted_targets,
     },
 };
@@ -337,11 +337,13 @@ fn flattened_error_instructions(
 ) -> CircuitResult<Vec<FlattenedError>> {
     let traversal = FoldedDemTraversal::new(model)?;
     traversal.validate_repeat_depth("SAT problem generation")?;
+    let block_policies = SatBlockPolicies::new(traversal.root());
     let mut errors = Vec::new();
     let mut visitor = SatErrorVisitor {
         mode,
         expanded_instructions: 0,
         target_occurrences: 0,
+        block_policies,
         errors: &mut errors,
     };
     let _ = traversal.try_visit(&mut visitor)?;
@@ -352,6 +354,7 @@ struct SatErrorVisitor<'a> {
     mode: SatProblemMode,
     expanded_instructions: u64,
     target_occurrences: usize,
+    block_policies: SatBlockPolicies,
     errors: &'a mut Vec<FlattenedError>,
 }
 
@@ -474,7 +477,7 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
             return Ok(DemRepeatSelection::Skip);
         }
         if !self.mode.includes_zero_probability_errors()
-            && !body.summary().has_nonzero_probability_error()
+            && !self.block_policies.has_nonzero_probability_error(body)?
         {
             return Ok(DemRepeatSelection::Skip);
         }
@@ -494,6 +497,54 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
             context: "SAT problem generation",
         })
     }
+}
+
+#[derive(Debug, Default)]
+struct SatBlockPolicies {
+    has_nonzero_probability_error: HashMap<usize, bool>,
+}
+
+impl SatBlockPolicies {
+    fn new(root: &FoldedDemBlock<'_>) -> Self {
+        let mut policies = Self::default();
+        summarize_sat_block_policy(root, &mut policies.has_nonzero_probability_error);
+        policies
+    }
+
+    fn has_nonzero_probability_error(&self, block: &FoldedDemBlock<'_>) -> CircuitResult<bool> {
+        self.has_nonzero_probability_error
+            .get(&block.compact_id())
+            .copied()
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "DEM SAT compact policy is missing a folded block",
+                )
+            })
+    }
+}
+
+fn summarize_sat_block_policy(
+    block: &FoldedDemBlock<'_>,
+    by_block: &mut HashMap<usize, bool>,
+) -> bool {
+    let mut has_nonzero_probability_error = false;
+    for item in block.items() {
+        match item {
+            FoldedDemItem::Instruction(instruction) => {
+                has_nonzero_probability_error |= instruction.kind() == DemInstructionKind::Error
+                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0;
+            }
+            FoldedDemItem::Repeat { repeat, body } => {
+                let child_has_nonzero_probability_error =
+                    summarize_sat_block_policy(body, by_block);
+                if repeat.repeat_count().get() > 0 {
+                    has_nonzero_probability_error |= child_has_nonzero_probability_error;
+                }
+            }
+        }
+    }
+    by_block.insert(block.compact_id(), has_nonzero_probability_error);
+    has_nonzero_probability_error
 }
 
 fn weighted_repeat_map_probability(probability: f64, repeat_count: u64) -> f64 {
@@ -766,6 +817,7 @@ p wcnf 3 7 71
             mode: SatProblemMode::Unweighted,
             expanded_instructions: 0,
             target_occurrences: MAX_SAT_TARGET_OCCURRENCES,
+            block_policies: Default::default(),
             errors: &mut errors,
         };
         let targets = [DemTarget::relative_detector(0)?];

@@ -5,8 +5,8 @@ use super::{
     ConversionPlan, DetectionConversionOutput, DetectionEventRecord, MAX_DETECTION_REPEAT_UNROLL,
 };
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory, Pauli,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
+    Pauli, PauliBasis, PauliSign, PauliString, RepeatBlock, Target,
 };
 
 pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> bool {
@@ -84,7 +84,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
         "CZ" => validate_frame_cz_targets(instruction),
         "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
-        name if crate::circuit_tableau::gate_tableau(name).is_ok() => Ok(()),
+        _ if crate::analysis::gate_has_tableau(instruction.gate()) => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
         name => Err(CircuitError::invalid_sampler_compilation(format!(
             "M9 detector frame subset does not support {name}"
@@ -98,7 +98,7 @@ fn validate_decomposed_frame_instruction(instruction: &CircuitInstruction) -> Ci
 }
 
 fn decomposed_frame_instruction(instruction: &CircuitInstruction) -> CircuitResult<Circuit> {
-    crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+    crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
         CircuitError::invalid_sampler_compilation(format!(
             "{} cannot be executed by frame detection via decomposition: {error}",
             instruction.gate().canonical_name()
@@ -410,7 +410,7 @@ impl ScalarDetectionFrame {
             "HERALDED_ERASE" => self.apply_heralded_erase(instruction, rng),
             "HERALDED_PAULI_CHANNEL_1" => self.apply_heralded_pauli_channel(instruction, rng),
             "SPP" | "SPP_DAG" => self.execute_decomposed_instruction(instruction, rng),
-            name if crate::circuit_tableau::gate_tableau(name).is_ok() => {
+            _ if crate::analysis::gate_has_tableau(instruction.gate()) => {
                 self.apply_tableau_instruction(instruction)
             }
             _ if zero_probability_noise(instruction)? => Ok(()),
@@ -614,7 +614,7 @@ impl ScalarDetectionFrame {
                     self.apply_pauli(qubit_index(instruction, target)?, basis)?;
                 }
             } else {
-                self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?;
+                self.apply_tableau_targets(instruction.gate(), target_group)?;
             }
         }
         Ok(())
@@ -651,9 +651,7 @@ impl ScalarDetectionFrame {
                     }
                 }
                 (Some(_), Some(_)) => {}
-                (None, None) => {
-                    self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?
-                }
+                (None, None) => self.apply_tableau_targets(instruction.gate(), target_group)?,
             }
         }
         Ok(())
@@ -680,7 +678,7 @@ impl ScalarDetectionFrame {
                 continue;
             }
             if left.qubit_id().is_some() && right.qubit_id().is_some() {
-                self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?;
+                self.apply_tableau_targets(instruction.gate(), target_group)?;
                 continue;
             }
             return Err(unsupported_frame_instruction(instruction));
@@ -690,13 +688,14 @@ impl ScalarDetectionFrame {
 
     fn apply_tableau_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         for target_group in instruction.target_groups() {
-            self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?;
+            self.apply_tableau_targets(instruction.gate(), target_group)?;
         }
         Ok(())
     }
 
-    fn apply_tableau_targets(&mut self, gate_name: &str, targets: &[Target]) -> CircuitResult<()> {
-        let tableau = crate::circuit_tableau::gate_tableau(gate_name)?;
+    fn apply_tableau_targets(&mut self, gate: Gate, targets: &[Target]) -> CircuitResult<()> {
+        let gate_name = gate.canonical_name();
+        let tableau = crate::analysis::gate_tableau(gate)?;
         let qubits = targets
             .iter()
             .map(|target| {
