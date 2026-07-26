@@ -19,6 +19,7 @@ mod dem_sampler;
 mod detection;
 mod error;
 mod error_matcher;
+mod execution;
 mod gate;
 mod ids;
 mod matched_error;
@@ -50,7 +51,7 @@ pub use circuit_flow::{
     check_if_circuit_has_unsigned_stabilizer_flows,
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
-    sample_if_circuit_has_stabilizer_flows, solve_for_flow_measurements,
+    solve_for_flow_measurements,
 };
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -87,6 +88,7 @@ pub use detection::{
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
+pub use execution::sample_if_circuit_has_stabilizer_flows;
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use gate::{
