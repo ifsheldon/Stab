@@ -76,6 +76,14 @@ product crates -X-> ops
 
 The repository enforces these edges through `just architecture::check`.
 
+The checker classifies workspace packages from their repository paths, validates every workspace dependency edge from Cargo metadata, and rejects product dependencies on operational crates.
+
+During the pre-0.2 migration it reports four exact temporary allowances instead of hiding them: the dev-only `stab-core` and `stab-cli` dependencies on `stab-compat-corpus`, plus direct portable-SIMD use in `crates/stab-core/src/bits/simd.rs` and `crates/stab-core/src/bits/clifford.rs`.
+
+Any additional product-to-ops edge or direct `std::simd` source site fails the check.
+
+The record-boundary and Nightly-isolation milestones remove these allowances; they are not permanent permitted dependencies.
+
 ## Toolchain Boundary
 
 Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components.

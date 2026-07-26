@@ -3,6 +3,9 @@ set fallback
 # Rust component checks.
 mod rust 'justfiles/rust.just'
 
+# Product dependency and source-boundary checks.
+mod architecture 'justfiles/architecture.just'
+
 # Repository maintenance helpers.
 mod maintenance 'justfiles/maintenance.just'
 
