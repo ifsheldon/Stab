@@ -106,6 +106,29 @@ fn validation_rejects_nonmeasured_parents_and_false_no_comparator_waivers() {
 }
 
 #[test]
+fn validation_rejects_missing_and_extra_cq0_api_items() {
+    let (mut missing, manifest, references) = fixture();
+    let removed = missing.public_api_items.pop().expect("public API item");
+    let error = validate(&missing, &manifest, &references, "UNFROZEN")
+        .expect_err("missing CQ0 API item must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("public API ids disagree with CQ0")
+    );
+
+    let (extra, manifest, mut references) = fixture();
+    references.public_api.remove(&removed.id);
+    let error = validate(&extra, &manifest, &references, "UNFROZEN")
+        .expect_err("extra PQ0 API item must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("public API ids disagree with CQ0")
+    );
+}
+
+#[test]
 fn validation_rejects_asymmetric_primary_cli_and_stale_stim_filter() {
     let (mut suite, manifest, references) = fixture();
     let cli_row = suite

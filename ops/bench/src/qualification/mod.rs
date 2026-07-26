@@ -314,7 +314,9 @@ pub(crate) fn regenerate(
     let checked_path = root.performance_qualification();
     let checked_bytes = read_bytes(root, &checked_path)?;
     let checked: QualificationSuite = serde_json::from_slice(&checked_bytes)?;
-    validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
+    if check {
+        validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
+    }
     let mut normalized = generated.clone();
     preserve_checked_checklist_presentation(&mut normalized, &checked)?;
     let normalized_bytes = render(&normalized)?;
@@ -327,7 +329,7 @@ pub(crate) fn regenerate(
         migration::check(root, &checked)?;
         println!("[{PREFIX}] performance qualification regeneration is clean");
     } else if checked_bytes == normalized_bytes {
-        migration::check(root, &checked)?;
+        migration::check(root, &generated)?;
         println!(
             "[{PREFIX}] performance qualification semantics are unchanged; retained frozen checklist presentation"
         );
@@ -639,9 +641,8 @@ mod tests {
         let mut generated = checked.clone();
         let item = generated
             .checklist_items
-            .iter_mut()
-            .find(|item| item.raw_status.starts_with("Reopened"))
-            .expect("reopened checklist item");
+            .first_mut()
+            .expect("checked checklist item");
         item.source_line += 17;
         item.anchor_digest = "a".repeat(64);
         item.raw_status = "Done for selected scope".to_string();

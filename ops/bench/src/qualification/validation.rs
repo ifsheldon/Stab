@@ -30,7 +30,6 @@ const CORRECTNESS_DIGEST: &str = "7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced99608
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_PUBLIC_API_ITEMS: usize = 2_065;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
@@ -91,11 +90,6 @@ fn validate_header(suite: &QualificationSuite, manifest: &BenchmarkManifest, iss
             "checklist rows",
             suite.checklist_items.len(),
             EXPECTED_CHECKLIST_ROWS,
-        ),
-        (
-            "public API items",
-            suite.public_api_items.len(),
-            EXPECTED_PUBLIC_API_ITEMS,
         ),
         (
             "manifest dispositions",
@@ -454,19 +448,26 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
             )),
         }
     }
-    let expected = BTreeMap::from([
-        ("constant", 1),
-        ("enum", 35),
-        ("field", 202),
-        ("function", 75),
-        ("method", 636),
-        ("struct", 88),
-        ("trait-impl", 759),
-        ("type-alias", 7),
-        ("variant", 262),
-    ]);
-    if kinds != expected {
-        issues.push(format!("public API kind counts are stale: {kinds:?}"));
+    let expected_ids = references
+        .public_api
+        .keys()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    if ids != expected_ids {
+        issues.push(format!(
+            "public API ids disagree with CQ0: missing={:?} extra={:?}",
+            expected_ids.difference(&ids).collect::<Vec<_>>(),
+            ids.difference(&expected_ids).collect::<Vec<_>>()
+        ));
+    }
+    let mut expected_kinds = BTreeMap::<&str, usize>::new();
+    for reference in references.public_api.values() {
+        *expected_kinds.entry(reference.kind.as_str()).or_default() += 1;
+    }
+    if kinds != expected_kinds {
+        issues.push(format!(
+            "public API kind counts disagree with CQ0: actual={kinds:?} expected={expected_kinds:?}"
+        ));
     }
 }
 
