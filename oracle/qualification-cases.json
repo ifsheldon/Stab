@@ -3381,6 +3381,204 @@
       ]
       },
       {
+        "id": "a2-result-diagnostic-value-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "result_format_diagnostic_value_contract_is_stable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed values prove byte-span arithmetic, stable severity and error codes, non-lossy FormatError wrapping, generic legacy conversion, and unchanged human display."
+        },
+        "negative_axes": [
+          "span-end-overflow",
+          "diagnostic-payload-loss",
+          "legacy-display-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ByteSpan"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ByteSpan::try_new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ByteSpan::byte_start"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ByteSpan::byte_length"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ByteSpan::byte_end"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DiagnosticSeverity"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DiagnosticSeverity::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatErrorCode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatErrorCode::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::invalid_data"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::code"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::severity"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::message"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::span"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitError::invalid_result_format"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitError::format_error"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-result-zero-one-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "zero_one_errors_report_exact_byte_spans_across_readers",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed LF, CRLF, UTF-8 byte, malformed byte, width, and EOF cases prove exact 01 diagnostic codes and byte spans across materialized, dense, packed, and sparse readers."
+        },
+        "negative_axes": [
+          "unterminated-record",
+          "short-record",
+          "invalid-byte",
+          "invalid-crlf",
+          "utf8-byte-offset"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-result-hits-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "hits_errors_report_separator_integer_and_bounds_spans",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed separator, termination, integer-overflow, and width-boundary cases prove exact HITS diagnostic codes and byte spans."
+        },
+        "negative_axes": [
+          "double-separator",
+          "unterminated-record",
+          "integer-overflow",
+          "index-out-of-range"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-result-dets-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "dets_errors_report_prefix_namespace_and_index_spans",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed shot-prefix, token-prefix, missing-index, namespace-boundary, and accepted EOF cases prove exact typed DETS diagnostic codes and byte spans."
+        },
+        "negative_axes": [
+          "invalid-shot-prefix",
+          "double-space",
+          "missing-index",
+          "namespace-index-out-of-range"
+        ],
+        "standalone": true
+      },
+      {
         "id": "cq2-result-dets-public-type-contract",
         "feature_id": "CQ-RESULT-FORMATS",
         "comparator": "exact-value",

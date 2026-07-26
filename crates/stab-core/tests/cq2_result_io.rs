@@ -478,9 +478,7 @@ fn cq_result_ptb64_dense_sparse_prefix_and_validation_match_stim() {
 #[test]
 fn cq_result_streaming_visitors_stop_at_first_error() {
     fn stop() -> CircuitResult<()> {
-        Err(CircuitError::InvalidResultFormat {
-            message: "stop".to_string(),
-        })
+        Err(CircuitError::invalid_result_format("stop"))
     }
 
     let mut visits = 0;

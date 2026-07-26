@@ -884,7 +884,7 @@ fn flattened_rejects_coordinate_overflow() {
         .flattened()
         .expect_err("reject coordinate overflow");
 
-    assert!(matches!(error, CircuitError::InvalidResultFormat { .. }));
+    assert!(matches!(error, CircuitError::InvalidResultFormat(_)));
     assert!(error.to_string().contains("coordinate shift overflowed"));
 }
 

@@ -17,6 +17,7 @@ mod circuit_transforms;
 mod dem;
 mod dem_sampler;
 mod detection;
+mod diagnostics;
 mod error;
 mod error_matcher;
 pub mod execution;
@@ -83,6 +84,7 @@ pub use detection::{
     validate_detection_sampling_circuit, write_detection_records, write_observable_records,
     write_ptb64_detection_records, write_ptb64_observable_records,
 };
+pub use diagnostics::{ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode};
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
 pub use execution::{

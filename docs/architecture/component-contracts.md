@@ -109,6 +109,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `gate.rs`, `gate/**` | Model | Gate syntax and closed Stim scalar or textual descriptors remain model-owned; algebra-valued projections and decomposition parsing are implemented by `analysis/gate_adapters.rs`. |
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
+| `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span and severity primitives here while domain errors are introduced. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
 | `result_formats.rs`, `result_formats/**`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |
 | `sampling.rs`, `sampling/**`, `execution/**`, `detection.rs`, `detection/**`, `dem_sampler.rs`, `probability_util.rs` | Engine | Simulator-backed helpers, randomized bit generation, compilation, reusable state, detection conversion, and DEM sampling are execution concerns. |
@@ -116,7 +117,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `circuit_detecting_regions*`, `circuit_feedback.rs`, `circuit_flow*`, `circuit_generation*`, `circuit_inverse*`, `circuit_missing_detectors*`, `circuit_simplify.rs`, `circuit_tableau.rs`, `circuit_transforms.rs` | Analysis | These are pure circuit transforms, generation, lowering, or analysis algorithms. |
 | `dem/analyze*`, `dem/arena_index.rs`, `dem/error_traversal.rs`, `dem/graphlike*`, `dem/hyper*`, `dem/sat*`, `dem/search_budget.rs` | Analysis | These consume the model-owned folded traversal boundary and own analysis-specific policies and outputs. |
 | `error_matcher*`, `matched_error.rs`, `mbqc_decomposition.rs`, `sparse_rev_frame_tracker*` | Analysis | These are pure matching, decomposition, and reverse-tracking algorithms; simulator-backed sampled-flow checks have moved to execution. |
-| `error.rs` | Facade, temporarily | A2 splits typed domain diagnostics while retaining lossless facade conversion. |
+| `error.rs` | Facade, temporarily | A2 splits typed domain diagnostics while retaining lossless facade conversion; result-format failures now wrap `FormatError` without changing their human display. |
 | `lib.rs` | Facade | Root reexports remain curated compatibility adapters and do not determine implementation ownership. |
 
 New source modules must fit exactly one row or update this table and the architecture decision record in the same change.

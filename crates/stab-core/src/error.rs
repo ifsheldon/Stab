@@ -1,3 +1,4 @@
+use crate::{FormatError, FormatErrorCode};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -41,8 +42,8 @@ pub enum CircuitError {
     #[error("cannot compile circuit sampler: {message}")]
     InvalidSamplerCompilation { message: String },
 
-    #[error("invalid result format data: {message}")]
-    InvalidResultFormat { message: String },
+    #[error("invalid result format data: {0}")]
+    InvalidResultFormat(#[source] FormatError),
 
     #[error("failed to {operation} circuit file: {message}")]
     CircuitIo {
@@ -94,9 +95,22 @@ impl CircuitError {
         }
     }
 
-    pub(crate) fn invalid_result_format(message: impl Into<String>) -> Self {
-        Self::InvalidResultFormat {
-            message: message.into(),
+    pub fn invalid_result_format(message: impl Into<String>) -> Self {
+        Self::InvalidResultFormat(FormatError::invalid_data(message))
+    }
+
+    pub(crate) fn invalid_result_format_diagnostic(
+        code: FormatErrorCode,
+        message: impl Into<String>,
+        span: Option<crate::ByteSpan>,
+    ) -> Self {
+        Self::InvalidResultFormat(FormatError::new(code, message, span))
+    }
+
+    pub const fn format_error(&self) -> Option<&FormatError> {
+        match self {
+            Self::InvalidResultFormat(error) => Some(error),
+            _ => None,
         }
     }
 
@@ -112,5 +126,11 @@ impl CircuitError {
         Self::InvalidDetectorErrorModel {
             message: message.into(),
         }
+    }
+}
+
+impl From<FormatError> for CircuitError {
+    fn from(error: FormatError) -> Self {
+        Self::InvalidResultFormat(error)
     }
 }

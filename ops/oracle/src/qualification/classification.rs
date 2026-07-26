@@ -314,6 +314,9 @@ pub(super) fn classify_public_api_source(
     if api_lower.contains("compileddemsampler") {
         return Some(FeatureId::DemSampling);
     }
+    if api_lower.ends_with("::format_error") || api_lower.ends_with("::invalid_result_format") {
+        return Some(FeatureId::ResultFormats);
+    }
     if api_lower.contains("shortest_graphlike")
         || api_lower.contains("find_undetectable")
         || api_lower.contains("sat_problem")
@@ -390,7 +393,8 @@ pub(super) fn classify_public_api_source(
     if value == "crates/stab-core/src/analysis/gate_adapters.rs" {
         return Some(FeatureId::GateContract);
     }
-    if value.starts_with("crates/stab-core/src/result_format")
+    if value == "crates/stab-core/src/diagnostics.rs"
+        || value.starts_with("crates/stab-core/src/result_format")
         || value.starts_with("crates/stab-core/src/result_stream")
     {
         return Some(FeatureId::ResultFormats);

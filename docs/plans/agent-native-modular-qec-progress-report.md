@@ -49,7 +49,7 @@ Exact public-API alias validation was added instead of relying on parent-name si
 
 The audit exposed three genuine specification gaps: namespace completeness, folded-visitor visibility, and diagnostic benchmark provenance. The A1 contract now enumerates required namespaces, defers detection and DEM sampling namespace completion to A5, keeps folded traversal crate-internal until A6, and defines the exact diagnostic benchmark policy.
 
-## Qualification State
+## A1 Qualification State
 
 - Correctness schema: 4.
 - Correctness inventory: 2,886 upstream cases, 2,159 public API items, and 1,759 evidence parents.
@@ -59,6 +59,8 @@ The audit exposed three genuine specification gaps: namespace completeness, fold
 - Performance digest: `1b427ef982217037371714676f3572386f9d005b016e17c2fd2afd25dc2ba6ea`.
 
 These identity changes make the previous formal evidence historical. No A1 result is being promoted as source-current formal qualification.
+
+The first A2 diagnostic slice advances the current inventory to 2,218 public API items and 1,763 evidence parents. Its correctness digest is `2fc7cc31e97de88a6c2707317b9c01ab0bf03e55ff0f7aa743f4918679021fee`, and its performance digest is `87a12f0778c38ba3ee8ec85571ca2cb9b1946c9289488b7c4b68408c3d9d644e`. The A1 identities above remain the exact closure checkpoint rather than being rewritten as if A2 had been part of A1.
 
 ## Verification
 
@@ -86,3 +88,7 @@ The original plan asked A2 to create a `PlanFingerprint` containing a selected b
 A2 therefore owns `ModelFingerprint` and backend-neutral `CompilationRequestFingerprint`. A4 completes `PlanFingerprint` after compilation can bind the selected backend and executable-contract identity. This keeps fingerprints honest and avoids designing around state that does not yet exist.
 
 The first A2 slice is the result-format diagnostic nucleus because the existing byte-oriented text grammar already has strong pinned-Stim coverage. It can establish stable codes and exact byte spans with low behavioral risk before circuit and DEM parsers acquire position-aware source cursors.
+
+Implementation has started with a typed `FormatError` payload, stable `FormatErrorCode` values, `DiagnosticSeverity`, and overflow-aware `ByteSpan`. The existing `CircuitError` human prefix is preserved, while `CircuitError::format_error` exposes the typed payload. Exact 01, HITS, and DETS span selectors own this first slice; packed-format spans and CLI JSON rendering remain in A2.
+
+The result-reader timing probes use accepted clean baseline `target/benchmarks/q8-final-f465b6f-primary-baseline/baseline.json`, source revision `f4bd438aa66db95296644f68769fd0c904f792f7`, `local_modifications=true`, one warmup, and three measurement runs. Reports `target/benchmarks/a2-diagnostics-m8-01`, `target/benchmarks/a2-diagnostics-m8-hits`, and `target/benchmarks/a2-diagnostics-m8-dets` record ratios of `0.283x`, `0.713x`, and `0.843x`, respectively. A separate one-run allocation diagnostic at `target/benchmarks/a2-diagnostics-result-reader-allocations` records maximum Stab allocation bytes of 12,288 for 01, 13,544 for HITS, and 28,672 for DETS, with zero resident-memory delta in all three rows. These dirty-worktree reports are development diagnostics only and are not promotable evidence.

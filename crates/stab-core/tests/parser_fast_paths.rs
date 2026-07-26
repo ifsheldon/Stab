@@ -111,7 +111,7 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
     .expect_err("zero lookback must not compile for detection conversion");
     assert!(matches!(
         conversion_error,
-        CircuitError::InvalidResultFormat { .. }
+        CircuitError::InvalidResultFormat(_)
     ));
     assert!(conversion_error.to_string().contains("rec[-0]"));
 

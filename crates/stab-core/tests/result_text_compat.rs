@@ -205,9 +205,7 @@ fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
     let result = for_each_dets_record(input, layout, |record| {
         assert_eq!(record.len(), 4);
         dense_calls += 1;
-        Err(CircuitError::InvalidResultFormat {
-            message: "stop".to_string(),
-        })
+        Err(CircuitError::invalid_result_format("stop"))
     });
     assert!(result.is_err());
     assert_eq!(dense_calls, 1);
@@ -216,9 +214,7 @@ fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
     let result = for_each_dets_packed_record(input, layout, |record| {
         assert_eq!(record.len(), 4);
         packed_calls += 1;
-        Err(CircuitError::InvalidResultFormat {
-            message: "stop".to_string(),
-        })
+        Err(CircuitError::invalid_result_format("stop"))
     });
     assert!(result.is_err());
     assert_eq!(packed_calls, 1);
@@ -227,9 +223,7 @@ fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
     let result = for_each_dets_token_record(input, layout, |record| {
         assert_eq!(record.len(), 2);
         token_calls += 1;
-        Err(CircuitError::InvalidResultFormat {
-            message: "stop".to_string(),
-        })
+        Err(CircuitError::invalid_result_format("stop"))
     });
     assert!(result.is_err());
     assert_eq!(token_calls, 1);
@@ -239,9 +233,7 @@ fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
         assert_eq!(shot.hits, [0, 2]);
         assert_eq!(shot.obs_mask, [false]);
         sparse_calls += 1;
-        Err(CircuitError::InvalidResultFormat {
-            message: "stop".to_string(),
-        })
+        Err(CircuitError::invalid_result_format("stop"))
     });
     assert!(result.is_err());
     assert_eq!(sparse_calls, 1);
@@ -323,11 +315,11 @@ fn assert_all_width_readers_reject(input: &[u8], format: SampleFormat, width: us
 fn bits(record: BitSlice<'_>) -> CircuitResult<Vec<bool>> {
     (0..record.len())
         .map(|index| {
-            record
-                .get(index)
-                .ok_or_else(|| CircuitError::InvalidResultFormat {
-                    message: format!("packed test record index {index} was out of range"),
-                })
+            record.get(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "packed test record index {index} was out of range"
+                ))
+            })
         })
         .collect()
 }

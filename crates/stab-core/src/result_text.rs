@@ -1,5 +1,5 @@
 use crate::{
-    CircuitError, CircuitResult,
+    ByteSpan, CircuitError, CircuitResult, FormatErrorCode,
     result_formats::{DetsLayout, DetsResultType, DetsToken},
 };
 
@@ -16,19 +16,32 @@ where
         let start = offset;
         for bit_index in 0..bits_per_record {
             let byte = input.get(offset).copied().ok_or_else(|| {
-                CircuitError::invalid_result_format(format!(
-                    "01 data ended in the middle of a record at bit {bit_index}; expected {bits_per_record} bits"
-                ))
+                invalid_at(
+                    input,
+                    offset,
+                    FormatErrorCode::UnexpectedEndOfInput,
+                    format!(
+                        "01 data ended in the middle of a record at bit {bit_index}; expected {bits_per_record} bits"
+                    ),
+                )
             })?;
             if matches!(byte, b'\n' | b'\r') {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "01 record ended after {bit_index} bits; expected {bits_per_record} bits"
-                )));
+                return Err(invalid_at(
+                    input,
+                    offset,
+                    FormatErrorCode::InvalidRecordWidth,
+                    format!(
+                        "01 record ended after {bit_index} bits; expected {bits_per_record} bits"
+                    ),
+                ));
             }
             if !matches!(byte, b'0' | b'1') {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "01 record contains non-bit byte {byte}"
-                )));
+                return Err(invalid_at(
+                    input,
+                    offset,
+                    FormatErrorCode::InvalidByte,
+                    format!("01 record contains non-bit byte {byte}"),
+                ));
             }
             offset += 1;
         }
@@ -64,21 +77,29 @@ where
         }
 
         loop {
-            let value = parse_u64(input, &mut offset, "HITS index")?;
+            let parsed = parse_u64(input, &mut offset, "HITS index")?;
+            let value = parsed.value;
             let index = usize::try_from(value).map_err(|_| {
-                CircuitError::invalid_result_format(format!(
-                    "HITS index {value} does not fit usize"
-                ))
+                CircuitError::invalid_result_format_diagnostic(
+                    FormatErrorCode::IntegerOverflow,
+                    format!("HITS index {value} does not fit usize"),
+                    Some(parsed.span),
+                )
             })?;
             if index >= bits_per_record {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "HITS index {value} exceeds record width {bits_per_record}"
-                )));
+                return Err(CircuitError::invalid_result_format_diagnostic(
+                    FormatErrorCode::IndexOutOfRange,
+                    format!("HITS index {value} exceeds record width {bits_per_record}"),
+                    Some(parsed.span),
+                ));
             }
             hits.push(value);
 
             let delimiter = input.get(offset).copied().ok_or_else(|| {
-                CircuitError::invalid_result_format(
+                invalid_at(
+                    input,
+                    offset,
+                    FormatErrorCode::InvalidRecordSeparator,
                     "HITS data was not comma-separated integers terminated by a newline",
                 )
             })?;
@@ -97,14 +118,20 @@ where
                         }
                         Some(b',') => offset += 1,
                         _ => {
-                            return Err(CircuitError::invalid_result_format(
+                            return Err(invalid_at(
+                                input,
+                                offset,
+                                FormatErrorCode::InvalidRecordSeparator,
                                 "HITS data was not comma-separated integers terminated by a newline",
                             ));
                         }
                     }
                 }
                 _ => {
-                    return Err(CircuitError::invalid_result_format(
+                    return Err(invalid_at(
+                        input,
+                        offset,
+                        FormatErrorCode::InvalidRecordSeparator,
                         "HITS data was not comma-separated integers terminated by a newline",
                     ));
                 }
@@ -139,8 +166,11 @@ where
             CircuitError::invalid_result_format("DETS prefix byte offset overflowed")
         })?;
         if input.get(offset..prefix_end) != Some(b"shot".as_slice()) {
-            return Err(CircuitError::invalid_result_format(
+            let available = input.len().saturating_sub(offset).min(4);
+            return Err(CircuitError::invalid_result_format_diagnostic(
+                FormatErrorCode::InvalidPrefix,
                 "DETS data did not start with 'shot'",
+                ByteSpan::try_new(offset, available),
             ));
         }
         offset = prefix_end;
@@ -171,23 +201,47 @@ where
                         Some(b'D') => DetsResultType::Detector,
                         Some(b'L') => DetsResultType::Observable,
                         _ => {
-                            return Err(CircuitError::invalid_result_format(
+                            return Err(invalid_at(
+                                input,
+                                offset,
+                                FormatErrorCode::InvalidPrefix,
                                 "unrecognized DETS prefix; expected M, D, or L",
                             ));
                         }
                     };
                     offset += 1;
-                    let value = parse_u64(input, &mut offset, "DETS token index")?;
+                    let parsed = parse_u64(input, &mut offset, "DETS token index")?;
+                    let value = parsed.value;
                     let index = usize::try_from(value).map_err(|_| {
-                        CircuitError::invalid_result_format(format!(
-                            "DETS index {value} does not fit usize"
-                        ))
+                        CircuitError::invalid_result_format_diagnostic(
+                            FormatErrorCode::IntegerOverflow,
+                            format!("DETS index {value} does not fit usize"),
+                            Some(parsed.span),
+                        )
                     })?;
+                    let namespace_width = match result_type {
+                        DetsResultType::Measurement => layout.measurements(),
+                        DetsResultType::Detector => layout.detectors(),
+                        DetsResultType::Observable => layout.observables(),
+                    };
+                    if index >= namespace_width {
+                        return Err(CircuitError::invalid_result_format_diagnostic(
+                            FormatErrorCode::IndexOutOfRange,
+                            format!(
+                                "DETS token {}{index} exceeds namespace width {namespace_width}",
+                                char::from(result_type.prefix())
+                            ),
+                            Some(parsed.span),
+                        ));
+                    }
                     layout.resolve(result_type, index)?;
                     tokens.push(DetsToken::new(result_type, index));
                 }
                 _ => {
-                    return Err(CircuitError::invalid_result_format(
+                    return Err(invalid_at(
+                        input,
+                        offset,
+                        FormatErrorCode::InvalidRecordSeparator,
                         "DETS data was not single-space-separated with no trailing spaces",
                     ));
                 }
@@ -211,9 +265,12 @@ fn consume_required_newline(
             *offset += 1;
             require_lf(input, offset, format)
         }
-        _ => Err(CircuitError::invalid_result_format(format!(
-            "{format} data did not end with a newline after the expected record width"
-        ))),
+        _ => Err(invalid_at(
+            input,
+            *offset,
+            FormatErrorCode::MissingRecordTerminator,
+            format!("{format} data did not end with a newline after the expected record width"),
+        )),
     }
 }
 
@@ -238,29 +295,64 @@ fn consume_empty_record_newline(
 
 fn require_lf(input: &[u8], offset: &mut usize, format: &'static str) -> CircuitResult<()> {
     if input.get(*offset).copied() != Some(b'\n') {
-        return Err(CircuitError::invalid_result_format(format!(
-            "{format} carriage return was not followed by a line feed"
-        )));
+        return Err(invalid_at(
+            input,
+            *offset,
+            FormatErrorCode::MissingRecordTerminator,
+            format!("{format} carriage return was not followed by a line feed"),
+        ));
     }
     *offset += 1;
     Ok(())
 }
 
-fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> CircuitResult<u64> {
+struct ParsedU64 {
+    value: u64,
+    span: ByteSpan,
+}
+
+fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> CircuitResult<ParsedU64> {
+    let start = *offset;
     let mut value = 0u64;
-    let mut digits = 0usize;
     while let Some(byte @ b'0'..=b'9') = input.get(*offset).copied() {
-        value = value
+        let Some(next) = value
             .checked_mul(10)
             .and_then(|value| value.checked_add(u64::from(byte - b'0')))
-            .ok_or_else(|| CircuitError::invalid_result_format(format!("{kind} overflowed u64")))?;
+        else {
+            return Err(CircuitError::invalid_result_format_diagnostic(
+                FormatErrorCode::IntegerOverflow,
+                format!("{kind} overflowed u64"),
+                ByteSpan::try_new(start, (*offset).saturating_sub(start).saturating_add(1)),
+            ));
+        };
+        value = next;
         *offset += 1;
-        digits += 1;
     }
-    if digits == 0 {
-        return Err(CircuitError::invalid_result_format(format!(
-            "{kind} was not followed by an unsigned integer"
-        )));
+    if *offset == start {
+        return Err(invalid_at(
+            input,
+            start,
+            FormatErrorCode::MissingIndex,
+            format!("{kind} was not followed by an unsigned integer"),
+        ));
     }
-    Ok(value)
+    Ok(ParsedU64 {
+        value,
+        span: ByteSpan::try_new(start, *offset - start).ok_or_else(|| {
+            CircuitError::invalid_result_format("parsed integer byte span overflowed")
+        })?,
+    })
+}
+
+fn invalid_at(
+    input: &[u8],
+    offset: usize,
+    code: FormatErrorCode,
+    message: impl Into<String>,
+) -> CircuitError {
+    CircuitError::invalid_result_format_diagnostic(
+        code,
+        message,
+        ByteSpan::try_new(offset, usize::from(offset < input.len())),
+    )
 }

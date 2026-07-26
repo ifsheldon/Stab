@@ -132,9 +132,9 @@ where
                 });
             }
             let chunk = available.get(..consumed).ok_or_else(|| {
-                CliError::from(stab_core::CircuitError::InvalidResultFormat {
-                    message: format!("{kind} byte range was out of bounds"),
-                })
+                CliError::from(stab_core::CircuitError::invalid_result_format(format!(
+                    "{kind} byte range was out of bounds"
+                )))
             })?;
             line.extend_from_slice(chunk);
             (consumed, chunk.last() == Some(&b'\n'))

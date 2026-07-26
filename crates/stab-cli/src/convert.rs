@@ -364,9 +364,9 @@ where
         let mut bridge = |record: &[bool]| {
             if let Err(error) = visit(record) {
                 callback_error = Some(error);
-                return Err(CircuitError::InvalidResultFormat {
-                    message: "convert output visitor stopped after an I/O error".to_string(),
-                });
+                return Err(CircuitError::invalid_result_format(
+                    "convert output visitor stopped after an I/O error",
+                ));
             }
             Ok(())
         };
@@ -685,7 +685,5 @@ fn usize_from_u64(value: u64, kind: &'static str) -> Result<usize, CliError> {
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::Circuit(CircuitError::InvalidResultFormat {
-        message: message.into(),
-    })
+    CliError::Circuit(CircuitError::invalid_result_format(message))
 }

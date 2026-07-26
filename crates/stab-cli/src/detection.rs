@@ -351,9 +351,7 @@ fn observable_output_mode(append_observables: bool) -> DetectionObservableOutput
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::from(CircuitError::InvalidResultFormat {
-        message: message.into(),
-    })
+    CliError::from(CircuitError::invalid_result_format(message))
 }
 
 fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
@@ -472,13 +470,11 @@ impl<'a> M2dRecordStream<'a> {
                 continue;
             }
             let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-                CircuitError::InvalidResultFormat {
-                    message: format!(
-                        "{} record decoded into {} records",
-                        self.kind,
-                        records.len()
-                    ),
-                }
+                CircuitError::invalid_result_format(format!(
+                    "{} record decoded into {} records",
+                    self.kind,
+                    records.len()
+                ))
             })?;
             return Ok(Some(record));
         }
@@ -588,9 +584,10 @@ fn decode_single_m2d_record(
 ) -> Result<Vec<bool>, CliError> {
     let records = read_measurement_records(input, format, measurement_width)?;
     let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-        CircuitError::InvalidResultFormat {
-            message: format!("{kind} record decoded into {} records", records.len()),
-        }
+        CircuitError::invalid_result_format(format!(
+            "{kind} record decoded into {} records",
+            records.len()
+        ))
     })?;
     Ok(record)
 }

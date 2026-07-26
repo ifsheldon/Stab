@@ -518,9 +518,7 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             "cannot compile circuit sampler: unsupported gate",
         ),
         (
-            CircuitError::InvalidResultFormat {
-                message: "bad width".to_string(),
-            },
+            CircuitError::invalid_result_format("bad width"),
             "invalid result format data: bad width",
         ),
         (
@@ -565,7 +563,7 @@ fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
         | CircuitError::InvalidTableauConversion { .. }
         | CircuitError::InvalidCircuitSimplification { .. }
         | CircuitError::InvalidSamplerCompilation { .. }
-        | CircuitError::InvalidResultFormat { .. }
+        | CircuitError::InvalidResultFormat(_)
         | CircuitError::CircuitIo { .. }
         | CircuitError::InvalidDetectorErrorModel { .. }
         | CircuitError::UnterminatedRepeatBlock

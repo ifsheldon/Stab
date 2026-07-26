@@ -235,9 +235,7 @@ fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::from(CircuitError::InvalidResultFormat {
-        message: message.into(),
-    })
+    CliError::from(CircuitError::invalid_result_format(message))
 }
 
 fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
@@ -440,9 +438,10 @@ where
         }
         let records = read_measurement_records(&record_bytes, SampleFormat::B8, error_count)?;
         let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-            CircuitError::InvalidResultFormat {
-                message: format!("b8 replay record decoded into {} records", records.len()),
-            }
+            CircuitError::invalid_result_format(format!(
+                "b8 replay record decoded into {} records",
+                records.len()
+            ))
         })?;
         visit(&record)?;
     }
@@ -488,9 +487,10 @@ where
             continue;
         }
         let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
-            CircuitError::InvalidResultFormat {
-                message: format!("replay record decoded into {} records", records.len()),
-            }
+            CircuitError::invalid_result_format(format!(
+                "replay record decoded into {} records",
+                records.len()
+            ))
         })?;
         visit(&record)?;
         records_read += 1;
@@ -503,29 +503,31 @@ fn read_hits_replay_record(input: &[u8], error_count: usize) -> Result<Vec<bool>
     let mut record = None;
     for_each_sparse_record(input, SampleFormat::Hits, error_count, |hits| {
         if record.is_some() {
-            return Err(CircuitError::InvalidResultFormat {
-                message: "HITS replay line decoded into multiple records".to_string(),
-            });
+            return Err(CircuitError::invalid_result_format(
+                "HITS replay line decoded into multiple records",
+            ));
         }
         let mut decoded = vec![false; error_count];
         for hit in hits {
-            let index = usize::try_from(*hit).map_err(|_| CircuitError::InvalidResultFormat {
-                message: format!("HITS replay index {hit} does not fit usize"),
+            let index = usize::try_from(*hit).map_err(|_| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS replay index {hit} does not fit usize"
+                ))
             })?;
-            let bit = decoded
-                .get_mut(index)
-                .ok_or_else(|| CircuitError::InvalidResultFormat {
-                    message: format!("HITS replay index {index} exceeds error count {error_count}"),
-                })?;
+            let bit = decoded.get_mut(index).ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "HITS replay index {index} exceeds error count {error_count}"
+                ))
+            })?;
             *bit = true;
         }
         record = Some(decoded);
         Ok(())
     })?;
     record.ok_or_else(|| {
-        CliError::from(CircuitError::InvalidResultFormat {
-            message: "HITS replay line did not contain one record".to_string(),
-        })
+        CliError::from(CircuitError::invalid_result_format(
+            "HITS replay line did not contain one record",
+        ))
     })
 }
 
@@ -575,9 +577,9 @@ fn read_r8_replay_record(
         match reader.read(&mut byte) {
             Ok(0) if !read_any => return Ok(None),
             Ok(0) => {
-                return Err(CliError::from(CircuitError::InvalidResultFormat {
-                    message: "r8 input ended before record completed".to_string(),
-                }));
+                return Err(CliError::from(CircuitError::invalid_result_format(
+                    "r8 input ended before record completed",
+                )));
             }
             Ok(_) => {
                 read_any = true;
@@ -592,34 +594,34 @@ fn read_r8_replay_record(
 
         if byte[0] == u8::MAX {
             bit_index = bit_index.checked_add(usize::from(u8::MAX)).ok_or_else(|| {
-                CliError::from(CircuitError::InvalidResultFormat {
-                    message: "r8 run-length offset overflowed".to_string(),
-                })
+                CliError::from(CircuitError::invalid_result_format(
+                    "r8 run-length offset overflowed",
+                ))
             })?;
             if bit_index > bits_per_record {
-                return Err(CliError::from(CircuitError::InvalidResultFormat {
-                    message: "r8 run-length overshot record width".to_string(),
-                }));
+                return Err(CliError::from(CircuitError::invalid_result_format(
+                    "r8 run-length overshot record width",
+                )));
             }
             continue;
         }
         bit_index = bit_index.checked_add(usize::from(byte[0])).ok_or_else(|| {
-            CliError::from(CircuitError::InvalidResultFormat {
-                message: "r8 run-length offset overflowed".to_string(),
-            })
+            CliError::from(CircuitError::invalid_result_format(
+                "r8 run-length offset overflowed",
+            ))
         })?;
         if bit_index > bits_per_record {
-            return Err(CliError::from(CircuitError::InvalidResultFormat {
-                message: "r8 run-length overshot record width".to_string(),
-            }));
+            return Err(CliError::from(CircuitError::invalid_result_format(
+                "r8 run-length overshot record width",
+            )));
         }
         if bit_index == bits_per_record {
             return Ok(Some(record));
         }
         let Some(bit) = record.get_mut(bit_index) else {
-            return Err(CliError::from(CircuitError::InvalidResultFormat {
-                message: format!("r8 hit index {bit_index} exceeds record width {bits_per_record}"),
-            }));
+            return Err(CliError::from(CircuitError::invalid_result_format(
+                format!("r8 hit index {bit_index} exceeds record width {bits_per_record}"),
+            )));
         };
         *bit = true;
         bit_index += 1;
