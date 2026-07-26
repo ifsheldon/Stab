@@ -328,28 +328,49 @@ pub(crate) fn regenerate(
         }
         migration::check(root, &checked)?;
         println!("[{PREFIX}] performance qualification regeneration is clean");
-    } else if checked_bytes == normalized_bytes {
-        migration::check(root, &generated)?;
-        println!(
-            "[{PREFIX}] performance qualification semantics are unchanged; retained frozen checklist presentation"
-        );
     } else {
-        migration::check(root, &generated)?;
-        let bytes = render(&generated)?;
-        atomic_write(root, &checked_path, &bytes)?;
-        println!(
-            "[{PREFIX}] wrote {} checklist rows, {} public API items, {} groups, and {} manifest decisions",
-            generated.checklist_items.len(),
-            generated.public_api_items.len(),
-            generated.qualification_groups.len(),
-            generated.manifest_rows.len()
+        let unchanged = checked_bytes == normalized_bytes;
+        let retained = retained_regeneration_inventory(
+            &generated,
+            &normalized,
+            &checked_bytes,
+            &normalized_bytes,
         );
-        println!(
-            "[{PREFIX}] performance qualification digest {}",
-            generated.semantic_digest
-        );
+        migration::check(root, retained)?;
+        if unchanged {
+            println!(
+                "[{PREFIX}] performance qualification semantics are unchanged; retained frozen checklist presentation"
+            );
+        } else {
+            let bytes = render(&generated)?;
+            atomic_write(root, &checked_path, &bytes)?;
+            println!(
+                "[{PREFIX}] wrote {} checklist rows, {} public API items, {} groups, and {} manifest decisions",
+                generated.checklist_items.len(),
+                generated.public_api_items.len(),
+                generated.qualification_groups.len(),
+                generated.manifest_rows.len()
+            );
+            println!(
+                "[{PREFIX}] performance qualification digest {}",
+                generated.semantic_digest
+            );
+        }
     }
     Ok(())
+}
+
+fn retained_regeneration_inventory<'a>(
+    generated: &'a QualificationSuite,
+    normalized: &'a QualificationSuite,
+    checked_bytes: &[u8],
+    normalized_bytes: &[u8],
+) -> &'a QualificationSuite {
+    if checked_bytes == normalized_bytes {
+        normalized
+    } else {
+        generated
+    }
 }
 
 fn preserve_checked_checklist_presentation(
@@ -653,6 +674,35 @@ mod tests {
             .expect("normalize presentation");
 
         assert_eq!(generated, checked);
+    }
+
+    #[test]
+    fn unchanged_regeneration_validates_the_retained_normalized_identity() {
+        let checked = checked_suite();
+        let checked_bytes = render(&checked).expect("checked bytes");
+        let mut generated = checked.clone();
+        let item = generated
+            .checklist_items
+            .first_mut()
+            .expect("checked checklist item");
+        item.source_line += 17;
+        generated.semantic_digest =
+            discovery::semantic_digest(&generated).expect("transient generated digest");
+        let transient_digest = generated.semantic_digest.clone();
+        let mut normalized = generated.clone();
+        preserve_checked_checklist_presentation(&mut normalized, &checked)
+            .expect("normalize presentation");
+        let normalized_bytes = render(&normalized).expect("normalized bytes");
+
+        let retained = retained_regeneration_inventory(
+            &generated,
+            &normalized,
+            &checked_bytes,
+            &normalized_bytes,
+        );
+
+        assert_ne!(transient_digest, checked.semantic_digest);
+        assert_eq!(retained.semantic_digest, checked.semantic_digest);
     }
 
     #[test]
