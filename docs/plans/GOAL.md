@@ -12,24 +12,35 @@ Preserve implemented Stim v1.16.0 CLI and file-format compatibility while intent
 - Architecture contract: [../architecture/README.md](../architecture/README.md)
 - Feature state: [../stab-feature-checklist.md](../stab-feature-checklist.md)
 - Generated qualification state: [../qualification-status.md](../qualification-status.md)
-- Correctness contract: [comprehensive-correctness-qualification-plan.md](comprehensive-correctness-qualification-plan.md)
-- Performance contract: [comprehensive-stim-performance-qualification-plan.md](comprehensive-stim-performance-qualification-plan.md)
+- Qualification contracts: [correctness](comprehensive-correctness-qualification-plan.md) and [performance](comprehensive-stim-performance-qualification-plan.md)
 - Lessons: [lessons-learned.md](lessons-learned.md)
 
-Stop when these sources disagree.
-
-Fix the owning source and regenerate derived state instead of choosing the easiest interpretation.
+Stop when these sources disagree; fix the owning source and regenerate derived state.
 
 ## Current State
 
-- The pre-refactor repository checkpoint is `cfaa1098fe7d37512b71bd2f5974196bbcdb14b9`.
 - The accepted compatibility evidence revision is `68d107a42f655254f31628f0cbedc55479f6c0f3`.
-- The previous qualification-economy program is complete and historical.
-- Milestone A0 is active.
+- A0 and A1 are complete; the implementation checkpoint is `05a69aa3`.
+- Current correctness inventory: `eef15f812b10889de6572a25ec8bc3322b7dd075f15b8a470bab907277f7c383`.
+- Current performance inventory: `1b427ef982217037371714676f3572386f9d005b016e17c2fd2afd25dc2ba6ea`.
+- Formal evidence for these inventories has not started; see [the A1 closure and reviewer feedback](agent-native-modular-qec-progress-report.md).
+
+## Active Milestone
+
+Milestone A2 is active.
+
+Implement it in independently reviewable slices:
+
+1. Add the result-format diagnostic nucleus: `ByteSpan`, `DiagnosticSeverity`, and a domain `FormatError` with stable codes.
+2. Route materialized and streaming result readers through byte-aware diagnostics without changing accepted grammar or human CLI behavior.
+3. Add schema-version-1 CLI JSON rendering as an additive `--error-format` mode.
+4. Add operation-owned resource policies and estimates while preserving every current default limit and first rejection.
+5. Add `ModelFingerprint` and backend-neutral `CompilationRequestFingerprint`.
+6. Generate capabilities from current descriptors and add `capabilities`, `inspect`, and `plan sample`.
+
+Do not create a backend-bearing `PlanFingerprint` in A2. A4 owns it because selected backend and executable-contract identity do not exist until compilation.
 
 ## Execution Loop
-
-For each milestone:
 
 1. Read the complete milestone, linked contracts, and affected source before editing.
 2. Add or port meaningful tests that fail for the missing contract.
@@ -54,7 +65,13 @@ Do not defer a milestone defect merely because a later crate extraction could hi
 - Treat missing self-regression identities as unseeded, never passing.
 - Do not introduce dynamic Rust plugins, runtime gate registration, a placeholder GPU backend, or serialized compiled plans.
 - Preserve every historical evidence artifact and source identity.
+- Treat dirty benchmark comparisons as diagnostics only and record their exact baseline, source revision, run count, and local-modification state.
 
-## Completion
+## Immediate Verification
 
-The goal completes only when A0 through A9 satisfy their tests, benchmarks, acceptance criteria, audits, synchronized documentation, controlled AArch64 evidence, and `0.2.0` release requirements.
+```text
+cargo test -p stab-core result_format --quiet
+cargo test -p stab-cli error_format --quiet
+just qualification::correctness-regenerate --check
+just architecture::check
+```

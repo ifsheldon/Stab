@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-27 - A1: Namespace, Visitor, And Diagnostic Evidence Scope
+
+Status: Resolved
+Revealed by: milestone audit of the logical ownership implementation and its primary diagnostic comparison.
+Current text: A1 required `analysis` and `execution` namespaces, an advanced folded DEM visitor boundary, and the existing primary diagnostic comparison without enumerating namespace scope, visitor visibility, or evidence provenance.
+Gap: the milestone did not say whether every engine API needed an A1 namespace path, whether folded traversal was public, or which baseline, run count, artifact path, and dirty-worktree policy governed the diagnostic comparison.
+Proposed amendment: enumerate the A1 analysis and execution families, defer detection-converter and DEM-sampler namespace completion to A5, make the traversal crate-internal until A6, and require one warmed single-run comparison against the latest accepted clean baseline at a unique non-promotable path with provenance recorded.
+Resolution: the A1 task and benchmark text in `agent-native-modular-qec-architecture-plan.md` now states those exact boundaries.
+
 ## 2026-07-23 - Q7/Q8: Evidence Closure Versus Checklist Inventory Identity
 
 Status: Resolved

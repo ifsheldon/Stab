@@ -177,9 +177,13 @@ Estimation must not execute the expensive operation it describes.
 
 `ModelFingerprint` hashes the dialect identity, fingerprint schema, and canonical model bytes with SHA-256.
 
-`PlanFingerprint` hashes the model fingerprint, compiler schema, options, limits, selected backend, and executable-contract identity.
+`CompilationRequestFingerprint` hashes the model fingerprint, compiler schema, operation kind, normalized options, and effective limits before backend selection.
 
-Fingerprints are comparable only when their fingerprint schema and backend identity match.
+`PlanFingerprint` is completed in A4 after compilation and hashes the request fingerprint, selected backend, and executable-contract identity.
+
+Request fingerprints are comparable only when their fingerprint schema and operation kind match.
+
+Plan fingerprints are comparable only when their fingerprint schema and backend identity match.
 
 Compiled plans are not serializable.
 
@@ -337,13 +341,13 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 ### Tasks
 
 - Assign every current module to one logical model, bits, records, algebra, execution, analysis, or facade owner.
-- Introduce owning code namespaces in A1 where behavior moves across the current monolith, specifically `analysis` and `execution`; keep physical source and crate extraction exclusively in A6.
+- Introduce owning code namespaces in A1 where behavior moves across the current monolith, specifically `analysis` for gate projections and pure circuit or DEM transforms, and `execution` for compiled sampling, reference sampling, determined-measurement counting, and sampled-flow checks; keep physical source and crate extraction exclusively in A6, and defer detection-converter and DEM-sampler namespace completion to A5.
 - Preserve implementation behavior while changing internal ownership.
 - Remove algebra's dependency on `Gate`.
 - Move named-gate-to-tableau, flow, unitary, and decomposition conversion into semantic adapters that depend on both the model and algebra.
 - Move algorithmic `Circuit` conveniences out of the model implementation.
 - Move simulation-backed analysis helpers into execution.
-- Keep folded DEM traversal model-owned through a documented advanced visitor boundary used by analysis and execution.
+- Keep folded DEM traversal model-owned through a documented crate-internal advanced visitor boundary used by analysis and execution; A6 decides the minimum cross-crate visibility required during physical extraction.
 - Make execution depend on analysis lowering instead of duplicating gate semantic tables.
 - Add an `ops` Rust architecture checker backed by `cargo metadata`.
 - Expose it through `just architecture::check` and CI.
@@ -357,7 +361,7 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 
 ### Benchmarks
 
-- Run benchmark smoke and the existing primary diagnostic comparison.
+- Run benchmark smoke and one warmed, single-measurement-run primary diagnostic comparison against the latest accepted clean primary baseline, write it to a unique `target/benchmarks/` path, and record the baseline identity, source revision, and local-modification state; a dirty-worktree result is permitted only as non-promotable diagnostic evidence.
 - Do not create new timing rows for namespace-only moves.
 
 ### Done Criteria
@@ -374,7 +378,7 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 - Add exact byte spans to circuit, DEM, and result-format parse errors.
 - Move configurable constants into operation-owned policy defaults without changing values.
 - Add typed resource estimates with exact, upper-bound, and unknown classifications.
-- Add versioned model and plan fingerprints.
+- Add versioned model and backend-neutral compilation-request fingerprints.
 - Generate runtime capabilities from execution descriptors.
 - Add `--error-format=human|json`.
 - Add `stab capabilities`, `stab inspect`, and `stab plan sample` as documented Stab extensions.
@@ -386,13 +390,13 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 - Existing CLI error class, precedence, exit status, and path-safety behavior.
 - Exact old accepted maxima and first rejections under default policies.
 - Rejection of policy overflow and attempted semantic-limit overrides.
-- Fingerprint determinism, schema separation, canonical-input identity, and backend distinction.
+- Model and request fingerprint determinism, schema separation, canonical-input identity, operation distinction, and normalized-option identity.
 - Capability generation consistency with gate and compiler descriptors.
 
 ### Benchmarks
 
 - Measure successful parse and compile paths to ensure diagnostics do not add hot-path allocations.
-- Measure estimate and fingerprint generation separately from execution.
+- Measure estimate and model or request fingerprint generation separately from execution.
 
 ### Done Criteria
 
@@ -443,6 +447,7 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 - Introduce compiler, immutable plan, mutable session, random policy, run summary, sink finalization, and sink error composition.
 - Keep the executable IR private.
 - Select scalar or portable SIMD at compilation.
+- Complete the backend-bearing `PlanFingerprint` only after backend selection and bind it to the request fingerprint and executable-contract identity.
 - Reuse frames, RNG, reference samples, records, and output batches across calls.
 - Preserve direct-Z, small-frame, and general stabilizer-frame execution as private plan variants.
 - Make existing materialized and byte-returning conveniences thin adapters on the new path.
@@ -452,6 +457,7 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 ### Tests
 
 - Compilation and unsupported-capability diagnostics.
+- Plan-fingerprint determinism, schema separation, backend distinction, and executable-contract distinction.
 - Plan sharing across threads and session isolation.
 - Same-session chunking equivalence.
 - Zero-shot behavior.

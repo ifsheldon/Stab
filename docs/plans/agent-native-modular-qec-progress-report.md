@@ -1,0 +1,88 @@
+# Agent-Native Modular QEC Progress Report
+
+Current as of 2026-07-27.
+
+## Status
+
+- A0 architecture contract and baseline: complete.
+- A1 logical ownership and dependency enforcement: complete.
+- A2 diagnostics, resources, fingerprints, and capabilities: active.
+- Formal correctness and performance evidence for the current post-A1 inventories: not started.
+
+The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
+
+## A0 Foundation
+
+| Commit | Purpose |
+| --- | --- |
+| `4fc7c505` | Define the rationalized migration plan, target graph, ADRs, component contracts, and active execution goal. |
+| `b3104e69` | Add the Cargo-metadata architecture checker, `just architecture::check`, and CI enforcement. |
+| `c4c7555c` | Separate historical qualification checkpoints from the new architecture program. |
+
+The plan accepts the external review's compiler-style direction while rejecting unnecessary abstraction. Stab keeps a closed Stim dialect, a private executable IR, operation-specific policies, focused batch families, static hot-loop dispatch, and public extension traits only after two real implementations prove a useful common contract.
+
+## A1 Implementation
+
+| Commit | Purpose |
+| --- | --- |
+| `01ce5669` | Remove the algebra layer's dependency on the Stim gate model and establish semantic gate adapters. |
+| `220d27cd` | Move simulator-backed sampled-flow checks into execution ownership. |
+| `e5df8807` | Move determined-measurement counting into the circuit model facade and execution implementation. |
+| `102eb68a` | Validate the complete dependency graph, including optional features. |
+| `3097f42b` | Make performance regeneration validate the normalized inventory it actually retains. |
+| `aa93a9d4` | Test every ordered product dependency edge for normal, development, and build dependencies. |
+| `05a69aa3` | Establish public `analysis` and `execution` namespaces, model-owned folded DEM traversal, consumer-owned traversal policies, compatibility adapters, and exact qualification aliases. |
+
+Gate tableau, flow, unitary, and decomposition semantics now have one analysis owner. Pure circuit and DEM transforms are analysis-owned. Reference sampling, compiled sampling, determined-measurement counting, and sampled-flow checks are execution-owned. Existing root types, root functions that predated A1, and inherent methods remain compatible adapters.
+
+Folded DEM traversal remains model-owned and crate-internal. Its compact block identity is a deterministic traversal-local preorder index rather than a pointer address. Search, SAT, and ErrorMatcher retain their own policy caches so traversal does not absorb consumer-specific semantics.
+
+## Review Feedback And Repairs
+
+The milestone audit found that representative forbidden-edge fixtures did not prove the stated requirement to reject every forbidden edge. A1 now table-drives all product package pairs and all dependency kinds against the source-owned graph.
+
+The audit also found that the human migration ledger omitted execution-owned root movements. The ledger now covers `CompiledSampler`, `ReferenceSampleTree`, determined-measurement counting, and sampled-flow checking in addition to circuit, gate, and DEM adapters.
+
+Full-code-review found that the first namespace implementation accidentally added new root free functions for gate semantics, circuit transforms, and reference sampling. Those root additions were removed. Namespace functions now map directly to the pre-existing inherent-method evidence parents, avoiding an unplanned facade and qualification lifecycle.
+
+Exact public-API alias validation was added instead of relying on parent-name similarity. The checked ledger rejects self-aliases, chains, stale paths, feature mismatches, undeclared aliases, and attempts to use a parent alias to authorize an undeclared child.
+
+The audit exposed three genuine specification gaps: namespace completeness, folded-visitor visibility, and diagnostic benchmark provenance. The A1 contract now enumerates required namespaces, defers detection and DEM sampling namespace completion to A5, keeps folded traversal crate-internal until A6, and defines the exact diagnostic benchmark policy.
+
+## Qualification State
+
+- Correctness schema: 4.
+- Correctness inventory: 2,886 upstream cases, 2,159 public API items, and 1,759 evidence parents.
+- Correctness digest: `eef15f812b10889de6572a25ec8bc3322b7dd075f15b8a470bab907277f7c383`.
+- Performance schema: 3.
+- Performance inventory: 127 checklist rows, 2,159 public API items, 169 groups, and 161 inherited manifest decisions.
+- Performance digest: `1b427ef982217037371714676f3572386f9d005b016e17c2fd2afd25dc2ba6ea`.
+
+These identity changes make the previous formal evidence historical. No A1 result is being promoted as source-current formal qualification.
+
+## Verification
+
+The A1 closure passed:
+
+- `cargo fmt --all --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo test --workspace --quiet`
+- `RUSTDOCFLAGS='-D warnings' cargo doc -p stab-core --no-deps`
+- `cargo test -p stab-architecture --quiet`
+- `just architecture::check`
+- `just qualification::correctness-check`
+- `just qualification::correctness-regenerate --check`
+- `just bench::qualification-check`
+- `just bench::qualification-regenerate --check`
+- `just qualification::status --check`
+- `just bench::smoke`
+
+The primary diagnostic comparison is `target/benchmarks/a1-final-primary-compare`. It used accepted clean baseline `target/benchmarks/q8-final-f465b6f-primary-baseline/baseline.json`, one warmup, one measurement run, source revision `102eb68a0cad1211cda51b1b31fac926da919755`, and `local_modifications=true`. It measured 86 rows: 77 passed and nine were explicitly not comparable. The maximum comparable ratio was `1.25x`. This is diagnostic evidence only.
+
+## A2 Sequencing Feedback
+
+The original plan asked A2 to create a `PlanFingerprint` containing a selected backend, but backend selection is introduced in A4. Creating that identity in A2 would either invent a placeholder backend contract or require later semantic replacement.
+
+A2 therefore owns `ModelFingerprint` and backend-neutral `CompilationRequestFingerprint`. A4 completes `PlanFingerprint` after compilation can bind the selected backend and executable-contract identity. This keeps fingerprints honest and avoids designing around state that does not yet exist.
+
+The first A2 slice is the result-format diagnostic nucleus because the existing byte-oriented text grammar already has strong pinned-Stim coverage. It can establish stable codes and exact byte spans with low behavioral risk before circuit and DEM parsers acquire position-aware source cursors.
