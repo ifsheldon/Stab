@@ -5,7 +5,8 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 
 ## Contents
 
-- [plans/](plans/): milestone plans and progress reports. `plans/rust-stim-drop-in-rewrite.md` is the implementation roadmap, and `plans/GOAL.md` is the active execution contract for `plans/qualification-economy-regression-plan.md`.
+- [plans/](plans/): milestone plans and progress reports. `plans/GOAL.md` is the active execution contract for `plans/agent-native-modular-qec-architecture-plan.md`; the original rewrite and completed qualification plans remain historical sources.
+- [architecture/](architecture/): product dependency rules, compilation phases, extension seams, and architecture decision records.
 - [stab-feature-checklist.md](stab-feature-checklist.md): Stab feature availability against Stim v1.16.0.
 - [stim-feature-list.md](stim-feature-list.md): the upstream Stim v1.16.0 feature inventory that the checklist maps onto.
 - [qualification-status.md](qualification-status.md): generated current qualification counts, contract identities, and completion checkpoint.
