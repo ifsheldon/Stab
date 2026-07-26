@@ -2,6 +2,7 @@
 
 //! Core circuit, detector error model, and simulator primitives for Stab.
 
+pub mod analysis;
 pub mod bits;
 mod circuit;
 mod circuit_detecting_regions;
@@ -32,6 +33,7 @@ mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
 
+pub use analysis::single_qubit_clifford_for_gate;
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,

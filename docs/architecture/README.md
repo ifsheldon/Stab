@@ -6,6 +6,8 @@ The detailed migration sequence, tests, benchmarks, and release criteria live in
 
 The starting package graph and public inventory are frozen in [the pre-0.2 baseline](pre-0.2-api-baseline.md).
 
+Intentional public Rust API changes are tracked in [the Stab 0.2 API migration inventory](0.2-api-migration-inventory.md).
+
 ## Architectural Center
 
 ```text

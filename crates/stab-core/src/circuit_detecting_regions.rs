@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemDetectorId,
-    DemTarget, FlexPauliString, PauliBasis, SingleQubitClifford, Target,
+    DemTarget, FlexPauliString, PauliBasis, Target,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
@@ -327,7 +327,7 @@ fn validate_supported_subset_inner(
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
+    if crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
         return validate_single_plain_qubit_targets(instruction);
     }
     if is_feedback_capable_controlled_pauli(instruction.gate().canonical_name()) {

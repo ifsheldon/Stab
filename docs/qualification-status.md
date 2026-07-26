@@ -5,7 +5,7 @@ This dashboard is generated from the checked correctness inventory, performance 
 
 ## Current Checkpoint
 
-Formal repaired-contract completion: scope `dem-r6` at `68d107a42f655254f31628f0cbedc55479f6c0f3` on `aarch64` (`target/benchmarks/qualification/q8-68d107a-dem-r6-completion`), report `48b858ddced6f6f77f4d57c5f985ce11fd1dcd88133b0c5ab70f52832472c967`, Stim parity `passed`, Stab regression `unseeded`.
+Formal completion for the current inventories: **not started**. The latest historical checkpoint is scope `dem-r6` at `68d107a42f655254f31628f0cbedc55479f6c0f3` on `aarch64` (`target/benchmarks/qualification/q8-68d107a-dem-r6-completion`), report `48b858ddced6f6f77f4d57c5f985ce11fd1dcd88133b0c5ab70f52832472c967`, with correctness inventory `7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced996087f5714c72699645c7b` and performance inventory `2ff0f012fa9d17b272e2afeecbe69fded8f38b099647a6e9191dbfe21e1d6776`.
 
 ## Inventory
 
@@ -22,11 +22,11 @@ Formal repaired-contract completion: scope `dem-r6` at `68d107a42f655254f31628f0
 
 ## Contract Identities
 
-- Correctness inventory: `7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced996087f5714c72699645c7b`
-- Performance inventory: `2ff0f012fa9d17b272e2afeecbe69fded8f38b099647a6e9191dbfe21e1d6776`
-- Stim parity policy: `d7717f759135a29053e7ee62abf431b399663c7a9f5ebeb3651594847dcbe59e`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
+- Correctness inventory: `d26a49df7664a8c764c06cad767d4723e784e5718b648fabc65eaf5829fe12c7`
+- Performance inventory: `e859ec031296294bda95919c83a013933600631460ebb5f306b82b04bcbbaf4e`
+- Stim parity policy: `11a1fe5a64ff41588916cf053fa7799011583bc25523576c998ae7317cdd8e88`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `b39962aa7adae87eeb179c327a703b2609c51bf7e81aa635afc1662061b4bc6c`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `755e3b965bfd78093210d90e04b5bce90878bc0c34cbfcff8cd8460414fb7888`; missing identities are unseeded, never passing.
 
 ## Interpretation
 

@@ -7359,7 +7359,7 @@
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::SingleQubitClifford::from_gate"
+          "owner_path": "stab_core::single_qubit_clifford_for_gate"
         },
         {
           "crate_name": "stab_core",
@@ -7379,7 +7379,7 @@
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::from_gate"
+          "owner_path": "stab_core::analysis::single_qubit_clifford_for_gate"
         },
         {
           "crate_name": "stab_core",

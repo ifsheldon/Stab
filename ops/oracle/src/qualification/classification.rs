@@ -377,7 +377,11 @@ pub(super) fn classify_public_api_source(
         return Some(FeatureId::GateContract);
     }
     if value.starts_with("crates/stab-core/src/stabilizers/")
-        || value == "crates/stab-core/src/circuit_tableau.rs"
+        || matches!(
+            value.as_str(),
+            "crates/stab-core/src/analysis/gate_semantics.rs"
+                | "crates/stab-core/src/circuit_tableau.rs"
+        )
     {
         return Some(FeatureId::Algebra);
     }

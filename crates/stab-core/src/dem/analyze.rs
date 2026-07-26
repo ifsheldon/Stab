@@ -195,7 +195,7 @@ impl Analyzer {
             "SHIFT_COORDS" => self.shift_coordinates(instruction),
             "TICK" | "QUBIT_COORDS" => Ok(()),
             name => {
-                if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
+                if let Ok(clifford) = crate::single_qubit_clifford_for_gate(instruction.gate()) {
                     self.apply_single_qubit_clifford(instruction, clifford)
                 } else if is_noise_instruction(name) {
                     Err(CircuitError::invalid_detector_error_model(format!(

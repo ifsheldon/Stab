@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced996087f5714c72699645c7b",
+  "semantic_digest": "d26a49df7664a8c764c06cad767d4723e784e5718b648fabc65eaf5829fe12c7",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -60793,7 +60793,7 @@
       "path": "stab_core::CliffordString",
       "kind": "struct",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 359,
+      "source_line": 319,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60806,7 +60806,7 @@
       "path": "stab_core::CliffordString as Clone for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60819,7 +60819,7 @@
       "path": "stab_core::CliffordString as Debug for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60832,7 +60832,7 @@
       "path": "stab_core::CliffordString as Display for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 649,
+      "source_line": 609,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60845,7 +60845,7 @@
       "path": "stab_core::CliffordString as Eq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60858,7 +60858,7 @@
       "path": "stab_core::CliffordString as PartialEq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60871,7 +60871,7 @@
       "path": "stab_core::CliffordString as StructuralPartialEq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60884,7 +60884,7 @@
       "path": "stab_core::CliffordString::concat",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 522,
+      "source_line": 482,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60897,7 +60897,7 @@
       "path": "stab_core::CliffordString::from_gates",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 390,
+      "source_line": 350,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60910,7 +60910,7 @@
       "path": "stab_core::CliffordString::gate_at",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 451,
+      "source_line": 411,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60923,7 +60923,7 @@
       "path": "stab_core::CliffordString::identity",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 371,
+      "source_line": 331,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60936,7 +60936,7 @@
       "path": "stab_core::CliffordString::is_empty",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 447,
+      "source_line": 407,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60949,7 +60949,7 @@
       "path": "stab_core::CliffordString::len",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 443,
+      "source_line": 403,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60962,7 +60962,7 @@
       "path": "stab_core::CliffordString::multiply",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 561,
+      "source_line": 521,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60975,7 +60975,7 @@
       "path": "stab_core::CliffordString::random",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 434,
+      "source_line": 394,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -60988,7 +60988,7 @@
       "path": "stab_core::CliffordString::randomize",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 486,
+      "source_line": 446,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -61001,7 +61001,7 @@
       "path": "stab_core::CliffordString::repeat",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 538,
+      "source_line": 498,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -61014,7 +61014,7 @@
       "path": "stab_core::CliffordString::right_multiply_in_place",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 572,
+      "source_line": 532,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -61027,7 +61027,7 @@
       "path": "stab_core::CliffordString::set_gate_at",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 464,
+      "source_line": 424,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -72101,7 +72101,7 @@
       "path": "stab_core::SingleQubitClifford as Display for@a69a0e9e6301",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 352,
+      "source_line": 312,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -72141,19 +72141,6 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
       "source_line": 46,
-      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
-      "performance_groups": [
-        "PERF-STABILIZER-ALGEBRA"
-      ]
-    },
-    {
-      "id": "cq-api-item-b0b93b9702752125",
-      "feature_id": "CQ-ALGEBRA",
-      "crate_name": "stab_core",
-      "path": "stab_core::SingleQubitClifford as TryFrom@7b9e76d70468 for@a69a0e9e6301",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 344,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -72491,19 +72478,6 @@
       "path": "stab_core::SingleQubitClifford::canonical_name",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 150,
-      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
-      "performance_groups": [
-        "PERF-STABILIZER-ALGEBRA"
-      ]
-    },
-    {
-      "id": "cq-api-item-ed13c2a1b45b6d7e",
-      "feature_id": "CQ-ALGEBRA",
-      "crate_name": "stab_core",
-      "path": "stab_core::SingleQubitClifford::from_gate",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
       "source_line": 118,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
@@ -72517,7 +72491,7 @@
       "path": "stab_core::SingleQubitClifford::multiply",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 208,
+      "source_line": 176,
       "owner_case_id": "cq-evidence-qualification-ae9390dd6a207cb6",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -72543,7 +72517,7 @@
       "path": "stab_core::SingleQubitClifford::token",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 179,
+      "source_line": 147,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -75933,6 +75907,19 @@
       ]
     },
     {
+      "id": "cq-api-item-fc33291f9c4c7130",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_core",
+      "path": "stab_core::analysis::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "source_path": "crates/stab-core/src/analysis/gate_semantics.rs",
+      "source_line": 7,
+      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
       "id": "cq-api-item-28247e83880f09c4",
       "feature_id": "CQ-SAMPLING",
       "crate_name": "stab_core",
@@ -77941,7 +77928,7 @@
       "path": "stab_core::circuit_to_tableau",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_tableau.rs",
-      "source_line": 8,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80002,6 +79989,19 @@
       ]
     },
     {
+      "id": "cq-api-item-5d3730fd2146a0e2",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_core",
+      "path": "stab_core::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "source_path": "crates/stab-core/src/analysis/gate_semantics.rs",
+      "source_line": 7,
+      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
       "id": "cq-api-item-99d84220dff859ac",
       "feature_id": "CQ-FLOW-UTILS",
       "crate_name": "stab_core",
@@ -80021,7 +80021,7 @@
       "path": "stab_core::stabilizers::CliffordString",
       "kind": "struct",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 359,
+      "source_line": 319,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80034,7 +80034,7 @@
       "path": "stab_core::stabilizers::CliffordString as Clone for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80047,7 +80047,7 @@
       "path": "stab_core::stabilizers::CliffordString as Debug for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80060,7 +80060,7 @@
       "path": "stab_core::stabilizers::CliffordString as Display for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 649,
+      "source_line": 609,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80073,7 +80073,7 @@
       "path": "stab_core::stabilizers::CliffordString as Eq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80086,7 +80086,7 @@
       "path": "stab_core::stabilizers::CliffordString as PartialEq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80099,7 +80099,7 @@
       "path": "stab_core::stabilizers::CliffordString as StructuralPartialEq for@b52a56f65946",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 358,
+      "source_line": 318,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80112,7 +80112,7 @@
       "path": "stab_core::stabilizers::CliffordString::concat",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 522,
+      "source_line": 482,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80125,7 +80125,7 @@
       "path": "stab_core::stabilizers::CliffordString::from_gates",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 390,
+      "source_line": 350,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80138,7 +80138,7 @@
       "path": "stab_core::stabilizers::CliffordString::gate_at",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 451,
+      "source_line": 411,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80151,7 +80151,7 @@
       "path": "stab_core::stabilizers::CliffordString::identity",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 371,
+      "source_line": 331,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80164,7 +80164,7 @@
       "path": "stab_core::stabilizers::CliffordString::is_empty",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 447,
+      "source_line": 407,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80177,7 +80177,7 @@
       "path": "stab_core::stabilizers::CliffordString::len",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 443,
+      "source_line": 403,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80190,7 +80190,7 @@
       "path": "stab_core::stabilizers::CliffordString::multiply",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 561,
+      "source_line": 521,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80203,7 +80203,7 @@
       "path": "stab_core::stabilizers::CliffordString::random",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 434,
+      "source_line": 394,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80216,7 +80216,7 @@
       "path": "stab_core::stabilizers::CliffordString::randomize",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 486,
+      "source_line": 446,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80229,7 +80229,7 @@
       "path": "stab_core::stabilizers::CliffordString::repeat",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 538,
+      "source_line": 498,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80242,7 +80242,7 @@
       "path": "stab_core::stabilizers::CliffordString::right_multiply_in_place",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 572,
+      "source_line": 532,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -80255,7 +80255,7 @@
       "path": "stab_core::stabilizers::CliffordString::set_gate_at",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 464,
+      "source_line": 424,
       "owner_case_id": "cq-evidence-qualification-510e746ec36e7d1c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -82127,7 +82127,7 @@
       "path": "stab_core::stabilizers::SingleQubitClifford as Display for@a69a0e9e6301",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 352,
+      "source_line": 312,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -82167,19 +82167,6 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
       "source_line": 46,
-      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
-      "performance_groups": [
-        "PERF-STABILIZER-ALGEBRA"
-      ]
-    },
-    {
-      "id": "cq-api-item-8d7fdae799e828f8",
-      "feature_id": "CQ-ALGEBRA",
-      "crate_name": "stab_core",
-      "path": "stab_core::stabilizers::SingleQubitClifford as TryFrom@7b9e76d70468 for@a69a0e9e6301",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 344,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -82517,19 +82504,6 @@
       "path": "stab_core::stabilizers::SingleQubitClifford::canonical_name",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 150,
-      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
-      "performance_groups": [
-        "PERF-STABILIZER-ALGEBRA"
-      ]
-    },
-    {
-      "id": "cq-api-item-03d84ee2c1acdb95",
-      "feature_id": "CQ-ALGEBRA",
-      "crate_name": "stab_core",
-      "path": "stab_core::stabilizers::SingleQubitClifford::from_gate",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
       "source_line": 118,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
@@ -82543,7 +82517,7 @@
       "path": "stab_core::stabilizers::SingleQubitClifford::multiply",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 208,
+      "source_line": 176,
       "owner_case_id": "cq-evidence-qualification-ae9390dd6a207cb6",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -82569,7 +82543,7 @@
       "path": "stab_core::stabilizers::SingleQubitClifford::token",
       "kind": "method",
       "source_path": "crates/stab-core/src/stabilizers/clifford.rs",
-      "source_line": 179,
+      "source_line": 147,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -103436,7 +103410,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-core/tests/stabilizers.rs",
-          "corpus_sha256": "277f305dc5d6bcbd1b6b7d37d2a436e65cd10b2d92e4764aba27f96980448c81",
+          "corpus_sha256": "c08017e1e326bf03a5c36386e6a555515627e81487f302135d51760b10511a33",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }

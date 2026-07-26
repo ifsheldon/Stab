@@ -1,7 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    PauliBasis, PauliSign, PauliString, QubitId, SingleQubitClifford, StabilizerResource, Tableau,
-    Target,
+    PauliBasis, PauliSign, PauliString, QubitId, StabilizerResource, Tableau, Target,
 };
 
 /// Converts a circuit after checking its dense Tableau width before materialization.
@@ -236,7 +235,7 @@ fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> CircuitResult<Vec<Qu
 
 pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
     if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && let Ok(clifford) = SingleQubitClifford::from_gate(gate)
+        && let Ok(clifford) = crate::single_qubit_clifford_for_gate(gate)
     {
         return Ok(clifford.tableau());
     }
@@ -251,7 +250,7 @@ pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
 
 pub(crate) fn gate_has_tableau(gate_name: &str) -> bool {
     if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && SingleQubitClifford::from_gate(gate).is_ok()
+        && crate::single_qubit_clifford_for_gate(gate).is_ok()
     {
         return true;
     }

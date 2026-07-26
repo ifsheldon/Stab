@@ -304,7 +304,8 @@ fn append_decomposed_spp(
         append_single_target_sequence(
             result,
             &shortest_single_qubit_base_sequence(
-                SingleQubitClifford::from_gate(phase_gate).map_err(stabilizer_to_simplify_error)?,
+                crate::single_qubit_clifford_for_gate(phase_gate)
+                    .map_err(stabilizer_to_simplify_error)?,
             )?,
             Target::qubit(
                 product
@@ -354,7 +355,7 @@ fn append_basis_change(
         Pauli::Y => append_single_target_sequence(
             result,
             &shortest_single_qubit_base_sequence(
-                SingleQubitClifford::from_gate(Gate::from_name("H_YZ")?)
+                crate::single_qubit_clifford_for_gate(Gate::from_name("H_YZ")?)
                     .map_err(stabilizer_to_simplify_error)?,
             )?,
             Target::qubit(term.qubit, false),
@@ -477,7 +478,8 @@ fn single_qubit_base_decomposition(gate: Gate) -> CircuitResult<Option<Vec<Gate>
     ) {
         return Ok(None);
     }
-    let clifford = SingleQubitClifford::from_gate(gate).map_err(stabilizer_to_simplify_error)?;
+    let clifford =
+        crate::single_qubit_clifford_for_gate(gate).map_err(stabilizer_to_simplify_error)?;
     shortest_single_qubit_base_sequence(clifford).map(Some)
 }
 
@@ -512,13 +514,13 @@ fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> Circuit
     let target = clifford.tableau();
     let h = (
         Gate::from_name("H")?,
-        SingleQubitClifford::from_gate(Gate::from_name("H")?)
+        crate::single_qubit_clifford_for_gate(Gate::from_name("H")?)
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );
     let s = (
         Gate::from_name("S")?,
-        SingleQubitClifford::from_gate(Gate::from_name("S")?)
+        crate::single_qubit_clifford_for_gate(Gate::from_name("S")?)
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );

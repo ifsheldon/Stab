@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
-    RepeatBlock, SingleQubitClifford, Target,
+    RepeatBlock, Target,
 };
 
 use super::{SparseReverseFrameTracker, qubit_index, replace_qubit_set, toggle_targets};
@@ -259,7 +259,7 @@ fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
 }
 
 fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
-    if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
+    if crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
         return has_plain_qubit_groups(instruction, 1);
     }
     instruction.gate().is_two_qubit_gate()
@@ -373,7 +373,7 @@ mod tests {
     )]
 
     use super::*;
-    use crate::Gate;
+    use crate::{Gate, SingleQubitClifford};
 
     const FIXED_TWO_QUBIT_TABLEAU_GATES: &[&str] = &[
         "II",

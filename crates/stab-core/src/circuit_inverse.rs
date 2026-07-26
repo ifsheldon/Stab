@@ -1,7 +1,7 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, StabilizerResource,
-    Tableau, Target, circuit_flow::check_unsigned_flows_with_sparse_tracker,
+    PauliBasis, PauliSign, PauliString, RepeatBlock, StabilizerResource, Tableau, Target,
+    circuit_flow::check_unsigned_flows_with_sparse_tracker,
 };
 
 mod qec;
@@ -319,7 +319,7 @@ fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
 }
 
 fn sparse_tracker_supports_folded_instruction(instruction: &CircuitInstruction) -> bool {
-    SingleQubitClifford::from_gate(instruction.gate()).is_ok()
+    crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok()
         || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
 }
 

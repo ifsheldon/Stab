@@ -60,6 +60,14 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
+            Path::new("crates/stab-core/src/analysis/gate_semantics.rs"),
+            "stab_core::analysis::single_qubit_clifford_for_gate",
+        ),
+        Some(FeatureId::Algebra)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
             Path::new("crates/stab-core/src/ids.rs"),
             "stab_core::DemRepeatCount",
         ),

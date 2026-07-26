@@ -12,7 +12,7 @@ use rand::rngs::SmallRng;
 use stab_core::{
     BitError, CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, Gate, PauliBasis,
     PauliPhase, PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
-    StabilizerResult,
+    StabilizerResult, single_qubit_clifford_for_gate,
 };
 
 const STIM_ALL_CLIFFORDS_ORDER: [SingleQubitClifford; 24] = [
@@ -259,15 +259,14 @@ fn cq2_algebra_single_qubit_clifford_contract_covers_values_and_names() {
         assert!(tokens.insert(value.token()));
         assert_eq!(value.to_string(), value.token());
         let gate = Gate::from_name(value.canonical_name()).expect("canonical gate");
-        assert_eq!(SingleQubitClifford::from_gate(gate), Ok(value));
-        assert_eq!(SingleQubitClifford::try_from(gate), Ok(value));
+        assert_eq!(single_qubit_clifford_for_gate(gate), Ok(value));
     }
     assert_eq!(canonical_names.len(), 24);
     assert_eq!(tokens.len(), 24);
 
     let cx = Gate::from_name("CX").expect("CX gate");
     assert_eq!(
-        SingleQubitClifford::from_gate(cx),
+        single_qubit_clifford_for_gate(cx),
         Err(StabilizerError::InvalidSingleQubitCliffordGate {
             gate: "CX".to_owned(),
         })

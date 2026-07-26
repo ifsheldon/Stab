@@ -12,7 +12,7 @@ use rand::rngs::SmallRng;
 use stab_core::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
-    unitary_to_tableau,
+    single_qubit_clifford_for_gate, unitary_to_tableau,
 };
 
 #[test]
@@ -436,11 +436,11 @@ fn stabilizers_single_qubit_clifford_gate_conversion_matches_stim() {
     for gate in SingleQubitClifford::all() {
         let parsed_gate = Gate::from_name(gate.canonical_name()).expect("single-qubit gate name");
         assert_eq!(
-            SingleQubitClifford::from_gate(parsed_gate).expect("single-qubit Clifford"),
+            single_qubit_clifford_for_gate(parsed_gate).expect("single-qubit Clifford"),
             gate
         );
     }
-    assert!(SingleQubitClifford::from_gate(Gate::from_name("CX").expect("CX")).is_err());
+    assert!(single_qubit_clifford_for_gate(Gate::from_name("CX").expect("CX")).is_err());
 }
 
 #[test]

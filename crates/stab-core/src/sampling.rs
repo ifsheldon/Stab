@@ -6,7 +6,7 @@ use self::operation::SampleOperation;
 use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    MeasureRecordOffset, Pauli, PauliBasis, SampleFormat, SingleQubitClifford,
+    MeasureRecordOffset, Pauli, PauliBasis, SampleFormat,
     result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
@@ -535,7 +535,7 @@ fn compile_instruction(
             compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y)
         }
         "CZ" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Z),
-        _ if SingleQubitClifford::from_gate(gate).is_ok() => {
+        _ if crate::single_qubit_clifford_for_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
         }
         _ if crate::circuit_tableau::gate_tableau(gate.canonical_name()).is_ok() => {
@@ -977,7 +977,7 @@ fn compile_single_qubit_clifford(
         return Ok(());
     }
 
-    let clifford = SingleQubitClifford::from_gate(instruction.gate())
+    let clifford = crate::single_qubit_clifford_for_gate(instruction.gate())
         .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
     let transform = LocalTableauTransform::from_tableau(&clifford.tableau())?;
     for target in instruction.targets() {

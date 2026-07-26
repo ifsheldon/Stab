@@ -8,7 +8,7 @@ use super::{
 use crate::bits::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
 };
-use crate::{BitError, BitVec, Gate};
+use crate::{BitError, BitVec};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct SignedPauli {
@@ -113,38 +113,6 @@ impl SingleQubitClifford {
             .get(index)
             .copied()
             .unwrap_or(Self::I)
-    }
-
-    pub fn from_gate(gate: Gate) -> StabilizerResult<Self> {
-        match gate.canonical_name() {
-            "I" => Ok(Self::I),
-            "X" => Ok(Self::X),
-            "Y" => Ok(Self::Y),
-            "Z" => Ok(Self::Z),
-            "H" => Ok(Self::H),
-            "SQRT_Y_DAG" => Ok(Self::SqrtYDag),
-            "H_NXZ" => Ok(Self::Hnxz),
-            "SQRT_Y" => Ok(Self::SqrtY),
-            "S" => Ok(Self::S),
-            "H_XY" => Ok(Self::Hxy),
-            "H_NXY" => Ok(Self::Hnxy),
-            "S_DAG" => Ok(Self::SDag),
-            "SQRT_X_DAG" => Ok(Self::SqrtXDag),
-            "SQRT_X" => Ok(Self::SqrtX),
-            "H_NYZ" => Ok(Self::Hnyz),
-            "H_YZ" => Ok(Self::Hyz),
-            "C_XYZ" => Ok(Self::Cxyz),
-            "C_XYNZ" => Ok(Self::Cxynz),
-            "C_NXYZ" => Ok(Self::Cnxyz),
-            "C_XNYZ" => Ok(Self::Cxnyz),
-            "C_ZYX" => Ok(Self::Czyx),
-            "C_ZNYX" => Ok(Self::Cznyx),
-            "C_NZYX" => Ok(Self::Cnzyx),
-            "C_ZYNX" => Ok(Self::Czynx),
-            _ => Err(StabilizerError::InvalidSingleQubitCliffordGate {
-                gate: gate.canonical_name().to_owned(),
-            }),
-        }
     }
 
     pub fn canonical_name(self) -> &'static str {
@@ -338,14 +306,6 @@ impl SingleQubitClifford {
         };
         let phase = input.sign.to_phase().multiply(output.sign.to_phase());
         SignedPauli::try_from_phase_and_basis(phase, output.basis)
-    }
-}
-
-impl TryFrom<Gate> for SingleQubitClifford {
-    type Error = StabilizerError;
-
-    fn try_from(value: Gate) -> Result<Self, Self::Error> {
-        Self::from_gate(value)
     }
 }
 
