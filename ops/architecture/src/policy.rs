@@ -224,7 +224,7 @@ fn is_permitted_product_edge(from: &str, to: &str) -> bool {
         "stab-analysis" => matches!(to, "stab-model" | "stab-algebra"),
         "stab-engine" => matches!(
             to,
-            "stab-model" | "stab-records" | "stab-analysis" | "stab-kernels-simd"
+            "stab-model" | "stab-records" | "stab-algebra" | "stab-analysis" | "stab-kernels-simd"
         ),
         "stab-decoder" => matches!(to, "stab-model" | "stab-records"),
         "stab-core" => KNOWN_PRODUCT_PACKAGES

@@ -22,6 +22,7 @@
     { "from": "stab-analysis", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-model", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-records", "kind": "normal" },
+    { "from": "stab-engine", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-analysis", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-kernels-simd", "kind": "normal" },
     { "from": "stab-decoder", "to": "stab-model", "kind": "normal" },

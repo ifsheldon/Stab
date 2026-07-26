@@ -1,0 +1,13 @@
+[package]
+name = "stab-model"
+edition.workspace = true
+version.workspace = true
+
+[features]
+execution-leak = ["dep:stab-engine"]
+
+[dependencies]
+stab-engine = { path = "../stab-engine", optional = true }
+
+[lib]
+path = "src/lib.rs"

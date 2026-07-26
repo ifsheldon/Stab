@@ -67,7 +67,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-analysis + stab-kernels-simd
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-kernels-simd
 stab-decoder -> stab-model + stab-records
 stab-core -> all product components
 stab-cli -> stab-core
@@ -78,7 +78,7 @@ product crates -X-> ops
 
 The repository enforces these edges through `just architecture::check`.
 
-The checker classifies workspace packages from their repository paths, validates every workspace dependency edge from Cargo metadata, and rejects product dependencies on operational crates.
+The checker classifies workspace packages from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects product dependencies on operational crates.
 
 During the pre-0.2 migration it reports four exact temporary allowances instead of hiding them: the dev-only `stab-core` and `stab-cli` dependencies on `stab-compat-corpus`, plus direct portable-SIMD use in `crates/stab-core/src/bits/simd.rs` and `crates/stab-core/src/bits/clifford.rs`.
 

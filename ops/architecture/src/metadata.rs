@@ -9,7 +9,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
     let metadata = MetadataCommand::new()
         .current_dir(root)
         .manifest_path(root.join("Cargo.toml"))
-        .other_options(vec!["--locked".to_owned()])
+        .other_options(metadata_options())
         .exec()?;
     let metadata_root =
         std::fs::canonicalize(metadata.workspace_root.as_std_path()).map_err(|source| {
@@ -99,6 +99,10 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
     })
 }
 
+fn metadata_options() -> Vec<String> {
+    vec!["--locked".to_owned(), "--all-features".to_owned()]
+}
+
 fn package_name(
     package_names: &BTreeMap<PackageId, String>,
     id: &PackageId,
@@ -147,5 +151,23 @@ mod tests {
             relative_path: std::path::PathBuf::from("crates/stab-core"),
         };
         assert_eq!(package.relative_path, Path::new("crates/stab-core"));
+    }
+
+    #[test]
+    fn metadata_exposes_forbidden_optional_product_edges() {
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/optional-edge-workspace");
+        let graph = load_workspace_graph(&root).expect("load optional-edge fixture");
+
+        assert!(graph.edges.iter().any(|edge| {
+            edge.from == "stab-model"
+                && edge.to == "stab-engine"
+                && edge.kind == DependencyKind::Normal
+        }));
+        let report = crate::policy::validate_graph(&graph);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == "forbidden-product-edge"
+                && violation.message.contains("stab-model -> stab-engine")
+        }));
     }
 }

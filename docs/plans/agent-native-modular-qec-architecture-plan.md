@@ -49,6 +49,7 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 
 - The claim that models own algorithms is directionally correct at the API boundary, but many `Circuit` methods already delegate to free-function implementations.
 - The migration therefore separates enforceable ownership and dependencies instead of rewriting algorithms that are already internally separated.
+- Logical ownership is established before physical crate extraction so dependency cycles and public replacements are resolved while behavior still has one compilation boundary; A6 performs the mechanical extraction only after those seams are tested.
 - One universal `RecordBatch` would erase meaningful differences between measurements, typed `M` or `D` or `L` records, detector-observable pairs, sparse records, and 64-shot bit planes.
 - Stab will define focused batch families over shared packed storage instead.
 - A global `ResourcePolicy` would become another broad configuration object.
@@ -108,7 +109,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-analysis + stab-kernels-simd
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-kernels-simd
 stab-decoder -> stab-model + stab-records
 stab-core -> all product components
 stab-cli -> stab-core
@@ -335,7 +336,8 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 
 ### Tasks
 
-- Reorganize current modules under logical model, algebra, records, execution, and analysis namespaces.
+- Assign every current module to one logical model, bits, records, algebra, execution, analysis, or facade owner.
+- Introduce owning code namespaces in A1 where behavior moves across the current monolith, specifically `analysis` and `execution`; keep physical source and crate extraction exclusively in A6.
 - Preserve implementation behavior while changing internal ownership.
 - Remove algebra's dependency on `Gate`.
 - Move named-gate-to-tableau, flow, unitary, and decomposition conversion into semantic adapters that depend on both the model and algebra.
