@@ -707,7 +707,7 @@ impl ConversionPlan {
     }
 
     fn add_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        let measurement_count = instruction_measurement_count(instruction);
+        let measurement_count = instruction.measurement_result_count();
         self.measurement_count = self
             .measurement_count
             .checked_add(measurement_count)
@@ -876,22 +876,6 @@ fn observable_records_as_bits(output: &DetectionConversionOutput) -> CircuitResu
             Ok(record.observables.clone())
         })
         .collect()
-}
-
-pub(crate) fn instruction_measurement_count(instruction: &CircuitInstruction) -> usize {
-    match instruction.gate().canonical_name() {
-        "M"
-        | "MX"
-        | "MY"
-        | "MR"
-        | "MRX"
-        | "MRY"
-        | "MPAD"
-        | "HERALDED_ERASE"
-        | "HERALDED_PAULI_CHANNEL_1" => instruction.targets().len(),
-        "MXX" | "MYY" | "MZZ" | "MPP" => instruction.target_groups().len(),
-        _ => 0,
-    }
 }
 
 fn parity_of_terms(

@@ -36,6 +36,22 @@ impl CircuitItem {
 }
 
 impl CircuitInstruction {
+    pub(crate) fn measurement_result_count(&self) -> usize {
+        match self.gate.canonical_name() {
+            "M"
+            | "MX"
+            | "MY"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MPAD"
+            | "HERALDED_ERASE"
+            | "HERALDED_PAULI_CHANNEL_1" => self.targets.len(),
+            "MXX" | "MYY" | "MZZ" | "MPP" => self.target_groups().len(),
+            _ => 0,
+        }
+    }
+
     fn count_qubits(&self) -> usize {
         self.targets
             .iter()

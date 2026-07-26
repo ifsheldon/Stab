@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Gate,
     GateCategory, MeasureRecordOffset, Pauli, RepeatBlock, RepeatCount, Target,
-    detection::instruction_measurement_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const MAX_FEEDBACK_REPEAT_COUNT: u64 = 100_000;
@@ -243,7 +243,7 @@ impl WithoutFeedbackHelper {
             match item {
                 CircuitItem::Instruction(instruction) => {
                     *measurements_in_past = measurements_in_past
-                        .checked_add(instruction_measurement_count(instruction))
+                        .checked_add(instruction.measurement_result_count())
                         .ok_or_else(|| {
                             CircuitError::invalid_detector_error_model(
                                 "measurement count overflowed while building feedback-free circuit",
