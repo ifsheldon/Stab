@@ -96,6 +96,26 @@ fn record_codec_descriptors_are_unique_and_structurally_truthful() {
     assert_eq!(RecordFormat::Ptb64.encoding(), RecordEncoding::BitPlane64);
     assert_eq!(RecordFormat::ZeroOne.records_per_group(), 1);
     assert_eq!(RecordFormat::Ptb64.records_per_group(), 64);
+    assert_eq!(
+        RecordFormat::ZeroOne.estimate_output_bytes(3, 9),
+        Estimate::Exact(30)
+    );
+    assert_eq!(
+        RecordFormat::B8.estimate_output_bytes(3, 9),
+        Estimate::Exact(6)
+    );
+    assert_eq!(
+        RecordFormat::Ptb64.estimate_output_bytes(64, 9),
+        Estimate::Exact(72)
+    );
+    assert_eq!(
+        RecordFormat::Ptb64.estimate_output_bytes(63, 9),
+        Estimate::Unknown
+    );
+    assert_eq!(
+        RecordFormat::Dets.estimate_output_bytes(3, 9),
+        Estimate::Unknown
+    );
 }
 
 #[test]

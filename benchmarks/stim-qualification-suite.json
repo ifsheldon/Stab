@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "0319e045eac3b041a57a4f1c0025d05894d29e4794c31a88cd0cbe185ded9673",
-  "semantic_digest": "ced2d19d2400566a09c39f66158465ce846aa4c71b936a8ed7ad21a074b75f56",
+  "correctness_digest": "6ef5542cec398d1a8cf58a8751575698e75c85465da25bfb79f4fbce6b3eb5c8",
+  "semantic_digest": "71cd56407ab52234be1192189653f84ae7c0a50f53b43b29d4e82d9c8f1d4cb4",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -19915,6 +19915,19 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-44e6a7df3b6e2c02",
+      "path": "stab_core::RecordFormat::estimate_output_bytes",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-9a6e06b3597f9b48",
       "path": "stab_core::RecordFormat::records_per_group",
       "kind": "method",
@@ -29890,6 +29903,19 @@
     {
       "id": "cq-api-item-5b5598ac892ea590",
       "path": "stab_core::result_formats::RecordFormat::encoding",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-9eaac00a59f523e4",
+      "path": "stab_core::result_formats::RecordFormat::estimate_output_bytes",
       "kind": "method",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [

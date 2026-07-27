@@ -4082,6 +4082,10 @@
           },
           {
             "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat::estimate_output_bytes"
+          },
+          {
+            "crate_name": "stab_core",
             "owner_path": "stab_core::CodecCapability"
           },
           {
@@ -4127,6 +4131,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::result_formats::RecordFormat::records_per_group"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat::estimate_output_bytes"
           },
           {
             "crate_name": "stab_core",

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "0319e045eac3b041a57a4f1c0025d05894d29e4794c31a88cd0cbe185ded9673",
+  "semantic_digest": "6ef5542cec398d1a8cf58a8751575698e75c85465da25bfb79f4fbce6b3eb5c8",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -61715,7 +61715,7 @@
       "path": "stab_core::CodecCapability",
       "kind": "struct",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 70,
+      "source_line": 95,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61729,7 +61729,7 @@
       "path": "stab_core::CodecCapability as Clone for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61743,7 +61743,7 @@
       "path": "stab_core::CodecCapability as Copy for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61757,7 +61757,7 @@
       "path": "stab_core::CodecCapability as Debug for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61771,7 +61771,7 @@
       "path": "stab_core::CodecCapability as Eq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61785,7 +61785,7 @@
       "path": "stab_core::CodecCapability as Hash for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61799,7 +61799,7 @@
       "path": "stab_core::CodecCapability as PartialEq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61813,7 +61813,7 @@
       "path": "stab_core::CodecCapability as StructuralPartialEq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61827,7 +61827,7 @@
       "path": "stab_core::CodecCapability::can_decode",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 91,
+      "source_line": 116,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61841,7 +61841,7 @@
       "path": "stab_core::CodecCapability::can_encode",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 95,
+      "source_line": 120,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61855,7 +61855,7 @@
       "path": "stab_core::CodecCapability::format",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 87,
+      "source_line": 112,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -61869,7 +61869,7 @@
       "path": "stab_core::CodecCapability::requires_typed_layout",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 100,
+      "source_line": 125,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74292,7 +74292,7 @@
       "path": "stab_core::RecordEncoding",
       "kind": "enum",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74306,7 +74306,7 @@
       "path": "stab_core::RecordEncoding as Clone for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74320,7 +74320,7 @@
       "path": "stab_core::RecordEncoding as Copy for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74334,7 +74334,7 @@
       "path": "stab_core::RecordEncoding as Debug for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74348,7 +74348,7 @@
       "path": "stab_core::RecordEncoding as Eq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74362,7 +74362,7 @@
       "path": "stab_core::RecordEncoding as Hash for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74376,7 +74376,7 @@
       "path": "stab_core::RecordEncoding as PartialEq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74390,7 +74390,7 @@
       "path": "stab_core::RecordEncoding as StructuralPartialEq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74404,7 +74404,7 @@
       "path": "stab_core::RecordEncoding::BitPlane64",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 8,
+      "source_line": 10,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74418,7 +74418,7 @@
       "path": "stab_core::RecordEncoding::BytePacked",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 6,
+      "source_line": 8,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74432,7 +74432,7 @@
       "path": "stab_core::RecordEncoding::RunLength",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 7,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74446,7 +74446,7 @@
       "path": "stab_core::RecordEncoding::Text",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 5,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74460,7 +74460,7 @@
       "path": "stab_core::RecordEncoding::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 12,
+      "source_line": 14,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74474,7 +74474,7 @@
       "path": "stab_core::RecordFormat",
       "kind": "enum",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 25,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74488,7 +74488,7 @@
       "path": "stab_core::RecordFormat as Clone for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74502,7 +74502,7 @@
       "path": "stab_core::RecordFormat as Copy for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74516,7 +74516,7 @@
       "path": "stab_core::RecordFormat as Debug for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74530,7 +74530,7 @@
       "path": "stab_core::RecordFormat as Eq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74544,7 +74544,7 @@
       "path": "stab_core::RecordFormat as Hash for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74558,7 +74558,7 @@
       "path": "stab_core::RecordFormat as PartialEq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74572,7 +74572,7 @@
       "path": "stab_core::RecordFormat as StructuralPartialEq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74586,7 +74586,7 @@
       "path": "stab_core::RecordFormat::B8",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 27,
+      "source_line": 29,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74600,7 +74600,7 @@
       "path": "stab_core::RecordFormat::Dets",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 30,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74614,7 +74614,7 @@
       "path": "stab_core::RecordFormat::Hits",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 29,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74628,7 +74628,7 @@
       "path": "stab_core::RecordFormat::Ptb64",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 31,
+      "source_line": 33,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74642,7 +74642,7 @@
       "path": "stab_core::RecordFormat::R8",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 28,
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74656,7 +74656,7 @@
       "path": "stab_core::RecordFormat::ZeroOne",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 26,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74670,7 +74670,7 @@
       "path": "stab_core::RecordFormat::all",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74684,7 +74684,7 @@
       "path": "stab_core::RecordFormat::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 39,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74698,7 +74698,21 @@
       "path": "stab_core::RecordFormat::encoding",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 50,
+      "source_line": 52,
+      "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-44e6a7df3b6e2c02",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::RecordFormat::estimate_output_bytes",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
+      "source_line": 73,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -74712,7 +74726,7 @@
       "path": "stab_core::RecordFormat::records_per_group",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 60,
+      "source_line": 62,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84393,7 +84407,7 @@
       "path": "stab_core::result_formats::CodecCapability",
       "kind": "struct",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 70,
+      "source_line": 95,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84407,7 +84421,7 @@
       "path": "stab_core::result_formats::CodecCapability as Clone for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84421,7 +84435,7 @@
       "path": "stab_core::result_formats::CodecCapability as Copy for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84435,7 +84449,7 @@
       "path": "stab_core::result_formats::CodecCapability as Debug for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84449,7 +84463,7 @@
       "path": "stab_core::result_formats::CodecCapability as Eq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84463,7 +84477,7 @@
       "path": "stab_core::result_formats::CodecCapability as Hash for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84477,7 +84491,7 @@
       "path": "stab_core::result_formats::CodecCapability as PartialEq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84491,7 +84505,7 @@
       "path": "stab_core::result_formats::CodecCapability as StructuralPartialEq for@a0358242179f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 69,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84505,7 +84519,7 @@
       "path": "stab_core::result_formats::CodecCapability::can_decode",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 91,
+      "source_line": 116,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84519,7 +84533,7 @@
       "path": "stab_core::result_formats::CodecCapability::can_encode",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 95,
+      "source_line": 120,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84533,7 +84547,7 @@
       "path": "stab_core::result_formats::CodecCapability::format",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 87,
+      "source_line": 112,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -84547,7 +84561,7 @@
       "path": "stab_core::result_formats::CodecCapability::requires_typed_layout",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 100,
+      "source_line": 125,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85751,7 +85765,7 @@
       "path": "stab_core::result_formats::RecordEncoding",
       "kind": "enum",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85765,7 +85779,7 @@
       "path": "stab_core::result_formats::RecordEncoding as Clone for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85779,7 +85793,7 @@
       "path": "stab_core::result_formats::RecordEncoding as Copy for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85793,7 +85807,7 @@
       "path": "stab_core::result_formats::RecordEncoding as Debug for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85807,7 +85821,7 @@
       "path": "stab_core::result_formats::RecordEncoding as Eq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85821,7 +85835,7 @@
       "path": "stab_core::result_formats::RecordEncoding as Hash for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85835,7 +85849,7 @@
       "path": "stab_core::result_formats::RecordEncoding as PartialEq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85849,7 +85863,7 @@
       "path": "stab_core::result_formats::RecordEncoding as StructuralPartialEq for@05db70a98854",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 3,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85863,7 +85877,7 @@
       "path": "stab_core::result_formats::RecordEncoding::BitPlane64",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 8,
+      "source_line": 10,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85877,7 +85891,7 @@
       "path": "stab_core::result_formats::RecordEncoding::BytePacked",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 6,
+      "source_line": 8,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85891,7 +85905,7 @@
       "path": "stab_core::result_formats::RecordEncoding::RunLength",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 7,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85905,7 +85919,7 @@
       "path": "stab_core::result_formats::RecordEncoding::Text",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 5,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85919,7 +85933,7 @@
       "path": "stab_core::result_formats::RecordEncoding::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 12,
+      "source_line": 14,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85933,7 +85947,7 @@
       "path": "stab_core::result_formats::RecordFormat",
       "kind": "enum",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 25,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85947,7 +85961,7 @@
       "path": "stab_core::result_formats::RecordFormat as Clone for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85961,7 +85975,7 @@
       "path": "stab_core::result_formats::RecordFormat as Copy for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85975,7 +85989,7 @@
       "path": "stab_core::result_formats::RecordFormat as Debug for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -85989,7 +86003,7 @@
       "path": "stab_core::result_formats::RecordFormat as Eq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86003,7 +86017,7 @@
       "path": "stab_core::result_formats::RecordFormat as Hash for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86017,7 +86031,7 @@
       "path": "stab_core::result_formats::RecordFormat as PartialEq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86031,7 +86045,7 @@
       "path": "stab_core::result_formats::RecordFormat as StructuralPartialEq for@7fd36f1ac6fb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86045,7 +86059,7 @@
       "path": "stab_core::result_formats::RecordFormat::B8",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 27,
+      "source_line": 29,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86059,7 +86073,7 @@
       "path": "stab_core::result_formats::RecordFormat::Dets",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 30,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86073,7 +86087,7 @@
       "path": "stab_core::result_formats::RecordFormat::Hits",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 29,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86087,7 +86101,7 @@
       "path": "stab_core::result_formats::RecordFormat::Ptb64",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 31,
+      "source_line": 33,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86101,7 +86115,7 @@
       "path": "stab_core::result_formats::RecordFormat::R8",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 28,
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86115,7 +86129,7 @@
       "path": "stab_core::result_formats::RecordFormat::ZeroOne",
       "kind": "variant",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 26,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86129,7 +86143,7 @@
       "path": "stab_core::result_formats::RecordFormat::all",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86143,7 +86157,7 @@
       "path": "stab_core::result_formats::RecordFormat::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 39,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86157,7 +86171,21 @@
       "path": "stab_core::result_formats::RecordFormat::encoding",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 50,
+      "source_line": 52,
+      "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-9eaac00a59f523e4",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::result_formats::RecordFormat::estimate_output_bytes",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
+      "source_line": 73,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -86171,7 +86199,7 @@
       "path": "stab_core::result_formats::RecordFormat::records_per_group",
       "kind": "method",
       "source_path": "crates/stab-core/src/result_formats/capabilities.rs",
-      "source_line": 60,
+      "source_line": 62,
       "owner_case_id": "cq-evidence-qualification-e4261b1ea93221fa",
       "performance_groups": [
         "PERF-RESULT-IO",

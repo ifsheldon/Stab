@@ -1,3 +1,5 @@
+use crate::Estimate;
+
 /// Physical encoding used by a registered result-record codec.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -62,6 +64,29 @@ impl RecordFormat {
             Self::Ptb64 => 64,
             Self::ZeroOne | Self::B8 | Self::R8 | Self::Hits | Self::Dets => 1,
         }
+    }
+
+    /// Estimates encoded bytes for fixed-width records without producing any records.
+    ///
+    /// Sparse encodings depend on record contents and therefore return [`Estimate::Unknown`].
+    /// PTB64 is exact only for a complete number of 64-record groups.
+    pub fn estimate_output_bytes(
+        self,
+        record_count: usize,
+        bits_per_record: usize,
+    ) -> Estimate<usize> {
+        let bytes = match self {
+            Self::ZeroOne => bits_per_record
+                .checked_add(1)
+                .and_then(|per_record| record_count.checked_mul(per_record)),
+            Self::B8 => record_count.checked_mul(bits_per_record.div_ceil(8)),
+            Self::Ptb64 if record_count.is_multiple_of(64) => record_count
+                .checked_div(64)
+                .and_then(|groups| groups.checked_mul(bits_per_record))
+                .and_then(|words| words.checked_mul(size_of::<u64>())),
+            Self::R8 | Self::Hits | Self::Dets | Self::Ptb64 => None,
+        };
+        bytes.map_or(Estimate::Unknown, Estimate::Exact)
     }
 }
 

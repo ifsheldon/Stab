@@ -23,7 +23,7 @@ pub fn estimate_sampling_request(
         .ok()
         .and_then(|measurements| usize::try_from(measurements).ok())
         .map_or(Estimate::Unknown, |measurements| {
-            estimate_output_bytes(output_format, shots, measurements)
+            output_format.estimate_output_bytes(shots, measurements)
         });
 
     ResourceEstimate::for_sampling_request(
@@ -32,25 +32,6 @@ pub fn estimate_sampling_request(
         input_items.map_or(Estimate::Unknown, Estimate::Exact),
         output_bytes,
     )
-}
-
-fn estimate_output_bytes(
-    format: RecordFormat,
-    shots: usize,
-    measurements: usize,
-) -> Estimate<usize> {
-    let bytes = match format {
-        RecordFormat::ZeroOne => measurements
-            .checked_add(1)
-            .and_then(|per_shot| shots.checked_mul(per_shot)),
-        RecordFormat::B8 => shots.checked_mul(measurements.div_ceil(8)),
-        RecordFormat::Ptb64 if shots.is_multiple_of(64) => shots
-            .checked_div(64)
-            .and_then(|groups| groups.checked_mul(measurements))
-            .and_then(|words| words.checked_mul(size_of::<u64>())),
-        RecordFormat::R8 | RecordFormat::Hits | RecordFormat::Dets | RecordFormat::Ptb64 => None,
-    };
-    bytes.map_or(Estimate::Unknown, Estimate::Exact)
 }
 
 fn operation_counts(circuit: &Circuit) -> (Option<usize>, Option<usize>) {

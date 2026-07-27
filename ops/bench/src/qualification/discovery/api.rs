@@ -98,6 +98,7 @@ fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
             | "stab_core::RecordFormat::as_str"
             | "stab_core::RecordFormat::encoding"
             | "stab_core::RecordFormat::records_per_group"
+            | "stab_core::RecordFormat::estimate_output_bytes"
             | "stab_core::CodecCapability::format"
             | "stab_core::CodecCapability::can_decode"
             | "stab_core::CodecCapability::can_encode"
@@ -107,6 +108,7 @@ fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
             | "stab_core::result_formats::RecordFormat::as_str"
             | "stab_core::result_formats::RecordFormat::encoding"
             | "stab_core::result_formats::RecordFormat::records_per_group"
+            | "stab_core::result_formats::RecordFormat::estimate_output_bytes"
             | "stab_core::result_formats::CodecCapability::format"
             | "stab_core::result_formats::CodecCapability::can_decode"
             | "stab_core::result_formats::CodecCapability::can_encode"
@@ -196,6 +198,7 @@ mod tests {
             "stab_core::CapabilitySet::codecs",
             "stab_core::CompilationCapability::compiler_schema_version",
             "stab_core::RecordFormat::records_per_group",
+            "stab_core::RecordFormat::estimate_output_bytes",
             "stab_core::result_formats::CodecCapability::requires_typed_layout",
         ] {
             let disposition = make_disposition(&api(path, "method"));

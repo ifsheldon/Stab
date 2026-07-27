@@ -22,11 +22,11 @@ Formal completion for the current inventories: **not started**. The latest histo
 
 ## Contract Identities
 
-- Correctness inventory: `0319e045eac3b041a57a4f1c0025d05894d29e4794c31a88cd0cbe185ded9673`
-- Performance inventory: `ced2d19d2400566a09c39f66158465ce846aa4c71b936a8ed7ad21a074b75f56`
-- Stim parity policy: `558d92a188d21cdacd32f3dcf6e79135776b9c245c85aeb24604b0946d02134a`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
+- Correctness inventory: `6ef5542cec398d1a8cf58a8751575698e75c85465da25bfb79f4fbce6b3eb5c8`
+- Performance inventory: `71cd56407ab52234be1192189653f84ae7c0a50f53b43b29d4e82d9c8f1d4cb4`
+- Stim parity policy: `facd2bc17582da330a7993c60c33b41dd6f8c39d9b2d5ec52e7eb82b36862173`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `2a1e23a2ae45306ac6c178ff708f354968e3afb8184d6e4755fd3e4c4b4b4673`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `b4f07d84bd41f9a1d8979b2063dddc6571753ad3b7cc871ab8b42bd75d8edc17`; missing identities are unseeded, never passing.
 
 ## Interpretation
 
