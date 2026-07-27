@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "6512dfdc6056b4c03f95889a24ab311a9820845ae2615d7797146c1ca5dfcfcd",
+  "semantic_digest": "3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -130683,14 +130683,15 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Small circuit and DEM inputs prove exact dialect-specific counts, source facts, structural fingerprints, parse-estimate classifications, and the explicit no-execution result."
+        "detail": "Small circuit and DEM inputs prove the complete schema-version-1 object shapes, exact dialect-specific counts, source facts, structural fingerprints, and parse-estimate classifications. A circuit rejected by sampler compilation proves inspection stops after parsing and structural analysis."
       },
       "negative_axes": [
         "dialect-field-alias",
         "circuit-dem-count-alias",
         "fingerprint-loss",
         "unknown-estimate-promoted-to-zero",
-        "execution-side-effect"
+        "inspection-invokes-compilation",
+        "schema-field-drift"
       ],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
@@ -131108,56 +131109,6 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "cq-evidence-qualification-97a0619ad157e73d",
-      "feature_id": "CQ-CLI",
-      "behavioral_surface": "cli",
-      "provenance": "qualification-plan",
-      "source_id": "a2-cli-sampling-plan-no-execution-contract",
-      "comparator": "exact-bytes",
-      "execution": {
-        "tiers": [
-          "pr",
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-cli",
-          "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_samples",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "bounded-materialized",
-        "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical output, proving validation and estimation do not consume randomness or execute a shot."
-      },
-      "negative_axes": [
-        "planning-consumes-randomness",
-        "planning-executes-shot",
-        "unknown-output-estimate",
-        "nondeterministic-report"
-      ],
-      "performance_groups": [
-        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -133049,6 +133000,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-bbbead52c6f4dfd1",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-sampling-plan-determinism-contract",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configuration",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical complete schema-version-1 reports, proving report construction is deterministic and does not consume execution randomness."
+      },
+      "negative_axes": [
+        "planning-consumes-randomness",
+        "unknown-output-estimate",
+        "nondeterministic-report",
+        "schema-field-drift"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-bc6509ae4ef4f0db",
       "feature_id": "CQ-CIRCUIT-API",
       "behavioral_surface": "engine",
@@ -134722,7 +134723,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "streaming",
-        "detail": "The estimator traverses folded circuit structure once with depth-bounded inline storage, reports exact representable structure and fixed-width output facts, degrades overflow and sparse output size to unknown, and neither compiles nor executes the request."
+        "detail": "The estimator traverses folded circuit structure once with depth-bounded inline storage, reports exact representable structure and fixed-width output facts, degrades nested repeat multiplication, measurement-count, fixed-width output, and sparse output size to unknown, and neither compiles nor executes the request."
       },
       "negative_axes": [
         "repeat-expansion-overflow",
@@ -135351,7 +135352,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "One six-entry records-owned registry drives codec names, physical encodings, grouping, decode and encode availability, and typed-layout requirements without copying result capabilities into CLI help or qualification state."
+        "detail": "One six-entry records-owned registry drives codec names, physical encodings, grouping, decode and encode availability, and typed-layout requirements. Every advertised codec also encodes and decodes a nontrivial 64-record fixture through its executable public path."
       },
       "negative_axes": [
         "duplicate-format-name",

@@ -27,6 +27,195 @@ fn pointer<'a>(value: &'a Value, pointer: &str) -> &'a Value {
     value.pointer(pointer).expect("JSON pointer exists")
 }
 
+fn assert_exact_keys(object: &Value, expected: &[&str]) {
+    let actual = object
+        .as_object()
+        .expect("schema node is an object")
+        .keys()
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    let expected = expected
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(actual, expected);
+}
+
+fn assert_capability_schema(report: &Value) {
+    assert_exact_keys(
+        report,
+        &[
+            "schema_version",
+            "stab_version",
+            "stim_compatibility_version",
+            "commands",
+            "dialects",
+            "gates",
+            "codecs",
+            "compilers",
+            "selectable_backends",
+        ],
+    );
+    for command in pointer(report, "/commands")
+        .as_array()
+        .expect("commands are an array")
+    {
+        assert_exact_keys(command, &["name", "summary"]);
+    }
+    for dialect in pointer(report, "/dialects")
+        .as_array()
+        .expect("dialects are an array")
+    {
+        assert_exact_keys(dialect, &["name", "default_parse_limits"]);
+        assert_exact_keys(
+            pointer(dialect, "/default_parse_limits"),
+            &["source_lines", "repeat_nesting"],
+        );
+    }
+    for gate in pointer(report, "/gates")
+        .as_array()
+        .expect("gates are an array")
+    {
+        assert_exact_keys(
+            gate,
+            &[
+                "canonical_name",
+                "aliases",
+                "category",
+                "argument_rule",
+                "target_rule",
+                "target_grouping",
+                "support_scope",
+            ],
+        );
+        assert_exact_keys(pointer(gate, "/argument_rule"), &["kind", "count"]);
+    }
+    for codec in pointer(report, "/codecs")
+        .as_array()
+        .expect("codecs are an array")
+    {
+        assert_exact_keys(
+            codec,
+            &[
+                "name",
+                "encoding",
+                "can_decode",
+                "can_encode",
+                "requires_typed_layout",
+                "records_per_group",
+            ],
+        );
+    }
+    for compiler in pointer(report, "/compilers")
+        .as_array()
+        .expect("compilers are an array")
+    {
+        assert_exact_keys(
+            compiler,
+            &[
+                "operation",
+                "input_dialect",
+                "compiler_schema_version",
+                "request_fingerprint_schema_version",
+                "configurable_limits",
+                "backend_selection",
+            ],
+        );
+    }
+}
+
+fn assert_estimate_schema(estimate: &Value) {
+    assert_exact_keys(
+        estimate,
+        &[
+            "input_bytes",
+            "input_items",
+            "expanded_operations",
+            "folded_traversal",
+            "scratch_bytes",
+            "resident_bytes",
+            "output_bytes",
+            "work_units",
+        ],
+    );
+    for value in estimate
+        .as_object()
+        .expect("estimate is an object")
+        .values()
+    {
+        assert_exact_keys(value, &["class", "value"]);
+    }
+}
+
+fn assert_inspect_schema(report: &Value, model_keys: &[&str]) {
+    assert_exact_keys(
+        report,
+        &[
+            "schema_version",
+            "executes",
+            "source",
+            "parse_estimate",
+            "model",
+        ],
+    );
+    assert_exact_keys(pointer(report, "/source"), &["bytes", "physical_lines"]);
+    assert_estimate_schema(pointer(report, "/parse_estimate"));
+    assert_exact_keys(pointer(report, "/model"), model_keys);
+    assert_exact_keys(
+        pointer(report, "/model/fingerprint"),
+        &["schema_version", "algorithm", "dialect", "digest"],
+    );
+}
+
+fn assert_sample_plan_schema(report: &Value) {
+    assert_exact_keys(
+        report,
+        &[
+            "schema_version",
+            "operation",
+            "executes",
+            "source",
+            "model",
+            "compilation",
+            "run",
+            "estimates",
+        ],
+    );
+    assert_exact_keys(pointer(report, "/source"), &["bytes", "physical_lines"]);
+    assert_exact_keys(
+        pointer(report, "/model"),
+        &["schema_version", "algorithm", "dialect", "digest"],
+    );
+    assert_exact_keys(
+        pointer(report, "/compilation"),
+        &[
+            "request_fingerprint",
+            "compiler_schema_version",
+            "normalized_options",
+            "configurable_limits",
+            "selectable_backend",
+            "validated",
+        ],
+    );
+    assert_exact_keys(
+        pointer(report, "/compilation/request_fingerprint"),
+        &["schema_version", "algorithm", "digest"],
+    );
+    assert_exact_keys(
+        pointer(report, "/run"),
+        &[
+            "shots",
+            "random_policy",
+            "seed",
+            "reference_mode",
+            "output_format",
+            "skip_loop_folding_requested",
+            "skip_loop_folding_effect",
+        ],
+    );
+    assert_estimate_schema(pointer(report, "/estimates"));
+}
+
 #[test]
 fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
     fn collect_commands(prefix: &str, command: &clap::Command, output: &mut Vec<String>) {
@@ -46,6 +235,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
     assert_eq!(stderr, b"");
 
     let report = json_stdout(&stdout);
+    assert_capability_schema(&report);
     assert_eq!(
         pointer(&report, "/schema_version"),
         CapabilitySet::SCHEMA_VERSION
@@ -154,6 +344,19 @@ fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
         pointer(&report, "/parse_estimate/expanded_operations/class"),
         "unknown"
     );
+    assert_inspect_schema(
+        &report,
+        &[
+            "dialect",
+            "fingerprint",
+            "top_level_items",
+            "qubits",
+            "measurements",
+            "detectors",
+            "observables",
+            "sweep_bits",
+        ],
+    );
 
     let dem = b"error(0.125) D3 L2\n";
     let (status, stdout, stderr) = run_cli(["stab", "inspect", "--type=dem", "--format=json"], dem);
@@ -165,6 +368,29 @@ fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
     assert_eq!(pointer(&report, "/model/detectors"), 4);
     assert_eq!(pointer(&report, "/model/observables"), 3);
     assert!(report.pointer("/model/qubits").is_none());
+    assert_inspect_schema(
+        &report,
+        &[
+            "dialect",
+            "fingerprint",
+            "top_level_items",
+            "detectors",
+            "observables",
+        ],
+    );
+
+    let compile_rejected = b"CX sweep[0] 0\nM 0\n";
+    let (status, stdout, stderr) = run_cli(
+        ["stab", "inspect", "--type=stim", "--format=json"],
+        compile_rejected,
+    );
+    assert_eq!(status, 0);
+    assert_eq!(stderr, b"");
+    assert_eq!(
+        pointer(&json_stdout(&stdout), "/model/sweep_bits"),
+        1,
+        "inspection must stop before sampler compilation"
+    );
 }
 
 #[test]
@@ -322,6 +548,8 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     assert_eq!(status, 0);
     assert_eq!(second_stderr, b"");
     let second = json_stdout(&second_stdout);
+    assert_sample_plan_schema(&first);
+    assert_sample_plan_schema(&second);
 
     assert_eq!(
         pointer(&first, "/compilation/request_fingerprint/digest"),
@@ -352,7 +580,7 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
 }
 
 #[test]
-fn plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_samples() {
+fn plan_sample_is_deterministic_for_noisy_entropy_configuration() {
     let circuit = b"X_ERROR(0.5) 0\nM 0\n";
     let args = ["stab", "plan", "sample", "--shots=100", "--format=json"];
     let first = run_cli(args, circuit);
@@ -364,6 +592,7 @@ fn plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_sampl
     assert_eq!(first.2, b"");
     assert_eq!(second.2, b"");
     let report = json_stdout(&first.1);
+    assert_sample_plan_schema(&report);
     assert_eq!(pointer(&report, "/run/random_policy"), "entropy");
     assert_eq!(pointer(&report, "/run/seed"), &Value::Null);
     assert_eq!(pointer(&report, "/executes"), false);

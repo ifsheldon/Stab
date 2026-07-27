@@ -7,8 +7,11 @@ use std::collections::BTreeSet;
 
 use stab_core::{
     CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint, CompiledSampler,
-    Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
+    Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat, SampleFormat,
     estimate_sampling_request,
+    result_formats::{
+        read_ptb64_records_all, read_records, write_ptb64_records_checked, write_records,
+    },
 };
 
 const RICH_CIRCUIT: &str = "X_ERROR[π](0.12345641) 0\n\
@@ -117,6 +120,37 @@ fn record_codec_descriptors_are_unique_and_structurally_truthful() {
         RecordFormat::Dets.estimate_output_bytes(3, 9),
         Estimate::Unknown
     );
+
+    let records = (0usize..64)
+        .map(|shot| {
+            (0usize..9)
+                .map(|bit| (shot + bit).is_multiple_of(3))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    for codec in CapabilitySet::current().codecs() {
+        let decoded = match codec.format() {
+            RecordFormat::Ptb64 => {
+                let encoded =
+                    write_ptb64_records_checked(&records).expect("encode registered ptb64");
+                read_ptb64_records_all(&encoded, 9).expect("decode registered ptb64")
+            }
+            format => {
+                let sample_format = match format {
+                    RecordFormat::ZeroOne => SampleFormat::ZeroOne,
+                    RecordFormat::B8 => SampleFormat::B8,
+                    RecordFormat::R8 => SampleFormat::R8,
+                    RecordFormat::Hits => SampleFormat::Hits,
+                    RecordFormat::Dets => SampleFormat::Dets,
+                    RecordFormat::Ptb64 => unreachable!("ptb64 handled separately"),
+                    _ => unreachable!("new codec format needs an executable capability fixture"),
+                };
+                let encoded = write_records(&records, sample_format);
+                read_records(&encoded, sample_format, 9).expect("decode registered record format")
+            }
+        };
+        assert_eq!(decoded, records, "codec {:?}", codec.format());
+    }
 }
 
 #[test]
@@ -186,6 +220,27 @@ fn sampling_request_estimate_counts_folded_and_expanded_work_without_execution()
             Estimate::Unknown
         );
     }
+
+    let expanded_overflow = Circuit::from_stim_str(
+        "REPEAT 4294967296 {\n\
+             REPEAT 4294967296 {\n\
+                 M 0\n\
+             }\n\
+         }\n",
+    )
+    .expect("nested repeat overflow circuit");
+    let overflow_estimate = estimate_sampling_request(&expanded_overflow, 1, RecordFormat::ZeroOne);
+    assert_eq!(overflow_estimate.input_items(), Estimate::Exact(3));
+    assert_eq!(overflow_estimate.folded_traversal(), Estimate::Exact(3));
+    assert_eq!(overflow_estimate.expanded_operations(), Estimate::Unknown);
+    assert_eq!(overflow_estimate.output_bytes(), Estimate::Unknown);
+
+    let output_overflow = Circuit::from_stim_str("M 0\n").expect("output overflow circuit");
+    assert_eq!(
+        estimate_sampling_request(&output_overflow, usize::MAX, RecordFormat::ZeroOne)
+            .output_bytes(),
+        Estimate::Unknown
+    );
 
     let allocations = allocation_counter::measure(|| {
         std::hint::black_box(estimate_sampling_request(

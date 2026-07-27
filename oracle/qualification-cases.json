@@ -4042,7 +4042,7 @@
         },
         "resource_contract": {
           "kind": "constant-scratch",
-          "detail": "One six-entry records-owned registry drives codec names, physical encodings, grouping, decode and encode availability, and typed-layout requirements without copying result capabilities into CLI help or qualification state."
+          "detail": "One six-entry records-owned registry drives codec names, physical encodings, grouping, decode and encode availability, and typed-layout requirements. Every advertised codec also encodes and decodes a nontrivial 64-record fixture through its executable public path."
         },
         "negative_axes": [
           "duplicate-format-name",
@@ -4180,7 +4180,7 @@
         },
         "resource_contract": {
           "kind": "streaming",
-          "detail": "The estimator traverses folded circuit structure once with depth-bounded inline storage, reports exact representable structure and fixed-width output facts, degrades overflow and sparse output size to unknown, and neither compiles nor executes the request."
+          "detail": "The estimator traverses folded circuit structure once with depth-bounded inline storage, reports exact representable structure and fixed-width output facts, degrades nested repeat multiplication, measurement-count, fixed-width output, and sparse output size to unknown, and neither compiles nor executes the request."
         },
         "negative_axes": [
           "repeat-expansion-overflow",
@@ -5017,14 +5017,15 @@
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Small circuit and DEM inputs prove exact dialect-specific counts, source facts, structural fingerprints, parse-estimate classifications, and the explicit no-execution result."
+          "detail": "Small circuit and DEM inputs prove the complete schema-version-1 object shapes, exact dialect-specific counts, source facts, structural fingerprints, and parse-estimate classifications. A circuit rejected by sampler compilation proves inspection stops after parsing and structural analysis."
         },
         "negative_axes": [
           "dialect-field-alias",
           "circuit-dem-count-alias",
           "fingerprint-loss",
           "unknown-estimate-promoted-to-zero",
-          "execution-side-effect"
+          "inspection-invokes-compilation",
+          "schema-field-drift"
         ],
         "standalone": true
       },
@@ -5115,7 +5116,7 @@
         "standalone": true
       },
       {
-        "id": "a2-cli-sampling-plan-no-execution-contract",
+        "id": "a2-cli-sampling-plan-determinism-contract",
         "feature_id": "CQ-CLI",
         "comparator": "exact-bytes",
         "primary_selector": {
@@ -5126,20 +5127,20 @@
             "test",
             "-p",
             "stab-cli",
-            "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_samples",
+            "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configuration",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical output, proving validation and estimation do not consume randomness or execute a shot."
+          "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical complete schema-version-1 reports, proving report construction is deterministic and does not consume execution randomness."
         },
         "negative_axes": [
           "planning-consumes-randomness",
-          "planning-executes-shot",
           "unknown-output-estimate",
-          "nondeterministic-report"
+          "nondeterministic-report",
+          "schema-field-drift"
         ],
         "standalone": true
       },
