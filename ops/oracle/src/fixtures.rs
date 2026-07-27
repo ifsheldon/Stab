@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
 mod direct_rust;
+mod hex_payload;
 mod milestone;
 mod outputs;
 mod paths;
@@ -385,6 +386,9 @@ pub(crate) enum FixtureError {
     #[error("fixture file {path} exceeds the {limit}-byte limit")]
     FixtureFileTooLarge { path: PathBuf, limit: usize },
 
+    #[error("fixture hex payload {path} is invalid: {reason}")]
+    InvalidHexPayload { path: PathBuf, reason: Box<str> },
+
     #[error("failed to prepare private fixture output directory at {path}: {source}")]
     CreateOutputDir {
         path: PathBuf,
@@ -570,8 +574,21 @@ impl FixtureManifest {
                 ),
             ] {
                 if !relative.is_empty() {
-                    validate_fixture_path(&fixture_root, &row.id, field, relative, must_exist)
-                        .unwrap_or_else(|violation| violations.push(violation));
+                    if let Err(violation) =
+                        validate_fixture_path(&fixture_root, &row.id, field, relative, must_exist)
+                    {
+                        violations.push(violation);
+                        continue;
+                    }
+                    if relative.ends_with(".hex")
+                        && fixture_root.join(relative).is_file()
+                        && let Err(error) = hex_payload::read(root, relative)
+                    {
+                        violations.push(format!(
+                            "{} has invalid hex-encoded {field}: {error}",
+                            row.id
+                        ));
+                    }
                 }
             }
         }
@@ -706,7 +723,7 @@ impl FixtureRow {
         if self.stdin_path.is_empty() {
             return Ok(Vec::new());
         }
-        paths::read_fixture_file(root, &self.stdin_path)
+        hex_payload::read(root, &self.stdin_path)
     }
 
     fn expected_stdout_file(&self, root: &RepoRoot) -> Result<PathBuf, FixtureError> {
@@ -752,7 +769,7 @@ pub(crate) fn record_fixtures(
         check_expected_process_shape(row, &output)?;
         let expected_path = row.expected_stdout_file(root)?;
         if check_clean {
-            let expected = paths::read_fixture_file(root, &row.expected_stdout_path)?;
+            let expected = hex_payload::read(root, &row.expected_stdout_path)?;
             if expected != output.stdout.bytes {
                 return Err(FixtureError::ExpectedStdoutMismatch {
                     id: row.id.clone(),
@@ -763,7 +780,7 @@ pub(crate) fn record_fixtures(
             outputs::compare_expected_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] CLEAN {}", row.id);
         } else {
-            paths::write_fixture_file(root, &row.expected_stdout_path, &output.stdout.bytes)?;
+            hex_payload::write(root, &row.expected_stdout_path, &output.stdout.bytes)?;
             outputs::record_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] RECORDED {}", row.id);
         }
@@ -1007,7 +1024,7 @@ fn compare_expected_stdout(
     output: &crate::ProcessOutput,
 ) -> Result<(), FixtureError> {
     let expected_path = row.expected_stdout_file(root)?;
-    let expected = paths::read_fixture_file(root, &row.expected_stdout_path)?;
+    let expected = hex_payload::read(root, &row.expected_stdout_path)?;
     if expected != output.stdout.bytes {
         return Err(FixtureError::ExpectedStdoutMismatch {
             id: row.id.clone(),

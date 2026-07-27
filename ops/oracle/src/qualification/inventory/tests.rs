@@ -93,6 +93,30 @@ fn exact_circuit_api_fixtures_override_ambiguous_circuit_source_paths() {
 }
 
 #[test]
+fn parser_rejection_fixtures_override_the_analyzer_command_transport() {
+    for id in [
+        "m4-parser-number-token-64-reject",
+        "m4-parser-repeat-uint63-overflow-reject",
+    ] {
+        assert_eq!(oracle_feature_override(id), Some(FeatureId::StimFormat));
+    }
+}
+
+#[test]
+fn opaque_metadata_fixtures_override_the_execution_transport() {
+    for id in [
+        "m4-parser-opaque-metadata-accept",
+        "m4-parser-opaque-comment-source-order-reject",
+    ] {
+        assert_eq!(oracle_feature_override(id), Some(FeatureId::StimFormat));
+    }
+    assert_eq!(
+        oracle_feature_override("m10-dem-parser-opaque-metadata-accept"),
+        Some(FeatureId::DemFormat)
+    );
+}
+
+#[test]
 fn generation_fails_before_discovery_for_an_unvalidated_stim_checkout() {
     let temporary = tempfile::tempdir().expect("temporary repository");
     std::fs::create_dir_all(temporary.path().join("vendor/stim")).expect("fake Stim directory");

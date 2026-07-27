@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use super::classification::{
-    classify_public_api_source, classify_upstream_case, classify_upstream_path, default_comparator,
+    classify_public_api_source, classify_upstream_case, classify_upstream_path,
 };
 use super::extract::{
     CppTestDeclaration, ExtractionError, PYTHON_AST_VERSION, PythonSource,
@@ -511,7 +511,7 @@ fn make_upstream_ownerships(feature_ids: &[FeatureId], key: &str) -> Vec<Upstrea
         .iter()
         .map(|feature_id| UpstreamOwnership {
             feature_id: *feature_id,
-            comparator: default_comparator(*feature_id),
+            comparator: feature_id.default_comparator(),
             owner_case_id: stable_id(
                 StableCaseDomain::EvidenceUpstream,
                 &format!("{key}\0{}", feature_id.as_str()),
@@ -595,7 +595,7 @@ fn make_public_api_records(
                     feature_id,
                     EvidenceProvenance::PublicRustApi,
                     evidence_owner_path.clone(),
-                    default_comparator(feature_id),
+                    feature_id.default_comparator(),
                     planned_api_selector(&item.crate_name, &owner_case_id),
                 )
             });
@@ -819,6 +819,11 @@ fn generate_existing_oracle_evidence(
 fn oracle_feature_override(id: &str) -> Option<FeatureId> {
     match id {
         "coverage-util-bot-twiddle" => Some(FeatureId::BitKernels),
+        "m4-parser-number-token-64-reject"
+        | "m4-parser-repeat-uint63-overflow-reject"
+        | "m4-parser-opaque-metadata-accept"
+        | "m4-parser-opaque-comment-source-order-reject" => Some(FeatureId::StimFormat),
+        "m10-dem-parser-opaque-metadata-accept" => Some(FeatureId::DemFormat),
         "pf1-circuit-concat"
         | "pf1-circuit-detector-coordinates"
         | "pf1-circuit-insert-pop"

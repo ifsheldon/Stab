@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::model::{Comparator, DeferredProduct, FeatureId, UpstreamDisposition};
+use super::model::{DeferredProduct, FeatureId, UpstreamDisposition};
 
 mod stabilizer;
 
@@ -280,11 +280,11 @@ pub(super) fn classify_public_api_source(
     }
     let value = source_path.to_string_lossy().replace('\\', "/");
     let api_lower = api_path.to_ascii_lowercase();
-    if api_lower.ends_with("::from_stim_str_with_limits")
-        || api_lower.ends_with("::from_dem_str_with_limits")
-        || api_lower.ends_with("::resource_limit_error")
-    {
+    if is_resource_policy_api(&api_lower) || api_lower.ends_with("::resource_limit_error") {
         return Some(FeatureId::Resource);
+    }
+    if api_lower.contains("parseerror") || api_lower.ends_with("::parse_error") {
+        return Some(FeatureId::StimFormat);
     }
     if api_lower.contains("erroranalyzeroptions")
         || api_lower.contains("circuit_to_detector_error_model")
@@ -378,10 +378,14 @@ pub(super) fn classify_public_api_source(
     ) {
         return Some(FeatureId::DemFormat);
     }
-    if value == "crates/stab-core/src/dem_sampler.rs" {
+    if value == "crates/stab-core/src/dem_sampler.rs"
+        || value.starts_with("crates/stab-core/src/dem_sampler/")
+    {
         return Some(FeatureId::DemSampling);
     }
-    if value == "crates/stab-core/src/detection.rs" {
+    if value == "crates/stab-core/src/detection.rs"
+        || value.starts_with("crates/stab-core/src/detection/")
+    {
         return Some(FeatureId::Detection);
     }
     if value.starts_with("crates/stab-core/src/gate") || value == "crates/stab-core/src/target.rs" {
@@ -449,6 +453,25 @@ pub(super) fn classify_public_api_source(
         return Some(FeatureId::CircuitApi);
     }
     None
+}
+
+fn is_resource_policy_api(api_lower: &str) -> bool {
+    api_lower.ends_with("_with_limits")
+        || api_lower.ends_with("_and_limits")
+        || api_lower.ends_with("::compile_with_limits")
+        || api_lower.ends_with("::validate_replay_work_units")
+        || api_lower.ends_with("::try_for_each_detection_event_from_error_records")
+        || [
+            "parselimits",
+            "circuitflattenlimits",
+            "demflattenlimits",
+            "detectionconversionlimits",
+            "demsamplerlimits",
+            "logicalerrorsearchlimits",
+            "satmaterializationlimits",
+        ]
+        .iter()
+        .any(|name| api_lower.contains(name))
 }
 
 fn classify_command(value: &str) -> UpstreamClassification {
@@ -1164,21 +1187,6 @@ fn classify_util_top(value: &str, symbol: &str) -> UpstreamClassification {
         }
     } else {
         UpstreamClassification::selected(FeatureId::CircuitApi)
-    }
-}
-
-pub(super) fn default_comparator(feature_id: FeatureId) -> Comparator {
-    match feature_id {
-        FeatureId::StimFormat | FeatureId::DemFormat => Comparator::Canonical,
-        FeatureId::ResultFormats | FeatureId::Generation | FeatureId::Cli => Comparator::ExactBytes,
-        FeatureId::GateContract => Comparator::StateEquivalence,
-        FeatureId::BitKernels | FeatureId::CircuitApi | FeatureId::Algebra => Comparator::Property,
-        FeatureId::Sampling | FeatureId::DemSampling => Comparator::Statistical,
-        FeatureId::Detection | FeatureId::Analyzer | FeatureId::FlowUtils => {
-            Comparator::SemanticInvariant
-        }
-        FeatureId::Search => Comparator::Structural,
-        FeatureId::Resource => Comparator::Resource,
     }
 }
 

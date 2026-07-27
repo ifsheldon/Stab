@@ -12,7 +12,7 @@ pub(super) const EXISTING_RESOURCE_SOURCE_ID: &str =
 pub(super) const EXISTING_PROPERTY_SOURCE_ID: &str = super::property::PASS_TARGET_ID;
 pub(super) const BOUNDED_TEXT_LINE_SOURCE_ID: &str = "cq3-resource-bounded-text-line-reader";
 
-const EXISTING_RESOURCE_SOURCE_IDS: [&str; 13] = [
+const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     EXISTING_RESOURCE_SOURCE_ID,
     EXISTING_PROPERTY_SOURCE_ID,
     BOUNDED_TEXT_LINE_SOURCE_ID,
@@ -24,8 +24,67 @@ const EXISTING_RESOURCE_SOURCE_IDS: [&str; 13] = [
     "a2-parse-repeat-policy-admission",
     "a2-default-parse-policy-boundaries",
     "a2-parse-policy-preallocation",
+    "a2-parser-diagnostic-bounded-storage",
+    "a2-parser-diagnostic-bounded-allocation",
     "a2-sampling-request-resource-estimate",
     "a2-cli-sampling-plan-folded-herald-count",
+    "a2-byte-parse-policy-admission",
+    "a2-byte-parse-rejected-line-bounded-work",
+    "a2-byte-parse-resource-source-order",
+    "a2-opaque-metadata-linear-classification",
+    "a2-parse-resource-span-contract",
+    "a2-circuit-flatten-policy-admission",
+    "a2-circuit-flatten-payload-policy",
+    "a2-circuit-flatten-payload-overflow",
+    "a2-circuit-flatten-repeat-envelope",
+    "a2-circuit-flatten-platform-capacity",
+    "a2-dem-flatten-policy-admission",
+    "a2-dem-flatten-payload-policy",
+    "a2-dem-flatten-platform-capacity",
+    "a2-dem-flatten-default-repeat-boundaries",
+    "a2-dem-programmatic-depth-257-compatibility",
+    "a2-dem-programmatic-repeat-stack-safety",
+    "a2-detection-record-policy-admission",
+    "a2-detection-default-record-boundary",
+    "a2-detection-work-policy-admission",
+    "a2-detection-repeat-policy-admission",
+    "a2-detection-default-traversal-envelope",
+    "a2-detection-programmatic-repeat-envelope",
+    "a2-detection-programmatic-repeat-stack-safety",
+    "a2-detection-default-traversal-boundaries",
+    "a2-detection-compiled-plan-policy",
+    "a2-detection-materialization-policy-admission",
+    "a2-detection-zero-width-materialization",
+    "a2-detection-streamed-measurement-accounting",
+    "a2-detection-entry-policy-propagation",
+    "a2-detection-frame-policy-propagation",
+    "a2-dem-sampler-work-policy-admission",
+    "a2-dem-sampler-replay-work-policy-admission",
+    "a2-dem-sampler-replay-work-overflow",
+    "a2-cli-dem-replay-work-policy",
+    "a2-dem-sampler-unit-policy-admission",
+    "a2-dem-sampler-byte-policy-admission",
+    "a2-dem-sampler-platform-capacity",
+    "a2-dem-sampler-error-record-policy-admission",
+    "a2-dem-sampler-replay-policy-admission",
+    "a2-logical-search-traversal-policy-admission",
+    "a2-logical-search-default-repeat-boundaries",
+    "a2-logical-search-mechanism-policy-admission",
+    "a2-logical-search-target-policy-admission",
+    "a2-logical-search-total-target-policy-admission",
+    "a2-logical-search-traversal-overflow",
+    "a2-logical-search-effective-node-policy-admission",
+    "a2-logical-search-graph-policy-admission",
+    "a2-logical-search-hyperedge-policy-admission",
+    "a2-logical-search-default-hyperedge-degree-boundary",
+    "a2-logical-search-frontier-policy-admission",
+    "a2-logical-search-frontier-payload-policy-admission",
+    "a2-logical-search-public-entry-policy",
+    "a2-sat-default-policy-contract",
+    "a2-sat-traversal-policy-admission",
+    "a2-sat-input-policy-admission",
+    "a2-sat-cnf-policy-admission",
+    "a2-sat-output-policy-admission",
 ];
 
 struct PlannedResourceCaseSpec {
@@ -129,7 +188,8 @@ const PLANNED_RESOURCE_CASES: [PlannedResourceCaseSpec; 13] = [
 
 pub(super) fn required_source_ids() -> impl Iterator<Item = &'static str> {
     EXISTING_RESOURCE_SOURCE_IDS
-        .into_iter()
+        .iter()
+        .copied()
         .chain(PLANNED_RESOURCE_CASES.iter().map(|spec| spec.source_id))
 }
 
@@ -169,8 +229,8 @@ pub(super) fn validate_inventory(
                 || case.primary_selector.value.as_slice() != [case.source_id.as_str()])
         {
             violations.push(format!(
-                "CQ-RESOURCE case {:?} has a stale planned selector",
-                case.id
+                "CQ-RESOURCE case {:?} for source {:?} has a stale planned selector",
+                case.id, case.source_id
             ));
         }
     }

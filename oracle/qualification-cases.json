@@ -4415,6 +4415,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::ParseLimits::estimate"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseLimits::estimate_bytes"
           }
         ],
         "standalone": true
@@ -4661,6 +4665,3231 @@
         "negative_axes": [
           "pre-admission-allocation-growth",
           "circuit-dem-preallocation-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-model-parse-code-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "parse_error_codes_are_stable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Every public circuit and DEM parse failure class has one stable schema-version-1 kebab-case identity, including numeric range and unterminated-token distinctions."
+        },
+        "negative_axes": [
+          "diagnostic-code-drift",
+          "code-collision",
+          "schema-v1-spelling-change"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseErrorCode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseErrorCode::as_str"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-model-parse-diagnostic-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "circuit_parse_diagnostics_locate_crlf_utf8_arguments_targets_and_repeats",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Typed circuit diagnostics preserve exact CRLF and UTF-8 byte spans, severity, concise and human messages, token roles, and non-lossy facade access."
+        },
+        "negative_axes": [
+          "byte-character-offset-confusion",
+          "diagnostic-payload-loss",
+          "facade-diagnostic-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::code"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::severity"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::message"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::span"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitError::parse_error"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-model-parse-context-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "parse_error_context_variants_preserve_typed_fields_and_dialect",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Model, UTF-8, instruction, domain-value, argument-count, argument, target, and target-count failures preserve their typed fields and circuit or DEM dialect."
+        },
+        "negative_axes": [
+          "context-variant-collapse",
+          "typed-field-loss",
+          "dialect-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::context"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseErrorContext"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseErrorContext::dialect"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-model-parse-invalid-utf8-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "parse_error_decode_utf8_accepts_valid_and_locates_invalid_sequences",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The public byte decoder accepts valid UTF-8 and derives known-length and truncated malformed spans plus typed dialect context from the same input slice."
+        },
+        "negative_axes": [
+          "unrelated-error-input-pairing",
+          "truncated-sequence-span-loss",
+          "dialect-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ParseError::decode_utf8"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-byte-parse-invalid-utf8-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "circuit_byte_entrypoint_reports_invalid_utf8_at_the_first_invalid_sequence",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The public circuit byte parser rejects the first malformed UTF-8 sequence and preserves its exact byte span through the circuit error facade."
+        },
+        "negative_axes": [
+          "lossy-circuit-decoding",
+          "first-invalid-byte-loss",
+          "facade-diagnostic-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::Circuit::from_stim_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-byte-parse-invalid-utf8-contract",
+        "feature_id": "CQ-DEM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "dem_byte_entrypoint_reports_invalid_utf8_at_the_first_invalid_sequence",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The public DEM byte parser rejects a truncated UTF-8 sequence and preserves its exact byte span and detector-error-model dialect."
+        },
+        "negative_axes": [
+          "lossy-dem-decoding",
+          "truncated-sequence-span-loss",
+          "dialect-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectorErrorModel::from_dem_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-byte-parse-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit and DEM byte entry points decode valid UTF-8, accept exact custom line and nesting maxima, and reject each first excess through the supplied parse policy."
+        },
+        "negative_axes": [
+          "byte-entry-policy-bypass",
+          "line-or-repeat-off-by-one",
+          "circuit-dem-entry-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::Circuit::from_stim_bytes_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectorErrorModel::from_dem_bytes_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-byte-parse-rejected-line-bounded-work",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "resource_policies",
+            "byte_parse_admission_does_not_copy_an_unterminated_rejected_line",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit and DEM byte admission retains only a bounded prefix of the first rejected physical line, keeps allocation independent of its remaining length, and reports the line limit before malformed bytes on that rejected line."
+        },
+        "negative_axes": [
+          "rejected-line-copy",
+          "unterminated-line-scan-allocation",
+          "resource-invalid-utf8-precedence"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-model-byte-metadata-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "byte_entrypoints_follow_source_order_and_accept_opaque_metadata_bytes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit and DEM byte entrypoints preserve pinned source-order error precedence and accept opaque comment payloads without whole-input UTF-8 normalization."
+        },
+        "negative_axes": [
+          "whole-input-utf8-precedence",
+          "opaque-comment-rejection"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-byte-parse-resource-source-order",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "byte_parsers_report_earlier_repeat_limits_before_later_invalid_utf8",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Circuit and DEM byte parsers preserve source order when a repeat-nesting resource rejection precedes a later non-metadata invalid UTF-8 sequence."
+        },
+        "negative_axes": [
+          "later-utf8-overwrites-earlier-resource-error",
+          "repeat-resource-span-loss",
+          "circuit-dem-source-order-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-comment-diagnostic-position",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "opaque_comments_do_not_shift_later_parser_diagnostics",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Opaque comment bytes remain accepted metadata while a later circuit or DEM parse error keeps the exact original byte span."
+        },
+        "negative_axes": [
+          "opaque-comment-offset-shift",
+          "later-error-code-drift",
+          "circuit-dem-offset-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-eof-diagnostic-position",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "opaque_unterminated_tags_report_the_exact_original_eof",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Unterminated opaque circuit and DEM tags report the exact original EOF span without replacement-byte or sanitization-offset drift."
+        },
+        "negative_axes": [
+          "opaque-tag-eof-shift",
+          "replacement-byte-span-drift",
+          "circuit-dem-eof-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-parser-diagnostic-bounded-storage",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "attacker_controlled_parser_text_is_stored_as_bounded_utf8_excerpts",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Attacker-controlled gate, instruction, and numeric token text is capped at a UTF-8-safe 256-byte diagnostic excerpt while the exact source span and original byte length remain available."
+        },
+        "negative_axes": [
+          "attacker-sized-error-payload",
+          "utf8-boundary-split",
+          "exact-span-truncation"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-parser-diagnostic-bounded-allocation",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "rejected_parser_diagnostic_allocation_is_independent_of_token_length",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Allocation instrumentation proves that growing a rejected unknown-gate token from 1 KiB to 16 KiB does not grow parser diagnostic allocation."
+        },
+        "negative_axes": [
+          "diagnostic-allocation-scales-with-token",
+          "full-token-error-clone",
+          "pre-rejection-payload-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-metadata-linear-classification",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "model_bytes::tests::opaque_metadata_classification_advances_monotonically",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Opaque-byte classification advances one source-ordered metadata cursor, bounding total range traversal by metadata count instead of rescanning all earlier ranges for every invalid byte."
+        },
+        "negative_axes": [
+          "opaque-metadata-quadratic-scan",
+          "metadata-cursor-regression",
+          "range-order-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-byte-tag-serialization-contract",
+        "feature_id": "CQ-STIM-FORMAT",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "circuit_byte_tags_serialize_without_loss",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit byte parsing preserves opaque instruction and repeat tags through canonical byte serialization, including Stim tag escapes."
+        },
+        "negative_axes": [
+          "opaque-circuit-tag-loss",
+          "circuit-tag-escape-byte-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::Circuit::to_stim_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-byte-tag-access-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "circuit_byte_tags_expose_exact_opaque_bytes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Circuit instruction and repeat accessors expose exact unescaped tag bytes without replacing invalid UTF-8."
+        },
+        "negative_axes": [
+          "opaque-circuit-tag-access-loss",
+          "instruction-repeat-tag-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitInstruction::tag_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RepeatBlock::tag_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-byte-tag-contract",
+        "feature_id": "CQ-DEM-FORMAT",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "dem_byte_tags_expose_and_serialize_exact_opaque_bytes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM byte parsing exposes exact opaque instruction and repeat tag bytes and preserves them through canonical byte serialization."
+        },
+        "negative_axes": [
+          "opaque-dem-tag-loss",
+          "dem-tag-escape-byte-drift",
+          "instruction-repeat-tag-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectorErrorModel::to_dem_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemInstruction::tag_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemRepeatBlock::tag_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-circuit-flatten-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "flattened_circuit_preserves_opaque_instruction_tags",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit flattening preserves exact opaque instruction tags while expanding repeat bodies and intentionally removing the expanded repeat wrapper."
+        },
+        "negative_axes": [
+          "flattened-tag-loss",
+          "opaque-tag-utf8-replacement",
+          "repeat-expansion-order"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-circuit-without-noise-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "circuit_without_noise_preserves_opaque_tags_on_surviving_records",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Noise removal drops noisy instructions and probabilities while preserving exact opaque tags on every surviving operation."
+        },
+        "negative_axes": [
+          "surviving-tag-loss",
+          "opaque-tag-utf8-replacement",
+          "noise-removal-semantic-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-circuit-decomposition-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Simplification and decomposition copy exact opaque source tags onto every expanded base-gate operation."
+        },
+        "negative_axes": [
+          "expanded-operation-tag-loss",
+          "opaque-tag-utf8-replacement",
+          "decomposition-order"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-circuit-inverse-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "inverse_circuits_preserve_opaque_tags_in_reversed_models",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Unitary and selected QEC inverse transforms preserve exact instruction and repeat tag bytes while reversing operation order and gate direction."
+        },
+        "negative_axes": [
+          "inverse-tag-loss",
+          "repeat-tag-loss",
+          "opaque-tag-utf8-replacement"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-feedback-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operations",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Feedback inlining preserves exact tags on surviving operations and transfers the feedback source tag to the introduced observable operation."
+        },
+        "negative_axes": [
+          "feedback-tag-loss",
+          "introduced-operation-tag-drift",
+          "opaque-tag-utf8-replacement"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-dem-rounding-contract",
+        "feature_id": "CQ-DEM-FORMAT",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "rounded_dem_preserves_opaque_instruction_and_repeat_tags",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM probability rounding changes only numeric arguments and preserves exact opaque instruction and repeat tag bytes."
+        },
+        "negative_axes": [
+          "rounded-tag-loss",
+          "repeat-tag-loss",
+          "opaque-tag-utf8-replacement"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-dem-flatten-contract",
+        "feature_id": "CQ-DEM-FORMAT",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "opaque_tag_transform_regressions",
+            "flattened_dem_preserves_opaque_tags_on_materialized_instructions",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM flattening preserves exact opaque instruction tags while applying detector shifts and intentionally removing expanded repeat and shift wrappers."
+        },
+        "negative_axes": [
+          "flattened-dem-tag-loss",
+          "opaque-tag-utf8-replacement",
+          "detector-shift-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-analyzer-contract",
+        "feature_id": "CQ-ANALYZER",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_analyzer_tags",
+            "dem_analyzer_keeps_distinct_opaque_error_tags_unmerged",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit-to-DEM analysis keys error aggregation by exact tag bytes so distinct opaque tags remain distinct output mechanisms."
+        },
+        "negative_axes": [
+          "opaque-error-tag-merge",
+          "tag-key-lossy-normalization",
+          "analyzer-output-byte-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-opaque-tag-folded-analyzer-contract",
+        "feature_id": "CQ-ANALYZER",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_analyzer_tags",
+            "folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Folded circuit-to-DEM analysis preserves distinct opaque error tags across compact repeat output and the final unrolled iteration."
+        },
+        "negative_axes": [
+          "folded-opaque-error-tag-merge",
+          "repeat-output-tag-loss",
+          "tag-key-lossy-normalization"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-opaque-analyzer-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m10::analyze_errors_opaque_error_tags_remain_distinct",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The public analyze_errors CLI preserves exact opaque tag bytes and does not aggregate same-effect errors carrying distinct tags."
+        },
+        "negative_axes": [
+          "cli-analyzer-tag-byte-loss",
+          "cli-opaque-error-tag-merge",
+          "stdout-utf8-replacement"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-opaque-folded-analyzer-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m10::analyze_errors_opaque_tag_bytes_survive_fold_loops",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The public analyze_errors --fold_loops CLI preserves exact opaque bytes in error, repeat, detector, and observable tags."
+        },
+        "negative_axes": [
+          "cli-folded-tag-byte-loss",
+          "repeat-declaration-tag-loss",
+          "stdout-utf8-replacement"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-parse-resource-span-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_parse_diagnostics",
+            "parse_resource_failures_carry_the_rejected_source_span",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Circuit and DEM line and repeat-depth admission failures expose the exact rejected source span through the typed resource diagnostic."
+        },
+        "negative_axes": [
+          "missing-resource-span",
+          "wrong-rejected-header",
+          "circuit-dem-span-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ResourceLimitError::span"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-flatten-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flatten_limits",
+            "policy_preserves_defaults_and_rejects_before_output_allocation",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit flattening preserves the established default, accepts the exact configured operation maximum, and rejects the first excess without allocation proportional to rejected target storage."
+        },
+        "negative_axes": [
+          "flatten-off-by-one",
+          "output-before-admission",
+          "typed-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_OPERATIONS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_operations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_operations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::analysis::flattened_circuit_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-flatten-payload-policy",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flatten_limits",
+            "retained_payload_dimensions_have_exact_boundaries",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit flattening independently admits retained target occurrences, argument values, and conservative materialized bytes at exact custom boundaries before fallible output reservation."
+        },
+        "negative_axes": [
+          "retained-target-undercount",
+          "retained-argument-undercount",
+          "conservative-byte-off-by-one",
+          "allocation-before-payload-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_TARGETS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_ARGUMENTS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_targets"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_arguments"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::max_materialized_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_targets"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_arguments"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CircuitFlattenLimits::with_max_materialized_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-flatten-payload-overflow",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flatten_limits",
+            "retained_payload_count_overflow_fails_before_materialization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Circuit flattening rejects retained-target and retained-argument count overflow before output reservation, recursive traversal, or payload materialization."
+        },
+        "negative_axes": [
+          "retained-target-overflow",
+          "retained-argument-overflow",
+          "materialization-before-overflow-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-flatten-repeat-envelope",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flatten_limits",
+            "programmatic_repeat_depth_is_admitted_before_recursive_flattening",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Programmatically constructed circuits accept the fixed 256-level recursive envelope and reject the first excess before recursive flatten traversal or output allocation."
+        },
+        "negative_axes": [
+          "programmatic-parser-bypass",
+          "repeat-depth-off-by-one",
+          "recursive-work-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::analysis::flattened_circuit_operations_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-flatten-platform-capacity",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flatten_limits",
+            "caller_raised_limit_cannot_exceed_platform_materialization_capacity",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A caller-raised flatten policy cannot bypass the platform's maximum instruction-vector capacity; both materialized adapters return a typed resource error before reservation or repeat traversal."
+        },
+        "negative_axes": [
+          "raised-policy-capacity-panic",
+          "platform-limit-bypass",
+          "allocation-before-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-flatten-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_flatten_limits",
+            "each_limit_accepts_its_exact_boundary_and_rejects_the_first_excess",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM flattening independently admits repeat count, aggregate repeat work, and expanded instructions at their configured maxima before materialization."
+        },
+        "negative_axes": [
+          "repeat-count-coupling",
+          "aggregate-work-coupling",
+          "expanded-output-off-by-one"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_REPEAT_UNROLL"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_REPEAT_ITERATIONS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::analysis::flattened_detector_error_model_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-flatten-payload-policy",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_flatten_limits",
+            "retained_payload_dimensions_have_exact_boundaries",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM flattening independently admits retained target occurrences, argument values, and conservative materialized bytes at exact custom boundaries before fallible output reservation."
+        },
+        "negative_axes": [
+          "retained-target-undercount",
+          "retained-argument-undercount",
+          "conservative-byte-off-by-one",
+          "allocation-before-payload-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_ARGUMENT_VALUES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_argument_values"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::max_materialized_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_argument_values"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemFlattenLimits::with_max_materialized_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-flatten-platform-capacity",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_flatten_limits",
+            "caller_raised_limit_cannot_exceed_platform_materialization_capacity",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A caller-raised DEM flatten policy cannot bypass the platform's maximum item-vector capacity and rejects before reservation or repeat traversal."
+        },
+        "negative_axes": [
+          "raised-policy-capacity-panic",
+          "platform-limit-bypass",
+          "allocation-before-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-flatten-default-repeat-boundaries",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_flatten_limits",
+            "practical_default_repeat_boundaries_are_executed_exactly",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Compact empty-body fixtures execute the real 100,000 repeat-count and 1,000,000 aggregate-repeat default maxima and reject the first aggregate excess without retaining expanded instructions."
+        },
+        "negative_axes": [
+          "default-repeat-boundary-drift",
+          "default-aggregate-off-by-one",
+          "unnecessary-empty-body-materialization"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-programmatic-depth-257-compatibility",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_traversal_depth",
+            "programmatic_folded_traversal_preserves_depth_257_compatibility",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Folded DEM summaries preserve the established programmatic depth-257 count behavior independently of the parsed-model repeat envelope."
+        },
+        "negative_axes": [
+          "programmatic-dem-depth-regression",
+          "parser-envelope-conflation",
+          "compact-summary-recursion"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-programmatic-repeat-stack-safety",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_traversal_depth",
+            "programmatic_folded_traversal_and_source_drop_use_bounded_stack",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "A 10,000-level programmatic DEM builds, clones, compares, formats a bounded debug summary, rounds probabilities, strips tags, summarizes, and drops every source and transformed model on a 64 KiB thread stack through iterative ownership operations."
+        },
+        "negative_axes": [
+          "recursive-folded-tree-construction",
+          "recursive-folded-tree-destruction",
+          "recursive-source-clone",
+          "recursive-source-equality",
+          "recursive-source-debug",
+          "recursive-source-rounding",
+          "recursive-source-tag-stripping",
+          "recursive-source-destruction",
+          "constrained-stack-overflow",
+          "deep-summary-rejection"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-record-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "record_width_is_admitted_at_the_limit_and_rejected_above_it",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Detection compilation accepts the exact measurement-record width and rejects the first excess with typed operation, resource, actual, and limit context."
+        },
+        "negative_axes": [
+          "record-width-off-by-one",
+          "compile-policy-bypass",
+          "typed-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_record_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_record_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDetectionConverter::compile_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-default-record-boundary",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "default_record_width_is_executed_exactly",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A single wide measurement executes the real 1,000,000-bit default record boundary and rejects 1,000,001 before compiled-plan materialization."
+        },
+        "negative_axes": [
+          "default-record-width-drift",
+          "default-record-off-by-one",
+          "materialization-before-width-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-work-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "repeat_and_expanded_instruction_limits_are_independent",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Detection compilation applies independent per-repeat and expanded-instruction limits so tightening one dimension cannot silently reinterpret the other."
+        },
+        "negative_axes": [
+          "repeat-expanded-coupling",
+          "expanded-instruction-off-by-one",
+          "repeat-count-off-by-one"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_expanded_instructions"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-repeat-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "nested_repeat_iterations_are_bounded_in_aggregate",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Nested detection repeats consume one aggregate iteration budget and reject the first excess without expanding the complete repeat product."
+        },
+        "negative_axes": [
+          "nested-repeat-undercount",
+          "repeat-product-materialization",
+          "aggregate-off-by-one"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_repeat_iterations"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-default-traversal-envelope",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "defaults_bound_aggregate_detection_traversal",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Default detection compilation applies finite expanded-instruction, aggregate-repeat, compiled-term, and compiled-byte ceilings and rejects compact nested work beyond the traversal envelope."
+        },
+        "negative_axes": [
+          "unbounded-default-traversal",
+          "compact-repeat-product-expansion",
+          "default-policy-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-programmatic-repeat-envelope",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "detection_repeat_nesting_accepts_the_fixed_boundary_and_rejects_the_next",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Detection conversion accepts the fixed 256-level model-safety envelope and rejects depth 257 with typed operation, repeat-nesting resource, actual, and limit context."
+        },
+        "negative_axes": [
+          "programmatic-circuit-depth-bypass",
+          "repeat-nesting-off-by-one",
+          "typed-context-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-programmatic-repeat-stack-safety",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "deeply_nested_programmatic_detection_circuits_reject_before_recursion",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Detection conversion rejects 10,000-level direct and detector-frame programmatic circuits on a 64 KiB thread stack before recursive conversion planning."
+        },
+        "negative_axes": [
+          "recursive-frame-prescan",
+          "recursive-direct-plan-admission",
+          "constrained-stack-overflow"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-default-traversal-boundaries",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "practical_default_traversal_boundaries_are_executed_exactly",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Detection compilation executes the real 1,000,000 expanded-instruction and aggregate-repeat default maxima and rejects each first excess through the typed resource boundary."
+        },
+        "negative_axes": [
+          "default-expanded-boundary-drift",
+          "default-repeat-aggregate-off-by-one",
+          "typed-context-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-compiled-plan-policy",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "compiled_term_and_byte_budgets_preflight_wide_repeats",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Detection compilation counts retained measurement terms and conservative compiled-plan bytes in a dry admission pass, accepts exact custom boundaries, and rejects the first excess before retaining terms."
+        },
+        "negative_axes": [
+          "compiled-term-undercount",
+          "compiled-byte-off-by-one",
+          "term-storage-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_compiled_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_compiled_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_compiled_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_compiled_bytes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-record-writer-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::tests::detection_record_writers_cover_text_and_bit_packed_formats",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Detection and observable writers produce exact 01, DETS, HITS, B8, and PTB64 bytes for detector-only, appended, prepended, and side-output layouts."
+        },
+        "negative_axes": [
+          "detector-observable-order-drift",
+          "result-format-byte-drift",
+          "ptb64-layout-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::write_detection_records"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::write_observable_records"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::write_ptb64_detection_records"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::write_ptb64_observable_records"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-materialization-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "materialized_buffers_are_bounded_but_streaming_records_are_not",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Materialized detection conversion charges all returned bits while streaming conversion retains only reusable per-record state and does not invent a total-stream cap."
+        },
+        "negative_axes": [
+          "materialized-size-overflow",
+          "stream-total-cap",
+          "buffer-policy-bypass"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::max_materialized_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectionConversionLimits::with_max_materialized_bits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::convert_measurements_to_detection_events_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-zero-width-materialization",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "zero_width_materialized_sampling_charges_record_ownership",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Zero-width detection output still charges one owned outer record per shot, accepts the exact custom boundary, rejects its first excess, and rejects usize::MAX before allocation."
+        },
+        "negative_axes": [
+          "zero-width-zero-cost",
+          "outer-record-capacity-panic",
+          "materialized-boundary-off-by-one"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-streamed-measurement-accounting",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "materialized_sampling_does_not_charge_streamed_measurement_records",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Materialized sampling charges returned detection-record ownership but not measurement records streamed through reusable conversion state; materialized conversion retains its separate input-buffer admission contract."
+        },
+        "negative_axes": [
+          "streamed-buffer-double-charge",
+          "returned-output-undercharge",
+          "sampling-conversion-policy-conflation"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-entry-policy-propagation",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "public_count_and_streaming_entry_points_apply_limits_before_work",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Public count-query and sampled-detection streaming entry points propagate the supplied compile policy and reject before sampling or visitor work."
+        },
+        "negative_axes": [
+          "count-query-policy-bypass",
+          "streaming-policy-bypass",
+          "visitor-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::measurement_record_count_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::detection_record_width_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::convert_measurements_to_detection_events_with_sweep_and_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::try_for_each_sampled_detection_event_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-detection-frame-policy-propagation",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "frame_validation_and_sampling_apply_policy_before_materialization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Detector-frame validation and sampling share one admitted conversion plan and apply the same custom repeat policy before execution-circuit materialization."
+        },
+        "negative_axes": [
+          "validation-sampling-policy-drift",
+          "frame-materialization-before-admission",
+          "wrong-resource-context"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::sample_detection_events_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::validate_detection_sampling_circuit_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-work-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "custom_limits_accept_exact_sampled_work_maximum_and_reject_first_excess",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "DEM sampling accepts the exact configured stochastic error-application work and rejects the first excess before RNG advancement or visitor work."
+        },
+        "negative_axes": [
+          "sample-work-off-by-one",
+          "rng-before-admission",
+          "visitor-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::max_sampled_error_applications"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::with_max_sampled_error_applications"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_with_seed_and_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-replay-work-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "replay_work_is_bounded_separately_from_returned_output",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "DEM replay accepts the exact configured traversal-work maximum, rejects the first excess with typed context, and does not misclassify caller-owned replay records as returned output units."
+        },
+        "negative_axes": [
+          "replay-work-off-by-one",
+          "caller-input-counted-as-returned-output",
+          "unbounded-replay-traversal"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::max_replay_work_units"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::with_max_replay_work_units"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::validate_replay_work_units"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::validate_replay_work_units_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-replay-work-overflow",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem_sampler::tests::replay_work_arithmetic_overflow_rejects_before_iteration",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "DEM replay validates the product of record count and per-record traversal width with checked arithmetic before iterating caller-owned error records."
+        },
+        "negative_axes": [
+          "replay-work-product-overflow",
+          "iteration-before-overflow-check",
+          "overflow-resource-misclassification"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-dem-replay-work-policy",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m11::sample_dem_replay_work_rejects_before_prefix_read_or_output_truncation",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "The sample_dem CLI admits total replay traversal work before scanning the replay prefix or truncating output, even though replay records are converted and written as a bounded stream."
+        },
+        "negative_axes": [
+          "per-record-policy-reset",
+          "replay-prefix-before-work-admission",
+          "output-truncation-before-work-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-unit-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "custom_limits_accept_exact_materialized_unit_maximum_and_reject_first_excess",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Materialized DEM sampling accepts the exact detector, observable, and error unit budget and rejects the first excess with typed context."
+        },
+        "negative_axes": [
+          "materialized-unit-off-by-one",
+          "output-before-admission",
+          "typed-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::max_materialized_units"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::with_max_materialized_units"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_with_seed_and_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-byte-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "custom_limits_accept_exact_materialized_byte_maximum_and_reject_first_excess",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "DEM sampling estimates retained record storage, accepts the exact byte maximum, and rejects the first excess before allocating the output vector."
+        },
+        "negative_axes": [
+          "materialized-byte-off-by-one",
+          "record-overhead-omission",
+          "allocation-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::max_materialized_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DemSamplerLimits::with_max_materialized_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::validate_sample_buffer_units_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-platform-capacity",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "caller_raised_limits_cannot_bypass_platform_vector_capacity",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Caller-raised DEM sampling policies cannot bypass the platform's vector capacity; an unrepresentable record container rejects before reservation or RNG construction."
+        },
+        "negative_axes": [
+          "raised-policy-capacity-panic",
+          "platform-limit-bypass",
+          "rng-before-capacity-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-error-record-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "public_validation_and_error_materialization_obey_custom_dem_sampler_limits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Public DEM-sampler validation and materialized detector-plus-error output accept the exact custom unit maximum, while sampled-error streaming rejects insufficient reusable scratch before invoking the visitor."
+        },
+        "negative_axes": [
+          "error-record-scratch-undercount",
+          "visitor-before-admission",
+          "materialized-streaming-policy-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_and_errors_with_seed_and_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_and_error_with_seed_and_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-sampler-replay-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "replay_charges_only_newly_materialized_detection_output",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Materialized replay charges only newly returned detector and observable storage, never caller-owned sampled-error input, while preserving replay semantics exactly."
+        },
+        "negative_axes": [
+          "replay-policy-bypass",
+          "replay-semantic-drift",
+          "caller-owned-input-double-charge"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_from_error_records_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-traversal-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_repeat_limits_cover_exact_and_nested_aggregate_boundaries",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Logical-error traversal independently admits per-repeat and aggregate repeat work, including compact nested repeats, before forwarding error mechanisms."
+        },
+        "negative_axes": [
+          "repeat-unroll-off-by-one",
+          "nested-repeat-undercount",
+          "visitor-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_repeat_iterations"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-default-repeat-boundaries",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_repeat_limits_execute_practical_default_maxima",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Logical-error traversal executes the real 100,000 repeat-count and 1,000,000 aggregate-repeat defaults and rejects each first excess through compact folded models."
+        },
+        "negative_axes": [
+          "default-repeat-boundary-drift",
+          "default-aggregate-off-by-one",
+          "compact-repeat-policy-bypass"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-mechanism-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_traversal_has_a_distinct_error_mechanism_cap",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Folded search traversal counts nonzero error mechanisms independently of annotations and rejects the first configured excess."
+        },
+        "negative_axes": [
+          "annotation-miscount",
+          "zero-probability-miscount",
+          "mechanism-limit-coupling"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_expanded_error_mechanisms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_expanded_error_mechanisms"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-target-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_traversal_rejects_large_error_target_lists_before_normalization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Search rejects a single oversized error target list before normalization, graph construction, or callback delivery."
+        },
+        "negative_axes": [
+          "pre-normalization-bypass",
+          "per-mechanism-off-by-one",
+          "callback-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_error_target_occurrences_per_mechanism"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_error_target_occurrences_per_mechanism"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-total-target-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Folded search traversal accumulates target occurrences across repeated error mechanisms and rejects the first aggregate excess."
+        },
+        "negative_axes": [
+          "aggregate-target-undercount",
+          "repeat-multiplier-loss",
+          "target-mechanism-coupling"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_total_error_target_occurrences"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_total_error_target_occurrences"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-traversal-overflow",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_traversal_counter_overflow_rejects_before_forwarding",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Logical-search traversal rejects mechanism and aggregate-target counter overflow before forwarding an error instruction to graph construction."
+        },
+        "negative_axes": [
+          "mechanism-counter-overflow",
+          "target-counter-overflow",
+          "callback-before-overflow-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-effective-node-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::error_traversal::tests::search_target_collection_has_a_distinct_effective_detector_cap",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Search target collection bounds the distinct effective detector set before allocating graph nodes or adjacency state."
+        },
+        "negative_axes": [
+          "sparse-id-dense-allocation",
+          "effective-node-off-by-one",
+          "node-mechanism-coupling"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_effective_detector_nodes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_effective_detector_nodes"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-graph-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::search_budget::tests::graph_construction_budget_enforces_edge_and_payload_limits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Graph construction separately admits unique edges and retained detector, observable, and adjacency payload before committing either counter."
+        },
+        "negative_axes": [
+          "edge-off-by-one",
+          "payload-undercount",
+          "partial-budget-commit"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_unique_graph_edges"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_unique_graph_edges"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_stored_graph_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_stored_graph_terms"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-hyperedge-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::hyper::limit_policy_tests::hyperedge_degree_and_incidence_rejections_leave_graph_unchanged",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Hypergraph construction admits edge degree and aggregate incidences before mutating the edge arena, node adjacency, or incidence counter."
+        },
+        "negative_axes": [
+          "hyperedge-degree-off-by-one",
+          "incidence-undercount",
+          "graph-mutation-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_hyperedge_degree"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_hyperedge_degree"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_hyperedge_incidences"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_hyperedge_incidences"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-default-hyperedge-degree-boundary",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::hyper::limit_policy_tests::default_hyperedge_degree_boundary_is_executed_exactly",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Hypergraph construction executes the production 4,096-detector edge boundary and rejects 4,097 before mutating edge or adjacency state."
+        },
+        "negative_axes": [
+          "default-hyperedge-degree-drift",
+          "default-hyperedge-off-by-one",
+          "graph-mutation-before-default-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-frontier-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::search_budget::tests::search_budget_enforces_state_and_transition_limits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Logical-search frontier admission independently bounds retained states and explored transitions at the exact configured maxima."
+        },
+        "negative_axes": [
+          "search-state-off-by-one",
+          "transition-off-by-one",
+          "state-transition-coupling"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_search_states"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_search_states"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_search_transitions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_search_transitions"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-frontier-payload-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "dem::search_budget::tests::search_budget_enforces_per_state_and_aggregate_payload_limits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Logical-search frontier admission separately bounds one state's detector and observable payload and the aggregate payload retained across all states."
+        },
+        "negative_axes": [
+          "per-state-payload-off-by-one",
+          "aggregate-payload-undercount",
+          "payload-before-state-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_search_state_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_search_state_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::max_stored_search_state_terms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::LogicalErrorSearchLimits::with_max_stored_search_state_terms"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-logical-search-public-entry-policy",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "logical_error_search_limits",
+            "public_search_entry_points_propagate_traversal_graph_and_frontier_limits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "Both graphlike and hypergraph public entry points propagate supplied traversal, graph-construction, and frontier policies with typed first-excess failures."
+        },
+        "negative_axes": [
+          "graphlike-policy-bypass",
+          "hypergraph-policy-bypass",
+          "state-retained-before-rejection"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::shortest_graphlike_undetectable_logical_error_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::find_undetectable_logical_error_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sat-default-policy-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sat_materialization_limits",
+            "default_policy_keeps_frozen_literals_and_existing_entry_points",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Explicit default SAT materialization policy reproduces every frozen production limit, legacy result, and first repeat rejection for shortest and weighted WCNF generation."
+        },
+        "negative_axes": [
+          "default-limit-drift",
+          "legacy-entry-drift",
+          "weighted-shortest-policy-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_REPEAT_UNROLL"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_REPEAT_ITERATIONS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_ERROR_MECHANISMS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_VARIABLES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_CLAUSES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_CLAUSE_LITERALS"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::DEFAULT_MAX_OUTPUT_BYTES"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_error_mechanisms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_variables"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_clauses"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_clause_literals"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::max_output_bytes"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::shortest_error_sat_problem_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::likeliest_error_sat_problem_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sat-traversal-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sat_materialization_limits",
+            "traversal_limits_accept_exact_maxima_and_reject_first_excesses",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "SAT traversal receives independent repeat-count, aggregate repeat-work, and expanded-instruction limits before error collection or CNF construction."
+        },
+        "negative_axes": [
+          "repeat-limit-coupling",
+          "expanded-work-undercount",
+          "collection-before-traversal-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_repeat_iterations"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sat-input-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sat_materialization_limits",
+            "flattened_error_and_target_limits_are_admitted_before_collection",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "SAT input admission counts flattened nonzero error mechanisms and target occurrences before collecting the corresponding owned vectors."
+        },
+        "negative_axes": [
+          "error-mechanism-off-by-one",
+          "target-occurrence-off-by-one",
+          "collection-before-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_error_mechanisms"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_target_occurrences"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sat-cnf-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sat_materialization_limits",
+            "cnf_shape_limits_accept_exact_maxima_and_reject_first_excess",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "SAT construction admits variables, clauses, and clause literals independently at their exact maxima before retaining the first excess CNF item."
+        },
+        "negative_axes": [
+          "variable-off-by-one",
+          "clause-off-by-one",
+          "literal-off-by-one"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_variables"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_clauses"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_clause_literals"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sat-output-policy-admission",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sat_materialization_limits",
+            "every_early_unsat_path_obeys_the_output_byte_limit",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Every early UNSAT result and ordinary WCNF serialization obey their exact encoded byte lengths before allocating or returning a string."
+        },
+        "negative_axes": [
+          "early-unsat-policy-bypass",
+          "output-byte-off-by-one",
+          "weighted-shortest-output-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::SatMaterializationLimits::with_max_output_bytes"
+          }
         ],
         "standalone": true
       },
@@ -4965,6 +8194,91 @@
           "help-json-reclassification",
           "version-json-reclassification",
           "display-stderr-routing"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-bounded-parser-diagnostics",
+        "feature_id": "CQ-CLI",
+        "comparator": "structural",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "--lib",
+            "tests::diagnostics::parser_diagnostics_bound_attacker_controlled_text_in_human_and_json_output",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Human and JSON CLI diagnostics preserve typed parse context and exact spans while refusing to echo attacker-sized gate tokens."
+        },
+        "negative_axes": [
+          "human-attacker-token-echo",
+          "json-attacker-token-echo",
+          "bounded-core-unbounded-cli"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-global-option-legacy-dispatch",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::global_error_format_can_precede_legacy_dispatch_and_help_topics",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The global error-format option can precede legacy sample, convert, and help dispatch without changing successful output or routing."
+        },
+        "negative_axes": [
+          "global-option-order",
+          "legacy-dispatch-skip",
+          "help-topic-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-opaque-model-metadata",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Canonical conversion preserves opaque tag bytes, sampling accepts opaque comments, and agent inspection accepts opaque DEM metadata through the shared byte parser."
+        },
+        "negative_axes": [
+          "cli-whole-input-utf8-decode",
+          "canonical-tag-byte-loss",
+          "agent-parser-drift"
         ],
         "standalone": true
       },
@@ -6410,6 +9724,62 @@
       "negative_axes": [
         "inactive-output-truncation",
         "inactive-input-open"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a2-cli-analyzer-admission-before-output-activation",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::m10::analyze_errors_admission_precedes_output_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "analyze_errors opens and identity-preflights its output path before parsing but does not truncate a pre-existing output until circuit parsing and detector-error-model analysis succeed."
+      },
+      "negative_axes": [
+        "parse-rejection-after-truncation",
+        "analysis-rejection-after-truncation",
+        "output-data-loss"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a2-cli-m2d-admission-before-output-activation",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::m9::path_io::m2d_converter_admission_precedes_output_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "m2d opens and identity-preflights every explicit path but does not truncate primary or observable outputs until detection-conversion admission succeeds."
+      },
+      "negative_axes": [
+        "conversion-admission-after-truncation",
+        "primary-output-data-loss",
+        "observable-output-data-loss"
       ],
       "standalone": true
     },

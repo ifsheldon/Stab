@@ -140,6 +140,94 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
+            Path::new("crates/stab-core/src/detection/output.rs"),
+            "stab_core::write_detection_records",
+        ),
+        Some(FeatureId::Detection)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/dem_sampler/limits.rs"),
+            "stab_core::DemSamplerLimits",
+        ),
+        Some(FeatureId::Resource)
+    );
+    for (source, api) in [
+        (
+            "crates/stab-core/src/circuit_transforms.rs",
+            "stab_core::CircuitFlattenLimits",
+        ),
+        ("crates/stab-core/src/dem.rs", "stab_core::DemFlattenLimits"),
+        (
+            "crates/stab-core/src/detection/limits.rs",
+            "stab_core::DetectionConversionLimits",
+        ),
+        (
+            "crates/stab-core/src/dem_sampler.rs",
+            "stab_core::DemSamplerLimits",
+        ),
+        (
+            "crates/stab-core/src/dem/search_budget.rs",
+            "stab_core::LogicalErrorSearchLimits",
+        ),
+        (
+            "crates/stab-core/src/dem/sat/limits.rs",
+            "stab_core::SatMaterializationLimits",
+        ),
+        (
+            "crates/stab-core/src/detection.rs",
+            "stab_core::CompiledDetectionConverter::compile_with_limits",
+        ),
+        (
+            "crates/stab-core/src/dem_sampler.rs",
+            "stab_core::CompiledDemSampler::sample_detection_events_with_seed_and_limits",
+        ),
+        (
+            "crates/stab-core/src/dem_sampler.rs",
+            "stab_core::CompiledDemSampler::validate_replay_work_units",
+        ),
+        (
+            "crates/stab-core/src/dem_sampler.rs",
+            "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records",
+        ),
+        (
+            "crates/stab-core/src/dem.rs",
+            "stab_core::find_undetectable_logical_error_with_limits",
+        ),
+    ] {
+        assert_eq!(
+            classify_public_api_source("stab_core", Path::new(source), api),
+            Some(FeatureId::Resource),
+            "{api}"
+        );
+    }
+    for api in [
+        "stab_core::ParseError",
+        "stab_core::ParseErrorCode",
+        "stab_core::ParseErrorContext",
+    ] {
+        assert_eq!(
+            classify_public_api_source(
+                "stab_core",
+                Path::new("crates/stab-core/src/diagnostics.rs"),
+                api,
+            ),
+            Some(FeatureId::StimFormat),
+            "{api}"
+        );
+    }
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/error.rs"),
+            "stab_core::CircuitError::parse_error",
+        ),
+        Some(FeatureId::StimFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
             Path::new("crates/stab-core/src/fingerprint.rs"),
             "stab_core::ModelFingerprint",
         ),

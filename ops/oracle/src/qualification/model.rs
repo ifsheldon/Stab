@@ -314,6 +314,19 @@ impl FeatureId {
             .find(|feature| feature.as_str() == value)
     }
 
+    pub(super) const fn default_comparator(self) -> Comparator {
+        match self {
+            Self::StimFormat | Self::DemFormat => Comparator::Canonical,
+            Self::ResultFormats | Self::Generation | Self::Cli => Comparator::ExactBytes,
+            Self::GateContract => Comparator::StateEquivalence,
+            Self::BitKernels | Self::CircuitApi | Self::Algebra => Comparator::Property,
+            Self::Sampling | Self::DemSampling => Comparator::Statistical,
+            Self::Detection | Self::Analyzer | Self::FlowUtils => Comparator::SemanticInvariant,
+            Self::Search => Comparator::Structural,
+            Self::Resource => Comparator::Resource,
+        }
+    }
+
     pub(super) const fn performance_groups(self) -> &'static [&'static str] {
         match self {
             Self::StimFormat => &["PERF-CIRCUIT-MODEL"],

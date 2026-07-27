@@ -1,13 +1,33 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
     RunFilter, RunMode, cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests,
-    compare_fixture, is_recordable,
+    compare_fixture,
+    hex_payload::decode as decode_hex_payload,
+    is_recordable,
     outputs::{self, FixtureArgToken},
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
 
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
 const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
+
+#[test]
+fn hex_fixture_payloads_preserve_arbitrary_bytes_and_reject_malformed_text() {
+    assert_eq!(
+        decode_hex_payload(b"00 ff\nA5 7e").expect("valid mixed-case hex"),
+        vec![0x00, 0xff, 0xa5, 0x7e]
+    );
+    assert!(
+        decode_hex_payload(b"abc")
+            .expect_err("odd digit count must reject")
+            .contains("even number")
+    );
+    assert!(
+        decode_hex_payload(b"fg")
+            .expect_err("non-hex digit must reject")
+            .contains("0x67")
+    );
+}
 
 fn process_output(status: Option<i32>, stdout: &[u8], stderr: &[u8]) -> crate::ProcessOutput {
     crate::ProcessOutput {

@@ -83,6 +83,7 @@ just oracle::run --all
 
 The fixture manifest lives at `oracle/fixtures/manifest.csv`.
 It records fixture ids, upstream sources, command shapes, parity modes, comparator types, expected statuses, implementation status, statistical plans, and source-license notes.
+Fixture input or expected-output paths ending in `.hex` contain reviewable hexadecimal payload text; ASCII whitespace is ignored, malformed or odd-length payloads fail closed, and oracle execution decodes the bytes before invoking Stim or Stab. Recording writes canonical lowercase hexadecimal plus one terminal newline.
 Manifest validation also requires every planned M4 through M11 P0/P1 C++ source from the compatibility matrix to have an explicit fixture row with the matching milestone and parity mode.
 Manifest `argv` tokens may use `{fixture_input:inputs/name.ext}` for validated fixture-relative side inputs and `{fixture_output:expected/name.ext}` for exact-output side files written by Stim and Stab during comparison.
 Both placeholder forms reject absolute paths, parent-directory traversal, symlinks in fixture paths, and missing fixture inputs; fixture-output placeholders require committed expected files during normal validation and `just oracle::record --check-clean` unless the row is a statistical fixture with `source=fixture_output`.
