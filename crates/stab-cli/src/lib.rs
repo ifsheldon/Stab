@@ -16,6 +16,7 @@ use std::path::PathBuf;
 mod analyze_errors;
 mod convert;
 mod detection;
+mod diagnostics;
 mod help;
 mod input;
 mod io_plan;
@@ -27,6 +28,10 @@ use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use convert::{ConvertArgs, run_convert};
 use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
+use diagnostics::{
+    CliError, ErrorFormatArg, probe_error_format, write_cli_error, write_frame0_deprecation,
+    write_prepend_observables_deprecation,
+};
 use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo};
@@ -39,7 +44,6 @@ use stab_core::{
     result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
 use streaming::write_ptb64_group;
-use thiserror::Error;
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 pub(crate) const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
@@ -52,6 +56,15 @@ pub(crate) const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
     about = "A Rust implementation of Stim-compatible core workflows."
 )]
 struct Cli {
+    /// Selects human-readable or JSON Lines diagnostics.
+    #[arg(
+        long = "error-format",
+        value_enum,
+        default_value_t = ErrorFormatArg::Human,
+        global = true
+    )]
+    error_format: ErrorFormatArg,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -259,99 +272,6 @@ struct SampleArgs {
     frame0: bool,
 }
 
-#[derive(Debug, Error)]
-pub(crate) enum CliError {
-    #[error("failed to read stdin: {0}")]
-    ReadInput(std::io::Error),
-
-    #[error("failed to read {path}: {source}")]
-    ReadPath {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("failed to write output: {0}")]
-    WriteOutput(std::io::Error),
-
-    #[error("failed to write {path}: {source}")]
-    WritePath {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("file roles {first} and {second} refer to the same file")]
-    ConflictingFileRoles {
-        first: &'static str,
-        second: &'static str,
-    },
-
-    #[error("internal CLI I/O plan invariant failed: {message}")]
-    IoPlanInvariant { message: &'static str },
-
-    #[error("{0}")]
-    Circuit(#[from] stab_core::CircuitError),
-
-    #[error("unsupported repetition_code task {task:?}; expected memory")]
-    UnsupportedRepetitionTask { task: String },
-
-    #[error(
-        "unsupported surface_code task {task:?}; expected rotated_memory_x, rotated_memory_z, unrotated_memory_x, or unrotated_memory_z"
-    )]
-    UnsupportedSurfaceTask { task: String },
-
-    #[error("unsupported color_code task {task:?}; expected memory_xyz")]
-    UnsupportedColorTask { task: String },
-
-    #[error(
-        "unsupported conversion; supported conversions are result formats 01, b8, r8, hits, dets, and ptb64 with explicit layout information, plus stim input to stim output"
-    )]
-    UnsupportedConversion,
-
-    #[error("{flag} is not valid for stim-to-stim conversion")]
-    UnsupportedStimConversionOption { flag: &'static str },
-
-    #[error("format {format} is not supported for detection data")]
-    UnsupportedDetectionFormat { format: &'static str },
-
-    #[error("cannot combine --prepend_observables, --append_observables, or --obs_out")]
-    ConflictingObservableRouting,
-
-    #[error("replay error input has {actual} records but --shots requested {expected}")]
-    ReplayErrorRecordCountMismatch { expected: usize, actual: usize },
-
-    #[error("{kind} is too large; limit is {limit} bytes")]
-    InputTooLarge { kind: &'static str, limit: u64 },
-
-    #[error("not enough information given to parse input file")]
-    MissingRecordWidth,
-
-    #[error(
-        "not enough information given to parse input file to write to dets; provide explicit measurement, detector, or observable counts"
-    )]
-    MissingRecordTypesForDets,
-
-    #[error("--circuit requires --types to select M, D, or L records")]
-    MissingConvertTypes,
-
-    #[error("--types contains unknown result type {result_type:?}; expected M, D, or L")]
-    UnknownConvertType { result_type: char },
-
-    #[error("--types contains duplicate result type {result_type}")]
-    DuplicateConvertType { result_type: char },
-
-    #[error("ptb64 output requires records in groups of 64; got trailing group of {count}")]
-    IncompletePtb64OutputGroup { count: usize },
-
-    #[error("unrecognized help topic {topic:?}")]
-    UnknownHelpTopic { topic: String },
-
-    #[error("input is not valid UTF-8 text")]
-    InvalidUtf8Input,
-
-    #[error("measurement count overflowed")]
-    MeasurementCountOverflow,
-}
-
 fn parse_stim_usize(value: &str) -> Result<usize, String> {
     let parsed = parse_stim_i64_compatible_u64(value)?;
     usize::try_from(parsed).map_err(|_| format!("{value:?} does not fit in usize"))
@@ -381,19 +301,28 @@ where
     E: Write,
 {
     let args = normalize_legacy_args(args);
+    let error_format_probe = probe_error_format(&args);
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(error) => {
-            return write_clap_error(error, stdout, stderr);
+            return write_clap_error(error, error_format_probe, stdout, stderr);
         }
     };
+    let Cli {
+        error_format,
+        command,
+    } = cli;
 
-    let result = match cli.command {
+    let result = match command {
         Some(Command::Help(args)) => run_help(args, &mut stdout),
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
         Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
-        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout, &mut stderr),
-        Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout, &mut stderr),
+        Some(Command::Sample(args)) => {
+            run_sample(args, error_format, &mut input, &mut stdout, &mut stderr)
+        }
+        Some(Command::Detect(args)) => {
+            run_detect(args, error_format, &mut input, &mut stdout, &mut stderr)
+        }
         Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout),
         Some(Command::AnalyzeErrors(args)) => run_analyze_errors(args, &mut input, &mut stdout),
         Some(Command::SampleDem(args)) => run_sample_dem(args, &mut input, &mut stdout),
@@ -402,14 +331,14 @@ where
                 ErrorKind::MissingSubcommand,
                 "no command was given; try --help",
             );
-            return write_clap_error(error, stdout, stderr);
+            return write_clap_error(error, error_format, stdout, stderr);
         }
     };
 
     match result {
         Ok(()) => 0,
         Err(error) => {
-            if writeln!(stderr, "error: {error}").is_err() {
+            if write_cli_error(&mut stderr, error_format, &error).is_err() {
                 return 1;
             }
             1
@@ -709,7 +638,12 @@ where
     }
 }
 
-fn write_clap_error<W, E>(error: clap::Error, mut stdout: W, mut stderr: E) -> i32
+fn write_clap_error<W, E>(
+    error: clap::Error,
+    error_format: ErrorFormatArg,
+    mut stdout: W,
+    mut stderr: E,
+) -> i32
 where
     W: Write,
     E: Write,
@@ -723,7 +657,11 @@ where
             0
         }
         _ => {
-            if write!(stderr, "{message}").is_err() {
+            let result = match error_format {
+                ErrorFormatArg::Human => write!(stderr, "{message}"),
+                ErrorFormatArg::Json => diagnostics::write_clap_error(&mut stderr, &error),
+            };
+            if result.is_err() {
                 return 1;
             }
             1
@@ -733,6 +671,7 @@ where
 
 fn run_sample<R, W, E>(
     args: SampleArgs,
+    error_format: ErrorFormatArg,
     input: &mut R,
     stdout: &mut W,
     stderr: &mut E,
@@ -750,11 +689,7 @@ where
         [(FileRole::Output, args.output.as_deref())],
     )?;
     if args.frame0 {
-        writeln!(
-            stderr,
-            "[DEPRECATION] Use `--skip_reference_sample` instead of `--frame0`"
-        )
-        .map_err(CliError::WriteOutput)?;
+        write_frame0_deprecation(stderr, error_format).map_err(CliError::WriteOutput)?;
     }
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
         read_limited_input_file(

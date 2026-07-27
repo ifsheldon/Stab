@@ -4,14 +4,15 @@ use std::path::PathBuf;
 
 use clap::Args;
 use stab_core::{
-    CircuitError, CompiledDetectionConverter, DetectionConversionOptions, DetectionEventRecord,
-    DetectionObservableOutputMode, circuit_with_inlined_feedback,
+    ByteSpan, CircuitError, CompiledDetectionConverter, DetectionConversionOptions,
+    DetectionEventRecord, DetectionObservableOutputMode, FormatError, FormatErrorCode,
+    circuit_with_inlined_feedback,
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
     try_for_each_sampled_detection_event, validate_detection_sampling_circuit,
 };
 
 use crate::{
-    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
+    CliError, ErrorFormatArg, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
     input::{read_limited_input_file, read_limited_line, read_limited_stdin},
     io_plan::{FileRole, InputFile, PendingIo},
     parse_circuit_bytes,
@@ -115,6 +116,7 @@ pub(crate) struct M2dArgs {
 
 pub(crate) fn run_detect<R, W, E>(
     args: DetectArgs,
+    error_format: ErrorFormatArg,
     input: &mut R,
     stdout: &mut W,
     stderr: &mut E,
@@ -134,11 +136,8 @@ where
         ],
     )?;
     if args.prepend_observables {
-        writeln!(
-            stderr,
-            "[DEPRECATION] Avoid using `--prepend_observables`. Data readers assume observables are appended, not prepended."
-        )
-        .map_err(CliError::WriteOutput)?;
+        crate::write_prepend_observables_deprecation(stderr, error_format)
+            .map_err(CliError::WriteOutput)?;
     }
     if args.shots == 0 {
         let mut outputs = io.activate()?;
@@ -370,6 +369,7 @@ struct M2dRecordStream<'a> {
     format: RecordFormatArg,
     bits_per_record: usize,
     kind: &'static str,
+    text_byte_offset: usize,
     ptb64_records: VecDeque<Vec<bool>>,
     empty_b8_zero_width_sweep_checked: bool,
 }
@@ -416,6 +416,7 @@ impl<'a> M2dRecordStream<'a> {
             format,
             bits_per_record,
             kind,
+            text_byte_offset: 0,
             ptb64_records: VecDeque::new(),
             empty_b8_zero_width_sweep_checked: false,
         }
@@ -463,9 +464,23 @@ impl<'a> M2dRecordStream<'a> {
             else {
                 return Ok(None);
             };
-            validate_m2d_text_record_terminator(&line, self.format, self.kind)?;
+            let record_byte_offset = self.text_byte_offset;
+            self.text_byte_offset = self
+                .text_byte_offset
+                .checked_add(line.len())
+                .ok_or(CliError::InputByteOffsetOverflow { kind: self.kind })?;
+            validate_m2d_text_record_terminator(&line, self.format, self.kind).map_err(
+                |source| CliError::InputRecord {
+                    byte_offset: record_byte_offset,
+                    source,
+                },
+            )?;
             let sample_format = self.format.sample_format()?;
-            let records = read_measurement_records(&line, sample_format, self.bits_per_record)?;
+            let records = read_measurement_records(&line, sample_format, self.bits_per_record)
+                .map_err(|source| CliError::InputRecord {
+                    byte_offset: record_byte_offset,
+                    source,
+                })?;
             if self.format == RecordFormatArg::Dets && records.is_empty() {
                 continue;
             }
@@ -563,13 +578,13 @@ fn validate_m2d_text_record_terminator(
     line: &[u8],
     format: RecordFormatArg,
     kind: &str,
-) -> Result<(), CliError> {
+) -> Result<(), CircuitError> {
     match format {
         RecordFormatArg::ZeroOne | RecordFormatArg::Hits if !line.ends_with(b"\n") => {
-            Err(invalid_result_format(format!(
-                "{} {} record must end with a newline",
-                kind,
-                format.name()
+            Err(CircuitError::from(FormatError::new(
+                FormatErrorCode::MissingRecordTerminator,
+                format!("{} {} record must end with a newline", kind, format.name()),
+                ByteSpan::try_new(line.len(), 0),
             )))
         }
         _ => Ok(()),

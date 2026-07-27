@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::result_formats::DetsResultType;
+
 /// A half-open byte range in the original input.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ByteSpan {
@@ -81,6 +83,24 @@ impl FormatErrorCode {
     }
 }
 
+/// Typed machine-readable details attached to result-format failures.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum FormatErrorContext {
+    None,
+    RecordWidth {
+        actual_bits: usize,
+        expected_bits: usize,
+    },
+    InvalidByte {
+        byte: u8,
+    },
+    Index {
+        result_type: Option<DetsResultType>,
+        index: u64,
+        exclusive_bound: usize,
+    },
+}
+
 /// A structured result-format diagnostic.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("{message}")]
@@ -89,15 +109,26 @@ pub struct FormatError {
     severity: DiagnosticSeverity,
     message: String,
     span: Option<ByteSpan>,
+    context: FormatErrorContext,
 }
 
 impl FormatError {
     pub fn new(code: FormatErrorCode, message: impl Into<String>, span: Option<ByteSpan>) -> Self {
+        Self::with_context(code, message, span, FormatErrorContext::None)
+    }
+
+    pub(crate) fn with_context(
+        code: FormatErrorCode,
+        message: impl Into<String>,
+        span: Option<ByteSpan>,
+        context: FormatErrorContext,
+    ) -> Self {
         Self {
             code,
             severity: DiagnosticSeverity::Error,
             message: message.into(),
             span,
+            context,
         }
     }
 
@@ -119,5 +150,9 @@ impl FormatError {
 
     pub const fn span(&self) -> Option<ByteSpan> {
         self.span
+    }
+
+    pub const fn context(&self) -> FormatErrorContext {
+        self.context
     }
 }

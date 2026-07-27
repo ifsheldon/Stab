@@ -109,7 +109,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `gate.rs`, `gate/**` | Model | Gate syntax and closed Stim scalar or textual descriptors remain model-owned; algebra-valued projections and decomposition parsing are implemented by `analysis/gate_adapters.rs`. |
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
-| `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span and severity primitives here while domain errors are introduced. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
+| `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, and typed-context primitives here while domain errors are introduced. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
 | `result_formats.rs`, `result_formats/**`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |
 | `sampling.rs`, `sampling/**`, `execution/**`, `detection.rs`, `detection/**`, `dem_sampler.rs`, `probability_util.rs` | Engine | Simulator-backed helpers, randomized bit generation, compilation, reusable state, detection conversion, and DEM sampling are execution concerns. |

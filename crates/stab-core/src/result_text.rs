@@ -1,5 +1,5 @@
 use crate::{
-    ByteSpan, CircuitError, CircuitResult, FormatErrorCode,
+    ByteSpan, CircuitError, CircuitResult, FormatErrorCode, FormatErrorContext,
     result_formats::{DetsLayout, DetsResultType, DetsToken},
 };
 
@@ -16,31 +16,40 @@ where
         let start = offset;
         for bit_index in 0..bits_per_record {
             let byte = input.get(offset).copied().ok_or_else(|| {
-                invalid_at(
+                invalid_at_with_context(
                     input,
                     offset,
                     FormatErrorCode::UnexpectedEndOfInput,
                     format!(
                         "01 data ended in the middle of a record at bit {bit_index}; expected {bits_per_record} bits"
                     ),
+                    FormatErrorContext::RecordWidth {
+                        actual_bits: bit_index,
+                        expected_bits: bits_per_record,
+                    },
                 )
             })?;
             if matches!(byte, b'\n' | b'\r') {
-                return Err(invalid_at(
+                return Err(invalid_at_with_context(
                     input,
                     offset,
                     FormatErrorCode::InvalidRecordWidth,
                     format!(
                         "01 record ended after {bit_index} bits; expected {bits_per_record} bits"
                     ),
+                    FormatErrorContext::RecordWidth {
+                        actual_bits: bit_index,
+                        expected_bits: bits_per_record,
+                    },
                 ));
             }
             if !matches!(byte, b'0' | b'1') {
-                return Err(invalid_at(
+                return Err(invalid_at_with_context(
                     input,
                     offset,
                     FormatErrorCode::InvalidByte,
                     format!("01 record contains non-bit byte {byte}"),
+                    FormatErrorContext::InvalidByte { byte },
                 ));
             }
             offset += 1;
@@ -87,10 +96,15 @@ where
                 )
             })?;
             if index >= bits_per_record {
-                return Err(CircuitError::invalid_result_format_diagnostic(
+                return Err(CircuitError::invalid_result_format_diagnostic_with_context(
                     FormatErrorCode::IndexOutOfRange,
                     format!("HITS index {value} exceeds record width {bits_per_record}"),
                     Some(parsed.span),
+                    FormatErrorContext::Index {
+                        result_type: None,
+                        index: value,
+                        exclusive_bound: bits_per_record,
+                    },
                 ));
             }
             hits.push(value);
@@ -225,13 +239,18 @@ where
                         DetsResultType::Observable => layout.observables(),
                     };
                     if index >= namespace_width {
-                        return Err(CircuitError::invalid_result_format_diagnostic(
+                        return Err(CircuitError::invalid_result_format_diagnostic_with_context(
                             FormatErrorCode::IndexOutOfRange,
                             format!(
                                 "DETS token {}{index} exceeds namespace width {namespace_width}",
                                 char::from(result_type.prefix())
                             ),
                             Some(parsed.span),
+                            FormatErrorContext::Index {
+                                result_type: Some(result_type),
+                                index: value,
+                                exclusive_bound: namespace_width,
+                            },
                         ));
                     }
                     layout.resolve(result_type, index)?;
@@ -354,5 +373,20 @@ fn invalid_at(
         code,
         message,
         ByteSpan::try_new(offset, usize::from(offset < input.len())),
+    )
+}
+
+fn invalid_at_with_context(
+    input: &[u8],
+    offset: usize,
+    code: FormatErrorCode,
+    message: impl Into<String>,
+    context: FormatErrorContext,
+) -> CircuitError {
+    CircuitError::invalid_result_format_diagnostic_with_context(
+        code,
+        message,
+        ByteSpan::try_new(offset, usize::from(offset < input.len())),
+        context,
     )
 }

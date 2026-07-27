@@ -46,6 +46,7 @@ Every command above finishes in well under a second at distance 3.
 Larger distances exercise much bigger simulations; Stab enforces documented resource bounds where Stim would attempt unbounded allocation.
 
 Use `stab help commands`, `stab help formats`, and `stab help gates` to explore the supported surface.
+Human-readable diagnostics remain the default; add `--error-format=json` to any command when an agent or tool needs one schema-version-1 JSON object per warning or error.
 
 ## Supported Platforms
 

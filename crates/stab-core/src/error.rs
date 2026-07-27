@@ -1,4 +1,4 @@
-use crate::{FormatError, FormatErrorCode};
+use crate::{FormatError, FormatErrorCode, FormatErrorContext};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -105,6 +105,15 @@ impl CircuitError {
         span: Option<crate::ByteSpan>,
     ) -> Self {
         Self::InvalidResultFormat(FormatError::new(code, message, span))
+    }
+
+    pub(crate) fn invalid_result_format_diagnostic_with_context(
+        code: FormatErrorCode,
+        message: impl Into<String>,
+        span: Option<crate::ByteSpan>,
+        context: FormatErrorContext,
+    ) -> Self {
+        Self::InvalidResultFormat(FormatError::with_context(code, message, span, context))
     }
 
     pub const fn format_error(&self) -> Option<&FormatError> {

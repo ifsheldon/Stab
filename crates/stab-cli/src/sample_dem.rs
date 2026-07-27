@@ -463,6 +463,7 @@ where
     let mut reader = BufReader::new(input);
     let mut records_read = 0usize;
     let mut skipped_dets_blank_bytes = 0usize;
+    let mut byte_offset = 0usize;
     while records_read < expected_shots {
         let Some(line) = read_limited_line(
             &mut reader,
@@ -476,10 +477,30 @@ where
                 actual: records_read,
             });
         };
+        let record_byte_offset = byte_offset;
+        byte_offset =
+            byte_offset
+                .checked_add(line.len())
+                .ok_or(CliError::InputByteOffsetOverflow {
+                    kind: "sample_dem replay text record",
+                })?;
         let parsed = if format == SampleDemRecordFormatArg::Hits {
-            vec![read_hits_replay_record(&line, error_count)?]
+            vec![
+                read_hits_replay_record(&line, error_count).map_err(|error| match error {
+                    CliError::Circuit(source) => CliError::InputRecord {
+                        byte_offset: record_byte_offset,
+                        source,
+                    },
+                    error => error,
+                })?,
+            ]
         } else {
-            read_measurement_records(&line, sample_format, error_count)?
+            read_measurement_records(&line, sample_format, error_count).map_err(|source| {
+                CliError::InputRecord {
+                    byte_offset: record_byte_offset,
+                    source,
+                }
+            })?
         };
         if format == SampleDemRecordFormatArg::Dets && parsed.is_empty() {
             skipped_dets_blank_bytes =

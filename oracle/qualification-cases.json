@@ -3451,6 +3451,10 @@
           },
           {
             "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatErrorContext"
+          },
+          {
+            "crate_name": "stab_core",
             "owner_path": "stab_core::FormatError::new"
           },
           {
@@ -3472,6 +3476,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::FormatError::span"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::FormatError::context"
           },
           {
             "crate_name": "stab_core",
@@ -3575,6 +3583,254 @@
           "double-space",
           "missing-index",
           "namespace-index-out-of-range"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-result-diagnostic-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::json_result_format_diagnostic_has_schema_span_and_typed_context",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "One malformed record proves the complete schema-version-1 JSON object, stable code, exact span, empty labels, null help, and typed width context."
+        },
+        "negative_axes": [
+          "schema-field-drift",
+          "message-parsing",
+          "span-loss",
+          "context-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-warning-order-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::json_warnings_and_errors_are_ordered_json_lines",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "A deprecated flag followed by invalid UTF-8 proves one bounded JSON object per diagnostic and warning-before-error order."
+        },
+        "negative_axes": [
+          "warning-loss",
+          "warning-error-coalescing",
+          "diagnostic-reordering"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-clap-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::clap_errors_use_json_only_for_one_unambiguous_request",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed argument vectors prove JSON selection for one valid request while duplicate and post-terminator spellings leave authority with Clap."
+        },
+        "negative_axes": [
+          "duplicate-mode-bypass",
+          "post-terminator-probe",
+          "clap-kind-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-m2d-absolute-span-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::m2d_streaming_diagnostic_shifts_second_record_span_to_input_offset",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Two bounded records prove that m2d translates record-local parser spans into absolute input byte offsets without materializing the input."
+        },
+        "negative_axes": [
+          "second-record-local-offset",
+          "prefix-output-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-replay-absolute-span-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::sample_dem_replay_diagnostic_shifts_second_record_span_to_input_offset",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Two bounded replay records prove absolute parser spans during retained-handle replay preflight."
+        },
+        "negative_axes": [
+          "second-record-local-offset",
+          "replay-preflight-span-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-alias-safety-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::json_mode_preserves_alias_rejection_before_truncation",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "One retained input sentinel proves JSON rendering does not move file-role rejection after output truncation."
+        },
+        "negative_axes": [
+          "input-truncation",
+          "file-role-context-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-writer-priority-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::json_mode_reports_the_original_output_writer_failure",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "An injected output failure proves conversion preserves the original writer error instead of exposing its visitor-stop sentinel."
+        },
+        "negative_axes": [
+          "callback-sentinel-priority",
+          "writer-error-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-human-diagnostic-preservation",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::human_result_format_diagnostic_remains_byte_exact",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "One malformed record freezes the complete pre-JSON human stderr bytes and exit class."
+        },
+        "negative_axes": [
+          "default-mode-drift",
+          "human-prefix-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-help-version-routing",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::help_and_version_remain_successful_human_stdout",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Help and version prove that requesting JSON diagnostics does not reclassify successful display operations as errors."
+        },
+        "negative_axes": [
+          "help-json-reclassification",
+          "version-json-reclassification",
+          "display-stderr-routing"
         ],
         "standalone": true
       },

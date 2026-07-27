@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "2fc7cc31e97de88a6c2707317b9c01ab0bf03e55ff0f7aa743f4918679021fee",
+  "semantic_digest": "b8ee2e2daa6a35e52d54713505c44ba08a1cd35a21a39ca77be60321bd55ea1c",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -56649,7 +56649,7 @@
       "path": "stab_cli::run_from",
       "kind": "function",
       "source_path": "crates/stab-cli/src/lib.rs",
-      "source_line": 375,
+      "source_line": 295,
       "owner_case_id": "cq-evidence-api-12ed696bea345f58",
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
@@ -58170,7 +58170,7 @@
       "path": "stab_core::ByteSpan",
       "kind": "struct",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 5,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58184,7 +58184,7 @@
       "path": "stab_core::ByteSpan as Clone for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58198,7 +58198,7 @@
       "path": "stab_core::ByteSpan as Copy for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58212,7 +58212,7 @@
       "path": "stab_core::ByteSpan as Debug for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58226,7 +58226,7 @@
       "path": "stab_core::ByteSpan as Eq for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58240,7 +58240,7 @@
       "path": "stab_core::ByteSpan as Hash for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58254,7 +58254,7 @@
       "path": "stab_core::ByteSpan as PartialEq for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58268,7 +58268,7 @@
       "path": "stab_core::ByteSpan as StructuralPartialEq for@f84b91e6be60",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 4,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58282,7 +58282,7 @@
       "path": "stab_core::ByteSpan::byte_end",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 29,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58296,7 +58296,7 @@
       "path": "stab_core::ByteSpan::byte_length",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 25,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58310,7 +58310,7 @@
       "path": "stab_core::ByteSpan::byte_start",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 21,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -58324,7 +58324,7 @@
       "path": "stab_core::ByteSpan::try_new",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 11,
+      "source_line": 13,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -59442,7 +59442,7 @@
       "path": "stab_core::CircuitError as From@ade2874edc42 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 132,
+      "source_line": 141,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60002,7 +60002,7 @@
       "path": "stab_core::CircuitError::format_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 110,
+      "source_line": 119,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65616,7 +65616,7 @@
       "path": "stab_core::DiagnosticSeverity",
       "kind": "enum",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 37,
+      "source_line": 39,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65630,7 +65630,7 @@
       "path": "stab_core::DiagnosticSeverity as Clone for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65644,7 +65644,7 @@
       "path": "stab_core::DiagnosticSeverity as Copy for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65658,7 +65658,7 @@
       "path": "stab_core::DiagnosticSeverity as Debug for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65672,7 +65672,7 @@
       "path": "stab_core::DiagnosticSeverity as Eq for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65686,7 +65686,7 @@
       "path": "stab_core::DiagnosticSeverity as Hash for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65700,7 +65700,7 @@
       "path": "stab_core::DiagnosticSeverity as PartialEq for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65714,7 +65714,7 @@
       "path": "stab_core::DiagnosticSeverity as StructuralPartialEq for@02e9dd46895b",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 35,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65728,7 +65728,7 @@
       "path": "stab_core::DiagnosticSeverity::Error",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 38,
+      "source_line": 40,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65742,7 +65742,7 @@
       "path": "stab_core::DiagnosticSeverity::Warning",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 39,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -65756,7 +65756,7 @@
       "path": "stab_core::DiagnosticSeverity::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 43,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66875,7 +66875,7 @@
       "path": "stab_core::FormatError",
       "kind": "struct",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 87,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66889,7 +66889,7 @@
       "path": "stab_core::FormatError as Clone for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66903,7 +66903,7 @@
       "path": "stab_core::FormatError as Debug for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66917,7 +66917,7 @@
       "path": "stab_core::FormatError as Display for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66931,7 +66931,7 @@
       "path": "stab_core::FormatError as Eq for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66945,7 +66945,7 @@
       "path": "stab_core::FormatError as Error for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66959,7 +66959,7 @@
       "path": "stab_core::FormatError as PartialEq for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66973,7 +66973,7 @@
       "path": "stab_core::FormatError as StructuralPartialEq for@e7b961d391f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 85,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -66987,7 +66987,21 @@
       "path": "stab_core::FormatError::code",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 108,
+      "source_line": 139,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-db26ecb310a3d2aa",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatError::context",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 155,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67001,7 +67015,7 @@
       "path": "stab_core::FormatError::invalid_data",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 104,
+      "source_line": 135,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67015,7 +67029,7 @@
       "path": "stab_core::FormatError::message",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 116,
+      "source_line": 147,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67029,7 +67043,7 @@
       "path": "stab_core::FormatError::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 95,
+      "source_line": 116,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67043,7 +67057,7 @@
       "path": "stab_core::FormatError::severity",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 112,
+      "source_line": 143,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67057,7 +67071,7 @@
       "path": "stab_core::FormatError::span",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 120,
+      "source_line": 151,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67071,7 +67085,7 @@
       "path": "stab_core::FormatErrorCode",
       "kind": "enum",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 54,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67085,7 +67099,7 @@
       "path": "stab_core::FormatErrorCode as Clone for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67099,7 +67113,7 @@
       "path": "stab_core::FormatErrorCode as Copy for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67113,7 +67127,7 @@
       "path": "stab_core::FormatErrorCode as Debug for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67127,7 +67141,7 @@
       "path": "stab_core::FormatErrorCode as Eq for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67141,7 +67155,7 @@
       "path": "stab_core::FormatErrorCode as Hash for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67155,7 +67169,7 @@
       "path": "stab_core::FormatErrorCode as PartialEq for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67169,7 +67183,7 @@
       "path": "stab_core::FormatErrorCode as StructuralPartialEq for@c27457c675c9",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 52,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67183,7 +67197,7 @@
       "path": "stab_core::FormatErrorCode::IndexOutOfRange",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 64,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67197,7 +67211,7 @@
       "path": "stab_core::FormatErrorCode::IntegerOverflow",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 63,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67211,7 +67225,7 @@
       "path": "stab_core::FormatErrorCode::InvalidByte",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 58,
+      "source_line": 60,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67225,7 +67239,7 @@
       "path": "stab_core::FormatErrorCode::InvalidData",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 55,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67239,7 +67253,7 @@
       "path": "stab_core::FormatErrorCode::InvalidPrefix",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 61,
+      "source_line": 63,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67253,7 +67267,7 @@
       "path": "stab_core::FormatErrorCode::InvalidRecordSeparator",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 60,
+      "source_line": 62,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67267,7 +67281,7 @@
       "path": "stab_core::FormatErrorCode::InvalidRecordWidth",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 57,
+      "source_line": 59,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67281,7 +67295,7 @@
       "path": "stab_core::FormatErrorCode::MissingIndex",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 62,
+      "source_line": 64,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67295,7 +67309,7 @@
       "path": "stab_core::FormatErrorCode::MissingRecordTerminator",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 59,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67309,7 +67323,7 @@
       "path": "stab_core::FormatErrorCode::UnexpectedEndOfInput",
       "kind": "variant",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 56,
+      "source_line": 58,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67323,7 +67337,259 @@
       "path": "stab_core::FormatErrorCode::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/diagnostics.rs",
-      "source_line": 68,
+      "source_line": 70,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-67d7fa791b032ce5",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext",
+      "kind": "enum",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 88,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-1dcba722370c412a",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as Clone for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-5ca88b30a2f60a00",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as Copy for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-659a98eec940947c",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as Debug for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-96c41e030f6ba099",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as Eq for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-1485523d9afab8b6",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as Hash for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-970af237665eb471",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as PartialEq for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-537a05fe47766d02",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext as StructuralPartialEq for@98b3de9ffee8",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-1b30db7346ce8933",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::Index",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 97,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-ffac6ec39e422b58",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::Index::exclusive_bound",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 100,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-8a919e5e08f06fa7",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::Index::index",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-83ae3784118f64fb",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::Index::result_type",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 98,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-3e089d2c9f910450",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::InvalidByte",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-be5e095d72f9c50d",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::InvalidByte::byte",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 95,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-2aaf0bc0a0cf64fa",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::None",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 89,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-74a8cd6a5e9f871d",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::RecordWidth",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 90,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-7867f4662c8f7c51",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::RecordWidth::actual_bits",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 91,
+      "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-d8db496cf9f6bbaa",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::FormatErrorContext::RecordWidth::expected_bits",
+      "kind": "field",
+      "source_path": "crates/stab-core/src/diagnostics.rs",
+      "source_line": 92,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -122188,6 +122454,55 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-41cbaac1b27a79af",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-warning-order-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_warnings_and_errors_are_ordered_json_lines",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A deprecated flag followed by invalid UTF-8 proves one bounded JSON object per diagnostic and warning-before-error order."
+      },
+      "negative_axes": [
+        "warning-loss",
+        "warning-error-coalescing",
+        "diagnostic-reordering"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-41f72583e3caaba6",
       "feature_id": "CQ-RESULT-FORMATS",
       "behavioral_surface": "file-format",
@@ -122394,6 +122709,54 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-46830cbf6567e970",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-alias-safety-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_mode_preserves_alias_rejection_before_truncation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "One retained input sentinel proves JSON rendering does not move file-role rejection after output truncation."
+      },
+      "negative_axes": [
+        "input-truncation",
+        "file-role-context-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -122873,6 +123236,54 @@
       ],
       "performance_groups": [
         "PERF-BIT-KERNELS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-4e2dda9697eb8ab1",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-clap-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::clap_errors_use_json_only_for_one_unambiguous_request",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Fixed argument vectors prove JSON selection for one valid request while duplicate and post-terminator spellings leave authority with Clap."
+      },
+      "negative_axes": [
+        "duplicate-mode-bypass",
+        "post-terminator-probe",
+        "clap-kind-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -123782,6 +124193,53 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-GENERATION"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-6ad821016818b052",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-writer-priority-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_mode_reports_the_original_output_writer_failure",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "An injected output failure proves conversion preserves the original writer error instead of exposing its visitor-stop sentinel."
+      },
+      "negative_axes": [
+        "callback-sentinel-priority",
+        "writer-error-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -126113,6 +126571,54 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-a330fe58623f38e3",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-human-diagnostic-preservation",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::human_result_format_diagnostic_remains_byte_exact",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "One malformed record freezes the complete pre-JSON human stderr bytes and exit class."
+      },
+      "negative_axes": [
+        "default-mode-drift",
+        "human-prefix-drift"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-a332fc484c66d6ba",
       "feature_id": "CQ-GENERATION",
       "behavioral_surface": "engine",
@@ -126213,6 +126719,102 @@
       ],
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-a66d8b4dee948fa2",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-replay-absolute-span-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::sample_dem_replay_diagnostic_shifts_second_record_span_to_input_offset",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Two bounded replay records prove absolute parser spans during retained-handle replay preflight."
+      },
+      "negative_axes": [
+        "second-record-local-offset",
+        "replay-preflight-span-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-a739e6b9bc118d19",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-help-version-routing",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::help_and_version_remain_successful_human_stdout",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Help and version prove that requesting JSON diagnostics does not reclassify successful display operations as errors."
+      },
+      "negative_axes": [
+        "help-json-reclassification",
+        "version-json-reclassification",
+        "display-stderr-routing"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -127522,6 +128124,54 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-c13a44e2c551fcf5",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-m2d-absolute-span-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::m2d_streaming_diagnostic_shifts_second_record_span_to_input_offset",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Two bounded records prove that m2d translates record-local parser spans into absolute input byte offsets without materializing the input."
+      },
+      "negative_axes": [
+        "second-record-local-offset",
+        "prefix-output-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -129953,6 +130603,56 @@
       ],
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-fdafe523bb27cb9f",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-json-result-diagnostic-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_result_format_diagnostic_has_schema_span_and_typed_context",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "One malformed record proves the complete schema-version-1 JSON object, stable code, exact span, empty labels, null help, and typed width context."
+      },
+      "negative_axes": [
+        "schema-field-drift",
+        "message-parsing",
+        "span-loss",
+        "context-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
