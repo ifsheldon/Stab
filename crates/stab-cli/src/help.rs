@@ -1,44 +1,15 @@
 use std::io::Write;
 
 use clap::Args;
-use stab_core::{Gate, GateCategory};
+use stab_core::{Gate, GateCategory, RecordFormat};
 
-use crate::{CliError, RecordFormatArg, write_output};
+use crate::{CliError, agent::command_descriptions, write_output};
 
 #[derive(Debug, Args)]
 pub(crate) struct HelpArgs {
     /// Optional help topic: commands, formats, gates, a command, a result format, or a gate.
     topic: Option<String>,
 }
-
-const COMMANDS: &[(&str, &str)] = &[
-    ("gen", "Generates supported example circuits."),
-    ("convert", "Converts result data between supported formats."),
-    ("sample", "Samples measurements from a circuit."),
-    (
-        "detect",
-        "Samples detector events and observable flips from a circuit.",
-    ),
-    ("m2d", "Converts measurements into detector events."),
-    (
-        "analyze_errors",
-        "Converts a circuit into a detector error model.",
-    ),
-    (
-        "sample_dem",
-        "Samples detection events from a detector error model.",
-    ),
-    ("help", "Prints help for commands, formats, and gates."),
-];
-
-const FORMATS: &[RecordFormatArg] = &[
-    RecordFormatArg::ZeroOne,
-    RecordFormatArg::B8,
-    RecordFormatArg::R8,
-    RecordFormatArg::Hits,
-    RecordFormatArg::Dets,
-    RecordFormatArg::Ptb64,
-];
 
 pub(crate) fn run_help<W>(args: HelpArgs, stdout: &mut W) -> Result<(), CliError>
 where
@@ -57,11 +28,7 @@ fn topic_help(topic: &str) -> Result<String, CliError> {
     if let Some(text) = command_help(topic) {
         return Ok(text);
     }
-    if let Some(format) = FORMATS
-        .iter()
-        .copied()
-        .find(|format| format.name() == topic)
-    {
+    if let Some(format) = RecordFormat::all().find(|format| format.as_str() == topic) {
         return Ok(format_help(format));
     }
     if let Ok(gate) = Gate::from_name(topic) {
@@ -78,18 +45,20 @@ fn command_list_help() -> String {
         "Stab(ilizer): an agent-native simulation toolkit for quantum error correction research,\nwritten in safe Rust. It implements selected Stim v1.16.0-compatible command, .stim circuit,\n.dem detector error model, and 01, b8, r8, hits, dets, and ptb64 result-format workflows.\n\n",
     );
     out.push_str("Available stab commands:\n\n");
-    for (name, summary) in COMMANDS {
+    for (name, summary) in command_descriptions() {
         out.push_str("    stab ");
-        out.push_str(name);
+        out.push_str(&name);
         out.push_str("    # ");
-        out.push_str(summary);
+        out.push_str(&summary);
         out.push('\n');
     }
     out.push_str("\nExample:\n");
     out.push_str("    stab gen --code repetition_code --task memory --distance 3 --rounds 3 --out circuit.stim\n");
     out.push_str("    stab sample --shots 100 --in circuit.stim --out shots.01\n");
     out.push_str("\nUse `stab help [topic]` for help on commands, formats, and gates.\n");
-    out.push_str("Useful topics: commands, formats, gates, convert, sample, 01, ptb64, H.\n");
+    out.push_str(
+        "Useful topics: commands, formats, gates, capabilities, inspect, plan, sample, 01, ptb64, H.\n",
+    );
     out.push_str("Use `--error-format=json` for schema-version-1 JSON Lines diagnostics.\n");
     out.push_str("\nDocs and sources: ");
     out.push_str(env!("CARGO_PKG_REPOSITORY"));
@@ -100,11 +69,11 @@ fn command_list_help() -> String {
 fn format_list_help() -> String {
     let mut out = String::new();
     out.push_str("Supported result formats:\n\n");
-    for format in FORMATS {
+    for format in RecordFormat::all() {
         out.push_str("    ");
-        out.push_str(format.name());
+        out.push_str(format.as_str());
         out.push_str("    # ");
-        out.push_str(format_summary(*format));
+        out.push_str(format_summary(format));
         out.push('\n');
     }
     out
@@ -124,6 +93,15 @@ fn command_help(command: &str) -> Option<String> {
     let text = match command {
         "gen" => {
             "stab gen\n\nGenerates supported repetition, surface, and color-code circuits.\n\nKey flags: --code, --task, --distance, --rounds, --out, and supported noise probabilities.\n"
+        }
+        "capabilities" => {
+            "stab capabilities\n\nReports commands, model dialects, gate syntax, result codecs, compilers, parse defaults, and selectable backends from source-owned descriptors.\n\nUse --format=json for schema-version-1 machine output.\n"
+        }
+        "inspect" => {
+            "stab inspect [INPUT]\n\nParses and summarizes a .stim circuit or .dem detector error model without compiling or executing it.\n\nUse --type=stim or --type=dem for stdin or paths without a recognized extension. Use --format=json for schema-version-1 machine output.\n"
+        }
+        "plan" => {
+            "stab plan sample [INPUT]\n\nValidates and describes a sampling request without executing shots.\n\nRun configuration remains separate from the backend-neutral compilation-request fingerprint. Use --format=json for schema-version-1 machine output.\n"
         }
         "convert" => {
             "stab convert\n\nConverts result data between 01, b8, r8, hits, dets, and ptb64 formats.\n\nLayout flags: --num_measurements, --num_detectors, --num_observables, --bits_per_shot, --circuit, --dem, and --types.\n\nI/O flags: --in_format, --out_format, --in, --out, --obs_out, and --obs_out_format.\n\nThe Stab extension `--in_format=stim --out_format=stim` canonicalizes .stim circuit text.\n"
@@ -151,10 +129,10 @@ fn command_help(command: &str) -> Option<String> {
     Some(text.to_string())
 }
 
-fn format_help(format: RecordFormatArg) -> String {
+fn format_help(format: RecordFormat) -> String {
     let mut out = String::new();
     out.push_str("Result format ");
-    out.push_str(format.name());
+    out.push_str(format.as_str());
     out.push_str("\n\n");
     out.push_str(format_summary(format));
     out.push('\n');
@@ -162,39 +140,35 @@ fn format_help(format: RecordFormatArg) -> String {
     out
 }
 
-fn format_summary(format: RecordFormatArg) -> &'static str {
+fn format_summary(format: RecordFormat) -> &'static str {
     match format {
-        RecordFormatArg::ZeroOne => "text records made from 0 and 1 characters",
-        RecordFormatArg::B8 => "little-endian bit-packed bytes",
-        RecordFormatArg::R8 => "run-length encoded sparse hits",
-        RecordFormatArg::Hits => "comma-separated sparse hit indexes",
-        RecordFormatArg::Dets => "sparse text records using shot plus M, D, and L prefixes",
-        RecordFormatArg::Ptb64 => "64-shot transposed little-endian packed bits",
-        RecordFormatArg::Stim => {
-            ".stim circuit text, supported only by the Stab canonical convert extension"
-        }
+        RecordFormat::ZeroOne => "text records made from 0 and 1 characters",
+        RecordFormat::B8 => "little-endian bit-packed bytes",
+        RecordFormat::R8 => "run-length encoded sparse hits",
+        RecordFormat::Hits => "comma-separated sparse hit indexes",
+        RecordFormat::Dets => "sparse text records using shot plus M, D, and L prefixes",
+        RecordFormat::Ptb64 => "64-shot transposed little-endian packed bits",
+        _ => "registered result records",
     }
 }
 
-fn format_details(format: RecordFormatArg) -> &'static str {
+fn format_details(format: RecordFormat) -> &'static str {
     match format {
-        RecordFormatArg::ZeroOne => "Each record is one line. The first character is bit 0.\n",
-        RecordFormatArg::B8 => {
+        RecordFormat::ZeroOne => "Each record is one line. The first character is bit 0.\n",
+        RecordFormat::B8 => {
             "Each record uses ceil(width / 8) bytes. Bit 0 is the low bit of the first byte.\n"
         }
-        RecordFormatArg::R8 => {
+        RecordFormat::R8 => {
             "Each record stores zero-run lengths between set bits and ends when the record width is reached.\n"
         }
-        RecordFormatArg::Hits => "Each record is a comma-separated list of set bit indexes.\n",
-        RecordFormatArg::Dets => {
+        RecordFormat::Hits => "Each record is a comma-separated list of set bit indexes.\n",
+        RecordFormat::Dets => {
             "Each record starts with `shot`, followed by sparse terms such as M0, D1, or L2 when the layout includes those result types.\n"
         }
-        RecordFormatArg::Ptb64 => {
+        RecordFormat::Ptb64 => {
             "Records are written in groups of exactly 64 shots. For each result bit, one little-endian u64 stores that bit for the 64 shots.\n"
         }
-        RecordFormatArg::Stim => {
-            "Use `stab convert --in_format=stim --out_format=stim` to parse and canonicalize circuit text.\n"
-        }
+        _ => "This format is registered by the Stab records component.\n",
     }
 }
 

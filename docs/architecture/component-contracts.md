@@ -123,4 +123,6 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `error.rs` | Facade, temporarily | A2 splits typed domain diagnostics while retaining lossless facade conversion; result-format failures wrap `FormatError`, and configurable admission failures wrap `ResourceLimitError`, without changing their established human display. |
 | `lib.rs` | Facade | Root reexports remain curated compatibility adapters and do not determine implementation ownership. |
 
+`stab-cli/src/agent.rs` is a CLI adapter, not a new product component. It discovers commands from Clap, renders core descriptors and identities, reuses retained-handle input admission, and may compose parsing, compilation validation, and estimates. It must not become an alternate source of gate, codec, compiler, backend, or qualification truth.
+
 New source modules must fit exactly one row or update this table and the architecture decision record in the same change.

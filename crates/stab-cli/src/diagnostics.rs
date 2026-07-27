@@ -41,6 +41,15 @@ pub(crate) enum CliError {
     #[error("internal CLI I/O plan invariant failed: {message}")]
     IoPlanInvariant { message: &'static str },
 
+    #[error("cannot infer model type from stdin; pass --type=stim or --type=dem")]
+    MissingInspectModelType,
+
+    #[error("cannot infer model type from path {path}; pass --type=stim or --type=dem")]
+    UnknownInspectModelType { path: PathBuf },
+
+    #[error("failed to serialize agent output: {0}")]
+    SerializeAgentOutput(serde_json::Error),
+
     #[error("{0}")]
     Circuit(#[from] CircuitError),
 
@@ -298,6 +307,9 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::WritePath { .. } => "path-write-failed",
         CliError::ConflictingFileRoles { .. } => "conflicting-file-roles",
         CliError::IoPlanInvariant { .. } => "io-plan-invariant-failed",
+        CliError::MissingInspectModelType => "missing-inspect-model-type",
+        CliError::UnknownInspectModelType { .. } => "unknown-inspect-model-type",
+        CliError::SerializeAgentOutput(_) => "agent-output-serialization-failed",
         CliError::Circuit(error) => circuit_error_code(error),
         CliError::InputRecord { source, .. } => circuit_error_code(source),
         CliError::InputByteOffsetOverflow { .. } => "input-byte-offset-overflow",
@@ -348,6 +360,9 @@ fn cli_error_help(error: &CliError) -> Option<&'static str> {
         CliError::MissingRecordWidth => Some("Provide layout counts or `--bits_per_shot`."),
         CliError::MissingConvertTypes => Some("Add `--types` with unique M, D, or L letters."),
         CliError::UnknownHelpTopic { .. } => Some("Run `stab help commands` to list help topics."),
+        CliError::MissingInspectModelType | CliError::UnknownInspectModelType { .. } => {
+            Some("Pass `--type=stim` for a circuit or `--type=dem` for a detector error model.")
+        }
         _ => None,
     }
 }
@@ -365,6 +380,13 @@ fn cli_error_context(error: &CliError) -> Value {
         CliError::IoPlanInvariant { message } => json!({
             "invariant": message,
         }),
+        CliError::MissingInspectModelType => json!({
+            "input": "stdin",
+        }),
+        CliError::UnknownInspectModelType { path } => json!({
+            "path": path.to_string_lossy(),
+        }),
+        CliError::SerializeAgentOutput(_) => json!({}),
         CliError::Circuit(error) => circuit_error_context(error),
         CliError::InputRecord { source, .. } => circuit_error_context(source),
         CliError::InputByteOffsetOverflow { kind } => json!({

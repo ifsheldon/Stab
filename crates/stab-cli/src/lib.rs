@@ -13,6 +13,7 @@ use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+mod agent;
 mod analyze_errors;
 mod convert;
 mod detection;
@@ -23,6 +24,7 @@ mod io_plan;
 mod sample_dem;
 mod streaming;
 
+use agent::{CapabilitiesArgs, InspectArgs, PlanArgs, run_capabilities, run_inspect, run_plan};
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
@@ -73,6 +75,15 @@ struct Cli {
 enum Command {
     /// Prints Stab-native command, format, and gate help.
     Help(HelpArgs),
+
+    /// Reports machine-readable product capabilities.
+    Capabilities(CapabilitiesArgs),
+
+    /// Parses and summarizes a circuit or detector error model without executing it.
+    Inspect(InspectArgs),
+
+    /// Validates and describes an operation without executing it.
+    Plan(PlanArgs),
 
     /// Generates example circuits.
     Gen(GenArgs),
@@ -184,14 +195,19 @@ enum RecordFormatArg {
 
 impl RecordFormatArg {
     fn name(self) -> &'static str {
+        self.record_format()
+            .map_or("stim", stab_core::RecordFormat::as_str)
+    }
+
+    fn record_format(self) -> Option<stab_core::RecordFormat> {
         match self {
-            Self::ZeroOne => "01",
-            Self::B8 => "b8",
-            Self::R8 => "r8",
-            Self::Ptb64 => "ptb64",
-            Self::Hits => "hits",
-            Self::Dets => "dets",
-            Self::Stim => "stim",
+            Self::ZeroOne => Some(stab_core::RecordFormat::ZeroOne),
+            Self::B8 => Some(stab_core::RecordFormat::B8),
+            Self::R8 => Some(stab_core::RecordFormat::R8),
+            Self::Ptb64 => Some(stab_core::RecordFormat::Ptb64),
+            Self::Hits => Some(stab_core::RecordFormat::Hits),
+            Self::Dets => Some(stab_core::RecordFormat::Dets),
+            Self::Stim => None,
         }
     }
 
@@ -225,6 +241,17 @@ enum SampleOutFormatArg {
 }
 
 impl SampleOutFormatArg {
+    fn record_format(self) -> stab_core::RecordFormat {
+        match self {
+            Self::ZeroOne => stab_core::RecordFormat::ZeroOne,
+            Self::B8 => stab_core::RecordFormat::B8,
+            Self::R8 => stab_core::RecordFormat::R8,
+            Self::Ptb64 => stab_core::RecordFormat::Ptb64,
+            Self::Hits => stab_core::RecordFormat::Hits,
+            Self::Dets => stab_core::RecordFormat::Dets,
+        }
+    }
+
     fn sample_format(self) -> Result<SampleFormat, CliError> {
         match self {
             Self::ZeroOne => Ok(SampleFormat::ZeroOne),
@@ -315,6 +342,9 @@ where
 
     let result = match command {
         Some(Command::Help(args)) => run_help(args, &mut stdout),
+        Some(Command::Capabilities(args)) => run_capabilities(args, &mut stdout),
+        Some(Command::Inspect(args)) => run_inspect(args, &mut input, &mut stdout),
+        Some(Command::Plan(args)) => run_plan(args, &mut input, &mut stdout),
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
         Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
         Some(Command::Sample(args)) => {

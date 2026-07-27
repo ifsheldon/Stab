@@ -27,6 +27,9 @@ fn help_lists_implemented_commands_for_help_spellings() {
         assert_eq!(status, 0, "{args:?}");
         assert_eq!(stderr, "", "{args:?}");
         assert!(stdout.contains("Available stab commands"), "{stdout}");
+        assert!(stdout.contains("stab capabilities"), "{stdout}");
+        assert!(stdout.contains("stab inspect"), "{stdout}");
+        assert!(stdout.contains("stab plan sample"), "{stdout}");
         assert!(stdout.contains("stab convert"), "{stdout}");
         assert!(stdout.contains("stab sample_dem"), "{stdout}");
         assert!(!stdout.contains("stab diagram"), "{stdout}");
@@ -37,6 +40,12 @@ fn help_lists_implemented_commands_for_help_spellings() {
 fn help_topics_cover_commands_formats_and_gates() {
     for (args, expected) in [
         (&["stab", "help", "convert"][..], "--obs_out_format"),
+        (
+            &["stab", "help", "capabilities"][..],
+            "source-owned descriptors",
+        ),
+        (&["stab", "help", "inspect"][..], "--type=stim"),
+        (&["stab", "help", "plan"][..], "without executing shots"),
         (
             &["stab", "help", "analyze_errors"][..],
             "--block_decompose_from_introducing_remnant_edges",

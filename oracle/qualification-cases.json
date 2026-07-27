@@ -4931,6 +4931,208 @@
         "standalone": true
       },
       {
+        "id": "a2-cli-capability-discovery-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::capabilities_json_is_generated_from_product_and_clap_descriptors",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "One schema-version-1 report proves that CLI commands, closed gate syntax, result codecs, compiler registrations, parse defaults, and the empty selectable-backend set come from their owning product descriptors."
+        },
+        "negative_axes": [
+          "manual-command-drift",
+          "manual-gate-drift",
+          "manual-codec-drift",
+          "placeholder-backend-claim",
+          "execution-support-overclaim"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-model-inspection-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::inspect_json_reports_exact_circuit_and_dem_structure_without_execution",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Small circuit and DEM inputs prove exact dialect-specific counts, source facts, structural fingerprints, parse-estimate classifications, and the explicit no-execution result."
+        },
+        "negative_axes": [
+          "dialect-field-alias",
+          "circuit-dem-count-alias",
+          "fingerprint-loss",
+          "unknown-estimate-promoted-to-zero",
+          "execution-side-effect"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-model-inspection-admission-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::inspect_rejects_oversized_files_before_reading_them",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A sparse file one byte beyond the existing 64 MiB CLI input envelope proves metadata-first rejection before content materialization."
+        },
+        "negative_axes": [
+          "oversized-input-read",
+          "input-limit-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-agent-diagnostic-routing-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::agent_commands_route_parse_and_compile_failures_through_json_diagnostics",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Invalid UTF-8 inspection and rejected sampler compilation prove that the new successful-output mode remains independent from the global schema-version-1 diagnostic channel."
+        },
+        "negative_axes": [
+          "successful-output-error-envelope",
+          "invalid-utf8-code-loss",
+          "compile-error-code-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-sampling-plan-identity-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::plan_sample_separates_compilation_identity_from_run_configuration",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Two validated requests over one circuit prove that shots, seed, reference mode, output format, and the accepted loop-folding no-op remain outside backend-neutral compilation identity."
+        },
+        "negative_axes": [
+          "shots-in-compilation-identity",
+          "seed-in-compilation-identity",
+          "codec-in-compilation-identity",
+          "reference-mode-in-compilation-identity",
+          "no-op-in-compilation-identity",
+          "placeholder-backend"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-sampling-plan-no-execution-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_samples",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical output, proving validation and estimation do not consume randomness or execute a shot."
+        },
+        "negative_axes": [
+          "planning-consumes-randomness",
+          "planning-executes-shot",
+          "unknown-output-estimate",
+          "nondeterministic-report"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-sampling-plan-visible-output-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::plan_sample_matches_one_shot_herald_filtering_output_width",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "One heralded record plus one ordinary measurement proves planned fixed-width output bytes match the existing Stim-compatible one-shot CLI visibility rule."
+        },
+        "negative_axes": [
+          "herald-column-overcount",
+          "plan-execution-output-drift"
+        ],
+        "standalone": true
+      },
+      {
         "id": "cq2-result-dets-public-type-contract",
         "feature_id": "CQ-RESULT-FORMATS",
         "comparator": "exact-value",

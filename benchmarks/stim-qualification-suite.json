@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "6ef5542cec398d1a8cf58a8751575698e75c85465da25bfb79f4fbce6b3eb5c8",
-  "semantic_digest": "71cd56407ab52234be1192189653f84ae7c0a50f53b43b29d4e82d9c8f1d4cb4",
+  "correctness_digest": "286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295",
+  "semantic_digest": "012b51cfe72a54cd6cbb22051ae56d94cc91d9b7f65aa7bbd7ba569fdb5fc562",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -3607,7 +3607,7 @@
     {
       "id": "PERFC-e506fabb116fcd08",
       "source_line": 20,
-      "anchor_digest": "f2743699c941aa6f232fe95db2830e16945f04bef62475f89cc6098df98d631a",
+      "anchor_digest": "43e3acdff67a1f1ea07618b8bc8304d30aead6962d0a1b4947a25ac8da72b24c",
       "section": "1. Top-Level Product Surface",
       "feature": "CLI binary",
       "raw_status": "Done for selected Stab CLI surface",

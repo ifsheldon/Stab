@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "6ef5542cec398d1a8cf58a8751575698e75c85465da25bfb79f4fbce6b3eb5c8",
+  "semantic_digest": "286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -56649,7 +56649,7 @@
       "path": "stab_cli::run_from",
       "kind": "function",
       "source_path": "crates/stab-cli/src/lib.rs",
-      "source_line": 295,
+      "source_line": 322,
       "owner_case_id": "cq-evidence-api-12ed696bea345f58",
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
@@ -124636,6 +124636,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-09a06df3b5eddccf",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-capability-discovery-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::capabilities_json_is_generated_from_product_and_clap_descriptors",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One schema-version-1 report proves that CLI commands, closed gate syntax, result codecs, compiler registrations, parse defaults, and the empty selectable-backend set come from their owning product descriptors."
+      },
+      "negative_axes": [
+        "manual-command-drift",
+        "manual-gate-drift",
+        "manual-codec-drift",
+        "placeholder-backend-claim",
+        "execution-support-overclaim"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-0a4be178ce1c903b",
       "feature_id": "CQ-ALGEBRA",
       "behavioral_surface": "engine",
@@ -127522,6 +127573,53 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-49b6860a430f72d9",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-model-inspection-admission-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::inspect_rejects_oversized_files_before_reading_them",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A sparse file one byte beyond the existing 64 MiB CLI input envelope proves metadata-first rejection before content materialization."
+      },
+      "negative_axes": [
+        "oversized-input-read",
+        "input-limit-drift"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-4a6aec589376fe2f",
       "feature_id": "CQ-ALGEBRA",
       "behavioral_surface": "engine",
@@ -128338,6 +128436,55 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-58a6ddc3174389e9",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-agent-diagnostic-routing-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::agent_commands_route_parse_and_compile_failures_through_json_diagnostics",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Invalid UTF-8 inspection and rejected sampler compilation prove that the new successful-output mode remains independent from the global schema-version-1 diagnostic channel."
+      },
+      "negative_axes": [
+        "successful-output-error-envelope",
+        "invalid-utf8-code-loss",
+        "compile-error-code-loss"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-5945540dfaa8e389",
       "feature_id": "CQ-ALGEBRA",
       "behavioral_surface": "engine",
@@ -128752,6 +128899,54 @@
       ],
       "performance_groups": [
         "PERF-BIT-KERNELS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-66ee5fdeccae8d69",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-sampling-plan-visible-output-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_matches_one_shot_herald_filtering_output_width",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One heralded record plus one ordinary measurement proves planned fixed-width output bytes match the existing Stim-compatible one-shot CLI visibility rule."
+      },
+      "negative_axes": [
+        "herald-column-overcount",
+        "plan-execution-output-drift"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -129466,6 +129661,57 @@
       ],
       "performance_groups": [
         "PERF-GENERATION"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-786df0bd48cb5562",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-sampling-plan-identity-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_separates_compilation_identity_from_run_configuration",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Two validated requests over one circuit prove that shots, seed, reference mode, output format, and the accepted loop-folding no-op remain outside backend-neutral compilation identity."
+      },
+      "negative_axes": [
+        "shots-in-compilation-identity",
+        "seed-in-compilation-identity",
+        "codec-in-compilation-identity",
+        "reference-mode-in-compilation-identity",
+        "no-op-in-compilation-identity",
+        "placeholder-backend"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },
@@ -130399,6 +130645,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-91f0372aa5146419",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-model-inspection-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::inspect_json_reports_exact_circuit_and_dem_structure_without_execution",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Small circuit and DEM inputs prove exact dialect-specific counts, source facts, structural fingerprints, parse-estimate classifications, and the explicit no-execution result."
+      },
+      "negative_axes": [
+        "dialect-field-alias",
+        "circuit-dem-count-alias",
+        "fingerprint-loss",
+        "unknown-estimate-promoted-to-zero",
+        "execution-side-effect"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-925f7f4a67b23b70",
       "feature_id": "CQ-ALGEBRA",
       "behavioral_surface": "engine",
@@ -130809,6 +131106,56 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-97a0619ad157e73d",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-sampling-plan-no-execution-contract",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_is_deterministic_for_noisy_entropy_configurations_and_never_samples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Repeated planning of a noisy entropy-configured circuit produces byte-identical output, proving validation and estimation do not consume randomness or execute a shot."
+      },
+      "negative_axes": [
+        "planning-consumes-randomness",
+        "planning-executes-shot",
+        "unknown-output-estimate",
+        "nondeterministic-report"
+      ],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },

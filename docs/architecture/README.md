@@ -12,6 +12,8 @@ The stable byte contract for source-model identities is defined by [model finger
 
 The stable byte contract for backend-neutral compiler inputs is defined by [compilation request fingerprint schema version 1](compilation-request-fingerprint-schema-v1.md).
 
+The successful machine-output contract for Stab-native discovery, inspection, and planning commands is defined by [agent CLI schema version 1](agent-cli-schema-v1.md).
+
 ## Architectural Center
 
 ```text

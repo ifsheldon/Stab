@@ -1,6 +1,7 @@
 use super::run_from;
 use tempfile::tempdir;
 
+mod agent;
 mod convert;
 mod diagnostics;
 mod generation;
