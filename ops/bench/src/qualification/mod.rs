@@ -20,13 +20,13 @@ mod status;
 mod validation;
 
 pub(crate) use runtime::{
-    BaselineCandidateArgs, CompletionArgs, CompletionReportArgs, ParityArgs, ProbeArgs, ReportArgs,
-    RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs, WorkerArgs,
+    BaselineCandidateArgs, CompletionArgs, CompletionReportArgs, DiagnosticArgs, ParityArgs,
+    ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs, WorkerArgs,
 };
 pub(crate) use status::StatusArgs;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "218fd62fb54f043b917b29b02131fa964ab2bcf6b057d0e28a5559b2396cd605";
+    "4a4cb7cb40753f42fa1f2c91a34e1a9bc5dcaf89c6696a5a71a0d461efb8a007";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -73,6 +73,24 @@ pub(crate) fn run_qualification(root: &RepoRoot, args: RunArgs) -> Result<(), Be
         .map_err(BenchError::Qualification)?;
         println!(
             "[{PREFIX}] published performance qualification evidence at {}",
+            output.display()
+        );
+        Ok(())
+    })
+}
+
+pub(crate) fn run_diagnostic(root: &RepoRoot, args: DiagnosticArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_diagnostic(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published Stab-only product diagnostic at {}",
             output.display()
         );
         Ok(())

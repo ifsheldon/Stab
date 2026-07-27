@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use super::Issues;
 use crate::qualification::discovery::SourceReferences;
 use crate::qualification::model::{
-    CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, QualificationGroup,
-    QualificationStatus, RunnerFidelity, ScalePoint, ThresholdPolicy, TimingBatchPolicy,
+    CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
+    PRODUCT_DIAGNOSTIC_GATE_STATISTIC, QualificationGroup, QualificationStatus, RunnerFidelity,
+    ScalePoint, ThresholdPolicy, TimingBatchPolicy,
 };
 
 pub(super) fn validate_planned_workload(
@@ -164,6 +165,10 @@ pub(super) fn validate_planned_workload(
 }
 
 fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) {
+    if group.runner_fidelity == RunnerFidelity::StabReportOnly {
+        validate_product_diagnostic(group, issues);
+        return;
+    }
     let expected_batch_policy = if group.id == "PERFQ-M6-CLIFFORD-STRING" {
         TimingBatchPolicy::IndependentThroughput
     } else {
@@ -206,6 +211,47 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
     {
         issues.push(format!(
             "graduated planned-origin group {} lacks an exact executable workload contract",
+            group.id
+        ));
+    }
+}
+
+fn validate_product_diagnostic(group: &QualificationGroup, issues: &mut Issues) {
+    let expected_scale_ids = ["small", "medium", "large"];
+    let actual_scale_ids = group
+        .workload_family
+        .scales
+        .iter()
+        .map(|scale| scale.id.as_str())
+        .collect::<Vec<_>>();
+    let valid_parameters = group.workload_family.scales.iter().all(|scale| {
+        parameter_map(&group.id, &scale.parameters, issues).is_some_and(|parameters| {
+            parameters.get("generator") == Some(&"circuit-parse-cycle-v1")
+                && parameters.values().all(|value| !is_placeholder(value))
+        })
+    });
+    if actual_scale_ids != expected_scale_ids
+        || !valid_parameters
+        || group.disposition != crate::qualification::model::PerformanceDisposition::Measured
+        || group.correctness_binding != CorrectnessBinding::ExactCases
+        || group.correctness_cases.len() != 1
+        || group.planned_correctness_case_id.is_some()
+        || group.output_contract.digest_state != EvidenceState::Existing
+        || !group.output_contract.comparator_sources.is_empty()
+        || group.timing_policy.batch_policy != TimingBatchPolicy::CommonIterations
+        || group.timing_policy.calibration_min_ms != 250
+        || group.timing_policy.calibration_max_ms != 2_000
+        || group.timing_policy.common_wide_ratio_max_ms != 20_000
+        || group.timing_policy.warmup_batches != 3
+        || group.timing_policy.full_pairs != 9
+        || group.timing_policy.timeout_seconds != 600
+        || group.timing_policy.gate_statistic != PRODUCT_DIAGNOSTIC_GATE_STATISTIC
+        || group.memory_policy.method != crate::qualification::model::MemoryMethod::NotApplicable
+        || !group.memory_policy.scale_ids.is_empty()
+        || group.threshold_policy != ThresholdPolicy::ReportOnly
+    {
+        issues.push(format!(
+            "Stab-only product diagnostic {} lacks an exact executable diagnostic contract",
             group.id
         ));
     }

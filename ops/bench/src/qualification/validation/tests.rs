@@ -799,12 +799,15 @@ fn validation_rejects_measured_group_without_primary_row_or_correctness_dependen
 }
 
 #[test]
-fn validation_rejects_planned_scales_without_generator_or_seed() {
+fn validation_rejects_release_groups_over_cap() {
     let (mut suite, manifest, references) = fixture();
     let template = suite
         .qualification_groups
         .iter()
-        .find(|group| group.disposition == PerformanceDisposition::Measured)
+        .find(|group| {
+            group.disposition == PerformanceDisposition::Measured
+                && group.runner_fidelity != RunnerFidelity::StabReportOnly
+        })
         .expect("release group")
         .clone();
     for index in 0..=MAX_RELEASE_GROUPS {
@@ -949,11 +952,37 @@ fn generated_inventory_has_a_finite_executable_matrix() {
     let release = suite
         .qualification_groups
         .iter()
-        .filter(|group| group.disposition == PerformanceDisposition::Measured)
+        .filter(|group| {
+            group.disposition == PerformanceDisposition::Measured
+                && group.runner_fidelity != RunnerFidelity::StabReportOnly
+        })
+        .count();
+    let diagnostics = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| {
+            group.disposition == PerformanceDisposition::Measured
+                && group.runner_fidelity == RunnerFidelity::StabReportOnly
+        })
         .count();
 
     assert_eq!(release, 19);
+    assert_eq!(diagnostics, 4);
     assert!(release <= MAX_RELEASE_GROUPS);
+    assert!(diagnostics <= MAX_DIAGNOSTIC_GROUPS);
+    assert!(
+        suite
+            .qualification_groups
+            .iter()
+            .filter(|group| group.runner_fidelity == RunnerFidelity::StabReportOnly)
+            .all(|group| {
+                group.correctness_binding == CorrectnessBinding::ExactCases
+                    && group.correctness_cases.len() == 1
+                    && group.output_contract.comparator_sources.is_empty()
+                    && group.threshold_policy == ThresholdPolicy::ReportOnly
+                    && group.timing_policy.timeout_seconds == 600
+            })
+    );
     assert!(
         suite
             .qualification_groups
@@ -974,6 +1003,26 @@ fn generated_inventory_has_a_finite_executable_matrix() {
 
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("finite executable matrix validates");
+}
+
+#[test]
+fn product_diagnostic_inventory_keeps_suite_and_invocation_timeouts_distinct() {
+    let (mut suite, manifest, references) = fixture();
+    let group = suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.runner_fidelity == RunnerFidelity::StabReportOnly)
+        .expect("product diagnostic");
+    assert_eq!(group.timing_policy.timeout_seconds, 600);
+    group.timing_policy.timeout_seconds = 30;
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("per-invocation timeout must not replace the suite timeout");
+    assert!(
+        error
+            .to_string()
+            .contains("lacks an exact executable diagnostic contract")
+    );
 }
 
 #[test]

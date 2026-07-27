@@ -6,6 +6,7 @@ mod completion;
 #[cfg(test)]
 mod contract;
 mod correctness;
+mod diagnostic;
 mod executable;
 mod git;
 mod group;
@@ -27,6 +28,8 @@ mod worker;
 pub(super) use crate::process;
 
 pub(crate) use completion::{CompletionArgs, CompletionReportArgs};
+pub(crate) use diagnostic::DiagnosticArgs;
+pub(super) use group::GROUP_CONTRACT_SCHEMA_VERSION;
 pub(crate) use parity::ParityArgs;
 pub(crate) use probe::ProbeArgs;
 pub(crate) use report::ReportArgs;
@@ -168,6 +171,23 @@ pub(crate) fn run_qualification(
     args: RunArgs,
 ) -> Result<std::path::PathBuf, String> {
     run::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn run_diagnostic(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: DiagnosticArgs,
+) -> Result<std::path::PathBuf, String> {
+    diagnostic::run_with_repository(
         &session.root,
         &session.source_root,
         &session.repository,

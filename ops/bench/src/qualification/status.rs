@@ -58,6 +58,7 @@ struct RuntimeGroup {
 #[serde(rename_all = "kebab-case")]
 enum RuntimeClaimClass {
     DiagnosticInfrastructure,
+    ProductDiagnostic,
     PromotablePerformance,
 }
 
@@ -165,7 +166,8 @@ fn collect(root: &RepoRoot, suite: &QualificationSuite) -> Result<StatusData, Be
         &root.path.join(RUNTIME_GROUPS_PATH),
         "runtime contracts",
     )?;
-    if runtime.schema_version != 7 || runtime.performance_inventory_sha256 != suite.semantic_digest
+    if runtime.schema_version != super::runtime::GROUP_CONTRACT_SCHEMA_VERSION
+        || runtime.performance_inventory_sha256 != suite.semantic_digest
     {
         return Err(BenchError::Qualification(
             "qualification status found stale runtime contracts".to_string(),
@@ -376,10 +378,16 @@ mod tests {
         let suite = super::super::read(&root).expect("performance inventory");
         let data = collect(&root, &suite).expect("status data");
         let rendered = render(&data);
+        let runtime: RuntimeContracts = parse(
+            &root,
+            &root.path.join(RUNTIME_GROUPS_PATH),
+            "runtime contracts",
+        )
+        .expect("runtime contracts");
 
         assert_eq!(
             data.release_groups + data.diagnostic_groups,
-            20,
+            runtime.groups.len(),
             "every runtime contract is classified"
         );
         assert!(data.correctness_counts.values().sum::<usize>() > 1_000);

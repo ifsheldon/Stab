@@ -34,9 +34,10 @@ fn report_identity(
 fn source_contracts() -> (RepoRoot, Vec<super::super::group::GroupContract>) {
     let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
-    let contracts =
+    let contracts = pairable_contracts(
         super::super::group::load_groups(&root, crate::qualification::EXPECTED_FROZEN_DIGEST)
-            .expect("runtime contracts");
+            .expect("runtime contracts"),
+    );
     (root, contracts)
 }
 

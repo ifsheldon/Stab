@@ -413,6 +413,7 @@ pub(super) fn generate(
     }
     groups.extend(graduation::additional_groups(root, &groups)?);
     groups.extend(graduation::curated_api_groups(root, &groups)?);
+    groups.extend(graduation::agent_diagnostic_groups(&groups)?);
     groups.sort_by(|left, right| left.id.cmp(&right.id));
     row_dispositions.sort_by(|left, right| left.id.cmp(&right.id));
 

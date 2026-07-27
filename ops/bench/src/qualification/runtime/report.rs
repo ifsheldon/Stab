@@ -742,6 +742,9 @@ fn validate_claim(
                 return Err(ReportError::Claim);
             }
         }
+        ClaimClass::ProductDiagnostic => {
+            return Err(ReportError::Claim);
+        }
         ClaimClass::PromotablePerformance => {
             if group.parity_eligibility != super::group::ParityEligibility::ThresholdEligible
                 || report.correctness_preflight.case_ids != group.correctness_case_ids

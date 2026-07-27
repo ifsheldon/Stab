@@ -43,6 +43,11 @@ qualification-worker-reproducibility:
 qualification-run *args:
     cargo run -q -p stab-bench --profile release -- qualification-run {{args}}
 
+# Execute one Stab-only product diagnostic without paired or parity evidence.
+[working-directory: '..']
+diagnostic-run *args:
+    cargo run -q -p stab-bench --profile release -- qualification-diagnostic {{args}}
+
 # Validate a paired qualification report and regenerate its derived artifacts.
 [working-directory: '..']
 qualification-report *args:

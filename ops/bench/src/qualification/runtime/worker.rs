@@ -13,6 +13,7 @@ use crate::config::STIM_COMMIT;
 use clap::{Args, ValueEnum};
 use sha2::{Digest as _, Sha256};
 
+mod agent_diagnostic;
 mod bits;
 pub(super) mod clifford_string;
 pub(in crate::qualification::runtime) mod dem_model;
@@ -40,8 +41,12 @@ use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use prepared::PreparedWorkload;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 13] = [
+const WORKER_SOURCES: [(&str, &[u8]); 14] = [
     ("worker.rs", include_bytes!("worker.rs")),
+    (
+        "worker/agent_diagnostic.rs",
+        include_bytes!("worker/agent_diagnostic.rs"),
+    ),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     (
         "worker/clifford_string.rs",
@@ -281,6 +286,7 @@ enum WorkloadOutput {
 
 enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
+    AgentDiagnostic(agent_diagnostic::AgentDiagnosticOutput),
     DemParsed(stab_core::DetectorErrorModel),
     DemSerialized(String),
     PopcountChecksum(u64),

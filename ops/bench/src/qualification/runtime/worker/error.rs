@@ -22,6 +22,10 @@ pub(crate) enum WorkerError {
     CircuitScaleRange(u64),
     #[error("circuit-parse fixture capacity overflows usize")]
     CircuitFixtureOverflow,
+    #[error("agent diagnostic workload returned no output")]
+    AgentDiagnosticMissingOutput,
+    #[error("agent diagnostic workload {0} differed from its untimed typed witness")]
+    AgentDiagnosticWitness(&'static str),
     #[error("DEM model work count {actual} is not a positive multiple of {cycle}")]
     DemItemShape { actual: u64, cycle: u64 },
     #[error("DEM model work count {actual} exceeds maximum {maximum}")]

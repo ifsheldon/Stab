@@ -16,7 +16,7 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 7;
+pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 8;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_RELEASE_GROUPS: usize = 40;
@@ -265,6 +265,35 @@ fn validate_inventory_contracts(
                 .collect(),
         });
     }
+    let runtime_diagnostic_ids = file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .map(|group| group.id.to_string())
+        .collect::<BTreeSet<_>>();
+    let inventory_diagnostic_ids = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| {
+            group.status != QualificationStatus::Planned
+                && group.disposition == PerformanceDisposition::Measured
+                && group.runner_fidelity == RunnerFidelity::StabReportOnly
+                && group.threshold_policy == ThresholdPolicy::ReportOnly
+        })
+        .map(|group| group.id.clone())
+        .collect::<BTreeSet<_>>();
+    if runtime_diagnostic_ids != inventory_diagnostic_ids {
+        return Err(GroupError::DiagnosticInventoryCoverage {
+            runtime_only: runtime_diagnostic_ids
+                .difference(&inventory_diagnostic_ids)
+                .cloned()
+                .collect(),
+            inventory_only: inventory_diagnostic_ids
+                .difference(&runtime_diagnostic_ids)
+                .cloned()
+                .collect(),
+        });
+    }
 
     for contract in file
         .groups
@@ -331,6 +360,61 @@ fn validate_inventory_contracts(
             return Err(GroupError::InventoryContract(contract.id.to_string()));
         }
     }
+    for contract in file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+    {
+        let group = suite
+            .qualification_groups
+            .iter()
+            .find(|candidate| candidate.id == contract.id.to_string())
+            .ok_or_else(|| GroupError::InventoryContract(contract.id.to_string()))?;
+        let contract_scale_ids = contract
+            .scales
+            .iter()
+            .map(|scale| scale.id.to_string())
+            .collect::<Vec<_>>();
+        let inventory_scale_ids = group
+            .workload_family
+            .scales
+            .iter()
+            .map(|scale| scale.id.clone())
+            .collect::<Vec<_>>();
+        let scales_match = contract
+            .scales
+            .iter()
+            .zip(&group.workload_family.scales)
+            .all(|(contract, inventory)| {
+                contract.id.to_string() == inventory.id
+                    && contract.family_id.to_string() == inventory.family_id
+                    && contract.size_class == inventory.size_class
+                    && inventory.semantic_work == Some(contract.work_items.get())
+                    && inventory.input_bytes
+                        == InputByteCount::Exact {
+                            bytes: contract.input_bytes,
+                        }
+                    && inventory.input_digest.as_deref() == Some(contract.input_digest.as_str())
+            });
+        if group.disposition != PerformanceDisposition::Measured
+            || group.runner_fidelity != RunnerFidelity::StabReportOnly
+            || group.correctness_binding != CorrectnessBinding::ExactCases
+            || group.correctness_cases != contract.correctness_case_ids
+            || group.owner != contract.owner.to_string()
+            || group.planned_correctness_case_id.is_some()
+            || group.output_contract.digest_state != EvidenceState::Existing
+            || group.threshold_policy != ThresholdPolicy::ReportOnly
+            || group.timing_policy.batch_policy != contract.timing_batch_policy
+            || group.status == QualificationStatus::Planned
+            || inventory_scale_ids != contract_scale_ids
+            || !group.memory_policy.scale_ids.is_empty()
+            || !group.output_contract.comparator_sources.is_empty()
+            || !contract.comparator_sources.is_empty()
+            || !scales_match
+        {
+            return Err(GroupError::InventoryContract(contract.id.to_string()));
+        }
+    }
     for row in &suite.manifest_rows {
         for replacement in &row.replacement_contracts {
             let contract = file
@@ -342,10 +426,10 @@ fn validate_inventory_contracts(
                     group: replacement.runtime_group_id.clone(),
                     measurement: replacement.runtime_measurement_id.clone(),
                 })?;
-            if !contract
-                .measurement_ids
-                .iter()
-                .any(|measurement| measurement.to_string() == replacement.runtime_measurement_id)
+            if contract.claim_class != ClaimClass::PromotablePerformance
+                || !contract.measurement_ids.iter().any(|measurement| {
+                    measurement.to_string() == replacement.runtime_measurement_id
+                })
                 || replacement.runtime_scale_id.as_ref().is_some_and(|scale| {
                     !contract
                         .scales
@@ -453,7 +537,7 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
     let diagnostic_groups = file
         .groups
         .iter()
-        .filter(|group| group.claim_class == ClaimClass::DiagnosticInfrastructure)
+        .filter(|group| group.claim_class != ClaimClass::PromotablePerformance)
         .count();
     if release_groups > MAX_RELEASE_GROUPS || diagnostic_groups > MAX_DIAGNOSTIC_GROUPS {
         return Err(GroupError::MatrixCap {
@@ -506,6 +590,10 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         match (group.claim_class, group.parity_eligibility) {
             (ClaimClass::DiagnosticInfrastructure, ParityEligibility::ReportOnly)
                 if group.correctness_case_ids.is_empty() => {}
+            (ClaimClass::ProductDiagnostic, ParityEligibility::ReportOnly)
+                if !group.correctness_case_ids.is_empty()
+                    && group.comparator_sources.is_empty()
+                    && group.profiler_note.is_none() => {}
             (ClaimClass::PromotablePerformance, ParityEligibility::ThresholdEligible)
                 if !group.correctness_case_ids.is_empty() => {}
             _ => return Err(GroupError::InvalidGroup(group.id.to_string())),
@@ -607,6 +695,13 @@ pub(super) enum GroupError {
         "runtime and implemented threshold-eligible inventory groups differ: runtime-only={runtime_only:?}, inventory-only={inventory_only:?}"
     )]
     InventoryCoverage {
+        runtime_only: Vec<String>,
+        inventory_only: Vec<String>,
+    },
+    #[error(
+        "runtime and implemented Stab-only diagnostic groups differ: runtime-only={runtime_only:?}, inventory-only={inventory_only:?}"
+    )]
+    DiagnosticInventoryCoverage {
         runtime_only: Vec<String>,
         inventory_only: Vec<String>,
     },

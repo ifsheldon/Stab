@@ -29,9 +29,9 @@ const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
 const CALIBRATION_MAXIMUM: Duration = Duration::from_secs(2);
 const CALIBRATION_WIDE_RATIO_MAXIMUM: Duration = Duration::from_secs(20);
-const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
+pub(super) const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
 const MAXIMUM_ITERATIONS: u64 = 1_000_000_000;
-const WARMUP_BATCHES: usize = 3;
+pub(super) const WARMUP_BATCHES: usize = 3;
 const MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 const PRIMARY_THRESHOLD: f64 = 1.25;
 
@@ -44,12 +44,17 @@ pub(crate) enum QualificationTier {
 }
 
 impl QualificationTier {
-    fn pair_count(self) -> usize {
+    pub(super) const fn sample_count(self) -> usize {
         match self {
             Self::Pr => 3,
             Self::Full => 9,
             Self::Soak => 15,
         }
+    }
+
+    #[cfg(test)]
+    const fn pair_count(self) -> usize {
+        self.sample_count()
     }
 }
 
@@ -98,7 +103,14 @@ pub(crate) struct RunArgs {
 #[serde(rename_all = "kebab-case")]
 pub(super) enum ClaimClass {
     DiagnosticInfrastructure,
+    ProductDiagnostic,
     PromotablePerformance,
+}
+
+impl ClaimClass {
+    pub(super) const fn uses_paired_workers(self) -> bool {
+        !matches!(self, Self::ProductDiagnostic)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -488,7 +500,7 @@ pub(super) fn run_with_repository(
             work_items: scale.work_items.get(),
             allow_unverified_host: args.allow_unverified_host,
             warmup_batches: WARMUP_BATCHES,
-            paired_samples: args.tier.pair_count(),
+            paired_samples: args.tier.sample_count(),
             maximum_timing_attempts: MAXIMUM_TIMING_ATTEMPTS,
             invocation_timeout_seconds: INVOCATION_TIMEOUT.as_secs(),
             correctness_output: args
@@ -603,6 +615,9 @@ fn correctness_preflight(
             CorrectnessRequirement::NotApplicable {
                 reason: "PQ1 protocol-smoke validates benchmark infrastructure and cannot support a product performance claim",
             }
+        }
+        ClaimClass::ProductDiagnostic => {
+            return Err(RunError::ProductDiagnosticRequiresStabOnlyRunner);
         }
         ClaimClass::PromotablePerformance => CorrectnessRequirement::Required {
             output: args
@@ -778,9 +793,9 @@ fn execute_timing_attempt(
         warmups.push(execution);
     }
 
-    let mut samples = Vec::with_capacity(plan.tier.pair_count());
-    let mut paired_samples = Vec::with_capacity(plan.tier.pair_count());
-    for pair_index in 0..plan.tier.pair_count() {
+    let mut samples = Vec::with_capacity(plan.tier.sample_count());
+    let mut paired_samples = Vec::with_capacity(plan.tier.sample_count());
+    for pair_index in 0..plan.tier.sample_count() {
         let execution = execute_pair(
             workers,
             group,
@@ -1002,7 +1017,7 @@ fn hex_digit(value: u8) -> char {
     })
 }
 
-fn unix_epoch_seconds() -> Result<u64, RunError> {
+pub(super) fn unix_epoch_seconds() -> Result<u64, RunError> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
@@ -1037,6 +1052,8 @@ pub(super) enum RunError {
     InvalidIterationCap,
     #[error("diagnostic PQ1 protocol-smoke does not accept product correctness evidence")]
     UnexpectedCorrectnessInput,
+    #[error("product diagnostics must use the Stab-only diagnostic runner")]
+    ProductDiagnosticRequiresStabOnlyRunner,
     #[error(
         "promotable performance evidence requires a CQ1 report directory plus controller-approved request and completion digests"
     )]

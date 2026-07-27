@@ -1,7 +1,7 @@
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "218fd62fb54f043b917b29b02131fa964ab2bcf6b057d0e28a5559b2396cd605",
+  "performance_inventory_sha256": "4a4cb7cb40753f42fa1f2c91a34e1a9bc5dcaf89c6696a5a71a0d461efb8a007",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -24,6 +24,170 @@
       ],
       "correctness_case_ids": [],
       "owner": "ops/bench",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT",
+      "claim_class": "product-diagnostic",
+      "parity_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
+      "workload_id": "circuit-model-fingerprint",
+      "measurement_ids": [
+        "fingerprint"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "family_id": "default",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "family_id": "default",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-e16abe30d8c7992c"
+      ],
+      "owner": "stab-core/model-fingerprint",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT",
+      "claim_class": "product-diagnostic",
+      "parity_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
+      "workload_id": "sampling-request-fingerprint",
+      "measurement_ids": [
+        "fingerprint-inclusive"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "family_id": "default",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "family_id": "default",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-d63aa8cd2dc62e63"
+      ],
+      "owner": "stab-core/compilation-request",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE",
+      "claim_class": "product-diagnostic",
+      "parity_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
+      "workload_id": "sampling-request-estimate",
+      "measurement_ids": [
+        "estimate"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "family_id": "default",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "family_id": "default",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-d65b079751fe7119"
+      ],
+      "owner": "stab-core/resource-estimation",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-A2-SAMPLER-COMPILE",
+      "claim_class": "product-diagnostic",
+      "parity_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
+      "workload_id": "sampler-compile",
+      "measurement_ids": [
+        "compile"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "family_id": "default",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "family_id": "default",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-c05d9e9942e9284c"
+      ],
+      "owner": "stab-core/sampling-compiler",
       "profiler_note": null
     },
     {

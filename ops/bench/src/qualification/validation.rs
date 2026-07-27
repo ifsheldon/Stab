@@ -411,7 +411,11 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
                             )
                             && group.correctness_cases.contains(&item.correctness_case_id)
                     }) {
-                        parent_features.insert(group.performance_feature.as_str());
+                        if group.runner_fidelity == super::model::RunnerFidelity::StabReportOnly {
+                            parent_features.extend(api_features.iter().copied());
+                        } else {
+                            parent_features.insert(group.performance_feature.as_str());
+                        }
                     } else {
                         issues.push(format!(
                             "public API {} parent {parent} is absent, cross-domain, or not measured",
@@ -508,13 +512,16 @@ fn validate_groups(
     let release_groups = suite
         .qualification_groups
         .iter()
-        .filter(|group| group.disposition == PerformanceDisposition::Measured)
+        .filter(|group| {
+            group.disposition == PerformanceDisposition::Measured
+                && group.runner_fidelity != super::model::RunnerFidelity::StabReportOnly
+        })
         .count();
     let diagnostic_groups = suite
         .qualification_groups
         .iter()
         .filter(|group| {
-            group.disposition == PerformanceDisposition::FutureCandidate
+            group.disposition == PerformanceDisposition::Measured
                 && group.runner_fidelity == super::model::RunnerFidelity::StabReportOnly
         })
         .count();

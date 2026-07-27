@@ -36,6 +36,11 @@ pub(crate) enum InvocationError {
     },
     #[error("qualification runtime group is not implemented by both workers: {0}")]
     UnsupportedGroup(String),
+    #[error("{group} does not support the {implementation} qualification worker")]
+    UnsupportedImplementation {
+        group: String,
+        implementation: Implementation,
+    },
     #[error("qualification runtime group {0} does not match the materialized comparator sources")]
     ComparatorSourceContract(String),
     #[error("qualification CPU {0} exceeds the shared worker protocol")]

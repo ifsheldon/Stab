@@ -301,6 +301,7 @@ fn validate_policy(
     }
     let contract_by_id = contracts
         .iter()
+        .filter(|contract| contract.claim_class.uses_paired_workers())
         .map(|contract| (contract.id.to_string(), contract))
         .collect::<BTreeMap<_, _>>();
     if policy.groups.len() != contract_by_id.len() {

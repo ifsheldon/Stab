@@ -214,11 +214,60 @@ fn valid_contract_file() -> GroupContractFile {
         ),
     ]);
     groups.extend(test_contracts::dem_contracts());
+    groups.extend([
+        product_diagnostic_contract(
+            super::super::invocation::A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID,
+            "circuit-model-fingerprint",
+            "fingerprint",
+        ),
+        product_diagnostic_contract(
+            super::super::invocation::A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
+            "sampling-request-fingerprint",
+            "fingerprint-inclusive",
+        ),
+        product_diagnostic_contract(
+            super::super::invocation::A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID,
+            "sampling-request-estimate",
+            "estimate",
+        ),
+        product_diagnostic_contract(
+            super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID,
+            "sampler-compile",
+            "compile",
+        ),
+    ]);
     GroupContractFile {
         schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
         timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         performance_inventory_sha256: "a".repeat(64),
         groups,
+    }
+}
+
+fn product_diagnostic_contract(
+    group_id: &str,
+    workload_id: &str,
+    measurement_id: &str,
+) -> GroupContract {
+    GroupContract {
+        id: ProtocolId::try_new(group_id).expect("group id"),
+        claim_class: ClaimClass::ProductDiagnostic,
+        parity_eligibility: ParityEligibility::ReportOnly,
+        timing_batch_policy: TimingBatchPolicy::CommonIterations,
+        workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
+        measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
+        scales: vec![ScaleContract {
+            id: ProtocolId::try_new("small").expect("scale id"),
+            family_id: ProtocolId::try_new("default").expect("family id"),
+            size_class: crate::qualification::model::SizeClass::Small,
+            work_items: NonZeroU64::new(64).expect("positive work"),
+            input_bytes: 429,
+            input_digest: InputDigest::try_new("c".repeat(64)).expect("input digest"),
+        }],
+        correctness_case_ids: vec!["cq-evidence-agent-diagnostic".to_string()],
+        owner: ProtocolId::try_new("stab-core/agent-diagnostic").expect("owner"),
+        profiler_note: None,
+        comparator_sources: Vec::new(),
     }
 }
 
@@ -330,6 +379,33 @@ fn diagnostic_groups_are_report_only_and_have_no_correctness_cases() {
         .parity_eligibility = ParityEligibility::ThresholdEligible;
     assert!(matches!(
         validate(&thresholded, &"a".repeat(64)),
+        Err(GroupError::InvalidGroup(_))
+    ));
+}
+
+#[test]
+fn product_diagnostics_require_exact_owners_without_parity_or_profiler_inputs() {
+    let valid = valid_contract_file();
+    let diagnostic = valid
+        .groups
+        .iter()
+        .find(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .expect("product diagnostic");
+    assert_eq!(diagnostic.parity_eligibility, ParityEligibility::ReportOnly);
+    assert_eq!(diagnostic.correctness_case_ids.len(), 1);
+    assert!(diagnostic.comparator_sources.is_empty());
+    assert!(diagnostic.profiler_note.is_none());
+    validate(&valid, &"a".repeat(64)).expect("valid product diagnostic contract");
+
+    let mut invalid = valid;
+    invalid
+        .groups
+        .iter_mut()
+        .find(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .expect("product diagnostic")
+        .parity_eligibility = ParityEligibility::ThresholdEligible;
+    assert!(matches!(
+        validate(&invalid, &"a".repeat(64)),
         Err(GroupError::InvalidGroup(_))
     ));
 }

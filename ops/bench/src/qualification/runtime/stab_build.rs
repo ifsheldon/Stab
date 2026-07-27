@@ -20,8 +20,12 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
-const WORKER_SOURCES: [(&str, &str); 13] = [
+const WORKER_SOURCES: [(&str, &str); 14] = [
     ("worker.rs", "ops/bench/src/qualification/runtime/worker.rs"),
+    (
+        "worker/agent_diagnostic.rs",
+        "ops/bench/src/qualification/runtime/worker/agent_diagnostic.rs",
+    ),
     (
         "worker/bits.rs",
         "ops/bench/src/qualification/runtime/worker/bits.rs",

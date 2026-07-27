@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub(super) const SCHEMA_VERSION: u32 = 3;
+pub(super) const PRODUCT_DIAGNOSTIC_GATE_STATISTIC: &str = "median Stab batch seconds and normalized seconds per semantic work item, reported independently per operation and scale";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

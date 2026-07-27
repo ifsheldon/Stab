@@ -108,6 +108,9 @@ enum Command {
     /// Run one paired qualification group and publish validated evidence.
     QualificationRun(qualification::RunArgs),
 
+    /// Run one Stab-only product diagnostic without producing parity evidence.
+    QualificationDiagnostic(qualification::DiagnosticArgs),
+
     /// Validate a paired qualification report and regenerate derived artifacts.
     QualificationReport(qualification::ReportArgs),
 
@@ -304,6 +307,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationRun(args) => {
             qualification::run_qualification(&root, args)?;
+        }
+        Command::QualificationDiagnostic(args) => {
+            qualification::run_diagnostic(&root, args)?;
         }
         Command::QualificationReport(args) => {
             qualification::report(&root, args)?;

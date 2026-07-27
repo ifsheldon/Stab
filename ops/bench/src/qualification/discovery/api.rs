@@ -9,6 +9,14 @@ pub(super) const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 pub(super) const PAULI_STRING_ITER_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
 pub(super) const CLIFFORD_STRING_NON_IDENTITY_GROUP_ID: &str =
     "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY";
+pub(in crate::qualification::discovery) const A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID: &str =
+    "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT";
+pub(in crate::qualification::discovery) const A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID: &str =
+    "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT";
+pub(in crate::qualification::discovery) const A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID: &str =
+    "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE";
+pub(in crate::qualification::discovery) const A2_SAMPLER_COMPILE_GROUP_ID: &str =
+    "PERFQ-A2-SAMPLER-COMPILE";
 
 pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     let performance_feature = item
@@ -18,7 +26,12 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
         .unwrap_or_else(|| "PERF-RESOURCE-BOUNDARIES".to_string());
     let behavioral = is_behavioral(item) && !is_fixed_fingerprint_metadata(item);
     let supporting_performance_features = item.performance_groups.iter().skip(1).cloned().collect();
-    let mut parent_group_ids = if behavioral {
+    let diagnostic_parent = behavioral
+        .then(|| diagnostic_group_id(&item.path))
+        .flatten();
+    let mut parent_group_ids = if let Some(parent) = diagnostic_parent {
+        vec![parent.to_string()]
+    } else if behavioral {
         item.performance_groups
             .iter()
             .filter_map(|feature| qualification_group_id(item, feature))
@@ -26,8 +39,8 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     } else {
         Vec::new()
     };
-    let has_complete_measured_parent =
-        behavioral && parent_group_ids.len() == item.performance_groups.len();
+    let has_complete_measured_parent = behavioral
+        && (diagnostic_parent.is_some() || parent_group_ids.len() == item.performance_groups.len());
     if !has_complete_measured_parent {
         parent_group_ids.clear();
     }
@@ -47,7 +60,13 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
         },
         parent_group_ids,
         reason: if has_complete_measured_parent {
-            "Behavioral operation is covered by the listed executable release workload.".to_string()
+            if diagnostic_parent.is_some() {
+                "Behavioral operation is covered by the listed executable Stab-only product diagnostic."
+                    .to_string()
+            } else {
+                "Behavioral operation is covered by the listed executable release workload."
+                    .to_string()
+            }
         } else if behavioral {
             "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
                 .to_string()
@@ -55,6 +74,19 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
             "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
                 .to_string()
         },
+    }
+}
+
+fn diagnostic_group_id(path: &str) -> Option<&'static str> {
+    match path {
+        "stab_core::Circuit::fingerprint" => Some(A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID),
+        "stab_core::CompilationRequestFingerprint::for_sampling" => {
+            Some(A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID)
+        }
+        "stab_core::estimate_sampling_request" => Some(A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID),
+        "stab_core::CompiledSampler::compile"
+        | "stab_core::execution::CompiledSampler::compile" => Some(A2_SAMPLER_COMPILE_GROUP_ID),
+        _ => None,
     }
 }
 
@@ -210,19 +242,37 @@ mod tests {
             assert!(disposition.parent_group_ids.is_empty(), "{path}");
         }
 
-        for path in [
+        for (path, parent) in [
             "stab_core::Circuit::fingerprint",
-            "stab_core::DetectorErrorModel::fingerprint",
             "stab_core::CompilationRequestFingerprint::for_sampling",
             "stab_core::estimate_sampling_request",
-        ] {
+            "stab_core::CompiledSampler::compile",
+            "stab_core::execution::CompiledSampler::compile",
+        ]
+        .into_iter()
+        .zip([
+            A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID,
+            A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
+            A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID,
+            A2_SAMPLER_COMPILE_GROUP_ID,
+            A2_SAMPLER_COMPILE_GROUP_ID,
+        ]) {
             let disposition = make_disposition(&api(path, "method"));
             assert_eq!(
                 disposition.disposition,
-                PerformanceDisposition::FutureCandidate,
+                PerformanceDisposition::CoveredByParent,
                 "{path}"
             );
+            assert_eq!(disposition.parent_group_ids, [parent], "{path}");
         }
+
+        let path = "stab_core::DetectorErrorModel::fingerprint";
+        let disposition = make_disposition(&api(path, "method"));
+        assert_eq!(
+            disposition.disposition,
+            PerformanceDisposition::FutureCandidate,
+            "{path}"
+        );
     }
 
     fn api(path: &str, kind: &str) -> CorrectnessApi {

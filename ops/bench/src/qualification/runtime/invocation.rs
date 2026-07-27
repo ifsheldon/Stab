@@ -15,10 +15,14 @@ use crate::root::RepoRoot;
 use serde::{Deserialize, Serialize};
 
 pub(in crate::qualification::runtime) mod clifford_string;
+mod diagnostic;
 mod error;
 pub(super) mod pauli_iter;
 mod preflight;
 
+pub(super) use diagnostic::{
+    DiagnosticInvocationRequest, DiagnosticWorkerIdentityEvidence, PreparedDiagnosticWorker,
+};
 pub(crate) use error::InvocationError;
 #[cfg(test)]
 use preflight::worker_contract_preflight_digest;
@@ -38,6 +42,11 @@ const POPCOUNT_CAP_CASE_ID: &str = "simd-word-popcount-over-cap";
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
+pub(super) const A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID: &str = "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT";
+pub(super) const A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID: &str =
+    "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT";
+pub(super) const A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID: &str = "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE";
+pub(super) const A2_SAMPLER_COMPILE_GROUP_ID: &str = "PERFQ-A2-SAMPLER-COMPILE";
 pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 pub(super) const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 pub(super) const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
@@ -77,6 +86,18 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == CIRCUIT_CANONICAL_PRINT_GROUP_ID
                     && workload == "circuit-canonical-print"
                     && measurement == "serialize")
+                || (group == A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID
+                    && workload == "circuit-model-fingerprint"
+                    && measurement == "fingerprint")
+                || (group == A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID
+                    && workload == "sampling-request-fingerprint"
+                    && measurement == "fingerprint-inclusive")
+                || (group == A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID
+                    && workload == "sampling-request-estimate"
+                    && measurement == "estimate")
+                || (group == A2_SAMPLER_COMPILE_GROUP_ID
+                    && workload == "sampler-compile"
+                    && measurement == "compile")
                 || (group == GATE_NAME_HASH_GROUP_ID
                     && workload == "gate-name-hash"
                     && measurement == "hash-all-names")
@@ -132,7 +153,7 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    20
+    24
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -227,7 +248,10 @@ impl PreparedWorkers {
         toolchain: &super::toolchain::ToolchainEvidence,
         performance_inventory_sha256: &str,
     ) -> Result<Self, InvocationError> {
-        let contracts = super::group::load_groups(root, performance_inventory_sha256)?;
+        let contracts = pairable_contracts(super::group::load_groups(
+            root,
+            performance_inventory_sha256,
+        )?);
         let adapter = prepare_adapter(root, repository_commit)?;
         let worker =
             super::stab_build::StabWorkerExecutable::prepare(root, repository_commit, toolchain)?;
@@ -327,6 +351,14 @@ impl PreparedWorkers {
         } = request;
         if !supports_group(group) {
             return Err(InvocationError::UnsupportedGroup(group.id.to_string()));
+        }
+        if group.claim_class == super::run::ClaimClass::ProductDiagnostic
+            && implementation == Implementation::Stim
+        {
+            return Err(InvocationError::UnsupportedImplementation {
+                group: group.id.to_string(),
+                implementation,
+            });
         }
         if !self
             .adapter
@@ -668,8 +700,10 @@ impl PreparedWorkers {
 
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
         self.verify_executables()?;
-        let contracts =
-            super::group::load_groups(&self.source_root, &self.performance_inventory_sha256)?;
+        let contracts = pairable_contracts(super::group::load_groups(
+            &self.source_root,
+            &self.performance_inventory_sha256,
+        )?);
         if self.contract_preflight.as_ref().is_none_or(|evidence| {
             !evidence.validates_source_contract(&self.performance_inventory_sha256, &contracts)
         }) {
@@ -684,6 +718,15 @@ impl PreparedWorkers {
             .verify(&self.toolchain, &self.repository_commit)?;
         Ok(())
     }
+}
+
+fn pairable_contracts(
+    contracts: Vec<super::group::GroupContract>,
+) -> Vec<super::group::GroupContract> {
+    contracts
+        .into_iter()
+        .filter(|contract| contract.claim_class.uses_paired_workers())
+        .collect()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
