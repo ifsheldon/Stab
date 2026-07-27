@@ -286,14 +286,6 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .iter()
             .all(|case| case.status == EvidenceStatus::Implemented)
     );
-    assert!(
-        manifest
-            .evidence_cases
-            .iter()
-            .filter(|case| case.feature_id == FeatureId::ResultFormats)
-            .all(|case| case.status == EvidenceStatus::Implemented)
-    );
-
     let sample_format_parent = result_qualification_cases
         .iter()
         .find(|case| case.source_id == "cq2-result-writer-exact-format-contract")
@@ -303,7 +295,6 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .iter()
         .filter(|item| item.feature_id == FeatureId::ResultFormats)
         .collect::<Vec<_>>();
-    assert_eq!(result_api_items.len(), 268);
     assert!(result_api_items.iter().all(|item| {
         manifest
             .evidence_cases

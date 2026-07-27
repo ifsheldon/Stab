@@ -84,6 +84,22 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
+            Path::new("crates/stab-core/src/capabilities.rs"),
+            "stab_core::CapabilitySet",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/compilation_fingerprint.rs"),
+            "stab_core::CompilationRequestFingerprint",
+        ),
+        Some(FeatureId::Sampling)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
             Path::new("crates/stab-core/src/analysis/dem_adapters.rs"),
             "stab_core::DetectorErrorModel::flattened",
         ),
@@ -145,6 +161,10 @@ fn classifications_distinguish_selected_execution_domains() {
         (
             "crates/stab-core/src/resources.rs",
             "stab_core::ResourceEstimate",
+        ),
+        (
+            "crates/stab-core/src/sampling/estimate.rs",
+            "stab_core::estimate_sampling_request",
         ),
         (
             "crates/stab-core/src/circuit.rs",

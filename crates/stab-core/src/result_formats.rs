@@ -6,8 +6,11 @@ use crate::{
     },
 };
 
+mod capabilities;
 mod dets;
 
+pub(crate) use capabilities::codec_capabilities;
+pub use capabilities::{CodecCapability, RecordEncoding, RecordFormat};
 pub use dets::{DetsLayout, DetsResultType, DetsToken, read_dets_records};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -67,10 +67,50 @@ fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
     matches!(
         item.path.as_str(),
         "stab_core::ModelDialect::as_str"
+            | "stab_core::ModelDialect::all"
             | "stab_core::ModelFingerprint::schema_version"
             | "stab_core::ModelFingerprint::dialect"
             | "stab_core::ModelFingerprint::digest"
             | "stab_core::ModelFingerprint::digest_hex"
+            | "stab_core::CompilationOperation::as_str"
+            | "stab_core::CompilationRequestFingerprint::schema_version"
+            | "stab_core::CompilationRequestFingerprint::compiler_schema_version"
+            | "stab_core::CompilationRequestFingerprint::operation"
+            | "stab_core::CompilationRequestFingerprint::model_fingerprint"
+            | "stab_core::CompilationRequestFingerprint::digest"
+            | "stab_core::CompilationRequestFingerprint::digest_hex"
+            | "stab_core::CapabilitySet::current"
+            | "stab_core::CapabilitySet::dialects"
+            | "stab_core::CapabilitySet::gates"
+            | "stab_core::CapabilitySet::record_formats"
+            | "stab_core::CapabilitySet::codecs"
+            | "stab_core::CapabilitySet::compilation_operations"
+            | "stab_core::CapabilitySet::selectable_backend_ids"
+            | "stab_core::CapabilitySet::default_parse_limits"
+            | "stab_core::CompilationCapability::operation"
+            | "stab_core::CompilationCapability::input_dialect"
+            | "stab_core::CompilationCapability::compiler_schema_version"
+            | "stab_core::CompilationCapability::request_fingerprint_schema_version"
+            | "stab_core::CompilationCapability::has_configurable_limits"
+            | "stab_core::CompilationCapability::supports_backend_selection"
+            | "stab_core::RecordEncoding::as_str"
+            | "stab_core::RecordFormat::all"
+            | "stab_core::RecordFormat::as_str"
+            | "stab_core::RecordFormat::encoding"
+            | "stab_core::RecordFormat::records_per_group"
+            | "stab_core::CodecCapability::format"
+            | "stab_core::CodecCapability::can_decode"
+            | "stab_core::CodecCapability::can_encode"
+            | "stab_core::CodecCapability::requires_typed_layout"
+            | "stab_core::result_formats::RecordEncoding::as_str"
+            | "stab_core::result_formats::RecordFormat::all"
+            | "stab_core::result_formats::RecordFormat::as_str"
+            | "stab_core::result_formats::RecordFormat::encoding"
+            | "stab_core::result_formats::RecordFormat::records_per_group"
+            | "stab_core::result_formats::CodecCapability::format"
+            | "stab_core::result_formats::CodecCapability::can_decode"
+            | "stab_core::result_formats::CodecCapability::can_encode"
+            | "stab_core::result_formats::CodecCapability::requires_typed_layout"
     )
 }
 
@@ -146,10 +186,17 @@ mod tests {
     fn fingerprint_work_stays_visible_without_speculative_accessor_workloads() {
         for path in [
             "stab_core::ModelDialect::as_str",
+            "stab_core::ModelDialect::all",
             "stab_core::ModelFingerprint::schema_version",
             "stab_core::ModelFingerprint::dialect",
             "stab_core::ModelFingerprint::digest",
             "stab_core::ModelFingerprint::digest_hex",
+            "stab_core::CompilationRequestFingerprint::schema_version",
+            "stab_core::CompilationRequestFingerprint::model_fingerprint",
+            "stab_core::CapabilitySet::codecs",
+            "stab_core::CompilationCapability::compiler_schema_version",
+            "stab_core::RecordFormat::records_per_group",
+            "stab_core::result_formats::CodecCapability::requires_typed_layout",
         ] {
             let disposition = make_disposition(&api(path, "method"));
             assert_eq!(
@@ -163,6 +210,8 @@ mod tests {
         for path in [
             "stab_core::Circuit::fingerprint",
             "stab_core::DetectorErrorModel::fingerprint",
+            "stab_core::CompilationRequestFingerprint::for_sampling",
+            "stab_core::estimate_sampling_request",
         ] {
             let disposition = make_disposition(&api(path, "method"));
             assert_eq!(

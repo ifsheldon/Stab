@@ -56,6 +56,24 @@ impl ResourceEstimate {
         }
     }
 
+    pub(crate) const fn for_sampling_request(
+        input_items: Estimate<usize>,
+        expanded_operations: Estimate<usize>,
+        folded_traversal: Estimate<usize>,
+        output_bytes: Estimate<usize>,
+    ) -> Self {
+        Self {
+            input_items,
+            expanded_operations,
+            folded_traversal,
+            output_bytes,
+            input_bytes: Estimate::Unknown,
+            scratch_bytes: Estimate::Unknown,
+            resident_bytes: Estimate::Unknown,
+            work_units: Estimate::Unknown,
+        }
+    }
+
     pub const fn input_bytes(&self) -> Estimate<usize> {
         self.input_bytes
     }

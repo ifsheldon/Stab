@@ -4,6 +4,7 @@
 
 pub mod analysis;
 pub mod bits;
+mod capabilities;
 mod circuit;
 mod circuit_detecting_regions;
 mod circuit_feedback;
@@ -14,6 +15,7 @@ mod circuit_missing_detectors;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_transforms;
+mod compilation_fingerprint;
 mod dem;
 mod dem_sampler;
 mod detection;
@@ -46,6 +48,7 @@ pub use analysis::{
     single_qubit_clifford_for_gate,
 };
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
+pub use capabilities::{CapabilitySet, CompilationCapability};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
     CircuitInstruction, CircuitItem, RepeatBlock,
@@ -68,6 +71,7 @@ pub use circuit_generation::{
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
+pub use compilation_fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use dem::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
@@ -122,7 +126,11 @@ pub use probability_util::biased_randomize_bits;
 pub use resources::{
     Estimate, EstimateClass, ResourceEstimate, ResourceKind, ResourceLimitError, ResourceOperation,
 };
-pub use result_formats::{DetsLayout, DetsResultType, DetsToken, SampleFormat};
+pub use result_formats::{
+    CodecCapability, DetsLayout, DetsResultType, DetsToken, RecordEncoding, RecordFormat,
+    SampleFormat,
+};
+pub use sampling::estimate_sampling_request;
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
     PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,

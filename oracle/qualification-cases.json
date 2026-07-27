@@ -3823,6 +3823,374 @@
         "standalone": true
       },
       {
+        "id": "a2-compilation-request-fingerprint",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "agent_capabilities",
+            "sampling_compilation_fingerprint_normalizes_source_spelling",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "An independently reconstructed rich request digest binds the model fingerprint, sampling operation, compiler schema, zero caller options, and zero configurable compile limits without compilation, execution, or heap allocation."
+        },
+        "negative_axes": [
+          "request-schema-drift",
+          "compiler-schema-drift",
+          "operation-drift",
+          "model-mutation",
+          "source-spelling-drift",
+          "execution-option-contamination",
+          "request-fingerprint-allocation"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationOperation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationOperation::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::SCHEMA_VERSION"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::ALGORITHM"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::for_sampling"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::schema_version"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::compiler_schema_version"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::operation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::model_fingerprint"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::digest"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationRequestFingerprint::digest_hex"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-runtime-capability-descriptors",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "agent_capabilities",
+            "capability_set_is_generated_from_current_product_descriptors",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Runtime discovery iterates the closed gate table, records-owned codec registry, and sampling compiler registration directly. It reads no qualification inventory, allocates no capability manifest, and exposes no selectable backend before one exists."
+        },
+        "negative_axes": [
+          "gate-registry-drift",
+          "codec-registry-drift",
+          "compiler-registration-drift",
+          "parse-default-drift",
+          "invented-backend",
+          "qualification-manifest-dependency"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::SCHEMA_VERSION"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::STIM_COMPATIBILITY_VERSION"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::current"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::dialects"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::gates"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::record_formats"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::codecs"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::compilation_operations"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::selectable_backend_ids"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CapabilitySet::default_parse_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::operation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::input_dialect"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::compiler_schema_version"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::request_fingerprint_schema_version"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::has_configurable_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompilationCapability::supports_backend_selection"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelDialect::all"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-record-codec-capability-descriptors",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "agent_capabilities",
+            "record_codec_descriptors_are_unique_and_structurally_truthful",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "One six-entry records-owned registry drives codec names, physical encodings, grouping, decode and encode availability, and typed-layout requirements without copying result capabilities into CLI help or qualification state."
+        },
+        "negative_axes": [
+          "duplicate-format-name",
+          "missing-codec",
+          "encoding-drift",
+          "group-size-drift",
+          "typed-layout-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordEncoding"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordEncoding::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat::all"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat::encoding"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::RecordFormat::records_per_group"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CodecCapability"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CodecCapability::format"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CodecCapability::can_decode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CodecCapability::can_encode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CodecCapability::requires_typed_layout"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordEncoding"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordEncoding::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat::all"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat::as_str"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat::encoding"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::RecordFormat::records_per_group"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::CodecCapability"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::CodecCapability::format"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::CodecCapability::can_decode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::CodecCapability::can_encode"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::result_formats::CodecCapability::requires_typed_layout"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-sampling-request-resource-estimate",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "agent_capabilities",
+            "sampling_request_estimate_counts_folded_and_expanded_work_without_execution",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The estimator traverses folded circuit structure once with depth-bounded inline storage, reports exact representable structure and fixed-width output facts, degrades overflow and sparse output size to unknown, and neither compiles nor executes the request."
+        },
+        "negative_axes": [
+          "repeat-expansion-overflow",
+          "output-size-overflow",
+          "incomplete-ptb64-group",
+          "sparse-size-overclaim",
+          "runtime-work-overclaim",
+          "estimate-allocation"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::estimate_sampling_request"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-parse-policy-default-contract",
         "feature_id": "CQ-RESOURCE",
         "comparator": "exact-value",

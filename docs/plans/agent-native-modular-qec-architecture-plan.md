@@ -175,6 +175,8 @@ Hard semantic limits remain private and cannot be overridden.
 
 Estimation must not execute the expensive operation it describes.
 
+Sampling estimation counts folded structure and representable expanded operations without compiling, reports exact output bytes only for fixed-width encodings, and leaves sparse output size, runtime work, scratch, and resident memory unknown until their owners can calculate defensible values.
+
 ### Fingerprints And Capabilities
 
 `ModelFingerprint` hashes the dialect identity, fingerprint schema, and canonical model structure with SHA-256.
@@ -187,6 +189,12 @@ The exact field order, discriminator assignments, primitive encodings, frozen ve
 
 `CompilationRequestFingerprint` hashes the model fingerprint, compiler schema, operation kind, normalized options, and effective limits before backend selection.
 
+Schema one uses the fixed `stab:compilation-request-fingerprint\0` domain, a big-endian request schema, operation and model-dialect discriminators, compiler and model schemas, the raw model digest, and big-endian `u128` counts before normalized option and configurable-limit entries.
+
+Sampling compiler schema one has zero caller-selectable compilation options and zero configurable compile limits. Sweep rejection and representability checks are fixed compiler semantics; shots, seed, reference mode, output format, and paths are execution or routing inputs and are excluded.
+
+The exact byte contract and independently reconstructed vector are normative in [compilation request fingerprint schema version 1](../architecture/compilation-request-fingerprint-schema-v1.md).
+
 `PlanFingerprint` is completed in A4 after compilation and hashes the request fingerprint, selected backend, and executable-contract identity.
 
 Request fingerprints are comparable only when their fingerprint schema and operation kind match.
@@ -198,6 +206,8 @@ Compiled plans are not serializable.
 `CapabilitySet` is generated from gate descriptors, compiler registrations, codec registrations, and backend registrations.
 
 No feature checklist or manually synchronized capability manifest is used at runtime.
+
+The first registry reads gates from `Gate::all()`, codecs from one records-owned six-format table, and sampling from a descriptor colocated with `CompiledSampler::compile`. Its selectable-backend iterator is empty until A4 introduces a genuine backend-selection boundary.
 
 ### Plans, Sessions, And Execution
 

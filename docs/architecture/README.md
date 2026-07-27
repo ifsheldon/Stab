@@ -10,6 +10,8 @@ Intentional public Rust API changes are tracked in [the Stab 0.2 API migration i
 
 The stable byte contract for source-model identities is defined by [model fingerprint schema version 1](model-fingerprint-schema-v1.md).
 
+The stable byte contract for backend-neutral compiler inputs is defined by [compilation request fingerprint schema version 1](compilation-request-fingerprint-schema-v1.md).
+
 ## Architectural Center
 
 ```text

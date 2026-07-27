@@ -5,12 +5,14 @@ use self::execute::{ExecutionBuffers, count_determined_operations, execute_opera
 use self::operation::SampleOperation;
 use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    MeasureRecordOffset, Pauli, PauliBasis, SampleFormat,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompilationCapability,
+    CompilationOperation, CompilationRequestFingerprint, GateCategory, MeasureRecordOffset,
+    ModelDialect, Pauli, PauliBasis, SampleFormat,
     result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
 mod direct_z_measurement;
+mod estimate;
 mod execute;
 mod measurement_flip;
 mod noise;
@@ -21,7 +23,17 @@ mod small_frame;
 mod stabilizer_frame;
 mod stream;
 
+pub use estimate::estimate_sampling_request;
 pub(crate) use reference::ReferenceSampleScratch;
+
+pub(crate) const COMPILATION_CAPABILITY: CompilationCapability = CompilationCapability::new(
+    CompilationOperation::Sampling,
+    ModelDialect::StimCircuit,
+    CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
+    CompilationRequestFingerprint::SCHEMA_VERSION,
+    false,
+    false,
+);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {

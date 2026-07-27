@@ -408,11 +408,18 @@ pub(super) fn classify_public_api_source(
     if matches!(
         value.as_str(),
         "crates/stab-core/src/parse_limits.rs" | "crates/stab-core/src/resources.rs"
-    ) {
+    ) || value == "crates/stab-core/src/sampling/estimate.rs"
+    {
         return Some(FeatureId::Resource);
     }
     if value == "crates/stab-core/src/fingerprint.rs" {
         return Some(FeatureId::CircuitApi);
+    }
+    if value == "crates/stab-core/src/capabilities.rs" {
+        return Some(FeatureId::CircuitApi);
+    }
+    if value == "crates/stab-core/src/compilation_fingerprint.rs" {
+        return Some(FeatureId::Sampling);
     }
     if value.starts_with("crates/stab-core/src/sampling")
         || matches!(

@@ -17,6 +17,12 @@ pub enum ModelDialect {
 }
 
 impl ModelDialect {
+    pub const ALL: [Self; 2] = [Self::StimCircuit, Self::DetectorErrorModel];
+
+    pub fn all() -> impl ExactSizeIterator<Item = Self> {
+        Self::ALL.into_iter()
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::StimCircuit => "stim-circuit",
@@ -29,6 +35,10 @@ impl ModelDialect {
             Self::StimCircuit => 1,
             Self::DetectorErrorModel => 2,
         }
+    }
+
+    pub(crate) const fn fingerprint_discriminator(self) -> u8 {
+        self.discriminator()
     }
 }
 
