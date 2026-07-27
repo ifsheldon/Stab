@@ -303,7 +303,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .iter()
         .filter(|item| item.feature_id == FeatureId::ResultFormats)
         .collect::<Vec<_>>();
-    assert_eq!(result_api_items.len(), 253);
+    assert_eq!(result_api_items.len(), 268);
     assert!(result_api_items.iter().all(|item| {
         manifest
             .evidence_cases

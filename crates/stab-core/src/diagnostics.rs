@@ -64,6 +64,9 @@ pub enum FormatErrorCode {
     MissingIndex,
     IntegerOverflow,
     IndexOutOfRange,
+    InvalidPackedLength,
+    RunLengthOvershoot,
+    ArithmeticOverflow,
 }
 
 impl FormatErrorCode {
@@ -79,6 +82,9 @@ impl FormatErrorCode {
             Self::MissingIndex => "missing-index",
             Self::IntegerOverflow => "integer-overflow",
             Self::IndexOutOfRange => "index-out-of-range",
+            Self::InvalidPackedLength => "invalid-packed-length",
+            Self::RunLengthOvershoot => "run-length-overshoot",
+            Self::ArithmeticOverflow => "arithmetic-overflow",
         }
     }
 }
@@ -91,6 +97,10 @@ pub enum FormatErrorContext {
         actual_bits: usize,
         expected_bits: usize,
     },
+    MinimumRecordWidth {
+        actual_bits: usize,
+        minimum_bits: usize,
+    },
     InvalidByte {
         byte: u8,
     },
@@ -98,6 +108,18 @@ pub enum FormatErrorContext {
         result_type: Option<DetsResultType>,
         index: u64,
         exclusive_bound: usize,
+    },
+    InputLengthMultiple {
+        actual_bytes: usize,
+        byte_multiple: usize,
+    },
+    MinimumInputLength {
+        actual_bytes: usize,
+        minimum_bytes: usize,
+    },
+    RunLength {
+        decoded_bits: usize,
+        expected_bits: usize,
     },
 }
 

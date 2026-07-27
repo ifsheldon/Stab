@@ -3587,6 +3587,96 @@
         "standalone": true
       },
       {
+        "id": "a2-result-b8-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "b8_errors_report_trailing_partial_record_across_readers",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed zero-width and trailing-partial-record cases prove exact b8 diagnostic codes, byte spans, and typed contexts across materialized, dense, packed, and sparse readers."
+        },
+        "negative_axes": [
+          "zero-width-record",
+          "trailing-partial-record",
+          "reader-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-result-r8-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "r8_errors_report_eof_and_overshooting_byte_across_readers",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "A shared zero-allocation decoder is exercised through materialized, dense, packed, and sparse readers for exact EOF and overshooting-run spans and typed contexts."
+        },
+        "negative_axes": [
+          "partial-record-eof",
+          "run-length-overshoot",
+          "reader-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-result-ptb64-span-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "result_format_spans",
+            "ptb64_errors_report_partial_group_and_missing_prefix_bytes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed partial-group, missing-prefix, and arithmetic-overflow cases prove exact ptb64 byte spans and contexts across materialized and streamed readers."
+        },
+        "negative_axes": [
+          "partial-shot-group",
+          "short-requested-prefix",
+          "record-byte-width-overflow"
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-cli-json-result-diagnostic-contract",
         "feature_id": "CQ-CLI",
         "comparator": "exact-value",
@@ -3612,6 +3702,34 @@
           "message-parsing",
           "span-loss",
           "context-loss"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-json-packed-diagnostic-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::diagnostics::json_packed_format_diagnostics_include_exact_span_and_context",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Malformed b8 and r8 inputs prove the public convert path preserves exact packed-format spans, stable codes, and typed byte-length or run-length context in schema-version-1 JSON."
+        },
+        "negative_axes": [
+          "packed-span-loss",
+          "packed-context-loss",
+          "format-reader-drift"
         ],
         "standalone": true
       },

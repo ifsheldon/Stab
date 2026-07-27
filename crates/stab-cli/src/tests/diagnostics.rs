@@ -90,6 +90,59 @@ fn json_result_format_diagnostic_has_schema_span_and_typed_context() {
 }
 
 #[test]
+fn json_packed_format_diagnostics_include_exact_span_and_context() {
+    let cases = [
+        (
+            &[
+                "stab",
+                "convert",
+                "--in_format=b8",
+                "--out_format=01",
+                "--bits_per_shot=9",
+                "--error-format=json",
+            ][..],
+            &b"\x01"[..],
+            "invalid-packed-length",
+            serde_json::json!({
+                "actual_bytes": 1,
+                "byte_multiple": 2,
+            }),
+        ),
+        (
+            &[
+                "stab",
+                "convert",
+                "--in_format=r8",
+                "--out_format=01",
+                "--bits_per_shot=3",
+                "--error-format=json",
+            ][..],
+            &b"\x04"[..],
+            "run-length-overshoot",
+            serde_json::json!({
+                "decoded_bits": 4,
+                "expected_bits": 3,
+            }),
+        ),
+    ];
+
+    for (args, input, expected_code, expected_context) in cases {
+        let (status, stdout, stderr) = run_cli(args, input);
+        assert_eq!(status, 1, "{args:?}");
+        assert_eq!(stdout, b"", "{args:?}");
+        let diagnostic = only_json_line(&stderr);
+        assert_eq!(field(&diagnostic, "/code"), expected_code, "{args:?}");
+        assert_eq!(field(&diagnostic, "/span/byte_start"), 0, "{args:?}");
+        assert_eq!(field(&diagnostic, "/span/byte_length"), 1, "{args:?}");
+        assert_eq!(
+            field(&diagnostic, "/context"),
+            &expected_context,
+            "{args:?}"
+        );
+    }
+}
+
+#[test]
 fn json_warnings_and_errors_are_ordered_json_lines() {
     let (status, stdout, stderr) = run_cli(
         &["stab", "sample", "--frame0", "--error-format=json"],

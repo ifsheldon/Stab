@@ -511,6 +511,13 @@ fn format_error_context(error: &FormatError) -> Value {
             "actual_bits": actual_bits,
             "expected_bits": expected_bits,
         }),
+        FormatErrorContext::MinimumRecordWidth {
+            actual_bits,
+            minimum_bits,
+        } => json!({
+            "actual_bits": actual_bits,
+            "minimum_bits": minimum_bits,
+        }),
         FormatErrorContext::InvalidByte { byte } => json!({
             "byte": byte,
         }),
@@ -526,6 +533,27 @@ fn format_error_context(error: &FormatError) -> Value {
                 "exclusive_bound": exclusive_bound,
             })
         }
+        FormatErrorContext::InputLengthMultiple {
+            actual_bytes,
+            byte_multiple,
+        } => json!({
+            "actual_bytes": actual_bytes,
+            "byte_multiple": byte_multiple,
+        }),
+        FormatErrorContext::MinimumInputLength {
+            actual_bytes,
+            minimum_bytes,
+        } => json!({
+            "actual_bytes": actual_bytes,
+            "minimum_bytes": minimum_bytes,
+        }),
+        FormatErrorContext::RunLength {
+            decoded_bits,
+            expected_bits,
+        } => json!({
+            "decoded_bits": decoded_bits,
+            "expected_bits": expected_bits,
+        }),
     }
 }
 

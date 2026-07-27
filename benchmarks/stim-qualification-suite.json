@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "b8ee2e2daa6a35e52d54713505c44ba08a1cd35a21a39ca77be60321bd55ea1c",
-  "semantic_digest": "95bfb5065c302569870ccc8fcd666268a315b6a4fb311a154be8df6c72466584",
+  "correctness_digest": "cf4cc26432e4b84e45815f3e7037043e53b50004e7eb31584285ba16222fad8e",
+  "semantic_digest": "98c3ab4c8ea6125633cf05cc0492d333b7f6d8f7e877d0e03e12acfcea0a8c38",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -13148,6 +13148,19 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-7d4defc56d5f2311",
+      "path": "stab_core::FormatErrorCode::ArithmeticOverflow",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-d896c9988b3d8152",
       "path": "stab_core::FormatErrorCode::IndexOutOfRange",
       "kind": "variant",
@@ -13189,6 +13202,19 @@
     {
       "id": "cq-api-item-c4ff5904672dd734",
       "path": "stab_core::FormatErrorCode::InvalidData",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-13ea8b0313a58cc1",
+      "path": "stab_core::FormatErrorCode::InvalidPackedLength",
       "kind": "variant",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [
@@ -13254,6 +13280,19 @@
     {
       "id": "cq-api-item-6dfc5b38756a8e98",
       "path": "stab_core::FormatErrorCode::MissingRecordTerminator",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-89beac8c4b28206c",
+      "path": "stab_core::FormatErrorCode::RunLengthOvershoot",
       "kind": "variant",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [
@@ -13447,6 +13486,45 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-3c9bc59e7209b894",
+      "path": "stab_core::FormatErrorContext::InputLengthMultiple",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ac62385a7bacb83d",
+      "path": "stab_core::FormatErrorContext::InputLengthMultiple::actual_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-caf4521df0027204",
+      "path": "stab_core::FormatErrorContext::InputLengthMultiple::byte_multiple",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-3e089d2c9f910450",
       "path": "stab_core::FormatErrorContext::InvalidByte",
       "kind": "variant",
@@ -13462,6 +13540,84 @@
     {
       "id": "cq-api-item-be5e095d72f9c50d",
       "path": "stab_core::FormatErrorContext::InvalidByte::byte",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4d41670fa4d9a4bd",
+      "path": "stab_core::FormatErrorContext::MinimumInputLength",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-43574fb9cefd2206",
+      "path": "stab_core::FormatErrorContext::MinimumInputLength::actual_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5134243326dc23b3",
+      "path": "stab_core::FormatErrorContext::MinimumInputLength::minimum_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-340c0e38972d7aba",
+      "path": "stab_core::FormatErrorContext::MinimumRecordWidth",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-70ed5a68e0c04721",
+      "path": "stab_core::FormatErrorContext::MinimumRecordWidth::actual_bits",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-110ef90e14f102df",
+      "path": "stab_core::FormatErrorContext::MinimumRecordWidth::minimum_bits",
       "kind": "field",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [
@@ -13514,6 +13670,45 @@
     {
       "id": "cq-api-item-d8db496cf9f6bbaa",
       "path": "stab_core::FormatErrorContext::RecordWidth::expected_bits",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-26e4ca790377c95c",
+      "path": "stab_core::FormatErrorContext::RunLength",
+      "kind": "variant",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f6d7bf460f72830b",
+      "path": "stab_core::FormatErrorContext::RunLength::decoded_bits",
+      "kind": "field",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-9266cc5440c62101",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3dc77b7793a0f80b",
+      "path": "stab_core::FormatErrorContext::RunLength::expected_bits",
       "kind": "field",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [

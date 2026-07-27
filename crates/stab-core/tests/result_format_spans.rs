@@ -7,8 +7,11 @@
 use stab_core::{
     ByteSpan, CircuitError, CircuitResult, DetsLayout, DiagnosticSeverity, FormatError,
     FormatErrorCode, FormatErrorContext, SampleFormat,
-    result_formats::{read_dets_records, read_records},
-    result_streaming::{for_each_packed_record, for_each_record, for_each_sparse_record},
+    result_formats::{read_dets_records, read_ptb64_records, read_ptb64_records_all, read_records},
+    result_streaming::{
+        for_each_packed_record, for_each_ptb64_record, for_each_ptb64_record_all, for_each_record,
+        for_each_sparse_record,
+    },
 };
 
 #[test]
@@ -40,6 +43,12 @@ fn result_format_diagnostic_value_contract_is_stable() {
         (FormatErrorCode::MissingIndex, "missing-index"),
         (FormatErrorCode::IntegerOverflow, "integer-overflow"),
         (FormatErrorCode::IndexOutOfRange, "index-out-of-range"),
+        (
+            FormatErrorCode::InvalidPackedLength,
+            "invalid-packed-length",
+        ),
+        (FormatErrorCode::RunLengthOvershoot, "run-length-overshoot"),
+        (FormatErrorCode::ArithmeticOverflow, "arithmetic-overflow"),
     ] {
         assert_eq!(code.as_str(), expected);
     }
@@ -201,6 +210,106 @@ fn dets_errors_report_prefix_namespace_and_index_spans() -> CircuitResult<()> {
     Ok(())
 }
 
+#[test]
+fn b8_errors_report_trailing_partial_record_across_readers() {
+    for error in packed_reader_errors(b"\x01", SampleFormat::B8, 9) {
+        assert_format_error(
+            error,
+            FormatErrorCode::InvalidPackedLength,
+            span(0, 1),
+            FormatErrorContext::InputLengthMultiple {
+                actual_bytes: 1,
+                byte_multiple: 2,
+            },
+            "b8 input length 1 is not a multiple of record byte width 2",
+        );
+    }
+
+    for error in packed_reader_errors(b"", SampleFormat::B8, 0) {
+        assert_format_error_without_span(
+            error,
+            FormatErrorCode::InvalidRecordWidth,
+            FormatErrorContext::MinimumRecordWidth {
+                actual_bits: 0,
+                minimum_bits: 1,
+            },
+            "b8 input cannot represent zero-width records",
+        );
+    }
+}
+
+#[test]
+fn r8_errors_report_eof_and_overshooting_byte_across_readers() {
+    for error in packed_reader_errors(b"\x01", SampleFormat::R8, 3) {
+        assert_format_error(
+            error,
+            FormatErrorCode::UnexpectedEndOfInput,
+            span(1, 0),
+            FormatErrorContext::RecordWidth {
+                actual_bits: 2,
+                expected_bits: 3,
+            },
+            "r8 input ended before record completed",
+        );
+    }
+
+    for error in packed_reader_errors(b"\x04", SampleFormat::R8, 3) {
+        assert_format_error(
+            error,
+            FormatErrorCode::RunLengthOvershoot,
+            span(0, 1),
+            FormatErrorContext::RunLength {
+                decoded_bits: 4,
+                expected_bits: 3,
+            },
+            "r8 run-length overshot record width",
+        );
+    }
+}
+
+#[test]
+fn ptb64_errors_report_partial_group_and_missing_prefix_bytes() {
+    let partial_group = [0_u8; 7];
+    for error in [
+        read_ptb64_records_all(&partial_group, 1).expect_err("materialized whole input"),
+        for_each_ptb64_record_all(&partial_group, 1, |_| Ok(())).expect_err("streamed whole input"),
+    ] {
+        assert_format_error(
+            error,
+            FormatErrorCode::InvalidPackedLength,
+            span(0, 7),
+            FormatErrorContext::InputLengthMultiple {
+                actual_bytes: 7,
+                byte_multiple: 8,
+            },
+            "ptb64 input length 7 is not a multiple of shot-group byte width 8",
+        );
+    }
+
+    for error in [
+        read_ptb64_records(&partial_group, 1, 64).expect_err("materialized prefix"),
+        for_each_ptb64_record(&partial_group, 1, 64, |_| Ok(())).expect_err("streamed prefix"),
+    ] {
+        assert_format_error(
+            error,
+            FormatErrorCode::UnexpectedEndOfInput,
+            span(7, 0),
+            FormatErrorContext::MinimumInputLength {
+                actual_bytes: 7,
+                minimum_bytes: 8,
+            },
+            "ptb64 input expected at least 8 bytes for 64 records with 1 bits each, got 7",
+        );
+    }
+
+    assert_format_error_without_span(
+        read_ptb64_records_all(b"", usize::MAX).expect_err("byte-width overflow"),
+        FormatErrorCode::ArithmeticOverflow,
+        FormatErrorContext::None,
+        "ptb64 record byte width overflowed",
+    );
+}
+
 fn zero_one_reader_errors(input: &[u8], width: usize) -> Vec<CircuitError> {
     let mut errors =
         vec![read_records(input, SampleFormat::ZeroOne, width).expect_err("materialized reader")];
@@ -218,6 +327,16 @@ fn zero_one_reader_errors(input: &[u8], width: usize) -> Vec<CircuitError> {
     errors
 }
 
+fn packed_reader_errors(input: &[u8], format: SampleFormat, width: usize) -> Vec<CircuitError> {
+    let mut errors = vec![read_records(input, format, width).expect_err("materialized reader")];
+    errors.push(for_each_record(input, format, width, |_| Ok(())).expect_err("dense reader"));
+    errors
+        .push(for_each_packed_record(input, format, width, |_| Ok(())).expect_err("packed reader"));
+    errors
+        .push(for_each_sparse_record(input, format, width, |_| Ok(())).expect_err("sparse reader"));
+    errors
+}
+
 fn assert_format_error(
     error: CircuitError,
     expected_code: FormatErrorCode,
@@ -231,6 +350,26 @@ fn assert_format_error(
     assert_eq!(diagnostic.code(), expected_code);
     assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
     assert_eq!(diagnostic.span(), Some(expected_span));
+    assert_eq!(diagnostic.context(), expected_context);
+    assert_eq!(diagnostic.message(), expected_message);
+    assert_eq!(
+        error.to_string(),
+        format!("invalid result format data: {expected_message}")
+    );
+}
+
+fn assert_format_error_without_span(
+    error: CircuitError,
+    expected_code: FormatErrorCode,
+    expected_context: FormatErrorContext,
+    expected_message: &str,
+) {
+    let diagnostic = error
+        .format_error()
+        .expect("expected result-format diagnostic payload");
+    assert_eq!(diagnostic.code(), expected_code);
+    assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
+    assert_eq!(diagnostic.span(), None);
     assert_eq!(diagnostic.context(), expected_context);
     assert_eq!(diagnostic.message(), expected_message);
     assert_eq!(

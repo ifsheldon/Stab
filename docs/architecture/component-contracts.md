@@ -110,7 +110,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
 | `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, and typed-context primitives here while domain errors are introduced. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
-| `result_formats.rs`, `result_formats/**`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. |
+| `result_formats.rs`, `result_formats/**`, `result_packed.rs`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |
 | `sampling.rs`, `sampling/**`, `execution/**`, `detection.rs`, `detection/**`, `dem_sampler.rs`, `probability_util.rs` | Engine | Simulator-backed helpers, randomized bit generation, compilation, reusable state, detection conversion, and DEM sampling are execution concerns. |
 | `analysis/**` | Analysis | Cross-model semantic adapters live here even when their implementation delegates to a source module awaiting extraction. |

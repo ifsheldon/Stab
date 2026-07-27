@@ -1,4 +1,10 @@
-use crate::{CircuitError, CircuitResult};
+use crate::{
+    CircuitError, CircuitResult,
+    result_packed::{
+        b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout,
+        ptb64_record_count as packed_ptb64_record_count,
+    },
+};
 
 mod dets;
 
@@ -54,25 +60,9 @@ pub fn read_ptb64_records(
     if max_shots == 0 {
         return Ok(Vec::new());
     }
-    if bits_per_record == 0 {
-        return Err(CircuitError::invalid_result_format(
-            "ptb64 input cannot represent a nonzero number of zero-width records",
-        ));
-    }
-
     let shot_groups = max_shots / 64;
-    let bytes_per_group = bits_per_record
-        .checked_mul(8)
-        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 record byte width overflowed"))?;
-    let expected_bytes = shot_groups.checked_mul(bytes_per_group).ok_or_else(|| {
-        CircuitError::invalid_result_format("ptb64 expected byte count overflowed")
-    })?;
-    if input.len() < expected_bytes {
-        return Err(CircuitError::invalid_result_format(format!(
-            "ptb64 input expected at least {expected_bytes} bytes for {max_shots} records with {bits_per_record} bits each, got {}",
-            input.len()
-        )));
-    }
+    let (bytes_per_group, expected_bytes) =
+        ptb64_prefix_layout(input.len(), bits_per_record, max_shots)?;
 
     let input = input.get(..expected_bytes).ok_or_else(|| {
         CircuitError::invalid_result_format("ptb64 expected byte range was out of bounds")
@@ -111,24 +101,7 @@ pub fn read_ptb64_records_all(
 }
 
 pub fn ptb64_record_count(input: &[u8], bits_per_record: usize) -> CircuitResult<usize> {
-    if bits_per_record == 0 {
-        return Err(CircuitError::invalid_result_format(
-            "ptb64 input cannot infer a shot count for zero-width records",
-        ));
-    }
-    let bytes_per_group = bits_per_record
-        .checked_mul(8)
-        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 record byte width overflowed"))?;
-    if !input.len().is_multiple_of(bytes_per_group) {
-        return Err(CircuitError::invalid_result_format(format!(
-            "ptb64 input length {} is not a multiple of shot-group byte width {bytes_per_group}",
-            input.len()
-        )));
-    }
-    let shot_groups = input.len() / bytes_per_group;
-    shot_groups
-        .checked_mul(64)
-        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 shot count overflowed"))
+    packed_ptb64_record_count(input.len(), bits_per_record)
 }
 
 pub fn validate_ptb64_shot_count(shots: usize) -> CircuitResult<()> {
@@ -624,18 +597,7 @@ fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> CircuitResult<
 }
 
 fn read_b8_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
-    let bytes_per_record = bits_per_record.div_ceil(8);
-    if bytes_per_record == 0 {
-        return Err(CircuitError::invalid_result_format(
-            "b8 input cannot represent zero-width records",
-        ));
-    }
-    if !input.len().is_multiple_of(bytes_per_record) {
-        return Err(CircuitError::invalid_result_format(format!(
-            "b8 input length {} is not a multiple of record byte width {bytes_per_record}",
-            input.len()
-        )));
-    }
+    let bytes_per_record = b8_bytes_per_record(input.len(), bits_per_record)?;
     input
         .chunks_exact(bytes_per_record)
         .map(|chunk| Ok(unpack_b8_chunk(chunk, bits_per_record)))
@@ -647,38 +609,15 @@ fn read_r8_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Ve
     let mut offset = 0usize;
     while offset < input.len() {
         let mut record = vec![false; bits_per_record];
-        let mut bit_index = 0usize;
-        loop {
-            let byte = *input.get(offset).ok_or_else(|| {
-                CircuitError::invalid_result_format("r8 input ended before record completed")
-            })?;
-            offset += 1;
-            if byte == u8::MAX {
-                bit_index += usize::from(u8::MAX);
-                if bit_index > bits_per_record {
-                    return Err(CircuitError::invalid_result_format(
-                        "r8 run-length overshot record width",
-                    ));
-                }
-                continue;
-            }
-            bit_index += usize::from(byte);
-            if bit_index > bits_per_record {
-                return Err(CircuitError::invalid_result_format(
-                    "r8 run-length overshot record width",
-                ));
-            }
-            if bit_index == bits_per_record {
-                break;
-            }
+        decode_next_r8_record(input, bits_per_record, &mut offset, |bit_index| {
             let Some(bit) = record.get_mut(bit_index) else {
                 return Err(CircuitError::invalid_result_format(format!(
                     "r8 hit index {bit_index} exceeds record width {bits_per_record}"
                 )));
             };
             *bit = true;
-            bit_index += 1;
-        }
+            Ok(())
+        })?;
         records.push(record);
     }
     Ok(records)

@@ -27,6 +27,7 @@ mod matched_error;
 mod mbqc_decomposition;
 mod probability_util;
 pub mod result_formats;
+mod result_packed;
 pub mod result_streaming;
 mod result_text;
 mod sampling;

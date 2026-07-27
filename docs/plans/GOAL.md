@@ -20,9 +20,9 @@ Stop when these sources disagree; fix the owning source and regenerate derived s
 ## Current State
 
 - The accepted compatibility evidence revision is `68d107a42f655254f31628f0cbedc55479f6c0f3`.
-- A0 and A1 are complete; A2 is active at committed checkpoint `6aad05b8`.
-- Current correctness inventory: `b8ee2e2daa6a35e52d54713505c44ba08a1cd35a21a39ca77be60321bd55ea1c`.
-- Current performance inventory: `95bfb5065c302569870ccc8fcd666268a315b6a4fb311a154be8df6c72466584`.
+- A0 and A1 are complete; A2 is active at committed checkpoint `66239b60`.
+- Current correctness inventory: `cf4cc26432e4b84e45815f3e7037043e53b50004e7eb31584285ba16222fad8e`.
+- Current performance inventory: `98c3ab4c8ea6125633cf05cc0492d333b7f6d8f7e877d0e03e12acfcea0a8c38`.
 - Formal evidence for these inventories has not started; see [the A1 closure and reviewer feedback](agent-native-modular-qec-progress-report.md).
 
 ## Active Milestone
