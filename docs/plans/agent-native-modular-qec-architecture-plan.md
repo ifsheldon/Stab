@@ -25,7 +25,7 @@ The implemented Stim v1.16.0 file formats, CLI behavior, strict grammars, path-a
 
 Focused model, record, bit-storage, and scalar-algebra crates become usable on Rust 1.97.1 without compiling portable SIMD.
 
-The current repository checkpoint is `cfaa1098fe7d37512b71bd2f5974196bbcdb14b9`.
+The current architecture-migration checkpoint is `3454722`.
 
 Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted pre-refactor formal compatibility and AArch64 performance checkpoint.
 

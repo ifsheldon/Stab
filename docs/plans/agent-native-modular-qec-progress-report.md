@@ -6,7 +6,7 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: active.
+- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `3454722`.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
