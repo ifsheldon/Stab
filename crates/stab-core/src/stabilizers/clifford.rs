@@ -449,15 +449,19 @@ impl CliffordString {
     {
         let mut non_identity_count = 0_usize;
         let mut remaining = self.len();
-        let words = self
-            .z_signs
-            .words_mut()
+        let mut z_signs = self.z_signs.words_mut();
+        let mut x_signs = self.x_signs.words_mut();
+        let mut inv_x2x = self.inv_x2x.words_mut();
+        let mut x2z = self.x2z.words_mut();
+        let mut z2x = self.z2x.words_mut();
+        let mut inv_z2z = self.inv_z2z.words_mut();
+        let words = z_signs
             .iter_mut()
-            .zip(self.x_signs.words_mut())
-            .zip(self.inv_x2x.words_mut())
-            .zip(self.x2z.words_mut())
-            .zip(self.z2x.words_mut())
-            .zip(self.inv_z2z.words_mut());
+            .zip(x_signs.iter_mut())
+            .zip(inv_x2x.iter_mut())
+            .zip(x2z.iter_mut())
+            .zip(z2x.iter_mut())
+            .zip(inv_z2z.iter_mut());
         for (((((z_signs, x_signs), inv_x2x), x2z), z2x), inv_z2z) in words {
             let chunk_len = remaining.min(u64::BITS as usize);
             let mut packed = [0_u64; 6];
@@ -535,13 +539,19 @@ impl CliffordString {
             return Ok(());
         }
         let word_count = rhs.z_signs.word_count();
+        let mut z_signs = self.z_signs.words_mut();
+        let mut x_signs = self.x_signs.words_mut();
+        let mut inv_x2x = self.inv_x2x.words_mut();
+        let mut x2z = self.x2z.words_mut();
+        let mut z2x = self.z2x.words_mut();
+        let mut inv_z2z = self.inv_z2z.words_mut();
         let left = CliffordPlanesMut {
-            z_signs: prefix_mut(self.z_signs.words_mut(), word_count)?,
-            x_signs: prefix_mut(self.x_signs.words_mut(), word_count)?,
-            inv_x2x: prefix_mut(self.inv_x2x.words_mut(), word_count)?,
-            x2z: prefix_mut(self.x2z.words_mut(), word_count)?,
-            z2x: prefix_mut(self.z2x.words_mut(), word_count)?,
-            inv_z2z: prefix_mut(self.inv_z2z.words_mut(), word_count)?,
+            z_signs: prefix_mut(&mut z_signs, word_count)?,
+            x_signs: prefix_mut(&mut x_signs, word_count)?,
+            inv_x2x: prefix_mut(&mut inv_x2x, word_count)?,
+            x2z: prefix_mut(&mut x2z, word_count)?,
+            z2x: prefix_mut(&mut z2x, word_count)?,
+            inv_z2z: prefix_mut(&mut inv_z2z, word_count)?,
         };
         let right = CliffordPlanes {
             z_signs: rhs.z_signs.words(),

@@ -8,8 +8,8 @@
 use std::collections::BTreeSet;
 
 use proptest::prelude::*;
-use stab_core::bits;
-use stab_core::{BitBlock, BitMatrix, BitSlice, BitVec, SparseXorVec};
+use stab_bits as bits;
+use stab_bits::{BitBlock, BitMatrix, BitSlice, BitVec, SparseXorVec};
 
 #[test]
 fn bits_bit_ref_and_tail_boundaries_follow_stim() {
@@ -54,6 +54,32 @@ fn bits_dirty_tail_padding_is_ignored_and_canonicalized() {
     ored.or_assign(&dirty).expect("or dirty-padded slice");
     assert_eq!(ored.words(), &[u64::MAX, 1]);
     assert!(ored.not_zero());
+}
+
+#[test]
+fn bits_bitvec_owned_storage_contract_preserves_tail_and_resize_semantics() {
+    let mut bits = BitVec::from_bits([true, false, true]);
+    assert_eq!(bits.len(), 3);
+    assert_eq!(bits.words(), &[0b101]);
+
+    bits.resize_zeros(65);
+    assert_eq!(bits.len(), 65);
+    assert_eq!(bits.get(0), Some(true));
+    assert_eq!(bits.get(1), Some(false));
+    assert_eq!(bits.get(2), Some(true));
+    assert_eq!(bits.get(64), Some(false));
+
+    {
+        let mut words = bits.words_mut();
+        words[0] = u64::MAX;
+        words[1] = u64::MAX;
+    }
+    assert_eq!(bits.words(), &[u64::MAX, 1]);
+    assert_eq!(bits.popcount(), 65);
+
+    bits.resize_zeros(2);
+    assert_eq!(bits.words(), &[0b11]);
+    assert_eq!(bits.popcount(), 2);
 }
 
 #[test]

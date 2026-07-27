@@ -37,19 +37,19 @@ pub(super) fn oracle_reference(
     }
     let (corpus_path, generator_domain) = match source_id {
         "coverage-mem-bit-ref" => (
-            "crates/stab-core/tests/bits.rs",
+            "crates/stab-bits/tests/bits.rs",
             "bit-vector tail and storage boundary corpus",
         ),
         "coverage-mem-simd-util" => (
-            "crates/stab-core/tests/bits.rs",
+            "crates/stab-bits/tests/bits.rs",
             "scalar bit-utility boundary corpus",
         ),
         "coverage-mem-simd-word" => (
-            "crates/stab-core/tests/bits.rs",
+            "crates/stab-bits/tests/bits.rs",
             "SIMD word scalar-reference corpus",
         ),
         "coverage-util-bot-twiddle" => (
-            "crates/stab-core/tests/bits.rs",
+            "crates/stab-bits/tests/bits.rs",
             "twiddle helper boundary and upstream example corpus",
         ),
         "coverage-stabilizers-pauli-string-ref" => (

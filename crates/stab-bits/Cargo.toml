@@ -1,0 +1,18 @@
+[package]
+name = "stab-bits"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+description = "Stable packed bit storage and scalar layout primitives for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

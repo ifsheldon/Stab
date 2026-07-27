@@ -2179,6 +2179,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "stab-bits"
+version = "0.1.1"
+dependencies = [
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
 name = "stab-cli"
 version = "0.1.1"
 dependencies = [
@@ -2215,6 +2223,7 @@ dependencies = [
  "rand 0.10.1",
  "sha2",
  "smallvec",
+ "stab-bits",
  "stab-compat-corpus",
  "thiserror",
 ]

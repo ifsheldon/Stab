@@ -3,10 +3,16 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use super::model::PublicApiKind;
+
+mod identity;
+mod reexports;
+
+use identity::{canonical_value_digest, resolved_path_id, resolved_path_name};
+use reexports::ExternalReexport;
+pub(super) use reexports::resolve_external_reexports;
 
 const MAX_RUSTDOC_JSON_BYTES: usize = 32 << 20;
 const MAX_PUBLIC_API_ITEMS: usize = 16_384;
@@ -35,8 +41,10 @@ pub(super) struct ExtractedPublicApiItem {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct RustdocInventory {
+    pub(super) crate_name: String,
     pub(super) format_version: u64,
     pub(super) items: Vec<ExtractedPublicApiItem>,
+    external_reexports: Vec<ExternalReexport>,
 }
 
 #[derive(Debug, Error)]
@@ -68,6 +76,14 @@ pub(crate) enum PublicApiError {
 
     #[error("rustdoc JSON references missing item id {0}")]
     MissingItem(String),
+
+    #[error(
+        "public API re-export {alias_path:?} targets unresolved external Stab path {canonical_path:?}"
+    )]
+    UnresolvedExternalReexport {
+        alias_path: String,
+        canonical_path: String,
+    },
 
     #[error("failed to determine the pinned Rust host target: {0}")]
     HostTarget(Box<str>),
@@ -211,6 +227,11 @@ fn extract_rustdoc_inventory(
         .get("index")
         .and_then(Value::as_object)
         .ok_or(PublicApiError::InvalidField("index"))?;
+    let empty_paths = Map::new();
+    let paths = value
+        .get("paths")
+        .and_then(Value::as_object)
+        .unwrap_or(&empty_paths);
     if expected_crate_name == "stab_core" {
         for entry in index.values() {
             if let Some(name) = entry.get("name").and_then(Value::as_str)
@@ -232,7 +253,9 @@ fn extract_rustdoc_inventory(
     let mut collector = ApiCollector {
         crate_name,
         index,
+        paths,
         items: BTreeMap::new(),
+        external_reexports: BTreeSet::new(),
         visited_modules: BTreeSet::new(),
         visited_globs: BTreeSet::new(),
         traversal_steps: 0,
@@ -245,15 +268,19 @@ fn extract_rustdoc_inventory(
         });
     }
     Ok(RustdocInventory {
+        crate_name: crate_name.to_string(),
         format_version,
         items: collector.items.into_values().collect(),
+        external_reexports: collector.external_reexports.into_iter().collect(),
     })
 }
 
 struct ApiCollector<'a> {
     crate_name: &'a str,
     index: &'a Map<String, Value>,
+    paths: &'a Map<String, Value>,
     items: BTreeMap<(String, PublicApiKind), ExtractedPublicApiItem>,
+    external_reexports: BTreeSet<ExternalReexport>,
     visited_modules: BTreeSet<(String, String)>,
     visited_globs: BTreeSet<(String, String)>,
     traversal_steps: usize,
@@ -335,13 +362,16 @@ impl ApiCollector<'_> {
             .and_then(Value::as_bool)
             .ok_or(PublicApiError::InvalidField("use.is_glob"))?;
         if is_glob {
-            return self.collect_glob_use(&target_id, parent_path);
+            return self.collect_glob_use(use_item, &target_id, parent_path);
         }
         let name = use_value
             .get("name")
             .and_then(Value::as_str)
             .ok_or(PublicApiError::InvalidField("use.name"))?;
-        let target = item(self.index, &target_id)?;
+        let Some(target) = self.index.get(&target_id) else {
+            let alias_path = join_path(parent_path, name)?;
+            return self.collect_external_reexport(use_item, &target_id, alias_path);
+        };
         if is_doc_hidden(target) {
             return Ok(());
         }
@@ -361,6 +391,7 @@ impl ApiCollector<'_> {
 
     fn collect_glob_use(
         &mut self,
+        use_item: &Value,
         target_id: &str,
         parent_path: &str,
     ) -> Result<(), PublicApiError> {
@@ -370,7 +401,9 @@ impl ApiCollector<'_> {
         {
             return Ok(());
         }
-        let target = item(self.index, target_id)?;
+        let Some(target) = self.index.get(target_id) else {
+            return self.collect_external_reexport(use_item, target_id, parent_path.to_string());
+        };
         let item_ids = target
             .get("inner")
             .and_then(|inner| inner.get("module"))
@@ -381,6 +414,50 @@ impl ApiCollector<'_> {
             let item_id = json_id(item_id)?;
             self.collect_reachable_item(&item_id, parent_path, None)?;
         }
+        Ok(())
+    }
+
+    fn collect_external_reexport(
+        &mut self,
+        span_item: &Value,
+        target_id: &str,
+        alias_path: String,
+    ) -> Result<(), PublicApiError> {
+        let path_entry = self
+            .paths
+            .get(target_id)
+            .ok_or_else(|| PublicApiError::MissingItem(target_id.to_string()))?;
+        let components = path_entry
+            .get("path")
+            .and_then(Value::as_array)
+            .ok_or(PublicApiError::InvalidField("paths.path"))?
+            .iter()
+            .map(|component| {
+                component
+                    .as_str()
+                    .ok_or(PublicApiError::InvalidField("paths.path component"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let Some(canonical_crate_name) = components.first().copied() else {
+            return Err(PublicApiError::InvalidField("paths.path"));
+        };
+        if !canonical_crate_name.starts_with("stab_") {
+            return Ok(());
+        }
+        let canonical_path = components.join("::");
+        validate_api_path(&canonical_path)?;
+        validate_api_path(&alias_path)?;
+        let (source_path, source_line) =
+            source_span(span_item).ok_or_else(|| PublicApiError::MissingSpan {
+                path: alias_path.clone(),
+            })?;
+        self.external_reexports.insert(ExternalReexport {
+            canonical_crate_name: canonical_crate_name.to_string(),
+            canonical_path,
+            alias_path,
+            source_path,
+            source_line,
+        });
         Ok(())
     }
 
@@ -774,58 +851,6 @@ fn source_span(value: &Value) -> Option<(PathBuf, u32)> {
     Some((PathBuf::from(filename), line))
 }
 
-fn resolved_path_name(value: &Value) -> Result<String, PublicApiError> {
-    let resolved = value.get("resolved_path").unwrap_or(value);
-    let base = value
-        .get("resolved_path")
-        .and_then(|path| path.get("path"))
-        .or_else(|| value.get("path"))
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or(PublicApiError::InvalidField("impl.trait.path"))?;
-    let Some(args) = resolved.get("args").filter(|args| !args.is_null()) else {
-        return Ok(base);
-    };
-    let suffix = canonical_value_digest(args);
-    Ok(format!("{base}@{suffix}"))
-}
-
-fn resolved_path_id(value: &Value) -> Result<Option<String>, PublicApiError> {
-    let Some(path) = value.get("resolved_path") else {
-        return Ok(None);
-    };
-    path.get("id")
-        .map(json_id)
-        .transpose()
-        .map_err(|_| PublicApiError::InvalidField("resolved_path.id"))
-}
-
-fn canonical_value_digest(value: &Value) -> String {
-    let canonical = canonicalize_rustdoc_value(value);
-    let digest = Sha256::digest(canonical.to_string().as_bytes());
-    digest
-        .iter()
-        .take(6)
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
-
-fn canonicalize_rustdoc_value(value: &Value) -> Value {
-    match value {
-        Value::Array(values) => {
-            Value::Array(values.iter().map(canonicalize_rustdoc_value).collect())
-        }
-        Value::Object(values) => Value::Object(
-            values
-                .iter()
-                .filter(|(key, _)| !matches!(key.as_str(), "id" | "crate_id"))
-                .map(|(key, value)| (key.clone(), canonicalize_rustdoc_value(value)))
-                .collect(),
-        ),
-        _ => value.clone(),
-    }
-}
-
 fn join_path(parent: &str, name: &str) -> Result<String, PublicApiError> {
     let path = format!("{parent}::{name}");
     validate_api_path(&path)?;
@@ -883,6 +908,86 @@ mod tests {
         assert!(paths.iter().any(|(path, kind)| {
             path.starts_with("stab_core::Thing as Clone for@") && *kind == PublicApiKind::TraitImpl
         }));
+    }
+
+    #[test]
+    fn rustdoc_extractor_resolves_external_stab_reexports() {
+        let facade_json = json!({
+            "format_version": 57,
+            "includes_private": false,
+            "root": 0,
+            "index": {
+                "0": item_json("stab_core", "public", "crates/stab-core/src/lib.rs", 1, json!({"module": {"items": [1]}})),
+                "1": item_json(Option::<&str>::None, "public", "crates/stab-core/src/lib.rs", 3, json!({"use": {"source": "stab_bits::BitVec", "name": "BitVec", "id": 50, "is_glob": false}}))
+            },
+            "paths": {
+                "50": {"crate_id": 1, "path": ["stab_bits", "BitVec"], "kind": "struct"}
+            }
+        });
+        let mut facade =
+            extract_rustdoc_inventory(&facade_json, "stab_core").expect("facade inventory");
+        let dependency = RustdocInventory {
+            crate_name: "stab_bits".to_string(),
+            format_version: 57,
+            items: vec![
+                ExtractedPublicApiItem {
+                    crate_name: "stab_bits".to_string(),
+                    path: "stab_bits::BitVec".to_string(),
+                    kind: PublicApiKind::Struct,
+                    source_path: PathBuf::from("crates/stab-bits/src/lib.rs"),
+                    source_line: 10,
+                    owner_path: "stab_bits::BitVec".to_string(),
+                },
+                ExtractedPublicApiItem {
+                    crate_name: "stab_bits".to_string(),
+                    path: "stab_bits::BitVec::zeros".to_string(),
+                    kind: PublicApiKind::Method,
+                    source_path: PathBuf::from("crates/stab-bits/src/lib.rs"),
+                    source_line: 20,
+                    owner_path: "stab_bits::BitVec::zeros".to_string(),
+                },
+            ],
+            external_reexports: Vec::new(),
+        };
+
+        resolve_external_reexports(&mut facade, &[dependency]).expect("resolved facade");
+
+        let paths = facade
+            .items
+            .iter()
+            .map(|item| (item.path.as_str(), item.kind))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            paths,
+            BTreeSet::from([
+                ("stab_core::BitVec", PublicApiKind::Struct),
+                ("stab_core::BitVec::zeros", PublicApiKind::Method),
+            ])
+        );
+        assert!(facade.external_reexports.is_empty());
+    }
+
+    #[test]
+    fn external_stab_reexport_fails_closed_without_canonical_inventory() {
+        let mut facade = RustdocInventory {
+            crate_name: "stab_core".to_string(),
+            format_version: 57,
+            items: Vec::new(),
+            external_reexports: vec![ExternalReexport {
+                canonical_crate_name: "stab_records".to_string(),
+                canonical_path: "stab_records::SampleFormat".to_string(),
+                alias_path: "stab_core::SampleFormat".to_string(),
+                source_path: PathBuf::from("crates/stab-core/src/lib.rs"),
+                source_line: 2,
+            }],
+        };
+
+        let error = resolve_external_reexports(&mut facade, &[])
+            .expect_err("missing canonical inventory must fail");
+        assert!(matches!(
+            error,
+            PublicApiError::UnresolvedExternalReexport { .. }
+        ));
     }
 
     #[test]

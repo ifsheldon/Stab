@@ -10706,25 +10706,45 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::words" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::zeros" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::get" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::get" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::new" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::new" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::word_count" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::word_count" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::get" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::get" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::is_empty" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::is_empty" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::len" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::len" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::new" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::new" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::words" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::words" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::as_bitslice" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::as_bitslice" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::from_words_truncated" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::from_words_truncated" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::get" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::get" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::is_empty" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::is_empty" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::len" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::len" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::set" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::set" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::word_count" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::word_count" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::zeros" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::zeros" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::zeros" }
       ]
     },
     {
@@ -10852,13 +10872,21 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::popcount" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::popcount" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::popcount" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::and_assign" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::and_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::clear" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::clear" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::masked_xor_assign" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::masked_xor_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::not_zero" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::not_zero" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::or_assign" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::or_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_assign" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_assign" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::xor_assign" }
       ],
       "oracle_fixture_owners": [
         "coverage-mem-simd-bits"
@@ -10900,12 +10928,59 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::copy_from_bitslice" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_range_from" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitError" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitError" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitResult" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitResult" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::copy_from_bitslice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_range_from" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::copy_from_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_range_from" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::xor_range_from" }
       ],
       "oracle_fixture_owners": [
         "coverage-mem-simd-bits-range-ref"
+      ]
+    },
+    {
+      "id": "a3-bitvec-owned-storage-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-bits",
+          "--test",
+          "bits",
+          "bits_bitvec_owned_storage_contract_preserves_tail_and_resize_semantics",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Owned bit construction and resize allocate only the checked logical width; guarded raw-word mutation restores zero padding before the value can be observed again."
+      },
+      "negative_axes": [
+        "non-word-aligned-growth",
+        "non-word-aligned-shrink",
+        "dirty-tail-word"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::from_bits" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::resize_zeros" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::words_mut" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitWordsMut" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::from_bits" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::resize_zeros" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::words_mut" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitWordsMut" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::from_bits" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::resize_zeros" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::words_mut" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitWordsMut" }
       ]
     },
     {
@@ -10969,14 +11044,23 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::xor" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::zero" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BIT_BLOCK_WORDS" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BIT_BLOCK_WORDS" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::and" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::and" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::from_words" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::from_words" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::or" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::or" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::popcount" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::popcount" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::words" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::words" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::xor" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::zero" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::xor" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::zero" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::zero" }
       ]
     },
     {
@@ -11035,16 +11119,27 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::xor_row_into" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::zeros" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::cols" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::cols" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::get" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::get" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::identity" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::identity" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::masked_xor_row_into" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::masked_xor_row_into" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::row" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::row" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::rows" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::rows" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::set" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::set" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::swap_rows" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::swap_rows" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::xor_row_into" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::zeros" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::zeros" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::zeros" }
       ],
       "oracle_fixture_owners": [
         "coverage-mem-simd-bit-table"
@@ -11110,7 +11205,9 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose" },
         { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose_square_in_place" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose_square_in_place" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::transpose" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose_square_in_place" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::transpose_square_in_place" }
       ]
     },
     {
@@ -11172,16 +11269,27 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_item" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::contains" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::contains" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::from_sorted_items" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::from_sorted_items" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_empty" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::is_empty" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_superset_of" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::is_superset_of" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::items" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::items" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::new" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::new" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_assign" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::xor_assign" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_item" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::xor_item" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::inplace_xor_sort" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_subset_of_sorted" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::inplace_xor_sort" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_subset_of_sorted" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::is_subset_of_sorted" }
       ],
       "oracle_fixture_owners": [
         "coverage-mem-sparse-xor-vec"
@@ -11232,8 +11340,11 @@
       ],
       "public_api_owners": [
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::first_set_bit" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::first_set_bit" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::floor_lg2" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_power_of_2" }
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::floor_lg2" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_power_of_2" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::is_power_of_2" }
       ]
     },
     {

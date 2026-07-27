@@ -19,7 +19,9 @@ use super::model::{
     SelectorKind, SemanticDigest, StableCaseDomain, UpstreamCase, UpstreamOwnership,
     UpstreamProvenance,
 };
-use super::public_api::{ExtractedPublicApiItem, PublicApiError, generate_rustdoc_inventory};
+use super::public_api::{
+    ExtractedPublicApiItem, PublicApiError, generate_rustdoc_inventory, resolve_external_reexports,
+};
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::CargoTestSelector;
 
@@ -255,7 +257,15 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         .flat_map(make_upstream_evidence_cases)
         .collect::<Vec<_>>();
 
+    let bits_api = generate_rustdoc_inventory(&root.path, "stab-bits", "stab_bits")?;
     let mut extracted_api = generate_rustdoc_inventory(&root.path, "stab-core", "stab_core")?;
+    resolve_external_reexports(&mut extracted_api, std::slice::from_ref(&bits_api))?;
+    if extracted_api.format_version != bits_api.format_version {
+        return Err(InventoryError::PublicApi(PublicApiError::InvalidField(
+            "rustdoc format version mismatch",
+        )));
+    }
+    extracted_api.items.extend(bits_api.items);
     let cli_api = generate_rustdoc_inventory(&root.path, "stab-cli", "stab_cli")?;
     if extracted_api.format_version != cli_api.format_version {
         return Err(InventoryError::PublicApi(PublicApiError::InvalidField(

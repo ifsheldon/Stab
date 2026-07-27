@@ -342,7 +342,11 @@ pub(super) fn classify_public_api_source(
             return Some(FeatureId::CircuitApi);
         }
     }
-    if value.starts_with("crates/stab-core/src/bits/") {
+    if value.starts_with("crates/stab-bits/src/")
+        || value.starts_with("crates/stab-core/src/bits/")
+        || api_lower.starts_with("stab_core::bit")
+        || api_lower.starts_with("stab_core::sparsexorvec")
+    {
         return Some(FeatureId::BitKernels);
     }
     if value.starts_with("crates/stab-core/src/circuit_generation") {

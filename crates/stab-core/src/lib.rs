@@ -51,7 +51,9 @@ pub use analysis::{
     circuit_with_inlined_feedback, decomposed_circuit, simplified_circuit,
     single_qubit_clifford_for_gate,
 };
-pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
+pub use bits::{
+    BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, BitWordsMut, SparseXorVec,
+};
 pub use capabilities::{CapabilitySet, CompilationCapability};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,

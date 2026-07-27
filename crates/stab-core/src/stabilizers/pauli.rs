@@ -393,10 +393,12 @@ impl PauliString {
         let word = index / WORD_BITS;
         let bit = index % WORD_BITS;
         let mask = 1_u64 << bit;
-        let Some(x_word) = self.xs.words_mut().get_mut(word) else {
+        let mut x_words = self.xs.words_mut();
+        let mut z_words = self.zs.words_mut();
+        let Some(x_word) = x_words.get_mut(word) else {
             return;
         };
-        let Some(z_word) = self.zs.words_mut().get_mut(word) else {
+        let Some(z_word) = z_words.get_mut(word) else {
             return;
         };
         if basis.x_bit() {
@@ -477,18 +479,22 @@ impl PauliString {
             .any(|(x_word, z_word)| (x_word | z_word) != 0);
         let left_len = self.len();
         let right_len = rhs.len();
-        let left_x = self.xs.words_mut().get_mut(..rhs_word_count).ok_or(
-            StabilizerError::LengthMismatch {
-                left: left_len,
-                right: right_len,
-            },
-        )?;
-        let left_z = self.zs.words_mut().get_mut(..rhs_word_count).ok_or(
-            StabilizerError::LengthMismatch {
-                left: left_len,
-                right: right_len,
-            },
-        )?;
+        let mut left_x_words = self.xs.words_mut();
+        let mut left_z_words = self.zs.words_mut();
+        let left_x =
+            left_x_words
+                .get_mut(..rhs_word_count)
+                .ok_or(StabilizerError::LengthMismatch {
+                    left: left_len,
+                    right: right_len,
+                })?;
+        let left_z =
+            left_z_words
+                .get_mut(..rhs_word_count)
+                .ok_or(StabilizerError::LengthMismatch {
+                    left: left_len,
+                    right: right_len,
+                })?;
         let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words());
         self.has_terms = trailing_has_terms || product.has_terms;
 

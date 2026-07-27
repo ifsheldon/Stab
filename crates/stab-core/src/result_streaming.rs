@@ -256,7 +256,10 @@ where
     let bytes_per_record = b8_bytes_per_record(input.len(), bits_per_record)?;
     let mut record = BitVec::zeros(bits_per_record);
     for chunk in input.chunks_exact(bytes_per_record) {
-        unpack_b8_chunk_into_words(chunk, bits_per_record, record.words_mut());
+        {
+            let mut words = record.words_mut();
+            unpack_b8_chunk_into_words(chunk, bits_per_record, &mut words);
+        }
         visit(record.as_bitslice())?;
     }
     Ok(())

@@ -111,7 +111,7 @@ fn transpose_tile(tile: &mut [u64; 64]) {
 )]
 mod tests {
     use super::*;
-    use crate::bits::BitLen;
+    use crate::BitLen;
 
     #[test]
     fn tile_transpose_moves_every_single_bit() {
