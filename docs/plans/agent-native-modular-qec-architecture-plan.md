@@ -25,7 +25,7 @@ The implemented Stim v1.16.0 file formats, CLI behavior, strict grammars, path-a
 
 Focused model, record, bit-storage, and scalar-algebra crates become usable on Rust 1.97.1 without compiling portable SIMD.
 
-The current architecture-migration checkpoint is `b03b3c75`.
+The current architecture-migration checkpoint is `688495fd`.
 
 Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted pre-refactor formal compatibility and AArch64 performance checkpoint.
 
@@ -424,10 +424,12 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 ### Benchmarks
 
 - Reuse the existing successful circuit-parse benchmark instead of creating an overlapping parse product.
-- Add exactly four Stab-only diagnostic runtime groups: circuit model fingerprint, inclusive sampling-request fingerprint, sampling-request estimate, and sampler compilation.
+- Add exactly four Stab-only diagnostic runtime groups: circuit model fingerprint, inclusive sampling-request fingerprint, sampling-request estimate, and the sampler compile-and-release lifecycle.
 - Give each diagnostic one measurement and structural scales of 64, 4,096, and 65,536 top-level circuit items.
 - Parse and fixture construction occur before timing. Output witness construction, digesting, RSS collection, and serialization occur after the `raw-work-v2` finish clock.
 - The inclusive request-fingerprint measurement includes the model fingerprint calculated by `CompilationRequestFingerprint::for_sampling`; do not subtract independently measured medians to imply incremental cost.
+- Sampler compilation cannot retain every compiled plan until the finish clock without making memory scale with calibrated iterations. Measure compile-and-release honestly, then recompile once outside timing and compare the complete typed plan with the setup witness.
+- Enforce the source-owned 600-second diagnostic measurement-suite deadline with one outer monotonic clock and cap each child invocation by the remaining suite time.
 - Do not add these rows to Stim parity policy, self-regression baselines, release rollups, the legacy manifest, or formal completion receipts. They are Stab-only product diagnostics until a scientifically equivalent comparator and a demonstrated release risk exist.
 - Do not create separate capability-enumeration or JSON-rendering benchmarks without profiling evidence that either is a meaningful product cost.
 

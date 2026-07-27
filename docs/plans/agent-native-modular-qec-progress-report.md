@@ -6,7 +6,7 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `b03b3c75`.
+- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `688495fd`.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -145,6 +145,29 @@ Commit `b03b3c75` adds `stab capabilities`, `stab inspect`, and `stab plan sampl
 
 The first planning implementation reused the one-shot sampling path's expanded herald-column index list when correcting output width. Audit rejected that resource behavior because a compact repeat with a huge count could make a dry run expand billions of logical measurements. Planning now uses folded checked counting, while the actual sampler retains the index list it needs to filter emitted records. A ten-billion-iteration regression proves exact width without repeat expansion.
 
-The benchmark design deliberately does not time `stab_cli::run_from` end to end. That would merge parsing, hashing, compilation, estimation, rendering, and I/O into an unactionable number and repeat the review-rejected mixed parse-and-estimate mistake. A2 instead uses four Stab-only product diagnostics with one measurement each: model fingerprint, inclusive request fingerprint, request estimate, and sampler compilation. Existing circuit-parse evidence remains the parse measurement. These diagnostics have no Stim ratio, parity policy, waiver, self-regression baseline, legacy-manifest row, or formal completion claim.
+The benchmark design deliberately does not time `stab_cli::run_from` end to end. That would merge parsing, hashing, compilation, estimation, rendering, and I/O into an unactionable number and repeat the review-rejected mixed parse-and-estimate mistake. A2 instead uses four Stab-only product diagnostics with one measurement each: model fingerprint, inclusive request fingerprint, request estimate, and the sampler compile-and-release lifecycle. Existing circuit-parse evidence remains the parse measurement. These diagnostics have no Stim ratio, parity policy, waiver, self-regression baseline, legacy-manifest row, or formal completion claim.
 
-At committed checkpoint `b03b3c75`, the current correctness inventory contains 2,886 upstream cases, 2,567 public API items, and 1,800 evidence parents with digest `286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295`. The performance digest is `012b51cfe72a54cd6cbb22051ae56d94cc91d9b7f65aa7bbd7ba569fdb5fc562`. The post-audit sampler-compilation and folded-planning evidence advances these identities and will be recorded with the diagnostic benchmark contract after regeneration. None of these source-current inventories has formal compatibility or performance completion evidence.
+Commit `dbdd4763` replaces expanded herald-column discovery in dry-run planning with folded checked counting and adds a ten-billion-repeat regression. It also gives sampler compilation a semantic correctness prerequisite that proves deterministic compiled plans preserve the circuit's execution contract instead of owning the API through a declaration-only test.
+
+Commit `c2eb331c` added the first four executable Stab-only product diagnostics under runtime-group schema version 8. The diagnostic runner reused bounded subprocess supervision, isolated clean-source builds, host capture, calibration, immutable publication, and the `raw-work-v2` finish boundary, but it did not enter the paired Stim runner, parity policy, self-regression policy, release rollups, completion manifests, or the legacy M12 matrix.
+
+The historical clean AArch64 PR-tier diagnostic checkpoint recorded:
+
+| Group | 64 items | 4,096 items | 65,536 items | Report SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Circuit model fingerprint | 48.170 ns/item | 46.470 ns/item | 46.554 ns/item | `c73a9b21af6aa0468466a88c4630cf0942153c66784858506c5bcf4ea6553b95` |
+| Inclusive sampling-request fingerprint | 49.946 ns/item | 46.552 ns/item | 46.768 ns/item | `a9b29096d2e1ab0ec0ba98f0ba626439dc912c787f41723463cfab7e352946f2` |
+| Sampling-request estimate | 6.116 ns/item | 5.519 ns/item | 5.481 ns/item | `00fb776844f696dd1e44b4eba7770b902cf20b88936151027fe6caef4ec9da36` |
+| Sampler compilation as then implemented | 384.430 ns/item | 357.606 ns/item | 353.695 ns/item | `193e359c6989852a47bd3fe625bd98632332242a7dd8eee5f4c4030dbed328d9` |
+
+All four reports bind clean revision `c2eb331c84b5040149d6d2597491ec748f9fe8cb`, correctness inventory `6512dfdc6056b4c03f95889a24ab311a9820845ae2615d7797146c1ca5dfcfcd`, and performance inventory `4a4cb7cb40753f42fa1f2c91a34e1a9bc5dcaf89c6696a5a71a0d461efb8a007`, with `local_modifications=false` before and after each run. The host was explicitly admitted as unverified, swap remained configured and unchanged, and the reports make no Stim parity, self-regression, release, or formal-completion claim. They are historical after the audit below and must not be cited as source-current diagnostics.
+
+The immutable local report directories are `target/benchmarks/qualification/a2-circuit-model-fingerprint-c2eb331c`, `target/benchmarks/qualification/a2-sampling-request-fingerprint-c2eb331c`, `target/benchmarks/qualification/a2-sampling-request-estimate-c2eb331c`, and `target/benchmarks/qualification/a2-sampler-compile-c2eb331c`.
+
+The focused milestone audit found no agent-command behavior defect but rejected four overstrong evidence claims. Commit `062f2cd5` freezes every successful schema-version-1 object shape, proves inspection accepts a circuit rejected by sampler compilation, executes every advertised codec through a nontrivial encode/decode fixture, covers checked estimator overflow directly, and narrows deterministic-plan wording so it does not pretend byte-identical reports are a shot-execution oracle.
+
+The full benchmark review found that repeated sampler compilation replaced the previous plan inside the timed loop, so destruction was included despite a compile-only description. Retaining every plan until the finish clock would make memory scale with calibrated iterations, while per-iteration clocks would dominate the small workload. Commit `688495fd` therefore defines the scientifically honest operation as compile-and-release, validates a complete recompiled plan outside timing, and changes the measurement identity to `compile-and-release`. The same commit advances runtime-group schema to version 9 and enforces the previously declarative 600-second measurement-suite timeout through one outer monotonic deadline; every child timeout is the lesser of 30 seconds and remaining suite time.
+
+The current correctness inventory contains 2,886 upstream cases, 2,567 public API items, and 1,801 evidence parents: 637 implemented, 17 evidence-close, and 1,147 planned. Its digest is `3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976`; the current performance digest is `4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8`. Fresh source-current diagnostic reports have not yet been produced under these repaired contracts.
+
+A2 remains active because exact circuit and DEM parser spans and the remaining operation-owned compile, sampling, materialization, and search policies have not been implemented.
