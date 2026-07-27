@@ -1,7 +1,13 @@
 # Contributing to Stab
 
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-Nightly is required by the roadmap because the core bit kernels will use `std::simd` through `portable_simd`; until `portable_simd` is stable, the pin keeps local and CI behavior aligned.
+The full workspace and `stab-core` still require Nightly for the quantum-specific Clifford `std::simd` implementation. The extracted `stab-bits` package is a Stable Rust 1.97.1 leaf with scalar packed-storage kernels; the later `stab-kernels-simd` extraction will isolate direct portable-SIMD use behind the architecture's Nightly boundary.
+
+Check the Stable component directly with:
+
+```sh
+cargo +1.97.1 test -p stab-bits
+```
 
 The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.
 Clone with tags and initialize `vendor/stim` with its tags because pinned Stim validation requires both commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` and exact tag `v1.16.0`.

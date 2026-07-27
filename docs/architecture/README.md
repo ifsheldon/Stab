@@ -64,13 +64,14 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current pre-A3 product graph is:
+The current A3 product graph is:
 
 ```text
 stab-cli -> stab-core
+stab-core -> stab-bits
 ```
 
-The repository has not yet extracted `stab-bits`, `stab-records`, or the other target component crates. The post-extraction target graph below is normative for A3 and later milestones. Dependency arrows point from a consumer to its dependency:
+`stab-bits` was physically extracted at revision `3de29da0c177c150f74b1fa93ed5217db186ead1`. `stab-records` and the remaining target component crates have not yet been extracted. The completed target graph below remains normative for later A3 through A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -94,7 +95,7 @@ product crates -X-> ops
 
 The checker classifies workspace packages from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects product dependencies on operational crates.
 
-During the pre-0.2 migration it reports four exact temporary allowances instead of hiding them: the dev-only `stab-core` and `stab-cli` dependencies on `stab-compat-corpus`, plus direct portable-SIMD use in `crates/stab-core/src/bits/simd.rs` and `crates/stab-core/src/bits/clifford.rs`.
+During the pre-0.2 migration it reports three exact temporary allowances instead of hiding them: the dev-only `stab-core` and `stab-cli` dependencies on `stab-compat-corpus`, plus direct portable-SIMD use in `crates/stab-core/src/bits/clifford.rs`.
 
 Any additional product-to-ops edge or direct `std::simd` source site fails the check.
 
@@ -102,13 +103,13 @@ The record-boundary and Nightly-isolation milestones remove these allowances; th
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits` package already builds and tests on that compiler.
 
 `stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
 
-Every direct `std::simd` use belongs to `stab-kernels-simd`.
+Every direct `std::simd` use will belong to `stab-kernels-simd` after A6.
 
-The current migration source has direct SIMD in both `bits/simd.rs` and `bits/clifford.rs`; both move behind the new kernel boundary.
+Generic packed storage and scalar kernels now live in Stable `stab-bits`. The remaining direct SIMD site is the quantum-specific Clifford kernel in `stab-core`; it moves behind the later kernel boundary without making Stable storage depend on Nightly.
 
 `stab-kernels-simd` has no Stab dependency and accepts only raw word slices and fixed word blocks.
 

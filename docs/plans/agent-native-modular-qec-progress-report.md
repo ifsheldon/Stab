@@ -7,7 +7,7 @@ Current as of 2026-07-27.
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
-- A3 stable packed records and codecs: not started.
+- A3 stable packed records and codecs: in progress; `stab-bits` was physically extracted at clean revision `3de29da0c177c150f74b1fa93ed5217db186ead1`, while `stab-records` remains pending.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -222,7 +222,7 @@ The architecture plan also separates executable allocation correctness gates fro
 
 Rejected parser suffix and rejected circuit-flatten payload allocation invariants are direct `cargo test` gates, the existing `m4-circuit-parse` compare supplies the Stim-relative timing and allocation observations, and the four A2 product diagnostics remain independent Stab-only phase timings.
 
-A3 has not started. In particular, `stab-bits` and `stab-records` have not yet been extracted as physical crates.
+At that A2 audit checkpoint, A3 had not started. In particular, `stab-bits` and `stab-records` had not yet been extracted as physical crates.
 
 ## A2 Clean Closure
 
@@ -267,3 +267,30 @@ Every diagnostic binds the clean source revision before and after execution, the
 The source revision passed formatting, warnings-denied workspace Clippy, all workspace tests, warnings-denied rustdoc, architecture enforcement, implemented oracle fixtures, the live 62-case result-format oracle, correctness and performance check/regeneration, generated-status checking, benchmark smoke, and staged pre-commit validation.
 
 A2 does not claim physical modularity. At its closure revision, `stab-bits` and `stab-records` still do not exist as Cargo packages; that extraction is the first A3 task.
+
+## A3 Stable Bits Extraction
+
+The first half of A3 completed at clean source revision `3de29da0c177c150f74b1fa93ed5217db186ead1`.
+
+`stab-bits` is now a physical Cargo package and a Stable Rust 1.97.1 leaf dependency of `stab-core`. It owns checked packed bit storage, borrowed views, scalar word kernels, sparse XOR storage, matrix storage, and transpose behavior. Quantum-specific Clifford SIMD and Pauli-word semantics remain in `stab-core` until the later algebra and SIMD-kernel extractions, so the leaf package does not acquire quantum semantics or a Nightly requirement.
+
+The extraction introduced `BitWordsMut`, a guarded mutable word view that restores the unused-tail-bit invariant on drop. Existing `stab_core::bits` and root paths remain compatibility re-exports while `stab_bits::*` is the canonical component API. Qualification inventory generation now resolves public re-exports from external workspace crates against their canonical leaf inventories and fails closed when a canonical inventory is unavailable.
+
+The current correctness inventory has digest `7cab7ce523970408fdbcc437c190aede4ed16ba7921a33eb5e17bb2fbc455691`, 2,886 upstream cases, 3,041 exported API items, and 1,894 evidence cases. The current performance inventory has digest `e01aec62e8ce2b5820a5dc1178a96d882f403541991369c22a7bf54e5ee9ba30`, 127 checklist rows, 3,041 exported API items, 173 groups, and 161 inherited rows. No behavioral `stab_bits::*` item remains assigned only to planned correctness evidence.
+
+The clean pre-extraction M5 baseline is `target/benchmarks/a3-pre-extraction-baseline-6d10e8f8/baseline.json` with SHA-256 `0f23df41ed5afdda9a00312acfa55ff50a475de11966e18f6e91106bbf06d7d1`. The matching pre-extraction compare is `target/benchmarks/a3-pre-extraction-compare-6d10e8f8/compare.json` with SHA-256 `0d64aca154e839326c3410db862e7c3aaa8d4a9b84e0f155697001b95668c13f`.
+
+The clean post-extraction reports are:
+
+| Scope | Report SHA-256 | Pre | Post | Interpretation |
+| --- | --- | --- | --- | --- |
+| Generic XOR | `41815c885e41750145c04bfa415ed7a2b38f86ea67d12adad61adfe79e438a2c` | 17 ns | 16 ns | No regression |
+| Not-zero probe | `41815c885e41750145c04bfa415ed7a2b38f86ea67d12adad61adfe79e438a2c` | 1 ns | 4 ns | Sub-single-digit-nanosecond timer noise on mismatched Stim and Stab work sizes; not a material regression claim |
+| Sparse row XOR | `127cf72804994ea35a8d231e12bc5170598d320a485d0d73e69f327d478d7665` | 16.096 us | 15.440 us | Improved |
+| Sparse item XOR | `127cf72804994ea35a8d231e12bc5170598d320a485d0d73e69f327d478d7665` | 13 ns | 13 ns | Unchanged |
+| Matrix row XOR | `da1e688fe6b22a82bb115dc33f975527ebfb84743b1d58ce4f33cbf224ff9d7c` | 416 ns | 416 ns | Unchanged |
+| Matrix transpose | `da1e688fe6b22a82bb115dc33f975527ebfb84743b1d58ce4f33cbf224ff9d7c` | 592 ns | 592 ns | Unchanged |
+
+Stable package checks, warnings-denied workspace Clippy, complete workspace tests, warnings-denied `stab-bits` rustdoc, architecture enforcement, correctness and performance inventory regeneration, generated-status checking, the complete implemented oracle fixture run, and staged pre-commit validation passed at the extraction revision.
+
+A3 is not complete. `stab-records`, typed shot-major and bit-plane batches, direct component corpus ownership, and post-extraction M7/M8 codec evidence remain required before A3 closure.

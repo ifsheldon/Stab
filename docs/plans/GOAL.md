@@ -24,18 +24,20 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 
 - A0, A1, and A2 are complete.
 - A2 closed at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
-- The workspace still has no `stab-bits` or `stab-records` package.
-- Existing bit storage, record layouts, strict text lexers, typed DETS parsing, streaming visitors, and writers remain inside `stab-core`.
+- `stab-bits` is physically extracted and locally verified at clean source revision `3de29da0c177c150f74b1fa93ed5217db186ead1`; formal post-refactor qualification remains pending.
+- Canonical packed storage, scalar kernels, sparse XOR storage, transpose behavior, and their public API inventory now belong to `stab-bits`; `stab-core` retains compatibility re-exports and quantum-specific SIMD.
+- The workspace still has no `stab-records` package.
+- Record layouts, strict text lexers, typed DETS parsing, streaming visitors, and writers remain inside `stab-core` and are the next extraction.
 
 ## Execution Sequence
 
-1. Inventory the exact modules, public items, tests, feature flags, and dependency edges that belong to bits and records. Resolve any cycle before moving files.
-2. Create publishable Stable Rust 1.97.1 `stab-bits` with checked packed storage, borrowed views, layout primitives, scalar kernels, and no dependency on Stab product crates.
+1. Preserve the completed `stab-bits` package and its compatibility, qualification, and pre/post performance evidence.
+2. Inventory the exact record modules, public items, tests, feature flags, diagnostics, and dependency edges. Resolve every `stab-records -> stab-core` cycle before moving files.
 3. Create publishable Stable Rust 1.97.1 `stab-records` depending only on `stab-bits` and ordinary Stable dependencies.
 4. Move strict `01`, HITS, DETS, `b8`, `r8`, and PTB64 codecs plus typed layouts and visitors into `stab-records`; keep compatibility re-exports in `stab-core`.
 5. Add owned and borrowed shot-major and bit-plane batches, separate detector and observable planes, and bounded conversion between layouts.
 6. Make writers consume typed records or batches. Keep record-at-a-time callbacks as bounded adapters with first-error and cancellation guarantees.
-7. Move corpus ownership tests to the extracted crates and run every checked case through direct component APIs, `stab-core` compatibility paths, the CLI, and pinned Stim.
+7. Move corpus ownership tests to the extracted crate and run every checked case through direct component APIs, `stab-core` compatibility paths, the CLI, and pinned Stim.
 8. Add property tests for layout conversion, tail bits, zero widths, namespaces, duplicates, PTB64 groups, bounded allocation, retained capacity, and cancellation.
 9. Bind shot-major writing, bit-plane writing, transpose, DETS parsing, representative format conversion, and reusable-codec allocation to focused benchmarks. Compare pre-extraction and post-extraction evidence before making a performance claim.
 10. Regenerate architecture and qualification inventories, run milestone-audit and full-code-review, fix confirmed findings, update the progress report, and commit each coherent extraction or contract change separately.

@@ -96,9 +96,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Resource behavior: `CircuitFlattenLimits`, `DemFlattenLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits` own their independent expansion, retained-state, and output budgets. Other partial analysis algorithms retain documented fixed safety contracts instead of sharing a generic policy.
 - Extension points: typed circuit passes.
 
-## A1 Logical Source Ownership
+## Current Source Ownership
 
-This table assigns every current `stab-core` product source module to one target component before physical crate extraction.
+This table records both physically extracted components and the remaining logical ownership inside `stab-core`.
 
 Nested `tests.rs` and resource-test modules inherit the owner of their parent source family.
 
@@ -110,7 +110,8 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `fingerprint.rs` | Model | Versioned circuit and DEM identities stream dialect-separated structural model encodings into SHA-256 without depending on compatibility-printer precision or allocating model-sized text. An explicit traversal stack is inline through the parser's repeat envelope and spills by depth only for deeper programmatic models. Compilation-request and backend-bearing plan identities remain with engine compilation rather than extending the model fingerprint. |
 | `compilation_fingerprint.rs`, `capabilities.rs` | Engine and facade, temporarily | Backend-neutral request identity binds one source-owned compiler registration without inventing backend selection or compile budgets. The facade assembles runtime discovery from model, records, and engine descriptors; descriptor ownership remains with the operation that implements each capability. |
-| `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
+| `crates/stab-bits/src/**` | Bits | Stable Rust 1.97.1 packed storage, checked views, scalar kernels, sparse XOR storage, and transpose implementation are physically extracted. This leaf package has no dependency on another Stab product crate. |
+| `crates/stab-core/src/bits/clifford.rs`, `crates/stab-core/src/bits/scalar.rs` | Algebra and SIMD kernel bridge | Quantum-specific Clifford and Pauli-word operations remain in core until A6. Direct portable SIMD is confined to the Clifford implementation; the scalar Pauli-word operation consumes `stab-bits` storage without moving quantum semantics into the storage crate. |
 | `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, parse, format, and resource-context primitives here. Validation, compile, execution, and analysis errors wait for their owning A3 through A6 boundaries instead of adding placeholder variants. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
 | `resources.rs` | Facade, temporarily | A2 owns shared estimate classifications and lossless resource-limit context here while operation-owned policies are introduced beside their model, engine, or analysis operations. A6 must place the shared vocabulary without creating a global resource-policy dependency. |
 | `result_formats.rs`, `result_formats/**`, `result_packed.rs`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. The codec capability registry lives beside these implementations and is consumed by the facade and CLI instead of being copied into a status manifest. |
@@ -124,5 +125,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `lib.rs` | Facade | Root reexports remain curated compatibility adapters and do not determine implementation ownership. |
 
 `stab-cli/src/agent.rs` is a CLI adapter, not a new product component. It discovers commands from Clap, renders core descriptors and identities, reuses retained-handle input admission, and may compose parsing, compilation validation, and estimates. It must not become an alternate source of gate, codec, compiler, backend, or qualification truth.
+
+The `stab-core::bits` module and root bit-type paths are compatibility re-exports of canonical `stab_bits` items. Result codecs remain implemented in `stab-core` only until the second A3 extraction creates `stab-records`.
 
 New source modules must fit exactly one row or update this table and the architecture decision record in the same change.
