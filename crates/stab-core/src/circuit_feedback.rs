@@ -81,10 +81,10 @@ impl WithoutFeedbackHelper {
             self.reversed_output.clear();
             self.undo_circuit(repeat.body())?;
             let body = Circuit::from_unfused_items(std::mem::take(&mut self.reversed_output));
-            outer_output.push(CircuitItem::RepeatBlock(RepeatBlock::new(
+            outer_output.push(CircuitItem::RepeatBlock(RepeatBlock::new_with_tag_bytes(
                 RepeatCount::try_new(1)?,
                 body,
-                repeat.tag().map(str::to_owned),
+                repeat.tag_bytes(),
             )));
         }
         self.reversed_output = outer_output;
@@ -207,14 +207,14 @@ impl WithoutFeedbackHelper {
             if records.is_empty() {
                 continue;
             }
-            let instruction = CircuitInstruction::new(
+            let instruction = CircuitInstruction::new_with_tag_bytes(
                 Gate::from_name("OBSERVABLE_INCLUDE")?,
                 vec![observable as f64],
                 records
                     .into_iter()
                     .map(Target::measurement_record)
                     .collect(),
-                source.tag().map(str::to_owned),
+                source.tag_bytes(),
             )?;
             self.reversed_output
                 .push(CircuitItem::Instruction(instruction));
@@ -274,10 +274,10 @@ impl WithoutFeedbackHelper {
                             measurements_in_past,
                             detectors_in_past,
                         )?;
-                        result.append_repeat_block(RepeatBlock::new(
+                        result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                             RepeatCount::try_new(1)?,
                             body,
-                            repeat.tag().map(str::to_owned),
+                            repeat.tag_bytes(),
                         ));
                     }
                 }
@@ -298,15 +298,17 @@ fn append_items(circuit: &mut Circuit, items: Vec<CircuitItem>) {
 
 fn fuse_identical_adjacent_loops(circuit: Circuit) -> CircuitResult<Circuit> {
     let mut result = Circuit::new();
-    let mut growing_loop: Option<(Circuit, u64, Option<String>)> = None;
+    let mut growing_loop: Option<GrowingLoop> = None;
 
     for item in circuit.items() {
         match item {
             CircuitItem::RepeatBlock(repeat) => {
-                if let Some((body, repetitions, _)) = growing_loop.as_mut()
-                    && body == repeat.body()
+                if let Some(growing) = growing_loop.as_mut()
+                    && growing.body == *repeat.body()
+                    && growing.tag.as_deref() == repeat.tag_bytes()
                 {
-                    *repetitions = repetitions
+                    growing.repetitions = growing
+                        .repetitions
                         .checked_add(repeat.repeat_count().get())
                         .ok_or_else(|| {
                             CircuitError::invalid_detector_error_model(
@@ -316,11 +318,11 @@ fn fuse_identical_adjacent_loops(circuit: Circuit) -> CircuitResult<Circuit> {
                     continue;
                 }
                 flush_growing_loop(&mut result, &mut growing_loop)?;
-                growing_loop = Some((
-                    repeat.body().clone(),
-                    repeat.repeat_count().get(),
-                    repeat.tag().map(str::to_owned),
-                ));
+                growing_loop = Some(GrowingLoop {
+                    body: repeat.body().clone(),
+                    repetitions: repeat.repeat_count().get(),
+                    tag: repeat.tag_bytes().map(Box::<[u8]>::from),
+                });
             }
             CircuitItem::Instruction(instruction) => {
                 flush_growing_loop(&mut result, &mut growing_loop)?;
@@ -332,21 +334,32 @@ fn fuse_identical_adjacent_loops(circuit: Circuit) -> CircuitResult<Circuit> {
     Ok(result)
 }
 
+struct GrowingLoop {
+    body: Circuit,
+    repetitions: u64,
+    tag: Option<Box<[u8]>>,
+}
+
 fn flush_growing_loop(
     result: &mut Circuit,
-    growing_loop: &mut Option<(Circuit, u64, Option<String>)>,
+    growing_loop: &mut Option<GrowingLoop>,
 ) -> CircuitResult<()> {
-    let Some((body, repetitions, tag)) = growing_loop.take() else {
+    let Some(GrowingLoop {
+        body,
+        repetitions,
+        tag,
+    }) = growing_loop.take()
+    else {
         return Ok(());
     };
     let fused_body = fuse_identical_adjacent_loops(body)?;
     if repetitions == 1 {
         append_items(result, fused_body.items().to_vec());
     } else {
-        result.append_repeat_block(RepeatBlock::new(
+        result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
             RepeatCount::try_new(repetitions)?,
             fused_body,
-            tag,
+            tag.as_deref(),
         ));
     }
     Ok(())
@@ -467,14 +480,14 @@ fn rewritten_detector(
         let index = absolute_record_index(measurements_in_past, offset)?;
         toggle_value(&mut targets, index);
     }
-    CircuitInstruction::new(
+    CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets
             .into_iter()
             .map(|index| relative_record_target(index, measurements_in_past))
             .collect::<CircuitResult<Vec<_>>>()?,
-        instruction.tag().map(str::to_owned),
+        instruction.tag_bytes(),
     )
 }
 
@@ -511,11 +524,11 @@ fn instruction_with_targets(
     instruction: &CircuitInstruction,
     targets: Vec<Target>,
 ) -> CircuitResult<CircuitInstruction> {
-    CircuitInstruction::new(
+    CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets,
-        instruction.tag().map(str::to_owned),
+        instruction.tag_bytes(),
     )
 }
 

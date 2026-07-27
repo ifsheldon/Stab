@@ -10,22 +10,17 @@ use super::{
     DemDetectorId, DemInstruction, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
     arena_index::ArenaIndex,
     error_traversal::{
-        SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
+        SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
+        visit_search_graph_errors_with_limits,
     },
-    search_budget::{GraphConstructionBudget, SearchBudget},
+    search_budget::{GraphConstructionBudget, LogicalErrorSearchLimits, SearchBudget},
     traversal::{FoldedDemTraversal, shifted_targets},
 };
-use crate::{CircuitError, CircuitResult, Probability};
+use crate::resources::LogicalErrorSearchResource;
+use crate::{CircuitError, CircuitResult, Probability, ResourceLimitError};
 
-const MAX_FULL_DEM_SEARCH_GRAPH_NODES: usize = 1_000_000;
-#[cfg(not(test))]
-const MAX_HYPERGRAPH_EDGE_DEGREE: usize = 4_096;
 #[cfg(test)]
 const MAX_HYPERGRAPH_EDGE_DEGREE: usize = 64;
-#[cfg(not(test))]
-const MAX_HYPERGRAPH_EDGE_INCIDENCES: usize = 5_000_000;
-#[cfg(test)]
-const MAX_HYPERGRAPH_EDGE_INCIDENCES: usize = 256;
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct ObservableMask {
@@ -191,7 +186,21 @@ enum DetectorIndex {
 }
 
 impl Graph {
+    #[cfg(test)]
     fn new(node_count: usize, num_observables: usize) -> Self {
+        let limits = LogicalErrorSearchLimits::default()
+            .with_max_unique_graph_edges(64)
+            .with_max_stored_graph_terms(2_048)
+            .with_max_hyperedge_degree(64)
+            .with_max_hyperedge_incidences(256);
+        Self::new_with_limits(node_count, num_observables, limits)
+    }
+
+    fn new_with_limits(
+        node_count: usize,
+        num_observables: usize,
+        limits: LogicalErrorSearchLimits,
+    ) -> Self {
         Self {
             nodes: vec![Node::default(); node_count],
             edges: Vec::new(),
@@ -201,7 +210,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("hypergraph search"),
+            construction_budget: GraphConstructionBudget::new("hypergraph search", limits),
         }
     }
 
@@ -222,7 +231,10 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("hypergraph search"),
+            construction_budget: GraphConstructionBudget::new(
+                "hypergraph search",
+                LogicalErrorSearchLimits::default(),
+            ),
         })
     }
 
@@ -230,6 +242,20 @@ impl Graph {
         detectors: BTreeSet<DemDetectorId>,
         num_observables: usize,
         has_declared_detectors: bool,
+    ) -> CircuitResult<Self> {
+        Self::try_new_sparse_with_limits(
+            detectors,
+            num_observables,
+            has_declared_detectors,
+            LogicalErrorSearchLimits::default(),
+        )
+    }
+
+    fn try_new_sparse_with_limits(
+        detectors: BTreeSet<DemDetectorId>,
+        num_observables: usize,
+        has_declared_detectors: bool,
+        limits: LogicalErrorSearchLimits,
     ) -> CircuitResult<Self> {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
@@ -259,10 +285,11 @@ impl Graph {
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("hypergraph search"),
+            construction_budget: GraphConstructionBudget::new("hypergraph search", limits),
         })
     }
 
+    #[cfg(test)]
     fn from_parts(
         node_edges: Vec<Vec<Edge>>,
         num_observables: usize,
@@ -386,11 +413,15 @@ impl Graph {
         if detectors.len() > max_weight {
             return Ok(());
         }
-        if detectors.len() > MAX_HYPERGRAPH_EDGE_DEGREE {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "hypergraph search currently supports edges with at most {MAX_HYPERGRAPH_EDGE_DEGREE} detectors, got {}",
-                detectors.len()
-            )));
+        let degree_limit = self.construction_budget.limits().max_hyperedge_degree();
+        if detectors.len() > degree_limit {
+            return Err(ResourceLimitError::logical_error_search(
+                "hypergraph search",
+                LogicalErrorSearchResource::HyperedgeDegree,
+                detectors.len() as u64,
+                degree_limit as u64,
+            )
+            .into());
         }
 
         let edge = Edge::new(detectors.clone(), observables);
@@ -405,10 +436,15 @@ impl Graph {
                     "hypergraph edge incidence count overflowed",
                 )
             })?;
-        if projected_incidences > MAX_HYPERGRAPH_EDGE_INCIDENCES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "hypergraph search currently supports at most {MAX_HYPERGRAPH_EDGE_INCIDENCES} edge incidences, got at least {projected_incidences}"
-            )));
+        let incidence_limit = self.construction_budget.limits().max_hyperedge_incidences();
+        if projected_incidences > incidence_limit {
+            return Err(ResourceLimitError::logical_error_search(
+                "hypergraph search",
+                LogicalErrorSearchResource::HyperedgeIncidences,
+                projected_incidences as u64,
+                incidence_limit as u64,
+            )
+            .into());
         }
 
         let adjacency_stored_terms = detectors.len().checked_mul(2).ok_or_else(|| {
@@ -440,6 +476,14 @@ impl Graph {
     }
 
     fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> CircuitResult<Self> {
+        Self::from_dem_with_limits(model, max_weight, LogicalErrorSearchLimits::default())
+    }
+
+    fn from_dem_with_limits(
+        model: &DetectorErrorModel,
+        max_weight: usize,
+        limits: LogicalErrorSearchLimits,
+    ) -> CircuitResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
         let full_observable_count = traversal.root().summary().observable_count();
@@ -447,27 +491,23 @@ impl Graph {
             &traversal,
             "hypergraph search",
             SearchGraphTargetPolicy::Hypergraph {
-                max_weight: max_weight.min(MAX_HYPERGRAPH_EDGE_DEGREE),
+                max_weight: max_weight.min(limits.max_hyperedge_degree()),
             },
-            MAX_FULL_DEM_SEARCH_GRAPH_NODES,
+            limits,
         )?;
-        let effective_detector_count = effective_detectors.len();
-        if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
-            )));
-        }
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
             CircuitError::invalid_detector_error_model("observable count does not fit usize")
         })?;
-        let mut graph = Self::try_new_sparse(
+        let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
             num_observables,
             full_detector_count > 0,
+            limits,
         )?;
-        visit_search_graph_errors(
+        visit_search_graph_errors_with_limits(
             &traversal,
             "hypergraph search",
+            limits,
             |instruction, detector_offset| {
                 let shifted = shifted_targets(instruction.targets(), detector_offset)?;
                 graph.add_edge_from_dem_targets(&shifted, max_weight)
@@ -581,13 +621,31 @@ pub(super) fn find_undetectable_logical_error(
     dont_explore_edges_with_degree_above: usize,
     dont_explore_edges_increasing_symptom_degree: bool,
 ) -> CircuitResult<DetectorErrorModel> {
+    find_undetectable_logical_error_with_limits(
+        model,
+        dont_explore_detection_event_sets_with_size_above,
+        dont_explore_edges_with_degree_above,
+        dont_explore_edges_increasing_symptom_degree,
+        LogicalErrorSearchLimits::default(),
+    )
+}
+
+pub(super) fn find_undetectable_logical_error_with_limits(
+    model: &DetectorErrorModel,
+    dont_explore_detection_event_sets_with_size_above: usize,
+    dont_explore_edges_with_degree_above: usize,
+    dont_explore_edges_increasing_symptom_degree: bool,
+    limits: LogicalErrorSearchLimits,
+) -> CircuitResult<DetectorErrorModel> {
     if dont_explore_edges_with_degree_above == 2
         && dont_explore_detection_event_sets_with_size_above == 2
     {
-        return super::shortest_graphlike_undetectable_logical_error(model, true);
+        return super::graphlike::shortest_graphlike_undetectable_logical_error_with_limits(
+            model, true, limits,
+        );
     }
 
-    let graph = Graph::from_dem(model, dont_explore_edges_with_degree_above)?;
+    let graph = Graph::from_dem_with_limits(model, dont_explore_edges_with_degree_above, limits)?;
     let empty = SearchState::new(BTreeSet::new(), ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
@@ -598,7 +656,7 @@ pub(super) fn find_undetectable_logical_error(
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("hypergraph search");
+    let mut budget = SearchBudget::new("hypergraph search", limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -811,6 +869,201 @@ fn format_detector(detector: DemDetectorId) -> String {
 
 fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
+}
+
+#[cfg(test)]
+mod limit_policy_tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "focused resource-policy tests use fixed valid DEM fixtures"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn default_policy_preserves_hypergraph_search_result() {
+        let model = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n")
+            .expect("valid search model");
+        let legacy =
+            find_undetectable_logical_error(&model, 3, 3, false).expect("default search succeeds");
+        let explicit = find_undetectable_logical_error_with_limits(
+            &model,
+            3,
+            3,
+            false,
+            LogicalErrorSearchLimits::default(),
+        )
+        .expect("explicit default search succeeds");
+        assert_eq!(legacy, explicit);
+    }
+
+    #[test]
+    fn effective_detector_limit_is_exact_and_independent() {
+        let model = DetectorErrorModel::from_dem_str("error(0.1) D0 L0\nerror(0.1) D1 L1\n")
+            .expect("valid graph model");
+        let exact = LogicalErrorSearchLimits::default()
+            .with_max_effective_detector_nodes(2)
+            .with_max_search_states(1);
+        let graph = Graph::from_dem_with_limits(&model, usize::MAX, exact)
+            .expect("two effective detectors fit");
+        assert_eq!(graph.nodes.len(), 2);
+
+        let error = Graph::from_dem_with_limits(
+            &model,
+            usize::MAX,
+            exact.with_max_effective_detector_nodes(1),
+        )
+        .expect_err("third-party graph allocation must not start beyond the node limit");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 1 effective detector nodes, got 2")
+        );
+    }
+
+    #[test]
+    fn hyperedge_degree_and_incidence_rejections_leave_graph_unchanged() {
+        let two_detector_edge = [
+            DemTarget::relative_detector(0).expect("D0"),
+            DemTarget::relative_detector(1).expect("D1"),
+        ];
+        let degree_exact = LogicalErrorSearchLimits::default().with_max_hyperedge_degree(2);
+        let mut exact_graph = Graph::new_with_limits(2, 0, degree_exact);
+        exact_graph
+            .add_edge_from_dem_targets(&two_detector_edge, usize::MAX)
+            .expect("the exact two-detector degree maximum is accepted");
+        assert_eq!(exact_graph.edge_incidences, 2);
+
+        let mut degree_rejected =
+            Graph::new_with_limits(2, 0, degree_exact.with_max_hyperedge_degree(1));
+        let error = degree_rejected
+            .add_edge_from_dem_targets(&two_detector_edge, usize::MAX)
+            .expect_err("the first detector above the degree policy should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("edges with at most 1 detectors, got 2")
+        );
+        assert!(degree_rejected.edges.is_empty());
+        assert!(
+            degree_rejected
+                .nodes
+                .iter()
+                .all(|node| node.edge_ids.is_empty())
+        );
+        assert_eq!(degree_rejected.edge_incidences, 0);
+
+        let limits = LogicalErrorSearchLimits::default()
+            .with_max_hyperedge_degree(2)
+            .with_max_hyperedge_incidences(2)
+            .with_max_unique_graph_edges(2);
+        let mut graph = Graph::new_with_limits(2, 2, limits);
+        graph
+            .add_edge_from_dem_targets(
+                &[
+                    DemTarget::relative_detector(0).expect("D0"),
+                    DemTarget::relative_detector(1).expect("D1"),
+                    DemTarget::logical_observable(0).expect("L0"),
+                ],
+                usize::MAX,
+            )
+            .expect("first edge reaches the exact incidence boundary");
+        let before_edges = graph.edges.clone();
+        let before_nodes = graph.nodes.clone();
+
+        let error = graph
+            .add_edge_from_dem_targets(
+                &[
+                    DemTarget::relative_detector(0).expect("D0"),
+                    DemTarget::logical_observable(1).expect("L1"),
+                ],
+                usize::MAX,
+            )
+            .expect_err("next incidence exceeds the policy");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 2 edge incidences, got at least 3")
+        );
+        assert_eq!(graph.edges, before_edges);
+        assert_eq!(graph.nodes, before_nodes);
+        assert_eq!(graph.edge_incidences, 2);
+    }
+
+    #[test]
+    fn default_hyperedge_degree_boundary_is_executed_exactly() {
+        let default_degree = LogicalErrorSearchLimits::default().max_hyperedge_degree();
+        let exact_targets = (0..default_degree)
+            .map(|detector| {
+                DemTarget::relative_detector(
+                    u64::try_from(detector).expect("default degree fits a detector identifier"),
+                )
+                .expect("default degree uses valid detector identifiers")
+            })
+            .collect::<Vec<_>>();
+        let mut exact_graph =
+            Graph::new_with_limits(default_degree, 0, LogicalErrorSearchLimits::default());
+        exact_graph
+            .add_edge_from_dem_targets(&exact_targets, usize::MAX)
+            .expect("the production hyperedge-degree maximum is accepted");
+        assert_eq!(exact_graph.edge_incidences, default_degree);
+
+        let first_excess = default_degree
+            .checked_add(1)
+            .expect("the production hyperedge-degree maximum is finite");
+        let excessive_targets = (0..first_excess)
+            .map(|detector| {
+                DemTarget::relative_detector(
+                    u64::try_from(detector).expect("first excess fits a detector identifier"),
+                )
+                .expect("first excess uses valid detector identifiers")
+            })
+            .collect::<Vec<_>>();
+        let mut rejected_graph =
+            Graph::new_with_limits(first_excess, 0, LogicalErrorSearchLimits::default());
+        let error = rejected_graph
+            .add_edge_from_dem_targets(&excessive_targets, usize::MAX)
+            .expect_err("the first degree above the production limit is rejected");
+        assert!(
+            error.to_string().contains(&format!(
+                "edges with at most {default_degree} detectors, got {first_excess}"
+            )),
+            "unexpected error: {error}"
+        );
+        assert!(rejected_graph.edges.is_empty());
+        assert_eq!(rejected_graph.edge_incidences, 0);
+        assert!(
+            rejected_graph
+                .nodes
+                .iter()
+                .all(|node| node.edge_ids.is_empty())
+        );
+    }
+
+    #[test]
+    fn hypergraph_search_state_boundary_is_inclusive() {
+        let model = DetectorErrorModel::from_dem_str(
+            "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
+        )
+        .expect("valid search model");
+        let exact = LogicalErrorSearchLimits::default().with_max_search_states(5);
+        find_undetectable_logical_error_with_limits(&model, 3, 3, false, exact)
+            .expect("the first derived logical state reaches the exact boundary");
+
+        let error = find_undetectable_logical_error_with_limits(
+            &model,
+            3,
+            3,
+            false,
+            exact.with_max_search_states(4),
+        )
+        .expect_err("first state past the limit");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 4 search states, got at least 5")
+        );
+    }
 }
 
 #[cfg(test)]

@@ -70,7 +70,7 @@ struct ReverseFlowEngine {
     coordinate_shift: Vec<f64>,
     detector_measurements: BTreeMap<DemTarget, BTreeSet<usize>>,
     target_coordinates: BTreeMap<DemTarget, Vec<f64>>,
-    target_tags: BTreeMap<DemTarget, Option<String>>,
+    target_tags: BTreeMap<DemTarget, Option<Box<[u8]>>>,
     remaining_measurements: usize,
     remaining_detectors: u64,
     new_measurement_count: usize,
@@ -185,7 +185,7 @@ impl ReverseFlowEngine {
                     Gate::from_name(reset_gate)?,
                     Vec::new(),
                     vec![target.clone()],
-                    instruction.tag(),
+                    instruction.tag_bytes(),
                 )?;
             } else {
                 self.record_new_measurement(&record_targets);
@@ -193,15 +193,15 @@ impl ReverseFlowEngine {
                     instruction.gate().best_candidate_inverse()?,
                     instruction.args().to_vec(),
                     vec![target.clone()],
-                    instruction.tag(),
+                    instruction.tag_bytes(),
                 )?;
             }
 
-            let tracker_instruction = CircuitInstruction::new(
+            let tracker_instruction = CircuitInstruction::new_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
                 vec![target.clone()],
-                instruction.tag().map(str::to_owned),
+                instruction.tag_bytes(),
             )?;
             self.tracker.undo_instruction(&tracker_instruction)?;
             self.remaining_measurements = record_index;
@@ -235,7 +235,7 @@ impl ReverseFlowEngine {
             instruction.gate().best_candidate_inverse()?,
             Vec::new(),
             targets.clone(),
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
         if is_measure_reset && !instruction.args().is_empty() {
             let error_gate = match instruction.gate().canonical_name() {
@@ -251,7 +251,7 @@ impl ReverseFlowEngine {
                 Gate::from_name(error_gate)?,
                 instruction.args().to_vec(),
                 targets.clone(),
-                instruction.tag(),
+                instruction.tag_bytes(),
             )?;
         }
         self.flush_detectors_and_observables()
@@ -279,7 +279,7 @@ impl ReverseFlowEngine {
             instruction.gate().best_candidate_inverse()?,
             instruction.args().to_vec(),
             reversed_target_groups(instruction),
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
         self.flush_detectors_and_observables()
     }
@@ -296,7 +296,7 @@ impl ReverseFlowEngine {
             shifted_coordinates(instruction.args(), &self.coordinate_shift),
         );
         self.target_tags
-            .insert(target, instruction.tag().map(str::to_owned));
+            .insert(target, instruction.tag_bytes().map(Box::<[u8]>::from));
         Ok(())
     }
 
@@ -313,13 +313,13 @@ impl ReverseFlowEngine {
             .collect::<Vec<_>>();
         if pauli_targets.is_empty() {
             self.target_tags
-                .insert(target, instruction.tag().map(str::to_owned));
+                .insert(target, instruction.tag_bytes().map(Box::<[u8]>::from));
         } else {
             self.append_instruction(
                 instruction.gate(),
                 instruction.args().to_vec(),
                 pauli_targets,
-                instruction.tag(),
+                instruction.tag_bytes(),
             )?;
         }
         self.tracker.undo_instruction(instruction)
@@ -331,7 +331,7 @@ impl ReverseFlowEngine {
             instruction.gate().best_candidate_inverse()?,
             instruction.args().to_vec(),
             reversed_target_groups(instruction),
-            instruction.tag(),
+            instruction.tag_bytes(),
         )
     }
 
@@ -339,12 +339,13 @@ impl ReverseFlowEngine {
         match instruction.gate().canonical_name() {
             "QUBIT_COORDS" => {
                 let shifted = shifted_coordinates(instruction.args(), &self.coordinate_shift);
-                self.qubit_coordinates.push(CircuitInstruction::new(
-                    instruction.gate(),
-                    shifted,
-                    instruction.targets().to_vec(),
-                    instruction.tag().map(str::to_owned),
-                )?);
+                self.qubit_coordinates
+                    .push(CircuitInstruction::new_with_tag_bytes(
+                        instruction.gate(),
+                        shifted,
+                        instruction.targets().to_vec(),
+                        instruction.tag_bytes(),
+                    )?);
                 Ok(())
             }
             "SHIFT_COORDS" => {
@@ -471,17 +472,15 @@ impl ReverseFlowEngine {
         gate: Gate,
         args: Vec<f64>,
         targets: Vec<Target>,
-        tag: Option<&str>,
+        tag: Option<&[u8]>,
     ) -> CircuitResult<()> {
         if targets.is_empty() && gate.canonical_name() != "TICK" {
             return Ok(());
         }
-        self.inverted.append_instruction(CircuitInstruction::new(
-            gate,
-            args,
-            targets,
-            tag.map(str::to_owned),
-        )?);
+        self.inverted
+            .append_instruction(CircuitInstruction::new_with_tag_bytes(
+                gate, args, targets, tag,
+            )?);
         Ok(())
     }
 

@@ -3,13 +3,18 @@ use rand::{Rng, RngExt as _, SeedableRng as _};
 
 use crate::{
     CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemTarget,
-    DetectionConversionOutput, DetectionEventRecord, DetectorErrorModel,
+    DetectionConversionOutput, DetectionEventRecord, DetectorErrorModel, ResourceLimitError,
     dem::{FoldedDemBlock, FoldedDemItem, FoldedDemTraversal, MAX_DEM_REPEAT_NESTING},
 };
 
-const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
-const MAX_DEM_SAMPLER_BUFFER_BYTES: usize = 64 * 1024 * 1024;
-const MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS: usize = 64_000_000;
+mod buffers;
+mod limits;
+
+use buffers::{
+    try_clone_bool_slice, try_clone_detection_record, try_false_vec, try_vec_with_capacity,
+    validate_vector_capacity,
+};
+pub use limits::DemSamplerLimits;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDemSampler {
@@ -55,10 +60,20 @@ impl CompiledDemSampler {
         shots: usize,
         seed: Option<u64>,
     ) -> CircuitResult<DetectionConversionOutput> {
-        self.validate_sample_buffer_units(shots, false)?;
-        let mut records = Vec::with_capacity(shots);
-        self.try_for_each_detection_event_with_seed(shots, seed, |record| {
-            records.push(record.clone());
+        self.sample_detection_events_with_seed_and_limits(shots, seed, DemSamplerLimits::default())
+    }
+
+    pub fn sample_detection_events_with_seed_and_limits(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<DetectionConversionOutput> {
+        self.validate_sample_buffer_units_with_limits(shots, false, limits)?;
+        self.validate_detector_sample_work_units_with_limits(shots, limits)?;
+        let mut records = try_vec_with_capacity(shots, "DEM detection record container")?;
+        self.try_for_each_detection_event_with_seed_and_limits(shots, seed, limits, |record| {
+            records.push(try_clone_detection_record(record)?);
             Ok::<(), CircuitError>(())
         })?;
         Ok(DetectionConversionOutput {
@@ -77,6 +92,19 @@ impl CompiledDemSampler {
         shots: usize,
         include_error_records: bool,
     ) -> CircuitResult<()> {
+        self.validate_sample_buffer_units_with_limits(
+            shots,
+            include_error_records,
+            DemSamplerLimits::default(),
+        )
+    }
+
+    pub fn validate_sample_buffer_units_with_limits(
+        &self,
+        shots: usize,
+        include_error_records: bool,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<()> {
         let mut units_per_shot = self
             .detector_count
             .checked_add(self.observable_count)
@@ -86,31 +114,89 @@ impl CompiledDemSampler {
                 )
             })?;
         if include_error_records {
-            units_per_shot = units_per_shot.checked_add(self.error_count()).ok_or_else(|| {
-                CircuitError::invalid_sampler_compilation(
+            units_per_shot = units_per_shot
+                .checked_add(self.error_count())
+                .ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
                     "DEM sampler output and error width overflowed while validating buffer size",
                 )
-            })?;
+                })?;
         }
         let units_per_shot = units_per_shot.max(1);
         let total_units = shots.checked_mul(units_per_shot).ok_or_else(|| {
             CircuitError::invalid_sampler_compilation("DEM sampler buffer size overflowed")
         })?;
-        if total_units > MAX_DEM_SAMPLER_BUFFER_UNITS {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "DEM sampler would require {total_units} buffered units; current limit is {MAX_DEM_SAMPLER_BUFFER_UNITS}"
-            )));
+        if total_units > limits.max_materialized_units() {
+            return Err(ResourceLimitError::dem_materialized_units(
+                total_units,
+                limits.max_materialized_units(),
+            )
+            .into());
         }
+        self.validate_materialized_bytes_with_limits(shots, include_error_records, limits)?;
+        validate_vector_capacity::<DetectionEventRecord>(shots, "DEM detection record container")?;
+        validate_vector_capacity::<bool>(self.detector_count, "DEM detector record")?;
+        validate_vector_capacity::<bool>(self.observable_count, "DEM observable record")?;
+        if include_error_records {
+            validate_vector_capacity::<Vec<bool>>(shots, "DEM sampled-error record container")?;
+            validate_vector_capacity::<bool>(self.error_count(), "DEM sampled-error record")?;
+        }
+        Ok(())
+    }
+
+    fn validate_materialized_bytes_with_limits(
+        &self,
+        shots: usize,
+        include_error_records: bool,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<()> {
         let bytes_per_shot = self.materialized_bytes_per_shot(include_error_records)?;
         let total_bytes = shots.checked_mul(bytes_per_shot).ok_or_else(|| {
             CircuitError::invalid_sampler_compilation("DEM sampler buffer byte size overflowed")
         })?;
-        if total_bytes > MAX_DEM_SAMPLER_BUFFER_BYTES {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "DEM sampler would require at least {total_bytes} materialized bytes; current limit is {MAX_DEM_SAMPLER_BUFFER_BYTES}"
-            )));
+        if total_bytes > limits.max_materialized_bytes() {
+            return Err(ResourceLimitError::dem_materialized_bytes(
+                total_bytes,
+                limits.max_materialized_bytes(),
+            )
+            .into());
         }
         Ok(())
+    }
+
+    pub fn validate_replay_work_units(&self, shots: usize) -> CircuitResult<()> {
+        self.validate_replay_work_units_with_limits(shots, DemSamplerLimits::default())
+    }
+
+    pub fn validate_replay_work_units_with_limits(
+        &self,
+        shots: usize,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<()> {
+        let units_per_shot = self.replay_work_units_per_shot()?;
+        let total_units = shots.checked_mul(units_per_shot).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation("DEM sampler replay work overflowed")
+        })?;
+        if total_units > limits.max_replay_work_units() {
+            return Err(ResourceLimitError::dem_replay_work_units(
+                total_units,
+                limits.max_replay_work_units(),
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    fn replay_work_units_per_shot(&self) -> CircuitResult<usize> {
+        self.detector_count
+            .checked_add(self.observable_count)
+            .and_then(|width| width.checked_add(self.error_count()))
+            .map(|width| width.max(1))
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "DEM sampler replay work overflowed while validating buffer size",
+                )
+            })
     }
 
     fn materialized_bytes_per_shot(&self, include_error_records: bool) -> CircuitResult<usize> {
@@ -142,18 +228,27 @@ impl CompiledDemSampler {
         Ok(bytes.max(1))
     }
 
-    fn validate_detector_sample_work_units(&self, shots: usize) -> CircuitResult<()> {
-        self.validate_sample_work_units(shots, self.operations.direct_sample_work_count)
+    fn validate_detector_sample_work_units_with_limits(
+        &self,
+        shots: usize,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<()> {
+        self.validate_sample_work_units(shots, self.operations.direct_sample_work_count, limits)
     }
 
-    fn validate_sampled_error_work_units(&self, shots: usize) -> CircuitResult<()> {
-        self.validate_sample_work_units(shots, self.error_count())
+    fn validate_sampled_error_work_units_with_limits(
+        &self,
+        shots: usize,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<()> {
+        self.validate_sample_work_units(shots, self.error_count(), limits)
     }
 
     fn validate_sample_work_units(
         &self,
         shots: usize,
         error_applications_per_shot: usize,
+        limits: DemSamplerLimits,
     ) -> CircuitResult<()> {
         if error_applications_per_shot == 0 || shots == 0 {
             return Ok(());
@@ -163,10 +258,12 @@ impl CompiledDemSampler {
             .ok_or_else(|| {
                 CircuitError::invalid_sampler_compilation("DEM sampler sample work overflowed")
             })?;
-        if work_units > MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "DEM sampler would apply {work_units} sampled errors; current limit is {MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS}"
-            )));
+        if work_units > limits.max_sampled_error_applications() {
+            return Err(ResourceLimitError::dem_sampled_error_applications(
+                work_units,
+                limits.max_sampled_error_applications(),
+            )
+            .into());
         }
         Ok(())
     }
@@ -176,15 +273,33 @@ impl CompiledDemSampler {
         shots: usize,
         seed: Option<u64>,
     ) -> CircuitResult<(DetectionConversionOutput, Vec<Vec<bool>>)> {
-        self.validate_sample_buffer_units(shots, true)?;
-        let mut records = Vec::with_capacity(shots);
-        let mut error_records = Vec::with_capacity(shots);
-        self.try_for_each_detection_event_and_error_with_seed(
+        self.sample_detection_events_and_errors_with_seed_and_limits(
             shots,
             seed,
+            DemSamplerLimits::default(),
+        )
+    }
+
+    pub fn sample_detection_events_and_errors_with_seed_and_limits(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<(DetectionConversionOutput, Vec<Vec<bool>>)> {
+        self.validate_sample_buffer_units_with_limits(shots, true, limits)?;
+        self.validate_sampled_error_work_units_with_limits(shots, limits)?;
+        let mut records = try_vec_with_capacity(shots, "DEM detection record container")?;
+        let mut error_records = try_vec_with_capacity(shots, "DEM sampled-error record container")?;
+        self.try_for_each_detection_event_and_error_with_seed_and_limits(
+            shots,
+            seed,
+            limits,
             |record, error_record| {
-                records.push(record.clone());
-                error_records.push(error_record.to_vec());
+                records.push(try_clone_detection_record(record)?);
+                error_records.push(try_clone_bool_slice(
+                    error_record,
+                    "DEM sampled-error record",
+                )?);
                 Ok::<(), CircuitError>(())
             },
         )?;
@@ -202,12 +317,27 @@ impl CompiledDemSampler {
         &self,
         error_records: &[Vec<bool>],
     ) -> CircuitResult<DetectionConversionOutput> {
-        self.validate_sample_buffer_units(error_records.len(), true)?;
-        let mut records = Vec::with_capacity(error_records.len());
-        self.try_for_each_detection_event_from_error_records(
+        self.sample_detection_events_from_error_records_with_limits(
+            error_records,
+            DemSamplerLimits::default(),
+        )
+    }
+
+    pub fn sample_detection_events_from_error_records_with_limits(
+        &self,
+        error_records: &[Vec<bool>],
+        limits: DemSamplerLimits,
+    ) -> CircuitResult<DetectionConversionOutput> {
+        self.validate_replay_work_units_with_limits(error_records.len(), limits)?;
+        self.validate_sample_buffer_units_with_limits(error_records.len(), false, limits)?;
+        self.validate_materialized_bytes_with_limits(error_records.len(), true, limits)?;
+        let mut records =
+            try_vec_with_capacity(error_records.len(), "DEM detection record container")?;
+        self.try_for_each_detection_event_from_error_records_with_limits(
             error_records.iter().map(Vec::as_slice),
+            limits,
             |record, _error_record| {
-                records.push(record.clone());
+                records.push(try_clone_detection_record(record)?);
                 Ok::<(), CircuitError>(())
             },
         )?;
@@ -222,15 +352,38 @@ impl CompiledDemSampler {
         &self,
         shots: usize,
         seed: Option<u64>,
+        visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<CircuitError>,
+        F: FnMut(&DetectionEventRecord) -> Result<(), E>,
+    {
+        self.try_for_each_detection_event_with_seed_and_limits(
+            shots,
+            seed,
+            DemSamplerLimits::default(),
+            visit,
+        )
+    }
+
+    pub fn try_for_each_detection_event_with_seed_and_limits<E, F>(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        limits: DemSamplerLimits,
         mut visit: F,
     ) -> Result<(), E>
     where
         E: From<CircuitError>,
         F: FnMut(&DetectionEventRecord) -> Result<(), E>,
     {
-        self.validate_detector_sample_work_units(shots)?;
+        if shots == 0 {
+            return Ok(());
+        }
+        self.validate_detector_sample_work_units_with_limits(shots, limits)?;
+        self.validate_sample_buffer_units_with_limits(1, false, limits)?;
+        let mut record = self.try_reusable_detection_record()?;
         let mut rng = dem_sampler_rng(seed);
-        let mut record = self.reusable_detection_record();
         for _ in 0..shots {
             self.sample_detection_record_into(&mut rng, &mut record)?;
             visit(&record)?;
@@ -242,17 +395,40 @@ impl CompiledDemSampler {
         &self,
         shots: usize,
         seed: Option<u64>,
+        visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<CircuitError>,
+        F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
+    {
+        self.try_for_each_detection_event_and_error_with_seed_and_limits(
+            shots,
+            seed,
+            DemSamplerLimits::default(),
+            visit,
+        )
+    }
+
+    pub fn try_for_each_detection_event_and_error_with_seed_and_limits<E, F>(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        limits: DemSamplerLimits,
         mut visit: F,
     ) -> Result<(), E>
     where
         E: From<CircuitError>,
         F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
     {
-        self.validate_sample_buffer_units(1, true)?;
-        self.validate_sampled_error_work_units(shots)?;
+        if shots == 0 {
+            return Ok(());
+        }
+        self.validate_sample_buffer_units_with_limits(1, true, limits)?;
+        self.validate_sampled_error_work_units_with_limits(shots, limits)?;
+        let mut error_record =
+            try_vec_with_capacity(self.error_count(), "DEM sampled-error record")?;
+        let mut record = self.try_reusable_detection_record()?;
         let mut rng = dem_sampler_rng(seed);
-        let mut error_record = Vec::with_capacity(self.error_count());
-        let mut record = self.reusable_detection_record();
         for _ in 0..shots {
             self.sample_detection_record_and_error_record_into(
                 &mut rng,
@@ -267,6 +443,24 @@ impl CompiledDemSampler {
     pub fn try_for_each_detection_event_from_error_records<'a, E, I, F>(
         &self,
         error_records: I,
+        visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<CircuitError>,
+        I: IntoIterator<Item = &'a [bool]>,
+        F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
+    {
+        self.try_for_each_detection_event_from_error_records_with_limits(
+            error_records,
+            DemSamplerLimits::default(),
+            visit,
+        )
+    }
+
+    pub fn try_for_each_detection_event_from_error_records_with_limits<'a, E, I, F>(
+        &self,
+        error_records: I,
+        limits: DemSamplerLimits,
         mut visit: F,
     ) -> Result<(), E>
     where
@@ -274,20 +468,47 @@ impl CompiledDemSampler {
         I: IntoIterator<Item = &'a [bool]>,
         F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
     {
-        let mut record = self.reusable_detection_record();
+        let units_per_shot = self.replay_work_units_per_shot()?;
+        let mut replay_work_units = 0_usize;
+        let mut record = None;
         for (shot_index, error_record) in error_records.into_iter().enumerate() {
             self.validate_error_record_width(error_record, Some(shot_index))?;
-            self.detection_record_from_error_record_into(error_record, &mut record)?;
-            visit(&record, error_record)?;
+            replay_work_units = replay_work_units
+                .checked_add(units_per_shot)
+                .ok_or_else(|| {
+                    E::from(CircuitError::invalid_sampler_compilation(
+                        "DEM sampler replay work overflowed",
+                    ))
+                })?;
+            if replay_work_units > limits.max_replay_work_units() {
+                return Err(E::from(
+                    ResourceLimitError::dem_replay_work_units(
+                        replay_work_units,
+                        limits.max_replay_work_units(),
+                    )
+                    .into(),
+                ));
+            }
+            if record.is_none() {
+                self.validate_sample_buffer_units_with_limits(1, false, limits)?;
+                record = Some(self.try_reusable_detection_record()?);
+            }
+            let Some(record) = record.as_mut() else {
+                return Err(E::from(CircuitError::invalid_sampler_compilation(
+                    "DEM replay record allocation did not produce reusable storage",
+                )));
+            };
+            self.detection_record_from_error_record_into(error_record, record)?;
+            visit(record, error_record)?;
         }
         Ok(())
     }
 
-    fn reusable_detection_record(&self) -> DetectionEventRecord {
-        DetectionEventRecord {
-            detectors: vec![false; self.detector_count],
-            observables: vec![false; self.observable_count],
-        }
+    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
+        Ok(DetectionEventRecord {
+            detectors: try_false_vec(self.detector_count, "DEM detector record")?,
+            observables: try_false_vec(self.observable_count, "DEM observable record")?,
+        })
     }
 
     fn sample_detection_record_into<R>(
@@ -946,85 +1167,4 @@ fn dem_sampler_rng(seed: Option<u64>) -> SmallRng {
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "DEM sampler tests use direct fixture assertions for compact diagnostics"
-    )]
-
-    use super::*;
-
-    fn collect_streamed_samples(
-        sampler: &CompiledDemSampler,
-        shots: usize,
-        seed: Option<u64>,
-    ) -> CircuitResult<(Vec<DetectionEventRecord>, Vec<Vec<bool>>)> {
-        let mut records = Vec::new();
-        let mut errors = Vec::new();
-        sampler.try_for_each_detection_event_and_error_with_seed(
-            shots,
-            seed,
-            |record, error_record| {
-                records.push(record.clone());
-                errors.push(error_record.to_vec());
-                Ok::<(), CircuitError>(())
-            },
-        )?;
-        Ok((records, errors))
-    }
-
-    #[test]
-    fn odd_parity_probability_matches_repeated_independent_error_parity() {
-        assert_eq!(odd_parity_probability(0.0, 1_000_000), 0.0);
-        assert_eq!(odd_parity_probability(1.0, 4), 0.0);
-        assert_eq!(odd_parity_probability(1.0, 5), 1.0);
-        assert!((odd_parity_probability(0.25, 2) - 0.375).abs() < 1e-12);
-        assert!((odd_parity_probability(0.5, 64_000_001) - 0.5).abs() < 1e-12);
-
-        let tiny_probability = odd_parity_probability(1e-18, 1_000_000_000_000_000_000);
-        let expected_tiny_probability = -0.5 * (-2.0_f64).exp_m1();
-        assert!((tiny_probability - expected_tiny_probability).abs() < 1e-12);
-
-        let near_one = 1.0 - 1e-12;
-        let near_one_probability = odd_parity_probability(near_one, 1_000_000_000_001);
-        let expected_near_one_probability =
-            1.0 - odd_parity_probability(1.0 - near_one, 1_000_000_000_001);
-        assert!((near_one_probability - expected_near_one_probability).abs() < 1e-12);
-    }
-
-    #[test]
-    fn dem_streaming_samples_match_materialized_seeded_samples() {
-        for dem_text in [
-            "error(1) D0\n",
-            "error(0.25) D0\n",
-            "error(0.25) L2\n",
-            "error(0.25) D0 D2\nerror(0.25) D2 D3\n",
-            "error(0.25) D0\nshift_detectors 1\nrepeat 2 {\n    error(0.25) D0\n    shift_detectors 1\n}\nerror(0) D0\n",
-        ] {
-            let model = DetectorErrorModel::from_dem_str(dem_text).expect("parse DEM");
-            let sampler = CompiledDemSampler::compile(&model).expect("compile DEM sampler");
-            let (materialized, materialized_errors) = sampler
-                .sample_detection_events_and_errors_with_seed(65, Some(7))
-                .expect("materialized samples");
-            let (streamed, streamed_errors) =
-                collect_streamed_samples(&sampler, 65, Some(7)).expect("streamed samples");
-
-            assert_eq!(streamed, materialized.records);
-            assert_eq!(streamed_errors, materialized_errors);
-            let replayed = sampler
-                .sample_detection_events_from_error_records(&streamed_errors)
-                .expect("materialized replay");
-            let mut streamed_replay = Vec::new();
-            sampler
-                .try_for_each_detection_event_from_error_records(
-                    streamed_errors.iter().map(Vec::as_slice),
-                    |record, _error_record| {
-                        streamed_replay.push(record.clone());
-                        Ok::<(), CircuitError>(())
-                    },
-                )
-                .expect("streamed replay");
-            assert_eq!(streamed_replay, replayed.records);
-        }
-    }
-}
+mod tests;

@@ -1,14 +1,26 @@
 use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
 
 use super::{Graph, ObservableMask, SearchState};
-use crate::dem::search_budget::SearchBudget;
+use crate::dem::search_budget::{LogicalErrorSearchLimits, SearchBudget};
 use crate::{CircuitError, CircuitResult, DemItem, DetectorErrorModel};
 
 pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
 ) -> CircuitResult<DetectorErrorModel> {
-    let graph = Graph::from_dem(model, ignore_ungraphlike_errors)?;
+    shortest_graphlike_undetectable_logical_error_with_limits(
+        model,
+        ignore_ungraphlike_errors,
+        LogicalErrorSearchLimits::default(),
+    )
+}
+
+pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
+    model: &DetectorErrorModel,
+    ignore_ungraphlike_errors: bool,
+    limits: LogicalErrorSearchLimits,
+) -> CircuitResult<DetectorErrorModel> {
+    let graph = Graph::from_dem_with_limits(model, ignore_ungraphlike_errors, limits)?;
     let empty = SearchState::new(None, None, ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
@@ -19,7 +31,7 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("graphlike search");
+    let mut budget = SearchBudget::new("graphlike search", limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -182,22 +194,66 @@ mod tests {
     use super::*;
 
     #[test]
+    fn default_policy_preserves_graphlike_search_result() {
+        let model = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n")
+            .expect("valid search model");
+        let legacy = shortest_graphlike_undetectable_logical_error(&model, false)
+            .expect("default search succeeds");
+        let explicit = shortest_graphlike_undetectable_logical_error_with_limits(
+            &model,
+            false,
+            LogicalErrorSearchLimits::default(),
+        )
+        .expect("explicit default search succeeds");
+        assert_eq!(legacy, explicit);
+    }
+
+    #[test]
+    fn graphlike_search_state_boundary_is_inclusive() {
+        let model = DetectorErrorModel::from_dem_str(
+            "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
+        )
+        .expect("valid search model");
+        let exact = LogicalErrorSearchLimits::default().with_max_search_states(5);
+        shortest_graphlike_undetectable_logical_error_with_limits(&model, false, exact)
+            .expect("the first derived logical state reaches the exact boundary");
+
+        let error = shortest_graphlike_undetectable_logical_error_with_limits(
+            &model,
+            false,
+            exact.with_max_search_states(4),
+        )
+        .expect_err("first state past the limit");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 4 search states, got at least 5")
+        );
+    }
+
+    #[test]
     fn graphlike_search_rejects_excessive_search_states() {
         let mut text = String::new();
         for observable in 0..64 {
             text.push_str(&format!("error(0.1) D0 L{observable}\n"));
         }
         let model = DetectorErrorModel::from_dem_str(&text).expect("valid search model");
-        let error = shortest_graphlike_undetectable_logical_error(&model, false)
-            .expect_err("search state cap");
+        let limits = LogicalErrorSearchLimits::default().with_max_search_states(64);
+        let error =
+            shortest_graphlike_undetectable_logical_error_with_limits(&model, false, limits)
+                .expect_err("search state cap");
         assert!(error.to_string().contains("at most 64 search states"));
     }
 
     #[test]
     fn graphlike_search_bounds_variable_state_payloads() {
         let per_state = variable_payload_model(64, 2);
-        let error = shortest_graphlike_undetectable_logical_error(&per_state, false)
-            .expect_err("per-state payload cap");
+        let limits = LogicalErrorSearchLimits::default()
+            .with_max_search_state_terms(64)
+            .with_max_stored_search_state_terms(256);
+        let error =
+            shortest_graphlike_undetectable_logical_error_with_limits(&per_state, false, limits)
+                .expect_err("per-state payload cap");
         assert!(
             error
                 .to_string()
@@ -205,8 +261,9 @@ mod tests {
         );
 
         let aggregate = variable_payload_model(60, 4);
-        let error = shortest_graphlike_undetectable_logical_error(&aggregate, false)
-            .expect_err("aggregate payload cap");
+        let error =
+            shortest_graphlike_undetectable_logical_error_with_limits(&aggregate, false, limits)
+                .expect_err("aggregate payload cap");
         assert!(
             error
                 .to_string()

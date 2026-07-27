@@ -260,11 +260,11 @@ fn undo_detecting_region_instruction(
         return Ok(());
     }
 
-    let kept_instruction = CircuitInstruction::new(
+    let kept_instruction = CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         kept_targets,
-        instruction.tag().map(str::to_owned),
+        instruction.tag_bytes(),
     )?;
     tracker.undo_instruction(&kept_instruction)
 }

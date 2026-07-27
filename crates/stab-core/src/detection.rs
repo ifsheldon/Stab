@@ -1,20 +1,36 @@
+mod buffers;
 mod frame;
+mod limits;
+mod output;
+mod prepared;
+mod reference;
+mod requirements;
 
-use frame::{
-    circuit_requires_detector_frame, frame_execution_circuit, sample_detection_events_with_frame,
-    try_for_each_detection_event_with_frame, validate_frame_detection_circuit,
+pub use limits::DetectionConversionLimits;
+pub use output::{
+    write_detection_records, write_observable_records, write_ptb64_detection_records,
+    write_ptb64_observable_records,
 };
 
+use buffers::{
+    resource_amount, try_clone_detection_record, try_false_vec, try_reserve_detection_record_slots,
+    try_vec_with_capacity, validate_buffer_bits, validate_vector_capacity,
+};
+use frame::{
+    frame_conversion_plan_with_limits, sample_detection_events_with_frame_and_limits,
+    try_for_each_detection_event_with_frame_and_limits,
+};
+use prepared::PreparedDetectionSampling;
+use reference::ReferenceSampleSource;
+use requirements::circuit_requires_detector_frame;
+
+use crate::resources::{DetectionBufferLimitSubject, DetectionRecordLimitSubject};
 use crate::sampling::ReferenceSampleScratch;
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
-    MeasureRecordOffset, RepeatBlock, SampleFormat,
-    result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
+    MeasureRecordOffset, RepeatBlock, RepeatNestingLimit, ResourceLimitError,
 };
 
-const MAX_DETECTION_RECORD_BITS: usize = 1_000_000;
-const MAX_DETECTION_BUFFER_BITS: usize = 64_000_000;
-const MAX_DETECTION_REPEAT_UNROLL: u64 = 100_000;
 const UNSUPPORTED_SWEEP_DETECTION_MESSAGE: &str =
     "sweep-conditioned detection conversion requires sweep input support";
 
@@ -49,16 +65,17 @@ pub struct CompiledDetectionConverter {
     reference_sample: ReferenceSampleSource,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum ReferenceSampleSource {
-    Zero,
-    Static(Vec<bool>),
-    Sweep(CompiledSampler),
-}
-
 impl CompiledDetectionConverter {
     pub fn compile(circuit: &Circuit, options: DetectionConversionOptions) -> CircuitResult<Self> {
-        let plan = ConversionPlan::from_circuit(circuit)?;
+        Self::compile_with_limits(circuit, options, DetectionConversionLimits::default())
+    }
+
+    pub fn compile_with_limits(
+        circuit: &Circuit,
+        options: DetectionConversionOptions,
+        limits: DetectionConversionLimits,
+    ) -> CircuitResult<Self> {
+        let plan = ConversionPlan::from_circuit_with_limits(circuit, limits)?;
         let reference_sample = if options.skip_reference_sample {
             ReferenceSampleSource::Zero
         } else if plan.sweep_bit_count > 0 {
@@ -72,7 +89,10 @@ impl CompiledDetectionConverter {
             }
             ReferenceSampleSource::Sweep(sampler)
         } else {
-            ReferenceSampleSource::Static(reference_sample(circuit, plan.measurement_count)?)
+            ReferenceSampleSource::Static(reference::static_reference_sample(
+                circuit,
+                plan.measurement_count,
+            )?)
         };
         Self::from_plan_and_reference_sample(plan, reference_sample)
     }
@@ -97,9 +117,10 @@ impl CompiledDetectionConverter {
         &self,
         measurement_record: &[bool],
     ) -> CircuitResult<DetectionEventRecord> {
-        let mut record = self.reusable_detection_record();
-        let mut reference_sample = self.reusable_reference_sample();
-        let sweep_record = vec![false; self.sweep_bit_count()];
+        let mut record = self.try_reusable_detection_record()?;
+        let mut reference_sample = self.try_reusable_reference_sample()?;
+        let sweep_record =
+            try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
         self.convert_record_with_sweep_into(
             measurement_record,
             &sweep_record,
@@ -119,10 +140,11 @@ impl CompiledDetectionConverter {
         I: IntoIterator<Item = &'a [bool]>,
         F: FnMut(&DetectionEventRecord) -> Result<(), E>,
     {
-        let mut record = self.reusable_detection_record();
-        let mut reference_sample = self.reusable_reference_sample();
+        let mut record = self.try_reusable_detection_record()?;
+        let mut reference_sample = self.try_reusable_reference_sample()?;
         let mut reference_scratch = self.reference_sample.reusable_scratch();
-        let sweep_record = vec![false; self.sweep_bit_count()];
+        let sweep_record =
+            try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
         for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
             self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
             self.convert_record_with_sweep_and_scratch_into(
@@ -151,8 +173,8 @@ impl CompiledDetectionConverter {
     {
         let mut measurement_iter = measurements.into_iter();
         let mut sweep_iter = sweeps.into_iter();
-        let mut record = self.reusable_detection_record();
-        let mut reference_sample = self.reusable_reference_sample();
+        let mut record = self.try_reusable_detection_record()?;
+        let mut reference_sample = self.try_reusable_reference_sample()?;
         let mut reference_scratch = self.reference_sample.reusable_scratch();
         let mut shot_index = 0usize;
         loop {
@@ -198,6 +220,26 @@ impl CompiledDetectionConverter {
         vec![false; self.measurement_count()]
     }
 
+    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
+        Ok(DetectionEventRecord {
+            detectors: try_false_vec(
+                self.detector_count(),
+                "detection conversion detector record",
+            )?,
+            observables: try_false_vec(
+                self.observable_count(),
+                "detection conversion observable record",
+            )?,
+        })
+    }
+
+    fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
+        try_false_vec(
+            self.measurement_count(),
+            "detection conversion reference sample",
+        )
+    }
+
     pub fn convert_record_with_sweep_into(
         &self,
         measurement_record: &[bool],
@@ -240,7 +282,7 @@ impl CompiledDetectionConverter {
         reference_sample: ReferenceSampleSource,
     ) -> CircuitResult<Self> {
         if let ReferenceSampleSource::Static(reference_sample) = &reference_sample {
-            validate_reference_sample_len(reference_sample, plan.measurement_count)?;
+            reference::validate_reference_sample_len(reference_sample, plan.measurement_count)?;
         }
         Ok(Self {
             plan,
@@ -293,52 +335,31 @@ impl CompiledDetectionConverter {
     }
 }
 
-impl ReferenceSampleSource {
-    fn reusable_scratch(&self) -> Option<ReferenceSampleScratch> {
-        match self {
-            Self::Sweep(sampler) => Some(sampler.reusable_reference_sample_scratch()),
-            Self::Zero | Self::Static(_) => None,
-        }
-    }
-
-    fn fill(
-        &self,
-        sweep_record: &[bool],
-        measurement_count: usize,
-        output: &mut Vec<bool>,
-        reference_scratch: Option<&mut ReferenceSampleScratch>,
-    ) -> CircuitResult<()> {
-        output.clear();
-        match self {
-            Self::Zero => output.resize(measurement_count, false),
-            Self::Static(reference_sample) => output.extend_from_slice(reference_sample),
-            Self::Sweep(sampler) => {
-                let scratch = reference_scratch.ok_or_else(|| {
-                    CircuitError::invalid_result_format(
-                        "internal sweep reference conversion scratch is unavailable",
-                    )
-                })?;
-                sampler.reference_measurement_record_with_sweep_and_scratch_into(
-                    sweep_record,
-                    scratch,
-                    output,
-                )?
-            }
-        }
-        validate_reference_sample_len(output, measurement_count)
-    }
-}
-
 pub fn convert_measurements_to_detection_events(
     circuit: &Circuit,
     measurements: &[Vec<bool>],
     options: DetectionConversionOptions,
 ) -> CircuitResult<DetectionConversionOutput> {
-    let converter = CompiledDetectionConverter::compile(circuit, options)?;
+    convert_measurements_to_detection_events_with_limits(
+        circuit,
+        measurements,
+        options,
+        DetectionConversionLimits::default(),
+    )
+}
+
+pub fn convert_measurements_to_detection_events_with_limits(
+    circuit: &Circuit,
+    measurements: &[Vec<bool>],
+    options: DetectionConversionOptions,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<DetectionConversionOutput> {
+    let converter = CompiledDetectionConverter::compile_with_limits(circuit, options, limits)?;
     converter.plan.validate_shot_count(measurements.len())?;
-    let mut records = Vec::with_capacity(measurements.len());
+    let mut records = Vec::new();
+    try_reserve_detection_record_slots(&mut records, measurements.len())?;
     converter.try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
-        records.push(record.clone());
+        records.push(try_clone_detection_record(record)?);
         Ok::<(), CircuitError>(())
     })?;
 
@@ -355,6 +376,22 @@ pub fn convert_measurements_to_detection_events_with_sweep(
     sweeps: &[Vec<bool>],
     options: DetectionConversionOptions,
 ) -> CircuitResult<DetectionConversionOutput> {
+    convert_measurements_to_detection_events_with_sweep_and_limits(
+        circuit,
+        measurements,
+        sweeps,
+        options,
+        DetectionConversionLimits::default(),
+    )
+}
+
+pub fn convert_measurements_to_detection_events_with_sweep_and_limits(
+    circuit: &Circuit,
+    measurements: &[Vec<bool>],
+    sweeps: &[Vec<bool>],
+    options: DetectionConversionOptions,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<DetectionConversionOutput> {
     if measurements.len() != sweeps.len() {
         return Err(CircuitError::invalid_result_format(format!(
             "measurement records have {} shots but sweep records have {} shots",
@@ -362,15 +399,21 @@ pub fn convert_measurements_to_detection_events_with_sweep(
             sweeps.len()
         )));
     }
-    let converter = CompiledDetectionConverter::compile(circuit, options)?;
+    let converter = CompiledDetectionConverter::compile_with_limits(circuit, options, limits)?;
     converter.plan.validate_shot_count(measurements.len())?;
-    validate_buffer_bits("sweep records", sweeps.len(), converter.sweep_bit_count())?;
-    let mut records = Vec::with_capacity(measurements.len());
+    validate_buffer_bits(
+        DetectionBufferLimitSubject::SweepRecords,
+        sweeps.len(),
+        converter.sweep_bit_count(),
+        limits.max_materialized_bits,
+    )?;
+    let mut records = Vec::new();
+    try_reserve_detection_record_slots(&mut records, measurements.len())?;
     converter.try_for_each_detection_event_with_sweep(
         measurements.iter().map(Vec::as_slice),
         sweeps.iter().map(Vec::as_slice),
         |record| {
-            records.push(record.clone());
+            records.push(try_clone_detection_record(record)?);
             Ok::<(), CircuitError>(())
         },
     )?;
@@ -387,24 +430,46 @@ pub fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
-    if circuit_requires_detector_frame(circuit) {
-        return sample_detection_events_with_frame(circuit, shots, seed);
+    sample_detection_events_with_limits(circuit, shots, seed, DetectionConversionLimits::default())
+}
+
+pub fn sample_detection_events_with_limits(
+    circuit: &Circuit,
+    shots: usize,
+    seed: Option<u64>,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<DetectionConversionOutput> {
+    if circuit_requires_detector_frame(circuit)? {
+        return sample_detection_events_with_frame_and_limits(circuit, shots, seed, limits);
     }
-    validate_detection_sampling_circuit(circuit)?;
-    let plan = ConversionPlan::from_circuit(circuit)?;
-    plan.validate_shot_count(shots)?;
-    let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
-    let reference_sample = sampler.reference_sample();
-    let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
-        plan,
-        ReferenceSampleSource::Static(reference_sample),
+    let prepared = PreparedDetectionSampling::compile(circuit, limits)?;
+    let converter = &prepared.converter;
+    let sampler = &prepared.sampler;
+    converter.plan.validate_detection_record_shot_count(shots)?;
+    let mut records = Vec::new();
+    try_reserve_detection_record_slots(&mut records, shots)?;
+    let mut record = converter.try_reusable_detection_record()?;
+    let mut reference_sample = converter.try_reusable_reference_sample()?;
+    let sweep_record = try_false_vec(
+        converter.sweep_bit_count(),
+        "detection conversion sweep record",
     )?;
-    let measurements = sampler.sample_zero_one_with_seed(shots, seed);
-    let mut records = Vec::with_capacity(measurements.len());
-    converter.try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
-        records.push(record.clone());
-        Ok::<(), CircuitError>(())
-    })?;
+    sampler.for_each_sample_with_seed_and_reference_mode(
+        shots,
+        seed,
+        false,
+        |measurement_record| {
+            converter.validate_measurement_record_width(measurement_record, None)?;
+            converter.convert_record_with_sweep_into(
+                measurement_record,
+                &sweep_record,
+                &mut reference_sample,
+                &mut record,
+            )?;
+            records.push(try_clone_detection_record(&record)?);
+            Ok::<(), CircuitError>(())
+        },
+    )?;
     Ok(DetectionConversionOutput {
         records,
         detector_count: converter.detector_count(),
@@ -416,26 +481,46 @@ pub fn try_for_each_sampled_detection_event<E, F>(
     circuit: &Circuit,
     shots: usize,
     seed: Option<u64>,
+    visit: F,
+) -> Result<(), E>
+where
+    E: From<CircuitError>,
+    F: FnMut(&DetectionEventRecord) -> Result<(), E>,
+{
+    try_for_each_sampled_detection_event_with_limits(
+        circuit,
+        shots,
+        seed,
+        DetectionConversionLimits::default(),
+        visit,
+    )
+}
+
+pub fn try_for_each_sampled_detection_event_with_limits<E, F>(
+    circuit: &Circuit,
+    shots: usize,
+    seed: Option<u64>,
+    limits: DetectionConversionLimits,
     mut visit: F,
 ) -> Result<(), E>
 where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    if circuit_requires_detector_frame(circuit) {
-        return try_for_each_detection_event_with_frame(circuit, shots, seed, visit);
+    if circuit_requires_detector_frame(circuit)? {
+        return try_for_each_detection_event_with_frame_and_limits(
+            circuit, shots, seed, limits, visit,
+        );
     }
-    validate_detection_sampling_circuit(circuit)?;
-    let plan = ConversionPlan::from_circuit(circuit)?;
-    let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
-    let reference_sample = sampler.reference_sample();
-    let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
-        plan,
-        ReferenceSampleSource::Static(reference_sample),
+    let prepared = PreparedDetectionSampling::compile(circuit, limits)?;
+    let converter = &prepared.converter;
+    let sampler = &prepared.sampler;
+    let mut record = converter.try_reusable_detection_record()?;
+    let mut reference_sample = converter.try_reusable_reference_sample()?;
+    let sweep_record = try_false_vec(
+        converter.sweep_bit_count(),
+        "detection conversion sweep record",
     )?;
-    let mut record = converter.reusable_detection_record();
-    let mut reference_sample = converter.reusable_reference_sample();
-    let sweep_record = vec![false; converter.sweep_bit_count()];
     sampler.for_each_sample_with_seed_and_reference_mode(shots, seed, false, |measurement_record| {
         converter.validate_measurement_record_width(measurement_record, None)?;
         converter.convert_record_with_sweep_into(
@@ -449,140 +534,206 @@ where
 }
 
 pub fn measurement_record_count(circuit: &Circuit) -> CircuitResult<usize> {
-    Ok(detection_conversion_plan(circuit)?.measurement_count)
+    measurement_record_count_with_limits(circuit, DetectionConversionLimits::default())
+}
+
+pub fn measurement_record_count_with_limits(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<usize> {
+    Ok(detection_conversion_plan_with_limits(circuit, limits)?.measurement_count)
 }
 
 pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
-    detection_conversion_plan(circuit)?.output_bit_count()
+    detection_record_width_with_limits(circuit, DetectionConversionLimits::default())
+}
+
+pub fn detection_record_width_with_limits(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<usize> {
+    detection_conversion_plan_with_limits(circuit, limits)?.output_bit_count()
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
-    if circuit_requires_detector_frame(circuit) {
-        validate_frame_detection_circuit(circuit)
+    validate_detection_sampling_circuit_with_limits(circuit, DetectionConversionLimits::default())
+}
+
+pub fn validate_detection_sampling_circuit_with_limits(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<()> {
+    if circuit_requires_detector_frame(circuit)? {
+        frame_conversion_plan_with_limits(circuit, limits)?;
+        Ok(())
     } else {
-        ConversionPlan::from_circuit(circuit)?;
-        CompiledSampler::compile_allowing_sweep(circuit)?;
+        PreparedDetectionSampling::compile(circuit, limits)?;
         Ok(())
     }
 }
 
-fn detection_conversion_plan(circuit: &Circuit) -> CircuitResult<ConversionPlan> {
-    if circuit_requires_detector_frame(circuit) {
-        let executable = frame_execution_circuit(circuit)?;
-        validate_frame_detection_circuit(&executable)?;
-        return ConversionPlan::from_circuit(&executable);
+fn detection_conversion_plan_with_limits(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<ConversionPlan> {
+    if circuit_requires_detector_frame(circuit)? {
+        return frame_conversion_plan_with_limits(circuit, limits);
     }
-    ConversionPlan::from_circuit(circuit)
-}
-
-pub fn write_detection_records(
-    output: &DetectionConversionOutput,
-    observable_mode: DetectionObservableOutputMode,
-    format: SampleFormat,
-) -> CircuitResult<Vec<u8>> {
-    let mut writer = MeasureRecordWriter::new(format);
-    for record in &output.records {
-        validate_record_widths(output, record)?;
-        if format == SampleFormat::Dets {
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                writer.begin_result_type(b'L');
-                writer.write_bits(&record.observables);
-            }
-            writer.begin_result_type(b'D');
-            writer.write_bits(&record.detectors);
-            if observable_mode == DetectionObservableOutputMode::Append {
-                writer.begin_result_type(b'L');
-                writer.write_bits(&record.observables);
-            }
-        } else {
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                writer.write_bits(&record.observables);
-            }
-            writer.write_bits(&record.detectors);
-            if observable_mode == DetectionObservableOutputMode::Append {
-                writer.write_bits(&record.observables);
-            }
-        }
-        writer.write_end();
-    }
-    Ok(writer.into_bytes())
-}
-
-pub fn write_observable_records(
-    output: &DetectionConversionOutput,
-    format: SampleFormat,
-) -> CircuitResult<Vec<u8>> {
-    let mut writer = MeasureRecordWriter::new(format);
-    for record in &output.records {
-        validate_record_widths(output, record)?;
-        if format == SampleFormat::Dets {
-            writer.begin_result_type(b'L');
-        }
-        writer.write_bits(&record.observables);
-        writer.write_end();
-    }
-    Ok(writer.into_bytes())
-}
-
-pub fn write_ptb64_detection_records(
-    output: &DetectionConversionOutput,
-    observable_mode: DetectionObservableOutputMode,
-) -> CircuitResult<Vec<u8>> {
-    let records = detection_records_as_bits(output, observable_mode)?;
-    write_ptb64_records_checked(&records)
-}
-
-pub fn write_ptb64_observable_records(
-    output: &DetectionConversionOutput,
-) -> CircuitResult<Vec<u8>> {
-    let records = observable_records_as_bits(output)?;
-    write_ptb64_records_checked(&records)
+    ConversionPlan::from_circuit_with_limits(circuit, limits)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ConversionPlan {
+    limits: DetectionConversionLimits,
     measurement_count: usize,
     sweep_bit_count: usize,
+    detector_count: usize,
+    observable_count: usize,
     detector_terms: Vec<Vec<usize>>,
     observable_terms: Vec<Vec<usize>>,
+    compiled_term_count: u64,
+    expanded_instruction_count: u64,
+    repeat_iteration_count: u64,
+    collect_terms: bool,
 }
 
 impl ConversionPlan {
-    fn from_circuit(circuit: &Circuit) -> CircuitResult<Self> {
-        let mut plan = Self {
-            measurement_count: 0,
-            sweep_bit_count: 0,
-            detector_terms: Vec::new(),
-            observable_terms: Vec::new(),
-        };
-        plan.visit_circuit(circuit)?;
+    fn from_circuit_with_limits(
+        circuit: &Circuit,
+        limits: DetectionConversionLimits,
+    ) -> CircuitResult<Self> {
+        circuit_requires_detector_frame(circuit)?;
+        Self::from_visitor(limits, |plan| plan.visit_circuit(circuit, 0))
+    }
+
+    fn from_visitor(
+        limits: DetectionConversionLimits,
+        mut visit: impl FnMut(&mut Self) -> CircuitResult<()>,
+    ) -> CircuitResult<Self> {
+        let mut admission = Self::new(limits, false);
+        visit(&mut admission)?;
+        admission.validate_compiled_shape()?;
+
+        let mut plan = Self::new(limits, true);
+        plan.detector_terms
+            .try_reserve_exact(admission.detector_count)
+            .map_err(|error| {
+                CircuitError::invalid_sampler_compilation(format!(
+                    "unable to reserve {} detector terms: {error}",
+                    admission.detector_count
+                ))
+            })?;
+        plan.observable_terms
+            .try_reserve_exact(admission.observable_count)
+            .map_err(|error| {
+                CircuitError::invalid_sampler_compilation(format!(
+                    "unable to reserve {} observable terms: {error}",
+                    admission.observable_count
+                ))
+            })?;
+        visit(&mut plan)?;
+        debug_assert_eq!(plan.measurement_count, admission.measurement_count);
+        debug_assert_eq!(plan.sweep_bit_count, admission.sweep_bit_count);
+        debug_assert_eq!(plan.detector_count, admission.detector_count);
+        debug_assert_eq!(plan.observable_count, admission.observable_count);
+        debug_assert_eq!(plan.compiled_term_count, admission.compiled_term_count);
         Ok(plan)
     }
 
-    fn visit_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
+    fn new(limits: DetectionConversionLimits, collect_terms: bool) -> Self {
+        Self {
+            limits,
+            measurement_count: 0,
+            sweep_bit_count: 0,
+            detector_count: 0,
+            observable_count: 0,
+            detector_terms: Vec::new(),
+            observable_terms: Vec::new(),
+            compiled_term_count: 0,
+            expanded_instruction_count: 0,
+            repeat_iteration_count: 0,
+            collect_terms,
+        }
+    }
+
+    fn visit_circuit(&mut self, circuit: &Circuit, depth: usize) -> CircuitResult<()> {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => self.visit_instruction(instruction)?,
-                CircuitItem::RepeatBlock(repeat) => self.visit_repeat(repeat)?,
+                CircuitItem::RepeatBlock(repeat) => self.visit_repeat(repeat, depth)?,
             }
         }
         Ok(())
     }
 
-    fn visit_repeat(&mut self, repeat: &RepeatBlock) -> CircuitResult<()> {
-        let repeat_count = repeat.repeat_count().get();
-        if repeat_count > MAX_DETECTION_REPEAT_UNROLL {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "detection conversion currently supports repeat counts up to {MAX_DETECTION_REPEAT_UNROLL}, got {repeat_count}"
-            )));
+    fn visit_repeat(&mut self, repeat: &RepeatBlock, depth: usize) -> CircuitResult<()> {
+        let next_depth = depth.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "detection conversion repeat nesting overflowed",
+            )
+        })?;
+        if next_depth > RepeatNestingLimit::HARD_MAX {
+            return Err(ResourceLimitError::detection_repeat_nesting(
+                next_depth,
+                RepeatNestingLimit::HARD_MAX,
+            )
+            .into());
         }
-        for _ in 0..repeat.repeat_count().get() {
-            self.visit_circuit(repeat.body())?;
+        self.visit_repeated_body(repeat.repeat_count().get(), |plan| {
+            plan.visit_circuit(repeat.body(), next_depth)
+        })
+    }
+
+    fn visit_repeated_body<F>(&mut self, repeat_count: u64, mut visit_body: F) -> CircuitResult<()>
+    where
+        F: FnMut(&mut Self) -> CircuitResult<()>,
+    {
+        if repeat_count > self.limits.max_repeat_unroll {
+            return Err(ResourceLimitError::detection_repeat_count(
+                repeat_count,
+                self.limits.max_repeat_unroll,
+            )
+            .into());
+        }
+        let next_repeat_iterations = self
+            .repeat_iteration_count
+            .checked_add(repeat_count)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "detection conversion repeat iteration count overflowed",
+                )
+            })?;
+        if next_repeat_iterations > self.limits.max_repeat_iterations {
+            return Err(ResourceLimitError::detection_repeat_iterations(
+                next_repeat_iterations,
+                self.limits.max_repeat_iterations,
+            )
+            .into());
+        }
+        self.repeat_iteration_count = next_repeat_iterations;
+        for _ in 0..repeat_count {
+            visit_body(self)?;
         }
         Ok(())
     }
 
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let next_expanded_instruction_count = self
+            .expanded_instruction_count
+            .checked_add(1)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "detection conversion expanded instruction count overflowed",
+                )
+            })?;
+        if next_expanded_instruction_count > self.limits.max_expanded_instructions {
+            return Err(ResourceLimitError::detection_expanded_instructions(
+                next_expanded_instruction_count,
+                self.limits.max_expanded_instructions,
+            )
+            .into());
+        }
+        self.expanded_instruction_count = next_expanded_instruction_count;
         self.record_sweep_bits(instruction)?;
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
@@ -603,31 +754,59 @@ impl ConversionPlan {
                     instruction.gate().canonical_name()
                 ))
             })?;
-        self.visit_circuit(&decomposed)
+        self.visit_circuit(&decomposed, 0)
     }
 
     fn record_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        let terms = instruction
-            .targets()
-            .iter()
-            .map(|target| {
-                target
-                    .measurement_record_offset()
-                    .ok_or_else(|| {
-                        CircuitError::invalid_result_format(format!(
-                            "DETECTOR target {target} is not a measurement record"
-                        ))
-                    })
-                    .and_then(|offset| self.measurement_index_from_offset(offset))
-            })
-            .collect::<CircuitResult<Vec<_>>>()?;
-        self.detector_terms.push(terms);
-        self.validate_record_width()?;
+        let next_width = self.output_bit_count()?.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_result_format(
+                "detection record width overflowed while planning conversion",
+            )
+        })?;
+        self.validate_record_width_value(next_width)?;
+        let mut terms = Vec::new();
+        if self.collect_terms {
+            terms
+                .try_reserve_exact(instruction.targets().len())
+                .map_err(|error| {
+                    CircuitError::invalid_sampler_compilation(format!(
+                        "unable to reserve {} detector measurement references: {error}",
+                        instruction.targets().len()
+                    ))
+                })?;
+        }
+        let mut term_count = 0_u64;
+        for target in instruction.targets() {
+            let offset = target.measurement_record_offset().ok_or_else(|| {
+                CircuitError::invalid_result_format(format!(
+                    "DETECTOR target {target} is not a measurement record"
+                ))
+            })?;
+            let measurement_index = self.measurement_index_from_offset(offset)?;
+            term_count = term_count.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "detection conversion compiled term count overflowed",
+                )
+            })?;
+            if self.collect_terms {
+                terms.push(measurement_index);
+            }
+        }
+        self.add_compiled_terms(term_count)?;
+        self.detector_count = self.detector_count.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_result_format(
+                "detector count overflowed while planning conversion",
+            )
+        })?;
+        if self.collect_terms {
+            self.detector_terms.push(terms);
+        }
         Ok(())
     }
 
     fn record_sweep_bits(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let mut found_sweep = None;
+        let mut next_sweep_bit_count = self.sweep_bit_count;
         for target in instruction.targets() {
             if let Some(sweep_id) = target.sweep_bit_id() {
                 found_sweep = Some(target.clone());
@@ -639,19 +818,25 @@ impl ConversionPlan {
                             "sweep bit id {sweep_id} does not fit this platform"
                         ))
                     })?;
-                if next_count > MAX_DETECTION_RECORD_BITS {
-                    return Err(CircuitError::invalid_result_format(format!(
-                        "sweep bit width {next_count} exceeds current detection conversion limit {MAX_DETECTION_RECORD_BITS}"
-                    )));
+                if next_count > self.limits.max_record_bits {
+                    return Err(ResourceLimitError::detection_record_bits(
+                        DetectionRecordLimitSubject::SweepRecord,
+                        resource_amount(next_count, "sweep bit width")?,
+                        resource_amount(self.limits.max_record_bits, "sweep bit limit")?,
+                    )
+                    .into());
                 }
-                self.sweep_bit_count = self.sweep_bit_count.max(next_count);
+                next_sweep_bit_count = next_sweep_bit_count.max(next_count);
             }
         }
         let Some(target) = found_sweep else {
             return Ok(());
         };
         match instruction.gate().canonical_name() {
-            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => Ok(()),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => {
+                self.sweep_bit_count = next_sweep_bit_count;
+                Ok(())
+            }
             name => Err(CircuitError::invalid_result_format(format!(
                 "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {name}"
             ))),
@@ -668,12 +853,30 @@ impl ConversionPlan {
                 observable_id.get()
             ))
         })?;
-        self.ensure_observable(observable_id)?;
 
         let mut terms = Vec::new();
+        if self.collect_terms {
+            terms
+                .try_reserve_exact(instruction.targets().len())
+                .map_err(|error| {
+                    CircuitError::invalid_sampler_compilation(format!(
+                        "unable to reserve {} observable measurement references: {error}",
+                        instruction.targets().len()
+                    ))
+                })?;
+        }
+        let mut term_count = 0_u64;
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
-                terms.push(self.measurement_index_from_offset(offset)?);
+                let measurement_index = self.measurement_index_from_offset(offset)?;
+                term_count = term_count.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
+                        "detection conversion compiled term count overflowed",
+                    )
+                })?;
+                if self.collect_terms {
+                    terms.push(measurement_index);
+                }
             } else if target.is_pauli_target() {
                 continue;
             } else {
@@ -681,6 +884,11 @@ impl ConversionPlan {
                     "OBSERVABLE_INCLUDE target {target} is not supported"
                 )));
             }
+        }
+        self.add_compiled_terms(term_count)?;
+        self.ensure_observable(observable_id)?;
+        if !self.collect_terms {
+            return Ok(());
         }
         let observable_terms = self
             .observable_terms
@@ -690,25 +898,63 @@ impl ConversionPlan {
                     "observable id {observable_id} was not initialized"
                 ))
             })?;
+        observable_terms.try_reserve(terms.len()).map_err(|error| {
+            CircuitError::invalid_sampler_compilation(format!(
+                "unable to reserve {} observable measurement references: {error}",
+                terms.len()
+            ))
+        })?;
         observable_terms.extend(terms);
         Ok(())
     }
 
     fn ensure_observable(&mut self, observable_id: usize) -> CircuitResult<()> {
-        if observable_id >= MAX_DETECTION_RECORD_BITS {
-            return Err(CircuitError::invalid_result_format(format!(
-                "observable id {observable_id} exceeds current detection record limit {MAX_DETECTION_RECORD_BITS}"
-            )));
+        if observable_id >= self.limits.max_record_bits {
+            let actual = observable_id.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_result_format(
+                    "observable count overflowed while planning detection conversion",
+                )
+            })?;
+            return Err(ResourceLimitError::detection_record_bits(
+                DetectionRecordLimitSubject::ObservableCount,
+                resource_amount(actual, "observable count")?,
+                resource_amount(self.limits.max_record_bits, "observable count limit")?,
+            )
+            .into());
         }
-        while self.observable_terms.len() <= observable_id {
-            self.observable_terms.push(Vec::new());
+        let next_observable_count = observable_id.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_result_format(
+                "observable count overflowed while planning detection conversion",
+            )
+        })?;
+        let next_width = self
+            .detector_count
+            .checked_add(next_observable_count)
+            .ok_or_else(|| {
+                CircuitError::invalid_result_format(
+                    "detection record width overflowed while planning conversion",
+                )
+            })?;
+        self.validate_record_width_value(next_width)?;
+        self.observable_count = self.observable_count.max(next_observable_count);
+        if self.collect_terms && self.observable_terms.len() < next_observable_count {
+            let additional = next_observable_count - self.observable_terms.len();
+            self.observable_terms
+                .try_reserve_exact(additional)
+                .map_err(|error| {
+                    CircuitError::invalid_sampler_compilation(format!(
+                        "unable to reserve {additional} observable term slots: {error}"
+                    ))
+                })?;
+            self.observable_terms
+                .resize_with(next_observable_count, Vec::new);
         }
-        self.validate_record_width()
+        Ok(())
     }
 
     fn add_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let measurement_count = instruction.measurement_result_count();
-        self.measurement_count = self
+        let next_measurement_count = self
             .measurement_count
             .checked_add(measurement_count)
             .ok_or_else(|| {
@@ -716,19 +962,24 @@ impl ConversionPlan {
                     "measurement record count overflowed during detection conversion planning",
                 )
             })?;
-        if self.measurement_count > MAX_DETECTION_RECORD_BITS {
-            return Err(CircuitError::invalid_result_format(format!(
-                "measurement record width {} exceeds current detection conversion limit {MAX_DETECTION_RECORD_BITS}",
-                self.measurement_count
-            )));
+        if next_measurement_count > self.limits.max_record_bits {
+            return Err(ResourceLimitError::detection_record_bits(
+                DetectionRecordLimitSubject::MeasurementRecord,
+                resource_amount(next_measurement_count, "measurement record width")?,
+                resource_amount(
+                    self.limits.max_record_bits,
+                    "measurement record width limit",
+                )?,
+            )
+            .into());
         }
+        self.measurement_count = next_measurement_count;
         Ok(())
     }
 
     fn output_bit_count(&self) -> CircuitResult<usize> {
-        self.detector_terms
-            .len()
-            .checked_add(self.observable_terms.len())
+        self.detector_count
+            .checked_add(self.observable_count)
             .ok_or_else(|| {
                 CircuitError::invalid_result_format(
                     "detection record width overflowed while planning conversion",
@@ -736,19 +987,116 @@ impl ConversionPlan {
             })
     }
 
-    fn validate_record_width(&self) -> CircuitResult<()> {
-        let width = self.output_bit_count()?;
-        if width > MAX_DETECTION_RECORD_BITS {
-            return Err(CircuitError::invalid_result_format(format!(
-                "detection record width {width} exceeds current limit {MAX_DETECTION_RECORD_BITS}"
-            )));
+    fn validate_record_width_value(&self, width: usize) -> CircuitResult<()> {
+        if width > self.limits.max_record_bits {
+            return Err(ResourceLimitError::detection_record_bits(
+                DetectionRecordLimitSubject::DetectionRecord,
+                resource_amount(width, "detection record width")?,
+                resource_amount(self.limits.max_record_bits, "detection record width limit")?,
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    fn add_compiled_terms(&mut self, count: u64) -> CircuitResult<()> {
+        self.compiled_term_count =
+            self.compiled_term_count.checked_add(count).ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "detection conversion compiled term count overflowed",
+                )
+            })?;
+        if self.compiled_term_count > self.limits.max_compiled_terms {
+            return Err(ResourceLimitError::detection_compiled_terms(
+                self.compiled_term_count,
+                self.limits.max_compiled_terms,
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    fn validate_compiled_shape(&self) -> CircuitResult<()> {
+        validate_vector_capacity::<bool>(
+            self.measurement_count,
+            "detection conversion measurement record",
+        )?;
+        validate_vector_capacity::<bool>(
+            self.sweep_bit_count,
+            "detection conversion sweep record",
+        )?;
+        validate_vector_capacity::<bool>(
+            self.detector_count,
+            "detection conversion detector record",
+        )?;
+        validate_vector_capacity::<bool>(
+            self.observable_count,
+            "detection conversion observable record",
+        )?;
+        validate_vector_capacity::<Vec<usize>>(
+            self.output_bit_count()?,
+            "detection conversion term table",
+        )?;
+        let term_count = usize::try_from(self.compiled_term_count).map_err(|_| {
+            ResourceLimitError::detection_compiled_terms(
+                self.compiled_term_count,
+                usize::MAX as u64,
+            )
+        })?;
+        validate_vector_capacity::<usize>(
+            term_count,
+            "detection conversion measurement references",
+        )?;
+        let outer_bytes = resource_amount(
+            self.output_bit_count()?
+                .checked_mul(std::mem::size_of::<Vec<usize>>())
+                .ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
+                        "detection conversion compiled byte count overflowed",
+                    )
+                })?,
+            "compiled term table bytes",
+        )?;
+        let term_bytes = self
+            .compiled_term_count
+            .checked_mul(std::mem::size_of::<usize>() as u64)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "detection conversion compiled byte count overflowed",
+                )
+            })?;
+        let compiled_bytes = outer_bytes.checked_add(term_bytes).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "detection conversion compiled byte count overflowed",
+            )
+        })?;
+        if compiled_bytes > self.limits.max_compiled_bytes {
+            return Err(ResourceLimitError::detection_compiled_bytes(
+                compiled_bytes,
+                self.limits.max_compiled_bytes,
+            )
+            .into());
         }
         Ok(())
     }
 
     fn validate_shot_count(&self, shots: usize) -> CircuitResult<()> {
-        validate_buffer_bits("measurement samples", shots, self.measurement_count)?;
-        validate_buffer_bits("detection records", shots, self.output_bit_count()?)
+        validate_buffer_bits(
+            DetectionBufferLimitSubject::MeasurementSamples,
+            shots,
+            self.measurement_count,
+            self.limits.max_materialized_bits,
+        )?;
+        self.validate_detection_record_shot_count(shots)
+    }
+
+    fn validate_detection_record_shot_count(&self, shots: usize) -> CircuitResult<()> {
+        validate_buffer_bits(
+            DetectionBufferLimitSubject::DetectionRecords,
+            shots,
+            self.output_bit_count()?,
+            self.limits.max_materialized_bits,
+        )
     }
 
     fn measurement_index_from_offset(&self, offset: MeasureRecordOffset) -> CircuitResult<usize> {
@@ -799,85 +1147,6 @@ impl ConversionPlan {
     }
 }
 
-fn reference_sample(circuit: &Circuit, measurement_count: usize) -> CircuitResult<Vec<bool>> {
-    let sampler = CompiledSampler::compile(circuit)?;
-    let mut reference_sample = Vec::with_capacity(measurement_count);
-    sampler.reference_measurement_record_with_sweep_into(&[], &mut reference_sample)?;
-    validate_reference_sample_len(&reference_sample, measurement_count)?;
-    Ok(reference_sample)
-}
-
-fn validate_reference_sample_len(
-    reference_sample: &[bool],
-    measurement_count: usize,
-) -> CircuitResult<()> {
-    if reference_sample.len() == measurement_count {
-        return Ok(());
-    }
-    Err(CircuitError::invalid_result_format(format!(
-        "reference sample has {} measurement bits but detection conversion expected {measurement_count}",
-        reference_sample.len()
-    )))
-}
-
-fn validate_buffer_bits(kind: &str, shots: usize, bits_per_shot: usize) -> CircuitResult<()> {
-    let total = shots.checked_mul(bits_per_shot).ok_or_else(|| {
-        CircuitError::invalid_result_format(format!("{kind} bit count overflowed"))
-    })?;
-    if total > MAX_DETECTION_BUFFER_BITS {
-        return Err(CircuitError::invalid_result_format(format!(
-            "{kind} would require {total} buffered bits; current limit is {MAX_DETECTION_BUFFER_BITS}"
-        )));
-    }
-    Ok(())
-}
-
-fn detection_records_as_bits(
-    output: &DetectionConversionOutput,
-    observable_mode: DetectionObservableOutputMode,
-) -> CircuitResult<Vec<Vec<bool>>> {
-    output
-        .records
-        .iter()
-        .map(|record| {
-            validate_record_widths(output, record)?;
-            let capacity = match observable_mode {
-                DetectionObservableOutputMode::DetectorsOnly => output.detector_count,
-                DetectionObservableOutputMode::Append | DetectionObservableOutputMode::Prepend => {
-                    output
-                        .detector_count
-                        .checked_add(output.observable_count)
-                        .ok_or_else(|| {
-                            CircuitError::invalid_result_format(
-                                "detection record width overflowed while writing ptb64 output",
-                            )
-                        })?
-                }
-            };
-            let mut bits = Vec::with_capacity(capacity);
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                bits.extend_from_slice(&record.observables);
-            }
-            bits.extend_from_slice(&record.detectors);
-            if observable_mode == DetectionObservableOutputMode::Append {
-                bits.extend_from_slice(&record.observables);
-            }
-            Ok(bits)
-        })
-        .collect()
-}
-
-fn observable_records_as_bits(output: &DetectionConversionOutput) -> CircuitResult<Vec<Vec<bool>>> {
-    output
-        .records
-        .iter()
-        .map(|record| {
-            validate_record_widths(output, record)?;
-            Ok(record.observables.clone())
-        })
-        .collect()
-}
-
 fn parity_of_terms(
     terms: &[usize],
     measurement_record: &[bool],
@@ -898,27 +1167,6 @@ fn parity_of_terms(
         parity ^= measurement ^ reference;
     }
     Ok(parity)
-}
-
-fn validate_record_widths(
-    output: &DetectionConversionOutput,
-    record: &DetectionEventRecord,
-) -> CircuitResult<()> {
-    if record.detectors.len() != output.detector_count {
-        return Err(CircuitError::invalid_result_format(format!(
-            "detection record has {} detector bits but expected {}",
-            record.detectors.len(),
-            output.detector_count
-        )));
-    }
-    if record.observables.len() != output.observable_count {
-        return Err(CircuitError::invalid_result_format(format!(
-            "detection record has {} observable bits but expected {}",
-            record.observables.len(),
-            output.observable_count
-        )));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

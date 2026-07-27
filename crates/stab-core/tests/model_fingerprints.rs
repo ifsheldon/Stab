@@ -103,6 +103,19 @@ fn model_fingerprint_value_contract_is_domain_separated_and_frozen() {
         Circuit::from_stim_str("DETECTOR(-0, 1) rec[-1]\n").expect("negative zero circuit");
     assert_eq!(positive_zero.fingerprint(), negative_zero.fingerprint());
 
+    let opaque_tag = Circuit::from_stim_bytes(b"H[\xff] 0\n").expect("opaque circuit tag");
+    let replacement_tag =
+        Circuit::from_stim_str("H[\u{fffd}] 0\n").expect("UTF-8 replacement-character tag");
+    assert_eq!(
+        opaque_tag.to_stim_string(),
+        replacement_tag.to_stim_string()
+    );
+    assert_ne!(
+        opaque_tag.fingerprint(),
+        replacement_tag.fingerprint(),
+        "fingerprints must encode exact tag bytes instead of their lossy display text"
+    );
+
     assert_eq!(ModelFingerprint::ALGORITHM, "sha256");
     assert_eq!(
         Circuit::from_stim_str(RICH_CIRCUIT)

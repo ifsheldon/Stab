@@ -1,10 +1,13 @@
-use crate::{FormatError, FormatErrorCode, FormatErrorContext, ResourceLimitError};
+use crate::{FormatError, FormatErrorCode, FormatErrorContext, ParseError, ResourceLimitError};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum CircuitError {
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
     #[error("unknown gate {0}")]
     UnknownGate(String),
 
@@ -122,6 +125,13 @@ impl CircuitError {
     pub const fn format_error(&self) -> Option<&FormatError> {
         match self {
             Self::InvalidResultFormat(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    pub const fn parse_error(&self) -> Option<&ParseError> {
+        match self {
+            Self::Parse(error) => Some(error),
             _ => None,
         }
     }

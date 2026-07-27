@@ -125,7 +125,7 @@ fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> CircuitResult<Ci
         first_mry.gate(),
         first_mry.args(),
         vec![mry1.clone(), mry0.clone()],
-        first_mry.tag(),
+        first_mry.tag_bytes(),
     )?;
     super::append_one_target_instruction(&mut result, reset_gate, &[], second_m_target, None)?;
     result.append_instruction(first_tick.clone());
@@ -134,7 +134,7 @@ fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> CircuitResult<Ci
         mzz.gate(),
         mzz.args(),
         vec![mzz2, mzz3, mzz0, mzz1],
-        mzz.tag(),
+        mzz.tag_bytes(),
     )?;
     result.append_instruction(second_tick.clone());
     super::append_one_target_instruction(
@@ -142,7 +142,7 @@ fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> CircuitResult<Ci
         first_m.gate(),
         first_m.args(),
         first_m_target,
-        first_m.tag(),
+        first_m.tag_bytes(),
     )?;
     super::append_target_instruction(
         &mut result,
@@ -152,14 +152,14 @@ fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> CircuitResult<Ci
             Target::measurement_record(MeasureRecordOffset::try_new(-2)?),
             Target::measurement_record(MeasureRecordOffset::try_new(-1)?),
         ],
-        detector.tag(),
+        detector.tag_bytes(),
     )?;
     super::append_target_instruction(
         &mut result,
         last_mry.gate(),
         last_mry.args(),
         vec![mry1, mry0],
-        last_mry.tag(),
+        last_mry.tag_bytes(),
     )?;
     Ok(result)
 }

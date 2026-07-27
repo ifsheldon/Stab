@@ -1,11 +1,6 @@
-use crate::{CircuitError, CircuitResult};
-
-pub(super) const MAX_SAT_ERROR_MECHANISMS: usize = 250_000;
-pub(super) const MAX_SAT_TARGET_OCCURRENCES: usize = 500_000;
-const MAX_SAT_VARIABLES: usize = 500_000;
-const MAX_SAT_CLAUSES: usize = 500_000;
-const MAX_SAT_CLAUSE_LITERALS: usize = 1_500_000;
-const MAX_SAT_OUTPUT_BYTES: usize = 128 * 1024 * 1024;
+use super::SatMaterializationLimits;
+use crate::resources::SatMaterializationResource;
+use crate::{CircuitError, CircuitResult, ResourceLimitError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum SatProblemMode {
@@ -117,39 +112,34 @@ pub(super) struct SatShape {
     pub(super) variables: usize,
     pub(super) clauses: usize,
     pub(super) clause_literals: usize,
-    pub(super) output_bytes: usize,
 }
 
 impl SatShape {
-    pub(super) fn with_output_bound(mut self, mode: SatProblemMode) -> CircuitResult<Self> {
-        let top = top_weight_for_clause_count(mode, self.clauses)?;
-        self.output_bytes =
-            estimated_output_bytes(self.variables, self.clauses, self.clause_literals, top)?;
-        self.validate()
-    }
-
-    pub(super) fn validate(self) -> CircuitResult<Self> {
+    pub(super) fn validate(self, limits: SatMaterializationLimits) -> CircuitResult<Self> {
         validate_limit(
-            "error mechanisms",
+            SatMaterializationResource::ErrorMechanisms,
             self.error_mechanisms,
-            MAX_SAT_ERROR_MECHANISMS,
+            limits.max_error_mechanisms(),
         )?;
         validate_limit(
-            "target occurrences",
+            SatMaterializationResource::TargetOccurrences,
             self.target_occurrences,
-            MAX_SAT_TARGET_OCCURRENCES,
+            limits.max_target_occurrences(),
         )?;
-        validate_limit("variables", self.variables, MAX_SAT_VARIABLES)?;
-        validate_limit("clauses", self.clauses, MAX_SAT_CLAUSES)?;
         validate_limit(
-            "clause literals",
+            SatMaterializationResource::Variables,
+            self.variables,
+            limits.max_variables(),
+        )?;
+        validate_limit(
+            SatMaterializationResource::Clauses,
+            self.clauses,
+            limits.max_clauses(),
+        )?;
+        validate_limit(
+            SatMaterializationResource::ClauseLiterals,
             self.clause_literals,
-            MAX_SAT_CLAUSE_LITERALS,
-        )?;
-        validate_limit(
-            "WDIMACS output bytes",
-            self.output_bytes,
-            MAX_SAT_OUTPUT_BYTES,
+            limits.max_clause_literals(),
         )?;
         Ok(self)
     }
@@ -157,6 +147,7 @@ impl SatShape {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct MaxSatInstance {
+    limits: SatMaterializationLimits,
     num_variables: usize,
     max_weight: f64,
     clauses: Vec<Clause>,
@@ -164,8 +155,11 @@ pub(super) struct MaxSatInstance {
 }
 
 impl MaxSatInstance {
-    pub(super) fn with_shape(shape: SatShape) -> CircuitResult<Self> {
-        let shape = shape.validate()?;
+    pub(super) fn with_shape(
+        shape: SatShape,
+        limits: SatMaterializationLimits,
+    ) -> CircuitResult<Self> {
+        let shape = shape.validate(limits)?;
         let mut clauses = Vec::new();
         clauses.try_reserve_exact(shape.clauses).map_err(|_| {
             CircuitError::invalid_detector_error_model(format!(
@@ -174,6 +168,7 @@ impl MaxSatInstance {
             ))
         })?;
         Ok(Self {
+            limits,
             clauses,
             ..Self::default()
         })
@@ -184,7 +179,11 @@ impl MaxSatInstance {
         let next = self.num_variables.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("SAT variable count overflowed")
         })?;
-        validate_limit("variables", next, MAX_SAT_VARIABLES)?;
+        validate_limit(
+            SatMaterializationResource::Variables,
+            next,
+            self.limits.max_variables(),
+        )?;
         self.num_variables = next;
         Ok(BoolRef::variable(variable))
     }
@@ -201,14 +200,22 @@ impl MaxSatInstance {
         let clause_count = self.clauses.len().checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("SAT clause count overflowed")
         })?;
-        validate_limit("clauses", clause_count, MAX_SAT_CLAUSES)?;
+        validate_limit(
+            SatMaterializationResource::Clauses,
+            clause_count,
+            self.limits.max_clauses(),
+        )?;
         let literal_count = self
             .clause_literals
             .checked_add(clause.vars.len())
             .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("SAT clause literal count overflowed")
             })?;
-        validate_limit("clause literals", literal_count, MAX_SAT_CLAUSE_LITERALS)?;
+        validate_limit(
+            SatMaterializationResource::ClauseLiterals,
+            literal_count,
+            self.limits.max_clause_literals(),
+        )?;
         self.clauses.push(clause);
         self.clause_literals = literal_count;
         Ok(())
@@ -252,9 +259,12 @@ impl MaxSatInstance {
     pub(super) fn to_wdimacs(&self, mode: SatProblemMode) -> CircuitResult<String> {
         let clause_count = self.clauses.len();
         let top = self.top_weight(mode, clause_count)?;
-        let output_bound =
-            estimated_output_bytes(self.num_variables, clause_count, self.clause_literals, top)?;
-        validate_limit("WDIMACS output bytes", output_bound, MAX_SAT_OUTPUT_BYTES)?;
+        let output_bound = self.exact_output_bytes(mode, top)?;
+        validate_limit(
+            SatMaterializationResource::OutputBytes,
+            output_bound,
+            self.limits.max_output_bytes(),
+        )?;
         let mut out = String::new();
         out.try_reserve(output_bound).map_err(|_| {
             CircuitError::invalid_detector_error_model(format!(
@@ -284,6 +294,39 @@ impl MaxSatInstance {
             out.push_str(" 0\n");
         }
         Ok(out)
+    }
+
+    fn exact_output_bytes(&self, mode: SatProblemMode, top: usize) -> CircuitResult<usize> {
+        let mut bytes = "p wcnf ".len();
+        bytes = checked_output_add(bytes, decimal_digits(self.num_variables))?;
+        bytes = checked_output_add(bytes, 1)?;
+        bytes = checked_output_add(bytes, decimal_digits(self.clauses.len()))?;
+        bytes = checked_output_add(bytes, 1)?;
+        bytes = checked_output_add(bytes, decimal_digits(top))?;
+        bytes = checked_output_add(bytes, 1)?;
+
+        for clause in &self.clauses {
+            let weight = self.quantized_weight(mode, top, &clause.weight)?;
+            if weight == 0 {
+                continue;
+            }
+            bytes = checked_output_add(bytes, decimal_digits(weight))?;
+            for var in &clause.vars {
+                let Some(index) = var.variable_index() else {
+                    continue;
+                };
+                let one_based = index.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "SAT variable index overflowed while sizing output",
+                    )
+                })?;
+                bytes = checked_output_add(bytes, 1)?;
+                bytes = checked_output_add(bytes, usize::from(var.negated))?;
+                bytes = checked_output_add(bytes, decimal_digits(one_based))?;
+            }
+            bytes = checked_output_add(bytes, " 0\n".len())?;
+        }
+        Ok(bytes)
     }
 
     fn top_weight(&self, mode: SatProblemMode, clause_count: usize) -> CircuitResult<usize> {
@@ -337,31 +380,10 @@ fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> Cir
     }
 }
 
-fn estimated_output_bytes(
-    variables: usize,
-    clauses: usize,
-    literals: usize,
-    top: usize,
-) -> CircuitResult<usize> {
-    let header = 16_usize
-        .checked_add(decimal_digits(variables))
-        .and_then(|value| value.checked_add(decimal_digits(clauses)))
-        .and_then(|value| value.checked_add(decimal_digits(top)))
-        .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT output byte estimate overflowed")
-        })?;
-    let clause_overhead = clauses
-        .checked_mul(decimal_digits(top).saturating_add(3))
-        .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT output byte estimate overflowed")
-        })?;
-    let literal_width = decimal_digits(variables).saturating_add(2);
-    header
-        .checked_add(clause_overhead)
-        .and_then(|value| value.checked_add(literals.checked_mul(literal_width)?))
-        .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT output byte estimate overflowed")
-        })
+fn checked_output_add(left: usize, right: usize) -> CircuitResult<usize> {
+    left.checked_add(right).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model("SAT exact output byte count overflowed")
+    })
 }
 
 fn decimal_digits(value: usize) -> usize {
@@ -387,11 +409,23 @@ fn rounded_nonnegative_usize(value: f64) -> CircuitResult<usize> {
         .map_err(|_| CircuitError::invalid_detector_error_model("SAT quantized weight overflowed"))
 }
 
-fn validate_limit(label: &str, actual: usize, limit: usize) -> CircuitResult<()> {
+pub(super) fn validate_limit(
+    resource: SatMaterializationResource,
+    actual: usize,
+    limit: usize,
+) -> CircuitResult<()> {
     if actual > limit {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "SAT problem generation currently supports at most {limit} {label}, got at least {actual}"
-        )));
+        let actual = u64::try_from(actual).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "SAT resource amount does not fit resource diagnostics",
+            )
+        })?;
+        let limit = u64::try_from(limit).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "SAT resource limit does not fit resource diagnostics",
+            )
+        })?;
+        return Err(ResourceLimitError::sat_materialization(resource, actual, limit).into());
     }
     Ok(())
 }
@@ -407,61 +441,54 @@ mod tests {
 
     #[test]
     fn sat_shape_rejects_each_resource_above_its_limit() {
+        let limits = SatMaterializationLimits::default();
         let baseline = SatShape {
             error_mechanisms: 1,
             target_occurrences: 1,
             variables: 1,
             clauses: 1,
             clause_literals: 1,
-            output_bytes: 1,
         };
         for (shape, expected) in [
             (
                 SatShape {
-                    error_mechanisms: MAX_SAT_ERROR_MECHANISMS + 1,
+                    error_mechanisms: limits.max_error_mechanisms() + 1,
                     ..baseline
                 },
                 "error mechanisms",
             ),
             (
                 SatShape {
-                    target_occurrences: MAX_SAT_TARGET_OCCURRENCES + 1,
+                    target_occurrences: limits.max_target_occurrences() + 1,
                     ..baseline
                 },
                 "target occurrences",
             ),
             (
                 SatShape {
-                    variables: MAX_SAT_VARIABLES + 1,
+                    variables: limits.max_variables() + 1,
                     ..baseline
                 },
                 "variables",
             ),
             (
                 SatShape {
-                    clauses: MAX_SAT_CLAUSES + 1,
+                    clauses: limits.max_clauses() + 1,
                     ..baseline
                 },
                 "clauses",
             ),
             (
                 SatShape {
-                    clause_literals: MAX_SAT_CLAUSE_LITERALS + 1,
+                    clause_literals: limits.max_clause_literals() + 1,
                     ..baseline
                 },
                 "clause literals",
             ),
-            (
-                SatShape {
-                    output_bytes: MAX_SAT_OUTPUT_BYTES + 1,
-                    ..baseline
-                },
-                "WDIMACS output bytes",
-            ),
         ] {
             assert!(
                 shape
-                    .validate()
+                    .validate(limits)
                     .expect_err("shape above resource limit")
                     .to_string()
                     .contains(expected)

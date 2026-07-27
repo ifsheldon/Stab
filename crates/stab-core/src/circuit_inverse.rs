@@ -44,10 +44,10 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let inverse_body = circuit_inverse_unitary(repeat.body())?;
-                result.append_repeat_block(RepeatBlock::new(
+                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     inverse_body,
-                    repeat.tag().map(str::to_owned),
+                    repeat.tag_bytes(),
                 ));
             }
         }
@@ -178,11 +178,11 @@ fn inverse_instruction(instruction: &CircuitInstruction) -> CircuitResult<Circui
     }
     let inverse_gate = gate.best_candidate_inverse()?;
     let targets = reversed_target_groups(instruction);
-    CircuitInstruction::new(
+    CircuitInstruction::new_with_tag_bytes(
         inverse_gate,
         instruction.args().to_vec(),
         targets,
-        instruction.tag().map(str::to_owned),
+        instruction.tag_bytes(),
     )
 }
 

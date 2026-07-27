@@ -101,6 +101,11 @@ impl ParseLimits {
     pub fn estimate(self, input: &str) -> ResourceEstimate {
         ResourceEstimate::for_text_parse(input)
     }
+
+    /// Estimates byte-oriented model parsing without requiring metadata to be valid UTF-8.
+    pub fn estimate_bytes(self, input: &[u8]) -> ResourceEstimate {
+        ResourceEstimate::for_model_bytes(input)
+    }
 }
 
 impl Default for ParseLimits {

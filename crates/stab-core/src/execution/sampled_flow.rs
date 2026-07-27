@@ -167,10 +167,10 @@ fn append_flow_test_block_for_circuit(
             CircuitItem::RepeatBlock(repeat) => {
                 let mut body = Circuit::new();
                 append_flow_test_block_for_circuit(&mut body, repeat.body(), ancilla, observables)?;
-                output.append_repeat_block(RepeatBlock::new(
+                output.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
-                    repeat.tag().map(str::to_owned),
+                    repeat.tag_bytes(),
                 ));
             }
         }
@@ -190,7 +190,7 @@ fn append_selected_observable_feedback(
                 "X",
                 Vec::new(),
                 Target::qubit(ancilla, false),
-                instruction.tag().map(str::to_owned),
+                instruction.tag_bytes(),
             )?;
         }
         if target.is_measurement_record_target() {
@@ -199,7 +199,7 @@ fn append_selected_observable_feedback(
                 "CX",
                 target.clone(),
                 Target::qubit(ancilla, false),
-                instruction.tag().map(str::to_owned),
+                instruction.tag_bytes(),
             )?;
         } else if target.is_x_target() {
             append_pauli_observable_feedback(output, "XCX", target, ancilla, instruction)?;
@@ -233,7 +233,7 @@ fn append_pauli_observable_feedback(
         gate_name,
         Target::qubit(qubit, false),
         Target::qubit(ancilla, false),
-        source.tag().map(str::to_owned),
+        source.tag_bytes(),
     )
 }
 
@@ -241,7 +241,7 @@ fn append_pauli_controlled_not(
     circuit: &mut Circuit,
     pauli: &PauliString,
     ancilla: QubitId,
-    tag: Option<String>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     for (index, basis) in pauli.active_terms() {
         let gate_name = match basis {
@@ -258,7 +258,7 @@ fn append_pauli_controlled_not(
                 false,
             ),
             Target::qubit(ancilla, false),
-            tag.clone(),
+            tag,
         )?;
     }
     if pauli.sign() == PauliSign::Minus {
@@ -344,9 +344,9 @@ fn append_one_target_instruction(
     gate_name: &'static str,
     args: Vec<f64>,
     target: Target,
-    tag: Option<String>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
-    circuit.append_instruction(CircuitInstruction::new(
+    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
         Gate::from_name(gate_name)?,
         args,
         vec![target],
@@ -360,9 +360,9 @@ fn append_two_target_instruction(
     gate_name: &'static str,
     first: Target,
     second: Target,
-    tag: Option<String>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
-    circuit.append_instruction(CircuitInstruction::new(
+    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
         Gate::from_name(gate_name)?,
         Vec::new(),
         vec![first, second],

@@ -208,21 +208,21 @@ fn build_selected_reset_cx_measure_two_to_one_inverse(
         reset.gate(),
         measurement.args(),
         reversed_reset_targets.clone(),
-        measurement.tag(),
+        measurement.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
         cx.gate(),
         cx.args(),
         cx.targets().to_vec(),
-        cx.tag(),
+        cx.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
         measurement.gate(),
         reset.args(),
         reversed_reset_targets,
-        reset.tag(),
+        reset.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
@@ -231,7 +231,7 @@ fn build_selected_reset_cx_measure_two_to_one_inverse(
         vec![Target::measurement_record(MeasureRecordOffset::try_new(
             -2,
         )?)],
-        detector.tag(),
+        detector.tag_bytes(),
     )?;
 
     Ok(result)
@@ -289,7 +289,7 @@ fn build_selected_mpp_detector_inverse(
         mpp.gate(),
         mpp.args(),
         reversed_pauli_product_targets(&product_groups)?,
-        mpp.tag(),
+        mpp.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
@@ -300,7 +300,7 @@ fn build_selected_mpp_detector_inverse(
             .rev()
             .map(|offset| MeasureRecordOffset::try_new(*offset).map(Target::measurement_record))
             .collect::<CircuitResult<Vec<_>>>()?,
-        detector.tag(),
+        detector.tag_bytes(),
     )?;
     Ok(result)
 }
@@ -327,7 +327,7 @@ fn selected_noisy_measurement_inverse(circuit: &Circuit) -> CircuitResult<Option
             instruction.gate(),
             instruction.args(),
             reversed_measurement_targets(instruction)?,
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
     }
     Ok(Some(result))
@@ -390,7 +390,7 @@ fn append_measure_reset_inverse(
             instruction.gate(),
             instruction.args(),
             targets,
-            instruction.tag(),
+            instruction.tag_bytes(),
         );
     }
 
@@ -403,14 +403,14 @@ fn append_measure_reset_inverse(
             instruction.gate(),
             &[],
             chunk.clone(),
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
         append_target_instruction(
             result,
             error_gate,
             instruction.args(),
             chunk,
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
     }
     Ok(())
@@ -549,7 +549,7 @@ fn build_selected_noisy_measure_reset_detector_inverse(
         vec![Target::measurement_record(MeasureRecordOffset::try_new(
             -1,
         )?)],
-        detector.tag(),
+        detector.tag_bytes(),
     )?;
     result.append_instruction(tick.clone());
     append_measure_reset_inverse(&mut result, pre_tick)?;
@@ -688,21 +688,21 @@ fn build_selected_measure_reset_pass_through_inverse(
         measure_reset.gate(),
         measure_reset.args(),
         measure_reset_targets.iter().rev().cloned().collect(),
-        measure_reset.tag(),
+        measure_reset.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
         measurement.gate(),
         measurement.args(),
         measurement_targets.iter().rev().cloned().collect(),
-        measurement.tag(),
+        measurement.tag_bytes(),
     )?;
     append_target_instruction(
         &mut result,
         measurement.gate(),
         reset.args(),
         reset_targets.iter().rev().cloned().collect(),
-        reset.tag(),
+        reset.tag_bytes(),
     )?;
 
     let total_measurements = measure_reset_targets.len().checked_mul(3).ok_or_else(|| {
@@ -746,7 +746,7 @@ fn build_selected_measure_reset_pass_through_inverse(
             detector.gate(),
             detector.args(),
             detector_targets,
-            detector.tag(),
+            detector.tag_bytes(),
         )?;
     }
 
@@ -870,7 +870,7 @@ fn build_selected_reset_measure_detector_inverse(
                     measurement.gate(),
                     measurement.args(),
                     target.clone(),
-                    measurement.tag(),
+                    measurement.tag_bytes(),
                 )?;
                 new_measurements += 1;
             } else {
@@ -879,7 +879,7 @@ fn build_selected_reset_measure_detector_inverse(
                     reset.gate(),
                     measurement.args(),
                     target.clone(),
-                    measurement.tag(),
+                    measurement.tag_bytes(),
                 )?;
             }
         } else {
@@ -891,7 +891,7 @@ fn build_selected_reset_measure_detector_inverse(
                 measurement.gate(),
                 measurement.args(),
                 target.clone(),
-                measurement.tag(),
+                measurement.tag_bytes(),
             )?;
             new_measurements += 1;
         }
@@ -912,7 +912,7 @@ fn build_selected_reset_measure_detector_inverse(
         measurement.gate(),
         reset.args(),
         reset_targets.iter().rev().cloned().collect(),
-        reset.tag(),
+        reset.tag_bytes(),
     )?;
 
     detector_measurements.sort_unstable();
@@ -939,7 +939,7 @@ fn build_selected_reset_measure_detector_inverse(
             detector.gate(),
             detector.args(),
             detector_targets,
-            detector.tag(),
+            detector.tag_bytes(),
         )?;
     }
 
@@ -951,7 +951,7 @@ fn append_one_target_instruction(
     gate: Gate,
     args: &[f64],
     target: Target,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     append_target_instruction(circuit, gate, args, vec![target], tag)
 }
@@ -961,16 +961,16 @@ fn append_target_instruction(
     gate: Gate,
     args: &[f64],
     targets: Vec<Target>,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     if targets.is_empty() {
         return Ok(());
     }
-    circuit.append_instruction(CircuitInstruction::new(
+    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
         gate,
         args.to_vec(),
         targets,
-        tag.map(str::to_owned),
+        tag,
     )?);
     Ok(())
 }

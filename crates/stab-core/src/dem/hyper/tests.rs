@@ -295,7 +295,10 @@ fn hyper_algo_rejects_excessive_search_states() {
     for observable in 0..64 {
         text.push_str(&format!("error(0.1) D0 L{observable}\n"));
     }
-    let error = find(&text, 3, 3, false).expect_err("search state cap");
+    let model = DetectorErrorModel::from_dem_str(&text).expect("valid search model");
+    let limits = LogicalErrorSearchLimits::default().with_max_search_states(64);
+    let error = find_undetectable_logical_error_with_limits(&model, 3, 3, false, limits)
+        .expect_err("search state cap");
     assert!(error.to_string().contains("at most 64 search states"));
 }
 

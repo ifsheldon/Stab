@@ -67,17 +67,89 @@ fn parse_estimate_classifies_only_cheaply_known_text_properties() {
         ParseLimits::default().estimate("H 0").input_items(),
         Estimate::Exact(1)
     );
+
+    let byte_estimate = ParseLimits::default().estimate_bytes(b"H 0 # \xff\nM[\xfe] 0");
+    assert_eq!(byte_estimate.input_bytes(), Estimate::Exact(14));
+    assert_eq!(byte_estimate.input_items(), Estimate::Exact(2));
 }
 
 #[test]
 fn resource_identifiers_are_stable() {
-    assert_eq!(ResourceOperation::CircuitParse.as_str(), "circuit-parse");
-    assert_eq!(
-        ResourceOperation::DetectorErrorModelParse.as_str(),
-        "detector-error-model-parse"
-    );
-    assert_eq!(ResourceKind::SourceLines.as_str(), "source-lines");
-    assert_eq!(ResourceKind::RepeatNesting.as_str(), "repeat-nesting");
+    for (operation, code) in [
+        (ResourceOperation::CircuitParse, "circuit-parse"),
+        (
+            ResourceOperation::DetectorErrorModelParse,
+            "detector-error-model-parse",
+        ),
+        (ResourceOperation::CircuitFlatten, "circuit-flatten"),
+        (
+            ResourceOperation::DetectionConversion,
+            "detection-conversion",
+        ),
+        (
+            ResourceOperation::DetectorErrorModelFlatten,
+            "detector-error-model-flatten",
+        ),
+        (
+            ResourceOperation::DetectorErrorModelSampling,
+            "detector-error-model-sampling",
+        ),
+        (
+            ResourceOperation::LogicalErrorSearch,
+            "logical-error-search",
+        ),
+        (ResourceOperation::SatMaterialization, "sat-materialization"),
+    ] {
+        assert_eq!(operation.as_str(), code);
+    }
+
+    for (resource, code) in [
+        (ResourceKind::SourceLines, "source-lines"),
+        (ResourceKind::RepeatNesting, "repeat-nesting"),
+        (ResourceKind::ExpandedOperations, "expanded-operations"),
+        (ResourceKind::RecordBits, "record-bits"),
+        (ResourceKind::MaterializedBits, "materialized-bits"),
+        (ResourceKind::RepeatCount, "repeat-count"),
+        (ResourceKind::RepeatIterations, "repeat-iterations"),
+        (ResourceKind::MaterializedUnits, "materialized-units"),
+        (ResourceKind::MaterializedBytes, "materialized-bytes"),
+        (
+            ResourceKind::SampledErrorApplications,
+            "sampled-error-applications",
+        ),
+        (ResourceKind::ReplayWorkUnits, "replay-work-units"),
+        (ResourceKind::ErrorMechanisms, "error-mechanisms"),
+        (ResourceKind::TargetOccurrences, "target-occurrences"),
+        (
+            ResourceKind::ErrorTargetOccurrencesPerMechanism,
+            "error-target-occurrences-per-mechanism",
+        ),
+        (
+            ResourceKind::TotalErrorTargetOccurrences,
+            "total-error-target-occurrences",
+        ),
+        (
+            ResourceKind::EffectiveDetectorNodes,
+            "effective-detector-nodes",
+        ),
+        (ResourceKind::UniqueGraphEdges, "unique-graph-edges"),
+        (ResourceKind::StoredGraphTerms, "stored-graph-terms"),
+        (ResourceKind::HyperedgeDegree, "hyperedge-degree"),
+        (ResourceKind::HyperedgeIncidences, "hyperedge-incidences"),
+        (ResourceKind::SearchStates, "search-states"),
+        (ResourceKind::SearchTransitions, "search-transitions"),
+        (ResourceKind::SearchStateTerms, "search-state-terms"),
+        (
+            ResourceKind::StoredSearchStateTerms,
+            "stored-search-state-terms",
+        ),
+        (ResourceKind::Variables, "variables"),
+        (ResourceKind::Clauses, "clauses"),
+        (ResourceKind::ClauseLiterals, "clause-literals"),
+        (ResourceKind::OutputBytes, "output-bytes"),
+    ] {
+        assert_eq!(resource.as_str(), code);
+    }
 }
 
 #[test]
@@ -264,6 +336,110 @@ fn parse_preallocation_is_bounded_by_the_admitted_line_prefix() {
         dem_large_allocations, dem_small_allocations,
         "DEM preallocation must not scale with rejected trailing input"
     );
+
+    let circuit_small_bytes = b"H 0\nM 0\n".as_slice();
+    let mut circuit_large_bytes = circuit_small_bytes.to_vec();
+    circuit_large_bytes.extend_from_slice("M 0\n".repeat(100_000).as_bytes());
+    let circuit_small_byte_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            Circuit::from_stim_bytes_with_limits(circuit_small_bytes, limits)
+                .expect_err("second circuit byte line is rejected"),
+        );
+    });
+    let circuit_large_byte_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            Circuit::from_stim_bytes_with_limits(&circuit_large_bytes, limits)
+                .expect_err("second circuit byte line is rejected"),
+        );
+    });
+    assert_eq!(
+        circuit_large_byte_allocations, circuit_small_byte_allocations,
+        "circuit byte preparation must stop after the first rejected physical line"
+    );
+
+    let dem_small_bytes = b"error(0.1) D0\nshift_detectors 1\n".as_slice();
+    let mut dem_large_bytes = dem_small_bytes.to_vec();
+    dem_large_bytes.extend_from_slice("shift_detectors 1\n".repeat(100_000).as_bytes());
+    let dem_small_byte_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            DetectorErrorModel::from_dem_bytes_with_limits(dem_small_bytes, limits)
+                .expect_err("second DEM byte line is rejected"),
+        );
+    });
+    let dem_large_byte_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            DetectorErrorModel::from_dem_bytes_with_limits(&dem_large_bytes, limits)
+                .expect_err("second DEM byte line is rejected"),
+        );
+    });
+    assert_eq!(
+        dem_large_byte_allocations, dem_small_byte_allocations,
+        "DEM byte preparation must stop after the first rejected physical line"
+    );
+}
+
+#[test]
+fn byte_parse_admission_does_not_copy_an_unterminated_rejected_line() {
+    let limits = ParseLimits::default().with_source_line_limit(SourceLineLimit::new(1));
+
+    let circuit_small = b"H 0\nM".as_slice();
+    let mut circuit_large = b"H 0\n".to_vec();
+    circuit_large.extend(std::iter::repeat_n(b'M', 1_000_000));
+    let circuit_small_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            Circuit::from_stim_bytes_with_limits(circuit_small, limits)
+                .expect_err("second circuit line is rejected"),
+        );
+    });
+    let circuit_large_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            Circuit::from_stim_bytes_with_limits(&circuit_large, limits)
+                .expect_err("large second circuit line is rejected"),
+        );
+    });
+    assert_eq!(
+        circuit_large_allocations, circuit_small_allocations,
+        "circuit byte admission must retain only the first byte of a rejected line"
+    );
+
+    let dem_small = b"error(0.1) D0\ns".as_slice();
+    let mut dem_large = b"error(0.1) D0\n".to_vec();
+    dem_large.extend(std::iter::repeat_n(b's', 1_000_000));
+    let dem_small_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            DetectorErrorModel::from_dem_bytes_with_limits(dem_small, limits)
+                .expect_err("second DEM line is rejected"),
+        );
+    });
+    let dem_large_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(
+            DetectorErrorModel::from_dem_bytes_with_limits(&dem_large, limits)
+                .expect_err("large second DEM line is rejected"),
+        );
+    });
+    assert_eq!(
+        dem_large_allocations, dem_small_allocations,
+        "DEM byte admission must retain only the first byte of a rejected line"
+    );
+
+    let circuit_error = Circuit::from_stim_bytes_with_limits(b"H 0\n\xff", limits)
+        .expect_err("line admission precedes decoding rejected circuit bytes");
+    assert_resource_limit(
+        &circuit_error,
+        ResourceOperation::CircuitParse,
+        ResourceKind::SourceLines,
+        2,
+        1,
+    );
+    let dem_error = DetectorErrorModel::from_dem_bytes_with_limits(b"error(0.1) D0\n\xff", limits)
+        .expect_err("line admission precedes decoding rejected DEM bytes");
+    assert_resource_limit(
+        &dem_error,
+        ResourceOperation::DetectorErrorModelParse,
+        ResourceKind::SourceLines,
+        2,
+        1,
+    );
 }
 
 fn nested_repeat_text(header: &str, body: &str, depth: usize) -> String {
@@ -284,8 +460,8 @@ fn assert_resource_limit(
     error: &CircuitError,
     operation: ResourceOperation,
     resource: ResourceKind,
-    actual: usize,
-    limit: usize,
+    actual: u64,
+    limit: u64,
 ) {
     let typed = error
         .resource_limit_error()

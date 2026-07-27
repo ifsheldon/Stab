@@ -1,16 +1,15 @@
 use std::fmt::{Display, Formatter};
 use std::io::{self, Write};
 use std::ops::RangeBounds;
-use std::str::Lines;
 
 use crate::gate::{ArgRule, GateTargetGroupKind};
-use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
+use crate::model_bytes::PreparedModelText;
+use crate::model_tag::ModelTag;
+use crate::target::TargetVec;
 use crate::{
-    CircuitError, CircuitResult, Gate, ModelFingerprint, ObservableId, ParseLimits, Probability,
-    RepeatCount, ResourceLimitError, Target,
+    CircuitError, CircuitResult, Gate, ModelDialect, ModelFingerprint, ObservableId, ParseLimits,
+    Probability, RepeatCount, Target,
 };
-
-const CIRCUIT_PREALLOCATION_SAMPLE_BYTES: usize = 1 << 20;
 
 mod api;
 mod counts;
@@ -44,8 +43,28 @@ impl Circuit {
         Self::from_stim_str_with_limits(input, ParseLimits::default())
     }
 
+    pub fn from_stim_bytes(input: &[u8]) -> CircuitResult<Self> {
+        Self::from_stim_bytes_with_limits(input, ParseLimits::default())
+    }
+
+    pub fn from_stim_bytes_with_limits(input: &[u8], limits: ParseLimits) -> CircuitResult<Self> {
+        let prepared = PreparedModelText::new(input, ModelDialect::StimCircuit, limits)?;
+        let parsed = if prepared.requires_tag_restore() {
+            parser::parse_circuit_unfused(prepared.text(), limits)
+        } else {
+            parser::parse_circuit(prepared.text(), limits)
+        };
+        let parsed = prepared.resolve(parsed);
+        let mut circuit = parsed?;
+        if let Some(tags) = prepared.into_tags() {
+            circuit.restore_byte_tags(tags)?;
+            circuit.fuse_adjacent_instructions();
+        }
+        Ok(circuit)
+    }
+
     pub fn from_stim_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
-        Parser::new(input, limits).parse()
+        parser::parse_circuit(input, limits)
     }
 
     /// Returns the schema-versioned structural identity of this circuit.
@@ -104,15 +123,71 @@ impl Circuit {
         self.push_instruction(instruction);
     }
 
+    pub(crate) fn try_reserve_items_exact(&mut self, additional: usize) -> CircuitResult<()> {
+        self.items.try_reserve_exact(additional).map_err(|error| {
+            CircuitError::invalid_domain_value(
+                "circuit allocation",
+                format!("unable to reserve {additional} item slots: {error}"),
+            )
+        })
+    }
+
+    pub(crate) fn try_append_instruction(
+        &mut self,
+        instruction: CircuitInstruction,
+    ) -> CircuitResult<()> {
+        if let Some(CircuitItem::Instruction(previous)) = self.items.last_mut()
+            && previous.can_fuse(&instruction)
+        {
+            let additional = instruction.targets.len();
+            previous
+                .targets
+                .try_reserve_exact(additional)
+                .map_err(|error| {
+                    CircuitError::invalid_domain_value(
+                        "circuit target allocation",
+                        format!("unable to reserve {additional} target slots: {error}"),
+                    )
+                })?;
+            previous.targets.extend(instruction.targets);
+            return Ok(());
+        }
+
+        self.items.try_reserve(1).map_err(|error| {
+            CircuitError::invalid_domain_value(
+                "circuit allocation",
+                format!("unable to reserve an instruction slot: {error}"),
+            )
+        })?;
+        self.items.push(CircuitItem::Instruction(instruction));
+        Ok(())
+    }
+
     /// Appends a repeat block without modifying its body.
     pub fn append_repeat_block(&mut self, repeat: RepeatBlock) {
         self.push(CircuitItem::RepeatBlock(repeat));
     }
 
+    /// Returns canonical Stim text as UTF-8.
+    ///
+    /// Opaque tag bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::to_stim_bytes`] when exact metadata preservation matters.
     pub fn to_stim_string(&self) -> String {
         let mut out = String::with_capacity(printing::stim_text_capacity(self, 0));
         self.write_stim(&mut out, 0);
         out
+    }
+
+    /// Returns canonical Stim text while preserving opaque bytes in tags.
+    ///
+    /// Use this method instead of [`Self::to_stim_string`] when the circuit came from a byte
+    /// source whose tags may not be valid UTF-8.
+    pub fn to_stim_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(printing::stim_text_capacity(self, 0));
+        match self.write_stim_io(&mut out) {
+            Ok(()) => out,
+            Err(error) => unreachable!("writing a circuit into Vec<u8> failed: {error}"),
+        }
     }
 
     pub(crate) fn from_items(items: Vec<CircuitItem>) -> Self {
@@ -147,6 +222,67 @@ impl Circuit {
             item.write_stim_io(out, indent)?;
         }
         Ok(())
+    }
+
+    fn restore_byte_tags(&mut self, tags: Vec<Vec<u8>>) -> CircuitResult<()> {
+        let expected = self.non_empty_tag_count();
+        if expected != tags.len() {
+            return Err(CircuitError::invalid_domain_value(
+                "Stim byte parser",
+                format!(
+                    "metadata scanner found {} tags but parser produced {expected}",
+                    tags.len()
+                ),
+            ));
+        }
+        let mut tags = tags.into_iter();
+        self.restore_byte_tags_from(&mut tags);
+        let exhausted = tags.next().is_none();
+        debug_assert!(exhausted);
+        Ok(())
+    }
+
+    fn restore_byte_tags_from(&mut self, tags: &mut impl Iterator<Item = Vec<u8>>) {
+        for item in &mut self.items {
+            match item {
+                CircuitItem::Instruction(instruction) => {
+                    if instruction.tag.is_some() {
+                        instruction.tag = tags.next().and_then(ModelTag::from_bytes);
+                    }
+                }
+                CircuitItem::RepeatBlock(repeat) => {
+                    if repeat.tag.is_some() {
+                        repeat.tag = tags.next().and_then(ModelTag::from_bytes);
+                    }
+                    repeat.body.restore_byte_tags_from(tags);
+                }
+            }
+        }
+    }
+
+    fn fuse_adjacent_instructions(&mut self) {
+        let items = std::mem::take(&mut self.items);
+        for item in items {
+            match item {
+                CircuitItem::Instruction(instruction) => self.push_instruction(instruction),
+                CircuitItem::RepeatBlock(mut repeat) => {
+                    repeat.body.fuse_adjacent_instructions();
+                    self.push(CircuitItem::RepeatBlock(repeat));
+                }
+            }
+        }
+    }
+
+    fn non_empty_tag_count(&self) -> usize {
+        self.items
+            .iter()
+            .map(|item| match item {
+                CircuitItem::Instruction(instruction) => usize::from(instruction.tag.is_some()),
+                CircuitItem::RepeatBlock(repeat) => {
+                    usize::from(repeat.tag.is_some()) + repeat.body.non_empty_tag_count()
+                }
+            })
+            .sum()
     }
 
     fn item_slice(&self, range: impl RangeBounds<usize>) -> CircuitResult<&[CircuitItem]> {
@@ -198,7 +334,7 @@ pub struct CircuitInstruction {
     gate: Gate,
     args: Vec<f64>,
     targets: TargetVec,
-    tag: Option<String>,
+    tag: Option<ModelTag>,
 }
 
 impl CircuitInstruction {
@@ -214,6 +350,22 @@ impl CircuitInstruction {
         Ok(Self::from_validated_parts(gate, args, targets, tag))
     }
 
+    pub(crate) fn new_with_tag_bytes(
+        gate: Gate,
+        args: Vec<f64>,
+        targets: Vec<Target>,
+        tag: Option<&[u8]>,
+    ) -> CircuitResult<Self> {
+        let targets = TargetVec::from_vec(targets);
+        gate.validate(&args, &targets)?;
+        Ok(Self {
+            gate,
+            args,
+            targets,
+            tag: tag.and_then(ModelTag::from_slice),
+        })
+    }
+
     fn from_validated_parts(
         gate: Gate,
         args: Vec<f64>,
@@ -224,7 +376,7 @@ impl CircuitInstruction {
             gate,
             args,
             targets,
-            tag: normalize_tag(tag),
+            tag: tag.and_then(ModelTag::from_string),
         }
     }
 
@@ -288,9 +440,17 @@ impl CircuitInstruction {
         &self.targets
     }
 
-    /// Returns the non-empty Stim tag attached to this instruction.
+    /// Returns the non-empty Stim tag attached to this instruction as UTF-8 display text.
+    ///
+    /// Opaque bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_deref()
+        self.tag.as_ref().map(ModelTag::as_str)
+    }
+
+    /// Returns the exact unescaped bytes of this instruction's optional Stim tag.
+    pub fn tag_bytes(&self) -> Option<&[u8]> {
+        self.tag.as_ref().map(ModelTag::as_bytes)
     }
 
     pub fn target_groups(&self) -> Vec<&[Target]> {
@@ -419,7 +579,7 @@ impl CircuitInstruction {
         out.push_str(self.gate.canonical_name());
         if let Some(tag) = &self.tag {
             out.push('[');
-            write_escaped_tag(out, tag);
+            tag.write_escaped_text(out);
             out.push(']');
         }
         if !self.args.is_empty() {
@@ -441,7 +601,7 @@ impl CircuitInstruction {
         out.write_all(self.gate.canonical_name().as_bytes())?;
         if let Some(tag) = &self.tag {
             out.write_all(b"[")?;
-            write_escaped_tag_io(out, tag)?;
+            tag.write_escaped_bytes(out)?;
             out.write_all(b"]")?;
         }
         if !self.args.is_empty() {
@@ -463,7 +623,7 @@ impl CircuitInstruction {
 pub struct RepeatBlock {
     repeat_count: RepeatCount,
     body: Circuit,
-    tag: Option<String>,
+    tag: Option<ModelTag>,
 }
 
 impl RepeatBlock {
@@ -472,7 +632,19 @@ impl RepeatBlock {
         Self {
             repeat_count,
             body,
-            tag: normalize_tag(tag),
+            tag: tag.and_then(ModelTag::from_string),
+        }
+    }
+
+    pub(crate) fn new_with_tag_bytes(
+        repeat_count: RepeatCount,
+        body: Circuit,
+        tag: Option<&[u8]>,
+    ) -> Self {
+        Self {
+            repeat_count,
+            body,
+            tag: tag.and_then(ModelTag::from_slice),
         }
     }
 
@@ -486,9 +658,17 @@ impl RepeatBlock {
         &self.body
     }
 
-    /// Returns the non-empty tag attached to this `REPEAT` block.
+    /// Returns the non-empty tag attached to this `REPEAT` block as UTF-8 display text.
+    ///
+    /// Opaque bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_deref()
+        self.tag.as_ref().map(ModelTag::as_str)
+    }
+
+    /// Returns the exact unescaped bytes of this repeat block's optional Stim tag.
+    pub fn tag_bytes(&self) -> Option<&[u8]> {
+        self.tag.as_ref().map(ModelTag::as_bytes)
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {
@@ -496,7 +676,7 @@ impl RepeatBlock {
         out.push_str("REPEAT");
         if let Some(tag) = &self.tag {
             out.push('[');
-            write_escaped_tag(out, tag);
+            tag.write_escaped_text(out);
             out.push(']');
         }
         out.push(' ');
@@ -515,7 +695,7 @@ impl RepeatBlock {
         out.write_all(b"REPEAT")?;
         if let Some(tag) = &self.tag {
             out.write_all(b"[")?;
-            write_escaped_tag_io(out, tag)?;
+            tag.write_escaped_bytes(out)?;
             out.write_all(b"]")?;
         }
         writeln!(out, " {} {{", self.repeat_count.get())?;
@@ -536,397 +716,7 @@ impl Display for Circuit {
 
 mod printing;
 
-mod parser_fast;
-
-struct Parser<'a> {
-    lines: Lines<'a>,
-    line_number: usize,
-    top_level_capacity: usize,
-    limits: ParseLimits,
-}
-
-impl<'a> Parser<'a> {
-    fn new(input: &'a str, limits: ParseLimits) -> Self {
-        Self {
-            lines: input.lines(),
-            line_number: 0,
-            top_level_capacity: top_level_item_capacity(input, limits),
-            limits,
-        }
-    }
-
-    fn parse(mut self) -> CircuitResult<Circuit> {
-        self.parse_block(false, 0)
-    }
-
-    fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> CircuitResult<Circuit> {
-        let mut circuit = if stop_on_terminator {
-            Circuit::new()
-        } else {
-            Circuit::with_capacity(self.top_level_capacity)
-        };
-        while let Some(raw_line) = self.lines.next() {
-            self.line_number += 1;
-            let line_number = self.line_number;
-            let limit = self.limits.source_line_limit().get();
-            if line_number > limit {
-                return Err(ResourceLimitError::circuit_source_lines(line_number, limit).into());
-            }
-            let Some(line) = strip_comment(raw_line) else {
-                continue;
-            };
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            if line == "}" {
-                if stop_on_terminator {
-                    return Ok(circuit);
-                }
-                return Err(CircuitError::UnexpectedRepeatTerminator);
-            }
-            if let Some(prefix) = line.strip_suffix('{') {
-                circuit.push(CircuitItem::RepeatBlock(self.parse_repeat(
-                    line_number,
-                    prefix.trim_end(),
-                    depth,
-                )?));
-            } else {
-                circuit.push_instruction(parse_instruction(line_number, line)?);
-            }
-        }
-        if stop_on_terminator {
-            Err(CircuitError::UnterminatedRepeatBlock)
-        } else {
-            Ok(circuit)
-        }
-    }
-
-    fn parse_repeat(
-        &mut self,
-        line_number: usize,
-        line: &str,
-        depth: usize,
-    ) -> CircuitResult<RepeatBlock> {
-        let limit = self.limits.repeat_nesting_limit().get();
-        if depth >= limit {
-            let actual = depth.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_domain_value("circuit repeat nesting", "depth overflow")
-            })?;
-            return Err(
-                ResourceLimitError::circuit_repeat_nesting(line_number, actual, limit).into(),
-            );
-        }
-        let (name, rest) = parse_name(line_number, line)?;
-        if !name.eq_ignore_ascii_case("REPEAT") {
-            return Err(CircuitError::parse_line(
-                line_number,
-                "repeat blocks must be written as REPEAT <count> {",
-            ));
-        }
-        let (tag, rest) = parse_optional_tag(line_number, rest)?;
-        let mut parts = rest.split_whitespace();
-        let count = parts
-            .next()
-            .ok_or_else(|| CircuitError::parse_line(line_number, "missing repeat count"))?;
-        if parts.next().is_some() {
-            return Err(CircuitError::parse_line(
-                line_number,
-                "repeat blocks must be written as REPEAT <count> {",
-            ));
-        }
-        let count = count
-            .parse::<u64>()
-            .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
-        let body = self.parse_block(true, depth + 1)?;
-        Ok(RepeatBlock::new(RepeatCount::try_new(count)?, body, tag))
-    }
-}
-
-fn top_level_item_capacity(input: &str, limits: ParseLimits) -> usize {
-    let admitted_lines = limits.source_line_limit().get();
-    if input.is_empty() || admitted_lines == 0 {
-        return 0;
-    }
-
-    let sample_len = input.len().min(CIRCUIT_PREALLOCATION_SAMPLE_BYTES);
-    let newline_count = input
-        .as_bytes()
-        .iter()
-        .take(sample_len)
-        .filter(|byte| **byte == b'\n')
-        .count();
-    let estimated_items = if sample_len == input.len() {
-        newline_count + usize::from(!input.ends_with('\n'))
-    } else if newline_count == 0 {
-        1
-    } else {
-        input
-            .len()
-            .saturating_mul(newline_count)
-            .div_ceil(sample_len)
-            .saturating_add(1)
-    };
-    estimated_items.min(admitted_lines)
-}
-
-fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitInstruction> {
-    if let Some(instruction) = parser_fast::parse_common_plain_instruction(line_number, line) {
-        return instruction;
-    }
-    let (name, rest) = parse_name(line_number, line)?;
-    if let Some(instruction) = parse_simple_plain_instruction(line_number, name, rest) {
-        return instruction;
-    }
-    parse_instruction_fully_generic_from_parts(line_number, name, rest)
-}
-
-fn parse_instruction_fully_generic_from_parts(
-    line_number: usize,
-    name: &str,
-    rest: &str,
-) -> CircuitResult<CircuitInstruction> {
-    let gate = Gate::from_name(name).map_err(|error| wrap_line(line_number, error))?;
-    let (tag, rest) = parse_optional_tag(line_number, rest)?;
-    let (args, rest) = parse_optional_args(line_number, rest)?;
-    let targets = parse_targets(rest).map_err(|error| wrap_line(line_number, error))?;
-    gate.validate(&args, &targets)
-        .map_err(|error| wrap_line(line_number, error))?;
-    Ok(CircuitInstruction::from_validated_parts(
-        gate, args, targets, tag,
-    ))
-}
-
-#[cfg(test)]
-fn parse_instruction_fully_generic(
-    line_number: usize,
-    line: &str,
-) -> CircuitResult<CircuitInstruction> {
-    let (name, rest) = parse_name(line_number, line)?;
-    parse_instruction_fully_generic_from_parts(line_number, name, rest)
-}
-
-fn parse_common_single_qubit_instruction(
-    line_number: usize,
-    gate: Gate,
-    rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
-    let target = match parse_common_qubit_id(rest) {
-        Ok(Some(target)) => target,
-        Ok(None) => return None,
-        Err(error) => return Some(Err(wrap_line(line_number, error))),
-    };
-    let mut targets = TargetVec::new();
-    targets.push(Target::qubit(target, false));
-    Some(Ok(CircuitInstruction::from_validated_parts(
-        gate,
-        Vec::new(),
-        targets,
-        None,
-    )))
-}
-
-fn parse_common_pair_instruction(
-    line_number: usize,
-    gate: Gate,
-    rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
-    let (left, right) = rest.split_once(' ')?;
-    let left = match parse_common_qubit_id(left) {
-        Ok(Some(target)) => target,
-        Ok(None) => return None,
-        Err(error) => return Some(Err(wrap_line(line_number, error))),
-    };
-    let right = match parse_common_qubit_id(right) {
-        Ok(Some(target)) => target,
-        Ok(None) => return None,
-        Err(error) => return Some(Err(wrap_line(line_number, error))),
-    };
-    if left == right {
-        return Some(Err(wrap_line(
-            line_number,
-            CircuitError::InvalidTarget {
-                gate: gate.canonical_name(),
-                target: left.get().to_string(),
-            },
-        )));
-    }
-    let mut targets = TargetVec::new();
-    targets.push(Target::qubit(left, false));
-    targets.push(Target::qubit(right, false));
-    Some(Ok(CircuitInstruction::from_validated_parts(
-        gate,
-        Vec::new(),
-        targets,
-        None,
-    )))
-}
-
-fn parse_common_qubit_id(text: &str) -> CircuitResult<Option<crate::QubitId>> {
-    if text.is_empty() || !text.as_bytes().iter().all(u8::is_ascii_digit) {
-        return Ok(None);
-    }
-    let mut value = 0u32;
-    for byte in text.bytes() {
-        let digit = u32::from(byte - b'0');
-        value = value
-            .checked_mul(10)
-            .and_then(|value| value.checked_add(digit))
-            .ok_or_else(|| CircuitError::invalid_domain_value("qubit target", text))?;
-        if value >= crate::ids::STIM_TARGET_VALUE_LIMIT {
-            return Err(CircuitError::invalid_domain_value("qubit target", text));
-        }
-    }
-    crate::QubitId::new(value).map(Some)
-}
-
-fn parse_simple_plain_instruction(
-    line_number: usize,
-    name: &str,
-    rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
-    let gate = Gate::from_simple_plain_name(name)?;
-    let rest = rest.trim_start();
-    if rest.starts_with('[') || rest.starts_with('(') {
-        return None;
-    }
-    let targets = match parse_plain_qubit_target_text(rest) {
-        Ok(Some(targets)) => targets,
-        Ok(None) => return None,
-        Err(error) => return Some(Err(wrap_line(line_number, error))),
-    };
-    let gate_name = gate.canonical_name();
-    if gate_name == "CX"
-        && let Err(error) = validate_simple_plain_pairs(gate_name, &targets)
-    {
-        return Some(Err(wrap_line(line_number, error)));
-    }
-    Some(Ok(CircuitInstruction::from_validated_parts(
-        gate,
-        Vec::new(),
-        targets,
-        None,
-    )))
-}
-
-fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> CircuitResult<()> {
-    if !targets.len().is_multiple_of(2) {
-        return Err(CircuitError::InvalidTargetCount {
-            gate,
-            count: targets.len(),
-        });
-    }
-    for pair in targets.chunks_exact(2) {
-        if let [left, right] = pair
-            && left == right
-        {
-            return Err(CircuitError::InvalidTarget {
-                gate,
-                target: left.to_string(),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
-    let mut end = None;
-    for (index, byte) in line.bytes().enumerate() {
-        let valid = if index == 0 {
-            byte.is_ascii_alphabetic()
-        } else {
-            byte.is_ascii_alphanumeric() || byte == b'_'
-        };
-        if !valid {
-            break;
-        }
-        end = Some(index + 1);
-    }
-    let end =
-        end.ok_or_else(|| CircuitError::parse_line(line_number, "missing instruction name"))?;
-    Ok(line.split_at(end))
-}
-
-fn parse_optional_tag(line_number: usize, rest: &str) -> CircuitResult<(Option<String>, &str)> {
-    let rest = rest.trim_start();
-    let Some(mut body) = rest.strip_prefix('[') else {
-        return Ok((None, rest));
-    };
-    let mut tag = String::new();
-    loop {
-        let Some((ch, after_ch)) = split_first_char(body) else {
-            return Err(CircuitError::parse_line(line_number, "unterminated tag"));
-        };
-        body = after_ch;
-        match ch {
-            ']' => return Ok((Some(tag), body)),
-            '\\' => {
-                let Some((escaped, after_escaped)) = split_first_char(body) else {
-                    return Err(CircuitError::parse_line(
-                        line_number,
-                        "unterminated tag escape",
-                    ));
-                };
-                body = after_escaped;
-                tag.push(match escaped {
-                    'C' => ']',
-                    'r' => '\r',
-                    'n' => '\n',
-                    'B' => '\\',
-                    _ => {
-                        return Err(CircuitError::parse_line(
-                            line_number,
-                            format!("invalid tag escape \\{escaped}"),
-                        ));
-                    }
-                });
-            }
-            '\r' | '\n' => {
-                return Err(CircuitError::parse_line(line_number, "invalid tag newline"));
-            }
-            _ => tag.push(ch),
-        }
-    }
-}
-
-fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64>, &str)> {
-    let rest = rest.trim_start();
-    let Some(body) = rest.strip_prefix('(') else {
-        return Ok((Vec::new(), rest));
-    };
-    let Some(end) = body.find(')') else {
-        return Err(CircuitError::parse_line(
-            line_number,
-            "unterminated argument list",
-        ));
-    };
-    let (raw_args, tail_with_paren) = body.split_at(end);
-    let tail = tail_with_paren
-        .strip_prefix(')')
-        .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
-    let mut args = Vec::new();
-    if !raw_args.trim().is_empty() {
-        for arg in raw_args.split(',') {
-            let arg = arg.trim();
-            args.push(arg.parse::<f64>().map_err(|_| {
-                CircuitError::parse_line(line_number, format!("invalid argument {arg}"))
-            })?);
-        }
-    }
-    Ok((args, tail))
-}
-
-fn parse_targets(rest: &str) -> CircuitResult<TargetVec> {
-    if let Some(targets) = parse_plain_qubit_target_text(rest)? {
-        return Ok(targets);
-    }
-
-    let mut targets = TargetVec::new();
-    for token in rest.split_whitespace() {
-        parse_target_token_into(token, &mut targets)?;
-    }
-    Ok(targets)
-}
+mod parser;
 
 fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
     let mut groups = Vec::new();
@@ -942,34 +732,6 @@ fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
         start = end;
     }
     groups
-}
-
-fn strip_comment(line: &str) -> Option<&str> {
-    if !line.as_bytes().contains(&b'#') {
-        return Some(line);
-    }
-
-    let mut in_tag = false;
-    let mut escaped = false;
-    for (index, ch) in line.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' if in_tag => escaped = true,
-            '[' if !in_tag => in_tag = true,
-            ']' if in_tag => in_tag = false,
-            '#' if !in_tag => return Some(line.split_at(index).0),
-            _ => {}
-        }
-    }
-    Some(line)
-}
-
-fn split_first_char(text: &str) -> Option<(char, &str)> {
-    let ch = text.chars().next()?;
-    Some((ch, text.split_at(ch.len_utf8()).1))
 }
 
 fn write_indent(out: &mut String, indent: usize) {
@@ -1018,38 +780,6 @@ fn write_targets_io(out: &mut impl Write, targets: &[Target]) -> io::Result<()> 
     Ok(())
 }
 
-fn write_escaped_tag(out: &mut String, tag: &str) {
-    for ch in tag.chars() {
-        match ch {
-            ']' => out.push_str("\\C"),
-            '\r' => out.push_str("\\r"),
-            '\n' => out.push_str("\\n"),
-            '\\' => out.push_str("\\B"),
-            _ => out.push(ch),
-        }
-    }
-}
-
-fn write_escaped_tag_io(out: &mut impl Write, tag: &str) -> io::Result<()> {
-    for ch in tag.chars() {
-        match ch {
-            ']' => out.write_all(b"\\C")?,
-            '\r' => out.write_all(b"\\r")?,
-            '\n' => out.write_all(b"\\n")?,
-            '\\' => out.write_all(b"\\B")?,
-            _ => {
-                let mut buffer = [0; 4];
-                out.write_all(ch.encode_utf8(&mut buffer).as_bytes())?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn normalize_tag(tag: Option<String>) -> Option<String> {
-    tag.filter(|tag| !tag.is_empty())
-}
-
 fn probability_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult<Probability> {
     Probability::try_new(arg).map_err(|_| CircuitError::InvalidArgument {
         gate,
@@ -1071,8 +801,4 @@ fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResu
             argument: arg.to_string(),
         })?;
     Ok(ObservableId::new(value))
-}
-
-fn wrap_line(line: usize, error: CircuitError) -> CircuitError {
-    CircuitError::parse_line(line, error.to_string())
 }

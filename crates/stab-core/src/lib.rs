@@ -28,6 +28,9 @@ mod gate;
 mod ids;
 mod matched_error;
 mod mbqc_decomposition;
+mod model_bytes;
+mod model_parse;
+mod model_tag;
 mod parse_limits;
 mod probability_util;
 mod resources;
@@ -36,6 +39,7 @@ mod result_packed;
 pub mod result_streaming;
 mod result_text;
 mod sampling;
+mod source_text;
 mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
@@ -71,29 +75,40 @@ pub use circuit_generation::{
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
+pub use circuit_transforms::CircuitFlattenLimits;
 pub use compilation_fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use dem::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
 pub use dem::{
-    DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
-    DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel, DisjointPauliProbabilities,
-    ErrorAnalyzerOptions, IndependentPauliProbabilities, circuit_to_detector_error_model,
-    find_undetectable_logical_error, independent_to_disjoint_xyz_errors,
-    likeliest_error_sat_problem, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
+    DemDetectorId, DemFlattenLimits, DemFlattenedInstructionIter, DemInstruction,
+    DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
+    LogicalErrorSearchLimits, SatMaterializationLimits, circuit_to_detector_error_model,
+    find_undetectable_logical_error, find_undetectable_logical_error_with_limits,
+    independent_to_disjoint_xyz_errors, likeliest_error_sat_problem,
+    likeliest_error_sat_problem_with_limits, shortest_error_sat_problem,
+    shortest_error_sat_problem_with_limits, shortest_graphlike_undetectable_logical_error,
+    shortest_graphlike_undetectable_logical_error_with_limits,
+    try_disjoint_to_independent_xyz_errors,
 };
-pub use dem_sampler::CompiledDemSampler;
+pub use dem_sampler::{CompiledDemSampler, DemSamplerLimits};
 pub use detection::{
-    CompiledDetectionConverter, DetectionConversionOptions, DetectionConversionOutput,
-    DetectionEventRecord, DetectionObservableOutputMode, convert_measurements_to_detection_events,
-    convert_measurements_to_detection_events_with_sweep, detection_record_width,
-    measurement_record_count, sample_detection_events, try_for_each_sampled_detection_event,
-    validate_detection_sampling_circuit, write_detection_records, write_observable_records,
-    write_ptb64_detection_records, write_ptb64_observable_records,
+    CompiledDetectionConverter, DetectionConversionLimits, DetectionConversionOptions,
+    DetectionConversionOutput, DetectionEventRecord, DetectionObservableOutputMode,
+    convert_measurements_to_detection_events, convert_measurements_to_detection_events_with_limits,
+    convert_measurements_to_detection_events_with_sweep,
+    convert_measurements_to_detection_events_with_sweep_and_limits, detection_record_width,
+    detection_record_width_with_limits, measurement_record_count,
+    measurement_record_count_with_limits, sample_detection_events,
+    sample_detection_events_with_limits, try_for_each_sampled_detection_event,
+    try_for_each_sampled_detection_event_with_limits, validate_detection_sampling_circuit,
+    validate_detection_sampling_circuit_with_limits, write_detection_records,
+    write_observable_records, write_ptb64_detection_records, write_ptb64_observable_records,
 };
 pub use diagnostics::{
-    ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
+    ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext, ParseError,
+    ParseErrorCode, ParseErrorContext,
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;

@@ -23,10 +23,10 @@ pub(super) fn unreverse_model(
                 }
                 let old_base = *base_detector_id;
                 let body = unreverse_model(repeat.body(), base_detector_id, seen)?;
-                output.push_repeat_block(DemRepeatBlock::new(
+                output.push_repeat_block(DemRepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
-                    repeat.tag().map(ToOwned::to_owned),
+                    repeat.tag_bytes(),
                 ));
                 let one_body_shift = base_detector_id.checked_sub(old_base).ok_or_else(|| {
                     CircuitError::invalid_detector_error_model(
@@ -85,7 +85,10 @@ fn unreverse_instruction(
                 .targets()
                 .first()
                 .is_some_and(|target| seen.contains(target));
-            if !instruction.args().is_empty() || instruction.tag().is_some() || !target_is_seen {
+            if !instruction.args().is_empty()
+                || instruction.tag_bytes().is_some()
+                || !target_is_seen
+            {
                 output.push_instruction(rebased_instruction(instruction, *base_detector_id)?);
             }
         }
@@ -118,10 +121,10 @@ fn rebased_instruction(
             }
         })
         .collect::<CircuitResult<Vec<_>>>()?;
-    DemInstruction::new(
+    DemInstruction::new_with_tag_bytes(
         instruction.kind(),
         instruction.args().to_vec(),
         targets,
-        instruction.tag().map(ToOwned::to_owned),
+        instruction.tag_bytes(),
     )
 }

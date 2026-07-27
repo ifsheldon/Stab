@@ -133,12 +133,12 @@ impl StructuralEncoder {
                     for target in instruction.targets() {
                         self.circuit_target(target);
                     }
-                    self.optional_text(instruction.tag());
+                    self.optional_bytes(instruction.tag_bytes());
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     self.byte(2);
                     self.u64(repeat.repeat_count().get());
-                    self.optional_text(repeat.tag());
+                    self.optional_bytes(repeat.tag_bytes());
                     self.len(repeat.body().items().len());
                     stack.push(repeat.body().items().iter());
                 }
@@ -198,12 +198,12 @@ impl StructuralEncoder {
                     for target in instruction.targets() {
                         self.dem_target(target);
                     }
-                    self.optional_text(instruction.tag());
+                    self.optional_bytes(instruction.tag_bytes());
                 }
                 DemItem::RepeatBlock(repeat) => {
                     self.byte(2);
                     self.u64(repeat.repeat_count().get());
-                    self.optional_text(repeat.tag());
+                    self.optional_bytes(repeat.tag_bytes());
                     self.len(repeat.body().items().len());
                     stack.push(repeat.body().items().iter());
                 }
@@ -229,11 +229,12 @@ impl StructuralEncoder {
         }
     }
 
-    fn optional_text(&mut self, text: Option<&str>) {
-        match text {
-            Some(text) => {
+    fn optional_bytes(&mut self, bytes: Option<&[u8]>) {
+        match bytes {
+            Some(bytes) => {
                 self.byte(1);
-                self.text(text);
+                self.len(bytes.len());
+                self.hasher.update(bytes);
             }
             None => self.byte(0),
         }

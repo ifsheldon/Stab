@@ -1,51 +1,77 @@
+use std::borrow::Cow;
+
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
 use super::{
-    ConversionPlan, DetectionConversionOutput, DetectionEventRecord, MAX_DETECTION_REPEAT_UNROLL,
+    ConversionPlan, DetectionConversionLimits, DetectionConversionOutput, DetectionEventRecord,
+    try_clone_detection_record, try_false_vec, try_reserve_detection_record_slots,
+    try_vec_with_capacity,
 };
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
-    Pauli, PauliBasis, PauliSign, PauliString, RepeatBlock, Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, Pauli, PauliBasis,
+    PauliSign, PauliString, RepeatBlock, Target,
 };
 
-pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> bool {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction)
-                if matches!(
-                    instruction.gate().canonical_name(),
-                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-                ) =>
-            {
-                return true;
-            }
-            CircuitItem::Instruction(instruction)
-                if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
-                    && instruction
-                        .targets()
-                        .iter()
-                        .any(crate::Target::is_pauli_target) =>
-            {
-                return true;
-            }
-            CircuitItem::Instruction(_) => {}
-            CircuitItem::RepeatBlock(repeat) if circuit_requires_detector_frame(repeat.body()) => {
-                return true;
-            }
-            CircuitItem::RepeatBlock(_) => {}
-        }
-    }
-    false
+mod helpers;
+
+use helpers::{
+    frame_bit, is_frame_bit_target, is_frame_qubit_or_bit_target, measurement_flip_probability,
+    measurement_record_bit, pauli_basis, probability_list, qubit_index, sample_flip,
+    sample_single_pauli, sample_two_qubit_pauli, set_frame_bit, single_probability_argument,
+    unsupported_frame_instruction, unsupported_frame_target, xor_frame_bit, zero_probability_noise,
+};
+
+struct AdmittedFrameConversion {
+    plan: ConversionPlan,
 }
 
-pub(super) fn validate_frame_detection_circuit(circuit: &Circuit) -> CircuitResult<()> {
+impl AdmittedFrameConversion {
+    fn admit(
+        circuit: &Circuit,
+        limits: DetectionConversionLimits,
+    ) -> CircuitResult<AdmittedFrameConversion> {
+        let plan = ConversionPlan::from_visitor(limits, |plan| {
+            append_frame_conversion_plan(circuit, plan)
+        })?;
+        Ok(Self { plan })
+    }
+
+    fn materialize_execution_circuit(&self, circuit: &Circuit) -> CircuitResult<Circuit> {
+        let mut result = Circuit::new();
+        append_frame_execution_circuit(circuit, &mut result)?;
+        Ok(result)
+    }
+}
+
+pub(super) fn frame_conversion_plan_with_limits(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> CircuitResult<ConversionPlan> {
+    Ok(AdmittedFrameConversion::admit(circuit, limits)?.plan)
+}
+
+fn append_frame_conversion_plan(circuit: &Circuit, plan: &mut ConversionPlan) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {
-            CircuitItem::Instruction(instruction) => {
-                validate_frame_detection_instruction(instruction)?
+            CircuitItem::Instruction(instruction)
+                if matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG") =>
+            {
+                let decomposed = decomposed_frame_instruction(instruction)?;
+                append_frame_conversion_plan(&decomposed, plan)?;
             }
-            CircuitItem::RepeatBlock(repeat) => validate_frame_detection_circuit(repeat.body())?,
+            CircuitItem::Instruction(instruction) => {
+                let Some(instruction) = frame_execution_instruction(instruction)? else {
+                    continue;
+                };
+                validate_frame_detection_instruction(instruction.as_ref())?;
+                plan.visit_instruction(instruction.as_ref())?;
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                plan.visit_repeated_body(repeat.repeat_count().get(), |plan| {
+                    append_frame_conversion_plan(repeat.body(), plan)
+                })?;
+            }
         }
     }
     Ok(())
@@ -80,7 +106,9 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         | "ELSE_CORRELATED_ERROR"
         | "HERALDED_ERASE"
         | "HERALDED_PAULI_CHANNEL_1" => Ok(()),
-        "SPP" | "SPP_DAG" => validate_decomposed_frame_instruction(instruction),
+        "SPP" | "SPP_DAG" => Err(CircuitError::invalid_sampler_compilation(
+            "frame detection must decompose SPP instructions before validation",
+        )),
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
         "CZ" => validate_frame_cz_targets(instruction),
         "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
@@ -90,11 +118,6 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
             "M9 detector frame subset does not support {name}"
         ))),
     }
-}
-
-fn validate_decomposed_frame_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    let decomposed = decomposed_frame_instruction(instruction)?;
-    validate_frame_detection_circuit(&decomposed)
 }
 
 fn decomposed_frame_instruction(instruction: &CircuitInstruction) -> CircuitResult<Circuit> {
@@ -155,23 +178,32 @@ fn validate_frame_x_or_y_controlled_z_targets(
     Ok(())
 }
 
-pub(super) fn sample_detection_events_with_frame(
+pub(super) fn sample_detection_events_with_frame_and_limits(
     circuit: &Circuit,
     shots: usize,
     seed: Option<u64>,
+    limits: DetectionConversionLimits,
 ) -> CircuitResult<DetectionConversionOutput> {
-    let executable = frame_execution_circuit(circuit)?;
-    validate_frame_detection_circuit(&executable)?;
-    let plan = ConversionPlan::from_circuit(&executable)?;
-    plan.validate_shot_count(shots)?;
+    let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
+    admitted.plan.validate_detection_record_shot_count(shots)?;
+    let executable = admitted.materialize_execution_circuit(circuit)?;
+    let plan = &admitted.plan;
     let detector_count = plan.detector_terms.len();
     let observable_count = plan.observable_terms.len();
+    let mut records = Vec::new();
+    try_reserve_detection_record_slots(&mut records, shots)?;
     let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
-    let mut records = Vec::with_capacity(shots);
-    sample_detection_events_with_frame_plan(&executable, shots, &plan, &mut rng, |record| {
-        records.push(record.clone());
-        Ok::<(), CircuitError>(())
-    })?;
+    sample_detection_events_with_frame_plan(
+        &executable,
+        shots,
+        plan,
+        limits,
+        &mut rng,
+        |record| {
+            records.push(try_clone_detection_record(record)?);
+            Ok::<(), CircuitError>(())
+        },
+    )?;
     Ok(DetectionConversionOutput {
         records,
         detector_count,
@@ -179,29 +211,24 @@ pub(super) fn sample_detection_events_with_frame(
     })
 }
 
-pub(super) fn try_for_each_detection_event_with_frame<E, F>(
+pub(super) fn try_for_each_detection_event_with_frame_and_limits<E, F>(
     circuit: &Circuit,
     shots: usize,
     seed: Option<u64>,
+    limits: DetectionConversionLimits,
     mut visit: F,
 ) -> Result<(), E>
 where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    let executable = frame_execution_circuit(circuit)?;
-    validate_frame_detection_circuit(&executable)?;
-    let plan = ConversionPlan::from_circuit(&executable)?;
+    let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
+    let executable = admitted.materialize_execution_circuit(circuit)?;
+    let plan = &admitted.plan;
     let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
-    sample_detection_events_with_frame_plan(&executable, shots, &plan, &mut rng, |record| {
+    sample_detection_events_with_frame_plan(&executable, shots, plan, limits, &mut rng, |record| {
         visit(record)
     })
-}
-
-pub(super) fn frame_execution_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
-    let mut result = Circuit::new();
-    append_frame_execution_circuit(circuit, &mut result)?;
-    Ok(result)
 }
 
 fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> CircuitResult<()> {
@@ -214,15 +241,16 @@ fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> Ci
             }
             CircuitItem::Instruction(instruction) => {
                 if let Some(instruction) = frame_execution_instruction(instruction)? {
-                    result.append_instruction(instruction);
+                    result.append_instruction(instruction.into_owned());
                 }
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let body = frame_execution_circuit(repeat.body())?;
-                result.append_repeat_block(RepeatBlock::new(
+                let mut body = Circuit::new();
+                append_frame_execution_circuit(repeat.body(), &mut body)?;
+                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
-                    repeat.tag().map(ToOwned::to_owned),
+                    repeat.tag_bytes(),
                 ));
             }
         }
@@ -230,38 +258,44 @@ fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> Ci
     Ok(())
 }
 
-fn frame_execution_instruction(
-    instruction: &CircuitInstruction,
-) -> CircuitResult<Option<CircuitInstruction>> {
+fn frame_execution_instruction<'a>(
+    instruction: &'a CircuitInstruction,
+) -> CircuitResult<Option<Cow<'a, CircuitInstruction>>> {
     if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
-        return Ok(Some(instruction.clone()));
+        return Ok(Some(Cow::Borrowed(instruction)));
     }
 
     let mut targets = Vec::new();
+    let mut removed_sweep_target = false;
     for target_group in instruction.target_groups() {
         let [left, right] = target_group else {
-            return Ok(Some(instruction.clone()));
+            return Ok(Some(Cow::Borrowed(instruction)));
         };
         if left.qubit_id().is_some() && right.is_sweep_bit_target() {
+            removed_sweep_target = true;
             continue;
         }
         targets.extend(target_group.iter().cloned());
     }
+    if !removed_sweep_target {
+        return Ok(Some(Cow::Borrowed(instruction)));
+    }
     if targets.is_empty() {
         return Ok(None);
     }
-    Ok(Some(CircuitInstruction::new(
+    Ok(Some(Cow::Owned(CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets,
-        instruction.tag().map(ToOwned::to_owned),
-    )?))
+        instruction.tag_bytes(),
+    )?)))
 }
 
 fn sample_detection_events_with_frame_plan<E, F>(
     circuit: &Circuit,
     shots: usize,
     plan: &ConversionPlan,
+    limits: DetectionConversionLimits,
     rng: &mut SmallRng,
     mut visit: F,
 ) -> Result<(), E>
@@ -270,14 +304,14 @@ where
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
     for _ in 0..shots {
-        let mut frame = ScalarDetectionFrame::new(
+        let mut frame = ScalarDetectionFrame::try_new(
             circuit.count_qubits(),
             plan.measurement_count,
             plan.detector_terms.len(),
             plan.observable_terms.len(),
             rng,
-        );
-        frame.execute_circuit(circuit, rng)?;
+        )?;
+        frame.execute_circuit(circuit, limits.max_repeat_unroll(), rng)?;
         if frame.measurements.len() != plan.measurement_count {
             return Err(CircuitError::invalid_result_format(format!(
                 "frame detection sampled {} measurement bits but expected {}",
@@ -305,40 +339,52 @@ struct ScalarDetectionFrame {
 }
 
 impl ScalarDetectionFrame {
-    fn new(
+    fn try_new(
         qubit_count: usize,
         measurement_count: usize,
         detector_count: usize,
         observable_count: usize,
         rng: &mut impl Rng,
-    ) -> Self {
-        let xs = vec![false; qubit_count];
-        let zs = (0..qubit_count).map(|_| rng.random_bool(0.5)).collect();
-        Self {
+    ) -> CircuitResult<Self> {
+        let xs = try_false_vec(qubit_count, "detection frame X state")?;
+        let mut zs = try_false_vec(qubit_count, "detection frame Z state")?;
+        let measurements =
+            try_vec_with_capacity(measurement_count, "detection frame measurement record")?;
+        let detectors = try_vec_with_capacity(detector_count, "detection frame detector record")?;
+        let observables = try_false_vec(observable_count, "detection frame observable record")?;
+        for bit in &mut zs {
+            *bit = rng.random_bool(0.5);
+        }
+        Ok(Self {
             xs,
             zs,
-            measurements: Vec::with_capacity(measurement_count),
-            detectors: Vec::with_capacity(detector_count),
-            observables: vec![false; observable_count],
+            measurements,
+            detectors,
+            observables,
             correlated_error_occurred: false,
-        }
+        })
     }
 
-    fn execute_circuit(&mut self, circuit: &Circuit, rng: &mut impl Rng) -> CircuitResult<()> {
+    fn execute_circuit(
+        &mut self,
+        circuit: &Circuit,
+        max_repeat_unroll: u64,
+        rng: &mut impl Rng,
+    ) -> CircuitResult<()> {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => {
-                    self.execute_instruction(instruction, rng)?
+                    self.execute_instruction(instruction, max_repeat_unroll, rng)?
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     let repeat_count = repeat.repeat_count().get();
-                    if repeat_count > MAX_DETECTION_REPEAT_UNROLL {
+                    if repeat_count > max_repeat_unroll {
                         return Err(CircuitError::invalid_sampler_compilation(format!(
-                            "frame detection currently supports repeat counts up to {MAX_DETECTION_REPEAT_UNROLL}, got {repeat_count}"
+                            "frame detection currently supports repeat counts up to {max_repeat_unroll}, got {repeat_count}"
                         )));
                     }
                     for _ in 0..repeat_count {
-                        self.execute_circuit(repeat.body(), rng)?;
+                        self.execute_circuit(repeat.body(), max_repeat_unroll, rng)?;
                     }
                 }
             }
@@ -349,6 +395,7 @@ impl ScalarDetectionFrame {
     fn execute_instruction(
         &mut self,
         instruction: &CircuitInstruction,
+        max_repeat_unroll: u64,
         rng: &mut impl Rng,
     ) -> CircuitResult<()> {
         match instruction.gate().canonical_name() {
@@ -409,7 +456,9 @@ impl ScalarDetectionFrame {
             "ELSE_CORRELATED_ERROR" => self.apply_correlated_error(instruction, true, rng),
             "HERALDED_ERASE" => self.apply_heralded_erase(instruction, rng),
             "HERALDED_PAULI_CHANNEL_1" => self.apply_heralded_pauli_channel(instruction, rng),
-            "SPP" | "SPP_DAG" => self.execute_decomposed_instruction(instruction, rng),
+            "SPP" | "SPP_DAG" => {
+                self.execute_decomposed_instruction(instruction, max_repeat_unroll, rng)
+            }
             _ if crate::analysis::gate_has_tableau(instruction.gate()) => {
                 self.apply_tableau_instruction(instruction)
             }
@@ -423,10 +472,11 @@ impl ScalarDetectionFrame {
     fn execute_decomposed_instruction(
         &mut self,
         instruction: &CircuitInstruction,
+        max_repeat_unroll: u64,
         rng: &mut impl Rng,
     ) -> CircuitResult<()> {
         let decomposed = decomposed_frame_instruction(instruction)?;
-        self.execute_circuit(&decomposed, rng)
+        self.execute_circuit(&decomposed, max_repeat_unroll, rng)
     }
 
     fn record_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -984,193 +1034,4 @@ impl ScalarDetectionFrame {
     fn xor_z_bit(&mut self, qubit: usize, value: bool) -> CircuitResult<()> {
         xor_frame_bit(&mut self.zs, qubit, value)
     }
-}
-
-fn frame_bit(bits: &[bool], qubit: usize) -> CircuitResult<bool> {
-    bits.get(qubit)
-        .copied()
-        .ok_or_else(|| frame_qubit_out_of_range(qubit))
-}
-
-fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> CircuitResult<()> {
-    let bit = bits
-        .get_mut(qubit)
-        .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
-    *bit = value;
-    Ok(())
-}
-
-fn xor_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> CircuitResult<()> {
-    let bit = bits
-        .get_mut(qubit)
-        .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
-    *bit ^= value;
-    Ok(())
-}
-
-fn frame_qubit_out_of_range(qubit: usize) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
-        "qubit target {qubit} is outside the detector frame state"
-    ))
-}
-
-fn measurement_record_bit(
-    measurements: &[bool],
-    offset: crate::MeasureRecordOffset,
-) -> CircuitResult<bool> {
-    let len = i64::try_from(measurements.len())
-        .map_err(|_| CircuitError::invalid_result_format("measurement count does not fit i64"))?;
-    let index = len + i64::from(offset.get());
-    let index = usize::try_from(index).map_err(|_| {
-        CircuitError::invalid_result_format(format!(
-            "measurement record target rec[{}] is not available",
-            offset.stim_text()
-        ))
-    })?;
-    measurements.get(index).copied().ok_or_else(|| {
-        CircuitError::invalid_result_format(format!(
-            "measurement record target rec[{}] is not available",
-            offset.stim_text()
-        ))
-    })
-}
-
-fn is_frame_bit_target(target: &Target) -> bool {
-    target.measurement_record_offset().is_some() || target.is_sweep_bit_target()
-}
-
-fn is_frame_qubit_or_bit_target(target: &Target) -> bool {
-    target.qubit_id().is_some() || is_frame_bit_target(target)
-}
-
-fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {
-    rng.random::<f64>() < probability
-}
-
-fn single_probability_argument(
-    instruction: &CircuitInstruction,
-) -> CircuitResult<crate::Probability> {
-    let Some(probabilities) = instruction.probability_arguments()? else {
-        return Err(unsupported_frame_instruction(instruction));
-    };
-    match probabilities.as_slice() {
-        [probability] => Ok(*probability),
-        _ => Err(unsupported_frame_instruction(instruction)),
-    }
-}
-
-fn measurement_flip_probability(instruction: &CircuitInstruction) -> CircuitResult<f64> {
-    match instruction.probability_argument()? {
-        None => Ok(0.0),
-        Some(probability) => Ok(probability.get()),
-    }
-}
-
-fn probability_list<const N: usize>(instruction: &CircuitInstruction) -> CircuitResult<[f64; N]> {
-    let Some(probabilities) = instruction.probability_arguments()? else {
-        return Err(unsupported_frame_instruction(instruction));
-    };
-    if probabilities.len() != N {
-        return Err(unsupported_frame_instruction(instruction));
-    }
-    let mut values = [0.0; N];
-    for (slot, probability) in values.iter_mut().zip(probabilities) {
-        *slot = probability.get();
-    }
-    Ok(values)
-}
-
-fn zero_probability_noise(instruction: &CircuitInstruction) -> CircuitResult<bool> {
-    if !matches!(
-        instruction.gate().category(),
-        GateCategory::Noise | GateCategory::HeraldedNoise
-    ) {
-        return Ok(false);
-    }
-    let Some(probabilities) = instruction.probability_arguments()? else {
-        return Ok(false);
-    };
-    Ok(probabilities
-        .iter()
-        .all(|probability| probability.get() == 0.0))
-}
-
-fn qubit_index(instruction: &CircuitInstruction, target: &Target) -> CircuitResult<usize> {
-    let Some(qubit) = target.qubit_id() else {
-        return Err(unsupported_frame_instruction(instruction));
-    };
-    usize::try_from(qubit.get()).map_err(|_| {
-        CircuitError::invalid_sampler_compilation(format!(
-            "qubit target {} cannot fit in this platform's usize",
-            qubit.get()
-        ))
-    })
-}
-
-fn pauli_basis(pauli: Pauli) -> PauliBasis {
-    match pauli {
-        Pauli::X => PauliBasis::X,
-        Pauli::Y => PauliBasis::Y,
-        Pauli::Z => PauliBasis::Z,
-    }
-}
-
-fn sample_single_pauli(probabilities: [f64; 3], rng: &mut impl Rng) -> Option<PauliBasis> {
-    let mut sampled_probability = rng.random::<f64>();
-    for (basis, probability) in [
-        (PauliBasis::X, probabilities[0]),
-        (PauliBasis::Y, probabilities[1]),
-        (PauliBasis::Z, probabilities[2]),
-    ] {
-        if sampled_probability < probability {
-            return Some(basis);
-        }
-        sampled_probability -= probability;
-    }
-    None
-}
-
-fn sample_two_qubit_pauli(
-    probabilities: [f64; 15],
-    rng: &mut impl Rng,
-) -> Option<(Option<PauliBasis>, Option<PauliBasis>)> {
-    let mut sampled_probability = rng.random::<f64>();
-    for (bases, probability) in TWO_QUBIT_FRAME_BASES.into_iter().zip(probabilities) {
-        if sampled_probability < probability {
-            return Some(bases);
-        }
-        sampled_probability -= probability;
-    }
-    None
-}
-
-const TWO_QUBIT_FRAME_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
-    (None, Some(PauliBasis::X)),
-    (None, Some(PauliBasis::Y)),
-    (None, Some(PauliBasis::Z)),
-    (Some(PauliBasis::X), None),
-    (Some(PauliBasis::X), Some(PauliBasis::X)),
-    (Some(PauliBasis::X), Some(PauliBasis::Y)),
-    (Some(PauliBasis::X), Some(PauliBasis::Z)),
-    (Some(PauliBasis::Y), None),
-    (Some(PauliBasis::Y), Some(PauliBasis::X)),
-    (Some(PauliBasis::Y), Some(PauliBasis::Y)),
-    (Some(PauliBasis::Y), Some(PauliBasis::Z)),
-    (Some(PauliBasis::Z), None),
-    (Some(PauliBasis::Z), Some(PauliBasis::X)),
-    (Some(PauliBasis::Z), Some(PauliBasis::Y)),
-    (Some(PauliBasis::Z), Some(PauliBasis::Z)),
-];
-
-fn unsupported_frame_instruction(instruction: &CircuitInstruction) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
-        "M9 detector frame subset does not support {}",
-        instruction.gate().canonical_name()
-    ))
-}
-
-fn unsupported_frame_target(gate_name: &str, target: &Target) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
-        "gate {gate_name} has non-qubit frame target {target}"
-    ))
 }

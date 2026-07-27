@@ -837,11 +837,11 @@ fn append_candidate_instruction(
                     })?
                     .to_vec(),
             };
-            circuit.append_instruction(CircuitInstruction::new(
+            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
                 gate,
                 args,
                 targets,
-                instruction.tag().map(ToOwned::to_owned),
+                instruction.tag_bytes(),
             )?);
         }
         CandidateReplacement::Measurement => {
@@ -890,11 +890,11 @@ fn append_measurement_slice(
             )
         })?
         .to_vec();
-    circuit.append_instruction(CircuitInstruction::new(
+    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         args,
         targets,
-        instruction.tag().map(ToOwned::to_owned),
+        instruction.tag_bytes(),
     )?);
     Ok(())
 }
@@ -906,19 +906,19 @@ fn append_sanitized_instruction(
     match instruction.gate().canonical_name() {
         name if is_pure_noise(name) => {}
         name if measurement_basis(name).is_some() || pair_measurement_basis(name).is_some() => {
-            circuit.append_instruction(CircuitInstruction::new(
+            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
                 instruction.targets().to_vec(),
-                instruction.tag().map(ToOwned::to_owned),
+                instruction.tag_bytes(),
             )?);
         }
         "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
-            circuit.append_instruction(CircuitInstruction::new(
+            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
                 instruction.gate(),
                 vec![0.0; instruction.args().len()],
                 instruction.targets().to_vec(),
-                instruction.tag().map(ToOwned::to_owned),
+                instruction.tag_bytes(),
             )?);
         }
         _ => circuit.append_instruction(instruction.clone()),

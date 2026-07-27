@@ -48,7 +48,7 @@ impl Circuit {
 
     /// Reads a `.stim` circuit file from a filesystem path.
     ///
-    /// Files larger than 64 MiB are rejected while the parser remains string-backed.
+    /// Files larger than 64 MiB are rejected before byte-oriented model parsing.
     pub fn from_stim_file(path: impl AsRef<Path>) -> CircuitResult<Self> {
         let path = path.as_ref();
         let file = File::open(path).map_err(|error| CircuitError::circuit_io("read", error))?;
@@ -67,13 +67,7 @@ impl Circuit {
             return Err(circuit_file_size_error(CIRCUIT_FILE_READ_LIMIT));
         }
 
-        let input = String::from_utf8(bytes).map_err(|error| {
-            CircuitError::circuit_io(
-                "read",
-                std::io::Error::new(std::io::ErrorKind::InvalidData, error),
-            )
-        })?;
-        Self::from_stim_str(&input)
+        Self::from_stim_bytes(&bytes)
     }
 
     /// Writes this circuit as canonical `.stim` text to a filesystem path.

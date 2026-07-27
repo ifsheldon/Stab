@@ -51,9 +51,12 @@ impl Gate {
 
     #[inline]
     pub fn from_name(name: &str) -> CircuitResult<Self> {
-        gate_info_from_name(name)
-            .map(|info| Self { info })
-            .ok_or_else(|| CircuitError::UnknownGate(name.to_string()))
+        Self::lookup_name(name).ok_or_else(|| CircuitError::UnknownGate(name.to_string()))
+    }
+
+    #[inline]
+    pub(crate) fn lookup_name(name: &str) -> Option<Self> {
+        gate_info_from_name(name).map(|info| Self { info })
     }
 
     #[inline]

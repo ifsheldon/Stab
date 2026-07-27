@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{CircuitError, CircuitInstruction, CircuitResult, Pauli, QubitId, Target};
 
-use super::Analyzer;
 use super::effects::AnalyzerBasis;
+use super::{Analyzer, owned_tag};
 
 impl Analyzer {
     pub(super) fn apply_spp(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -51,7 +51,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
-                    tag: instruction.tag().map(str::to_owned),
+                    tag: owned_tag(instruction.tag_bytes()),
                 });
             }
         }

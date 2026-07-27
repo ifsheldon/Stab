@@ -19,10 +19,12 @@ pub use crate::circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use crate::circuit_tableau::circuit_to_tableau;
 pub use crate::circuit_transforms::{
     circuit_without_noise, flattened_circuit, flattened_circuit_operations,
+    flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
 pub use circuit_adapters::circuit_without_tags;
 pub use dem_adapters::{
-    detector_error_model_without_tags, flattened_detector_error_model, rounded_detector_error_model,
+    detector_error_model_without_tags, flattened_detector_error_model,
+    flattened_detector_error_model_with_limits, rounded_detector_error_model,
 };
 pub use gate_adapters::{
     GateUnitaryMatrix, gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition,

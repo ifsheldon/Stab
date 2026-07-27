@@ -234,18 +234,22 @@ fn remap_circuit_items(
                         Ok(Target::qubit(dense, false))
                     })
                     .collect::<CircuitResult<Vec<_>>>()?;
-                Ok(CircuitItem::Instruction(CircuitInstruction::new(
-                    instruction.gate(),
-                    instruction.args().to_vec(),
-                    targets,
-                    instruction.tag().map(str::to_owned),
-                )?))
+                Ok(CircuitItem::Instruction(
+                    CircuitInstruction::new_with_tag_bytes(
+                        instruction.gate(),
+                        instruction.args().to_vec(),
+                        targets,
+                        instruction.tag_bytes(),
+                    )?,
+                ))
             }
-            CircuitItem::RepeatBlock(repeat) => Ok(CircuitItem::RepeatBlock(RepeatBlock::new(
-                repeat.repeat_count(),
-                remap_circuit_items(repeat.body(), dense_ids)?,
-                repeat.tag().map(str::to_owned),
-            ))),
+            CircuitItem::RepeatBlock(repeat) => {
+                Ok(CircuitItem::RepeatBlock(RepeatBlock::new_with_tag_bytes(
+                    repeat.repeat_count(),
+                    remap_circuit_items(repeat.body(), dense_ids)?,
+                    repeat.tag_bytes(),
+                )))
+            }
         })
         .collect::<CircuitResult<Vec<_>>>()?;
     Ok(Circuit::from_unfused_items(items))

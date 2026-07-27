@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::io::{self, Write};
 use std::str::FromStr;
 
 use smallvec::SmallVec;
@@ -7,7 +8,9 @@ mod analyze;
 mod api;
 mod arena_index;
 mod coordinate_scan;
+mod drop_impl;
 mod error_traversal;
+mod flatten;
 #[cfg(test)]
 mod generated_qec_tests;
 mod graphlike;
@@ -27,7 +30,12 @@ pub use analyze::{
     try_disjoint_to_independent_xyz_errors,
 };
 pub use api::DemFlattenedInstructionIter;
-pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
+pub use flatten::DemFlattenLimits;
+pub use sat::{
+    SatMaterializationLimits, likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
+    shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
+};
+pub use search_budget::LogicalErrorSearchLimits;
 /// Crate-internal advanced boundary for traversing compact DEM structure.
 ///
 /// This boundary stays owned by the DEM model: analysis and execution consumers may inspect the
@@ -38,9 +46,10 @@ pub(crate) use traversal::{
     FoldedDemVisitor,
 };
 
+use crate::model_bytes::PreparedModelText;
 use crate::{
-    CircuitError, CircuitResult, DemRepeatCount, ModelFingerprint, ParseLimits, Probability,
-    RepeatNestingLimit,
+    CircuitError, CircuitResult, DemRepeatCount, ModelDialect, ModelFingerprint, ParseLimits,
+    Probability, RepeatNestingLimit,
 };
 use parser::{parse_dem, parse_unsigned_dem_text_value};
 use tag::DemTag;
@@ -52,9 +61,12 @@ pub(crate) const MAX_DEM_REPEAT_NESTING: usize = RepeatNestingLimit::HARD_MAX;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
 pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
+pub(crate) const MAX_DEM_FLATTEN_TARGET_OCCURRENCES: u64 = 32_000_000;
+pub(crate) const MAX_DEM_FLATTEN_ARGUMENT_VALUES: u64 = 16_000_000;
+pub(crate) const MAX_DEM_FLATTEN_MATERIALIZED_BYTES: u64 = 512 * 1024 * 1024;
 const DEM_FLOAT_PRECISION: i32 = 34;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Default)]
 pub struct DetectorErrorModel {
     items: Vec<DemItem>,
 }
@@ -66,6 +78,20 @@ impl DetectorErrorModel {
 
     pub fn from_dem_str(input: &str) -> CircuitResult<Self> {
         Self::from_dem_str_with_limits(input, ParseLimits::default())
+    }
+
+    pub fn from_dem_bytes(input: &[u8]) -> CircuitResult<Self> {
+        Self::from_dem_bytes_with_limits(input, ParseLimits::default())
+    }
+
+    pub fn from_dem_bytes_with_limits(input: &[u8], limits: ParseLimits) -> CircuitResult<Self> {
+        let prepared = PreparedModelText::new(input, ModelDialect::DetectorErrorModel, limits)?;
+        let parsed = prepared.resolve(Self::from_dem_str_with_limits(prepared.text(), limits));
+        let mut model = parsed?;
+        if let Some(tags) = prepared.into_tags() {
+            model.restore_byte_tags(tags)?;
+        }
+        Ok(model)
     }
 
     pub fn from_dem_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
@@ -98,10 +124,34 @@ impl DetectorErrorModel {
         self.items.push(DemItem::RepeatBlock(repeat));
     }
 
+    pub(crate) fn try_reserve_items_exact(&mut self, additional: usize) -> CircuitResult<()> {
+        self.items.try_reserve_exact(additional).map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "unable to reserve {additional} flattened instruction slots: {error}"
+            ))
+        })
+    }
+
+    /// Returns canonical DEM text as UTF-8.
+    ///
+    /// Opaque tag bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::to_dem_bytes`] when exact metadata preservation matters.
     pub fn to_dem_string(&self) -> String {
         let mut out = String::new();
         self.write_dem(&mut out, 0);
         out
+    }
+
+    /// Returns canonical DEM text while preserving opaque bytes in tags.
+    ///
+    /// Use this method instead of [`Self::to_dem_string`] when the model came from a byte source
+    /// whose tags may not be valid UTF-8.
+    pub fn to_dem_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        match self.write_dem_io(&mut out, 0) {
+            Ok(()) => out,
+            Err(error) => unreachable!("writing a DEM into Vec<u8> failed: {error}"),
+        }
     }
 
     pub fn total_detector_shift(&self) -> CircuitResult<u64> {
@@ -125,112 +175,98 @@ impl DetectorErrorModel {
             .observable_count())
     }
 
-    pub(crate) fn validate_flattening_budget(&self, context: &'static str) -> CircuitResult<()> {
-        let mut budget = DemFlatteningBudget::default();
-        self.validate_flattening_budget_items(1, 0, context, &mut budget)
-    }
-
-    fn validate_flattening_budget_items(
-        &self,
-        multiplier: u64,
-        depth: usize,
-        context: &'static str,
-        budget: &mut DemFlatteningBudget,
-    ) -> CircuitResult<()> {
-        if depth > MAX_DEM_REPEAT_NESTING {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-            )));
-        }
-        for item in &self.items {
-            match item {
-                DemItem::Instruction(_) => {
-                    budget.add_expanded_instructions(multiplier, context)?;
-                }
-                DemItem::RepeatBlock(repeat) => {
-                    let repeat_count = repeat.repeat_count.get();
-                    if repeat_count == 0 {
-                        continue;
-                    }
-                    if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
-                        return Err(CircuitError::invalid_detector_error_model(format!(
-                            "DEM {context} currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
-                        )));
-                    }
-                    let repeated_multiplier =
-                        multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(format!(
-                                "DEM {context} repeat expansion count overflowed"
-                            ))
-                        })?;
-                    budget.add_repeat_iterations(repeated_multiplier, context)?;
-                    repeat.body.validate_flattening_budget_items(
-                        repeated_multiplier,
-                        depth + 1,
-                        context,
-                        budget,
-                    )?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn write_dem(&self, out: &mut String, indent: usize) {
         for item in &self.items {
             item.write_dem(out, indent);
         }
     }
-}
 
-#[derive(Clone, Debug, Default)]
-struct DemFlatteningBudget {
-    expanded_instructions: u64,
-    repeat_iterations: u64,
-}
-
-impl DemFlatteningBudget {
-    fn add_expanded_instructions(
-        &mut self,
-        count: u64,
-        context: &'static str,
-    ) -> CircuitResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions
-                .checked_add(count)
-                .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(format!(
-                        "DEM {context} expanded instruction count overflowed"
-                    ))
-                })?;
-        if self.expanded_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM {context} currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
+    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        for item in &self.items {
+            item.write_dem_io(out, indent)?;
         }
         Ok(())
     }
 
-    fn add_repeat_iterations(&mut self, count: u64, context: &'static str) -> CircuitResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
-                "DEM {context} repeat iteration count overflowed"
-            ))
-        })?;
-        if self.repeat_iterations > MAX_DEM_FLATTEN_REPEAT_ITERATIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM {context} currently supports at most {MAX_DEM_FLATTEN_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
-                self.repeat_iterations
-            )));
+    fn restore_byte_tags(&mut self, tags: Vec<Vec<u8>>) -> CircuitResult<()> {
+        let expected = self.non_empty_tag_count();
+        if expected != tags.len() {
+            return Err(CircuitError::invalid_domain_value(
+                "DEM byte parser",
+                format!(
+                    "metadata scanner found {} tags but parser produced {expected}",
+                    tags.len()
+                ),
+            ));
         }
+        let mut tags = tags.into_iter();
+        self.restore_byte_tags_from(&mut tags);
+        let exhausted = tags.next().is_none();
+        debug_assert!(exhausted);
         Ok(())
+    }
+
+    fn restore_byte_tags_from(&mut self, tags: &mut impl Iterator<Item = Vec<u8>>) {
+        for item in &mut self.items {
+            match item {
+                DemItem::Instruction(instruction) => {
+                    if instruction.tag.is_some() {
+                        instruction.tag = tags.next().and_then(DemTag::from_bytes);
+                    }
+                }
+                DemItem::RepeatBlock(repeat) => {
+                    if repeat.tag.is_some() {
+                        repeat.tag = tags.next().and_then(DemTag::from_bytes);
+                    }
+                    repeat.body.restore_byte_tags_from(tags);
+                }
+            }
+        }
+    }
+
+    fn non_empty_tag_count(&self) -> usize {
+        self.items
+            .iter()
+            .map(|item| match item {
+                DemItem::Instruction(instruction) => usize::from(instruction.tag.is_some()),
+                DemItem::RepeatBlock(repeat) => {
+                    usize::from(repeat.tag.is_some()) + repeat.body.non_empty_tag_count()
+                }
+            })
+            .sum()
     }
 }
 
 impl Display for DetectorErrorModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.to_dem_string())
+    }
+}
+
+impl Clone for DetectorErrorModel {
+    fn clone(&self) -> Self {
+        drop_impl::clone_model(self)
+    }
+}
+
+impl std::fmt::Debug for DetectorErrorModel {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DetectorErrorModel")
+            .field("top_level_items", &self.items.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for DetectorErrorModel {
+    fn eq(&self, other: &Self) -> bool {
+        drop_impl::models_equal(self, other)
+    }
+}
+
+impl Drop for DetectorErrorModel {
+    fn drop(&mut self) {
+        drop_impl::drop_items(&mut self.items);
     }
 }
 
@@ -245,6 +281,13 @@ impl DemItem {
         match self {
             Self::Instruction(instruction) => instruction.write_dem(out, indent),
             Self::RepeatBlock(repeat) => repeat.write_dem(out, indent),
+        }
+    }
+
+    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        match self {
+            Self::Instruction(instruction) => instruction.write_dem_io(out, indent),
+            Self::RepeatBlock(repeat) => repeat.write_dem_io(out, indent),
         }
     }
 }
@@ -263,6 +306,14 @@ impl DemRepeatBlock {
         tag: Option<String>,
     ) -> Self {
         Self::from_parts(repeat_count, body, normalize_tag(tag))
+    }
+
+    pub(crate) fn new_with_tag_bytes(
+        repeat_count: DemRepeatCount,
+        body: DetectorErrorModel,
+        tag: Option<&[u8]>,
+    ) -> Self {
+        Self::from_parts(repeat_count, body, tag.and_then(DemTag::from_slice))
     }
 
     fn from_parts(
@@ -285,20 +336,39 @@ impl DemRepeatBlock {
         &self.body
     }
 
+    /// Returns this repeat block's tag as UTF-8 display text.
+    ///
+    /// Opaque bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_ref().map(DemTag::as_str)
+    }
+
+    /// Returns the exact unescaped bytes of this repeat block's optional DEM tag.
+    pub fn tag_bytes(&self) -> Option<&[u8]> {
+        self.tag.as_ref().map(DemTag::as_bytes)
     }
 
     fn write_dem(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
         out.push_str("repeat");
-        write_optional_tag(out, self.tag());
+        write_optional_tag(out, self.tag.as_ref());
         out.push(' ');
         out.push_str(&self.repeat_count.get().to_string());
         out.push_str(" {\n");
         self.body.write_dem(out, indent + 4);
         write_indent(out, indent);
         out.push_str("}\n");
+    }
+
+    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        write_indent_io(out, indent)?;
+        out.write_all(b"repeat")?;
+        write_optional_tag_io(out, self.tag.as_ref())?;
+        writeln!(out, " {} {{", self.repeat_count.get())?;
+        self.body.write_dem_io(out, indent + 4)?;
+        write_indent_io(out, indent)?;
+        out.write_all(b"}\n")
     }
 }
 
@@ -320,15 +390,13 @@ impl DemInstructionKind {
         }
     }
 
-    fn from_name(name: &str) -> CircuitResult<Self> {
+    fn lookup_name(name: &str) -> Option<Self> {
         match name.len() {
-            5 if name.eq_ignore_ascii_case("error") => Ok(Self::Error),
-            8 if name.eq_ignore_ascii_case("detector") => Ok(Self::Detector),
-            18 if name.eq_ignore_ascii_case("logical_observable") => Ok(Self::LogicalObservable),
-            15 if name.eq_ignore_ascii_case("shift_detectors") => Ok(Self::ShiftDetectors),
-            _ => Err(CircuitError::invalid_detector_error_model(format!(
-                "unknown DEM instruction {name}"
-            ))),
+            5 if name.eq_ignore_ascii_case("error") => Some(Self::Error),
+            8 if name.eq_ignore_ascii_case("detector") => Some(Self::Detector),
+            18 if name.eq_ignore_ascii_case("logical_observable") => Some(Self::LogicalObservable),
+            15 if name.eq_ignore_ascii_case("shift_detectors") => Some(Self::ShiftDetectors),
+            _ => None,
         }
     }
 }
@@ -356,6 +424,20 @@ impl DemInstruction {
         )
     }
 
+    pub(crate) fn new_with_tag_bytes(
+        kind: DemInstructionKind,
+        args: Vec<f64>,
+        targets: Vec<DemTarget>,
+        tag: Option<&[u8]>,
+    ) -> CircuitResult<Self> {
+        Self::from_parts(
+            kind,
+            DemArgVec::from_vec(args),
+            DemTargetVec::from_vec(targets),
+            tag.and_then(DemTag::from_slice),
+        )
+    }
+
     fn from_parts(
         kind: DemInstructionKind,
         args: DemArgVec,
@@ -363,12 +445,21 @@ impl DemInstruction {
         tag: Option<DemTag>,
     ) -> CircuitResult<Self> {
         validate_dem_instruction(kind, &args, &targets)?;
-        Ok(Self {
+        Ok(Self::from_validated_parts(kind, args, targets, tag))
+    }
+
+    fn from_validated_parts(
+        kind: DemInstructionKind,
+        args: DemArgVec,
+        targets: DemTargetVec,
+        tag: Option<DemTag>,
+    ) -> Self {
+        Self {
             kind,
             args,
             targets,
             tag,
-        })
+        }
     }
 
     pub fn error(
@@ -445,8 +536,17 @@ impl DemInstruction {
             .collect()
     }
 
+    /// Returns this instruction's tag as UTF-8 display text.
+    ///
+    /// Opaque bytes are represented with the UTF-8 replacement character. Use
+    /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_ref().map(DemTag::as_str)
+    }
+
+    /// Returns the exact unescaped bytes of this instruction's optional DEM tag.
+    pub fn tag_bytes(&self) -> Option<&[u8]> {
+        self.tag.as_ref().map(DemTag::as_bytes)
     }
 
     pub(crate) fn detector_shift(&self) -> CircuitResult<u64> {
@@ -466,10 +566,19 @@ impl DemInstruction {
     fn write_dem(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
         out.push_str(self.kind.canonical_name());
-        write_optional_tag(out, self.tag());
+        write_optional_tag(out, self.tag.as_ref());
         write_args(out, &self.args);
         write_dem_targets(out, &self.targets);
         out.push('\n');
+    }
+
+    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        write_indent_io(out, indent)?;
+        out.write_all(self.kind.canonical_name().as_bytes())?;
+        write_optional_tag_io(out, self.tag.as_ref())?;
+        write_args_io(out, &self.args)?;
+        write_dem_targets_io(out, &self.targets)?;
+        out.write_all(b"\n")
     }
 }
 
@@ -691,13 +800,22 @@ fn write_indent(out: &mut String, indent: usize) {
     out.extend(std::iter::repeat_n(' ', indent));
 }
 
-fn write_optional_tag(out: &mut String, tag: Option<&str>) {
+fn write_optional_tag(out: &mut String, tag: Option<&DemTag>) {
     let Some(tag) = tag else {
         return;
     };
     out.push('[');
-    write_escaped_tag(out, tag);
+    tag.write_escaped_text(out);
     out.push(']');
+}
+
+fn write_optional_tag_io(out: &mut impl Write, tag: Option<&DemTag>) -> io::Result<()> {
+    let Some(tag) = tag else {
+        return Ok(());
+    };
+    out.write_all(b"[")?;
+    tag.write_escaped_bytes(out)?;
+    out.write_all(b"]")
 }
 
 fn write_args(out: &mut String, args: &[f64]) {
@@ -714,6 +832,20 @@ fn write_args(out: &mut String, args: &[f64]) {
     out.push(')');
 }
 
+fn write_args_io(out: &mut impl Write, args: &[f64]) -> io::Result<()> {
+    if args.is_empty() {
+        return Ok(());
+    }
+    out.write_all(b"(")?;
+    for (index, arg) in args.iter().enumerate() {
+        if index > 0 {
+            out.write_all(b", ")?;
+        }
+        out.write_all(format_float(*arg).as_bytes())?;
+    }
+    out.write_all(b")")
+}
+
 fn write_dem_targets(out: &mut String, targets: &[DemTarget]) {
     for target in targets {
         out.push(' ');
@@ -721,16 +853,18 @@ fn write_dem_targets(out: &mut String, targets: &[DemTarget]) {
     }
 }
 
-fn write_escaped_tag(out: &mut String, tag: &str) {
-    for ch in tag.chars() {
-        match ch {
-            ']' => out.push_str("\\C"),
-            '\r' => out.push_str("\\r"),
-            '\n' => out.push_str("\\n"),
-            '\\' => out.push_str("\\B"),
-            _ => out.push(ch),
-        }
+fn write_dem_targets_io(out: &mut impl Write, targets: &[DemTarget]) -> io::Result<()> {
+    for target in targets {
+        write!(out, " {target}")?;
     }
+    Ok(())
+}
+
+fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
+    for _ in 0..indent {
+        out.write_all(b" ")?;
+    }
+    Ok(())
 }
 
 fn normalize_tag(tag: Option<String>) -> Option<DemTag> {
@@ -803,6 +937,18 @@ pub fn shortest_graphlike_undetectable_logical_error(
     graphlike::shortest_graphlike_undetectable_logical_error(model, ignore_ungraphlike_errors)
 }
 
+pub fn shortest_graphlike_undetectable_logical_error_with_limits(
+    model: &DetectorErrorModel,
+    ignore_ungraphlike_errors: bool,
+    limits: LogicalErrorSearchLimits,
+) -> CircuitResult<DetectorErrorModel> {
+    graphlike::shortest_graphlike_undetectable_logical_error_with_limits(
+        model,
+        ignore_ungraphlike_errors,
+        limits,
+    )
+}
+
 pub fn find_undetectable_logical_error(
     model: &DetectorErrorModel,
     dont_explore_detection_event_sets_with_size_above: usize,
@@ -814,6 +960,22 @@ pub fn find_undetectable_logical_error(
         dont_explore_detection_event_sets_with_size_above,
         dont_explore_edges_with_degree_above,
         dont_explore_edges_increasing_symptom_degree,
+    )
+}
+
+pub fn find_undetectable_logical_error_with_limits(
+    model: &DetectorErrorModel,
+    dont_explore_detection_event_sets_with_size_above: usize,
+    dont_explore_edges_with_degree_above: usize,
+    dont_explore_edges_increasing_symptom_degree: bool,
+    limits: LogicalErrorSearchLimits,
+) -> CircuitResult<DetectorErrorModel> {
+    hyper::find_undetectable_logical_error_with_limits(
+        model,
+        dont_explore_detection_event_sets_with_size_above,
+        dont_explore_edges_with_degree_above,
+        dont_explore_edges_increasing_symptom_degree,
+        limits,
     )
 }
 

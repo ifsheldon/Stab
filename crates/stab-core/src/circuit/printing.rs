@@ -23,7 +23,7 @@ fn instruction_text_capacity(instruction: &CircuitInstruction, indent: usize) ->
     if let Some(tag) = &instruction.tag {
         capacity = capacity
             .saturating_add(2)
-            .saturating_add(escaped_tag_len(tag));
+            .saturating_add(escaped_tag_len(tag.as_bytes()));
     }
     if !instruction.args.is_empty() {
         capacity = capacity
@@ -49,7 +49,7 @@ fn repeat_text_capacity(repeat: &RepeatBlock, indent: usize) -> usize {
     if let Some(tag) = &repeat.tag {
         capacity = capacity
             .saturating_add(2)
-            .saturating_add(escaped_tag_len(tag));
+            .saturating_add(escaped_tag_len(tag.as_bytes()));
     }
     capacity
 }
@@ -241,11 +241,11 @@ fn decimal_len_u64(mut value: u64) -> usize {
     len
 }
 
-fn escaped_tag_len(tag: &str) -> usize {
-    tag.chars().fold(0usize, |len, ch| {
-        len.saturating_add(match ch {
-            ']' | '\r' | '\n' | '\\' => 2,
-            _ => ch.len_utf8(),
+fn escaped_tag_len(tag: &[u8]) -> usize {
+    tag.iter().fold(0usize, |len, byte| {
+        len.saturating_add(match byte {
+            b']' | b'\r' | b'\n' | b'\\' => 2,
+            _ => 1,
         })
     })
 }

@@ -14,6 +14,7 @@ mod gauge;
 mod instructions;
 mod measurements;
 mod mpp;
+mod options;
 mod probabilities;
 mod reverse_fold;
 
@@ -22,7 +23,7 @@ use crate::{
     Probability, QubitId, RepeatBlock, SingleQubitClifford,
 };
 
-use super::{DemInstruction, DemTarget, DetectorErrorModel};
+use super::{DemInstruction, DemInstructionKind, DemTarget, DetectorErrorModel};
 use budget::validate_analyzer_expansion_budget;
 use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
@@ -45,18 +46,15 @@ use error_decomp::{
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
 use instructions::{is_measurement_instruction, is_noise_instruction, pair_measurement_basis};
+pub use options::ErrorAnalyzerOptions;
 use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct ErrorAnalyzerOptions {
-    pub fold_loops: bool,
-    pub decompose_errors: bool,
-    pub allow_gauge_detectors: bool,
-    pub ignore_decomposition_failures: bool,
-    pub block_decomposition_from_introducing_remnant_edges: bool,
-    pub approximate_disjoint_errors_threshold: Option<Probability>,
+pub(super) type AnalyzerTag = Box<[u8]>;
+
+pub(super) fn owned_tag(tag: Option<&[u8]>) -> Option<AnalyzerTag> {
+    tag.map(Box::<[u8]>::from)
 }
 
 pub fn circuit_to_detector_error_model(
@@ -238,7 +236,7 @@ impl Analyzer {
                 probability,
                 qubit,
                 pauli,
-                instruction.tag().map(str::to_owned),
+                owned_tag(instruction.tag_bytes()),
             );
         }
         Ok(())
@@ -330,7 +328,7 @@ impl Analyzer {
             effects,
             Vec::new(),
             None,
-            instruction.tag().map(str::to_owned),
+            owned_tag(instruction.tag_bytes()),
         );
         Ok(())
     }
@@ -356,7 +354,7 @@ impl Analyzer {
                         "PAULI_CHANNEL_1 target {target} is not a qubit"
                     )));
                 };
-                let tag = instruction.tag().map(str::to_owned);
+                let tag = owned_tag(instruction.tag_bytes());
                 self.push_single_qubit_pauli_error(
                     independent.x,
                     qubit,
@@ -399,7 +397,7 @@ impl Analyzer {
                     x_probability: *x_probability,
                     y_probability: *y_probability,
                     z_probability: *z_probability,
-                    tag: instruction.tag().map(str::to_owned),
+                    tag: owned_tag(instruction.tag_bytes()),
                 });
         }
         Ok(())
@@ -410,7 +408,7 @@ impl Analyzer {
         probability: Probability,
         qubit: QubitId,
         pauli: AnalyzerPauli,
-        tag: Option<String>,
+        tag: Option<AnalyzerTag>,
     ) {
         if probability.get() == 0.0 {
             return;
@@ -478,7 +476,7 @@ impl Analyzer {
                     (left_qubit, left_pauli),
                     (right_qubit, right_pauli),
                     Some(group_id),
-                    instruction.tag().map(str::to_owned),
+                    owned_tag(instruction.tag_bytes()),
                 );
             }
         }
@@ -529,7 +527,7 @@ impl Analyzer {
                         (left_qubit, left_pauli),
                         (right_qubit, right_pauli),
                         None,
-                        instruction.tag().map(str::to_owned),
+                        owned_tag(instruction.tag_bytes()),
                     );
                 }
             }
@@ -543,7 +541,7 @@ impl Analyzer {
         left: (QubitId, Option<AnalyzerPauli>),
         right: (QubitId, Option<AnalyzerPauli>),
         disjoint_group: Option<u64>,
-        tag: Option<String>,
+        tag: Option<AnalyzerTag>,
     ) {
         let mut effects = Vec::new();
         let (left_qubit, left_pauli) = left;
@@ -569,7 +567,7 @@ impl Analyzer {
         effects: Vec<NoiseEffect>,
         measurements: Vec<usize>,
         disjoint_group: Option<u64>,
-        tag: Option<String>,
+        tag: Option<AnalyzerTag>,
     ) {
         let observables = self.observable_sensitivity.flipped_observables(&effects);
         self.pending_errors.push(PendingError {
@@ -596,7 +594,7 @@ impl Analyzer {
                     "DEPOLARIZE1 target {target} is not a qubit"
                 )));
             };
-            let tag = instruction.tag().map(str::to_owned);
+            let tag = owned_tag(instruction.tag_bytes());
             self.push_single_qubit_pauli_error(
                 channel_probability,
                 qubit,
@@ -738,7 +736,7 @@ impl Analyzer {
                     effects,
                     vec![measurement_index],
                     disjoint_group,
-                    instruction.tag().map(str::to_owned),
+                    owned_tag(instruction.tag_bytes()),
                 );
             }
         }
@@ -789,7 +787,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
-                    tag: instruction.tag().map(str::to_owned),
+                    tag: owned_tag(instruction.tag_bytes()),
                 });
             }
         }
@@ -827,7 +825,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
-                    tag: instruction.tag().map(str::to_owned),
+                    tag: owned_tag(instruction.tag_bytes()),
                 });
             }
         }
@@ -959,7 +957,7 @@ impl Analyzer {
         self.declarations.push(Declaration::Detector {
             detector_id,
             coordinates: instruction.args().to_vec(),
-            tag: instruction.tag().map(str::to_owned),
+            tag: owned_tag(instruction.tag_bytes()),
         });
         Ok(())
     }
@@ -1002,12 +1000,12 @@ impl Analyzer {
         }
         if has_pauli_target
             || has_measurement_record_target
-            || instruction.tag().is_some()
+            || instruction.tag_bytes().is_some()
             || !has_targets
         {
             self.declarations.push(Declaration::Observable {
                 observable: observable.get(),
-                tag: instruction.tag().map(str::to_owned),
+                tag: owned_tag(instruction.tag_bytes()),
             });
         }
         Ok(())
@@ -1017,7 +1015,7 @@ impl Analyzer {
         self.declarations.push(Declaration::Shift {
             coordinates: instruction.args().to_vec(),
             detector_shift: 0,
-            tag: instruction.tag().map(str::to_owned),
+            tag: owned_tag(instruction.tag_bytes()),
         });
         Ok(())
     }
@@ -1139,7 +1137,12 @@ impl Analyzer {
             for observable in touched_observables {
                 touched_logical_observables.insert(observable);
             }
-            dem.push_instruction(DemInstruction::error(probability, targets, tag)?);
+            dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                DemInstructionKind::Error,
+                vec![probability.get()],
+                targets,
+                tag.as_deref(),
+            )?);
         }
 
         for declaration in self.declarations {
@@ -1155,17 +1158,20 @@ impl Analyzer {
                     {
                         continue;
                     }
-                    dem.push_instruction(DemInstruction::detector(
+                    dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::Detector,
                         coordinates,
-                        DemTarget::relative_detector(detector_id)?,
-                        tag,
+                        vec![DemTarget::relative_detector(detector_id)?],
+                        tag.as_deref(),
                     )?);
                 }
                 Declaration::Observable { observable, tag } => {
                     if tag.is_some() || !touched_logical_observables.contains(&observable) {
-                        dem.push_instruction(DemInstruction::logical_observable(
-                            DemTarget::logical_observable(observable)?,
-                            tag,
+                        dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                            DemInstructionKind::LogicalObservable,
+                            Vec::new(),
+                            vec![DemTarget::logical_observable(observable)?],
+                            tag.as_deref(),
                         )?);
                     }
                 }
@@ -1174,10 +1180,11 @@ impl Analyzer {
                     detector_shift,
                     tag,
                 } => {
-                    dem.push_instruction(DemInstruction::shift_detectors(
+                    dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::ShiftDetectors,
                         coordinates,
-                        detector_shift,
-                        tag,
+                        vec![DemTarget::numeric(detector_shift)],
+                        tag.as_deref(),
                     )?);
                 }
             }

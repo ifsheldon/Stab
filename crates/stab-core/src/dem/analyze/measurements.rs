@@ -1,8 +1,8 @@
 use crate::{CircuitError, CircuitInstruction, CircuitResult, QubitId};
 
-use super::Analyzer;
 use super::effects::{AnalyzerBasis, AnalyzerPauli, NoiseEffect, PendingError};
 use super::instructions::measurement_basis;
+use super::{Analyzer, owned_tag};
 
 impl Analyzer {
     pub(super) fn record_measurements(
@@ -43,7 +43,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
-                    tag: instruction.tag().map(str::to_owned),
+                    tag: owned_tag(instruction.tag_bytes()),
                 });
             }
             self.project_pending_pauli_channels_through_measurement(

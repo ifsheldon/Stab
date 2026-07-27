@@ -3,21 +3,20 @@ use std::ops::ControlFlow;
 
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
-    DetectorErrorModel, MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
-    MAX_DEM_FLATTEN_REPEAT_UNROLL,
+    DetectorErrorModel,
     traversal::{
         DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-        FoldedDemVisitor, shifted_targets,
+        FoldedDemVisitor, shifted_detector, shifted_targets,
     },
 };
-use crate::{CircuitError, CircuitResult};
+use crate::resources::SatMaterializationResource;
+use crate::{CircuitError, CircuitResult, ResourceLimitError};
 
 mod instance;
+mod limits;
 
-use instance::{
-    BoolRef, Clause, MAX_SAT_ERROR_MECHANISMS, MAX_SAT_TARGET_OCCURRENCES, MaxSatInstance,
-    SatProblemMode, SatShape,
-};
+use instance::{BoolRef, Clause, MaxSatInstance, SatProblemMode, SatShape, validate_limit};
+pub use limits::SatMaterializationLimits;
 
 const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
 
@@ -93,6 +92,7 @@ fn preflight_sat_shape(
     errors: &[FlattenedError],
     target_index: &SatTargetIndex,
     mode: SatProblemMode,
+    limits: SatMaterializationLimits,
 ) -> CircuitResult<SatShape> {
     let mut seen_detectors = vec![false; target_index.detector_to_slot.len()];
     let mut seen_observables = vec![false; target_index.observable_to_slot.len()];
@@ -164,44 +164,65 @@ fn preflight_sat_shape(
         variables,
         clauses,
         clause_literals,
-        output_bytes: 0,
     }
-    .with_output_bound(mode)
+    .validate(limits)
 }
 
 pub fn shortest_error_sat_problem(model: &DetectorErrorModel) -> CircuitResult<String> {
-    sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted)
+    shortest_error_sat_problem_with_limits(model, SatMaterializationLimits::default())
+}
+
+/// Generates an unweighted SAT problem under explicit traversal and materialization limits.
+pub fn shortest_error_sat_problem_with_limits(
+    model: &DetectorErrorModel,
+    limits: SatMaterializationLimits,
+) -> CircuitResult<String> {
+    sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted, limits)
 }
 
 pub fn likeliest_error_sat_problem(
     model: &DetectorErrorModel,
     quantization: u32,
 ) -> CircuitResult<String> {
+    likeliest_error_sat_problem_with_limits(
+        model,
+        quantization,
+        SatMaterializationLimits::default(),
+    )
+}
+
+/// Generates a weighted SAT problem under explicit traversal and materialization limits.
+pub fn likeliest_error_sat_problem_with_limits(
+    model: &DetectorErrorModel,
+    quantization: u32,
+    limits: SatMaterializationLimits,
+) -> CircuitResult<String> {
     if quantization < 1 {
         return Err(CircuitError::invalid_detector_error_model(
             "weighted SAT quantization must be at least 1",
         ));
     }
-    sat_problem_as_wcnf_string(model, SatProblemMode::Weighted { quantization })
+    sat_problem_as_wcnf_string(model, SatProblemMode::Weighted { quantization }, limits)
 }
 
 fn sat_problem_as_wcnf_string(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
+    limits: SatMaterializationLimits,
 ) -> CircuitResult<String> {
     if model.count_observables()? == 0 || model.count_errors()? == 0 {
-        return Ok(UNSAT_WDIMACS.to_string());
+        return unsat_wdimacs(limits);
     }
-    let errors = flattened_error_instructions(model, mode)?;
+    let errors = flattened_error_instructions(model, mode, limits)?;
     if errors.is_empty() {
-        return Ok(UNSAT_WDIMACS.to_string());
+        return unsat_wdimacs(limits);
     }
     let target_index = SatTargetIndex::from_errors(&errors)?;
     if target_index.observable_to_slot.is_empty() {
-        return Ok(UNSAT_WDIMACS.to_string());
+        return unsat_wdimacs(limits);
     }
-    let shape = preflight_sat_shape(&errors, &target_index, mode)?;
-    let mut instance = MaxSatInstance::with_shape(shape)?;
+    let shape = preflight_sat_shape(&errors, &target_index, mode, limits)?;
+    let mut instance = MaxSatInstance::with_shape(shape, limits)?;
     let mut errors_activated = Vec::new();
     errors_activated
         .try_reserve_exact(errors.len())
@@ -246,6 +267,15 @@ fn sat_problem_as_wcnf_string(
     instance.add_clause(Clause::hard(observable_clause_vars))?;
     instance.validate_shape(shape)?;
     instance.to_wdimacs(mode)
+}
+
+fn unsat_wdimacs(limits: SatMaterializationLimits) -> CircuitResult<String> {
+    validate_limit(
+        SatMaterializationResource::OutputBytes,
+        UNSAT_WDIMACS.len(),
+        limits.max_output_bytes(),
+    )?;
+    Ok(UNSAT_WDIMACS.to_owned())
 }
 
 fn add_error_parity_terms(
@@ -334,44 +364,87 @@ fn soft_clause_is_stored(mode: SatProblemMode, probability: f64) -> bool {
 fn flattened_error_instructions(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
+    limits: SatMaterializationLimits,
 ) -> CircuitResult<Vec<FlattenedError>> {
     let traversal = FoldedDemTraversal::new(model)?;
     traversal.validate_repeat_depth("SAT problem generation")?;
     let block_policies = SatBlockPolicies::new(traversal.root());
+    // Complete traversal admission before reserving or mutating flattened error storage.
+    let mut admission = SatErrorVisitor::new(mode, limits, &block_policies, None);
+    let _ = traversal.try_visit(&mut admission)?;
+    let expected_counts = admission.counts;
+
     let mut errors = Vec::new();
-    let mut visitor = SatErrorVisitor {
-        mode,
-        expanded_instructions: 0,
-        target_occurrences: 0,
-        block_policies,
-        errors: &mut errors,
+    errors
+        .try_reserve_exact(expected_counts.error_mechanisms)
+        .map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "SAT problem generation cannot allocate another error mechanism",
+            )
+        })?;
+    let collected_counts = {
+        let mut collector = SatErrorVisitor::new(mode, limits, &block_policies, Some(&mut errors));
+        let _ = traversal.try_visit(&mut collector)?;
+        collector.counts
     };
-    let _ = traversal.try_visit(&mut visitor)?;
+    if collected_counts != expected_counts || errors.len() != expected_counts.error_mechanisms {
+        return Err(CircuitError::invalid_detector_error_model(
+            "SAT traversal shape changed between admission and materialization",
+        ));
+    }
     Ok(errors)
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct SatTraversalCounts {
+    expanded_instructions: u64,
+    error_mechanisms: usize,
+    target_occurrences: usize,
 }
 
 struct SatErrorVisitor<'a> {
     mode: SatProblemMode,
-    expanded_instructions: u64,
-    target_occurrences: usize,
-    block_policies: SatBlockPolicies,
-    errors: &'a mut Vec<FlattenedError>,
+    limits: SatMaterializationLimits,
+    counts: SatTraversalCounts,
+    block_policies: &'a SatBlockPolicies,
+    errors: Option<&'a mut Vec<FlattenedError>>,
 }
 
 impl SatErrorVisitor<'_> {
+    fn new<'a>(
+        mode: SatProblemMode,
+        limits: SatMaterializationLimits,
+        block_policies: &'a SatBlockPolicies,
+        errors: Option<&'a mut Vec<FlattenedError>>,
+    ) -> SatErrorVisitor<'a> {
+        SatErrorVisitor {
+            mode,
+            limits,
+            counts: SatTraversalCounts::default(),
+            block_policies,
+            errors,
+        }
+    }
+
     fn add_expanded_instruction(&mut self) -> CircuitResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions.checked_add(1).ok_or_else(|| {
+        let next = self
+            .counts
+            .expanded_instructions
+            .checked_add(1)
+            .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "DEM SAT problem generation expanded instruction count overflowed",
                 )
             })?;
-        if self.expanded_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM SAT problem generation currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
+        if next > self.limits.max_expanded_instructions() {
+            return Err(ResourceLimitError::sat_materialization(
+                SatMaterializationResource::ExpandedInstructions,
+                next,
+                self.limits.max_expanded_instructions(),
+            )
+            .into());
         }
+        self.counts.expanded_instructions = next;
         Ok(())
     }
 
@@ -381,13 +454,19 @@ impl SatErrorVisitor<'_> {
         targets: &[DemTarget],
         detector_offset: u64,
     ) -> CircuitResult<()> {
-        let next_error_count = self.errors.len().checked_add(1).ok_or_else(|| {
+        let next_error_count = self.counts.error_mechanisms.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("SAT error mechanism count overflowed")
         })?;
-        if next_error_count > MAX_SAT_ERROR_MECHANISMS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "SAT problem generation currently supports at most {MAX_SAT_ERROR_MECHANISMS} error mechanisms, got at least {next_error_count}"
-            )));
+        if next_error_count > self.limits.max_error_mechanisms() {
+            return Err(ResourceLimitError::sat_materialization(
+                SatMaterializationResource::ErrorMechanisms,
+                sat_resource_amount(next_error_count, "SAT error mechanism count")?,
+                sat_resource_amount(
+                    self.limits.max_error_mechanisms(),
+                    "SAT error mechanism limit",
+                )?,
+            )
+            .into());
         }
         let added_occurrences = targets
             .iter()
@@ -399,28 +478,43 @@ impl SatErrorVisitor<'_> {
             })
             .count();
         let next_target_occurrences = self
+            .counts
             .target_occurrences
             .checked_add(added_occurrences)
             .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("SAT target occurrence count overflowed")
             })?;
-        if next_target_occurrences > MAX_SAT_TARGET_OCCURRENCES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "SAT problem generation currently supports at most {MAX_SAT_TARGET_OCCURRENCES} target occurrences, got at least {next_target_occurrences}"
-            )));
-        }
-        self.errors.try_reserve(1).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
-                "SAT problem generation cannot allocate another error mechanism",
+        if next_target_occurrences > self.limits.max_target_occurrences() {
+            return Err(ResourceLimitError::sat_materialization(
+                SatMaterializationResource::TargetOccurrences,
+                sat_resource_amount(next_target_occurrences, "SAT target occurrence count")?,
+                sat_resource_amount(
+                    self.limits.max_target_occurrences(),
+                    "SAT target occurrence limit",
+                )?,
             )
-        })?;
-        self.errors.push(FlattenedError {
-            probability,
-            targets: shifted_targets(targets, detector_offset)?,
-        });
-        self.target_occurrences = next_target_occurrences;
+            .into());
+        }
+        validate_shifted_target_ids(targets, detector_offset)?;
+        if let Some(errors) = self.errors.as_deref_mut() {
+            errors.push(FlattenedError {
+                probability,
+                targets: shifted_targets(targets, detector_offset)?,
+            });
+        }
+        self.counts.error_mechanisms = next_error_count;
+        self.counts.target_occurrences = next_target_occurrences;
         Ok(())
     }
+}
+
+fn validate_shifted_target_ids(targets: &[DemTarget], detector_offset: u64) -> CircuitResult<()> {
+    for target in targets {
+        if let DemTarget::RelativeDetector(detector) = *target {
+            let _ = shifted_detector(detector, detector_offset)?;
+        }
+    }
+    Ok(())
 }
 
 impl FoldedDemVisitor for SatErrorVisitor<'_> {
@@ -481,22 +575,34 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
         {
             return Ok(DemRepeatSelection::Skip);
         }
-        if (in_folded_repeat || repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL)
+        if (in_folded_repeat || repeat_count > self.limits.max_repeat_unroll())
             && body_shift == 0
             && (in_folded_repeat || !body.items().is_empty())
         {
             return Ok(DemRepeatSelection::FoldOnce);
         }
-        if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM SAT problem generation currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
-            )));
+        if repeat_count > self.limits.max_repeat_unroll() {
+            return Err(ResourceLimitError::sat_materialization(
+                SatMaterializationResource::RepeatCount,
+                repeat_count,
+                self.limits.max_repeat_unroll(),
+            )
+            .into());
         }
         Ok(DemRepeatSelection::Expand {
-            max_total_iterations: MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
+            max_total_iterations: self.limits.max_repeat_iterations(),
             context: "SAT problem generation",
+            resource_operation: Some(crate::ResourceOperation::SatMaterialization),
         })
     }
+}
+
+fn sat_resource_amount(value: usize, context: &str) -> CircuitResult<u64> {
+    u64::try_from(value).map_err(|_| {
+        CircuitError::invalid_detector_error_model(format!(
+            "{context} does not fit resource diagnostics"
+        ))
+    })
 }
 
 #[derive(Debug, Default)]
@@ -592,8 +698,8 @@ mod tests {
     )]
 
     use super::{
-        MAX_SAT_TARGET_OCCURRENCES, SatErrorVisitor, SatProblemMode, likeliest_error_sat_problem,
-        shortest_error_sat_problem,
+        SatBlockPolicies, SatErrorVisitor, SatMaterializationLimits, SatProblemMode,
+        likeliest_error_sat_problem, shortest_error_sat_problem,
     };
     use crate::{CircuitError, CircuitResult, DemTarget, DetectorErrorModel};
 
@@ -813,23 +919,22 @@ p wcnf 3 7 71
     #[test]
     fn sat_error_visitor_rejects_target_occurrences_before_materialization() -> CircuitResult<()> {
         let mut errors = Vec::new();
-        let mut visitor = SatErrorVisitor {
-            mode: SatProblemMode::Unweighted,
-            expanded_instructions: 0,
-            target_occurrences: MAX_SAT_TARGET_OCCURRENCES,
-            block_policies: Default::default(),
-            errors: &mut errors,
-        };
-        let targets = [DemTarget::relative_detector(0)?];
-        let error = visitor
-            .push_error(0.1, &targets, 0)
-            .expect_err("target occurrence beyond the cap");
-        assert!(
-            error
-                .to_string()
-                .contains("at most 500000 target occurrences")
-        );
-        assert!(visitor.errors.is_empty());
+        let block_policies = SatBlockPolicies::default();
+        let limits = SatMaterializationLimits::default().with_max_target_occurrences(0);
+        {
+            let mut visitor = SatErrorVisitor::new(
+                SatProblemMode::Unweighted,
+                limits,
+                &block_policies,
+                Some(&mut errors),
+            );
+            let targets = [DemTarget::relative_detector(0)?];
+            let error = visitor
+                .push_error(0.1, &targets, 0)
+                .expect_err("target occurrence beyond the cap");
+            assert!(error.to_string().contains("at most 0 target occurrences"));
+        }
+        assert!(errors.is_empty());
         Ok(())
     }
 

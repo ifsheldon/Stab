@@ -1,13 +1,13 @@
-#![allow(
-    dead_code,
-    reason = "M10 graphlike search internals are being landed in parity-tested slices before the full search algorithm consumes them"
-)]
+#![allow(dead_code, reason = "search internals land before all callers")]
 
 mod algo;
 #[cfg(test)]
 mod resource_tests;
 
-pub(super) use algo::shortest_graphlike_undetectable_logical_error;
+pub(super) use algo::{
+    shortest_graphlike_undetectable_logical_error,
+    shortest_graphlike_undetectable_logical_error_with_limits,
+};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
@@ -19,14 +19,13 @@ use super::{
     DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel,
     arena_index::ArenaIndex,
     error_traversal::{
-        SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
+        SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
+        visit_search_graph_errors_with_limits,
     },
-    search_budget::GraphConstructionBudget,
+    search_budget::{GraphConstructionBudget, LogicalErrorSearchLimits},
     traversal::{FoldedDemTraversal, shifted_targets},
 };
 use crate::{CircuitError, CircuitResult, Probability};
-
-const MAX_FULL_DEM_SEARCH_GRAPH_NODES: usize = 1_000_000;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ObservableMask {
@@ -227,39 +226,39 @@ enum DetectorIndex {
 }
 
 impl Graph {
+    #[cfg(test)]
     pub(super) fn new(node_count: usize, num_observables: usize) -> Self {
+        let limits = LogicalErrorSearchLimits::default()
+            .with_max_unique_graph_edges(64)
+            .with_max_stored_graph_terms(2_048);
         Self {
             nodes: vec![Node::default(); node_count],
             detector_index: DetectorIndex::Identity,
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("graphlike search"),
+            construction_budget: GraphConstructionBudget::new("graphlike search", limits),
         }
-    }
-
-    fn try_new(node_count: usize, num_observables: usize) -> CircuitResult<Self> {
-        let mut nodes = Vec::new();
-        nodes.try_reserve_exact(node_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
-                "graphlike search cannot allocate {node_count} detector nodes"
-            ))
-        })?;
-        nodes.resize(node_count, Node::default());
-        Ok(Self {
-            nodes,
-            detector_index: DetectorIndex::Identity,
-            has_declared_detectors: node_count > 0,
-            num_observables,
-            distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("graphlike search"),
-        })
     }
 
     fn try_new_sparse(
         detectors: BTreeSet<DemDetectorId>,
         num_observables: usize,
         has_declared_detectors: bool,
+    ) -> CircuitResult<Self> {
+        Self::try_new_sparse_with_limits(
+            detectors,
+            num_observables,
+            has_declared_detectors,
+            LogicalErrorSearchLimits::default(),
+        )
+    }
+
+    fn try_new_sparse_with_limits(
+        detectors: BTreeSet<DemDetectorId>,
+        num_observables: usize,
+        has_declared_detectors: bool,
+        limits: LogicalErrorSearchLimits,
     ) -> CircuitResult<Self> {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
@@ -286,7 +285,7 @@ impl Graph {
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("graphlike search"),
+            construction_budget: GraphConstructionBudget::new("graphlike search", limits),
         })
     }
 
@@ -301,7 +300,10 @@ impl Graph {
             detector_index: DetectorIndex::Identity,
             num_observables,
             distance_1_error_mask,
-            construction_budget: GraphConstructionBudget::new("graphlike search"),
+            construction_budget: GraphConstructionBudget::new(
+                "graphlike search",
+                LogicalErrorSearchLimits::default(),
+            ),
         }
     }
 
@@ -436,6 +438,18 @@ impl Graph {
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
     ) -> CircuitResult<Self> {
+        Self::from_dem_with_limits(
+            model,
+            ignore_ungraphlike_errors,
+            LogicalErrorSearchLimits::default(),
+        )
+    }
+
+    pub(super) fn from_dem_with_limits(
+        model: &DetectorErrorModel,
+        ignore_ungraphlike_errors: bool,
+        limits: LogicalErrorSearchLimits,
+    ) -> CircuitResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
         let full_observable_count = traversal.root().summary().observable_count();
@@ -445,25 +459,21 @@ impl Graph {
             SearchGraphTargetPolicy::Graphlike {
                 ignore_ungraphlike_errors,
             },
-            MAX_FULL_DEM_SEARCH_GRAPH_NODES,
+            limits,
         )?;
-        let effective_detector_count = effective_detectors.len();
-        if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "graphlike search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
-            )));
-        }
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
             CircuitError::invalid_detector_error_model("observable count does not fit usize")
         })?;
-        let mut graph = Self::try_new_sparse(
+        let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
             num_observables,
             full_detector_count > 0,
+            limits,
         )?;
-        visit_search_graph_errors(
+        visit_search_graph_errors_with_limits(
             &traversal,
             "graphlike search",
+            limits,
             |instruction, detector_offset| {
                 let shifted = shifted_targets(instruction.targets(), detector_offset)?;
                 graph.add_edges_from_separable_targets(&shifted, ignore_ungraphlike_errors)

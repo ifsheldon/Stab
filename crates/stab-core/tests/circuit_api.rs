@@ -15,7 +15,7 @@ use std::{
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CompiledSampler,
-    QubitId, RepeatBlock, detection_record_width,
+    ParseErrorCode, QubitId, RepeatBlock, RepeatCount, detection_record_width,
     execution::{
         circuit_reference_sample, circuit_reference_sample_tree, count_determined_measurements,
     },
@@ -185,12 +185,13 @@ fn pf1_circuit_stats_counts_do_not_unroll_large_repeats() {
 
 #[test]
 fn pf1_circuit_stats_counts_reject_folded_overflow() {
-    let circuit = Circuit::from_stim_str(
-        "REPEAT 18446744073709551615 {\n\
-             M 0 1\n\
-         }\n",
-    )
-    .expect("parse circuit");
+    let body = Circuit::from_stim_str("M 0 1\n").expect("parse repeat body");
+    let mut circuit = Circuit::new();
+    circuit.append_repeat_block(RepeatBlock::new(
+        RepeatCount::try_new(u64::MAX).expect("nonzero programmatic repeat count"),
+        body,
+        None,
+    ));
 
     let error = circuit
         .count_measurements()
@@ -520,6 +521,11 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
         circuit.to_stim_string()
     );
 
+    let opaque_path = dir.join("opaque.stim");
+    fs::write(&opaque_path, b"H[\xff] 0 # \xfe\n").expect("write opaque circuit");
+    let opaque = Circuit::from_stim_file(&opaque_path).expect("read opaque circuit bytes");
+    assert_eq!(opaque.to_stim_bytes(), b"H[\xff] 0\n");
+
     fs::remove_dir_all(dir).expect("cleanup temp test dir");
 }
 
@@ -547,8 +553,9 @@ fn pf1_circuit_file_helpers_report_read_and_write_errors() {
     let invalid_path = dir.join("invalid.stim");
     fs::write(&invalid_path, "UNKNOWN 0\n").expect("write invalid circuit");
     let parse_error = Circuit::from_stim_file(&invalid_path).expect_err("reject invalid circuit");
-    assert!(
-        matches!(parse_error, CircuitError::ParseLine { .. }),
+    assert_eq!(
+        parse_error.parse_error().map(stab_core::ParseError::code),
+        Some(ParseErrorCode::UnknownInstruction),
         "{parse_error}"
     );
 

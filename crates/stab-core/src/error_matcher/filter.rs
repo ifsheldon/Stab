@@ -96,6 +96,7 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
         Ok(DemRepeatSelection::Expand {
             max_total_iterations: MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
             context: "ErrorMatcher filter",
+            resource_operation: None,
         })
     }
 }

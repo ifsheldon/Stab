@@ -16,7 +16,7 @@ use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
     DetectorErrorModel, MAX_DEM_REPEAT_NESTING,
 };
-use crate::{CircuitError, CircuitResult};
+use crate::{CircuitError, CircuitResult, ResourceLimitError, ResourceOperation};
 
 const MAX_DEM_COORDINATE_SCALAR_WORK: u64 = 8_000_000;
 
@@ -85,7 +85,7 @@ impl DemBlockSummary {
 /// structure. Repeat counts affect checked summaries, but do not duplicate body nodes. Analysis
 /// and execution share this representation instead of implementing consumer-specific repeat
 /// recursion.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct FoldedDemTraversal<'a> {
     root: FoldedDemBlock<'a>,
 }
@@ -154,7 +154,7 @@ impl<'a> FoldedDemTraversal<'a> {
 ///
 /// Blocks borrow instructions and repeat declarations from the source model. Their child vectors
 /// mirror compact syntax and never contain one entry per represented repeat iteration.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct FoldedDemBlock<'a> {
     compact_id: usize,
     items: Vec<FoldedDemItem<'a>>,
@@ -163,28 +163,71 @@ pub(crate) struct FoldedDemBlock<'a> {
 
 impl<'a> FoldedDemBlock<'a> {
     fn new(model: &'a DetectorErrorModel, next_block_id: &mut usize) -> CircuitResult<Self> {
-        let compact_id = *next_block_id;
-        *next_block_id = next_block_id.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
-                "DEM compact folded-block identifier overflowed",
-            )
-        })?;
-        let mut items = Vec::with_capacity(model.items().len());
-        for item in model.items() {
-            items.push(match item {
-                DemItem::Instruction(instruction) => FoldedDemItem::Instruction(instruction),
-                DemItem::RepeatBlock(repeat) => FoldedDemItem::Repeat {
-                    repeat,
-                    body: Box::new(Self::new(repeat.body(), next_block_id)?),
-                },
-            });
+        let root_id = take_next_block_id(next_block_id)?;
+        let mut stack = vec![FoldedDemBuildFrame::new(model, root_id, None)];
+        loop {
+            let action = {
+                let frame = stack.last_mut().ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "DEM folded traversal build stack became empty",
+                    )
+                })?;
+                match frame.model.items().get(frame.next_item) {
+                    Some(DemItem::Instruction(instruction)) => {
+                        frame.next_item = frame.next_item.saturating_add(1);
+                        FoldedDemBuildAction::Instruction(instruction)
+                    }
+                    Some(DemItem::RepeatBlock(repeat)) => {
+                        frame.next_item = frame.next_item.saturating_add(1);
+                        FoldedDemBuildAction::Repeat(repeat)
+                    }
+                    None => FoldedDemBuildAction::Finish,
+                }
+            };
+            match action {
+                FoldedDemBuildAction::Instruction(instruction) => {
+                    let frame = stack.last_mut().ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM folded traversal lost its instruction parent",
+                        )
+                    })?;
+                    frame.items.push(FoldedDemItem::Instruction(instruction));
+                }
+                FoldedDemBuildAction::Repeat(repeat) => {
+                    let compact_id = take_next_block_id(next_block_id)?;
+                    stack.push(FoldedDemBuildFrame::new(
+                        repeat.body(),
+                        compact_id,
+                        Some(repeat),
+                    ));
+                }
+                FoldedDemBuildAction::Finish => {
+                    let frame = stack.pop().ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM folded traversal lost its completed block",
+                        )
+                    })?;
+                    let parent_repeat = frame.parent_repeat;
+                    let block = Self {
+                        compact_id: frame.compact_id,
+                        summary: summarize(&frame.items),
+                        items: frame.items,
+                    };
+                    let Some(parent) = stack.last_mut() else {
+                        return Ok(block);
+                    };
+                    let repeat = parent_repeat.ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM folded traversal child has no repeat declaration",
+                        )
+                    })?;
+                    parent.items.push(FoldedDemItem::Repeat {
+                        repeat,
+                        body: Box::new(block),
+                    });
+                }
+            }
         }
-        let summary = summarize(&items);
-        Ok(Self {
-            compact_id,
-            items,
-            summary,
-        })
     }
 
     /// Returns the traversal-local identity of this compact block.
@@ -276,8 +319,67 @@ impl<'a> FoldedDemBlock<'a> {
     }
 }
 
+impl Drop for FoldedDemBlock<'_> {
+    fn drop(&mut self) {
+        let mut pending = Vec::new();
+        take_child_blocks(&mut self.items, &mut pending);
+        while let Some(mut block) = pending.pop() {
+            take_child_blocks(&mut block.items, &mut pending);
+        }
+    }
+}
+
+struct FoldedDemBuildFrame<'a> {
+    model: &'a DetectorErrorModel,
+    compact_id: usize,
+    next_item: usize,
+    items: Vec<FoldedDemItem<'a>>,
+    parent_repeat: Option<&'a DemRepeatBlock>,
+}
+
+impl<'a> FoldedDemBuildFrame<'a> {
+    fn new(
+        model: &'a DetectorErrorModel,
+        compact_id: usize,
+        parent_repeat: Option<&'a DemRepeatBlock>,
+    ) -> Self {
+        Self {
+            model,
+            compact_id,
+            next_item: 0,
+            items: Vec::with_capacity(model.items().len()),
+            parent_repeat,
+        }
+    }
+}
+
+enum FoldedDemBuildAction<'a> {
+    Instruction(&'a DemInstruction),
+    Repeat(&'a DemRepeatBlock),
+    Finish,
+}
+
+fn take_next_block_id(next_block_id: &mut usize) -> CircuitResult<usize> {
+    let compact_id = *next_block_id;
+    *next_block_id = (*next_block_id).checked_add(1).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model("DEM compact folded-block identifier overflowed")
+    })?;
+    Ok(compact_id)
+}
+
+fn take_child_blocks<'a>(
+    items: &mut Vec<FoldedDemItem<'a>>,
+    pending: &mut Vec<Box<FoldedDemBlock<'a>>>,
+) {
+    for item in std::mem::take(items) {
+        if let FoldedDemItem::Repeat { body, .. } = item {
+            pending.push(body);
+        }
+    }
+}
+
 /// Borrowed compact item exposed to advanced analysis and execution consumers.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum FoldedDemItem<'a> {
     Instruction(&'a DemInstruction),
     Repeat {
@@ -458,6 +560,8 @@ pub(crate) enum DemRepeatSelection {
         max_total_iterations: u64,
         /// Operation name included in a resource-limit error.
         context: &'static str,
+        /// Structured operation identity when the expansion limit is caller-selectable.
+        resource_operation: Option<ResourceOperation>,
     },
     /// Visit selected iteration indexes in the supplied order.
     ///
@@ -562,14 +666,18 @@ where
         DemRepeatSelection::Expand {
             max_total_iterations,
             context,
+            resource_operation,
         } => {
             expansion.used_iterations = expansion
                 .used_iterations
                 .checked_add(repeat_count)
-                .ok_or_else(|| expansion_error(context, max_total_iterations, u64::MAX))?;
+                .ok_or_else(|| {
+                    expansion_error(context, resource_operation, max_total_iterations, u64::MAX)
+                })?;
             if expansion.used_iterations > max_total_iterations {
                 return Err(expansion_error(
                     context,
+                    resource_operation,
                     max_total_iterations,
                     expansion.used_iterations,
                 ));
@@ -609,7 +717,18 @@ where
     }
 }
 
-fn expansion_error(context: &'static str, limit: u64, actual: u64) -> CircuitError {
+fn expansion_error(
+    context: &'static str,
+    resource_operation: Option<ResourceOperation>,
+    limit: u64,
+    actual: u64,
+) -> CircuitError {
+    if let Some(operation) = resource_operation {
+        return ResourceLimitError::dem_traversal_repeat_iterations(
+            operation, context, actual, limit,
+        )
+        .into();
+    }
     CircuitError::invalid_detector_error_model(format!(
         "DEM {context} traversal currently supports at most {limit} expanded repeat iterations, got at least {actual}"
     ))
@@ -876,24 +995,33 @@ pub(super) fn shifted_targets(
     targets: &[DemTarget],
     detector_offset: u64,
 ) -> CircuitResult<Vec<DemTarget>> {
-    targets
-        .iter()
-        .map(|target| match *target {
-            DemTarget::RelativeDetector(detector) => Ok(DemTarget::RelativeDetector(
-                shifted_detector(detector, detector_offset)?,
-            )),
-            DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
-                Ok(*target)
+    let mut shifted = Vec::new();
+    shifted
+        .try_reserve_exact(targets.len())
+        .map_err(|_| detector_summary_error("target allocation failed"))?;
+    for target in targets {
+        let target = match *target {
+            DemTarget::RelativeDetector(detector) => {
+                DemTarget::RelativeDetector(shifted_detector(detector, detector_offset)?)
             }
-        })
-        .collect()
+            DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
+                *target
+            }
+        };
+        shifted.push(target);
+    }
+    Ok(shifted)
 }
 
 pub(super) fn shifted_coordinates(
     coordinates: &[f64],
     coordinate_shift: &[f64],
 ) -> CircuitResult<Vec<f64>> {
-    let mut shifted = coordinates.to_vec();
+    let mut shifted = Vec::new();
+    shifted
+        .try_reserve_exact(coordinates.len())
+        .map_err(|_| detector_summary_error("coordinate allocation failed"))?;
+    shifted.extend_from_slice(coordinates);
     for (index, coordinate) in shifted.iter_mut().enumerate() {
         if let Some(delta) = coordinate_shift.get(index) {
             *coordinate += delta;

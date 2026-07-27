@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{CircuitError, CircuitResult, DemTarget, Probability};
 
+use super::AnalyzerTag;
 use super::probabilities::xor_probability;
 
 type KnownGraphlikeComponents = BTreeMap<Vec<DemTarget>, Vec<DemTarget>>;
-type TaggedErrorKey = (Vec<DemTarget>, Option<String>);
+type TaggedErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 
 pub(super) fn decompose_tagged_error_probabilities(
     probabilities: BTreeMap<TaggedErrorKey, Probability>,

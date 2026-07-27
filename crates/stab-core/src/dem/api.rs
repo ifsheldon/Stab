@@ -10,7 +10,7 @@ use super::coordinate_scan::{
 };
 use super::traversal::{
     DemDetectorBounds, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
-    FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates,
+    FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_targets,
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
@@ -781,33 +781,18 @@ fn flatten_instruction(
     let args = if instruction.kind() == DemInstructionKind::Detector {
         shifted_coordinates(instruction.args(), coordinate_shift)?
     } else {
-        instruction.args().to_vec()
-    };
-    let targets = instruction
-        .targets()
-        .iter()
-        .map(|target| shifted_target(*target, detector_offset))
-        .collect::<CircuitResult<Vec<_>>>()?;
-    DemInstruction::new(
-        instruction.kind(),
-        args,
-        targets,
-        instruction.tag().map(ToOwned::to_owned),
-    )
-}
-
-fn shifted_target(target: DemTarget, detector_offset: u64) -> CircuitResult<DemTarget> {
-    match target {
-        DemTarget::RelativeDetector(detector) => {
-            let shifted = detector.get().checked_add(detector_offset).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("relative detector id overflowed")
+        let mut args = Vec::new();
+        args.try_reserve_exact(instruction.args().len())
+            .map_err(|_| {
+                CircuitError::invalid_detector_error_model(
+                    "flattened instruction argument allocation failed",
+                )
             })?;
-            DemTarget::relative_detector(shifted)
-        }
-        DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
-            Ok(target)
-        }
-    }
+        args.extend_from_slice(instruction.args());
+        args
+    };
+    let targets = shifted_targets(instruction.targets(), detector_offset)?;
+    DemInstruction::new_with_tag_bytes(instruction.kind(), args, targets, instruction.tag_bytes())
 }
 
 pub(super) fn add_coordinate_shift_mul(

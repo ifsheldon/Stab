@@ -5,9 +5,9 @@ use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_core::{
     Circuit, CircuitError, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
-    PauliBasis, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
-    StabilizerResource, StabilizerResult, Tableau, TableauIterator, circuit_flow_generators,
-    stabilizers_to_tableau, unitary_to_tableau,
+    PauliBasis, PauliSign, PauliString, PauliStringIterator, RepeatBlock, RepeatCount,
+    SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
+    TableauIterator, circuit_flow_generators, stabilizers_to_tableau, unitary_to_tableau,
 };
 
 fn assert_resource_limit<T>(
@@ -347,21 +347,28 @@ fn cq2_algebra_circuit_tableau_repeat_work_is_logarithmic_and_bounded() {
     assert_eq!(resource.limit() % work_per_composition, 0);
 
     let nested = |depth: usize| {
-        let mut body = "H 0\n".to_owned();
+        let mut body = Circuit::from_stim_str("H 0\n").expect("parse nested repeat leaf");
         for _ in 0..depth {
-            body = format!("REPEAT 18446744073709551615 {{\n{body}}}\n");
+            let mut outer = Circuit::new();
+            outer.append_repeat_block(RepeatBlock::new(
+                RepeatCount::try_new(u64::MAX).expect("programmatic repeat count"),
+                body,
+                None,
+            ));
+            body = outer;
         }
-        format!("I 511\n{body}")
+        let mut result = Circuit::from_stim_str("I 511\n").expect("parse width marker");
+        result.append_circuit(&body);
+        result
     };
-    let accepted = Circuit::from_stim_str(&nested(accepted_depth))
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+    let accepted = nested(accepted_depth)
+        .to_tableau(false, false, false)
         .expect("last accepted aggregate compact-repeat work");
     let accepted_expected = Circuit::from_stim_str("I 511\nH 0\n")
         .and_then(|circuit| circuit.to_tableau(false, false, false))
         .expect("wide H tableau");
     assert_eq!(accepted, accepted_expected);
-    let rejected = Circuit::from_stim_str(&nested(accepted_depth + 1))
-        .and_then(|circuit| circuit.to_tableau(false, false, false));
+    let rejected = nested(accepted_depth + 1).to_tableau(false, false, false);
     assert!(matches!(
         rejected,
         Err(CircuitError::InvalidTableauConversion { ref message })

@@ -5,8 +5,8 @@
 )]
 
 use super::{
-    DemTarget, DetectorErrorModel, Graph, MAX_HYPERGRAPH_EDGE_DEGREE,
-    find_undetectable_logical_error,
+    DemTarget, DetectorErrorModel, Graph, LogicalErrorSearchLimits, MAX_HYPERGRAPH_EDGE_DEGREE,
+    find_undetectable_logical_error_with_limits,
 };
 
 #[test]
@@ -85,8 +85,17 @@ fn hyper_graph_rejects_excessive_edge_incidences_before_allocation() {
 #[test]
 fn hypergraph_search_bounds_variable_state_payloads() {
     let per_state = variable_payload_model(64, 2);
-    let error = find_undetectable_logical_error(&per_state, usize::MAX, usize::MAX, false)
-        .expect_err("per-state payload cap");
+    let limits = LogicalErrorSearchLimits::default()
+        .with_max_search_state_terms(64)
+        .with_max_stored_search_state_terms(256);
+    let error = find_undetectable_logical_error_with_limits(
+        &per_state,
+        usize::MAX,
+        usize::MAX,
+        false,
+        limits,
+    )
+    .expect_err("per-state payload cap");
     assert!(
         error
             .to_string()
@@ -94,8 +103,14 @@ fn hypergraph_search_bounds_variable_state_payloads() {
     );
 
     let aggregate = variable_payload_model(60, 4);
-    let error = find_undetectable_logical_error(&aggregate, usize::MAX, usize::MAX, false)
-        .expect_err("aggregate payload cap");
+    let error = find_undetectable_logical_error_with_limits(
+        &aggregate,
+        usize::MAX,
+        usize::MAX,
+        false,
+        limits,
+    )
+    .expect_err("aggregate payload cap");
     assert!(
         error
             .to_string()

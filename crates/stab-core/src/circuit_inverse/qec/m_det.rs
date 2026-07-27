@@ -100,14 +100,14 @@ fn build_selected_m_det_inverse(
         reset.gate(),
         reset.args(),
         vec![target2.clone(), target1.clone()],
-        reset.tag(),
+        reset.tag_bytes(),
     )?;
     super::append_one_target_instruction(
         &mut result,
         middle.gate(),
         middle.args(),
         target0,
-        middle.tag(),
+        middle.tag_bytes(),
     )?;
     result.append_instruction(first_tick.clone());
     super::append_target_instruction(
@@ -115,7 +115,7 @@ fn build_selected_m_det_inverse(
         last.gate(),
         last.args(),
         reversed_targets.clone(),
-        last.tag(),
+        last.tag_bytes(),
     )?;
     result.append_instruction(second_tick.clone());
     super::append_target_instruction(
@@ -123,7 +123,7 @@ fn build_selected_m_det_inverse(
         middle.gate(),
         middle.args(),
         reversed_targets,
-        middle.tag(),
+        middle.tag_bytes(),
     )?;
     super::append_target_instruction(
         &mut result,
@@ -132,7 +132,7 @@ fn build_selected_m_det_inverse(
         vec![Target::measurement_record(MeasureRecordOffset::try_new(
             -3,
         )?)],
-        first_detector.tag(),
+        first_detector.tag_bytes(),
     )?;
     super::append_target_instruction(
         &mut result,
@@ -141,7 +141,7 @@ fn build_selected_m_det_inverse(
         vec![Target::measurement_record(MeasureRecordOffset::try_new(
             -2,
         )?)],
-        second_detector.tag(),
+        second_detector.tag_bytes(),
     )?;
     Ok(result)
 }

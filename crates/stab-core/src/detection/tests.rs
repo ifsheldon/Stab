@@ -6,6 +6,7 @@
 )]
 
 use super::*;
+use crate::SampleFormat;
 
 #[cfg(feature = "ops-contracts")]
 use std::hint::black_box;

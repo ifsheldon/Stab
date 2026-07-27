@@ -37,10 +37,10 @@ fn append_simplified_circuit(circuit: &Circuit, result: &mut Circuit) -> Circuit
                 append_simplified_instruction(instruction, result)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                result.append_repeat_block(RepeatBlock::new(
+                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     simplified_circuit(repeat.body())?,
-                    repeat.tag().map(ToOwned::to_owned),
+                    repeat.tag_bytes(),
                 ));
             }
         }
@@ -55,10 +55,10 @@ fn append_decomposed_circuit(circuit: &Circuit, result: &mut Circuit) -> Circuit
                 append_decomposed_instruction(instruction, result)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                result.append_repeat_block(RepeatBlock::new(
+                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
                     repeat.repeat_count(),
                     decomposed_circuit(repeat.body())?,
-                    repeat.tag().map(ToOwned::to_owned),
+                    repeat.tag_bytes(),
                 ));
             }
         }
@@ -74,7 +74,12 @@ fn append_simplified_instruction(
         && let Some(sequence) = single_qubit_base_decomposition(instruction.gate())?
     {
         for target in instruction.targets() {
-            append_single_target_sequence(result, &sequence, target.clone(), instruction.tag())?;
+            append_single_target_sequence(
+                result,
+                &sequence,
+                target.clone(),
+                instruction.tag_bytes(),
+            )?;
         }
         return Ok(());
     }
@@ -84,7 +89,7 @@ fn append_simplified_instruction(
     {
         for group in instruction.target_groups() {
             if group.iter().all(Target::is_qubit_target) {
-                append_two_target_sequence(result, &sequence, group, instruction.tag())?;
+                append_two_target_sequence(result, &sequence, group, instruction.tag_bytes())?;
             } else {
                 append_instruction_group(result, instruction, group)?;
             }
@@ -178,7 +183,7 @@ fn append_template_decomposition(
             result,
             template_instruction.gate(),
             targets,
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
     }
     Ok(())
@@ -232,14 +237,14 @@ fn append_single_target_sequence(
     result: &mut Circuit,
     sequence: &[Gate],
     target: Target,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     for gate in sequence {
-        result.append_instruction(CircuitInstruction::new(
+        result.append_instruction(CircuitInstruction::new_with_tag_bytes(
             *gate,
             Vec::new(),
             vec![target.clone()],
-            tag.map(ToOwned::to_owned),
+            tag,
         )?);
     }
     Ok(())
@@ -259,12 +264,12 @@ fn append_decomposed_mpp(
                     QubitId::new(u32::from(product.negative))?,
                     false,
                 )],
-                instruction.tag(),
+                instruction.tag_bytes(),
             )?;
             continue;
         }
-        append_product_basis_change(result, &product.terms, instruction.tag())?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag())?;
+        append_product_basis_change(result, &product.terms, instruction.tag_bytes())?;
+        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
         let accumulator = product
             .terms
             .first()
@@ -274,10 +279,10 @@ fn append_decomposed_mpp(
             result,
             Gate::from_name("M")?,
             vec![Target::qubit(accumulator, product.negative)],
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag())?;
-        append_product_basis_change_reversed(result, &product.terms, instruction.tag())?;
+        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
+        append_product_basis_change_reversed(result, &product.terms, instruction.tag_bytes())?;
     }
     Ok(())
 }
@@ -292,8 +297,8 @@ fn append_decomposed_spp(
         if product.terms.is_empty() {
             continue;
         }
-        append_product_basis_change(result, &product.terms, instruction.tag())?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag())?;
+        append_product_basis_change(result, &product.terms, instruction.tag_bytes())?;
+        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
         let phase_gate = if product.negative ^ dagger {
             Gate::from_name("S_DAG")?
         } else {
@@ -313,10 +318,10 @@ fn append_decomposed_spp(
                     .qubit,
                 false,
             ),
-            instruction.tag(),
+            instruction.tag_bytes(),
         )?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag())?;
-        append_product_basis_change_reversed(result, &product.terms, instruction.tag())?;
+        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
+        append_product_basis_change_reversed(result, &product.terms, instruction.tag_bytes())?;
     }
     Ok(())
 }
@@ -324,7 +329,7 @@ fn append_decomposed_spp(
 fn append_product_basis_change(
     result: &mut Circuit,
     terms: &[ProductTerm],
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     for term in terms {
         append_basis_change(result, *term, tag)?;
@@ -335,7 +340,7 @@ fn append_product_basis_change(
 fn append_product_basis_change_reversed(
     result: &mut Circuit,
     terms: &[ProductTerm],
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     for term in terms.iter().rev() {
         append_basis_change(result, *term, tag)?;
@@ -346,7 +351,7 @@ fn append_product_basis_change_reversed(
 fn append_basis_change(
     result: &mut Circuit,
     term: ProductTerm,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     match term.pauli {
         Pauli::X => append_gate_on_qubit(result, Gate::from_name("H")?, term.qubit, tag),
@@ -366,7 +371,7 @@ fn append_basis_change(
 fn append_product_cx_fanout(
     result: &mut Circuit,
     terms: &[ProductTerm],
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     let Some(accumulator) = terms.first().map(|term| term.qubit) else {
         return Ok(());
@@ -390,7 +395,7 @@ fn append_gate_on_qubit(
     result: &mut Circuit,
     gate: Gate,
     qubit: QubitId,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     append_gate_targets(result, gate, vec![Target::qubit(qubit, false)], tag)
 }
@@ -399,16 +404,16 @@ fn append_gate_targets(
     result: &mut Circuit,
     gate: Gate,
     targets: Vec<Target>,
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     if targets.is_empty() {
         return Ok(());
     }
-    result.append_instruction(CircuitInstruction::new(
+    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
         gate,
         Vec::new(),
         targets,
-        tag.map(ToOwned::to_owned),
+        tag,
     )?);
     Ok(())
 }
@@ -418,11 +423,11 @@ fn append_instruction_group(
     instruction: &CircuitInstruction,
     targets: &[Target],
 ) -> CircuitResult<()> {
-    result.append_instruction(CircuitInstruction::new(
+    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets.to_vec(),
-        instruction.tag().map(ToOwned::to_owned),
+        instruction.tag_bytes(),
     )?);
     Ok(())
 }
@@ -431,7 +436,7 @@ fn append_two_target_sequence(
     result: &mut Circuit,
     sequence: &[BaseTwoQubitStep],
     targets: &[Target],
-    tag: Option<&str>,
+    tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     let left = targets
         .first()
@@ -454,11 +459,11 @@ fn append_two_target_sequence(
                     PairOrder::LeftRight => vec![left.clone(), right.clone()],
                     PairOrder::RightLeft => vec![right.clone(), left.clone()],
                 };
-                result.append_instruction(CircuitInstruction::new(
+                result.append_instruction(CircuitInstruction::new_with_tag_bytes(
                     *gate,
                     Vec::new(),
                     pair,
-                    tag.map(ToOwned::to_owned),
+                    tag,
                 )?);
             }
         }

@@ -13,6 +13,13 @@ fn analyze(text: &str) -> String {
         .to_dem_string()
 }
 
+fn analyze_bytes(text: &[u8], options: ErrorAnalyzerOptions) -> Vec<u8> {
+    let circuit = Circuit::from_stim_bytes(text).expect("circuit");
+    circuit_to_detector_error_model(&circuit, options)
+        .expect("analyze")
+        .to_dem_bytes()
+}
+
 #[test]
 fn dem_analyzer_preserves_instruction_tags_on_errors_and_declarations() {
     let dem = analyze(
@@ -89,4 +96,51 @@ fn dem_analyzer_preserves_tags_when_folding_prefixed_repeat() {
             "logical_observable[test-tag-4] L0\n",
         )
     );
+}
+
+#[test]
+fn dem_analyzer_keeps_distinct_opaque_error_tags_unmerged() {
+    let dem = analyze_bytes(
+        b"R 0\n\
+          X_ERROR[\xff](0.125) 0\n\
+          X_ERROR[\xfe](0.25) 0\n\
+          M 0\n\
+          DETECTOR rec[-1]\n",
+        ErrorAnalyzerOptions::default(),
+    );
+
+    assert_eq!(
+        dem,
+        b"error[\xfe](0.25) D0\n\
+          error[\xff](0.125) D0\n"
+    );
+}
+
+#[test]
+fn folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged() {
+    let dem = analyze_bytes(
+        b"R 0\n\
+          REPEAT 100 {\n\
+              X_ERROR[\xff](0.125) 0\n\
+              X_ERROR[\xfe](0.25) 0\n\
+              MR 0\n\
+              DETECTOR rec[-1]\n\
+          }\n",
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    );
+    let expected = [
+        b"repeat 99 {\n".as_slice(),
+        b"    error[\xfe](0.25) D0\n".as_slice(),
+        b"    error[\xff](0.125) D0\n".as_slice(),
+        b"    shift_detectors 1\n".as_slice(),
+        b"}\n".as_slice(),
+        b"error[\xfe](0.25) D0\n".as_slice(),
+        b"error[\xff](0.125) D0\n".as_slice(),
+    ]
+    .concat();
+
+    assert_eq!(dem, expected);
 }

@@ -9,7 +9,7 @@ struct RecordTailOutput {
     gate: Gate,
     args: Vec<f64>,
     targets: Vec<Target>,
-    tag: Option<String>,
+    tag: Option<Box<[u8]>>,
 }
 
 pub(super) fn selected_mpad_record_tail_inverse(
@@ -50,7 +50,7 @@ fn build_selected_mpad_record_tail_inverse(
                         gate: instruction.gate(),
                         args: instruction.args().to_vec(),
                         targets,
-                        tag: instruction.tag().map(str::to_owned),
+                        tag: instruction.tag_bytes().map(Box::<[u8]>::from),
                     });
                 }
             }
@@ -71,7 +71,7 @@ fn build_selected_mpad_record_tail_inverse(
                             gate: instruction.gate(),
                             args: instruction.args().to_vec(),
                             targets,
-                            tag: instruction.tag().map(str::to_owned),
+                            tag: instruction.tag_bytes().map(Box::<[u8]>::from),
                         },
                     );
                 }
@@ -85,11 +85,11 @@ fn build_selected_mpad_record_tail_inverse(
     }
 
     let mut result = Circuit::new();
-    result.append_instruction(CircuitInstruction::new(
+    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
         mpad.gate(),
         mpad.args().to_vec(),
         mpad.targets().iter().rev().cloned().collect(),
-        mpad.tag().map(str::to_owned),
+        mpad.tag_bytes(),
     )?);
     for output in detector_outputs
         .into_iter()
@@ -98,11 +98,11 @@ fn build_selected_mpad_record_tail_inverse(
         if output.targets.is_empty() {
             continue;
         }
-        result.append_instruction(CircuitInstruction::new(
+        result.append_instruction(CircuitInstruction::new_with_tag_bytes(
             output.gate,
             output.args,
             output.targets,
-            output.tag,
+            output.tag.as_deref(),
         )?);
     }
     Ok(result)

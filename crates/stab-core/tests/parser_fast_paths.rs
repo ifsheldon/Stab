@@ -29,15 +29,12 @@ fn common_phase_and_annotation_paths_preserve_public_semantics() {
 }
 
 #[test]
-fn detector_fast_path_preserves_generic_unicode_whitespace() {
+fn detector_fast_path_rejects_non_stim_unicode_whitespace() {
     for separator in ['\u{a0}', '\u{2003}'] {
-        let exact = Circuit::from_stim_str(&format!("DETECTOR rec[-1]{separator}rec[-2]\n"))
-            .expect("parse uppercase detector with Unicode whitespace");
-        let generic = Circuit::from_stim_str(&format!("detector rec[-1]{separator}rec[-2]\n"))
-            .expect("parse lowercase detector with Unicode whitespace");
-
-        assert_eq!(exact, generic);
-        assert_eq!(exact.to_stim_string(), "DETECTOR rec[-1] rec[-2]\n");
+        for name in ["DETECTOR", "detector"] {
+            Circuit::from_stim_str(&format!("{name} rec[-1]{separator}rec[-2]\n"))
+                .expect_err("reject non-Stim Unicode target separator");
+        }
     }
 }
 
@@ -71,6 +68,19 @@ fn qualification_cycle_uses_one_bounded_item_allocation() {
     assert_eq!(allocations.count_max, 1, "{allocations:?}");
     assert_eq!(allocations.bytes_total, expected_bytes, "{allocations:?}");
     assert_eq!(allocations.bytes_max, expected_bytes, "{allocations:?}");
+
+    let byte_allocations = allocation_counter::measure(|| {
+        let parsed = Circuit::from_stim_bytes(input.as_bytes()).expect("measured byte-entry parse");
+        std::hint::black_box(parsed.items().len());
+    });
+    assert_eq!(
+        byte_allocations.count_total, allocations.count_total,
+        "{byte_allocations:?}"
+    );
+    assert_eq!(
+        byte_allocations.bytes_total, allocations.bytes_total,
+        "{byte_allocations:?}"
+    );
 }
 
 #[test]

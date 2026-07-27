@@ -562,7 +562,8 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
 
 fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
     match error {
-        CircuitError::UnknownGate(_)
+        CircuitError::Parse(_)
+        | CircuitError::UnknownGate(_)
         | CircuitError::InvalidDomainValue { .. }
         | CircuitError::ParseLine { .. }
         | CircuitError::InvalidArgumentCount { .. }

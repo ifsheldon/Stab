@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstruction,
-    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Pauli, Probability, RepeatCount,
-    Target,
+    DemInstructionKind, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Pauli,
+    Probability, RepeatCount, Target,
     sparse_rev_frame_tracker::{
         AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
         search_shifted_recurrence,
@@ -11,13 +11,14 @@ use crate::{
 };
 
 use super::{
-    ErrorAnalyzerOptions,
+    AnalyzerTag, ErrorAnalyzerOptions,
     decompose::decompose_tagged_error_probabilities,
     effects::AnalyzerPauli,
     error_decomp::{
         depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
         pauli_channel2_components,
     },
+    owned_tag,
     probabilities::{merge_disjoint_probability, merge_independent_probability},
     try_disjoint_to_independent_xyz_errors,
 };
@@ -38,7 +39,7 @@ const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
 const MAX_LOOP_CYCLE_STEPS: u64 = 4_096;
 const MAX_BOUNDED_REPEAT_UNROLL: u64 = 100_000;
 
-type ErrorKey = (Vec<DemTarget>, Option<String>);
+type ErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct ReverseFoldDiagnostics {
@@ -151,7 +152,7 @@ impl ReverseFoldAnalyzer {
                     self.undo_instruction(instruction)?;
                 }
                 CircuitItem::RepeatBlock(repeat) => {
-                    self.run_loop(repeat.body(), repeat.repeat_count(), repeat.tag())?;
+                    self.run_loop(repeat.body(), repeat.repeat_count(), repeat.tag_bytes())?;
                 }
             }
         }
@@ -185,10 +186,11 @@ impl ReverseFoldAnalyzer {
             "DETECTOR" => {
                 self.tracker.undo_instruction(instruction)?;
                 self.reversed_model
-                    .push_instruction(DemInstruction::detector(
+                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::Detector,
                         instruction.args().to_vec(),
-                        DemTarget::relative_detector(self.tracker.detector_count())?,
-                        instruction.tag().map(ToOwned::to_owned),
+                        vec![DemTarget::relative_detector(self.tracker.detector_count())?],
+                        instruction.tag_bytes(),
                     )?);
             }
             "OBSERVABLE_INCLUDE" => {
@@ -199,17 +201,20 @@ impl ReverseFoldAnalyzer {
                     )
                 })?;
                 self.reversed_model
-                    .push_instruction(DemInstruction::logical_observable(
-                        DemTarget::logical_observable(observable.get())?,
-                        instruction.tag().map(ToOwned::to_owned),
+                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::LogicalObservable,
+                        Vec::new(),
+                        vec![DemTarget::logical_observable(observable.get())?],
+                        instruction.tag_bytes(),
                     )?);
             }
             "SHIFT_COORDS" => {
                 self.reversed_model
-                    .push_instruction(DemInstruction::shift_detectors(
+                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::ShiftDetectors,
                         instruction.args().to_vec(),
-                        0,
-                        instruction.tag().map(ToOwned::to_owned),
+                        vec![DemTarget::numeric(0)],
+                        instruction.tag_bytes(),
                     )?);
             }
             "TICK" => {
@@ -244,11 +249,7 @@ impl ReverseFoldAnalyzer {
         })?;
         for index in (start..end).rev() {
             let targets = self.tracker.record_targets_at(index)?;
-            self.add_independent_error(
-                probability,
-                targets,
-                instruction.tag().map(ToOwned::to_owned),
-            )?;
+            self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))?;
         }
         Ok(())
     }
@@ -269,11 +270,7 @@ impl ReverseFoldAnalyzer {
                 ))
             })?;
             let targets = self.tracker.error_sensitivity(qubit, pauli)?;
-            self.add_independent_error(
-                probability,
-                targets,
-                instruction.tag().map(ToOwned::to_owned),
-            )?;
+            self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))?;
         }
         Ok(())
     }
@@ -283,11 +280,7 @@ impl ReverseFoldAnalyzer {
             return Ok(());
         };
         let targets = self.composite_error_targets(instruction.targets())?;
-        self.add_independent_error(
-            probability,
-            targets,
-            instruction.tag().map(ToOwned::to_owned),
-        )
+        self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))
     }
 
     fn record_depolarize1(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -313,7 +306,7 @@ impl ReverseFoldAnalyzer {
                     self.tracker.error_sensitivity(qubit, Pauli::X)?,
                 ],
                 false,
-                instruction.tag(),
+                instruction.tag_bytes(),
             )?;
         }
         Ok(())
@@ -354,7 +347,7 @@ impl ReverseFoldAnalyzer {
                     self.tracker.error_sensitivity(right, Pauli::X)?,
                 ],
                 false,
-                instruction.tag(),
+                instruction.tag_bytes(),
             )?;
         }
         Ok(())
@@ -394,7 +387,7 @@ impl ReverseFoldAnalyzer {
                     self.add_independent_error(
                         probability,
                         self.tracker.error_sensitivity(qubit, pauli)?,
-                        instruction.tag().map(ToOwned::to_owned),
+                        owned_tag(instruction.tag_bytes()),
                     )?;
                 }
             } else {
@@ -404,7 +397,7 @@ impl ReverseFoldAnalyzer {
                         Ok((probability, self.tracker.error_sensitivity(qubit, pauli)?))
                     })
                     .collect::<CircuitResult<Vec<_>>>()?;
-                self.add_disjoint_components(disjoint, instruction.tag())?;
+                self.add_disjoint_components(disjoint, instruction.tag_bytes())?;
             }
         }
         Ok(())
@@ -452,7 +445,7 @@ impl ReverseFoldAnalyzer {
                     ))
                 })
                 .collect::<CircuitResult<Vec<_>>>()?;
-            self.add_disjoint_components(disjoint, instruction.tag())?;
+            self.add_disjoint_components(disjoint, instruction.tag_bytes())?;
         }
         Ok(())
     }
@@ -483,7 +476,7 @@ impl ReverseFoldAnalyzer {
     fn add_disjoint_components(
         &mut self,
         components: impl IntoIterator<Item = (Probability, BTreeSet<DemTarget>)>,
-        tag: Option<&str>,
+        tag: Option<&[u8]>,
     ) -> CircuitResult<()> {
         let mut disjoint = BTreeMap::new();
         for (probability, targets) in components {
@@ -497,11 +490,7 @@ impl ReverseFoldAnalyzer {
             )?;
         }
         for (targets, probability) in disjoint {
-            self.add_independent_error(
-                probability,
-                targets.into_iter().collect(),
-                tag.map(ToOwned::to_owned),
-            )?;
+            self.add_independent_error(probability, targets.into_iter().collect(), owned_tag(tag))?;
         }
         Ok(())
     }
@@ -511,7 +500,7 @@ impl ReverseFoldAnalyzer {
         mut probabilities: Vec<Probability>,
         basis_errors: Vec<BTreeSet<DemTarget>>,
         probabilities_are_disjoint: bool,
-        tag: Option<&str>,
+        tag: Option<&[u8]>,
     ) -> CircuitResult<()> {
         let combination_count = 1_usize
             .checked_shl(u32::try_from(basis_errors.len()).map_err(|_| {
@@ -565,7 +554,7 @@ impl ReverseFoldAnalyzer {
             merge_indistinguishable_disjoint_probabilities(&target_vectors, &mut probabilities)?;
         }
         for (probability, targets) in probabilities.into_iter().zip(target_vectors).skip(1) {
-            self.add_independent_error_targets(probability, targets, tag.map(ToOwned::to_owned))?;
+            self.add_independent_error_targets(probability, targets, owned_tag(tag))?;
         }
         Ok(())
     }
@@ -604,7 +593,7 @@ impl ReverseFoldAnalyzer {
         &mut self,
         probability: Probability,
         targets: BTreeSet<DemTarget>,
-        tag: Option<String>,
+        tag: Option<AnalyzerTag>,
     ) -> CircuitResult<()> {
         self.add_independent_error_targets(probability, targets.into_iter().collect(), tag)
     }
@@ -613,7 +602,7 @@ impl ReverseFoldAnalyzer {
         &mut self,
         probability: Probability,
         targets: Vec<DemTarget>,
-        tag: Option<String>,
+        tag: Option<AnalyzerTag>,
     ) -> CircuitResult<()> {
         if probability.get() == 0.0 || targets.is_empty() {
             return Ok(());
@@ -640,11 +629,13 @@ impl ReverseFoldAnalyzer {
         }
         for ((targets, tag), probability) in probabilities.into_iter().rev() {
             if probability.get() != 0.0 && !targets.is_empty() {
-                self.reversed_model.push_instruction(DemInstruction::error(
-                    probability,
-                    targets,
-                    tag,
-                )?);
+                self.reversed_model
+                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                        DemInstructionKind::Error,
+                        vec![probability.get()],
+                        targets,
+                        tag.as_deref(),
+                    )?);
             }
         }
         Ok(())
@@ -654,7 +645,7 @@ impl ReverseFoldAnalyzer {
         &mut self,
         body: &Circuit,
         repeat_count: RepeatCount,
-        tag: Option<&str>,
+        tag: Option<&[u8]>,
     ) -> CircuitResult<()> {
         let iterations = repeat_count.get();
         if iterations == 0 {
@@ -754,7 +745,7 @@ impl ReverseFoldAnalyzer {
         period_repetitions: u64,
         hare: &SparseReverseFrameTracker,
         tortoise_iterations: &mut u64,
-        tag: Option<&str>,
+        tag: Option<&[u8]>,
     ) -> CircuitResult<()> {
         let measurements_per_period = self
             .tracker
@@ -826,11 +817,12 @@ impl ReverseFoldAnalyzer {
         }
 
         self.reversed_model = outer_reversed;
-        self.reversed_model.push_repeat_block(DemRepeatBlock::new(
-            DemRepeatCount::new(period_repetitions),
-            period_body,
-            tag.map(ToOwned::to_owned),
-        ));
+        self.reversed_model
+            .push_repeat_block(DemRepeatBlock::new_with_tag_bytes(
+                DemRepeatCount::new(period_repetitions),
+                period_body,
+                tag,
+            ));
         Ok(())
     }
 
@@ -901,10 +893,11 @@ fn prepend_detector_shift(
                         "folded analyzer detector shift overflowed",
                     )
                 })?;
-            result.push_instruction(DemInstruction::shift_detectors(
+            result.push_instruction(DemInstruction::new_with_tag_bytes(
+                DemInstructionKind::ShiftDetectors,
                 instruction.args().to_vec(),
-                combined,
-                instruction.tag().map(ToOwned::to_owned),
+                vec![DemTarget::numeric(combined)],
+                instruction.tag_bytes(),
             )?);
         }
         Some(first) => {
