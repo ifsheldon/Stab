@@ -6,7 +6,7 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `688495fd`.
+- A2 diagnostics, resources, fingerprints, and capabilities: active at audited diagnostic checkpoint `8b540bc2`.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -168,6 +168,17 @@ The focused milestone audit found no agent-command behavior defect but rejected 
 
 The full benchmark review found that repeated sampler compilation replaced the previous plan inside the timed loop, so destruction was included despite a compile-only description. Retaining every plan until the finish clock would make memory scale with calibrated iterations, while per-iteration clocks would dominate the small workload. Commit `688495fd` therefore defines the scientifically honest operation as compile-and-release, validates a complete recompiled plan outside timing, and changes the measurement identity to `compile-and-release`. The same commit advances runtime-group schema to version 9 and enforces the previously declarative 600-second measurement-suite timeout through one outer monotonic deadline; every child timeout is the lesser of 30 seconds and remaining suite time.
 
-The current correctness inventory contains 2,886 upstream cases, 2,567 public API items, and 1,801 evidence parents: 637 implemented, 17 evidence-close, and 1,147 planned. Its digest is `3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976`; the current performance digest is `4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8`. Fresh source-current diagnostic reports have not yet been produced under these repaired contracts.
+The current correctness inventory contains 2,886 upstream cases, 2,567 public API items, and 1,801 evidence parents: 637 implemented, 17 evidence-close, and 1,147 planned. Its digest is `3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976`; the current performance digest is `4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8`.
+
+Fresh schema-version-2 diagnostic reports bind clean revision `8b540bc2578dee432fe2c4213749796a6fdbdc5a`, runtime-group schema version 9, the current inventory digests above, and the enforced 600-second suite deadline:
+
+| Group | 64 items | 4,096 items | 65,536 items | Report SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Circuit model fingerprint | 47.839 ns/item | 47.374 ns/item | 46.704 ns/item | `3f0f6541d9a5e2edd8805e864d1291fba46cafc52c29daf0bb9b0573d6da4291` |
+| Inclusive sampling-request fingerprint | 49.402 ns/item | 47.854 ns/item | 47.546 ns/item | `146be4d995d3a17930e970b2958269f0c48ab72952b1938a05fdee9070176225` |
+| Sampling-request estimate | 6.051 ns/item | 5.469 ns/item | 5.509 ns/item | `026245dc43269fdee5c5a2dc19cf5a253b5a7125901718de2e1e3071d18c2ffe` |
+| Sampler compile-and-release | 397.957 ns/item | 375.985 ns/item | 376.940 ns/item | `b20f42810e8f0690cdc34387d7c713e1df18f5b86ba68d8808e0cb4464eff1db` |
+
+The immutable report directories are `target/benchmarks/qualification/a2-circuit-model-fingerprint-8b540bc2`, `target/benchmarks/qualification/a2-sampling-request-fingerprint-8b540bc2`, `target/benchmarks/qualification/a2-sampling-request-estimate-8b540bc2`, and `target/benchmarks/qualification/a2-sampler-compile-release-8b540bc2`. All four record `local_modifications=false` before and after. The AArch64 host remains unverified because swap-in counters increased during each run; swap configuration stayed enabled and unchanged. These results are development diagnostics, not Stim parity, Stab self-regression, release, or formal-completion evidence.
 
 A2 remains active because exact circuit and DEM parser spans and the remaining operation-owned compile, sampling, materialization, and search policies have not been implemented.

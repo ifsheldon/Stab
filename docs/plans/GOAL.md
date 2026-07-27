@@ -20,7 +20,7 @@ Stop and repair the owning source when these documents, generated inventories, o
 ## Current State
 
 - A0 and A1 are complete.
-- A2 is active at implementation checkpoint `688495fd`.
+- A2 is active at audited diagnostic checkpoint `8b540bc2`.
 - Discovery, model and request fingerprints, bounded `inspect` and `plan sample`, folded herald counting, codec-owned output estimates, and four Stab-only product diagnostics are implemented.
 - Correctness inventory: `3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976`.
 - Performance inventory: `4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8`.
