@@ -215,4 +215,9 @@ pub(crate) enum BenchError {
 
     #[error("--track-allocations requires building stab-bench with --features count-allocations")]
     AllocationTrackingUnavailable,
+
+    #[error(
+        "--track-allocations cannot be combined with beta or regression timing gates; run an uninstrumented compare for timing evidence"
+    )]
+    AllocationTrackingTimingGateConflict,
 }

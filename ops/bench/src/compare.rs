@@ -20,6 +20,10 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
+mod options;
+
+use options::validate_compare_options;
+
 #[derive(Clone, Debug)]
 pub(crate) struct CompareOptions {
     pub(crate) baseline: PathBuf,
@@ -47,27 +51,7 @@ pub(crate) fn run_compare(
     manifest: &BenchmarkManifest,
     options: &CompareOptions,
 ) -> Result<(), BenchError> {
-    if options.require_profiler_notes && options.report.is_none() {
-        return Err(BenchError::ProfilerNotesRequireReport);
-    }
-    if options.memory_baseline.is_some() && !options.require_memory_gate {
-        return Err(BenchError::MemoryBaselineRequiresGate);
-    }
-    if options.beta_waivers.is_some() && !options.require_beta_gate {
-        return Err(BenchError::BetaWaiversRequireGate);
-    }
-    if options.regression_waivers.is_some() && options.thresholds.is_none() {
-        return Err(BenchError::RegressionWaiversRequireThresholds);
-    }
-    if options.require_memory_gate && !options.track_allocations {
-        return Err(BenchError::MemoryGateRequiresAllocationTracking);
-    }
-    if options.require_memory_gate && options.memory_baseline.is_none() {
-        return Err(BenchError::MemoryGateRequiresBaseline);
-    }
-    if options.measurement_runs == 0 {
-        return Err(BenchError::InvalidMeasurementRuns);
-    }
+    validate_compare_options(options)?;
     let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_report = read_baseline_report(&baseline_path)?;
@@ -226,7 +210,12 @@ pub(crate) fn run_compare(
         .map_or_else(Default::default, |memory_baseline| {
             apply_memory_gate(&mut report_rows, memory_baseline)
         });
-    let beta_gate_findings = apply_beta_gate(&mut report_rows, beta_waivers.as_ref());
+    let beta_gate_findings = if options.track_allocations {
+        mark_instrumented_timing_not_evaluated(&mut report_rows);
+        Default::default()
+    } else {
+        apply_beta_gate(&mut report_rows, beta_waivers.as_ref())
+    };
     let profiler_note_findings = if let Some(report_dir) = &options.report {
         write_compare_report(CompareReportWrite {
             root,
@@ -289,6 +278,21 @@ pub(crate) fn run_compare(
         })
     } else {
         Ok(())
+    }
+}
+
+fn mark_instrumented_timing_not_evaluated(rows: &mut [CompareRowResult]) {
+    for row in rows {
+        if row.status != "measured" {
+            continue;
+        }
+        if matches!(row.pass_fail_status.as_str(), "pass" | "fail") {
+            row.pass_fail_status = "not-evaluated-instrumented".to_string();
+        }
+        row.beta_gate_status = "not-evaluated-instrumented".to_string();
+        row.beta_gate_waiver_reason = None;
+        row.beta_gate_waiver_follow_up = None;
+        row.beta_gate_error = None;
     }
 }
 
@@ -825,7 +829,8 @@ mod tests {
 
     use super::{
         BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes,
-        build_compare_row_result, run_warmup_rows, validate_profiler_note_content,
+        build_compare_row_result, mark_instrumented_timing_not_evaluated, run_warmup_rows,
+        validate_profiler_note_content,
     };
     use crate::manifest::{BenchmarkRow, Milestone, Runner};
     use crate::report::{AllocationMeasurement, Measurement};
@@ -1048,6 +1053,24 @@ mod tests {
         assert_eq!(result.relative_ratio, Some(0.5));
         assert_eq!(result.pass_fail_status, "pass");
         assert_eq!(result.stab_measurements.len(), 2);
+    }
+
+    #[test]
+    fn allocation_instrumentation_preserves_ratios_without_claiming_timing_evidence() {
+        let mut rows = vec![
+            compare_row("fast-row", Some(0.5)),
+            compare_row("slow-row", Some(2.0)),
+        ];
+
+        mark_instrumented_timing_not_evaluated(&mut rows);
+
+        assert_eq!(rows.first().map(|row| row.relative_ratio), Some(Some(0.5)));
+        assert_eq!(rows.get(1).map(|row| row.relative_ratio), Some(Some(2.0)));
+        for row in rows {
+            assert_eq!(row.pass_fail_status, "not-evaluated-instrumented");
+            assert_eq!(row.beta_gate_status, "not-evaluated-instrumented");
+            assert!(row.beta_gate_error.is_none());
+        }
     }
 
     #[test]
