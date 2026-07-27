@@ -4199,6 +4199,44 @@
         "standalone": true
       },
       {
+        "id": "a2-sampling-compilation-semantic-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "agent_capabilities",
+            "sampling_compilation_is_deterministic_and_preserves_circuit_semantics",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Two compilations of one bounded parsed circuit produce equal immutable execution plans without mutating the source model. Exact deterministic samples prove reset, measurement, and folded-repeat lowering semantics; planning-layer tests separately prove that dry-run planning never executes shots."
+        },
+        "negative_axes": [
+          "nondeterministic-lowering",
+          "source-model-mutation",
+          "reset-lowering-drift",
+          "repeat-lowering-drift",
+          "compiled-semantic-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledSampler::compile"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-parse-policy-default-contract",
         "feature_id": "CQ-RESOURCE",
         "comparator": "exact-value",
@@ -5129,6 +5167,35 @@
         "negative_axes": [
           "herald-column-overcount",
           "plan-execution-output-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-cli-sampling-plan-folded-herald-count",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::agent::plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A compact ten-billion-iteration heralded repeat produces an exact one-shot output-width estimate through folded checked counting. Planning work and retained memory scale with structural circuit size rather than the expanded measurement count."
+        },
+        "negative_axes": [
+          "repeat-expansion-during-planning",
+          "herald-column-overcount",
+          "measurement-count-overflow",
+          "output-width-drift"
         ],
         "standalone": true
       },

@@ -12,7 +12,7 @@ use stab_core::{
 
 use crate::{
     Cli, CliError, CompiledSampler, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo,
-    SampleOutFormatArg, legacy_tableau_visible_measurements, parse_stim_u64, parse_stim_usize,
+    SampleOutFormatArg, legacy_tableau_visible_measurement_count, parse_stim_u64, parse_stim_usize,
     read_limited_input_file, read_limited_stdin,
 };
 
@@ -178,13 +178,13 @@ where
     ));
 
     let visible_measurements = if args.shots == 1 && !args.skip_reference_sample {
-        legacy_tableau_visible_measurements(&circuit)?
+        legacy_tableau_visible_measurement_count(&circuit)?
     } else {
         None
     };
-    if let Some(visible_measurements) = visible_measurements {
+    if let Some(visible_measurement_count) = visible_measurements {
         estimates.output_bytes = EstimateReport::from(
-            output_format.estimate_output_bytes(args.shots, visible_measurements.len()),
+            output_format.estimate_output_bytes(args.shots, visible_measurement_count),
         );
     }
 

@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295",
-  "semantic_digest": "012b51cfe72a54cd6cbb22051ae56d94cc91d9b7f65aa7bbd7ba569fdb5fc562",
+  "correctness_digest": "6512dfdc6056b4c03f95889a24ab311a9820845ae2615d7797146c1ca5dfcfcd",
+  "semantic_digest": "218fd62fb54f043b917b29b02131fa964ab2bcf6b057d0e28a5559b2396cd605",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -9886,7 +9886,7 @@
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6afcfa3ea4cff98a",
+      "correctness_case_id": "cq-evidence-qualification-c05d9e9942e9284c",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -27782,7 +27782,7 @@
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6afcfa3ea4cff98a",
+      "correctness_case_id": "cq-evidence-qualification-c05d9e9942e9284c",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

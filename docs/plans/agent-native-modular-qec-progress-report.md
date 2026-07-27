@@ -6,7 +6,7 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `3454722`.
+- A2 diagnostics, resources, fingerprints, and capabilities: active at committed checkpoint `b03b3c75`.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -132,3 +132,19 @@ The model-fingerprint slice advances the current inventory to 2,415 public API i
 The CLI-boundary diagnostic comparison is `target/benchmarks/a2-json-cli-overhead`. It uses accepted clean baseline `target/benchmarks/q8-final-f465b6f-primary-baseline/baseline.json`, committed source revision `6aad05b8a2c257e8db857653d5837eef89dca0ad`, `local_modifications=true`, one warmup, and three measurement runs. The public `convert` path records `0.273x` Stim and the primary repetition-code sample path records `0.004x` Stim. Both pass the unchanged `1.25x` parity threshold, but this dirty-worktree comparison is diagnostic only.
 
 The result-reader timing probes use accepted clean baseline `target/benchmarks/q8-final-f465b6f-primary-baseline/baseline.json`, source revision `f4bd438aa66db95296644f68769fd0c904f792f7`, `local_modifications=true`, one warmup, and three measurement runs. Reports `target/benchmarks/a2-diagnostics-m8-01`, `target/benchmarks/a2-diagnostics-m8-hits`, and `target/benchmarks/a2-diagnostics-m8-dets` record ratios of `0.283x`, `0.713x`, and `0.843x`, respectively. A separate one-run allocation diagnostic at `target/benchmarks/a2-diagnostics-result-reader-allocations` records maximum Stab allocation bytes of 12,288 for 01, 13,544 for HITS, and 28,672 for DETS, with zero resident-memory delta in all three rows. These dirty-worktree reports are development diagnostics only and are not promotable evidence.
+
+## A2 Discovery And Dry-Run Planning
+
+Commit `854fd127` adds a backend-neutral `CompilationRequestFingerprint`, sampling resource estimates, a records-owned codec registry, and a runtime `CapabilitySet`. The request identity includes model identity, operation, compiler schema, normalized compile options, and effective configurable limits. It intentionally excludes shots, seed, reference mode, codec, paths, and selected backend because those values either belong to execution or do not yet exist as caller choices.
+
+Commit `6f1443aa` moves fixed-width output-size knowledge into `RecordFormat::estimate_output_bytes`. The sampling estimator delegates to that records owner instead of duplicating codec arithmetic. `01`, `b8`, and complete `ptb64` groups report exact checked sizes; value-dependent sparse encodings and incomplete PTB64 groups remain unknown.
+
+Commit `b03b3c75` adds `stab capabilities`, `stab inspect`, and `stab plan sample`. Capability output is generated from the Clap command graph and product-owned gate, codec, compiler, parse-limit, and backend descriptors. Gate rows explicitly claim accepted circuit syntax rather than universal execution support, and the selectable-backend array remains empty until A4 creates a genuine caller-selectable backend.
+
+`inspect` parses and fingerprints a circuit or DEM without compiling or executing it. `plan sample` compiles only for validation, then reports backend-neutral request identity, run configuration, and estimates without calling a sampling method. Successful `--format=json` output is one complete document on stdout; warning and failure `--error-format=json` remains JSON Lines on stderr. [Agent CLI schema version 1](../architecture/agent-cli-schema-v1.md) fixes this separation.
+
+The first planning implementation reused the one-shot sampling path's expanded herald-column index list when correcting output width. Audit rejected that resource behavior because a compact repeat with a huge count could make a dry run expand billions of logical measurements. Planning now uses folded checked counting, while the actual sampler retains the index list it needs to filter emitted records. A ten-billion-iteration regression proves exact width without repeat expansion.
+
+The benchmark design deliberately does not time `stab_cli::run_from` end to end. That would merge parsing, hashing, compilation, estimation, rendering, and I/O into an unactionable number and repeat the review-rejected mixed parse-and-estimate mistake. A2 instead uses four Stab-only product diagnostics with one measurement each: model fingerprint, inclusive request fingerprint, request estimate, and sampler compilation. Existing circuit-parse evidence remains the parse measurement. These diagnostics have no Stim ratio, parity policy, waiver, self-regression baseline, legacy-manifest row, or formal completion claim.
+
+At committed checkpoint `b03b3c75`, the current correctness inventory contains 2,886 upstream cases, 2,567 public API items, and 1,800 evidence parents with digest `286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295`. The performance digest is `012b51cfe72a54cd6cbb22051ae56d94cc91d9b7f65aa7bbd7ba569fdb5fc562`. The post-audit sampler-compilation and folded-planning evidence advances these identities and will be recorded with the diagnostic benchmark contract after regeneration. None of these source-current inventories has formal compatibility or performance completion evidence.

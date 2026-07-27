@@ -844,7 +844,7 @@ where
 
 fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
     // Stim v1.16's one-shot tableau CLI path records heralds for feedback but does not write them.
-    if !circuit_contains_heralded_records(circuit) {
+    if legacy_tableau_hidden_measurement_count(circuit)? == 0 {
         return Ok(None);
     }
 
@@ -869,14 +869,45 @@ fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<u
     Ok(Some(visible))
 }
 
-fn circuit_contains_heralded_records(circuit: &Circuit) -> bool {
-    circuit.items().iter().any(|item| match item {
-        CircuitItem::Instruction(instruction) => matches!(
-            instruction.gate().canonical_name(),
-            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-        ),
-        CircuitItem::RepeatBlock(repeat) => circuit_contains_heralded_records(repeat.body()),
-    })
+fn legacy_tableau_visible_measurement_count(circuit: &Circuit) -> Result<Option<usize>, CliError> {
+    let hidden = legacy_tableau_hidden_measurement_count(circuit)?;
+    if hidden == 0 {
+        return Ok(None);
+    }
+    let visible = circuit
+        .count_measurements()?
+        .checked_sub(hidden)
+        .ok_or(CliError::MeasurementCountOverflow)?;
+    usize::try_from(visible)
+        .map(Some)
+        .map_err(|_| CliError::MeasurementCountOverflow)
+}
+
+fn legacy_tableau_hidden_measurement_count(circuit: &Circuit) -> Result<u64, CliError> {
+    let mut hidden = 0u64;
+    for item in circuit.items() {
+        let contribution = match item {
+            CircuitItem::Instruction(instruction)
+                if matches!(
+                    instruction.gate().canonical_name(),
+                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+                ) =>
+            {
+                u64::try_from(instruction.target_groups().len())
+                    .map_err(|_| CliError::MeasurementCountOverflow)?
+            }
+            CircuitItem::Instruction(_) => 0,
+            CircuitItem::RepeatBlock(repeat) => {
+                legacy_tableau_hidden_measurement_count(repeat.body())?
+                    .checked_mul(repeat.repeat_count().get())
+                    .ok_or(CliError::MeasurementCountOverflow)?
+            }
+        };
+        hidden = hidden
+            .checked_add(contribution)
+            .ok_or(CliError::MeasurementCountOverflow)?;
+    }
+    Ok(hidden)
 }
 
 fn write_ptb64_sample_output<W>(

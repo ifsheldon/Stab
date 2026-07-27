@@ -391,6 +391,20 @@ fn plan_sample_matches_one_shot_herald_filtering_output_width() {
 }
 
 #[test]
+fn plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat() {
+    let circuit = b"REPEAT 10000000000 {\nHERALDED_ERASE(0) 0\nM 0\n}\n";
+    let (status, stdout, stderr) = run_cli(["stab", "plan", "sample", "--format=json"], circuit);
+
+    assert_eq!(status, 0);
+    assert_eq!(stderr, b"");
+    let report = json_stdout(&stdout);
+    assert_eq!(
+        pointer(&report, "/estimates/output_bytes/value"),
+        10_000_000_001u64
+    );
+}
+
+#[test]
 fn plan_sample_rejects_invalid_output_groups_and_uncompilable_circuits() {
     let (status, stdout, stderr) = run_cli(
         ["stab", "plan", "sample", "--shots=65", "--out_format=ptb64"],

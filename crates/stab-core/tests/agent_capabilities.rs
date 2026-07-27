@@ -6,8 +6,9 @@
 use std::collections::BTreeSet;
 
 use stab_core::{
-    CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint, Estimate, Gate,
-    ModelDialect, ParseLimits, RecordEncoding, RecordFormat, estimate_sampling_request,
+    CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint, CompiledSampler,
+    Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
+    estimate_sampling_request,
 };
 
 const RICH_CIRCUIT: &str = "X_ERROR[π](0.12345641) 0\n\
@@ -195,4 +196,34 @@ fn sampling_request_estimate_counts_folded_and_expanded_work_without_execution()
     });
     assert_eq!(allocations.count_total, 0, "{allocations:?}");
     assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
+}
+
+#[test]
+fn sampling_compilation_is_deterministic_and_preserves_circuit_semantics() {
+    let circuit = Circuit::from_stim_str(
+        "X 0\n\
+         M 0\n\
+         R 0\n\
+         M 0\n\
+         REPEAT 2 {\n\
+             X 0\n\
+             M 0\n\
+         }\n",
+    )
+    .expect("sampling compilation circuit");
+    let model_before = circuit.fingerprint();
+
+    let first = CompiledSampler::compile(&circuit).expect("first compilation");
+    let second = CompiledSampler::compile(&circuit).expect("second compilation");
+
+    assert_eq!(first, second);
+    assert_eq!(circuit.fingerprint(), model_before);
+    assert_eq!(
+        first.sample_zero_one_with_seed(3, Some(5)),
+        vec![
+            vec![true, false, true, false],
+            vec![true, false, true, false],
+            vec![true, false, true, false],
+        ]
+    );
 }

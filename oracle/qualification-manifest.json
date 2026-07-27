@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "286c512c5c111e5efafb28c43fd452078a98e43276f20d861eae9cea4dcd8295",
+  "semantic_digest": "6512dfdc6056b4c03f95889a24ab311a9820845ae2615d7797146c1ca5dfcfcd",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -63367,7 +63367,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/sampling.rs",
       "source_line": 47,
-      "owner_case_id": "cq-evidence-api-6afcfa3ea4cff98a",
+      "owner_case_id": "cq-evidence-qualification-c05d9e9942e9284c",
       "performance_groups": [
         "PERF-SAMPLING"
       ]
@@ -83835,7 +83835,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/sampling.rs",
       "source_line": 47,
-      "owner_case_id": "cq-evidence-api-6afcfa3ea4cff98a",
+      "owner_case_id": "cq-evidence-qualification-c05d9e9942e9284c",
       "performance_groups": [
         "PERF-SAMPLING"
       ]
@@ -93816,54 +93816,6 @@
           "-p",
           "stab-core",
           "cq_evidence_api_6853013926d3fcdf",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-6afcfa3ea4cff98a",
-      "feature_id": "CQ-SAMPLING",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_core::CompiledSampler::compile",
-      "comparator": "statistical",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": {
-        "state": "planned",
-        "source": "qualification-case",
-        "id": "cq-evidence-api-6afcfa3ea4cff98a"
-      },
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "cq_evidence_api_6afcfa3ea4cff98a",
           "--quiet",
           "--exact"
         ]
@@ -128794,6 +128746,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-63e1a437c22a0479",
+      "feature_id": "CQ-RESOURCE",
+      "behavioral_surface": "resource-boundary",
+      "provenance": "qualification-plan",
+      "source_id": "a2-cli-sampling-plan-folded-herald-count",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A compact ten-billion-iteration heralded repeat produces an exact one-shot output-width estimate through folded checked counting. Planning work and retained memory scale with structural circuit size rather than the expanded measurement count."
+      },
+      "negative_axes": [
+        "repeat-expansion-during-planning",
+        "herald-column-overcount",
+        "measurement-count-overflow",
+        "output-width-drift"
+      ],
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-66d745cb68dfb5b9",
       "feature_id": "CQ-DEM-FORMAT",
       "behavioral_surface": "file-format",
@@ -133490,6 +133492,59 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-c05d9e9942e9284c",
+      "feature_id": "CQ-SAMPLING",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a2-sampling-compilation-semantic-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "agent_capabilities",
+          "sampling_compilation_is_deterministic_and_preserves_circuit_semantics",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Two compilations of one bounded parsed circuit produce equal immutable execution plans without mutating the source model. Exact deterministic samples prove reset, measurement, and folded-repeat lowering semantics; planning-layer tests separately prove that dry-run planning never executes shots."
+      },
+      "negative_axes": [
+        "nondeterministic-lowering",
+        "source-model-mutation",
+        "reset-lowering-drift",
+        "repeat-lowering-drift",
+        "compiled-semantic-drift"
+      ],
+      "performance_groups": [
+        "PERF-SAMPLING"
       ],
       "status": "implemented"
     },

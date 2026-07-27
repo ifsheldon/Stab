@@ -194,6 +194,8 @@ The `run` object contains:
 
 Fixed-width output estimates include Stim v1.16.0's one-shot CLI rule that hides heralded-noise measurement columns on the normal-reference path.
 
+The heralded-column adjustment traverses folded circuit structure with checked arithmetic, so compact repeat blocks are not expanded merely to estimate output width.
+
 Sparse result codecs report unknown output bytes because sampled values determine their encoded size.
 
 ## Schema Evolution
