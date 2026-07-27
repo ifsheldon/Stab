@@ -6,6 +6,16 @@ mod channels;
 mod parity_rows;
 mod pf7_cli;
 
+fn assert_analyze_errors_stdout_bytes(args: &[&str], input: &[u8], expected_stdout: &[u8]) {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args.iter().copied(), input, &mut stdout, &mut stderr);
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, expected_stdout);
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
 #[test]
 fn analyze_errors_basic_matches_m10_oracle_golden() {
     let mut stdout = Vec::new();
@@ -157,6 +167,49 @@ fn analyze_errors_fold_loops_nested_repeat_matches_m10_oracle_golden() {
         )
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn analyze_errors_opaque_error_tags_remain_distinct() {
+    assert_analyze_errors_stdout_bytes(
+        &["stab", "analyze_errors"],
+        b"X_ERROR[\xff](0.25) 0\n\
+          X_ERROR[\xfe](0.25) 0\n\
+          M 0\n\
+          DETECTOR rec[-1]\n",
+        b"error[\xfe](0.25) D0\n\
+          error[\xff](0.25) D0\n",
+    );
+}
+
+#[test]
+fn analyze_errors_opaque_tag_bytes_survive_fold_loops() {
+    let expected_stdout = [
+        b"error[\xff](0.25) D0 L0\n".as_slice(),
+        b"repeat[\xfd] 99 {\n",
+        b"    error[\xfe](0.125) D0 L0\n",
+        b"    detector[\xfc] D0\n",
+        b"    logical_observable[\xfb] L0\n",
+        b"    shift_detectors 1\n",
+        b"}\n",
+        b"error[\xfe](0.125) D0 L0\n",
+        b"detector[\xfc] D0\n",
+        b"logical_observable[\xfb] L0\n",
+    ]
+    .concat();
+
+    assert_analyze_errors_stdout_bytes(
+        &["stab", "analyze_errors", "--fold_loops"],
+        b"R 0\n\
+          X_ERROR[\xff](0.25) 0\n\
+          REPEAT[\xfd] 100 {\n\
+              X_ERROR[\xfe](0.125) 0\n\
+              MR 0\n\
+              DETECTOR[\xfc] rec[-1]\n\
+              OBSERVABLE_INCLUDE[\xfb](0) rec[-1]\n\
+          }\n",
+        &expected_stdout,
+    );
 }
 
 #[test]
@@ -377,7 +430,7 @@ fn analyze_errors_path_io_reports_input_and_output_path_errors() {
 }
 
 #[test]
-fn analyze_errors_path_io_opens_output_before_parsing_input() {
+fn analyze_errors_preflights_output_path_before_parsing_input() {
     let dir = tempdir().expect("tempdir");
     let unwritable_output = dir.path().join("missing-dir").join("output.dem");
     let mut output_stdout = Vec::new();
@@ -399,7 +452,11 @@ fn analyze_errors_path_io_opens_output_before_parsing_input() {
     let output_error = String::from_utf8(output_stderr).unwrap();
     assert!(output_error.contains("failed to write"), "{output_error}");
     assert!(output_error.contains("output.dem"), "{output_error}");
+}
 
+#[test]
+fn analyze_errors_admission_precedes_output_truncation() {
+    let dir = tempdir().expect("tempdir");
     let truncated_output = dir.path().join("truncated.dem");
     std::fs::write(&truncated_output, "old output\n").expect("seed analyze_errors output");
     let mut parse_stdout = Vec::new();
@@ -420,9 +477,25 @@ fn analyze_errors_path_io_opens_output_before_parsing_input() {
     assert_eq!(String::from_utf8(parse_stdout).unwrap(), "");
     assert_ne!(String::from_utf8(parse_stderr).unwrap(), "");
     assert_eq!(
-        std::fs::read_to_string(truncated_output).expect("read truncated analyze_errors output"),
-        ""
+        std::fs::read_to_string(truncated_output).expect("read preserved analyze_errors output"),
+        "old output\n"
     );
+}
+
+#[test]
+fn analyze_errors_empty_model_matches_stim_terminal_newline() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        b"M[\xff] 0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"\n");
+    assert!(stderr.is_empty());
 }
 
 #[test]

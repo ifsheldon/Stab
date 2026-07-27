@@ -8,7 +8,7 @@ use stab_core::{
     DetectionEventRecord, DetectionObservableOutputMode, FormatError, FormatErrorCode,
     circuit_with_inlined_feedback,
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
-    try_for_each_sampled_detection_event, validate_detection_sampling_circuit,
+    try_for_each_sampled_detection_event,
 };
 
 use crate::{
@@ -159,22 +159,18 @@ where
         read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "detect circuit input")?
     };
     let circuit = parse_circuit_bytes(&input_bytes)?;
-    validate_detection_sampling_circuit(&circuit)?;
     let observable_mode = detect_observable_output_mode(&args);
-    let mut outputs = io.activate()?;
-    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    let mut observable_output = outputs
-        .take(FileRole::ObservableOutput)
-        .map(FileOutputSink::from_output);
+    let mut outputs = DeferredDetectOutputs::new(io, stdout);
     let mut state = DetectionStreamState::default();
     try_for_each_sampled_detection_event(&circuit, args.shots, args.seed, |record| {
+        let (primary_output, observable_output) = outputs.activate()?;
         write_detect_stream_record(
             record,
             observable_mode,
             args.out_format,
             args.obs_out_format,
-            &mut primary_output,
-            observable_output.as_mut(),
+            primary_output,
+            observable_output,
             &mut state,
         )
     })?;
@@ -217,17 +213,17 @@ where
     let measurement_input = open_m2d_input_or_stdin(io.take_input(FileRole::Input), input);
     let observable_mode = observable_output_mode(args.append_observables);
     let sweep_input = io.take_input(FileRole::Sweep).map(open_m2d_input);
-    let mut outputs = io.activate()?;
-    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    let mut observable_output = outputs
-        .take(FileRole::ObservableOutput)
-        .map(FileOutputSink::from_output);
     let converter = CompiledDetectionConverter::compile(
         &circuit,
         DetectionConversionOptions {
             skip_reference_sample: args.skip_reference_sample,
         },
     )?;
+    let mut outputs = io.activate()?;
+    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let mut observable_output = outputs
+        .take(FileRole::ObservableOutput)
+        .map(FileOutputSink::from_output);
     let mut measurements = M2dRecordStream::from_open_input(
         measurement_input,
         args.in_format,
@@ -715,6 +711,60 @@ fn decode_ptb64_group(input: &[u8], bits_per_record: usize) -> Result<Vec<Vec<bo
         }
     }
     Ok(records)
+}
+
+enum DeferredDetectOutputs<'a, W>
+where
+    W: Write,
+{
+    Pending {
+        io: PendingIo,
+        stdout: &'a mut W,
+    },
+    Active {
+        primary: OutputSink<'a, W>,
+        observable: Option<FileOutputSink>,
+    },
+    Transition,
+}
+
+impl<'a, W> DeferredDetectOutputs<'a, W>
+where
+    W: Write,
+{
+    fn new(io: PendingIo, stdout: &'a mut W) -> Self {
+        Self::Pending { io, stdout }
+    }
+
+    fn activate(
+        &mut self,
+    ) -> Result<(&mut OutputSink<'a, W>, Option<&mut FileOutputSink>), CliError> {
+        if matches!(self, Self::Pending { .. }) {
+            let pending = std::mem::replace(self, Self::Transition);
+            let Self::Pending { io, stdout } = pending else {
+                return Err(CliError::IoPlanInvariant {
+                    message: "detect deferred output transition lost pending state",
+                });
+            };
+            let mut outputs = io.activate()?;
+            *self = Self::Active {
+                primary: OutputSink::from_output(outputs.take(FileRole::Output), stdout),
+                observable: outputs
+                    .take(FileRole::ObservableOutput)
+                    .map(FileOutputSink::from_output),
+            };
+        }
+        let Self::Active {
+            primary,
+            observable,
+        } = self
+        else {
+            return Err(CliError::IoPlanInvariant {
+                message: "detect deferred output activation did not produce active sinks",
+            });
+        };
+        Ok((primary, observable.as_mut()))
+    }
 }
 
 #[derive(Default)]

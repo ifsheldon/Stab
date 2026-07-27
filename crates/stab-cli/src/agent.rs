@@ -127,10 +127,9 @@ where
         "inspect model input",
         MAX_CIRCUIT_INPUT_BYTES,
     )?;
-    let text = std::str::from_utf8(&input).map_err(|_| CliError::InvalidUtf8Input)?;
     let report = match model_type {
-        InspectModelTypeArg::Circuit => InspectReport::for_circuit(text)?,
-        InspectModelTypeArg::Dem => InspectReport::for_dem(text)?,
+        InspectModelTypeArg::Circuit => InspectReport::for_circuit(&input)?,
+        InspectModelTypeArg::Dem => InspectReport::for_dem(&input)?,
     };
     write_agent_output(stdout, args.format, &report, &render_inspect_human(&report))
 }
@@ -165,8 +164,7 @@ where
         "plan sample circuit input",
         MAX_CIRCUIT_INPUT_BYTES,
     )?;
-    let text = std::str::from_utf8(&input).map_err(|_| CliError::InvalidUtf8Input)?;
-    let circuit = Circuit::from_stim_str(text)?;
+    let circuit = Circuit::from_stim_bytes(&input)?;
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let _validated_sampler = CompiledSampler::compile(&circuit)?;
@@ -192,7 +190,7 @@ where
         schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
         operation: "sample",
         executes: false,
-        source: SourceReport::new(text),
+        source: SourceReport::new(&input),
         model: ModelIdentityReport::from(circuit.fingerprint()),
         compilation: CompilationReport {
             request_fingerprint: CompilationFingerprintReport::from(request_fingerprint),
@@ -478,13 +476,15 @@ struct InspectReport {
 }
 
 impl InspectReport {
-    fn for_circuit(text: &str) -> Result<Self, CliError> {
-        let circuit = Circuit::from_stim_str(text)?;
+    fn for_circuit(input: &[u8]) -> Result<Self, CliError> {
+        let circuit = Circuit::from_stim_bytes(input)?;
         Ok(Self {
             schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
             executes: false,
-            source: SourceReport::new(text),
-            parse_estimate: ResourceEstimateReport::from(ParseLimits::default().estimate(text)),
+            source: SourceReport::new(input),
+            parse_estimate: ResourceEstimateReport::from(
+                ParseLimits::default().estimate_bytes(input),
+            ),
             model: InspectedModelReport::StimCircuit {
                 fingerprint: ModelIdentityReport::from(circuit.fingerprint()),
                 top_level_items: circuit.items().len(),
@@ -497,13 +497,15 @@ impl InspectReport {
         })
     }
 
-    fn for_dem(text: &str) -> Result<Self, CliError> {
-        let model = DetectorErrorModel::from_dem_str(text)?;
+    fn for_dem(input: &[u8]) -> Result<Self, CliError> {
+        let model = DetectorErrorModel::from_dem_bytes(input)?;
         Ok(Self {
             schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
             executes: false,
-            source: SourceReport::new(text),
-            parse_estimate: ResourceEstimateReport::from(ParseLimits::default().estimate(text)),
+            source: SourceReport::new(input),
+            parse_estimate: ResourceEstimateReport::from(
+                ParseLimits::default().estimate_bytes(input),
+            ),
             model: InspectedModelReport::DetectorErrorModel {
                 fingerprint: ModelIdentityReport::from(model.fingerprint()),
                 top_level_items: model.items().len(),
@@ -541,10 +543,15 @@ struct SourceReport {
 }
 
 impl SourceReport {
-    fn new(text: &str) -> Self {
+    fn new(input: &[u8]) -> Self {
         Self {
-            bytes: text.len(),
-            physical_lines: text.lines().count(),
+            bytes: input.len(),
+            physical_lines: if input.is_empty() {
+                0
+            } else {
+                input.iter().filter(|byte| **byte == b'\n').count()
+                    + usize::from(input.last() != Some(&b'\n'))
+            },
         }
     }
 }

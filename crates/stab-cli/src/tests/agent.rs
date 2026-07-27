@@ -472,10 +472,11 @@ fn agent_commands_route_parse_and_compile_failures_through_json_diagnostics() {
     );
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
-    assert_eq!(
-        pointer(&json_stdout(&stderr), "/code"),
-        "invalid-utf8-input"
-    );
+    let diagnostic = json_stdout(&stderr);
+    assert_eq!(pointer(&diagnostic, "/code"), "invalid-utf8-input");
+    assert_eq!(pointer(&diagnostic, "/span/byte_start"), 0);
+    assert_eq!(pointer(&diagnostic, "/span/byte_length"), 1);
+    assert_eq!(pointer(&diagnostic, "/context/dialect"), "stim-circuit");
 
     let (status, stdout, stderr) = run_cli(
         ["stab", "plan", "sample", "--error-format=json"],

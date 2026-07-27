@@ -68,8 +68,6 @@ where
         [(FileRole::Output, args.output.as_deref())],
     )?;
     let mut input_file = io.take_input(FileRole::Input);
-    let mut outputs = io.activate()?;
-    let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     let input_bytes = if let Some(input_file) = input_file.as_mut() {
         read_limited_input_file(
             input_file,
@@ -96,7 +94,16 @@ where
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
         },
     )?;
-    output.write_with(|writer| writer.write_all(dem.to_dem_string().as_bytes()))
+    let output_bytes = dem.to_dem_bytes();
+    let mut outputs = io.activate()?;
+    let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    output.write_with(|writer| {
+        if output_bytes.is_empty() {
+            writer.write_all(b"\n")
+        } else {
+            writer.write_all(&output_bytes)
+        }
+    })
 }
 
 fn parse_probability_threshold(value: &str) -> Result<Probability, String> {

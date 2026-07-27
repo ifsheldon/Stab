@@ -386,23 +386,41 @@ where
         return args;
     }
 
+    let mut legacy_index = 1;
+    while let Some(arg) = args.get(legacy_index) {
+        let arg = arg.to_string_lossy();
+        if arg == "--error-format" {
+            legacy_index = legacy_index.saturating_add(2);
+        } else if arg.starts_with("--error-format=") {
+            legacy_index = legacy_index.saturating_add(1);
+        } else {
+            break;
+        }
+    }
+    if legacy_index >= args.len() {
+        return args;
+    }
+
     let legacy_arg = args
-        .get(1)
+        .get(legacy_index)
         .map(|arg| arg.to_string_lossy().into_owned())
         .unwrap_or_default();
     if let Some(topic) = legacy_arg.strip_prefix("--help=") {
-        args.splice(1..2, [OsString::from("help"), OsString::from(topic)]);
+        args.splice(
+            legacy_index..legacy_index + 1,
+            [OsString::from("help"), OsString::from(topic)],
+        );
     } else if legacy_arg == "--help" {
-        if let Some(arg) = args.get_mut(1) {
+        if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("help");
         }
     } else if legacy_arg == "--convert" {
-        if let Some(arg) = args.get_mut(1) {
+        if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("convert");
         }
     } else if let Some(code) = legacy_arg.strip_prefix("--gen=") {
         args.splice(
-            1..2,
+            legacy_index..legacy_index + 1,
             [
                 OsString::from("gen"),
                 OsString::from("--code"),
@@ -410,13 +428,13 @@ where
             ],
         );
     } else if legacy_arg == "--gen" && args.len() >= 3 {
-        if let Some(arg) = args.get_mut(1) {
+        if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("gen");
         }
-        args.insert(2, OsString::from("--code"));
+        args.insert(legacy_index + 1, OsString::from("--code"));
     } else if let Some(shots) = legacy_arg.strip_prefix("--sample=") {
         args.splice(
-            1..2,
+            legacy_index..legacy_index + 1,
             [
                 OsString::from("sample"),
                 OsString::from("--shots"),
@@ -424,20 +442,20 @@ where
             ],
         );
     } else if legacy_arg == "--sample" {
-        if let Some(arg) = args.get_mut(1) {
+        if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("sample");
         }
-        args.insert(2, OsString::from("--shots"));
+        args.insert(legacy_index + 1, OsString::from("--shots"));
         if args
-            .get(3)
+            .get(legacy_index + 2)
             .map(|arg| arg.to_string_lossy().starts_with('-'))
             .unwrap_or(true)
         {
-            args.insert(3, OsString::from("1"));
+            args.insert(legacy_index + 2, OsString::from("1"));
         }
     } else if let Some(shots) = legacy_arg.strip_prefix("--detect=") {
         args.splice(
-            1..2,
+            legacy_index..legacy_index + 1,
             [
                 OsString::from("detect"),
                 OsString::from("--shots"),
@@ -445,22 +463,22 @@ where
             ],
         );
     } else if legacy_arg == "--detect" {
-        if let Some(arg) = args.get_mut(1) {
+        if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("detect");
         }
         if args
-            .get(2)
+            .get(legacy_index + 1)
             .map(|arg| !arg.to_string_lossy().starts_with('-'))
             .unwrap_or(false)
         {
-            args.insert(2, OsString::from("--shots"));
+            args.insert(legacy_index + 1, OsString::from("--shots"));
         }
     } else if legacy_arg == "--m2d"
-        && let Some(arg) = args.get_mut(1)
+        && let Some(arg) = args.get_mut(legacy_index)
     {
         *arg = OsString::from("m2d");
     } else if legacy_arg == "--analyze_errors"
-        && let Some(arg) = args.get_mut(1)
+        && let Some(arg) = args.get_mut(legacy_index)
     {
         *arg = OsString::from("analyze_errors");
     }
@@ -730,8 +748,7 @@ where
     } else {
         read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "sample circuit input")?
     };
-    let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
-    let circuit = Circuit::from_stim_str(circuit_text)?;
+    let circuit = Circuit::from_stim_bytes(&input_bytes)?;
     let sampler = CompiledSampler::compile(&circuit)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
@@ -768,8 +785,7 @@ where
 }
 
 pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
-    let circuit_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
-    Ok(Circuit::from_stim_str(circuit_text)?)
+    Ok(Circuit::from_stim_bytes(input)?)
 }
 
 fn write_sample_output<W>(

@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use stab_core::{
     ByteSpan, CircuitError, DetsResultType, DiagnosticSeverity, FormatError, FormatErrorContext,
+    ModelDialect, ParseError, ParseErrorContext, ResourceLimitError,
 };
 use thiserror::Error;
 
@@ -116,9 +117,6 @@ pub(crate) enum CliError {
 
     #[error("unrecognized help topic {topic:?}")]
     UnknownHelpTopic { topic: String },
-
-    #[error("input is not valid UTF-8 text")]
-    InvalidUtf8Input,
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
@@ -283,6 +281,32 @@ fn write_json(writer: &mut impl Write, diagnostic: &JsonDiagnostic) -> io::Resul
 }
 
 fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
+    if let Some((parse_error, byte_offset)) = parse_error_with_offset(error) {
+        return JsonDiagnostic {
+            schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
+            code: parse_error.code().as_str(),
+            severity: parse_error.severity().as_str(),
+            message: parse_error.message().to_string(),
+            span: shifted_span(parse_error.span(), byte_offset),
+            labels: Vec::new(),
+            help: cli_error_help(error),
+            context: parse_error_context(parse_error),
+        };
+    }
+    if let Some((resource_error, byte_offset)) = resource_error_with_offset(error) {
+        return JsonDiagnostic {
+            schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
+            code: resource_error.code(),
+            severity: DiagnosticSeverity::Error.as_str(),
+            message: resource_error.to_string(),
+            span: resource_error
+                .span()
+                .and_then(|span| shifted_span(span, byte_offset)),
+            labels: Vec::new(),
+            help: cli_error_help(error),
+            context: resource_error_context(resource_error),
+        };
+    }
     let (format_error, byte_offset) = format_error_with_offset(error).unzip();
     JsonDiagnostic {
         schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
@@ -329,13 +353,13 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::DuplicateConvertType { .. } => "duplicate-convert-type",
         CliError::IncompletePtb64OutputGroup { .. } => "incomplete-ptb64-output-group",
         CliError::UnknownHelpTopic { .. } => "unknown-help-topic",
-        CliError::InvalidUtf8Input => "invalid-utf8-input",
         CliError::MeasurementCountOverflow => "measurement-count-overflow",
     }
 }
 
 fn circuit_error_code(error: &CircuitError) -> &'static str {
     match error {
+        CircuitError::Parse(error) => error.code().as_str(),
         CircuitError::UnknownGate(_) => "unknown-gate",
         CircuitError::InvalidDomainValue { .. } => "invalid-domain-value",
         CircuitError::ParseLine { .. } => "circuit-parse-line",
@@ -402,7 +426,6 @@ fn cli_error_context(error: &CliError) -> Value {
         | CliError::MissingRecordWidth
         | CliError::MissingRecordTypesForDets
         | CliError::MissingConvertTypes
-        | CliError::InvalidUtf8Input
         | CliError::MeasurementCountOverflow => json!({}),
         CliError::UnsupportedStimConversionOption { flag } => json!({
             "flag": flag,
@@ -442,6 +465,30 @@ fn format_error_with_offset(error: &CliError) -> Option<(&FormatError, usize)> {
     }
 }
 
+fn parse_error_with_offset(error: &CliError) -> Option<(&ParseError, usize)> {
+    match error {
+        CliError::Circuit(error) => error.parse_error().map(|error| (error, 0)),
+        CliError::InputRecord {
+            byte_offset,
+            source,
+        } => source.parse_error().map(|error| (error, *byte_offset)),
+        _ => None,
+    }
+}
+
+fn resource_error_with_offset(error: &CliError) -> Option<(&ResourceLimitError, usize)> {
+    match error {
+        CliError::Circuit(error) => error.resource_limit_error().map(|error| (error, 0)),
+        CliError::InputRecord {
+            byte_offset,
+            source,
+        } => source
+            .resource_limit_error()
+            .map(|error| (error, *byte_offset)),
+        _ => None,
+    }
+}
+
 fn shifted_span(span: ByteSpan, byte_offset: usize) -> Option<JsonSpan> {
     let byte_start = span.byte_start().checked_add(byte_offset)?;
     Some(JsonSpan {
@@ -452,6 +499,7 @@ fn shifted_span(span: ByteSpan, byte_offset: usize) -> Option<JsonSpan> {
 
 fn circuit_error_context(error: &CircuitError) -> Value {
     match error {
+        CircuitError::Parse(error) => parse_error_context(error),
         CircuitError::UnknownGate(gate) => json!({
             "gate": gate,
         }),
@@ -490,12 +538,7 @@ fn circuit_error_context(error: &CircuitError) -> Value {
         | CircuitError::UnterminatedRepeatBlock
         | CircuitError::UnexpectedRepeatTerminator => json!({}),
         CircuitError::InvalidResultFormat(error) => format_error_context(error),
-        CircuitError::ResourceLimit(error) => json!({
-            "operation": error.operation().as_str(),
-            "resource": error.resource().as_str(),
-            "actual": error.actual(),
-            "limit": error.limit(),
-        }),
+        CircuitError::ResourceLimit(error) => resource_error_context(error),
         CircuitError::CircuitIo {
             operation, kind, ..
         } => json!({
@@ -503,6 +546,93 @@ fn circuit_error_context(error: &CircuitError) -> Value {
             "io_error_kind": io_error_kind_name(*kind),
         }),
     }
+}
+
+fn parse_error_context(error: &ParseError) -> Value {
+    match error.context() {
+        ParseErrorContext::Model { dialect } => json!({
+            "dialect": model_dialect_name(*dialect),
+        }),
+        ParseErrorContext::Utf8 {
+            dialect,
+            valid_up_to,
+            error_length,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "valid_up_to": valid_up_to,
+            "error_length": error_length,
+        }),
+        ParseErrorContext::Instruction {
+            dialect,
+            instruction,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "instruction": instruction,
+        }),
+        ParseErrorContext::DomainValue {
+            dialect,
+            kind,
+            value,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "domain": kind,
+            "value": value,
+        }),
+        ParseErrorContext::ArgumentCount {
+            dialect,
+            instruction,
+            expected,
+            actual,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "instruction": instruction,
+            "expected": expected,
+            "actual": actual,
+        }),
+        ParseErrorContext::Argument {
+            dialect,
+            instruction,
+            argument,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "instruction": instruction,
+            "argument": argument,
+        }),
+        ParseErrorContext::Target {
+            dialect,
+            instruction,
+            target,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "instruction": instruction,
+            "target": target,
+        }),
+        ParseErrorContext::TargetCount {
+            dialect,
+            instruction,
+            actual,
+        } => json!({
+            "dialect": model_dialect_name(*dialect),
+            "instruction": instruction,
+            "actual": actual,
+        }),
+        context => json!({
+            "dialect": model_dialect_name(context.dialect()),
+        }),
+    }
+}
+
+fn resource_error_context(error: &ResourceLimitError) -> Value {
+    json!({
+        "operation": error.operation().as_str(),
+        "resource": error.resource().as_str(),
+        "actual": error.actual(),
+        "limit": error.limit(),
+    })
+}
+
+fn model_dialect_name(dialect: ModelDialect) -> &'static str {
+    dialect.as_str()
 }
 
 fn io_error_kind_name(kind: io::ErrorKind) -> &'static str {

@@ -665,6 +665,44 @@ fn sample_dem_streams_huge_output_until_writer_failure() {
 }
 
 #[test]
+fn sample_dem_replay_work_rejects_before_prefix_read_or_output_truncation() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.01");
+    let output_path = dir.path().join("output.01");
+    std::fs::write(&replay_path, "0\n").expect("write short replay input");
+    std::fs::write(&output_path, "sentinel\n").expect("write output sentinel");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--out"),
+        output_path.clone().into_os_string(),
+        OsString::from("--shots"),
+        OsString::from("32000001"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"error(0) D0\n".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let stderr = String::from_utf8(stderr).expect("UTF-8 diagnostics");
+    assert!(
+        stderr.contains("64000002 buffered units; current limit is 64000000"),
+        "{stderr}"
+    );
+    assert!(
+        !stderr.contains("ended before shot"),
+        "work admission should happen before replay-prefix scanning: {stderr}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(output_path).expect("preserved output"),
+        "sentinel\n"
+    );
+}
+
+#[test]
 fn sample_dem_rejects_oversized_input_file_before_reading() {
     let dir = tempdir().expect("tempdir");
     let input_path = dir.path().join("oversized.dem");

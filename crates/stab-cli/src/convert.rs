@@ -284,8 +284,8 @@ where
         read_limited_stdin(stdin, MAX_CONVERT_INPUT_BYTES, "convert input")?
     };
     let circuit = parse_circuit_bytes(&input)?;
-    let output = circuit.to_stim_string();
-    write_convert_outputs(io, stdout, output.as_bytes(), None)
+    let output = circuit.to_stim_bytes();
+    write_convert_outputs(io, stdout, &output, None)
 }
 
 fn validate_stim_conversion_options(args: &ConvertArgs) -> Result<(), CliError> {
@@ -321,8 +321,7 @@ fn resolve_convert_layout(
     let mut layout = ConvertLayout::from_explicit_counts(args);
     if args.dem.is_some() {
         let dem_bytes = read_side_input(io, FileRole::Dem, "convert dem input")?;
-        let dem_text = std::str::from_utf8(&dem_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
-        let dem = DetectorErrorModel::from_dem_str(dem_text)?;
+        let dem = DetectorErrorModel::from_dem_bytes(&dem_bytes)?;
         layout.overwrite_dem_counts(&dem)?;
     }
     if args.circuit.is_some() {

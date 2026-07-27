@@ -31,6 +31,26 @@ fn field<'a>(value: &'a Value, pointer: &str) -> &'a Value {
     value.pointer(pointer).expect("diagnostic field exists")
 }
 
+fn assert_invalid_utf8_diagnostic(args: &[&str], dialect: &str) {
+    let (status, stdout, stderr) = run_cli(args, b"\xc3");
+    assert_eq!(status, 1, "{args:?}");
+    assert_eq!(stdout, b"", "{args:?}");
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(
+        field(&diagnostic, "/code"),
+        "invalid-utf8-input",
+        "{args:?}"
+    );
+    assert_eq!(field(&diagnostic, "/span/byte_start"), 0, "{args:?}");
+    assert_eq!(field(&diagnostic, "/span/byte_length"), 1, "{args:?}");
+    assert_eq!(field(&diagnostic, "/context/dialect"), dialect, "{args:?}");
+    assert_eq!(field(&diagnostic, "/context/valid_up_to"), 0, "{args:?}");
+    assert!(
+        field(&diagnostic, "/context/error_length").is_null(),
+        "{args:?}"
+    );
+}
+
 #[test]
 fn human_result_format_diagnostic_remains_byte_exact() {
     let (status, stdout, stderr) = run_cli(
@@ -165,7 +185,10 @@ fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
             "code": "resource-limit-exceeded",
             "severity": "error",
             "message": "failed to parse line 1000001: circuit input has more than 1000000 lines",
-            "span": null,
+            "span": {
+                "byte_start": 1_000_000,
+                "byte_length": 0,
+            },
             "labels": [],
             "help": null,
             "context": {
@@ -197,6 +220,236 @@ fn json_warnings_and_errors_are_ordered_json_lines() {
     );
     assert_eq!(field(&error, "/code"), "invalid-utf8-input");
     assert_eq!(field(&error, "/severity"), "error");
+    assert_eq!(field(&error, "/span/byte_start"), 0);
+    assert_eq!(field(&error, "/span/byte_length"), 1);
+    assert_eq!(field(&error, "/context/dialect"), "stim-circuit");
+    assert_eq!(field(&error, "/context/valid_up_to"), 0);
+    assert_eq!(field(&error, "/context/error_length"), 1);
+}
+
+#[test]
+fn json_invalid_utf8_diagnostics_are_consistent_across_model_inputs() {
+    for (args, dialect) in [
+        (
+            &[
+                "stab",
+                "convert",
+                "--in_format=stim",
+                "--out_format=stim",
+                "--error-format=json",
+            ][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "sample", "--shots=0", "--error-format=json"][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "detect", "--shots=1", "--error-format=json"][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "analyze_errors", "--error-format=json"][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "inspect", "--type=stim", "--error-format=json"][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "plan", "sample", "--shots=0", "--error-format=json"][..],
+            "stim-circuit",
+        ),
+        (
+            &["stab", "sample_dem", "--shots=1", "--error-format=json"][..],
+            "detector-error-model",
+        ),
+        (
+            &["stab", "inspect", "--type=dem", "--error-format=json"][..],
+            "detector-error-model",
+        ),
+    ] {
+        assert_invalid_utf8_diagnostic(args, dialect);
+    }
+}
+
+#[test]
+fn json_invalid_utf8_diagnostics_cover_circuit_and_dem_side_files() {
+    let temp = tempdir().expect("temporary directory");
+    let invalid_path = temp.path().join("invalid-model");
+    std::fs::write(&invalid_path, b"\xc3").expect("write invalid UTF-8 model");
+    let invalid_path = invalid_path.to_str().expect("UTF-8 test path");
+
+    for (args, dialect) in [
+        (
+            vec![
+                "stab",
+                "m2d",
+                "--circuit",
+                invalid_path,
+                "--in_format=01",
+                "--out_format=01",
+                "--error-format=json",
+            ],
+            "stim-circuit",
+        ),
+        (
+            vec![
+                "stab",
+                "convert",
+                "--circuit",
+                invalid_path,
+                "--types=M",
+                "--in_format=01",
+                "--out_format=01",
+                "--error-format=json",
+            ],
+            "stim-circuit",
+        ),
+        (
+            vec![
+                "stab",
+                "convert",
+                "--dem",
+                invalid_path,
+                "--in_format=01",
+                "--out_format=01",
+                "--error-format=json",
+            ],
+            "detector-error-model",
+        ),
+    ] {
+        assert_invalid_utf8_diagnostic(&args, dialect);
+    }
+}
+
+#[test]
+fn model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion() {
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "convert", "--in_format=stim", "--out_format=stim"],
+        b"H[\xff] 0 # \xfe\n",
+    );
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"H[\xff] 0\n");
+    assert_eq!(stderr, b"");
+
+    let (status, stdout, stderr) = run_cli(&["stab", "sample", "--shots=1"], b"M 0 # \xff\n");
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"0\n");
+    assert_eq!(stderr, b"");
+
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "inspect", "--type=dem", "--format=json"],
+        b"error[\xff](0) D0\n",
+    );
+    assert_eq!(status, 0);
+    assert!(serde_json::from_slice::<Value>(&stdout).is_ok());
+    assert_eq!(stderr, b"");
+}
+
+#[test]
+fn json_circuit_parse_diagnostic_preserves_code_span_context_and_human_mode() {
+    let input = b"H 0\r\nUNKNOWN 1\r\n";
+    let json_args = [
+        "stab",
+        "convert",
+        "--in_format=stim",
+        "--out_format=stim",
+        "--error-format=json",
+    ];
+    let (status, stdout, stderr) = run_cli(&json_args, input);
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert_eq!(
+        only_json_line(&stderr),
+        serde_json::json!({
+            "schema_version": 1,
+            "code": "unknown-instruction",
+            "severity": "error",
+            "message": "unknown gate UNKNOWN",
+            "span": {
+                "byte_start": 5,
+                "byte_length": 7,
+            },
+            "labels": [],
+            "help": null,
+            "context": {
+                "dialect": "stim-circuit",
+                "instruction": "UNKNOWN",
+            },
+        })
+    );
+
+    let human_args = ["stab", "convert", "--in_format=stim", "--out_format=stim"];
+    let (status, stdout, stderr) = run_cli(&human_args, input);
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert_eq!(
+        stderr,
+        b"error: failed to parse line 2: unknown gate UNKNOWN\n"
+    );
+}
+
+#[test]
+fn parser_diagnostics_bound_attacker_controlled_text_in_human_and_json_output() {
+    let gate = "A".repeat(16_384);
+    let input = format!("{gate} 0\n");
+    let json_args = [
+        "stab",
+        "convert",
+        "--in_format=stim",
+        "--out_format=stim",
+        "--error-format=json",
+    ];
+    let (status, stdout, stderr) = run_cli(&json_args, input.as_bytes());
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(stderr.len() <= 1_024);
+
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "unknown-instruction");
+    assert_eq!(field(&diagnostic, "/span/byte_start"), 0);
+    assert_eq!(field(&diagnostic, "/span/byte_length"), gate.len());
+    let message = field(&diagnostic, "/message")
+        .as_str()
+        .expect("diagnostic message is text");
+    assert!(message.len() <= 256);
+    assert!(message.contains("original length:"));
+    let instruction = field(&diagnostic, "/context/instruction")
+        .as_str()
+        .expect("instruction excerpt is text");
+    assert!(instruction.len() <= 256);
+    assert!(instruction.ends_with(" [truncated; original length: 16384 bytes]"));
+
+    let human_args = ["stab", "convert", "--in_format=stim", "--out_format=stim"];
+    let (status, stdout, stderr) = run_cli(&human_args, input.as_bytes());
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(stderr.len() <= 264);
+    assert!(
+        std::str::from_utf8(&stderr)
+            .expect("human diagnostic is UTF-8")
+            .contains("original length:")
+    );
+}
+
+#[test]
+fn json_dem_parse_diagnostic_preserves_numeric_location_and_typed_context() {
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "inspect", "--type=dem", "--error-format=json"],
+        b"error(0.1) D1152921504606846976\n",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "integer-out-of-range");
+    assert_eq!(field(&diagnostic, "/span/byte_start"), 11);
+    assert_eq!(field(&diagnostic, "/span/byte_length"), 20);
+    assert_eq!(
+        field(&diagnostic, "/context/dialect"),
+        "detector-error-model"
+    );
+    assert_eq!(field(&diagnostic, "/context/instruction"), "error");
 }
 
 #[test]
@@ -246,6 +499,40 @@ fn help_and_version_remain_successful_human_stdout() {
             serde_json::from_slice::<Value>(&stdout).is_err(),
             "{args:?} unexpectedly emitted JSON"
         );
+    }
+}
+
+#[test]
+fn global_error_format_can_precede_legacy_dispatch_and_help_topics() {
+    let (status, stdout, stderr) =
+        run_cli(&["stab", "--error-format=json", "--sample=1"], b"M 0\n");
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"0\n");
+    assert_eq!(stderr, b"");
+
+    let (status, stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "--error-format=json",
+            "--convert",
+            "--in_format=01",
+            "--out_format=b8",
+            "--bits_per_shot=2",
+        ],
+        b"10\n",
+    );
+    assert_eq!(status, 0);
+    assert_eq!(stdout, [1]);
+    assert_eq!(stderr, b"");
+
+    for args in [
+        &["stab", "--error-format=json", "--help", "sample"][..],
+        &["stab", "--error-format=json", "--help=sample"][..],
+    ] {
+        let (status, stdout, stderr) = run_cli(args, b"");
+        assert_eq!(status, 0, "{args:?}");
+        assert!(stdout.starts_with(b"stab sample\n"), "{args:?}");
+        assert_eq!(stderr, b"", "{args:?}");
     }
 }
 

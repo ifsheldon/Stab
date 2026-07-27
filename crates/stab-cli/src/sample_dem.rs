@@ -156,6 +156,7 @@ where
     let sampler = CompiledDemSampler::compile(&dem)?;
     let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
     if let Some(replay_input) = replay_input.as_mut() {
+        sampler.validate_replay_work_units(args.shots)?;
         validate_replay_prefix(
             replay_input,
             args.replay_err_in_format,
@@ -230,8 +231,7 @@ where
 }
 
 fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
-    let dem_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
-    Ok(DetectorErrorModel::from_dem_str(dem_text)?)
+    Ok(DetectorErrorModel::from_dem_bytes(input)?)
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {

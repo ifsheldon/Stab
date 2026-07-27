@@ -292,3 +292,52 @@ fn m2d_path_io_opens_all_inputs_before_outputs_and_preflights_output_batch() {
         "keep\n"
     );
 }
+
+#[test]
+fn m2d_converter_admission_precedes_output_truncation() {
+    let dir = tempdir().expect("temp dir");
+    let circuit_path = dir.path().join("over-limit.stim");
+    let measurement_path = dir.path().join("measurements.01");
+    let output_path = dir.path().join("output.01");
+    let obs_path = dir.path().join("observables.01");
+    std::fs::write(&circuit_path, "REPEAT 100001 {\nM 0\n}\n").expect("write circuit");
+    std::fs::write(&measurement_path, "").expect("write measurements");
+    std::fs::write(&output_path, "primary sentinel\n").expect("seed primary output");
+    std::fs::write(&obs_path, "observable sentinel\n").expect("seed observable output");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("m2d"),
+            OsString::from("--in_format=01"),
+            OsString::from("--out_format=01"),
+            OsString::from("--in"),
+            measurement_path.into_os_string(),
+            OsString::from("--out"),
+            output_path.clone().into_os_string(),
+            OsString::from("--obs_out"),
+            obs_path.clone().into_os_string(),
+            OsString::from("--obs_out_format=01"),
+            OsString::from("--circuit"),
+            circuit_path.into_os_string(),
+        ],
+        b"not-used".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert!(stdout.is_empty());
+    let error = String::from_utf8(stderr).expect("UTF-8 diagnostic");
+    assert!(error.contains("repeat counts up to 100000"), "{error}");
+    assert_eq!(
+        std::fs::read_to_string(output_path).expect("read primary sentinel"),
+        "primary sentinel\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(obs_path).expect("read observable sentinel"),
+        "observable sentinel\n"
+    );
+}
