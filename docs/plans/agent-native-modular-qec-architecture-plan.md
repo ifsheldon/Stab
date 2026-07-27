@@ -54,6 +54,8 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 - Stab will define focused batch families over shared packed storage instead.
 - A global `ResourcePolicy` would become another broad configuration object.
 - Stab will use operation-specific policies with unchanged safe defaults and separate exact admission from advisory estimates.
+- Public policy inputs that can be confused use named constrained quantities, but read-only estimate accessors retain ordinary integer values whose unit is fixed by the accessor. Creating a public wrapper for every byte, item, and work-unit field would multiply API surface without preventing an actual construction error because `ResourceEstimate` has no public positional constructor.
+- A configurable repeat budget may tighten the shared recursive safety envelope but may not raise it until all recursive model consumers are redesigned. This refines the general rule that configurable safety budgets may be relaxed without allowing a policy to bypass a current hard implementation invariant.
 - A universal pass or decoder framework will not be designed from hypothetical plugins.
 - Public traits are introduced only after a real built-in implementation and a separate external implementation prove the common contract.
 - Plan fingerprints are versioned reproducibility identities, not promises that compiled-plan hashes remain stable across Stab versions or backends.

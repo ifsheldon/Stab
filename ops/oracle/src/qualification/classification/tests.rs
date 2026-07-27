@@ -129,6 +129,34 @@ fn classifications_distinguish_selected_execution_domains() {
         ),
         Some(FeatureId::ResultFormats)
     );
+    for (source, api) in [
+        (
+            "crates/stab-core/src/parse_limits.rs",
+            "stab_core::ParseLimits",
+        ),
+        (
+            "crates/stab-core/src/resources.rs",
+            "stab_core::ResourceEstimate",
+        ),
+        (
+            "crates/stab-core/src/circuit.rs",
+            "stab_core::Circuit::from_stim_str_with_limits",
+        ),
+        (
+            "crates/stab-core/src/dem.rs",
+            "stab_core::DetectorErrorModel::from_dem_str_with_limits",
+        ),
+        (
+            "crates/stab-core/src/error.rs",
+            "stab_core::CircuitError::resource_limit_error",
+        ),
+    ] {
+        assert_eq!(
+            classify_public_api_source("stab_core", Path::new(source), api),
+            Some(FeatureId::Resource),
+            "{api}"
+        );
+    }
 
     let unknown = classify_public_api_source(
         "stab_core",

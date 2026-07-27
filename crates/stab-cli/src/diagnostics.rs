@@ -335,6 +335,7 @@ fn circuit_error_code(error: &CircuitError) -> &'static str {
         CircuitError::InvalidCircuitSimplification { .. } => "invalid-circuit-simplification",
         CircuitError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         CircuitError::InvalidResultFormat(error) => error.code().as_str(),
+        CircuitError::ResourceLimit(error) => error.code(),
         CircuitError::CircuitIo { .. } => "circuit-io-failed",
         CircuitError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
         CircuitError::UnterminatedRepeatBlock => "unterminated-repeat-block",
@@ -467,6 +468,12 @@ fn circuit_error_context(error: &CircuitError) -> Value {
         | CircuitError::UnterminatedRepeatBlock
         | CircuitError::UnexpectedRepeatTerminator => json!({}),
         CircuitError::InvalidResultFormat(error) => format_error_context(error),
+        CircuitError::ResourceLimit(error) => json!({
+            "operation": error.operation().as_str(),
+            "resource": error.resource().as_str(),
+            "actual": error.actual(),
+            "limit": error.limit(),
+        }),
         CircuitError::CircuitIo {
             operation, kind, ..
         } => json!({

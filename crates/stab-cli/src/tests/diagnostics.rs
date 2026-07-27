@@ -143,6 +143,42 @@ fn json_packed_format_diagnostics_include_exact_span_and_context() {
 }
 
 #[test]
+fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
+    let input = vec![b'\n'; 1_000_001];
+    let (status, stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "convert",
+            "--in_format=stim",
+            "--out_format=stim",
+            "--error-format=json",
+        ],
+        &input,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert_eq!(
+        only_json_line(&stderr),
+        serde_json::json!({
+            "schema_version": 1,
+            "code": "resource-limit-exceeded",
+            "severity": "error",
+            "message": "failed to parse line 1000001: circuit input has more than 1000000 lines",
+            "span": null,
+            "labels": [],
+            "help": null,
+            "context": {
+                "operation": "circuit-parse",
+                "resource": "source-lines",
+                "actual": 1_000_001,
+                "limit": 1_000_000,
+            },
+        })
+    );
+}
+
+#[test]
 fn json_warnings_and_errors_are_ordered_json_lines() {
     let (status, stdout, stderr) = run_cli(
         &["stab", "sample", "--frame0", "--error-format=json"],

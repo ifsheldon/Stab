@@ -5,10 +5,12 @@ use std::str::Lines;
 
 use crate::gate::{ArgRule, GateTargetGroupKind};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
-use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
+use crate::{
+    CircuitError, CircuitResult, Gate, ObservableId, ParseLimits, Probability, RepeatCount,
+    ResourceLimitError, Target,
+};
 
-const MAX_CIRCUIT_PARSE_LINES: usize = 1_000_000;
-const MAX_CIRCUIT_REPEAT_NESTING: usize = 256;
+const CIRCUIT_PREALLOCATION_SAMPLE_BYTES: usize = 1 << 20;
 
 mod api;
 mod counts;
@@ -39,7 +41,11 @@ impl Circuit {
     }
 
     pub fn from_stim_str(input: &str) -> CircuitResult<Self> {
-        Parser::new(input).parse()
+        Self::from_stim_str_with_limits(input, ParseLimits::default())
+    }
+
+    pub fn from_stim_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
+        Parser::new(input, limits).parse()
     }
 
     pub fn items(&self) -> &[CircuitItem] {
@@ -528,14 +534,16 @@ struct Parser<'a> {
     lines: Lines<'a>,
     line_number: usize,
     top_level_capacity: usize,
+    limits: ParseLimits,
 }
 
 impl<'a> Parser<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, limits: ParseLimits) -> Self {
         Self {
             lines: input.lines(),
             line_number: 0,
-            top_level_capacity: top_level_item_capacity(input),
+            top_level_capacity: top_level_item_capacity(input, limits),
+            limits,
         }
     }
 
@@ -552,11 +560,9 @@ impl<'a> Parser<'a> {
         while let Some(raw_line) = self.lines.next() {
             self.line_number += 1;
             let line_number = self.line_number;
-            if line_number > MAX_CIRCUIT_PARSE_LINES {
-                return Err(CircuitError::parse_line(
-                    line_number,
-                    format!("circuit input has more than {MAX_CIRCUIT_PARSE_LINES} lines"),
-                ));
+            let limit = self.limits.source_line_limit().get();
+            if line_number > limit {
+                return Err(ResourceLimitError::circuit_source_lines(line_number, limit).into());
             }
             let Some(line) = strip_comment(raw_line) else {
                 continue;
@@ -594,11 +600,14 @@ impl<'a> Parser<'a> {
         line: &str,
         depth: usize,
     ) -> CircuitResult<RepeatBlock> {
-        if depth >= MAX_CIRCUIT_REPEAT_NESTING {
-            return Err(CircuitError::parse_line(
-                line_number,
-                format!("repeat nesting exceeds current limit {MAX_CIRCUIT_REPEAT_NESTING}"),
-            ));
+        let limit = self.limits.repeat_nesting_limit().get();
+        if depth >= limit {
+            let actual = depth.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_domain_value("circuit repeat nesting", "depth overflow")
+            })?;
+            return Err(
+                ResourceLimitError::circuit_repeat_nesting(line_number, actual, limit).into(),
+            );
         }
         let (name, rest) = parse_name(line_number, line)?;
         if !name.eq_ignore_ascii_case("REPEAT") {
@@ -626,9 +635,31 @@ impl<'a> Parser<'a> {
     }
 }
 
-fn top_level_item_capacity(input: &str) -> usize {
-    let newline_count = input.bytes().filter(|byte| *byte == b'\n').count();
-    newline_count + usize::from(!input.is_empty() && !input.ends_with('\n'))
+fn top_level_item_capacity(input: &str, limits: ParseLimits) -> usize {
+    let admitted_lines = limits.source_line_limit().get();
+    if input.is_empty() || admitted_lines == 0 {
+        return 0;
+    }
+
+    let sample_len = input.len().min(CIRCUIT_PREALLOCATION_SAMPLE_BYTES);
+    let newline_count = input
+        .as_bytes()
+        .iter()
+        .take(sample_len)
+        .filter(|byte| **byte == b'\n')
+        .count();
+    let estimated_items = if sample_len == input.len() {
+        newline_count + usize::from(!input.ends_with('\n'))
+    } else if newline_count == 0 {
+        1
+    } else {
+        input
+            .len()
+            .saturating_mul(newline_count)
+            .div_ceil(sample_len)
+            .saturating_add(1)
+    };
+    estimated_items.min(admitted_lines)
 }
 
 fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitInstruction> {

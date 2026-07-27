@@ -12,10 +12,18 @@ pub(super) const EXISTING_RESOURCE_SOURCE_ID: &str =
 pub(super) const EXISTING_PROPERTY_SOURCE_ID: &str = super::property::PASS_TARGET_ID;
 pub(super) const BOUNDED_TEXT_LINE_SOURCE_ID: &str = "cq3-resource-bounded-text-line-reader";
 
-const EXISTING_RESOURCE_SOURCE_IDS: [&str; 3] = [
+const EXISTING_RESOURCE_SOURCE_IDS: [&str; 11] = [
     EXISTING_RESOURCE_SOURCE_ID,
     EXISTING_PROPERTY_SOURCE_ID,
     BOUNDED_TEXT_LINE_SOURCE_ID,
+    "a2-parse-policy-default-contract",
+    "a2-parse-estimate-contract",
+    "a2-resource-identifier-contract",
+    "a2-circuit-parse-policy-admission",
+    "a2-dem-parse-policy-admission",
+    "a2-parse-repeat-policy-admission",
+    "a2-default-parse-policy-boundaries",
+    "a2-parse-policy-preallocation",
 ];
 
 struct PlannedResourceCaseSpec {

@@ -104,12 +104,13 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 
 | Current source family | Logical owner | Migration note |
 | --- | --- | --- |
-| `circuit.rs`, `circuit/**` | Model | The model keeps syntax, values, parsing, printing, iteration, structural counts, and crate-private structure-preserving builders; algorithmic inherent methods, including recursive tag stripping, are temporary adapters implemented under `analysis` or `execution`. |
+| `circuit.rs`, `circuit/**`, `parse_limits.rs` | Model | The model keeps syntax, values, parsing, printing, iteration, structural counts, and operation-owned parse admission. Named line and repeat limits preserve the default boundary, cap preallocation by admitted work, and prevent repeat overrides from exceeding the recursive model safety envelope. Algorithmic inherent methods, including recursive tag stripping, are temporary adapters implemented under `analysis` or `execution`. |
 | `dem.rs`, `dem/api.rs`, `dem/coordinate_scan.rs`, `dem/parser.rs`, `dem/tag.rs`, `dem/traversal.rs` | Model | Folded traversal is the model-owned advanced boundary shared by DEM queries, analysis, and execution. Consumer-specific search, filtering, and probability policies remain with their analysis owners, while recursive transforms are implemented by `analysis/dem_adapters.rs`. |
 | `gate.rs`, `gate/**` | Model | Gate syntax and closed Stim scalar or textual descriptors remain model-owned; algebra-valued projections and decomposition parsing are implemented by `analysis/gate_adapters.rs`. |
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
 | `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, and typed-context primitives here while domain errors are introduced. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
+| `resources.rs` | Facade, temporarily | A2 owns shared estimate classifications and lossless resource-limit context here while operation-owned policies are introduced beside their model, engine, or analysis operations. A6 must place the shared vocabulary without creating a global resource-policy dependency. |
 | `result_formats.rs`, `result_formats/**`, `result_packed.rs`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |
 | `sampling.rs`, `sampling/**`, `execution/**`, `detection.rs`, `detection/**`, `dem_sampler.rs`, `probability_util.rs` | Engine | Simulator-backed helpers, randomized bit generation, compilation, reusable state, detection conversion, and DEM sampling are execution concerns. |
@@ -117,7 +118,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `circuit_detecting_regions*`, `circuit_feedback.rs`, `circuit_flow*`, `circuit_generation*`, `circuit_inverse*`, `circuit_missing_detectors*`, `circuit_simplify.rs`, `circuit_tableau.rs`, `circuit_transforms.rs` | Analysis | These are pure circuit transforms, generation, lowering, or analysis algorithms. |
 | `dem/analyze*`, `dem/arena_index.rs`, `dem/error_traversal.rs`, `dem/graphlike*`, `dem/hyper*`, `dem/sat*`, `dem/search_budget.rs` | Analysis | These consume the model-owned folded traversal boundary and own analysis-specific policies and outputs. |
 | `error_matcher*`, `matched_error.rs`, `mbqc_decomposition.rs`, `sparse_rev_frame_tracker*` | Analysis | These are pure matching, decomposition, and reverse-tracking algorithms; simulator-backed sampled-flow checks have moved to execution. |
-| `error.rs` | Facade, temporarily | A2 splits typed domain diagnostics while retaining lossless facade conversion; result-format failures now wrap `FormatError` without changing their human display. |
+| `error.rs` | Facade, temporarily | A2 splits typed domain diagnostics while retaining lossless facade conversion; result-format failures wrap `FormatError`, and configurable admission failures wrap `ResourceLimitError`, without changing their established human display. |
 | `lib.rs` | Facade | Root reexports remain curated compatibility adapters and do not determine implementation ownership. |
 
 New source modules must fit exactly one row or update this table and the architecture decision record in the same change.

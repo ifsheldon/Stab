@@ -38,14 +38,16 @@ pub(crate) use traversal::{
     FoldedDemVisitor,
 };
 
-use crate::{CircuitError, CircuitResult, DemRepeatCount, Probability};
+use crate::{
+    CircuitError, CircuitResult, DemRepeatCount, ParseLimits, Probability, RepeatNestingLimit,
+};
 use parser::{parse_dem, parse_unsigned_dem_text_value};
 use tag::DemTag;
 type DemArgVec = SmallVec<[f64; 3]>;
 type DemTargetVec = SmallVec<[DemTarget; 5]>;
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
-pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
+pub(crate) const MAX_DEM_REPEAT_NESTING: usize = RepeatNestingLimit::HARD_MAX;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
 pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 pub(crate) const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
@@ -62,7 +64,11 @@ impl DetectorErrorModel {
     }
 
     pub fn from_dem_str(input: &str) -> CircuitResult<Self> {
-        parse_dem(input)
+        Self::from_dem_str_with_limits(input, ParseLimits::default())
+    }
+
+    pub fn from_dem_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
+        parse_dem(input, limits)
     }
 
     fn with_capacity(capacity: usize) -> Self {

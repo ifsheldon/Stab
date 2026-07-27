@@ -280,6 +280,12 @@ pub(super) fn classify_public_api_source(
     }
     let value = source_path.to_string_lossy().replace('\\', "/");
     let api_lower = api_path.to_ascii_lowercase();
+    if api_lower.ends_with("::from_stim_str_with_limits")
+        || api_lower.ends_with("::from_dem_str_with_limits")
+        || api_lower.ends_with("::resource_limit_error")
+    {
+        return Some(FeatureId::Resource);
+    }
     if api_lower.contains("erroranalyzeroptions")
         || api_lower.contains("circuit_to_detector_error_model")
         || api_lower.ends_with("::detector_error_model")
@@ -398,6 +404,12 @@ pub(super) fn classify_public_api_source(
         || value.starts_with("crates/stab-core/src/result_stream")
     {
         return Some(FeatureId::ResultFormats);
+    }
+    if matches!(
+        value.as_str(),
+        "crates/stab-core/src/parse_limits.rs" | "crates/stab-core/src/resources.rs"
+    ) {
+        return Some(FeatureId::Resource);
     }
     if value.starts_with("crates/stab-core/src/sampling")
         || matches!(

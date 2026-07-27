@@ -1,4 +1,4 @@
-use crate::{FormatError, FormatErrorCode, FormatErrorContext};
+use crate::{FormatError, FormatErrorCode, FormatErrorContext, ResourceLimitError};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -44,6 +44,9 @@ pub enum CircuitError {
 
     #[error("invalid result format data: {0}")]
     InvalidResultFormat(#[source] FormatError),
+
+    #[error(transparent)]
+    ResourceLimit(#[from] ResourceLimitError),
 
     #[error("failed to {operation} circuit file: {message}")]
     CircuitIo {
@@ -119,6 +122,13 @@ impl CircuitError {
     pub const fn format_error(&self) -> Option<&FormatError> {
         match self {
             Self::InvalidResultFormat(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    pub const fn resource_limit_error(&self) -> Option<&ResourceLimitError> {
+        match self {
+            Self::ResourceLimit(error) => Some(error),
             _ => None,
         }
     }

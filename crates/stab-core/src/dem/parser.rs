@@ -2,31 +2,32 @@ use std::str::Lines;
 
 use super::{
     DemArgVec, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DemTargetVec,
-    DetectorErrorModel, MAX_DEM_REPEAT_NESTING,
+    DetectorErrorModel,
 };
-use crate::{CircuitError, CircuitResult, DemRepeatCount};
+use crate::{CircuitError, CircuitResult, DemRepeatCount, ParseLimits, ResourceLimitError};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
-const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
 const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
 
-pub(super) fn parse_dem(input: &str) -> CircuitResult<DetectorErrorModel> {
-    DemParser::new(input).parse()
+pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> CircuitResult<DetectorErrorModel> {
+    DemParser::new(input, limits).parse()
 }
 
 struct DemParser<'a> {
     lines: Lines<'a>,
     line_number: usize,
     top_level_capacity: usize,
+    limits: ParseLimits,
 }
 
 impl<'a> DemParser<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, limits: ParseLimits) -> Self {
         Self {
             lines: input.lines(),
             line_number: 0,
-            top_level_capacity: top_level_item_capacity(input),
+            top_level_capacity: top_level_item_capacity(input, limits),
+            limits,
         }
     }
 
@@ -39,10 +40,9 @@ impl<'a> DemParser<'a> {
         stop_on_terminator: bool,
         depth: usize,
     ) -> CircuitResult<DetectorErrorModel> {
-        if depth > MAX_DEM_REPEAT_NESTING {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-            )));
+        let limit = self.limits.repeat_nesting_limit().get();
+        if depth > limit {
+            return Err(ResourceLimitError::dem_repeat_nesting(depth, limit).into());
         }
         let mut model = if stop_on_terminator {
             DetectorErrorModel::new()
@@ -87,10 +87,9 @@ impl<'a> DemParser<'a> {
         self.line_number = self.line_number.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("DEM line count overflowed")
         })?;
-        if self.line_number > MAX_DEM_PARSE_LINES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM input has more than {MAX_DEM_PARSE_LINES} lines"
-            )));
+        let limit = self.limits.source_line_limit().get();
+        if self.line_number > limit {
+            return Err(ResourceLimitError::dem_source_lines(self.line_number, limit).into());
         }
         Ok(Some((self.line_number, raw_line)))
     }
@@ -132,8 +131,9 @@ impl<'a> DemParser<'a> {
     }
 }
 
-fn top_level_item_capacity(input: &str) -> usize {
-    if input.is_empty() {
+fn top_level_item_capacity(input: &str, limits: ParseLimits) -> usize {
+    let admitted_lines = limits.source_line_limit().get();
+    if input.is_empty() || admitted_lines == 0 {
         return 0;
     }
     let sample_len = input.len().min(DEM_PREALLOCATION_SAMPLE_BYTES);
@@ -152,6 +152,7 @@ fn top_level_item_capacity(input: &str) -> usize {
         .div_ceil(sample_len)
         .saturating_add(1)
         .min(MAX_DEM_PREALLOCATED_ITEMS)
+        .min(admitted_lines)
 }
 
 fn parse_dem_instruction(line_number: usize, line: &str) -> CircuitResult<DemInstruction> {

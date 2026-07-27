@@ -9,7 +9,8 @@ use std::io::ErrorKind;
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    ObservableId, QubitId, RepeatBlock, RepeatCount, Target, analysis::circuit_without_tags,
+    ObservableId, ParseLimits, QubitId, RepeatBlock, RepeatCount, SourceLineLimit, Target,
+    analysis::circuit_without_tags,
 };
 
 #[test]
@@ -522,6 +523,14 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             "invalid result format data: bad width",
         ),
         (
+            Circuit::from_stim_str_with_limits(
+                "H 0\n",
+                ParseLimits::default().with_source_line_limit(SourceLineLimit::new(0)),
+            )
+            .expect_err("construct typed resource failure"),
+            "failed to parse line 1: circuit input has more than 0 lines",
+        ),
+        (
             CircuitError::CircuitIo {
                 operation: "read",
                 kind: ErrorKind::NotFound,
@@ -564,6 +573,7 @@ fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
         | CircuitError::InvalidCircuitSimplification { .. }
         | CircuitError::InvalidSamplerCompilation { .. }
         | CircuitError::InvalidResultFormat(_)
+        | CircuitError::ResourceLimit(_)
         | CircuitError::CircuitIo { .. }
         | CircuitError::InvalidDetectorErrorModel { .. }
         | CircuitError::UnterminatedRepeatBlock

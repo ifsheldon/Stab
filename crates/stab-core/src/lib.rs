@@ -25,7 +25,9 @@ mod gate;
 mod ids;
 mod matched_error;
 mod mbqc_decomposition;
+mod parse_limits;
 mod probability_util;
+mod resources;
 pub mod result_formats;
 mod result_packed;
 pub mod result_streaming;
@@ -113,7 +115,11 @@ pub use matched_error::{
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
+pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
 pub use probability_util::biased_randomize_bits;
+pub use resources::{
+    Estimate, EstimateClass, ResourceEstimate, ResourceKind, ResourceLimitError, ResourceOperation,
+};
 pub use result_formats::{DetsLayout, DetsResultType, DetsToken, SampleFormat};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
