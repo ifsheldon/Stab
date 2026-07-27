@@ -6,7 +6,8 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: worktree closure candidate; clean-revision diagnostic and final audit closure remain pending.
+- A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
+- A3 stable packed records and codecs: not started.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -222,3 +223,47 @@ The architecture plan also separates executable allocation correctness gates fro
 Rejected parser suffix and rejected circuit-flatten payload allocation invariants are direct `cargo test` gates, the existing `m4-circuit-parse` compare supplies the Stim-relative timing and allocation observations, and the four A2 product diagnostics remain independent Stab-only phase timings.
 
 A3 has not started. In particular, `stab-bits` and `stab-records` have not yet been extracted as physical crates.
+
+## A2 Clean Closure
+
+A2 closed against clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9` after focused implementation, CLI, oracle, benchmark-contract, and documentation commits.
+
+| Commit | Purpose |
+| --- | --- |
+| `a74aab7a` | Add stable diagnostics, exact parser spans, fingerprints, capabilities, estimates, and operation-owned resource policies. |
+| `3f910cb4` | Expose additive JSON diagnostics, capabilities, inspection, and dry-run sampling plans through the CLI without changing human defaults. |
+| `adebbf35` | Qualify parser bytes, opaque metadata, resource boundaries, transforms, and CLI propagation against direct tests and pinned Stim cases. |
+| `5ec0edfb` | Bind the four A2 product diagnostics and their correctness prerequisites to the current benchmark contracts. |
+| `28bc3ce0` | Define the final A2 closure contract, resource-policy matrix, and executable evidence commands. |
+| `7b6c592b` | Prevent allocation instrumentation from being mislabeled as Stim-relative timing evidence. |
+
+The final milestone audit and full code review found no remaining source-current A2 blocker. Rust files remained below the 1,200-line project limit, all per-dimension resource-policy rows had direct selectors, generated correctness and performance identities matched their checked sources, and no A2 diagnostic was admitted to parity, self-regression, release, or formal-completion policy.
+
+The parser allocation correctness gates passed:
+
+- `parse_preallocation_is_bounded_by_the_admitted_line_prefix`
+- `byte_parse_admission_does_not_copy_an_unterminated_rejected_line`
+- `policy_preserves_defaults_and_rejects_before_output_allocation`
+
+The clean parser baseline is `target/benchmarks/a2-circuit-parse-baseline-7b6c592b/baseline.json`, with SHA-256 `e3a0516c2a98ae4756a2683c2b55b62dee1b3f6e21fd85623ef06831cfb8db23`.
+
+The clean timing report is `target/benchmarks/a2-circuit-parse-timing-7b6c592b/compare.json`, with SHA-256 `7126fd54e2470bd8055cd9b63665565cae227ffb3e1d03d797d97d7aeff97db`. It records `local_modifications=false`, a dense parse ratio of `1.135x`, a sparse parse ratio and headline ratio of `1.200x`, and a passing unchanged `1.25x` beta gate.
+
+The clean allocation observation is `target/benchmarks/a2-circuit-parse-allocations-7b6c592b/compare.json`, with SHA-256 `3e19749290b3a91c0224cc14caecffe6704666ffb907e47ec1d9af5c6474ba99`. It records `local_modifications=false`, a dense accepted-workload allocation peak of 1,152 bytes, a sparse allocation peak of 288,000 bytes, and `not-evaluated-instrumented` for both timing pass/fail and the beta gate. Its instrumented wall-time ratios are context only and make no parity claim.
+
+The earlier `28bc3ce0` allocation artifact is preserved but review-rejected because it incorrectly applied the timing beta gate to allocator-instrumented wall time. The dirty `target/benchmarks/a2-allocation-contract-probe-dirty` report is also non-promotable. Neither path may be reused as current evidence.
+
+The four clean product-diagnostic reports are:
+
+| Group | Report | SHA-256 | Small / medium / large median time per item |
+| --- | --- | --- | --- |
+| Circuit model fingerprint | `target/benchmarks/qualification/a2-circuit-model-fingerprint-7b6c592b/report.json` | `0e86cc4a7bf3a909fc08f8c37938785033418b23bf00ee9fd14c7fcd4c57a65f` | 46.192 ns / 45.363 ns / 45.507 ns |
+| Sampling request fingerprint, inclusive | `target/benchmarks/qualification/a2-sampling-request-fingerprint-7b6c592b/report.json` | `f9ebc69e71ac9531e11962a7e1b1d52c59bd7ca12a976acf5ae596127041bb33` | 47.802 ns / 45.405 ns / 45.532 ns |
+| Sampling request estimate | `target/benchmarks/qualification/a2-sampling-request-estimate-7b6c592b/report.json` | `bffb6d20bcf272d752eb89b47aba220bbbf5184b1fe1e190461aa20b6272a332` | 6.147 ns / 5.387 ns / 5.589 ns |
+| Sampler compile and release | `target/benchmarks/qualification/a2-sampler-compile-release-7b6c592b/report.json` | `55ba766fb013832e5a5c500be27a32046f1d977dd52248c58f35b901c9c2f34b` | 396.221 ns / 371.282 ns / 372.552 ns |
+
+Every diagnostic binds the clean source revision before and after execution, the frozen correctness digest `ccbeb26a1f4d10fedf68ef0aa66634c6b2b6607af76184598282501419c74a1d`, the frozen performance digest `0d1fb8a08702dbb57b55e734e4735b3ce39f41388846d7b9ed715031feb88f54`, all three source-owned scales, a complete semantic witness, and `raw-work-v2`. The reports are explicitly `product-diagnostic` with no parity or regression result. The host is unverified because swap-in counters changed during each run, so the reports remain development diagnostics and cannot support release evidence.
+
+The source revision passed formatting, warnings-denied workspace Clippy, all workspace tests, warnings-denied rustdoc, architecture enforcement, implemented oracle fixtures, the live 62-case result-format oracle, correctness and performance check/regeneration, generated-status checking, benchmark smoke, and staged pre-commit validation.
+
+A2 does not claim physical modularity. At its closure revision, `stab-bits` and `stab-records` still do not exist as Cargo packages; that extraction is the first A3 task.
