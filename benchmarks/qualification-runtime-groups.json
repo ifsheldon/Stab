@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8",
+  "performance_inventory_sha256": "0d1fb8a08702dbb57b55e734e4735b3ce39f41388846d7b9ed715031feb88f54",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -275,7 +275,7 @@
       "owner": "stab-core/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
-        "sha256": "da819f8a2faeebfe7873db2b84cd090cae9853772b8ac756bb63eb86bd8d7a58"
+        "sha256": "faf4355da06eecbadc22aa543c687af533d7a6aa2b08d932e3c654478f39a1ab"
       }
     },
     {

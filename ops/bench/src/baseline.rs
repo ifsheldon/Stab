@@ -232,23 +232,22 @@ pub(crate) fn run_stab_compare_row_with_root(
             let sparse_fixture = m4_stim_parse_sparse_fixture();
             Ok(Some(vec![
                 measure_stab("stab_circuit_parse", || {
-                    let circuit =
-                        Circuit::from_stim_str(M4_STIM_PARSE_DENSE_FIXTURE).map_err(|error| {
-                            BenchError::StabRunner {
-                                row_id: row.id.clone(),
-                                message: error.to_string(),
-                            }
+                    let circuit = Circuit::from_stim_bytes(M4_STIM_PARSE_DENSE_FIXTURE.as_bytes())
+                        .map_err(|error| BenchError::StabRunner {
+                            row_id: row.id.clone(),
+                            message: error.to_string(),
                         })?;
                     black_box(circuit.items().len());
                     Ok(())
                 })?,
                 measure_stab("stab_circuit_parse_sparse", || {
-                    let circuit = Circuit::from_stim_str(&sparse_fixture).map_err(|error| {
-                        BenchError::StabRunner {
-                            row_id: row.id.clone(),
-                            message: error.to_string(),
-                        }
-                    })?;
+                    let circuit =
+                        Circuit::from_stim_bytes(sparse_fixture.as_bytes()).map_err(|error| {
+                            BenchError::StabRunner {
+                                row_id: row.id.clone(),
+                                message: error.to_string(),
+                            }
+                        })?;
                     black_box(circuit.items().len());
                     Ok(())
                 })?,

@@ -343,7 +343,7 @@ fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {
 fn circuit_parse(iterations: u64, fixture: &str) -> Result<stab_core::Circuit, WorkerError> {
     let mut parsed = stab_core::Circuit::new();
     for _ in 0..iterations {
-        parsed = stab_core::Circuit::from_stim_str(fixture)?;
+        parsed = stab_core::Circuit::from_stim_bytes(fixture.as_bytes())?;
     }
     Ok(parsed)
 }
