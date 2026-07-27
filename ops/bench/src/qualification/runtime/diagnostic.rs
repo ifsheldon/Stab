@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,7 @@ use super::run::{
 use crate::qualification::model::SizeClass;
 use crate::root::RepoRoot;
 
-const DIAGNOSTIC_REPORT_SCHEMA_VERSION: u32 = 1;
+const DIAGNOSTIC_REPORT_SCHEMA_VERSION: u32 = 2;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/a2-diagnostic-latest";
 
 #[derive(Clone, Debug, Args)]
@@ -92,6 +93,7 @@ struct DiagnosticCommandEvidence {
     warmup_batches: usize,
     retained_samples: usize,
     invocation_timeout_seconds: u64,
+    suite_timeout_seconds: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -159,6 +161,10 @@ pub(super) fn run_with_repository(
     let mut worker =
         PreparedDiagnosticWorker::prepare(source_root, &repository_before.commit, &toolchain)?;
     worker.pin_to_cpu(host_guard.selected_cpu());
+    let suite_timeout_seconds = resolved_group
+        .product_diagnostic_suite_timeout_seconds
+        .get();
+    let deadline = SuiteDeadline::start(Duration::from_secs(suite_timeout_seconds))?;
 
     let mut scale_evidence = Vec::with_capacity(scales.len());
     for scale in scales {
@@ -167,8 +173,10 @@ pub(super) fn run_with_repository(
             &resolved_group.contract,
             scale,
             args.tier,
+            &deadline,
         )?);
     }
+    deadline.require_remaining()?;
     worker.verify()?;
     let worker_identity = worker.identity_evidence();
     let build_receipt = worker.build_receipt().clone();
@@ -206,6 +214,7 @@ pub(super) fn run_with_repository(
             warmup_batches: WARMUP_BATCHES,
             retained_samples: args.tier.sample_count(),
             invocation_timeout_seconds: INVOCATION_TIMEOUT.as_secs(),
+            suite_timeout_seconds,
         },
         repository,
         host,
@@ -214,7 +223,7 @@ pub(super) fn run_with_repository(
         stab_build_receipt: build_receipt,
         scales: scale_evidence,
     };
-    validate_report(&report, &resolved_group.contract)?;
+    validate_report(&report, &resolved_group.contract, suite_timeout_seconds)?;
     let report_json = render_json(&report)?;
     let report_markdown = render_markdown(&report, &super::run::sha256_hex(&report_json));
     let repository_evidence = report.repository.clone();
@@ -234,11 +243,12 @@ fn run_scale(
     group: &GroupContract,
     scale: &ScaleContract,
     tier: QualificationTier,
+    deadline: &SuiteDeadline,
 ) -> Result<DiagnosticScaleEvidence, DiagnosticError> {
     let mut probes = Vec::new();
     let decision = calibrate(super::run::calibration_policy()?, |iterations| {
-        let invocation =
-            invoke(worker, group, scale, iterations, None).map_err(|error| error.to_string())?;
+        let invocation = invoke(worker, group, scale, iterations, None, deadline)
+            .map_err(|error| error.to_string())?;
         let measured = invocation
             .measured_duration()
             .map_err(|error| error.to_string())?;
@@ -262,6 +272,7 @@ fn run_scale(
         scale,
         decision.iterations,
         Some(&selected_digest),
+        deadline,
     )?;
     let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
     for _ in 0..WARMUP_BATCHES {
@@ -271,6 +282,7 @@ fn run_scale(
             scale,
             decision.iterations,
             Some(&selected_digest),
+            deadline,
         )?);
     }
     let mut samples = Vec::with_capacity(tier.sample_count());
@@ -281,6 +293,7 @@ fn run_scale(
             scale,
             decision.iterations,
             Some(&selected_digest),
+            deadline,
         )?);
     }
     let summary = summarize_samples(&samples)?;
@@ -309,15 +322,17 @@ fn invoke(
     scale: &ScaleContract,
     iterations: NonZeroU64,
     expected_output_digest: Option<&SemanticDigest>,
-) -> Result<InvocationRecord, InvocationError> {
-    worker.invoke(DiagnosticInvocationRequest {
+    deadline: &SuiteDeadline,
+) -> Result<InvocationRecord, DiagnosticError> {
+    let timeout = deadline.invocation_timeout()?;
+    Ok(worker.invoke(DiagnosticInvocationRequest {
         group,
         evidence_mode: EvidenceMode::Timing,
         iterations,
         scale,
         expected_output_digest,
-        timeout: INVOCATION_TIMEOUT,
-    })
+        timeout,
+    })?)
 }
 
 fn selected_scales<'a>(
@@ -346,6 +361,7 @@ fn require_product_diagnostic(group: &GroupContract) -> Result<(), DiagnosticErr
 fn validate_report(
     report: &DiagnosticReport,
     group: &GroupContract,
+    suite_timeout_seconds: u64,
 ) -> Result<(), DiagnosticError> {
     if report.schema_version != DIAGNOSTIC_REPORT_SCHEMA_VERSION
         || report.scope != DiagnosticScope::StabOnlyProduct
@@ -355,6 +371,7 @@ fn validate_report(
         || report.correctness_case_ids != group.correctness_case_ids
         || report.scales.is_empty()
         || report.scales.len() != report.command.scale_ids.len()
+        || report.command.suite_timeout_seconds != suite_timeout_seconds
     {
         return Err(DiagnosticError::Report);
     }
@@ -379,6 +396,36 @@ fn validate_report(
         }
     }
     Ok(())
+}
+
+struct SuiteDeadline {
+    ends_at: Instant,
+}
+
+impl SuiteDeadline {
+    fn start(timeout: Duration) -> Result<Self, DiagnosticError> {
+        let ends_at = Instant::now()
+            .checked_add(timeout)
+            .ok_or(DiagnosticError::SuiteDeadlineOverflow)?;
+        Ok(Self { ends_at })
+    }
+
+    fn invocation_timeout(&self) -> Result<Duration, DiagnosticError> {
+        self.invocation_timeout_at(Instant::now())
+    }
+
+    fn invocation_timeout_at(&self, now: Instant) -> Result<Duration, DiagnosticError> {
+        let remaining = self
+            .ends_at
+            .checked_duration_since(now)
+            .filter(|duration| !duration.is_zero())
+            .ok_or(DiagnosticError::SuiteTimeout)?;
+        Ok(remaining.min(INVOCATION_TIMEOUT))
+    }
+
+    fn require_remaining(&self) -> Result<(), DiagnosticError> {
+        self.invocation_timeout_at(Instant::now()).map(|_| ())
+    }
 }
 
 fn invocation_is_stab_timing(invocation: &InvocationRecord, group: &GroupContract) -> bool {
@@ -505,6 +552,10 @@ pub(super) enum DiagnosticError {
     MeasurementCount(usize),
     #[error("repository commit changed during the diagnostic run: {before} -> {after}")]
     RepositoryChanged { before: String, after: String },
+    #[error("Stab-only diagnostic suite exceeded its source-owned timeout")]
+    SuiteTimeout,
+    #[error("Stab-only diagnostic suite deadline cannot be represented")]
+    SuiteDeadlineOverflow,
     #[error("failed to serialize Stab-only diagnostic evidence: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -569,6 +620,30 @@ mod tests {
 
         assert_eq!(summary.median_batch_seconds, 0.3);
         assert_eq!(summary.median_seconds_per_work_item, 0.0015);
+    }
+
+    #[test]
+    fn a2_agent_diagnostic_deadline_caps_each_child_by_remaining_suite_time() {
+        let now = Instant::now();
+        let deadline = SuiteDeadline {
+            ends_at: now + Duration::from_secs(600),
+        };
+        assert_eq!(
+            deadline
+                .invocation_timeout_at(now)
+                .expect("full child timeout"),
+            INVOCATION_TIMEOUT
+        );
+        assert_eq!(
+            deadline
+                .invocation_timeout_at(now + Duration::from_secs(595))
+                .expect("remaining child timeout"),
+            Duration::from_secs(5)
+        );
+        assert!(matches!(
+            deadline.invocation_timeout_at(now + Duration::from_secs(600)),
+            Err(DiagnosticError::SuiteTimeout)
+        ));
     }
 
     fn invocation(elapsed_seconds: f64, work_count: u64) -> InvocationRecord {

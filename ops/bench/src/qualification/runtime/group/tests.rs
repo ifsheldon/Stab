@@ -233,13 +233,15 @@ fn valid_contract_file() -> GroupContractFile {
         product_diagnostic_contract(
             super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID,
             "sampler-compile",
-            "compile",
+            "compile-and-release",
         ),
     ]);
     GroupContractFile {
         schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
         timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         performance_inventory_sha256: "a".repeat(64),
+        product_diagnostic_suite_timeout_seconds: NonZeroU64::new(600)
+            .expect("positive suite timeout"),
         groups,
     }
 }
@@ -407,6 +409,35 @@ fn product_diagnostics_require_exact_owners_without_parity_or_profiler_inputs() 
     assert!(matches!(
         validate(&invalid, &"a".repeat(64)),
         Err(GroupError::InvalidGroup(_))
+    ));
+}
+
+#[test]
+fn product_diagnostic_suite_timeout_is_bounded_and_matches_inventory() {
+    let mut invalid = valid_contract_file();
+    invalid.product_diagnostic_suite_timeout_seconds =
+        NonZeroU64::new(super::MAX_PRODUCT_DIAGNOSTIC_SUITE_TIMEOUT_SECONDS + 1)
+            .expect("positive timeout");
+    assert!(matches!(
+        validate(&invalid, &"a".repeat(64)),
+        Err(GroupError::InvalidProductDiagnosticSuiteTimeout(3_601))
+    ));
+
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+    suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID)
+        .expect("sampler compile diagnostic")
+        .timing_policy
+        .timeout_seconds = 599;
+    assert!(matches!(
+        validate_inventory_contracts(&file, &suite),
+        Err(GroupError::InventoryContract(group))
+            if group == super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID
     ));
 }
 

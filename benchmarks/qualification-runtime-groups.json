@@ -1,7 +1,8 @@
 {
-  "schema_version": 8,
+  "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "4a4cb7cb40753f42fa1f2c91a34e1a9bc5dcaf89c6696a5a71a0d461efb8a007",
+  "performance_inventory_sha256": "4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8",
+  "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -156,7 +157,7 @@
       "timing_batch_policy": "common-iterations",
       "workload_id": "sampler-compile",
       "measurement_ids": [
-        "compile"
+        "compile-and-release"
       ],
       "scales": [
         {

@@ -74,7 +74,7 @@ impl WorkerWorkload {
             Self::CircuitModelFingerprint => "fingerprint",
             Self::SamplingRequestFingerprint => "fingerprint-inclusive",
             Self::SamplingRequestEstimate => "estimate",
-            Self::SamplerCompile => "compile",
+            Self::SamplerCompile => "compile-and-release",
             Self::DemParse => "parse",
             Self::DemCanonicalPrint => "serialize",
             Self::GateNameHash => "hash-all-names",

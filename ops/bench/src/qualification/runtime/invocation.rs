@@ -97,7 +97,7 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                     && measurement == "estimate")
                 || (group == A2_SAMPLER_COMPILE_GROUP_ID
                     && workload == "sampler-compile"
-                    && measurement == "compile")
+                    && measurement == "compile-and-release")
                 || (group == GATE_NAME_HASH_GROUP_ID
                     && workload == "gate-name-hash"
                     && measurement == "hash-all-names")

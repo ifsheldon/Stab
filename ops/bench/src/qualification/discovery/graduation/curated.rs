@@ -113,7 +113,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             phase: Phase::Compile,
             correctness_case: "cq-evidence-qualification-c05d9e9942e9284c",
             owner: "stab-core/sampling-compiler",
-            reason: "Measures only CompiledSampler::compile over a pre-parsed deterministic circuit and compares the complete compiled plan with an untimed typed witness without executing samples.",
+            reason: "Measures the complete CompiledSampler compile-and-release lifecycle over a pre-parsed deterministic circuit. Untimed recompilation compares the complete compiled plan with a typed witness, and no sampling method is called.",
         },
     ]
     .into_iter()

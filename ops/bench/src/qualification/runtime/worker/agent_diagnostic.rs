@@ -48,6 +48,7 @@ pub(super) enum AgentDiagnosticOutput {
     CompilationRequestFingerprint(CompilationRequestFingerprint),
     SamplingRequestEstimate(ResourceEstimate),
     CompiledSampler(CompiledSampler),
+    CompileRelease { completed_iterations: u64 },
 }
 
 pub(super) struct AgentDiagnosticFixture {
@@ -73,6 +74,20 @@ impl AgentDiagnosticFixture {
     }
 
     pub(super) fn execute(&self, iterations: u64) -> Result<AgentDiagnosticOutput, WorkerError> {
+        if iterations == 0 {
+            return Err(WorkerError::AgentDiagnosticMissingOutput);
+        }
+        if self.kind == AgentDiagnosticKind::SamplerCompile {
+            for _ in 0..iterations {
+                compiler_fence(Ordering::SeqCst);
+                let compiled = CompiledSampler::compile(black_box(&self.circuit))?;
+                drop(black_box(compiled));
+            }
+            return Ok(AgentDiagnosticOutput::CompileRelease {
+                completed_iterations: iterations,
+            });
+        }
+
         let mut output = None;
         for _ in 0..iterations {
             compiler_fence(Ordering::SeqCst);
@@ -89,7 +104,22 @@ impl AgentDiagnosticFixture {
         iterations: u64,
         work_items: u64,
     ) -> Result<String, WorkerError> {
-        if output != self.expected {
+        if self.kind == AgentDiagnosticKind::SamplerCompile {
+            let AgentDiagnosticOutput::CompileRelease {
+                completed_iterations,
+            } = output
+            else {
+                return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
+            };
+            let AgentDiagnosticOutput::CompiledSampler(expected) = &self.expected else {
+                return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
+            };
+            if completed_iterations != iterations
+                || CompiledSampler::compile(&self.circuit)? != *expected
+            {
+                return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
+            }
+        } else if output != self.expected {
             return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
         }
         let mut material = Vec::with_capacity(128);
@@ -109,7 +139,7 @@ impl AgentDiagnosticFixture {
             AgentDiagnosticKind::CircuitModelFingerprint => "circuit-model-fingerprint",
             AgentDiagnosticKind::SamplingRequestFingerprint => "sampling-request-fingerprint",
             AgentDiagnosticKind::SamplingRequestEstimate => "sampling-request-estimate",
-            AgentDiagnosticKind::SamplerCompile => "sampler-compile",
+            AgentDiagnosticKind::SamplerCompile => "sampler-compile-release",
         }
     }
 }
@@ -165,7 +195,10 @@ fn encode_output(output: &AgentDiagnosticOutput, circuit: &Circuit, material: &m
                 encode_estimate(value, material);
             }
         }
-        AgentDiagnosticOutput::CompiledSampler(_) => {
+        AgentDiagnosticOutput::CompiledSampler(_)
+        | AgentDiagnosticOutput::CompileRelease {
+            completed_iterations: _,
+        } => {
             // Exact typed equality above validates the complete private plan shape. The stable
             // request identity binds the semantic model without making Debug output a contract.
             let request = CompilationRequestFingerprint::for_sampling(circuit);

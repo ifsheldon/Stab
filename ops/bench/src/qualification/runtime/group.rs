@@ -16,7 +16,7 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 8;
+pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 9;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_RELEASE_GROUPS: usize = 40;
@@ -28,6 +28,7 @@ const MAX_PROFILER_NOTE_PATH_BYTES: usize = 512;
 const MAX_COMPARATOR_SOURCE_PATH_BYTES: usize = 512;
 const MAX_PROFILER_NOTE_BYTES: usize = 64 << 10;
 const MAX_COMPARATOR_SOURCE_BYTES: usize = 1 << 20;
+const MAX_PRODUCT_DIAGNOSTIC_SUITE_TIMEOUT_SECONDS: u64 = 3_600;
 const PROFILER_NOTE_PREFIX: &str = "benchmarks/profiler-notes/qualification/";
 const COMPARATOR_SOURCE_PREFIX: &str = "benchmarks/stim_adapter/";
 
@@ -184,6 +185,7 @@ impl GroupContract {
 #[derive(Clone, Debug)]
 pub(super) struct ResolvedGroupContract {
     pub(super) source_sha256: String,
+    pub(super) product_diagnostic_suite_timeout_seconds: NonZeroU64,
     pub(super) contract: GroupContract,
 }
 
@@ -193,6 +195,7 @@ struct GroupContractFile {
     schema_version: u32,
     timing_boundary: TimingBoundary,
     performance_inventory_sha256: String,
+    product_diagnostic_suite_timeout_seconds: NonZeroU64,
     groups: Vec<GroupContract>,
 }
 
@@ -209,6 +212,7 @@ pub(super) fn load_group(
         .ok_or_else(|| GroupError::UnknownGroup(group_id.to_string()))?;
     Ok(ResolvedGroupContract {
         source_sha256,
+        product_diagnostic_suite_timeout_seconds: file.product_diagnostic_suite_timeout_seconds,
         contract,
     })
 }
@@ -405,6 +409,8 @@ fn validate_inventory_contracts(
             || group.output_contract.digest_state != EvidenceState::Existing
             || group.threshold_policy != ThresholdPolicy::ReportOnly
             || group.timing_policy.batch_policy != contract.timing_batch_policy
+            || u64::from(group.timing_policy.timeout_seconds)
+                != file.product_diagnostic_suite_timeout_seconds.get()
             || group.status == QualificationStatus::Planned
             || inventory_scale_ids != contract_scale_ids
             || !group.memory_policy.scale_ids.is_empty()
@@ -528,6 +534,13 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
     }
     if file.groups.is_empty() || file.groups.len() > MAX_GROUPS {
         return Err(GroupError::GroupCount(file.groups.len()));
+    }
+    if file.product_diagnostic_suite_timeout_seconds.get()
+        > MAX_PRODUCT_DIAGNOSTIC_SUITE_TIMEOUT_SECONDS
+    {
+        return Err(GroupError::InvalidProductDiagnosticSuiteTimeout(
+            file.product_diagnostic_suite_timeout_seconds.get(),
+        ));
     }
     let release_groups = file
         .groups
@@ -662,6 +675,10 @@ pub(super) enum GroupError {
     Inventory { actual: String, expected: String },
     #[error("runtime group contract has an invalid group count: {0}")]
     GroupCount(usize),
+    #[error(
+        "runtime group contract product-diagnostic suite timeout {0} seconds exceeds the 3600-second safety maximum"
+    )]
+    InvalidProductDiagnosticSuiteTimeout(u64),
     #[error(
         "runtime group matrix exceeds its cap: release={release}/{release_max}, diagnostic={diagnostic}/{diagnostic_max}"
     )]

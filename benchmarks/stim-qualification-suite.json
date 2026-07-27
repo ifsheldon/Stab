@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "6512dfdc6056b4c03f95889a24ab311a9820845ae2615d7797146c1ca5dfcfcd",
-  "semantic_digest": "4a4cb7cb40753f42fa1f2c91a34e1a9bc5dcaf89c6696a5a71a0d461efb8a007",
+  "correctness_digest": "3c08ac35fe7379f427d5512f98033353844f25053a16093a1e0a61f8085cf976",
+  "semantic_digest": "4902a52d00d291d6e2b8447c83262e9087bdc246de3ba3befc18ed1abcc09da8",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -34443,7 +34443,7 @@
         "expected_growth": "No release memory claim; bounded worker RSS remains present only in raw diagnostic receipts."
       },
       "threshold_policy": "report-only",
-      "reason": "Measures only CompiledSampler::compile over a pre-parsed deterministic circuit and compares the complete compiled plan with an untimed typed witness without executing samples.",
+      "reason": "Measures the complete CompiledSampler compile-and-release lifecycle over a pre-parsed deterministic circuit. Untimed recompilation compares the complete compiled plan with a typed witness, and no sampling method is called.",
       "owner": "stab-core/sampling-compiler",
       "status": "implemented"
     },
