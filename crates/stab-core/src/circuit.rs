@@ -6,8 +6,8 @@ use std::str::Lines;
 use crate::gate::{ArgRule, GateTargetGroupKind};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{
-    CircuitError, CircuitResult, Gate, ObservableId, ParseLimits, Probability, RepeatCount,
-    ResourceLimitError, Target,
+    CircuitError, CircuitResult, Gate, ModelFingerprint, ObservableId, ParseLimits, Probability,
+    RepeatCount, ResourceLimitError, Target,
 };
 
 const CIRCUIT_PREALLOCATION_SAMPLE_BYTES: usize = 1 << 20;
@@ -46,6 +46,14 @@ impl Circuit {
 
     pub fn from_stim_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
         Parser::new(input, limits).parse()
+    }
+
+    /// Returns the schema-versioned structural identity of this circuit.
+    ///
+    /// The fingerprint is independent of accepted textual spelling and printer precision. It
+    /// identifies this source model only, not compiler options, a backend, or an executable plan.
+    pub fn fingerprint(&self) -> ModelFingerprint {
+        ModelFingerprint::for_circuit(self)
     }
 
     pub fn items(&self) -> &[CircuitItem] {

@@ -177,7 +177,13 @@ Estimation must not execute the expensive operation it describes.
 
 ### Fingerprints And Capabilities
 
-`ModelFingerprint` hashes the dialect identity, fingerprint schema, and canonical model bytes with SHA-256.
+`ModelFingerprint` hashes the dialect identity, fingerprint schema, and canonical model structure with SHA-256.
+
+Schema one starts with the fixed `stab:model-fingerprint\0` domain, a big-endian `u16` schema, and a one-byte dialect discriminator. The remaining stream length-frames every sequence and UTF-8 string with a big-endian `u128`, uses explicit item, instruction, and target discriminators, encodes integers at fixed widths in big-endian order, and encodes exact `f64` bits after normalizing signed zero.
+
+The fingerprint does not hash `.stim` or `.dem` printer output. Compatibility printers intentionally round some floating-point values, so using their text would merge semantically distinct models and would make a schema identity change whenever presentation formatting changed. The structural encoder retains semantic precision, allocates no storage proportional to model volume, uses traversal storage proportional only to repeat depth, and is frozen by independently reconstructed rich circuit and DEM vectors.
+
+The exact field order, discriminator assignments, primitive encodings, frozen vectors, traversal resource behavior, and schema-evolution rule are normative in [model fingerprint schema version 1](../architecture/model-fingerprint-schema-v1.md).
 
 `CompilationRequestFingerprint` hashes the model fingerprint, compiler schema, operation kind, normalized options, and effective limits before backend selection.
 

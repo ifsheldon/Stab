@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "74533261b104c975cbce766ed081944fe8b6a87acafd05e8f24cfba3830d3562",
+  "semantic_digest": "a13218df4789cb139c80eb8d6dc54ecd7529d40e450def66cd5c54ba9d615b7e",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -58394,7 +58394,7 @@
       "path": "stab_core::Circuit as Display for@365131fdb4ac",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 523,
+      "source_line": 531,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58476,7 +58476,7 @@
       "path": "stab_core::Circuit::append_instruction",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 95,
+      "source_line": 103,
       "owner_case_id": "cq-evidence-qualification-bc6509ae4ef4f0db",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58490,7 +58490,7 @@
       "path": "stab_core::Circuit::append_repeat_block",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 100,
+      "source_line": 108,
       "owner_case_id": "cq-evidence-qualification-bc6509ae4ef4f0db",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58707,6 +58707,20 @@
       ]
     },
     {
+      "id": "cq-api-item-e25d6d4ff78e789a",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::Circuit::fingerprint",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/circuit.rs",
+      "source_line": 55,
+      "owner_case_id": "cq-evidence-qualification-e16abe30d8c7992c",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
       "id": "cq-api-item-90c4a02df0bc763d",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
@@ -58836,7 +58850,7 @@
       "path": "stab_core::Circuit::instruction_range",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 66,
+      "source_line": 74,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58903,7 +58917,7 @@
       "path": "stab_core::Circuit::item_range",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 59,
+      "source_line": 67,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58917,7 +58931,7 @@
       "path": "stab_core::Circuit::items",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 51,
+      "source_line": 59,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58931,7 +58945,7 @@
       "path": "stab_core::Circuit::iter_flattened_instructions",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 86,
+      "source_line": 94,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58945,7 +58959,7 @@
       "path": "stab_core::Circuit::iter_flattened_instructions_reverse",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 90,
+      "source_line": 98,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -58959,7 +58973,7 @@
       "path": "stab_core::Circuit::iter_items",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 55,
+      "source_line": 63,
       "owner_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -59123,7 +59137,7 @@
       "path": "stab_core::Circuit::to_stim_string",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 104,
+      "source_line": 112,
       "owner_case_id": "cq-evidence-qualification-e660819ae9a223c6",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -60496,7 +60510,7 @@
       "path": "stab_core::CircuitInstruction",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 189,
+      "source_line": 197,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60510,7 +60524,7 @@
       "path": "stab_core::CircuitInstruction as Clone for@acb2f8925027",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 188,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60524,7 +60538,7 @@
       "path": "stab_core::CircuitInstruction as Debug for@acb2f8925027",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 188,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60538,7 +60552,7 @@
       "path": "stab_core::CircuitInstruction as PartialEq for@acb2f8925027",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 188,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60552,7 +60566,7 @@
       "path": "stab_core::CircuitInstruction as StructuralPartialEq for@acb2f8925027",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 188,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60566,7 +60580,7 @@
       "path": "stab_core::CircuitInstruction::args",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 227,
+      "source_line": 235,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60580,7 +60594,7 @@
       "path": "stab_core::CircuitInstruction::coordinate_arguments",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 275,
+      "source_line": 283,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60594,7 +60608,7 @@
       "path": "stab_core::CircuitInstruction::disjoint_target_segments",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 305,
+      "source_line": 313,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60608,7 +60622,7 @@
       "path": "stab_core::CircuitInstruction::disjoint_target_segments_reversed",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 340,
+      "source_line": 348,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60622,7 +60636,7 @@
       "path": "stab_core::CircuitInstruction::gate",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 223,
+      "source_line": 231,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60636,7 +60650,7 @@
       "path": "stab_core::CircuitInstruction::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 198,
+      "source_line": 206,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60650,7 +60664,7 @@
       "path": "stab_core::CircuitInstruction::observable_id_argument",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 263,
+      "source_line": 271,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60664,7 +60678,7 @@
       "path": "stab_core::CircuitInstruction::probability_argument",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 232,
+      "source_line": 240,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60678,7 +60692,7 @@
       "path": "stab_core::CircuitInstruction::probability_arguments",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 247,
+      "source_line": 255,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60692,7 +60706,7 @@
       "path": "stab_core::CircuitInstruction::tag",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 284,
+      "source_line": 292,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60706,7 +60720,7 @@
       "path": "stab_core::CircuitInstruction::target_groups",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 288,
+      "source_line": 296,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60720,7 +60734,7 @@
       "path": "stab_core::CircuitInstruction::targets",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 279,
+      "source_line": 287,
       "owner_case_id": "cq-evidence-qualification-7d805260941fd248",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60734,7 +60748,7 @@
       "path": "stab_core::CircuitItem",
       "kind": "enum",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 153,
+      "source_line": 161,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60748,7 +60762,7 @@
       "path": "stab_core::CircuitItem as Clone for@61e7dd2d32f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 152,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60762,7 +60776,7 @@
       "path": "stab_core::CircuitItem as Debug for@61e7dd2d32f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 152,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60776,7 +60790,7 @@
       "path": "stab_core::CircuitItem as PartialEq for@61e7dd2d32f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 152,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60790,7 +60804,7 @@
       "path": "stab_core::CircuitItem as StructuralPartialEq for@61e7dd2d32f1",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 152,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60804,7 +60818,7 @@
       "path": "stab_core::CircuitItem::Instruction",
       "kind": "variant",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 154,
+      "source_line": 162,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60818,7 +60832,7 @@
       "path": "stab_core::CircuitItem::Instruction::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 154,
+      "source_line": 162,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60832,7 +60846,7 @@
       "path": "stab_core::CircuitItem::RepeatBlock",
       "kind": "variant",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 155,
+      "source_line": 163,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60846,7 +60860,7 @@
       "path": "stab_core::CircuitItem::RepeatBlock::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 155,
+      "source_line": 163,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60860,7 +60874,7 @@
       "path": "stab_core::CircuitItem::as_instruction",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 159,
+      "source_line": 167,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -60874,7 +60888,7 @@
       "path": "stab_core::CircuitItem::as_repeat_block",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 166,
+      "source_line": 174,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -62527,7 +62541,7 @@
       "path": "stab_core::DemDetectorId",
       "kind": "struct",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 468,
+      "source_line": 477,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62540,7 +62554,7 @@
       "path": "stab_core::DemDetectorId as Clone for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62553,7 +62567,7 @@
       "path": "stab_core::DemDetectorId as Copy for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62566,7 +62580,7 @@
       "path": "stab_core::DemDetectorId as Debug for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62579,7 +62593,7 @@
       "path": "stab_core::DemDetectorId as Eq for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62592,7 +62606,7 @@
       "path": "stab_core::DemDetectorId as Hash for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62605,7 +62619,7 @@
       "path": "stab_core::DemDetectorId as Ord for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62618,7 +62632,7 @@
       "path": "stab_core::DemDetectorId as PartialEq for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62631,7 +62645,7 @@
       "path": "stab_core::DemDetectorId as PartialOrd for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62644,7 +62658,7 @@
       "path": "stab_core::DemDetectorId as StructuralPartialEq for@514dab23ae99",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 467,
+      "source_line": 476,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62657,7 +62671,7 @@
       "path": "stab_core::DemDetectorId::get",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 480,
+      "source_line": 489,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62670,7 +62684,7 @@
       "path": "stab_core::DemDetectorId::try_new",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 471,
+      "source_line": 480,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62735,7 +62749,7 @@
       "path": "stab_core::DemInstruction",
       "kind": "struct",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 328,
+      "source_line": 337,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62748,7 +62762,7 @@
       "path": "stab_core::DemInstruction as Clone for@3d73562a73b3",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 327,
+      "source_line": 336,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62761,7 +62775,7 @@
       "path": "stab_core::DemInstruction as Debug for@3d73562a73b3",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 327,
+      "source_line": 336,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62774,7 +62788,7 @@
       "path": "stab_core::DemInstruction as PartialEq for@3d73562a73b3",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 327,
+      "source_line": 336,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62787,7 +62801,7 @@
       "path": "stab_core::DemInstruction as StructuralPartialEq for@3d73562a73b3",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 327,
+      "source_line": 336,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62800,7 +62814,7 @@
       "path": "stab_core::DemInstruction::args",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 425,
+      "source_line": 434,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62813,7 +62827,7 @@
       "path": "stab_core::DemInstruction::detector",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 380,
+      "source_line": 389,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62826,7 +62840,7 @@
       "path": "stab_core::DemInstruction::error",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 365,
+      "source_line": 374,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62839,7 +62853,7 @@
       "path": "stab_core::DemInstruction::kind",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 421,
+      "source_line": 430,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62852,7 +62866,7 @@
       "path": "stab_core::DemInstruction::logical_observable",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 395,
+      "source_line": 404,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62865,7 +62879,7 @@
       "path": "stab_core::DemInstruction::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 336,
+      "source_line": 345,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62878,7 +62892,7 @@
       "path": "stab_core::DemInstruction::shift_detectors",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 406,
+      "source_line": 415,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62891,7 +62905,7 @@
       "path": "stab_core::DemInstruction::tag",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 439,
+      "source_line": 448,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62904,7 +62918,7 @@
       "path": "stab_core::DemInstruction::target_groups",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 433,
+      "source_line": 442,
       "owner_case_id": "cq-evidence-qualification-b011a360db96ca78",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62917,7 +62931,7 @@
       "path": "stab_core::DemInstruction::targets",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 429,
+      "source_line": 438,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62930,7 +62944,7 @@
       "path": "stab_core::DemInstructionKind",
       "kind": "enum",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 297,
+      "source_line": 306,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62943,7 +62957,7 @@
       "path": "stab_core::DemInstructionKind as Clone for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62956,7 +62970,7 @@
       "path": "stab_core::DemInstructionKind as Copy for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62969,7 +62983,7 @@
       "path": "stab_core::DemInstructionKind as Debug for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62982,7 +62996,7 @@
       "path": "stab_core::DemInstructionKind as Eq for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -62995,7 +63009,7 @@
       "path": "stab_core::DemInstructionKind as PartialEq for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63008,7 +63022,7 @@
       "path": "stab_core::DemInstructionKind as StructuralPartialEq for@f80d4680c59f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 296,
+      "source_line": 305,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63021,7 +63035,7 @@
       "path": "stab_core::DemInstructionKind::Detector",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 299,
+      "source_line": 308,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63034,7 +63048,7 @@
       "path": "stab_core::DemInstructionKind::Error",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 298,
+      "source_line": 307,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63047,7 +63061,7 @@
       "path": "stab_core::DemInstructionKind::LogicalObservable",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 300,
+      "source_line": 309,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63060,7 +63074,7 @@
       "path": "stab_core::DemInstructionKind::ShiftDetectors",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 301,
+      "source_line": 310,
       "owner_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63073,7 +63087,7 @@
       "path": "stab_core::DemItem",
       "kind": "enum",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 229,
+      "source_line": 238,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63086,7 +63100,7 @@
       "path": "stab_core::DemItem as Clone for@474d6a259520",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 228,
+      "source_line": 237,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63099,7 +63113,7 @@
       "path": "stab_core::DemItem as Debug for@474d6a259520",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 228,
+      "source_line": 237,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63112,7 +63126,7 @@
       "path": "stab_core::DemItem as PartialEq for@474d6a259520",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 228,
+      "source_line": 237,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63125,7 +63139,7 @@
       "path": "stab_core::DemItem as StructuralPartialEq for@474d6a259520",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 228,
+      "source_line": 237,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63138,7 +63152,7 @@
       "path": "stab_core::DemItem::Instruction",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 230,
+      "source_line": 239,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63151,7 +63165,7 @@
       "path": "stab_core::DemItem::Instruction::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 230,
+      "source_line": 239,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63164,7 +63178,7 @@
       "path": "stab_core::DemItem::RepeatBlock",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 231,
+      "source_line": 240,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63177,7 +63191,7 @@
       "path": "stab_core::DemItem::RepeatBlock::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 231,
+      "source_line": 240,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63216,7 +63230,7 @@
       "path": "stab_core::DemObservableId",
       "kind": "struct",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 486,
+      "source_line": 495,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63229,7 +63243,7 @@
       "path": "stab_core::DemObservableId as Clone for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63242,7 +63256,7 @@
       "path": "stab_core::DemObservableId as Copy for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63255,7 +63269,7 @@
       "path": "stab_core::DemObservableId as Debug for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63268,7 +63282,7 @@
       "path": "stab_core::DemObservableId as Eq for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63281,7 +63295,7 @@
       "path": "stab_core::DemObservableId as Hash for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63294,7 +63308,7 @@
       "path": "stab_core::DemObservableId as Ord for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63307,7 +63321,7 @@
       "path": "stab_core::DemObservableId as PartialEq for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63320,7 +63334,7 @@
       "path": "stab_core::DemObservableId as PartialOrd for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63333,7 +63347,7 @@
       "path": "stab_core::DemObservableId as StructuralPartialEq for@1b4d6f2f7d54",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 485,
+      "source_line": 494,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63346,7 +63360,7 @@
       "path": "stab_core::DemObservableId::get",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 499,
+      "source_line": 508,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63359,7 +63373,7 @@
       "path": "stab_core::DemObservableId::try_new",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 489,
+      "source_line": 498,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63372,7 +63386,7 @@
       "path": "stab_core::DemRepeatBlock",
       "kind": "struct",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 244,
+      "source_line": 253,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63385,7 +63399,7 @@
       "path": "stab_core::DemRepeatBlock as Clone for@11c40674d30a",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 243,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63398,7 +63412,7 @@
       "path": "stab_core::DemRepeatBlock as Debug for@11c40674d30a",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 243,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63411,7 +63425,7 @@
       "path": "stab_core::DemRepeatBlock as PartialEq for@11c40674d30a",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 243,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63424,7 +63438,7 @@
       "path": "stab_core::DemRepeatBlock as StructuralPartialEq for@11c40674d30a",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 243,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63437,7 +63451,7 @@
       "path": "stab_core::DemRepeatBlock::body",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 275,
+      "source_line": 284,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63450,7 +63464,7 @@
       "path": "stab_core::DemRepeatBlock::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 251,
+      "source_line": 260,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63463,7 +63477,7 @@
       "path": "stab_core::DemRepeatBlock::repeat_count",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 271,
+      "source_line": 280,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63476,7 +63490,7 @@
       "path": "stab_core::DemRepeatBlock::tag",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 279,
+      "source_line": 288,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63645,7 +63659,7 @@
       "path": "stab_core::DemTarget",
       "kind": "enum",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 505,
+      "source_line": 514,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63658,7 +63672,7 @@
       "path": "stab_core::DemTarget as Clone for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63671,7 +63685,7 @@
       "path": "stab_core::DemTarget as Copy for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63684,7 +63698,7 @@
       "path": "stab_core::DemTarget as Debug for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63697,7 +63711,7 @@
       "path": "stab_core::DemTarget as Display for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 530,
+      "source_line": 539,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63710,7 +63724,7 @@
       "path": "stab_core::DemTarget as Eq for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63723,7 +63737,7 @@
       "path": "stab_core::DemTarget as FromStr for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 541,
+      "source_line": 550,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63736,7 +63750,7 @@
       "path": "stab_core::DemTarget as Ord for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63749,7 +63763,7 @@
       "path": "stab_core::DemTarget as PartialEq for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63762,7 +63776,7 @@
       "path": "stab_core::DemTarget as PartialOrd for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63775,7 +63789,7 @@
       "path": "stab_core::DemTarget as StructuralPartialEq for@15ca334f5f6f",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 504,
+      "source_line": 513,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63788,7 +63802,7 @@
       "path": "stab_core::DemTarget::LogicalObservable",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 507,
+      "source_line": 516,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63801,7 +63815,7 @@
       "path": "stab_core::DemTarget::LogicalObservable::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 507,
+      "source_line": 516,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63814,7 +63828,7 @@
       "path": "stab_core::DemTarget::Numeric",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 509,
+      "source_line": 518,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63827,7 +63841,7 @@
       "path": "stab_core::DemTarget::Numeric::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 509,
+      "source_line": 518,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63840,7 +63854,7 @@
       "path": "stab_core::DemTarget::RelativeDetector",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 506,
+      "source_line": 515,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63853,7 +63867,7 @@
       "path": "stab_core::DemTarget::RelativeDetector::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 506,
+      "source_line": 515,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63866,7 +63880,7 @@
       "path": "stab_core::DemTarget::Separator",
       "kind": "variant",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 508,
+      "source_line": 517,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63879,7 +63893,7 @@
       "path": "stab_core::DemTarget::logical_observable",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 517,
+      "source_line": 526,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63892,7 +63906,7 @@
       "path": "stab_core::DemTarget::numeric",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 525,
+      "source_line": 534,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63905,7 +63919,7 @@
       "path": "stab_core::DemTarget::relative_detector",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 513,
+      "source_line": 522,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -63918,7 +63932,7 @@
       "path": "stab_core::DemTarget::separator",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 521,
+      "source_line": 530,
       "owner_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64750,7 +64764,7 @@
       "path": "stab_core::DetectorErrorModel",
       "kind": "struct",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 57,
+      "source_line": 58,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64763,7 +64777,7 @@
       "path": "stab_core::DetectorErrorModel as Clone for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 56,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64776,7 +64790,7 @@
       "path": "stab_core::DetectorErrorModel as Debug for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 56,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64789,7 +64803,7 @@
       "path": "stab_core::DetectorErrorModel as Default for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 56,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64802,7 +64816,7 @@
       "path": "stab_core::DetectorErrorModel as Display for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 222,
+      "source_line": 231,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64815,7 +64829,7 @@
       "path": "stab_core::DetectorErrorModel as PartialEq for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 56,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64828,7 +64842,7 @@
       "path": "stab_core::DetectorErrorModel as StructuralPartialEq for@4a654b4743d5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 56,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64880,7 +64894,7 @@
       "path": "stab_core::DetectorErrorModel::count_detectors",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 105,
+      "source_line": 114,
       "owner_case_id": "cq-evidence-qualification-059d303438c3f849",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64906,7 +64920,7 @@
       "path": "stab_core::DetectorErrorModel::count_observables",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 112,
+      "source_line": 121,
       "owner_case_id": "cq-evidence-qualification-059d303438c3f849",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64952,6 +64966,19 @@
       ]
     },
     {
+      "id": "cq-api-item-5e035b8e5e6acaba",
+      "feature_id": "CQ-DEM-FORMAT",
+      "crate_name": "stab_core",
+      "path": "stab_core::DetectorErrorModel::fingerprint",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/dem.rs",
+      "source_line": 79,
+      "owner_case_id": "cq-evidence-qualification-bf29884152430ca6",
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ]
+    },
+    {
       "id": "cq-api-item-69675eca423ffcda",
       "feature_id": "CQ-DEM-FORMAT",
       "crate_name": "stab_core",
@@ -64971,7 +64998,7 @@
       "path": "stab_core::DetectorErrorModel::from_dem_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 66,
+      "source_line": 67,
       "owner_case_id": "cq-evidence-qualification-0908c21b917526e3",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -64984,7 +65011,7 @@
       "path": "stab_core::DetectorErrorModel::from_dem_str_with_limits",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 70,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-84e19743eb13dca3",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -65036,7 +65063,7 @@
       "path": "stab_core::DetectorErrorModel::items",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 80,
+      "source_line": 89,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -65088,7 +65115,7 @@
       "path": "stab_core::DetectorErrorModel::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 62,
+      "source_line": 63,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -65101,7 +65128,7 @@
       "path": "stab_core::DetectorErrorModel::push_instruction",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 84,
+      "source_line": 93,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -65114,7 +65141,7 @@
       "path": "stab_core::DetectorErrorModel::push_repeat_block",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 88,
+      "source_line": 97,
       "owner_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -65140,7 +65167,7 @@
       "path": "stab_core::DetectorErrorModel::to_dem_string",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 92,
+      "source_line": 101,
       "owner_case_id": "cq-evidence-qualification-0908c21b917526e3",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -65153,7 +65180,7 @@
       "path": "stab_core::DetectorErrorModel::total_detector_shift",
       "kind": "method",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 98,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-059d303438c3f849",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -70960,6 +70987,356 @@
       ]
     },
     {
+      "id": "cq-api-item-0e8bd9e24ecc5085",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect",
+      "kind": "enum",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-e379912fe93763ab",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as Clone for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-811a2bef0d93ee9a",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as Copy for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-2a3d0c4775da147b",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as Debug for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-bf48c799f6f966aa",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as Eq for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-24f736e723a7d63b",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as Hash for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-ceff74f00b7b16b6",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as PartialEq for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-25a9eb6893c1e298",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect as StructuralPartialEq for@f6916f9de97e",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-ec790dcd708e3e23",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect::DetectorErrorModel",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-5309feb43c36e126",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect::StimCircuit",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 15,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-e5e20168205d0011",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelDialect::as_str",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-53cedaecab76f7e6",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint",
+      "kind": "struct",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 52,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-922aad7d3277111d",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as Clone for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-a881ce26ff1f073e",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as Copy for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-f6144d274c9f3045",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as Debug for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-395451466d4c7baf",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as Eq for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-228fe485b2c03205",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as Hash for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7013588c4c1319e1",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as PartialEq for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-43e8b7eea0bec4e4",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint as StructuralPartialEq for@4dd98db8d4aa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 51,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7e8b40e7a6c96d41",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::ALGORITHM",
+      "kind": "constant",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 60,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-309ff0f0c850a1be",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::SCHEMA_VERSION",
+      "kind": "constant",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 59,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-48c4edd093d56706",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::dialect",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 78,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c849cdb9ae18623e",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::digest",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 82,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c4c49c61bbcdbd89",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::digest_hex",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 86,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c4b69d526320eb88",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::ModelFingerprint::schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/fingerprint.rs",
+      "source_line": 74,
+      "owner_case_id": "cq-evidence-qualification-d79d27ced125437d",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
       "id": "cq-api-item-8b7faf1b452580bb",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
@@ -73114,7 +73491,7 @@
       "path": "stab_core::RepeatBlock",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 455,
+      "source_line": 463,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73128,7 +73505,7 @@
       "path": "stab_core::RepeatBlock as Clone for@631e8253e3eb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 454,
+      "source_line": 462,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73142,7 +73519,7 @@
       "path": "stab_core::RepeatBlock as Debug for@631e8253e3eb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 454,
+      "source_line": 462,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73156,7 +73533,7 @@
       "path": "stab_core::RepeatBlock as PartialEq for@631e8253e3eb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 454,
+      "source_line": 462,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73170,7 +73547,7 @@
       "path": "stab_core::RepeatBlock as StructuralPartialEq for@631e8253e3eb",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 454,
+      "source_line": 462,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73184,7 +73561,7 @@
       "path": "stab_core::RepeatBlock::body",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 477,
+      "source_line": 485,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73198,7 +73575,7 @@
       "path": "stab_core::RepeatBlock::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 463,
+      "source_line": 471,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73212,7 +73589,7 @@
       "path": "stab_core::RepeatBlock::repeat_count",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 472,
+      "source_line": 480,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -73226,7 +73603,7 @@
       "path": "stab_core::RepeatBlock::tag",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit.rs",
-      "source_line": 482,
+      "source_line": 490,
       "owner_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -82429,7 +82806,7 @@
       "path": "stab_core::find_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 797,
+      "source_line": 806,
       "owner_case_id": "cq-evidence-api-32578357b1eddffd",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -84364,7 +84741,7 @@
       "path": "stab_core::shortest_graphlike_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 790,
+      "source_line": 799,
       "owner_case_id": "cq-evidence-api-2e502a23c3336410",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -130450,6 +130827,59 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-bf29884152430ca6",
+      "feature_id": "CQ-DEM-FORMAT",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a2-dem-model-fingerprint",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "model_fingerprints",
+          "dem_fingerprint_is_canonical_and_deterministic",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Equivalent DEM text with comments, case changes, LF or CRLF, Unicode tags, repeats, all instruction and target variants, and exact floating-point values produces one deterministic dialect-separated fingerprint. Hashing allocates no heap through the parser's repeat envelope and uses depth-only spill beyond it."
+      },
+      "negative_axes": [
+        "noncanonical-input-drift",
+        "nondeterministic-digest",
+        "model-volume-fingerprint-allocation",
+        "unbounded-call-stack-depth",
+        "wrong-model-dialect"
+      ],
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-bf50af7713385820",
       "feature_id": "CQ-GATE-CONTRACT",
       "behavioral_surface": "engine",
@@ -131593,6 +132023,61 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-d79d27ced125437d",
+      "feature_id": "CQ-CIRCUIT-API",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a2-model-fingerprint-value-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "model_fingerprints",
+          "model_fingerprint_value_contract_is_domain_separated_and_frozen",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Independently reproduced rich circuit and DEM SHA-256 vectors plus exact high-precision, signed-zero, content-mutation, and dialect cases prove schema-one structural encoding without model-volume allocation. Traversal is inline through the 256-level parser envelope and spills only additional depth frames for deeper programmatic models."
+      },
+      "negative_axes": [
+        "schema-domain-drift",
+        "dialect-collision",
+        "content-mutation-separation",
+        "printer-precision-collision",
+        "signed-zero-drift",
+        "identifier-drift"
+      ],
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-d849c55f3f5f8052",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -131956,6 +132441,59 @@
       ],
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-e16abe30d8c7992c",
+      "feature_id": "CQ-CIRCUIT-API",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a2-circuit-model-fingerprint",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "model_fingerprints",
+          "circuit_fingerprint_is_canonical_and_deterministic",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Equivalent circuit text with comments, gate aliases, case changes, LF or CRLF, Unicode tags, repeats, all target variants, and exact floating-point values produces one deterministic structural fingerprint. Hashing allocates no heap through the parser's repeat envelope and uses depth-only spill beyond it."
+      },
+      "negative_axes": [
+        "noncanonical-input-drift",
+        "nondeterministic-digest",
+        "model-volume-fingerprint-allocation",
+        "unbounded-call-stack-depth"
+      ],
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "implemented"
     },

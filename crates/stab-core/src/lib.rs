@@ -21,6 +21,7 @@ mod diagnostics;
 mod error;
 mod error_matcher;
 pub mod execution;
+mod fingerprint;
 mod gate;
 mod ids;
 mod matched_error;
@@ -96,6 +97,7 @@ pub use execution::{
     CompiledSampler, ReferenceSampleTree, count_determined_measurements,
     sample_if_circuit_has_stabilizer_flows,
 };
+pub use fingerprint::{ModelDialect, ModelFingerprint};
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use gate::{

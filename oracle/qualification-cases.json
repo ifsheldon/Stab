@@ -3677,6 +3677,152 @@
         "standalone": true
       },
       {
+        "id": "a2-model-fingerprint-value-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_fingerprints",
+            "model_fingerprint_value_contract_is_domain_separated_and_frozen",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Independently reproduced rich circuit and DEM SHA-256 vectors plus exact high-precision, signed-zero, content-mutation, and dialect cases prove schema-one structural encoding without model-volume allocation. Traversal is inline through the 256-level parser envelope and spills only additional depth frames for deeper programmatic models."
+        },
+        "negative_axes": [
+          "schema-domain-drift",
+          "dialect-collision",
+          "content-mutation-separation",
+          "printer-precision-collision",
+          "signed-zero-drift",
+          "identifier-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::SCHEMA_VERSION"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::ALGORITHM"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::schema_version"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::dialect"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::digest"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelFingerprint::digest_hex"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelDialect"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ModelDialect::as_str"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-circuit-model-fingerprint",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_fingerprints",
+            "circuit_fingerprint_is_canonical_and_deterministic",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Equivalent circuit text with comments, gate aliases, case changes, LF or CRLF, Unicode tags, repeats, all target variants, and exact floating-point values produces one deterministic structural fingerprint. Hashing allocates no heap through the parser's repeat envelope and uses depth-only spill beyond it."
+        },
+        "negative_axes": [
+          "noncanonical-input-drift",
+          "nondeterministic-digest",
+          "model-volume-fingerprint-allocation",
+          "unbounded-call-stack-depth"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::Circuit::fingerprint"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-dem-model-fingerprint",
+        "feature_id": "CQ-DEM-FORMAT",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "model_fingerprints",
+            "dem_fingerprint_is_canonical_and_deterministic",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Equivalent DEM text with comments, case changes, LF or CRLF, Unicode tags, repeats, all instruction and target variants, and exact floating-point values produces one deterministic dialect-separated fingerprint. Hashing allocates no heap through the parser's repeat envelope and uses depth-only spill beyond it."
+        },
+        "negative_axes": [
+          "noncanonical-input-drift",
+          "nondeterministic-digest",
+          "model-volume-fingerprint-allocation",
+          "unbounded-call-stack-depth",
+          "wrong-model-dialect"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::DetectorErrorModel::fingerprint"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-parse-policy-default-contract",
         "feature_id": "CQ-RESOURCE",
         "comparator": "exact-value",

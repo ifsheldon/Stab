@@ -124,6 +124,14 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
+            Path::new("crates/stab-core/src/fingerprint.rs"),
+            "stab_core::ModelFingerprint",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
             Path::new("crates/stab-core/src/error.rs"),
             "stab_core::CircuitError::format_error",
         ),

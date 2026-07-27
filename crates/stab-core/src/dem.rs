@@ -39,7 +39,8 @@ pub(crate) use traversal::{
 };
 
 use crate::{
-    CircuitError, CircuitResult, DemRepeatCount, ParseLimits, Probability, RepeatNestingLimit,
+    CircuitError, CircuitResult, DemRepeatCount, ModelFingerprint, ParseLimits, Probability,
+    RepeatNestingLimit,
 };
 use parser::{parse_dem, parse_unsigned_dem_text_value};
 use tag::DemTag;
@@ -69,6 +70,14 @@ impl DetectorErrorModel {
 
     pub fn from_dem_str_with_limits(input: &str, limits: ParseLimits) -> CircuitResult<Self> {
         parse_dem(input, limits)
+    }
+
+    /// Returns the schema-versioned structural identity of this detector error model.
+    ///
+    /// The fingerprint is independent of accepted textual spelling and printer precision. It
+    /// identifies this source model only, not an analysis policy or executable plan.
+    pub fn fingerprint(&self) -> ModelFingerprint {
+        ModelFingerprint::for_dem(self)
     }
 
     fn with_capacity(capacity: usize) -> Self {

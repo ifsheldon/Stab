@@ -16,7 +16,7 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
         .first()
         .cloned()
         .unwrap_or_else(|| "PERF-RESOURCE-BOUNDARIES".to_string());
-    let behavioral = is_behavioral(item);
+    let behavioral = is_behavioral(item) && !is_fixed_fingerprint_metadata(item);
     let supporting_performance_features = item.performance_groups.iter().skip(1).cloned().collect();
     let mut parent_group_ids = if behavioral {
         item.performance_groups
@@ -61,6 +61,17 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
 pub(super) fn is_behavioral(item: &CorrectnessApi) -> bool {
     matches!(item.kind.as_str(), "function" | "method")
         || item.kind == "trait-impl" && behavioral_trait_impl(&item.path)
+}
+
+fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
+    matches!(
+        item.path.as_str(),
+        "stab_core::ModelDialect::as_str"
+            | "stab_core::ModelFingerprint::schema_version"
+            | "stab_core::ModelFingerprint::dialect"
+            | "stab_core::ModelFingerprint::digest"
+            | "stab_core::ModelFingerprint::digest_hex"
+    )
 }
 
 fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> Option<String> {
@@ -125,4 +136,50 @@ fn behavioral_trait_impl(path: &str) -> bool {
         trait_name,
         "Display" | "From" | "FromStr" | "Iterator" | "TryFrom"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fingerprint_work_stays_visible_without_speculative_accessor_workloads() {
+        for path in [
+            "stab_core::ModelDialect::as_str",
+            "stab_core::ModelFingerprint::schema_version",
+            "stab_core::ModelFingerprint::dialect",
+            "stab_core::ModelFingerprint::digest",
+            "stab_core::ModelFingerprint::digest_hex",
+        ] {
+            let disposition = make_disposition(&api(path, "method"));
+            assert_eq!(
+                disposition.disposition,
+                PerformanceDisposition::NotPerformanceRelevant,
+                "{path}"
+            );
+            assert!(disposition.parent_group_ids.is_empty(), "{path}");
+        }
+
+        for path in [
+            "stab_core::Circuit::fingerprint",
+            "stab_core::DetectorErrorModel::fingerprint",
+        ] {
+            let disposition = make_disposition(&api(path, "method"));
+            assert_eq!(
+                disposition.disposition,
+                PerformanceDisposition::FutureCandidate,
+                "{path}"
+            );
+        }
+    }
+
+    fn api(path: &str, kind: &str) -> CorrectnessApi {
+        CorrectnessApi {
+            id: format!("test-{path}"),
+            path: path.to_string(),
+            kind: kind.to_string(),
+            owner_case_id: "test-correctness-owner".to_string(),
+            performance_groups: vec!["PERF-CIRCUIT-MODEL".to_string()],
+        }
+    }
 }

@@ -411,6 +411,9 @@ pub(super) fn classify_public_api_source(
     ) {
         return Some(FeatureId::Resource);
     }
+    if value == "crates/stab-core/src/fingerprint.rs" {
+        return Some(FeatureId::CircuitApi);
+    }
     if value.starts_with("crates/stab-core/src/sampling")
         || matches!(
             value.as_str(),

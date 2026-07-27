@@ -8,6 +8,8 @@ The starting package graph and public inventory are frozen in [the pre-0.2 basel
 
 Intentional public Rust API changes are tracked in [the Stab 0.2 API migration inventory](0.2-api-migration-inventory.md).
 
+The stable byte contract for source-model identities is defined by [model fingerprint schema version 1](model-fingerprint-schema-v1.md).
+
 ## Architectural Center
 
 ```text
