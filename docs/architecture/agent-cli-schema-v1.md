@@ -144,6 +144,8 @@ Every report contains:
 - `parse_estimate`.
 - a dialect-tagged `model`.
 
+Source byte and physical-line counts are computed from the original bounded input, not a lossy text conversion. Opaque comment and tag payloads accepted by the byte-oriented Stim and DEM parsers therefore remain inspectable without changing these counts.
+
 A circuit model reports its fingerprint, top-level item count, qubit count, measurement count, detector count, observable count, and sweep-bit count.
 
 A detector error model reports its fingerprint, top-level item count, detector count, and observable count.

@@ -6,7 +6,7 @@ Current as of 2026-07-27.
 
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
-- A2 diagnostics, resources, fingerprints, and capabilities: active at audited diagnostic checkpoint `8b540bc2`.
+- A2 diagnostics, resources, fingerprints, and capabilities: worktree closure candidate; clean-revision diagnostic and final audit closure remain pending.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -181,4 +181,44 @@ Fresh schema-version-2 diagnostic reports bind clean revision `8b540bc2578dee432
 
 The immutable report directories are `target/benchmarks/qualification/a2-circuit-model-fingerprint-8b540bc2`, `target/benchmarks/qualification/a2-sampling-request-fingerprint-8b540bc2`, `target/benchmarks/qualification/a2-sampling-request-estimate-8b540bc2`, and `target/benchmarks/qualification/a2-sampler-compile-release-8b540bc2`. All four record `local_modifications=false` before and after. The AArch64 host remains unverified because swap-in counters increased during each run; swap configuration stayed enabled and unchanged. These results are development diagnostics, not Stim parity, Stab self-regression, release, or formal-completion evidence.
 
-A2 remains active because exact circuit and DEM parser spans and the remaining operation-owned compile, sampling, materialization, and search policies have not been implemented.
+A2 remained active at checkpoint `8b540bc2` because exact circuit and DEM parser spans and the remaining operation-owned resource policies had not been implemented.
+
+## A2 Parser And Resource Closure Candidate
+
+The current worktree implements exact byte-oriented circuit and DEM diagnostics, source-order parsing, non-lossy opaque tag storage, byte serialization, and transform and analyzer preservation. Comments remain non-semantic and are discarded, but opaque comment bytes are admitted without changing the location or precedence of a later error.
+
+All seven A2 policies are now concrete: `ParseLimits`, `CircuitFlattenLimits`, `DemFlattenLimits`, `DetectionConversionLimits`, `DemSamplerLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits`. Fixed semantic, representation, recursive-safety, and platform invariants remain non-overridable.
+
+Independent review found and drove repairs for adjacent-operation fusion after byte parsing, lossy tag propagation through model-producing transforms, analyzer tag merging, rejected-line over-copying, quadratic opaque-range classification, caller-raised vector-capacity overflow, zero-width materialization undercounting, and recursive folded-DEM construction, transformation, and destruction. The folded DEM representation now constructs, clones, compares, formats, rounds, strips tags from, and drains deep programmatic trees iteratively while parser-owned recursive consumers retain their 256-level admission envelope.
+
+The full workspace suite exposed one additional policy ambiguity after those reviews. DEM replay input is caller-owned storage but replay traversal is operation-owned work, so materialized and streaming replay now share a separate typed `ReplayWorkUnits` budget. Returned output retains its independent materialized-unit budget, while the historical combined replay-work and active-byte rejection boundaries remain unchanged. `sample_dem` validates the command-wide replay request before reading replay prefixes or activating outputs.
+
+Review also found pre-admission recursion and output-lifecycle defects. Detection conversion now iteratively validates the fixed 256-level repeat envelope before direct or detector-frame recursive planning; exact depth 256 is accepted, depth 257 is typed, and 10,000-level programmatic inputs reject on a 64 KiB stack. `m2d` still opens every explicit path before converter setup for identity and open-error precedence, but does not activate or truncate primary and observable outputs until converter admission succeeds. `analyze_errors` applies the same open-before-parse and activate-after-analysis split, preserves a pre-existing output on rejection, and emits Stim's terminal newline for an empty model.
+
+The pinned oracle now accepts reviewable `.hex` fixture payloads for arbitrary bytes. Live Stim v1.16.0 and Stab cases cover non-UTF-8 circuit comments and tags, opaque comments before a later syntax rejection, opaque DEM tags, and exact opaque analyzer output bytes. The exact Stab selectors continue to own byte spans, accessors, serializers, and transform propagation.
+
+The regenerated correctness inventory contains 2,886 upstream cases, 2,877 public API items, and 1,893 evidence parents: 734 implemented, 17 evidence-close, and 1,142 planned. Its digest is `ccbeb26a1f4d10fedf68ef0aa66634c6b2b6607af76184598282501419c74a1d`. The regenerated performance inventory contains 127 checklist rows, 2,877 public API items, 173 groups, and 161 inherited manifest decisions. Its digest is `0d1fb8a08702dbb57b55e734e4735b3ce39f41388846d7b9ed715031feb88f54`.
+
+An earlier dirty-worktree checkpoint passed workspace formatting, warnings-denied Clippy, all workspace tests, `just architecture::check`, correctness checking and regeneration, performance regeneration, and generated-status checking.
+
+Review repairs have changed the source since that checkpoint, so those commands are historical development feedback and must be rerun.
+
+This is not yet an A2 completion checkpoint because the changes remain uncommitted, final milestone and code reviews are in progress, and source-current clean-revision parser, allocation, and four-group diagnostic reports have not been produced.
+
+The documentation audit converted the policy boundary rule into a per-policy and per-dimension evidence matrix in [the A2 resource policy inventory](../architecture/a2-resource-policy-inventory.md).
+
+The matrix now executes every practical production maximum directly: both parser dimensions, both DEM-flatten repeat dimensions, detection record width and all three detection traversal dimensions, both logical-search repeat dimensions, and the 4,096-detector hyperedge degree.
+
+The remaining dimensions use the documented reduced-boundary rule because their production ceilings would retain more than the ordinary single-test budget or execute tens of millions of work units. Each row names exact custom acceptance and first rejection, checked arithmetic or a dominating platform-capacity guard, and a concrete substitution rationale.
+
+The audit additionally found that representational maxima were unsafe defaults for compact repeated detection input. Detection conversion now has a fixed repeat-depth envelope plus finite aggregate traversal, compiled-term, and compiled-byte defaults, performs dry admission before materialization, reuses one admitted plan during sampling, and avoids the CLI's previous duplicate compilation. The resolved specification gap is recorded in [milestone-spec-gaps.md](milestone-spec-gaps.md).
+
+The architecture plan now contains the finite opaque-tag transform matrix and exact selectors for circuit flattening, noise removal, simplification, decomposition, unitary and QEC inversion, feedback inlining, DEM rounding and flattening, and flat and folded circuit-to-DEM analysis.
+
+Comments, unlisted transforms, lossy display, and deferred ErrorMatcher provenance are explicitly outside that matrix.
+
+The architecture plan also separates executable allocation correctness gates from timing reports.
+
+Rejected parser suffix and rejected circuit-flatten payload allocation invariants are direct `cargo test` gates, the existing `m4-circuit-parse` compare supplies the Stim-relative timing and allocation observations, and the four A2 product diagnostics remain independent Stab-only phase timings.
+
+A3 has not started. In particular, `stab-bits` and `stab-records` have not yet been extracted as physical crates.

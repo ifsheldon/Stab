@@ -14,6 +14,8 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The successful machine-output contract for Stab-native discovery, inspection, and planning commands is defined by [agent CLI schema version 1](agent-cli-schema-v1.md).
 
+The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
+
 ## Architectural Center
 
 ```text
@@ -62,7 +64,13 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-Dependency arrows point from a consumer to its dependency:
+The current pre-A3 product graph is:
+
+```text
+stab-cli -> stab-core
+```
+
+The repository has not yet extracted `stab-bits`, `stab-records`, or the other target component crates. The post-extraction target graph below is normative for A3 and later milestones. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -82,7 +90,7 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-The repository enforces these edges through `just architecture::check`.
+`just architecture::check` currently enforces every edge that exists in the workspace, rejects product dependencies on operational crates, and will enforce the target edges as the component crates are extracted.
 
 The checker classifies workspace packages from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects product dependencies on operational crates.
 
@@ -118,11 +126,13 @@ The qualification inventory records every exported item, but inventory ownership
 
 ## Resource And Diagnostic Policy
 
-Every materializing, expanding, searching, or executing operation has a typed admission policy.
+Every materializing, expanding, searching, or executing operation performs typed admission against either a caller-selectable operation policy or a fixed non-overridable safety contract.
 
 Default policies preserve current source-owned safe boundaries.
 
 Semantic hard limits are not configurable.
+
+A public policy is introduced only when callers can meaningfully choose the budget. The presence of an internal safety constant alone is not sufficient justification for another public limits type.
 
 Domain errors retain typed context and convert losslessly into structured diagnostics.
 
@@ -149,6 +159,7 @@ An extension seam is accepted only after a separate crate uses it without privat
 - [ADR 0002: Plans, Sessions, And Sinks](adr-0002-plan-session-sink.md)
 - [ADR 0003: Typed Batch Families](adr-0003-typed-batch-families.md)
 - [ADR 0004: Diagnostics And Resource Policies](adr-0004-diagnostics-and-resources.md)
+- [A2 Resource Policy Inventory](a2-resource-policy-inventory.md)
 - [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md)
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
 

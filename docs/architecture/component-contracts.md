@@ -50,10 +50,10 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 
 - Purpose: own exact Stim circuit and DEM values plus syntax.
 - Inputs and outputs: bytes or text, typed models, gate and target values, IDs, parse or validation errors.
-- Invariants: closed Stim v1.16.0 dialect, canonical printing, structural validity, typed indices and probabilities.
+- Invariants: closed Stim v1.16.0 dialect, canonical text and byte printing, opaque comment payloads, exact unescaped tag bytes, structural validity, typed indices and probabilities.
 - Dependencies: algebra values needed by the closed Stim model, plus foundational standard-library and parsing support.
 - Forbidden: engine, records, CLI, ops.
-- Resource behavior: bounded parsing and explicit structural limits.
+- Resource behavior: `ParseLimits` owns caller-selectable source-line admission and a caller-tightenable 256-level parsed-model repeat envelope. Programmatic models may exceed that parser envelope only for APIs with an established deeper contract; those consumers must be iterative or reject before recursive work. `DemFlattenLimits` belongs to the analysis adapter rather than the model.
 - Extension points: immutable typed circuit passes consume and return models.
 
 ### Records
@@ -83,7 +83,7 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Invariants: private executable IR, one backend decision per plan, session-owned mutable state, bounded execution batches.
 - Dependencies: model, records, algebra values, pure analysis lowering, and raw SIMD kernels.
 - Forbidden: textual codecs, filesystem paths, CLI, ops.
-- Resource behavior: explicit compile and sampling limits, reusable scratch, cancellation at bounded batch boundaries.
+- Resource behavior: `DetectionConversionLimits` and `DemSamplerLimits` own the A2 caller-selectable execution budgets. Ordinary circuit sampling retains fixed representability checks until A4 introduces real compiler, plan, session, and execution-request boundaries; reusable scratch and cancellation remain bounded at batch or record boundaries.
 - Extension points: measurement and detection sinks.
 
 ### Analysis
@@ -93,7 +93,7 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Invariants: no hidden execution session or filesystem state, explicit folded or materialized resource behavior.
 - Dependencies: model and algebra.
 - Forbidden: CLI, ops, and engine.
-- Resource behavior: operation-specific search and materialization policies.
+- Resource behavior: `CircuitFlattenLimits`, `DemFlattenLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits` own their independent expansion, retained-state, and output budgets. Other partial analysis algorithms retain documented fixed safety contracts instead of sharing a generic policy.
 - Extension points: typed circuit passes.
 
 ## A1 Logical Source Ownership
@@ -104,14 +104,14 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 
 | Current source family | Logical owner | Migration note |
 | --- | --- | --- |
-| `circuit.rs`, `circuit/**`, `parse_limits.rs` | Model | The model keeps syntax, values, parsing, printing, iteration, structural counts, and operation-owned parse admission. Named line and repeat limits preserve the default boundary, cap preallocation by admitted work, and prevent repeat overrides from exceeding the recursive model safety envelope. Algorithmic inherent methods, including recursive tag stripping, are temporary adapters implemented under `analysis` or `execution`. |
-| `dem.rs`, `dem/api.rs`, `dem/coordinate_scan.rs`, `dem/parser.rs`, `dem/tag.rs`, `dem/traversal.rs` | Model | Folded traversal is the model-owned advanced boundary shared by DEM queries, analysis, and execution. Consumer-specific search, filtering, and probability policies remain with their analysis owners, while recursive transforms are implemented by `analysis/dem_adapters.rs`. |
+| `circuit.rs`, `circuit/**`, `model_bytes.rs`, `model_parse.rs`, `model_tag.rs`, `source_text.rs`, `parse_limits.rs` | Model | The model keeps syntax, values, byte-aware parsing, canonical text and byte printing, iteration, structural counts, and operation-owned parse admission. The shared byte preparation path preserves source-order failures and opaque Stim metadata without applying lossy whole-input UTF-8 conversion. Named line and repeat limits preserve the default parsed-model boundary and cap preallocation by admitted work. Programmatic depth beyond the parser envelope remains consumer-specific rather than being silently accepted by recursive algorithms. Algorithmic inherent methods are temporary adapters implemented under `analysis` or `execution`. |
+| `dem.rs`, `dem/api.rs`, `dem/coordinate_scan.rs`, `dem/parser.rs`, `dem/tag.rs`, `dem/traversal.rs` | Model | The DEM model shares the byte-aware model preparation contract and retains exact opaque tag bytes. Folded traversal is the model-owned advanced boundary shared by DEM queries, analysis, and execution. Consumer-specific search, filtering, and probability policies remain with their analysis owners, while compact transforms use explicit stacks in `analysis/dem_adapters.rs`. |
 | `gate.rs`, `gate/**` | Model | Gate syntax and closed Stim scalar or textual descriptors remain model-owned; algebra-valued projections and decomposition parsing are implemented by `analysis/gate_adapters.rs`. |
 | `ids.rs`, `target.rs` | Model | Typed identifiers, targets, and validated probability primitives are foundational model values. |
 | `fingerprint.rs` | Model | Versioned circuit and DEM identities stream dialect-separated structural model encodings into SHA-256 without depending on compatibility-printer precision or allocating model-sized text. An explicit traversal stack is inline through the parser's repeat envelope and spills by depth only for deeper programmatic models. Compilation-request and backend-bearing plan identities remain with engine compilation rather than extending the model fingerprint. |
 | `compilation_fingerprint.rs`, `capabilities.rs` | Engine and facade, temporarily | Backend-neutral request identity binds one source-owned compiler registration without inventing backend selection or compile budgets. The facade assembles runtime discovery from model, records, and engine descriptors; descriptor ownership remains with the operation that implements each capability. |
 | `bits/**` | Bits | Direct portable-SIMD sites are temporary A6 migration allowances. |
-| `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, and typed-context primitives here while domain errors are introduced. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
+| `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, parse, format, and resource-context primitives here. Validation, compile, execution, and analysis errors wait for their owning A3 through A6 boundaries instead of adding placeholder variants. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
 | `resources.rs` | Facade, temporarily | A2 owns shared estimate classifications and lossless resource-limit context here while operation-owned policies are introduced beside their model, engine, or analysis operations. A6 must place the shared vocabulary without creating a global resource-policy dependency. |
 | `result_formats.rs`, `result_formats/**`, `result_packed.rs`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. The codec capability registry lives beside these implementations and is consumed by the facade and CLI instead of being copied into a status manifest. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |

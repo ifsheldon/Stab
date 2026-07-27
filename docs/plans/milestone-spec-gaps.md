@@ -23,6 +23,87 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-27 - A2: Detection Aggregate And Compiled-Plan Defaults
+
+Status: Resolved
+Revealed by: milestone audit of compact repeated detection-conversion inputs
+Current text: A2 said a newly exposed resource dimension with no historical rejection boundary should default to the representable maximum instead of inventing a finite limit.
+Gap: representational capacity is not an operation-safety policy. Compact repeated circuits could use representational traversal maxima to drive effectively unbounded CPU work or retain millions of compiled measurement terms before any materialized-output budget applied.
+Proposed amendment: permit a representational default only when compact input cannot cause unbounded traversal, retention, or allocation; otherwise require the owning operation to define a finite default, justify its dimensions, admit before materialization, and execute every practical production boundary in tests.
+Resolution: `DetectionConversionLimits` now defaults to 1,000,000 expanded instructions, 1,000,000 aggregate repeat iterations, 16,000,000 retained measurement terms, and 256 MiB of conservative compiled-plan storage. Detection compilation performs dry admission before materialization, sampling reuses one admitted plan, and the resource inventory records exact real-default or justified reduced-boundary selectors for every dimension.
+
+## 2026-07-27 - A2: Per-Dimension Resource Boundary Evidence
+
+Status: Resolved
+Revealed by: milestone audit of the seven operation-owned policy suites
+Current text: A2 permitted reduced policy boundaries for resource-prohibitive or representational maxima when the exact default, accepted `N`, rejected `N + 1`, checked arithmetic, overflow, and justification were independently proved.
+Gap: the plan did not map that rule to every dimension, so a policy-level green test could hide a dimension that only asserted its default or only tested rejection.
+Proposed amendment: require one row per policy dimension that states the production default, exact test selector, whether an accepted request executes the real default maximum, and the concrete memory, runtime, or representational reason for any reduced boundary; treat every missing accepted-boundary or overflow selector as a milestone blocker rather than a waiver.
+Resolution: [a2-resource-policy-inventory.md](../architecture/a2-resource-policy-inventory.md) now owns the per-dimension evidence matrix and explicitly leaves A2 open for every row whose current selectors do not satisfy the amended rule.
+
+## 2026-07-27 - A2: Opaque-Tag Transform Scope
+
+Status: Resolved
+Revealed by: milestone audit of the broad requirement to preserve opaque tags through transforms
+Current text: A2 required byte-oriented entry points to preserve exact tag bytes through models, transforms, fingerprints, and byte serializers.
+Gap: the word `transforms` did not identify a finite operation set, propagation semantics for generated operations, or exclusions, so one passing transform test could be cited as ownership of unrelated model-producing APIs.
+Proposed amendment: define an exact transform matrix with one selector and propagation rule per included operation, exclude comments and lossy display from semantic preservation, leave unlisted transforms unclaimed, and explicitly defer complete ErrorMatcher provenance.
+Resolution: [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md) now owns the finite matrix for circuit flattening, noise removal, simplification, decomposition, unitary and QEC inversion, feedback inlining, DEM rounding and flattening, and flat and folded circuit-to-DEM analysis.
+
+## 2026-07-27 - A2: Allocation Invariants Versus Timing Diagnostics
+
+Status: Resolved
+Revealed by: milestone audit of the A2 done criterion for source-current parser, allocation, and timing diagnostics
+Current text: A2 required source-current parser, allocation, and timing diagnostics without naming commands, workloads, acceptance rules, or whether allocator observations were correctness gates or performance reports.
+Gap: a timing report with allocation counters could be mistaken for proof that rejected hostile input does not allocate proportionally, while an allocation unit test could be mistaken for a source-current throughput report.
+Proposed amendment: name executable unit selectors and compared hostile-input workloads for allocation invariants, define their exact allocation acceptance, separately name the parser timing and allocation report commands, and preserve the four Stab-only product diagnostics as independent phase timings without Stim parity claims.
+Resolution: the executable A2 diagnostics section in [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md) now defines the commands, workloads, acceptance, clean-revision identities, and claim boundaries for each evidence class.
+
+## 2026-07-27 - A2: Parsed Repeat Envelope Versus Programmatic Folded DEM Depth
+
+Status: Resolved
+Revealed by: full-suite verification after the resource-safety review
+Current text: the A2 inventory described 256 levels as one non-overridable model and folded-traversal envelope, while the promoted PFM-B3 contract required compact count and transform APIs to preserve prior behavior for a programmatic depth-257 DEM.
+Gap: a global preflight at folded-traversal construction fixed a constrained-stack overflow but incorrectly rejected an established public programmatic-model case. The plan did not distinguish the parsed-model envelope from consumer-specific programmatic depth behavior.
+Proposed amendment: retain 256 as the parser and recursive-consumer envelope; require each programmatic-model consumer to reject before recursive work or implement iterative traversal; and preserve deeper behavior where existing evidence explicitly owns it.
+Resolution: folded DEM block construction and destruction are iterative, depth-257 compact summaries remain accepted, a 2,000-level count query runs on a 64 KiB stack, and expansion-owning consumers retain their existing explicit depth validation. The architecture plan, component contract, migration inventory, and resource-policy inventory now distinguish parsed and programmatic models.
+
+## 2026-07-27 - A2: Opaque Comments And Resource-Prohibitive Maxima
+
+Status: Resolved
+Revealed by: milestone audit of the byte-oriented parsers and seven operation-owned policies
+Current text: A2 required exact preservation of non-UTF-8 tag or comment payloads and direct acceptance plus first rejection at every default maximum.
+Gap: canonical circuit and DEM models intentionally discard comments, so exact comment preservation was not a realizable model contract. Several representational or serialized-output maxima also cannot be materialized inside an ordinary test without violating the resource policy the test is meant to protect.
+Proposed amendment: require exact byte preservation for tags; require opaque comments to be accepted while preserving later error location and precedence; and permit reduced custom-policy boundary tests only when exact defaults, accepted `N`, rejected `N + 1`, checked arithmetic, overflow, and the reason direct materialization is unsafe are all independently proved.
+Resolution: the A2 test contract now distinguishes semantic tag storage from discarded comments, and the [A2 resource policy inventory](../architecture/a2-resource-policy-inventory.md) defines the mandatory evidence for practical and resource-prohibitive boundaries.
+
+## 2026-07-27 - A2/A3/A6: Error Ownership And Physical Extraction Order
+
+Status: Resolved
+Revealed by: implementation planning and user review of the agent-native architecture sequence
+Current text: the architecture named the final domain error families, said logical ownership preceded physical extraction, assigned stable records to A3, and also described A6 as the physical extraction milestone.
+Gap: the plan did not distinguish A2's immediately implementable error families from later component-owned errors, and it was ambiguous whether A3 actually created crates or only prepared logical namespaces for an A6 split.
+Proposed amendment: limit A2 to parse, format, and operation-owned resource errors; introduce validation, compile, execution, and analysis errors with the component boundaries that can supply typed context; extract the stable leaf crates `stab-bits` and `stab-records` in A3; and reserve A6 for the remaining model, algebra, analysis, engine, facade, and SIMD extraction.
+Resolution: [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md) now states the staged error ownership and physical extraction order in its principles, component contracts, A1, A2, and A3 sections.
+
+## 2026-07-27 - A2: Concrete Resource Policies And Programmatic Repeat Admission
+
+Status: Resolved
+Revealed by: implementation and audit of existing safety constants
+Current text: A2 originally requested generic compile, sampling, materialization, and search limits without identifying which operations had genuine caller-selectable admission decisions or how programmatically constructed models entered recursive transforms.
+Gap: generic policy bags would expose irrelevant or misleading fields, while parser-only repeat admission did not protect public flattening APIs from circuits constructed deeper than the parser's 256-level recursive safety envelope.
+Proposed amendment: enumerate `ParseLimits`, `CircuitFlattenLimits`, `DemFlattenLimits`, `DetectionConversionLimits`, `DemSamplerLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits`; keep semantic, representation, recursive, and platform invariants private; add policy-aware public entry points where callers can choose meaningful budgets; and preflight programmatic circuit repeat depth iteratively before recursive flattening.
+Resolution: the architecture plan and [A2 resource policy inventory](../architecture/a2-resource-policy-inventory.md) now own the seven policies and fixed invariants. `Circuit::flattened_circuit_operations_with_limits` exposes the selectable flatten policy, and both default and policy-aware paths reject excessive programmatic nesting before recursive work.
+
+## 2026-07-27 - A2: Opaque Model Metadata And Non-Terminating Oracle Inputs
+
+Status: Resolved
+Revealed by: differential parser testing against pinned Stim v1.16.0
+Current text: A2 required exact byte spans for malformed bytes and UTF-8 tags but did not define whether comments and tags were Unicode text, opaque bytes, or how differential tests should handle an input for which the pinned executable does not terminate.
+Gap: whole-input UTF-8 decoding changed first-error precedence and rejected tag or comment bytes accepted by Stim. An unterminated tag at EOF could not safely be treated as an ordinary live-oracle case because pinned Stim v1.16.0 does not terminate on that input.
+Proposed amendment: treat comment and tag payloads as opaque bytes at byte-oriented entry points, preserve exact tag bytes in serializers, accessors, and fingerprints, retain UTF-8 string views as explicitly lossy display conveniences, and document EOF inside a tag as an intentional controlled Stab rejection backed by a bounded static regression instead of a hanging differential invocation.
+Resolution: A2 now includes byte-oriented circuit and DEM entry points, exact byte tag access and serialization, source-order diagnostics, byte-distinct fingerprints, and the documented controlled rejection. The architecture plan's A2 tests state the opaque-metadata and non-terminating-oracle boundary explicitly.
+
 ## 2026-07-27 - A1: Namespace, Visitor, And Diagnostic Evidence Scope
 
 Status: Resolved

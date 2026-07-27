@@ -49,13 +49,13 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 
 - The claim that models own algorithms is directionally correct at the API boundary, but many `Circuit` methods already delegate to free-function implementations.
 - The migration therefore separates enforceable ownership and dependencies instead of rewriting algorithms that are already internally separated.
-- Logical ownership is established before physical crate extraction so dependency cycles and public replacements are resolved while behavior still has one compilation boundary; A6 performs the mechanical extraction only after those seams are tested.
+- Logical ownership is established before physical crate extraction so dependency cycles and public replacements are resolved while behavior still has one compilation boundary. A3 extracts the two stable leaf crates, `stab-bits` and `stab-records`, after their boundaries are ready; A6 extracts the remaining model, algebra, analysis, engine, facade, and SIMD components after those broader seams are tested.
 - One universal `RecordBatch` would erase meaningful differences between measurements, typed `M` or `D` or `L` records, detector-observable pairs, sparse records, and 64-shot bit planes.
 - Stab will define focused batch families over shared packed storage instead.
 - A global `ResourcePolicy` would become another broad configuration object.
 - Stab will use operation-specific policies with unchanged safe defaults and separate exact admission from advisory estimates.
 - Public policy inputs that can be confused use named constrained quantities, but read-only estimate accessors retain ordinary integer values whose unit is fixed by the accessor. Creating a public wrapper for every byte, item, and work-unit field would multiply API surface without preventing an actual construction error because `ResourceEstimate` has no public positional constructor.
-- A configurable repeat budget may tighten the shared recursive safety envelope but may not raise it until all recursive model consumers are redesigned. This refines the general rule that configurable safety budgets may be relaxed without allowing a policy to bypass a current hard implementation invariant.
+- A configurable parser repeat budget may tighten the shared 256-level parsed-model safety envelope but may not raise it until every downstream consumer required for parsed models supports the larger depth. Programmatically constructed models may be deeper where an existing public API promises that behavior; each such consumer must either use iterative traversal or enforce its own documented limit before recursive work.
 - A universal pass or decoder framework will not be designed from hypothetical plugins.
 - Public traits are introduced only after a real built-in implementation and a separate external implementation prove the common contract.
 - Plan fingerprints are versioned reproducibility identities, not promises that compiled-plan hashes remain stable across Stab versions or backends.
@@ -130,7 +130,9 @@ Simulation-backed helpers that are currently described as analysis move to `stab
 
 ### Diagnostics
 
-Domain crates expose `ParseError`, `ValidationError`, `FormatError`, `ResourceLimitError`, `CompileError`, `ExecutionError`, and `AnalysisError`.
+The completed component graph exposes `ParseError`, `ValidationError`, `FormatError`, `ResourceLimitError`, `CompileError`, `ExecutionError`, and `AnalysisError` from their owning domain crates.
+
+A2 introduces only the error families whose owning boundaries are real in A2: parser diagnostics, result-format diagnostics, and operation-owned resource-limit diagnostics. Validation, compilation, execution, and analysis errors arrive with the A3 through A6 boundaries that can define their typed context without placeholder variants.
 
 The facade may expose a non-lossy `StabError` wrapper.
 
@@ -165,11 +167,17 @@ The human formatter remains the default and preserves current stderr classes and
 
 ### Resource Policies And Estimates
 
-Public policies are operation-specific: `ParseLimits`, `CompileLimits`, `SamplingLimits`, `MaterializationLimits`, and `SearchLimits`.
+Public policies are operation-owned rather than global configuration bags.
 
-Their defaults reproduce every current source-owned constant and first-rejection boundary.
+A2 introduces only policies backed by real caller-selectable admission decisions: `ParseLimits`, `CircuitFlattenLimits`, `DemFlattenLimits`, `DetectionConversionLimits`, `DemSamplerLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits`.
 
-Hard semantic limits remain private and cannot be overridden.
+The concrete names are intentional. Circuit flattening and DEM flattening have different traversal contracts; detection conversion and DEM sampling account for different work and output; logical-error search and SAT generation retain different structures. A generic `MaterializationLimits` or `SearchLimits` would either expose irrelevant fields or silently reinterpret the same field between operations.
+
+Ordinary circuit sampling does not receive a generic A2 `SamplingLimits`: its current representability checks are compiler semantics, while shot count and output routing belong to later execution requests and sessions. A generic `CompileLimits` is likewise deferred until a real compiler has caller-selectable compilation budgets.
+
+Each migrated field reproduces its current source-owned constant and first-rejection boundary.
+
+Hard semantic, representation, parser-recursion, and platform limits remain private and cannot be overridden. Existing fixed algorithm envelopes stay private when raising them would violate an implementation invariant and lowering them would add no useful experiment-control boundary.
 
 `ResourceEstimate` labels each field as exact, upper-bound, or unknown and may report input items, expanded operations, folded traversal, scratch bytes, resident bytes, output bytes, and work units.
 
@@ -181,7 +189,7 @@ Sampling estimation counts folded structure and representable expanded operation
 
 `ModelFingerprint` hashes the dialect identity, fingerprint schema, and canonical model structure with SHA-256.
 
-Schema one starts with the fixed `stab:model-fingerprint\0` domain, a big-endian `u16` schema, and a one-byte dialect discriminator. The remaining stream length-frames every sequence and UTF-8 string with a big-endian `u128`, uses explicit item, instruction, and target discriminators, encodes integers at fixed widths in big-endian order, and encodes exact `f64` bits after normalizing signed zero.
+Schema one starts with the fixed `stab:model-fingerprint\0` domain, a big-endian `u16` schema, and a one-byte dialect discriminator. The remaining stream length-frames every sequence, UTF-8 model string, and exact unescaped tag byte string with a big-endian `u128`, uses explicit item, instruction, and target discriminators, encodes integers at fixed widths in big-endian order, and encodes exact `f64` bits after normalizing signed zero.
 
 The fingerprint does not hash `.stim` or `.dem` printer output. Compatibility printers intentionally round some floating-point values, so using their text would merge semantically distinct models and would make a schema identity change whenever presentation formatting changed. The structural encoder retains semantic precision, allocates no storage proportional to model volume, uses traversal storage proportional only to repeat depth, and is frozen by independently reconstructed rich circuit and DEM vectors.
 
@@ -359,7 +367,7 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 ### Tasks
 
 - Assign every current module to one logical model, bits, records, algebra, execution, analysis, or facade owner.
-- Introduce owning code namespaces in A1 where behavior moves across the current monolith, specifically `analysis` for gate projections and pure circuit or DEM transforms, and `execution` for compiled sampling, reference sampling, determined-measurement counting, and sampled-flow checks; keep physical source and crate extraction exclusively in A6, and defer detection-converter and DEM-sampler namespace completion to A5.
+- Introduce owning code namespaces in A1 where behavior moves across the current monolith, specifically `analysis` for gate projections and pure circuit or DEM transforms, and `execution` for compiled sampling, reference sampling, determined-measurement counting, and sampled-flow checks; defer the two stable leaf-crate extractions to A3, the remaining physical extraction to A6, and detection-converter and DEM-sampler namespace completion to A5.
 - Preserve implementation behavior while changing internal ownership.
 - Remove algebra's dependency on `Gate`.
 - Move named-gate-to-tableau, flow, unitary, and decomposition conversion into semantic adapters that depend on both the model and algebra.
@@ -392,9 +400,10 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 
 ### Tasks
 
-- Introduce domain error types and non-lossy facade conversion.
+- Introduce A2-owned parse, format, and resource-limit error types with non-lossy facade conversion; leave validation, compile, execution, and analysis error families to their owning later milestones.
 - Add exact byte spans to circuit, DEM, and result-format parse errors.
-- Move configurable constants into operation-owned policy defaults without changing values.
+- Inventory safety constants by owning operation, representation invariant, and platform invariant.
+- Move only genuine caller-selectable admission constants into concrete operation-owned policy defaults without changing established safe acceptance. A newly exposed dimension with no old rejection boundary may begin at the representable maximum only when compact input cannot cause unbounded traversal, retention, or allocation; otherwise the owning milestone must define, justify, and test a finite operation-safety default before closure.
 - Add typed resource estimates with exact, upper-bound, and unknown classifications.
 - Add versioned model and backend-neutral compilation-request fingerprints.
 - Generate runtime capabilities from execution descriptors.
@@ -408,18 +417,56 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 - Describe gate entries as accepted circuit syntax rather than universal execution support; individual compilers still validate operation-specific capability.
 - Keep the selectable-backend list empty until A4 creates a real backend-selection boundary. A placeholder backend would make capability and fingerprint contracts lie about caller choice.
 - Keep shots, seed, reference mode, codec, paths, and compatibility no-ops in run configuration rather than backend-neutral compilation identity.
+- Prefer concrete policies to generic configuration bags. Do not add a policy merely because a constant exists; add it when callers can meaningfully choose a budget without weakening a semantic or recursive safety invariant.
+- Preserve established human diagnostics for behavior that was already compatible, but do not preserve an old Stab acceptance or rejection when direct pinned Stim v1.16.0 evidence contradicts it.
 - Let `inspect` stop after parsing and structural inspection. Let `plan sample` compile only for validation, then use folded checked counting for estimates; neither command executes a shot or expands a compact repeat merely to estimate output width.
 - Benchmark the owning phases, not `stab_cli::run_from` end to end. A combined CLI number could not distinguish parsing, hashing, compilation, estimation, serialization, and I/O.
 
 ### Tests
 
-- Exact parser spans for LF, CRLF, UTF-8 tags, malformed bytes, and EOF.
+- Exact parser spans for LF, CRLF, UTF-8 tags, malformed bytes outside opaque metadata, inline block transitions, numeric limits, and EOF.
+- Pinned source-order behavior for non-UTF-8 Stim and DEM metadata. Byte-oriented entry points preserve exact tag bytes through models, transforms, fingerprints, and byte serializers. Comments remain non-semantic and are discarded, but opaque comment bytes must be accepted without changing the location or precedence of a later parse error. EOF inside an unterminated tag remains a controlled Stab rejection because pinned Stim v1.16.0 does not terminate on that input.
+- Reviewable hex-encoded oracle fixtures `m4-parser-opaque-metadata-accept`, `m4-parser-opaque-comment-source-order-reject`, `m10-dem-parser-opaque-metadata-accept`, and `m10-analyze-errors-opaque-tag` run the exact non-UTF-8 bytes through both pinned Stim v1.16.0 and Stab. The first three own public parser acceptance and rejection class, while the analyzer row compares exact opaque output bytes. `just oracle::record --check-clean` validates their pinned expected bytes.
+- `cargo test -p stab-core --test model_parse_diagnostics opaque_comments_do_not_shift_later_parser_diagnostics -- --exact` owns the exact post-comment circuit and DEM error spans, and `cargo test -p stab-core --test model_parse_diagnostics opaque_unterminated_tags_report_the_exact_original_eof -- --exact` owns controlled EOF spans for opaque circuit and DEM tags.
+- Pinned Stim acceptance for 63-byte numbers, rejection of 64-byte numbers, uint63 circuit repeat counts, and legal commands immediately after opening or closing block braces.
 - Stable diagnostic codes and schema-version-1 JSON.
 - Existing CLI error class, precedence, exit status, and path-safety behavior.
-- Exact old accepted maxima and first rejections under default policies.
+- Exact old accepted maxima and first rejections under default policies when the boundary is practical to execute. A resource-prohibitive or representational maximum requires all of: an exact default-value assertion, reduced custom-policy tests at accepted `N` and rejected `N + 1`, checked-arithmetic and overflow tests for the same admission path, and an explicit justification in the A2 resource-policy inventory. This substitution is not permitted for a finite historical boundary that can be exercised safely in the ordinary test suite.
 - Rejection of policy overflow and attempted semantic-limit overrides.
+- Iterative admission of programmatically constructed circuit repeat depth before recursive flattening, including exact level 256 acceptance and level 257 rejection. Folded DEM summary construction and destruction remain iterative and preserve the established depth-257 compact-query behavior, including a substantially deeper constrained-stack regression; DEM consumers that historically own the 256-level cap still reject before recursive work.
+- Materialized zero-width detection output charges outer-record ownership, while streaming output and internally streamed measurement records do not acquire a total materialization cap.
+- DEM replay charges caller-owned input to a distinct traversal-work budget instead of returned-output units, while preserving the historical combined replay-work and active-byte rejection boundaries.
+- Opaque metadata classification advances monotonically through source-ordered ranges, and caller-raised flatten limits cannot bypass platform vector-capacity admission or fallible reservation.
 - Model and request fingerprint determinism, schema separation, canonical-input identity, operation distinction, and normalized-option identity.
 - Capability generation consistency with gate and compiler descriptors.
+
+### Opaque-Tag Transform Preservation Matrix
+
+This matrix is the complete A2 transform claim.
+
+Each included row requires byte-exact preservation of opaque tag payloads on surviving source operations and deterministic propagation to generated operations according to the named transform's source operation.
+
+| Transform or model-producing operation | Required preservation | Exact test selector |
+| --- | --- | --- |
+| Circuit flattening | Repeat-body instruction tags are copied to every materialized occurrence. | `cargo test -p stab-core --test opaque_tag_transform_regressions flattened_circuit_preserves_opaque_instruction_tags -- --exact` |
+| Circuit noise removal | Tags on surviving operations remain byte-identical, and removed noise contributes no tag. | `cargo test -p stab-core --test opaque_tag_transform_regressions circuit_without_noise_preserves_opaque_tags_on_surviving_records -- --exact` |
+| Circuit simplification | Every replacement operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-core --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
+| Circuit decomposition | Every decomposed operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-core --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
+| Unitary inversion | Instruction and repeat-block tags remain attached to their semantic inverse after order reversal. | `cargo test -p stab-core --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
+| QEC inversion | Measurement-family tags remain attached to the reversed measurement operation. | `cargo test -p stab-core --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
+| Feedback inlining | Surviving operations retain their tags, and an introduced correction record inherits the tag of the consumed feedback operation. | `cargo test -p stab-core --test opaque_tag_transform_regressions feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operations -- --exact` |
+| DEM probability rounding | Instruction and repeat-block tags remain byte-identical through numeric rounding. | `cargo test -p stab-core --test opaque_tag_transform_regressions rounded_dem_preserves_opaque_instruction_and_repeat_tags -- --exact` |
+| DEM flattening | Every materialized instruction retains the byte-identical source instruction tag after detector-offset rewriting. | `cargo test -p stab-core --test opaque_tag_transform_regressions flattened_dem_preserves_opaque_tags_on_materialized_instructions -- --exact` |
+| Circuit-to-DEM analysis without loop folding | Distinct opaque error tags remain distinct and are not merged merely because their detector effects match. | `cargo test -p stab-core --test dem_analyzer_tags dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
+| Circuit-to-DEM analysis with loop folding | Distinct opaque error tags remain distinct in folded and tail output. | `cargo test -p stab-core --test dem_analyzer_tags folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
+
+Comments are excluded because circuit and DEM comments are non-semantic and intentionally discarded during parsing.
+
+Human lossy tag display is excluded because byte accessors, byte serializers, and fingerprints own exact opaque identity.
+
+Transforms not listed in this matrix have no A2 opaque-tag preservation claim until an exact selector is added.
+
+ErrorMatcher provenance is explicitly excluded and remains deferred because ErrorMatcher does not yet preserve complete source provenance through candidate isolation and filtering.
 
 ### Benchmarks
 
@@ -433,10 +480,67 @@ Public plans wrap private backend-specific plan variants, and hot loops remain s
 - Do not add these rows to Stim parity policy, self-regression baselines, release rollups, the legacy manifest, or formal completion receipts. They are Stab-only product diagnostics until a scientifically equivalent comparator and a demonstrated release risk exist.
 - Do not create separate capability-enumeration or JSON-rendering benchmarks without profiling evidence that either is a meaningful product cost.
 
+### Executable A2 Diagnostics
+
+Allocation invariants are correctness gates, not timing reports.
+
+Run the parser admission invariants directly:
+
+```text
+cargo test -p stab-core --test resource_policies parse_preallocation_is_bounded_by_the_admitted_line_prefix -- --exact
+cargo test -p stab-core --test resource_policies byte_parse_admission_does_not_copy_an_unterminated_rejected_line -- --exact
+```
+
+The workload compares a short rejected suffix with a 100,000-line or one-million-byte rejected suffix after the same admitted prefix.
+
+Acceptance requires identical allocation measurements for parser preallocation and byte preparation, proving that rejected trailing input does not increase allocation count, total bytes, or peak retained bytes.
+
+Run the circuit-flatten rejection invariant directly:
+
+```text
+cargo test -p stab-core --test circuit_flatten_limits policy_preserves_defaults_and_rejects_before_output_allocation -- --exact
+```
+
+The workload compares a rejected four-operation repeat with one target against the same rejected repeat whose instruction has 4,096 targets.
+
+Acceptance requires no more than two additional allocation calls and no more than 256 additional allocated bytes for the wide rejected input, proving that rejection does not clone or materialize rejected target payload.
+
+These unit allocation gates remain authoritative even when a benchmark report also records allocator counters.
+
+Produce the source-current circuit-parser timing and allocation observations from a clean revision with unique paths:
+
+```text
+just bench::baseline --only m4-circuit-parse --out target/benchmarks/a2-circuit-parse-baseline-$(git rev-parse --short HEAD)
+just bench::compare --only m4-circuit-parse --baseline target/benchmarks/a2-circuit-parse-baseline-$(git rev-parse --short HEAD)/baseline.json --warmup --measurement-runs 3 --require-beta-gate --report target/benchmarks/a2-circuit-parse-timing-$(git rev-parse --short HEAD)
+just bench::compare-allocations --only m4-circuit-parse --baseline target/benchmarks/a2-circuit-parse-baseline-$(git rev-parse --short HEAD)/baseline.json --measurement-runs 1 --report target/benchmarks/a2-circuit-parse-allocations-$(git rev-parse --short HEAD)
+```
+
+The parser timing report must bind `local_modifications=false`, use the real byte-oriented public parse entry point, preserve the existing semantic witness, and pass the unchanged `1.25x` Stim-relative beta gate.
+
+The parser allocation report is diagnostic observation of the accepted benchmark workload and does not replace the rejected-input allocation invariants above.
+
+Produce the four Stab-only timing reports with:
+
+```text
+just bench::diagnostic-run --group PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT --all-scales --tier pr --out target/benchmarks/qualification/a2-circuit-model-fingerprint-$(git rev-parse --short HEAD) --allow-unverified-host
+just bench::diagnostic-run --group PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT --all-scales --tier pr --out target/benchmarks/qualification/a2-sampling-request-fingerprint-$(git rev-parse --short HEAD) --allow-unverified-host
+just bench::diagnostic-run --group PERFQ-A2-SAMPLING-REQUEST-ESTIMATE --all-scales --tier pr --out target/benchmarks/qualification/a2-sampling-request-estimate-$(git rev-parse --short HEAD) --allow-unverified-host
+just bench::diagnostic-run --group PERFQ-A2-SAMPLER-COMPILE --all-scales --tier pr --out target/benchmarks/qualification/a2-sampler-compile-release-$(git rev-parse --short HEAD) --allow-unverified-host
+```
+
+Each report must bind `local_modifications=false`, execute exactly the source-owned 64, 4,096, and 65,536-item scales, retain its complete untimed semantic witness, use `raw-work-v2`, and finish inside the shared 600-second suite deadline.
+
+These four reports are independent Stab-only phase timings with no Stim ratio, no `1.25x` conclusion, no self-regression conclusion, and no release-evidence status.
+
 ### Done Criteria
 
 - Agents can discover supported operations, parse structured failures, and inspect a sampling request without executing it.
 - Existing human CLI behavior remains the default.
+- The seven concrete operation policies preserve exact default maxima, reject before work proportional to rejected input, and account only for storage or work owned by the operation.
+- Source-current parser, allocation, and timing diagnostics pass without relaxing the `1.25x` gate.
+- Every per-dimension evidence row in the A2 resource-policy inventory either executes the real default maximum or satisfies the documented resource-prohibitive substitution contract without a missing selector.
+- A2 remains incomplete while any evidence row is marked missing, while source-current clean-revision diagnostics are absent, or while final milestone and code review findings remain open.
+- Physical extraction of `stab-bits` and `stab-records` is not part of A2 and must not begin until A2 closes.
 
 ## Milestone A3: Stable Packed Records And Codecs
 

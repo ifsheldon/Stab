@@ -28,14 +28,17 @@ All integers are big-endian. The dialect is one byte:
 | Boolean false or true | `u8(0)` or `u8(1)` |
 | Signed integer | Fixed-width two's-complement big-endian integer |
 | Unsigned integer | Fixed-width big-endian integer |
-| Length | `u128` containing an item count, except that a text length counts UTF-8 bytes |
+| Length | `u128` containing an item count or a following byte-string length |
+| Byte string | Byte length followed by those exact bytes |
 | Text | UTF-8 byte length followed by those exact bytes; no Unicode normalization |
-| Optional text | `u8(0)` for absent, or `u8(1)` followed by text |
+| Optional tag | `u8(0)` for absent, or `u8(1)` followed by the exact unescaped tag byte string |
 | Float sequence | `u128` item count followed by one `u64` per `f64` value |
 
 Each nonzero `f64` is encoded with `f64::to_bits()`. Both signed zeros encode as `u64(0)`. No other floating-point normalization or printer rounding occurs.
 
 Every sequence begins with its `u128` item count. Empty sequences therefore encode as sixteen zero bytes.
+
+Tags created through string APIs contain UTF-8 bytes. Byte-oriented circuit and DEM parsers may retain non-UTF-8 tag payloads accepted by Stim v1.16.0; schema one hashes those unescaped bytes directly. Comments are not model items and do not enter the fingerprint.
 
 ## Stim Circuit Model
 
