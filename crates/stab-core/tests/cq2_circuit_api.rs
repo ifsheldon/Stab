@@ -110,6 +110,25 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
             .get(),
         17
     );
+    let largest_observable = instruction("OBSERVABLE_INCLUDE(18446744073709549568) rec[-1]\n");
+    assert_eq!(
+        largest_observable
+            .observable_id_argument()
+            .expect("typed largest observable")
+            .expect("largest observable id")
+            .get(),
+        18_446_744_073_709_549_568
+    );
+    let overflowing_observable = instruction("OBSERVABLE_INCLUDE(18446744073709551616) rec[-1]\n");
+    assert_eq!(
+        overflowing_observable
+            .observable_id_argument()
+            .expect_err("2^64 is outside the ObservableId domain"),
+        CircuitError::InvalidArgument {
+            gate: "OBSERVABLE_INCLUDE",
+            argument: "18446744073709552000".to_string(),
+        }
+    );
 
     let channel = instruction("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\n");
     assert_eq!(channel.probability_argument().unwrap(), None);

@@ -799,17 +799,18 @@ fn probability_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult
 }
 
 fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult<ObservableId> {
-    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 {
+    const U64_EXCLUSIVE_UPPER_BOUND: f64 = f64::from_bits(0x43f0_0000_0000_0000);
+
+    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg >= U64_EXCLUSIVE_UPPER_BOUND {
         return Err(CircuitError::InvalidArgument {
             gate,
             argument: arg.to_string(),
         });
     }
-    let value = format!("{arg:.0}")
-        .parse::<u64>()
-        .map_err(|_| CircuitError::InvalidArgument {
-            gate,
-            argument: arg.to_string(),
-        })?;
-    Ok(ObservableId::new(value))
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the finite, integral, nonnegative, and exclusive 2^64 checks prove this cast exact"
+    )]
+    Ok(ObservableId::new(arg as u64))
 }
