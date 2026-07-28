@@ -9,9 +9,10 @@ Finish milestone A4 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 - A0 through A3 are complete.
 - `stab-bits` and `stab-records` are physical Stable Rust 1.97.1 crates.
 - Clean A3 evidence is recorded in [agent-native-modular-qec-progress-report.md](agent-native-modular-qec-progress-report.md).
-- `CompiledSampler` remains the compatibility center and owns compilation, mutable execution state, and materialized output in one abstraction.
-- `CompilationRequestFingerprint` is backend-neutral; A4 must add `PlanFingerprint` only after selecting a real backend and executable contract.
-- Typed measurement batches and sinks are ready for engine use.
+- A4 code is implemented but remains open until focused commits, audits, and clean evidence complete.
+- `SamplingCompiler`, immutable `SamplingPlan`, mutable `SamplingSession`, typed batches, sink composition, and backend-bearing `PlanFingerprint` are the canonical sampling path.
+- `CompiledSampler` remains a source-compatibility adapter, and `stab sample` uses the public plan/session/sink path.
+- Scalar is the sole registered backend; explicit portable SIMD requests fail before lowering until A6 provides a real implementation.
 
 ## Sources Of Truth
 
@@ -26,26 +27,27 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 
 ## Execution Sequence
 
-1. Inventory every `CompiledSampler`, sampling helper, CLI, oracle, and benchmark call site; freeze old-versus-new behavior selectors before implementation.
-2. Add failing semantic tests for compiler diagnostics, immutable-plan sharing, isolated sessions, same-session chunking, zero shots, cancellation, progress, sink failure, finalization failure, and session poisoning.
-3. Introduce a compiler, private executable IR, immutable `SamplingPlan`, mutable non-`Sync` `SamplingSession`, random policy, run summary, and backend-bearing `PlanFingerprint`.
-4. Reuse RNG, frames, reference samples, scratch, and at-most-64-shot batches after warmup; keep direct-Z, small-frame, and general-frame variants private.
-5. Route execution only through typed `MeasurementSink`; keep materialized and byte-returning APIs as thin migration adapters.
-6. Migrate `stab sample`, oracle paths, and benchmarks, preserving exact deterministic behavior where promised and statistical Stim parity elsewhere.
-7. Regenerate correctness ownership, performance dispositions, capability descriptors, API migration records, and generated status in the same change set.
-8. Measure compilation, session construction, raw execution, batch delivery, encoding, repeated-session execution, backend selection, and CLI end-to-end behavior with phase-separated workloads.
-9. Run milestone-audit and full-code-review, fix every confirmed finding, and close A4 only from clean committed evidence.
+1. Finish source-current correctness and performance inventory regeneration and generated status.
+2. Run focused A4 tests, complete workspace verification, architecture enforcement, implemented oracles, and benchmark smoke.
+3. Run milestone-audit and full-code-review; fix every confirmed implementation, test, benchmark, and documentation finding.
+4. Commit source, CLI, benchmark, qualification, and documentation changes in focused commits.
+5. From the clean source revision, rerun phase diagnostics and pinned comparable sampling rows using unique artifact paths and controlled affinity.
+6. Record clean evidence and close A4 only when the unchanged `1.25x` process-symmetric Stim parity gate passes and every new A4 measurement is explicitly recorded as an unseeded candidate for later `15%` Stab self-regression.
 
 ## Nonnegotiable Contracts
 
 - Execution imports no text codec, filesystem, CLI, or ops API.
 - Plans are immutable, cloneable, `Send + Sync`, and do not serialize private IR.
 - Sessions own mutation and reuse but are not promised `Sync`.
-- Backend selection is static per plan; no dynamic dispatch enters the hot loop.
+- Backend selection is static per plan; A4 registers only the real scalar backend, rejects explicit portable SIMD as unavailable, and leaves genuine SIMD registration to A6.
+- Ordinary sampling has no placeholder `SamplingLimits`; fixed representability checks remain compiler semantics until a real caller-selectable compilation budget exists.
 - Sink and finalization errors preserve the first error, exact committed progress, immediate stop, and poisoned-session semantics.
+- Each nonempty run finalizes one supplied sink lifecycle; chunked codec output uses fresh sinks and composes finalized streams.
+- Cooperative cancellation is checked between completed batches; it does not promise a wall-clock deadline inside one expensive shot.
+- Session construction rejects a conservative estimate above 256 MiB before allocating reusable frame, span, record, reference, or bit-plane storage.
 - Pre-execution validation failures do not poison a reusable session.
 - Existing random-stream promises do not expand; pinned Stim statistical and semantic equivalence remains the compatibility target.
-- Comparable rows retain the `1.25x` Stim parity gate and `15%` Stab self-regression gate.
+- Comparable process rows retain the `1.25x` Stim parity gate. New A4 phase and process measurement identities have no semantically identical pre-A4 baseline, so the clean A4 report seeds candidates and the `15%` Stab self-regression gate begins with later identity-matched revisions.
 
 ## Done Criteria
 

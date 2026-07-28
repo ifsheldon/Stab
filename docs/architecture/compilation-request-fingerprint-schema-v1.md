@@ -19,7 +19,7 @@ It binds:
 
 It does not bind execution inputs such as shot count, random seed, reference-sample mode, result encoding, or filesystem routing.
 
-It also does not bind a selected backend or executable-plan identity. A backend-bearing plan fingerprint is a separate later contract.
+It also does not bind a backend preference, selected backend, or executable-plan identity. Backend selection happens after this identity is calculated, and the resulting [plan fingerprint](plan-fingerprint-schema-v1.md) binds the selected backend.
 
 ## Primitive Encoding
 
@@ -57,12 +57,12 @@ The model dialect discriminators are shared with model fingerprint schema versio
 
 Sampling uses operation discriminator `1` and compiler schema version `1`.
 
-The public sampling compiler has one fixed semantic mode:
+The public sampling compiler has one fixed lowering mode:
 
 - sweep-controlled instructions are rejected;
 - representability and semantic validation remain mandatory;
 - no compile resource budget is caller-configurable;
-- no backend can be selected.
+- backend preference and selection are deliberately excluded because they do not change the backend-neutral lowering request.
 
 Fixed compiler behavior belongs to the compiler schema, not to the normalized caller-option list.
 
@@ -71,7 +71,9 @@ Sampling compiler schema 1 therefore encodes:
 - normalized option count `0`;
 - effective configurable-limit count `0`.
 
-Changing sweep admission, adding a caller-selectable compile option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review.
+Changing sweep admission, adding a caller-selectable lowering option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review.
+
+Adding or changing a backend registration does not by itself change this request schema. It changes the separate backend-bearing plan identity.
 
 ## Frozen Vector
 

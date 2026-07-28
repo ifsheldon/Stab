@@ -23,6 +23,51 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-28 - A4: Pre-A4 Performance Mapping
+
+Status: Resolved
+Revealed by: milestone audit of the first A4 phase-separated benchmark implementation
+Current text: A4 required every new phase measurement to remain within 15 percent of a clean pre-A4 checkpoint on the same host.
+Gap: clean pre-A4 revision `18099bf3` contained only one compile measurement and one bundled one-shot sampling measurement. Neither had the semantic work, timing boundary, process boundary, sink policy, or measurement identity of the new isolated A4 phases and process-symmetric CLI rows, so a numeric old-to-new ratio would compare unlike work.
+Proposed amendment: identify the exact historical checkpoint and any valid old-to-new mappings; classify each unmatched new identity as unseeded; let the first accepted A4 report seed a candidate; and apply the 15 percent self-regression limit only to later measurements with identical workload, timing, profile, target, and controlled-host identities.
+Resolution: the A4 benchmark contract and active goal now name revision `18099bf3`, state that there is no valid identity mapping, retain the historical values as diagnostics only, and require the clean A4 report to establish unseeded candidates rather than fabricate passing self-regression ratios.
+
+## 2026-07-28 - A4: Sink Finalization After Failure
+
+Status: Resolved
+Revealed by: milestone audit of sink-error and cancellation lifecycle tests
+Current text: A4 said every nonempty execution finalizes its sink, while also requiring a sink error to stop immediately.
+Gap: calling `finish` after a write or internal engine failure could perform further I/O through a sink whose state is already partial or invalid, contradicting immediate-stop and first-error preservation.
+Proposed amendment: successful and cooperatively cancelled nonempty runs finalize their sink; write and internal engine failures stop without finalization; finalization failures preserve the first finish error and poison the session.
+Resolution: the architecture contract now states these phase-specific rules, and the sampling failure tests require no later write or finish callback after a write or engine failure while preserving exact committed and attempted progress.
+
+## 2026-07-28 - A4: Adapter Removal Point And Evidence Boundaries
+
+Status: Resolved
+Revealed by: A4 milestone audit after the first complete implementation
+Current text: A4 said to retain compiled types until CLI and oracle migration and then remove them from the `0.2.0` root API, while the active goal and migration inventory retained `CompiledSampler` as an A4 source-compatibility adapter. The benchmark list also named broad phases without exact timed boundaries or row ownership.
+Gap: literal removal in A4 would conflict with the documented adapter state and force facade churn before physical engine extraction. Broad phase labels could allow simulation, delivery, and encoding to be timed together while still appearing to satisfy the milestone.
+Proposed amendment: retain `CompiledSampler` through A4, remove its root exposure during A6 facade curation, name every A4 phase measurement and timed boundary, keep in-process and phase rows report-only, and reserve the 1.25x Stim gate for process-equivalent rows.
+Resolution: the A4 task, migration inventory, benchmark table, evidence commands, and done criteria now use one removal point and one exact benchmark interpretation. The 1024-shot and million-shot in-process rows were removed from the Stim threshold policy instead of treating unlike work as parity evidence.
+
+## 2026-07-28 - A4: Cancellation And Session Storage Meaning
+
+Status: Resolved
+Revealed by: hostile compact-repeat testing and cancellation lifecycle review
+Current text: the 64-shot ceiling was said to bound cancellation latency, and ordinary sampling retained unspecified fixed representability checks.
+Gap: one folded operation or shot can take arbitrary time before the next cooperative check, so the text accidentally suggested a wall-clock guarantee. A compact circuit could also declare an enormous measurement count and reach infallible session allocation before execution.
+Proposed amendment: define cancellation in units of completed batch work rather than elapsed time, and define one private conservative 256 MiB session-storage envelope covering frame, span-solving, record, reference, and bit-plane state.
+Resolution: session construction now checks the envelope before allocation and uses fallible storage construction; compact hostile repeats return a typed execution error. The architecture contract explicitly rejects a wall-clock cancellation promise and keeps the envelope private rather than creating a placeholder caller policy.
+
+## 2026-07-28 - A4: Sampling Limits And Genuine Backend Selection
+
+Status: Resolved
+Revealed by: implementation inventory of the existing sampling hot paths
+Current text: the architecture example called `.limits(SamplingLimits::default())`, while A2 explicitly rejected a generic sampling policy with no real caller-selectable decision; A4 also required selecting scalar or portable SIMD before sampling had two genuine backend implementations.
+Gap: implementing the literal text would either create an empty policy bag or label scalar execution as portable SIMD. Both choices would expose a dishonest public contract and make fingerprints and capability discovery describe behavior that did not exist.
+Proposed amendment: remove the placeholder limits call, retain fixed sampler representability checks as compiler semantics, introduce backend selection with scalar as A4's only registered backend, reject explicit portable SIMD before compilation, and register portable SIMD in A6 only after `stab-kernels-simd` owns a distinct measured implementation.
+Resolution: the architecture plan and active A4 goal now state this boundary explicitly. A4 owns scalar selection, unavailable-backend diagnostics, and selected-backend plan fingerprints; A6 owns the second backend, cross-backend fingerprints, semantic equivalence, and scalar-versus-SIMD benchmarks.
+
 ## 2026-07-27 - A3: Typed Writer And Codec Memory Boundaries
 
 Status: Resolved

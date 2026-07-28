@@ -215,7 +215,7 @@ Compiled plans are not serializable.
 
 No feature checklist or manually synchronized capability manifest is used at runtime.
 
-The first registry reads gates from `Gate::all()`, codecs from one records-owned six-format table, and sampling from a descriptor colocated with `CompiledSampler::compile`. Its selectable-backend iterator is empty until A4 introduces a genuine backend-selection boundary.
+The first registry reads gates from `Gate::all()`, codecs from one records-owned six-format table, and sampling from a descriptor colocated with the sampling compiler. A4 registers scalar as the only selectable backend; A6 adds portable SIMD only after a distinct implementation exists.
 
 ### Plans, Sessions, And Execution
 
@@ -224,10 +224,9 @@ Sampling uses:
 ```rust
 let plan = SamplingCompiler::new()
     .backend(BackendPreference::Auto)
-    .limits(SamplingLimits::default())
     .compile(&circuit)?;
 
-let mut session = plan.session(RandomPolicy::Seeded(Seed::new(42)));
+let mut session = plan.session(RandomPolicy::Seeded(Seed::new(42)))?;
 let summary = session.run(ShotCount::new(10_000), &mut sink)?;
 ```
 
@@ -261,11 +260,17 @@ Sessions are reusable but are not promised to be `Sync`.
 
 Internal execution batches contain at most 64 shots.
 
-This ceiling aligns with PTB64, bounds cancellation latency, and permits backend-native bit planes.
+This ceiling aligns with PTB64, bounds the amount of completed work between cancellation checks, and permits backend-native bit planes.
+
+Cancellation is cooperative rather than preemptive. A single expensive folded operation or shot may delay the next check, so the 64-shot ceiling does not promise a wall-clock cancellation deadline.
+
+Sampling sessions enforce a private 256 MiB conservative storage envelope before allocating frames, span-solving scratch, records, reference samples, or bit planes. This is a fixed hostile-input and representability boundary rather than a caller-selectable tuning policy; a future configurable policy requires a real use case and separate estimation contract.
 
 Successful `run(a)` followed by `run(b)` on one seeded session must produce the same record sequence as `run(a + b)` on an equivalent session.
 
 This guarantee applies only to the same compiler schema, backend, plan, seed, and Stab version.
+
+Each successful or cooperatively cancelled nonempty `run` owns and finalizes the supplied sink lifecycle. A sink write failure or internal execution failure stops immediately without calling `finish`, because the sink or engine may already be in an invalid partial state. Terminal codec sinks are not reusable across calls; partitioned output uses a fresh sink per call and composes the finalized record sequences according to the selected format.
 
 Zero shots do not call the sink or advance the RNG.
 
@@ -339,6 +344,12 @@ An operation that cannot lower into the closed dialect is rejected instead of en
 There is no placeholder `Gpu` variant.
 
 Public plans wrap private backend-specific plan variants, and hot loops remain statically dispatched.
+
+A4 introduces this selection boundary with `Scalar` as the only registered sampling backend.
+
+`Auto` therefore selects `Scalar`, while an explicit `PortableSimd` request returns an unavailable-backend diagnostic without compiling or executing work.
+
+A6 registers `PortableSimd` only after `stab-kernels-simd` owns a genuinely distinct measured implementation; selecting a differently named backend that executes the scalar path is forbidden.
 
 ## Milestone A0: Architecture Contract And Baseline
 
@@ -588,45 +599,72 @@ These four reports are independent Stab-only phase timings with no Stim ratio, n
 - Replace `CompiledSampler` as the architectural center.
 - Introduce compiler, immutable plan, mutable session, random policy, run summary, sink finalization, and sink error composition.
 - Keep the executable IR private.
-- Select scalar or portable SIMD at compilation.
+- Select a registered backend at compilation; A4 registers only scalar, while A6 adds portable SIMD after extracting a genuine SIMD implementation.
 - Complete the backend-bearing `PlanFingerprint` only after backend selection and bind it to the request fingerprint and executable-contract identity.
 - Reuse frames, RNG, reference samples, records, and output batches across calls.
 - Preserve direct-Z, small-frame, and general stabilizer-frame execution as private plan variants.
 - Make existing materialized and byte-returning conveniences thin adapters on the new path.
-- Retain current compiled types as migration adapters until every CLI and oracle call site uses the new path, then remove them from the `0.2.0` root API.
+- Retain `CompiledSampler` through A4 as a source-compatible adapter even after CLI and oracle call sites use the new path. A6 removes it from the `0.2.0` root API only after facade curation and the remaining engine extraction eliminate every product dependency on the adapter.
 - Migrate `stab sample`.
 
 ### Tests
 
 - Compilation and unsupported-capability diagnostics.
-- Plan-fingerprint determinism, schema separation, backend distinction, and executable-contract distinction.
+- Plan-fingerprint determinism, schema separation, selected-backend binding, unavailable-backend rejection, and executable-contract distinction; A6 adds cross-backend distinction tests when a second backend exists.
 - Plan sharing across threads and session isolation.
 - Same-session chunking equivalence.
 - Zero-shot behavior.
-- Cancellation at batch boundaries.
+- Cancellation at batch boundaries, pre-cancelled finalization, and resumability without a wall-clock latency claim.
 - Sink write and finalization error poisoning, exact progress, and immediate stop.
+- Induced internal execution failure poisoning and exact progress.
 - Pre-execution validation rejection without poisoning.
 - Reference-sample and skip-reference behavior.
-- Direct-Z, small-frame, and general-frame seeded old-versus-new equivalence.
+- Direct-Z, small-frame, and general-frame seeded old-versus-new equivalence, including a frozen pre-A4 general-frame vector.
 - Deterministic and statistical Stim parity.
-- No allocation growth after session warmup.
+- No allocation growth after session and CLI codec warmup, including wide HITS, DETS, and PTB64 output.
 
 ### Benchmarks
 
 - Compilation.
 - Session construction.
 - Raw execution.
-- Batch delivery.
-- Encoding.
+- Consumption of one prebuilt typed batch, excluding simulation and encoding.
+- Encoding of one prebuilt typed batch, excluding simulation and sink delivery.
 - Repeated execution on one session.
-- Scalar versus portable SIMD.
+- Scalar compilation and backend-selection overhead; A6 owns scalar-versus-portable-SIMD comparison.
 - CLI end-to-end sampling.
+
+The source-owned `m8-sample-analysis-1shot` row uses these exact Stab measurements:
+
+| Measurement | Timed boundary |
+| --- | --- |
+| `stab_sample_compile_plan_auto_noisy_1q` | `SamplingCompiler::compile` with automatic scalar selection, lowering, and plan fingerprinting |
+| `stab_sample_compile_plan_scalar_noisy_1q` | The same compilation with explicit scalar selection |
+| `stab_sample_construct_session_noisy_1q` | Seeded session construction, including fallible reusable storage and reference state |
+| `stab_sample_execute_witness_sink_64_continuous_session` | One 64-shot run on a preconstructed session through a constant-work typed sink that observes dimensions plus the first and last sampled bits |
+| `stab_sample_consume_typed_batch_64` | Digest consumption of one prebuilt 64-shot typed bit-plane batch, with no simulation |
+| `stab_sample_encode_b8_64` | Construction, B8 encoding, finalization, and ownership of one prebuilt 64-shot typed batch, with no simulation |
+| `stab_sample_repeated_session_16x4_continuous_session` | Sixteen four-shot runs on one preconstructed session, including each run's sink lifecycle |
+
+Before clean A4 evidence, use unique revision-named paths and separate the report-only diagnostics from the process-symmetric parity gate:
+
+```text
+just bench::baseline --only m8-sample-analysis-1shot --only m8-sample-throughput-1024 --only m8-sample-throughput-1000000 --out target/benchmarks/a4-sampling-diagnostic-baseline-<revision>
+just bench::compare --only m8-sample-analysis-1shot --only m8-sample-throughput-1024 --only m8-sample-throughput-1000000 --baseline target/benchmarks/a4-sampling-diagnostic-baseline-<revision>/baseline.json --warmup --measurement-runs 3 --report target/benchmarks/a4-sampling-diagnostic-compare-<revision>
+
+just bench::baseline --only m8-sample-primary-repetition-contract --only m8-sample-primary-rotated-surface-contract --only m8-sample-primary-unrotated-surface-contract --only m8-sample-high-repeat-contract --out target/benchmarks/a4-sampling-parity-baseline-<revision>
+just bench::compare --only m8-sample-primary-repetition-contract --only m8-sample-primary-rotated-surface-contract --only m8-sample-primary-unrotated-surface-contract --only m8-sample-high-repeat-contract --baseline target/benchmarks/a4-sampling-parity-baseline-<revision>/baseline.json --warmup --measurement-runs 3 --require-beta-gate --report target/benchmarks/a4-sampling-parity-compare-<revision>
+```
+
+The analysis and in-process throughput rows are report-only and must not appear in the 1.25x threshold file. The four generated-circuit rows retain the Stim parity gate only because both implementations execute as bounded subprocesses with the same stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight checks a frozen pre-A4 output witness.
+
+Clean pre-A4 revision `18099bf3` owned only `stab_sample_compile_noisy_1q` and the bundled `stab_sample_1shot_zero_one` measurement. Neither is semantically identical to the new isolated phases or the process-symmetric CLI rows, so A4 must report the historical values only as diagnostics and mark every new measurement identity unseeded. The first accepted clean A4 report becomes the self-regression baseline for later revisions. The 15% Stab self-regression gate applies only to a subsequent measurement with the same row, measurement, workload, timing boundary, profile, target, and controlled-host identity; it cannot be backfilled from an unlike pre-A4 operation.
 
 ### Done Criteria
 
 - Execution imports no codec or filesystem API.
 - Existing sampling compatibility remains green.
-- Comparable rows retain the `1.25x` Stim gate and `15%` self-regression gate.
+- Process-equivalent rows retain the `1.25x` Stim gate, report-only rows make no Stim-ratio claim, and the clean A4 phase report establishes explicit unseeded baseline candidates for later 15% self-regression checks without inventing a pre-A4 mapping.
 
 ## Milestone A5: Detection And DEM Batch Pipelines
 

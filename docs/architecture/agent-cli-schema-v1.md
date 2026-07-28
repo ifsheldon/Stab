@@ -1,5 +1,9 @@
 # Agent CLI Schema Version 1
 
+Schema version 1 is historical.
+
+Stab 0.2 development now emits [schema version 2](agent-cli-schema-v2.md), which adds selected-backend and backend-bearing plan identity after A4 introduced a real compilation boundary.
+
 This document defines the successful machine-output contract for the Stab-native `capabilities`, `inspect`, and `plan sample` commands.
 
 These commands are additive Stab extensions.

@@ -12,7 +12,9 @@ The stable byte contract for source-model identities is defined by [model finger
 
 The stable byte contract for backend-neutral compiler inputs is defined by [compilation request fingerprint schema version 1](compilation-request-fingerprint-schema-v1.md).
 
-The successful machine-output contract for Stab-native discovery, inspection, and planning commands is defined by [agent CLI schema version 1](agent-cli-schema-v1.md).
+The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
+
+The current successful machine-output contract for Stab-native discovery, inspection, and planning commands is defined by [agent CLI schema version 2](agent-cli-schema-v2.md). [Schema version 1](agent-cli-schema-v1.md) remains historical.
 
 The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
 
@@ -64,7 +66,7 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A3 product graph is:
+The current A4 product graph is:
 
 ```text
 stab-cli -> stab-core

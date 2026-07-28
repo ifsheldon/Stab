@@ -22,7 +22,11 @@ The complete engine, facade, and CLI retain the pinned Nightly high-performance 
 
 Scalar behavior is the absence of the additive `portable-simd` feature.
 
-Backend selection occurs during compilation and supports only `Auto`, `Scalar`, and `PortableSimd`.
+Backend requests occur during compilation through `Auto`, `Scalar`, and `PortableSimd`. Selected-backend values describe registered implementations only.
+
+A4 registers only the scalar implementation: `Auto` selects scalar, explicit scalar succeeds, and explicit portable SIMD returns a typed unavailable-backend diagnostic before lowering.
+
+A6 registers portable SIMD only after `stab-kernels-simd` owns a distinct measured implementation.
 
 Public plans wrap private backend-specific variants.
 
