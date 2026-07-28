@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "5418ffc2bd640f55ce067ee6cd55c154a5b36c865ae929f07ac2f3f2ab2dca5b",
+  "semantic_digest": "883bd4a5147bbc8b69af56535a460b4b01c0e38b8930d34c0cb280765e035bfd",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -122521,7 +122521,7 @@
       "kind": "function",
       "source_path": "crates/stab-model/src/lib.rs",
       "source_line": 76,
-      "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
+      "owner_case_id": "cq-evidence-qualification-dfbaf2e4e0cf2eb7",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
         "PERF-SAMPLING",
@@ -122537,7 +122537,7 @@
       "kind": "function",
       "source_path": "crates/stab-model/src/lib.rs",
       "source_line": 82,
-      "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
+      "owner_case_id": "cq-evidence-qualification-dfbaf2e4e0cf2eb7",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
         "PERF-SAMPLING",
@@ -183948,6 +183948,61 @@
       ],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-dfbaf2e4e0cf2eb7",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-model-gate-validation-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "gate_contract",
+          "gate_validation_reports_model_owned_errors",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Closed gate validation inspects caller-provided argument and target slices without materializing circuit or execution state."
+      },
+      "negative_axes": [
+        "argument-count",
+        "target-count",
+        "duplicate-pair-target",
+        "probability-sum"
+      ],
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
       ],
       "status": "implemented"
     },

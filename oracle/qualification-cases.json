@@ -18604,6 +18604,47 @@
         "duplicate-count-capacity-growth"
       ],
       "standalone": true
+    },
+    {
+      "id": "a6-model-gate-validation-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "gate_contract",
+          "gate_validation_reports_model_owned_errors",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Closed gate validation inspects caller-provided argument and target slices without materializing circuit or execution state."
+      },
+      "negative_axes": [
+        "argument-count",
+        "target-count",
+        "duplicate-pair-target",
+        "probability-sum"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::validate_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::validate_gate_targets"
+        }
+      ],
+      "standalone": true
     }
   ],
   "public_api_aliases": [
@@ -19414,14 +19455,6 @@
         {
           "crate_name": "stab_model",
           "owner_path": "stab_model::GateTargetRule"
-        },
-        {
-          "crate_name": "stab_model",
-          "owner_path": "stab_model::advanced::validate_gate"
-        },
-        {
-          "crate_name": "stab_model",
-          "owner_path": "stab_model::advanced::validate_gate_targets"
         },
         {
           "crate_name": "stab_model",

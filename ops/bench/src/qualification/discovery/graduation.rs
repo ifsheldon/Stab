@@ -778,7 +778,7 @@ fn apply_gate_name_hash(group: &mut QualificationGroup) {
         "The immutable 82-name registry is prepared before timing; setup and peak process RSS are report-only observations at every scale. This slice makes no bounded-growth claim; PQ6 owns an explicit cross-scale RSS and allocation-growth rule.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/gates".to_string();
+    group.owner = "stab-model/gates".to_string();
     group.reason = "Implemented paired pinned-Stim and Rust all-gate-name hashing with exact CQ2, complete-sweep, output-digest, scale, timing, and memory bindings."
         .to_string();
     group.status = QualificationStatus::Implemented;

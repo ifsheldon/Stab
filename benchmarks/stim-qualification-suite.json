@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "5418ffc2bd640f55ce067ee6cd55c154a5b36c865ae929f07ac2f3f2ab2dca5b",
-  "semantic_digest": "93297f108744402faadfab291fb8be5104dda3dc5dda8132c033a3b9d2d26e00",
+  "correctness_digest": "883bd4a5147bbc8b69af56535a460b4b01c0e38b8930d34c0cb280765e035bfd",
+  "semantic_digest": "02e5a637b8b76713739542259388b0076c732168dc9899d89bcd1780b4c2d247",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -61692,7 +61692,7 @@
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
       ],
-      "correctness_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
+      "correctness_case_id": "cq-evidence-qualification-dfbaf2e4e0cf2eb7",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -61707,7 +61707,7 @@
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
       ],
-      "correctness_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
+      "correctness_case_id": "cq-evidence-qualification-dfbaf2e4e0cf2eb7",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -70387,7 +70387,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust all-gate-name hashing with exact CQ2, complete-sweep, output-digest, scale, timing, and memory bindings.",
-      "owner": "stab-core/gates",
+      "owner": "stab-model/gates",
       "status": "implemented"
     },
     {

@@ -2,6 +2,7 @@
 name = "stab-model"
 version.workspace = true
 edition.workspace = true
+rust-version = "1.97.1"
 description = "Stable typed Stim circuit and detector-error-model values for Stab."
 license.workspace = true
 repository.workspace = true
