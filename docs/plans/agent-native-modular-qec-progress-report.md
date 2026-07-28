@@ -9,7 +9,8 @@ Current as of 2026-07-28.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
 - A3 stable packed records and codecs: complete; product timing and allocation evidence binds clean revision `cb0f2ddbb19a99e16f27471b91966312a4404f79`, and the final oracle ownership repair is commit `07df4b33`.
 - A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
-- A5 detection and DEM batch pipelines: implementation complete in the working tree; closure audit and clean-revision evidence pending.
+- A5 detection and DEM batch pipelines: complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
+- A6 physical component extraction and Nightly isolation: active.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -423,7 +424,7 @@ A4 is complete. Sampling execution imports no codec, filesystem, CLI, or ops API
 
 ## A5 Detection And DEM Batch Pipelines
 
-A5 implementation is complete in the working tree and is undergoing closure audit. This checkpoint is deliberately not a clean-revision completion claim.
+A5 is complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
 
 `stab_core::execution` now owns three distinct public families:
 
@@ -456,7 +457,7 @@ Dirty local diagnostics, retained only as development evidence, observed:
 
 The combined dirty phase artifact is `target/benchmarks/a5-phase-compare-20260728`. It binds local modifications and makes no Stim parity or Stab self-regression claim. The new phase identities remain report-only and unseeded.
 
-The dirty process-symmetric probe at `target/benchmarks/a5-cli-contract-compare-20260728` observed `detect` at `0.975x`, `m2d` at `0.977x`, and `sample_dem` at `0.983x` pinned Stim. Each row contains exactly one Stab process measurement and one Stim process measurement, uses the same command shape and launch count, and validates the complete Stab output outside timing. The eleven process-equivalent rows are `m9-detect-text-cli`, `m9-detect-bitpacked-cli`, `m9-detect-primary-matrix-contract`, `m9-m2d-text-cli`, `m9-m2d-bitpacked-contract`, `m9-m2d-primary-matrix-contract`, `m11-sample-dem-cli`, `m11-sample-dem-sparse-contract`, `m11-sample-dem-dense-contract`, `m11-sample-dem-repeated-contract`, and `m11-sample-dem-high-detector-contract`. Allocation-enabled runs keep process timing but use an untimed in-process mirror with the same command and witness for product-semantic allocation and retained-memory fields. The historical memory baselines for these rows came from their former core proxies, so A5 treats this as a memory-measurement identity migration and will seed replacements only from reviewed clean-revision evidence. These local-modification results are diagnostic only.
+The dirty process-symmetric probe at `target/benchmarks/a5-cli-contract-compare-20260728` observed `detect` at `0.975x`, `m2d` at `0.977x`, and `sample_dem` at `0.983x` pinned Stim. Each row contains exactly one Stab process measurement and one Stim process measurement, uses the same command shape and launch count, and validates the complete Stab output outside timing. The eleven process-equivalent rows are `m9-detect-text-cli`, `m9-detect-bitpacked-cli`, `m9-detect-primary-matrix-contract`, `m9-m2d-text-cli`, `m9-m2d-bitpacked-contract`, `m9-m2d-primary-matrix-contract`, `m11-sample-dem-cli`, `m11-sample-dem-sparse-contract`, `m11-sample-dem-dense-contract`, `m11-sample-dem-repeated-contract`, and `m11-sample-dem-high-detector-contract`. Allocation-enabled runs keep process timing but use an untimed in-process mirror with the same command and witness for product-semantic allocation and retained-memory fields. Commit `56141a32` reseeded the former core-proxy memory identities from clean revision `06318e49`; A5 closure verifies those replacement identities with isolated warmed rows. The earlier local-modification results remain diagnostic only.
 
 The first full-code-review of clean commit `56141a32` found five additional defects. Incremental measurement conversion accepted arbitrary sinks across batches and could not report finish-failure prefix progress; direct detector-frame compilation omitted its retained executable circuit from `max_compiled_bytes`; the materialized DEM replay convenience API scanned caller records before poison and work admission; all eleven process rows validated only Stab output; and the report-only A5 phases calculated but did not enforce semantic witnesses. The repaired implementation binds one sink to one delivery, rejects repeated or post-finish operations, poisons abandoned committed delivery, dry-runs complete direct-frame retained storage before fallible materialization, admits replay work before width traversal, and preflights independent frozen Stim and Stab witnesses. New exact qualification parents own each lifecycle and resource boundary.
 
@@ -464,4 +465,27 @@ The follow-up milestone audit and full-code-review of clean commit `1936f9d3` fo
 
 The independent milestone audit of clean commit `31692bfb` found no remaining implementation defect or specification loophole. The separate full-code-review found two benchmark-boundary defects: allocation-enabled phase rows ran one extra operation through the same closure, extending fixed witness vectors and invalidating their digests, while all phase timers stopped only after plan checks, witness extraction, shot validation, and sequence bookkeeping. The benchmark harness now samples the finish clock immediately after raw product work, performs semantic validation afterward, and gives allocation observation independently initialized sessions and sinks. A fake-clock ordering test proves the finish-clock boundary, and an allocation-enabled three-row test plus a production probe proves the extra memory operation cannot alter timed witness sequences.
 
-All baseline, comparison, beta-gate, phase, and memory artifacts produced through `31692bfb` predate the final timing-boundary repair and are retained as historical diagnostics only. Failed witness-discovery paths under `target/benchmarks/a5-stim-witness-probe`, `target/benchmarks/a5-phase-witness-probe`, the later `a5-sequence-probe-*` paths, and the review-rejected allocation-enabled phase paths are likewise immutable development history. A clean timing-repair commit, independent re-audit and review, unique source-current evidence paths, and final workspace verification remain before A5 can be marked complete.
+All baseline, comparison, beta-gate, phase, and memory artifacts produced through `31692bfb` predate the final timing-boundary repair and are retained as historical diagnostics only. Failed witness-discovery paths under `target/benchmarks/a5-stim-witness-probe`, `target/benchmarks/a5-phase-witness-probe`, the later `a5-sequence-probe-*` paths, and the review-rejected allocation-enabled phase paths are likewise immutable development history.
+
+The final audit of clean commit `b8e3f459` confirmed that plan dimensions are now checked only in untimed preflight, timed compilation contains only compilation, optimizer opacity, and release, PTB64 digest writers cross the finish-clock boundary before witness extraction, and memory operations use independent state. The final full-code-review found no P0, P1, or P2 defect in A5 product behavior, resource admission, lifecycle semantics, benchmark validity, or the repaired process-supervisor test. Neither review found an A5 specification loophole.
+
+The source-current phase report is `target/benchmarks/a5-clean-phases-b8e3f459`, with compare hash `859ef2148766303710a5237c77a14224cb6a517eeece950490f835485cab6253` and report hash `6e8fe83bd7a9b54ce1c08988fd035f18dae2005398861289edbd9cdf4759e56a`. It records:
+
+| Phase | Median |
+| --- | ---: |
+| Detection plan compile-and-release | 0.736 us |
+| Detection session sample-to-detection | 53.60 million shots/s |
+| Detect PTB64 routing | 20.27 million shots/s |
+| Measurement-to-detection plan compile-and-release | 0.832 us |
+| Measurement-to-detection batch conversion | 54.79 million shots/s |
+| DEM plan compile-and-release | 5.088 us |
+| DEM detector-only session | 2.934 million shots/s |
+| DEM sampled-error session | 2.507 million shots/s |
+| DEM replay session | 3.364 million shots/s |
+| Sample-dem PTB64 routing | 19.92 million shots/s |
+
+The source-current process comparison is `target/benchmarks/a5-clean-cli-beta-b8e3f459`, with compare hash `71d9a889a1fb36844c63015e0bffd1d1e924c82e82a9c788a2cbcf4dd8958eb6` and report hash `657dbf5c77e0475fa015ca7a9aba3f2371d4d3fbc4b8c8b18c22a691fdfe2dc6`. All eleven rows pass the unchanged `1.25x` Stim gate. Ratios range from `0.999066x` for text detection through `1.072982x` for sparse DEM sampling; no waiver or threshold change was introduced.
+
+The first isolated source-current memory attempts under `target/benchmarks/a5-clean-cli-memory-b8e3f459-*` intentionally remain failed evidence because they omitted the benchmark's declared `--warmup`; ten rows therefore charged 68–86 KiB of initialization RSS against a 64 KiB page-noise allowance. Observer and extra-product-warmup experiments under the `a5-memory-*-probe-20260728-*` paths were falsified and removed from source. The clean three-run candidates under `target/benchmarks/a5-memory-isolated-baseline-candidate-b8e3f459-*` showed that matching the source-owned warmup restores the established measurement identity without changing its baseline. Final gated reports under `target/benchmarks/a5-clean-cli-memory-b8e3f459-warm-*` all pass, with exact product allocation peaks of 120,859–123,204 bytes and resident deltas of 0–8 KiB against unchanged allowances.
+
+Every final phase, timing, and memory report records commit `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c` with `local_modifications=false`. Formatting, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture enforcement, API docs, Stim version validation, the live 62-case result-format corpus, the complete implemented oracle run, correctness and performance check/regeneration, generated-status checking, and benchmark smoke all passed. A5 is closed; A6 owns the remaining physical crate extraction.

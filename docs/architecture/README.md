@@ -66,7 +66,7 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A5 product graph is:
+The post-A5, pre-A6 product graph is:
 
 ```text
 stab-cli -> stab-core

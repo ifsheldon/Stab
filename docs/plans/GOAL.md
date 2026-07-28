@@ -1,70 +1,62 @@
-# Goal: Build Detection And DEM Batch Pipelines
+# Goal: Extract The Product Components
 
 ## Objective
 
-Finish milestone A5 of [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md): give measurement-to-detection conversion, circuit detection sampling, and DEM sampling the same compiler, immutable-plan, mutable-session, typed-batch, and sink architecture established for circuit sampling.
+Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md): physically extract the remaining model, algebra, analysis, engine, and portable-SIMD boundaries while preserving the complete A0–A5 behavior and evidence contracts.
 
 ## Current State
 
-- A0 through A4 are complete.
-- `stab-bits` and `stab-records` are physical Stable Rust 1.97.1 crates.
-- Circuit sampling uses the public compiler, plan, session, and sink path; `CompiledSampler` remains only a compatibility adapter.
-- A5 implementation is present: measurement conversion, detection sampling, and DEM sampling expose separate compiler, immutable-plan, mutable-session, typed-batch, cancellation, progress, and sink families through `stab_core::execution`.
-- `detect`, `m2d`, and `sample_dem` use those public execution seams. Finite-shot sampling materializers and visitors delegate through compatibility adapters; the public per-record detection converter and unknown-length DEM replay iterator remain explicit low-level compatibility kernels.
-- Direct detector-frame and fused sample-convert execution remain distinct private variants. Detector-only, sampled-error, and replay DEM execution also remain distinct because their work and random consumption differ.
-- The first milestone audit findings are fixed. The first full-code-review then found five additional contract defects: incremental conversion could split one sink lifecycle, direct detector-frame compilation did not charge its retained executable circuit, the replay convenience API scanned records before admission, process-symmetric rows validated only Stab output, and report-only phases did not reject changed witnesses.
-- Those five review findings are repaired in the working tree with direct tests and regenerated correctness and performance inventories. Focused commits, a second audit and review, source-current clean evidence, and closure synchronization remain.
-- Physical extraction of the remaining model, algebra, analysis, engine, facade, and SIMD components belongs to A6, after A5 proves these execution boundaries inside `stab-core`.
+- A0 through A5 are complete. A5 closes at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
+- The physical product crates are currently `stab-bits`, `stab-records`, `stab-core`, and `stab-cli`.
+- `stab-bits` and `stab-records` build on Stable Rust 1.97.1. `stab-core` still contains model, algebra, analysis, execution, and the remaining direct portable-SIMD kernel.
+- Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
+- A6 must extract `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-kernels-simd`; `stab-core` becomes the curated facade rather than another implementation owner.
 
 ## Sources Of Truth
 
-- Active milestone: [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md), A5
-- Component boundaries: [../architecture/component-contracts.md](../architecture/component-contracts.md)
-- Dependency graph: [../architecture/README.md](../architecture/README.md)
+- Active milestone: [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md), A6
+- Product graph: [../architecture/README.md](../architecture/README.md)
+- Component contracts: [../architecture/component-contracts.md](../architecture/component-contracts.md)
 - API migration inventory: [../architecture/0.2-api-migration-inventory.md](../architecture/0.2-api-migration-inventory.md)
 - Progress record: [agent-native-modular-qec-progress-report.md](agent-native-modular-qec-progress-report.md)
 - Specification gaps: [milestone-spec-gaps.md](milestone-spec-gaps.md)
 
-Stop and repair the owning source when code, tests, generated inventories, benchmark contracts, or these documents disagree.
+Stop and repair the owning source when Cargo metadata, architecture checks, public API inventory, tests, benchmarks, or these documents disagree.
 
 ## Execution Sequence
 
-1. Finish focused verification of the five full-code-review repairs and commit core, CLI, benchmark, qualification, and documentation changes separately.
-2. Run milestone-audit and full-code-review again against the repaired clean revision; fix every confirmed finding and amend only genuine specification gaps.
-3. From the resulting clean revision, run source-current A5 phase diagnostics and all affected comparable CLI rows into new artifact paths.
-4. Keep unlike phase identities report-only and unseeded. Require every comparable process row to pass the unchanged `1.25x` Stim gate without waivers, with independent untimed Stim and Stab output witnesses.
-5. Run the complete required checks, synchronize the progress report and generated dashboard, commit closure documentation, and hand A6 the physical crate extraction.
+1. Freeze an exact module-to-crate move map, public replacement map, feature map, and dependency DAG before moving files.
+2. Extract scalar `stab-algebra` after removing its remaining `Gate` dependency; prove Stable default and external-consumer builds.
+3. Extract `stab-model` after moving foreign inherent algorithms to analysis or engine owners; preserve exact parsing, printing, fingerprint, tag, and resource behavior.
+4. Extract `stab-analysis` over model and algebra only; keep pure transforms and semantic projections free of records, execution, CLI, and ops.
+5. Extract `stab-engine` over model, records, algebra, and analysis; move every A4/A5 compiler, plan, session, and compatibility adapter without changing public behavior.
+6. Extract dependency-free `stab-kernels-simd`, move the only direct `std::simd` site into it, and make `portable-simd` an additive facade and engine feature with scalar default behavior.
+7. Curate `stab-core` root, `advanced`, and `experimental` APIs; remove `ops-contracts`, move benchmark-only descriptors to ops, and add exact `=0.2.0` path versions to every publishable edge.
+8. Add Stable and Nightly consumer fixtures, feature-unification tests, dependency rejection fixtures, rustdoc tier checks, and scalar-versus-SIMD equivalence.
+9. Rerun every benchmark family whose call path moved, then run milestone-audit and full-code-review; fix all findings before A6 closure.
 
 ## Nonnegotiable Contracts
 
-- Execution imports no text codec, filesystem, CLI, or ops API.
-- The three operation families remain distinct; no generic plan/session abstraction is introduced without two proven implementations and a real caller need.
-- Plans are immutable and shareable; sessions own reusable mutable state and poison after execution or sink failure.
-- Batch sizes are bounded implementation details and cannot change semantic output.
-- Conversion and reference-sample scratch scale with width and active batch size, not total shots or input record count.
-- DEM caller byte limits cover the active reusable record, error, packed-plane, and compatibility-sink storage; fused detection applies the private session limit to the combined sampling and conversion estimate.
-- The DEM byte policy covers width-dependent heap storage and compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are outside that dynamic scratch budget.
-- `m2d` consumes initial input record-at-a-time so a later malformed record cannot suppress already committed valid-prefix output.
-- One `m2d` conversion delivery remains bound to one sink until exactly one finish; double finish, write-after-finish, finish failure, and abandoned committed output have explicit progress and poison semantics.
-- Replay input is validated and rewound through the retained preflight handle before any output sink can create or truncate a file.
-- DEM replay rejects poison state and total traversal work before scanning caller-owned record widths.
-- Direct detector-frame compilation charges the complete retained conversion and executable-circuit representation before materialization.
-- Detector-only and sampled-error DEM paths stay separate and preserve their established random-consumption semantics.
-- Cancellation occurs only at documented batch or record boundaries and preserves exact progress.
-- Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, and statistical Stim contracts do not change.
-- New phase identities remain report-only and unseeded unless an exact prior identity exists; comparable process rows keep the `1.25x` Stim parity gate.
-- Every process-symmetric A5 row validates independent pinned-Stim and Stab output witnesses outside timing. Every report-only compile phase validates exact source-owned plan dimensions or a frozen plan fingerprint, and every output-producing phase validates shot counts plus a frozen result or ordered sequence digest.
-- Report-only phase timers stop immediately after raw product work; post-clock validation and ordered-witness collection are untimed, and allocation observation uses independent sessions and sinks.
+- Stable 1.97.1 owns model, bits, records, scalar algebra, and pure analysis; Stable default builds cannot parse or compile Nightly-only code.
+- Only `stab-kernels-simd` may contain `#![feature(portable_simd)]` or direct `std::simd`.
+- `stab-kernels-simd` has no Stab dependency and exposes only raw word slices, mutable word slices, and fixed `[u64; 4]` kernels.
+- Scalar behavior is the absence of the additive `portable-simd` feature. There are no mutually exclusive scalar and SIMD feature flags.
+- CLI, oracle, and benchmark crates enable the facade's `portable-simd` feature explicitly instead of relying on workspace feature unification.
+- Product crates never depend on ops or test support at runtime. Stable dev dependencies cannot reach engine, facade, CLI, or ops.
+- Every publishable path dependency includes exact version `=0.2.0`; ops and external conformance fixtures remain unpublished.
+- Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, statistical Stim, resource, cancellation, poisoning, and sink-lifecycle contracts remain unchanged.
+- Move implementation without duplicating it. Compatibility adapters delegate through the new owner and leave the root only where the migration inventory requires.
+- A second backend is registered only when portable SIMD executes a genuinely distinct implementation and passes semantic and performance evidence.
 
 ## Done Criteria
 
-- Every `detect`, `m2d`, and `sample_dem` product path delegates to its public compiler, plan, session, and sink architecture.
-- Streamed and materialized results agree across formats, reference modes, sweep-conditioned conversion, observable routing, correlated DEM events, replay, and sampled-error output; a 4,096-record matrix crosses multiple batches for every supported command format and side-output route.
-- Same-session partitioning, cancellation including replay finish-time cancellation, poisoning, valid-prefix delivery and progress, replay-before-output safety, writer failures, path aliases, caller byte admission, aggregate fused-session admission, and bounded allocation have direct tests.
-- Qualification inventories regenerate exactly and no implemented A5 behavior has only planned ownership.
-- Clean phase and affected CLI benchmarks show no unexplained material regression.
-- Milestone-audit, full-code-review, workspace verification, architecture enforcement, implemented oracles, qualification checks, benchmark smoke, and pre-commit have no open A5 finding.
+- The target dependency graph is physical and architecture checks reject every forbidden edge.
+- Stable component consumers compile and test on Rust 1.97.1 without `std::simd`; the Nightly facade retains portable-SIMD execution.
+- Every product crate documents purpose, dependencies, invariants, resource behavior, extension points, conformance tests, benchmarks, and synchronized files.
+- Public API and qualification inventories regenerate exactly, with no qualification-only product item.
+- Moved bit, algebra, parser, records, sampler, converter, DEM, and analysis benchmark phases have no unexplained regression.
+- Milestone-audit, full-code-review, full verification, and pre-commit have no open A6 finding.
 
 ## Required Checks
 
-Use targeted tests during implementation. Before each focused commit, run the checks for touched crates and staged pre-commit validation. Before A5 closure, run formatting, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture enforcement, implemented and result-format oracles, correctness and performance check/regeneration, generated-status checking, benchmark smoke, and clean revision-named phase and comparable CLI evidence.
+Use targeted crate and fixture tests after each extraction. Before every focused commit, run formatting, warnings-denied checks for touched crates, targeted tests, architecture enforcement, and staged pre-commit. Before A6 closure, run Stable and Nightly matrices, default and portable-SIMD feature checks, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture and API checks, implemented and result-format oracles, qualification check/regeneration, generated status, benchmark smoke, and source-current phase evidence for every moved call path.

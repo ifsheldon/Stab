@@ -670,7 +670,7 @@ Clean pre-A4 revision `18099bf3` owned only `stab_sample_compile_noisy_1q` and t
 
 ## Milestone A5: Detection And DEM Batch Pipelines
 
-Status: Active; implementation complete, closure audit and clean evidence pending.
+Status: Complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
 
 ### Tasks
 
@@ -736,6 +736,8 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 The caller byte policy accounts for width-dependent heap capacity retained by reusable detection, observable, sampled-error, and packed batch planes plus compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are not charged to this dynamic scratch budget.
 
 ## Milestone A6: Physical Component Extraction And Nightly Isolation
+
+Status: Active.
 
 ### Tasks
 
