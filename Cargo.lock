@@ -2191,6 +2191,7 @@ dependencies = [
 name = "stab-cli"
 version = "0.1.1"
 dependencies = [
+ "allocation-counter",
  "clap",
  "same-file",
  "serde",

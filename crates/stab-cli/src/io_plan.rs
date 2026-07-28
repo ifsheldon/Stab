@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use same_file::Handle;
 
@@ -116,6 +116,41 @@ pub(crate) struct PendingIo {
 }
 
 impl PendingIo {
+    pub(crate) fn reject_aliases_without_opening<'input, 'output>(
+        inputs: impl IntoIterator<Item = (FileRole, Option<&'input Path>)>,
+        outputs: impl IntoIterator<Item = (FileRole, Option<&'output Path>)>,
+    ) -> Result<(), CliError> {
+        let inputs = inputs
+            .into_iter()
+            .filter_map(|(role, path)| path.map(|path| (role, path)))
+            .collect::<Vec<_>>();
+        let outputs = outputs
+            .into_iter()
+            .filter_map(|(role, path)| path.map(|path| (role, path)))
+            .collect::<Vec<_>>();
+        for (input_role, input_path) in &inputs {
+            for (output_role, output_path) in &outputs {
+                if paths_alias_without_creation(input_path, output_path) {
+                    return Err(CliError::ConflictingFileRoles {
+                        first: input_role.flag(),
+                        second: output_role.flag(),
+                    });
+                }
+            }
+        }
+        for (index, (role, path)) in outputs.iter().enumerate() {
+            for (other_role, other_path) in outputs.iter().skip(index + 1) {
+                if paths_alias_without_creation(path, other_path) {
+                    return Err(CliError::ConflictingFileRoles {
+                        first: role.flag(),
+                        second: other_role.flag(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn preflight<'input, 'output>(
         inputs: impl IntoIterator<Item = (FileRole, Option<&'input Path>)>,
         outputs: impl IntoIterator<Item = (FileRole, Option<&'output Path>)>,
@@ -173,6 +208,39 @@ impl PendingIo {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ActiveOutputs { outputs })
     }
+}
+
+fn paths_alias_without_creation(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    if lexical_absolute(left)
+        .is_some_and(|left| lexical_absolute(right).is_some_and(|right| left == right))
+    {
+        return true;
+    }
+    left.exists() && right.exists() && same_file::is_same_file(left, right).unwrap_or(false)
+}
+
+fn lexical_absolute(path: &Path) -> Option<PathBuf> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+    Some(normalized)
 }
 
 #[derive(Debug)]

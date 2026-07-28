@@ -190,16 +190,28 @@ fn assert_sample_plan_schema(report: &Value) {
         pointer(report, "/compilation"),
         &[
             "request_fingerprint",
+            "plan_fingerprint",
             "compiler_schema_version",
             "normalized_options",
             "configurable_limits",
-            "selectable_backend",
+            "selected_backend",
             "validated",
         ],
     );
     assert_exact_keys(
         pointer(report, "/compilation/request_fingerprint"),
         &["schema_version", "algorithm", "digest"],
+    );
+    assert_exact_keys(
+        pointer(report, "/compilation/plan_fingerprint"),
+        &[
+            "schema_version",
+            "algorithm",
+            "backend",
+            "executable_contract_schema_version",
+            "executable_contract_digest",
+            "digest",
+        ],
     );
     assert_exact_keys(
         pointer(report, "/run"),
@@ -236,10 +248,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
-    assert_eq!(
-        pointer(&report, "/schema_version"),
-        CapabilitySet::SCHEMA_VERSION
-    );
+    assert_eq!(pointer(&report, "/schema_version"), 2);
     assert_eq!(
         pointer(&report, "/stim_compatibility_version"),
         CapabilitySet::STIM_COMPATIBILITY_VERSION
@@ -298,7 +307,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
     assert_eq!(pointer(&report, "/compilers/0/operation"), "sample");
     assert_eq!(
         pointer(&report, "/selectable_backends"),
-        &serde_json::json!([])
+        &serde_json::json!(["scalar"])
     );
 }
 
@@ -313,7 +322,7 @@ fn capabilities_human_output_is_concise_and_structural() {
         "commands:",
         "gates:",
         "result codecs: 6",
-        "selectable backends: 0",
+        "selectable backends: 1",
     ] {
         assert!(output.contains(expected), "{output}");
     }
@@ -557,6 +566,10 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
         pointer(&second, "/compilation/request_fingerprint/digest")
     );
     assert_eq!(
+        pointer(&first, "/compilation/plan_fingerprint/digest"),
+        pointer(&second, "/compilation/plan_fingerprint/digest")
+    );
+    assert_eq!(
         pointer(&first, "/model/digest"),
         pointer(&second, "/model/digest")
     );
@@ -568,9 +581,14 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
         pointer(&first, "/compilation/configurable_limits"),
         &serde_json::json!([])
     );
+    assert_eq!(pointer(&first, "/compilation/selected_backend"), "scalar");
     assert_eq!(
-        pointer(&first, "/compilation/selectable_backend"),
-        &Value::Null
+        pointer(&first, "/compilation/plan_fingerprint/backend"),
+        "scalar"
+    );
+    assert_eq!(
+        pointer(&first, "/compilation/plan_fingerprint/schema_version"),
+        1
     );
     assert_eq!(
         pointer(&second, "/run/skip_loop_folding_effect"),

@@ -19,5 +19,6 @@ stab-core = { path = "../stab-core" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+allocation-counter = { workspace = true }
 stab-compat-corpus = { path = "../../test-support/compat-corpus" }
 tempfile = { workspace = true }

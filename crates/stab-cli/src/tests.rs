@@ -13,6 +13,7 @@ mod m9;
 mod path_alias;
 mod resource;
 mod result_text_compat;
+mod sample;
 
 #[cfg(unix)]
 #[test]
@@ -817,23 +818,30 @@ fn sample_writes_r8_format_like_stim() {
 
 #[test]
 fn sample_writes_ptb64_format_like_stim() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "sample", "--shots=64", "--out_format=ptb64"],
-        "X 1\nM 0 1\n".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
+    let group = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    ];
+    for (shots, groups) in [(0, 0), (64, 1), (128, 2)] {
+        let shots = shots.to_string();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "sample",
+                "--shots",
+                shots.as_str(),
+                "--out_format=ptb64",
+            ],
+            "X 1\nM 0 1\n".as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
 
-    assert_eq!(status, 0);
-    assert_eq!(
-        stdout,
-        vec![
-            0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-        ]
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+        assert_eq!(status, 0, "{shots} shots");
+        assert_eq!(stdout, group.repeat(groups), "{shots} shots");
+        assert_eq!(String::from_utf8(stderr).unwrap(), "", "{shots} shots");
+    }
 }
 
 #[test]
@@ -846,6 +854,7 @@ fn sample_rejects_ptb64_shots_that_are_not_multiple_of_64() {
         [
             "stab",
             "sample",
+            "--shots=65",
             "--out_format",
             "ptb64",
             "--out",

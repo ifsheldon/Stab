@@ -6,17 +6,17 @@ use serde::Serialize;
 use stab_core::{
     CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, Estimate,
     GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, ModelFingerprint,
-    ParseLimits, RecordFormat, ResourceEstimate, estimate_sampling_request,
-    result_formats::validate_ptb64_shot_count,
+    ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate, SamplingCompiler,
+    estimate_sampling_request, result_formats::validate_ptb64_shot_count,
 };
 
 use crate::{
-    Cli, CliError, CompiledSampler, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo,
-    SampleOutFormatArg, legacy_tableau_visible_measurement_count, parse_stim_u64, parse_stim_usize,
+    Cli, CliError, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo, SampleOutFormatArg,
+    legacy_tableau_visible_measurement_count, parse_stim_u64, parse_stim_usize,
     read_limited_input_file, read_limited_stdin,
 };
 
-const AGENT_OUTPUT_SCHEMA_VERSION: u16 = 1;
+const AGENT_OUTPUT_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
 pub(crate) enum AgentOutputFormatArg {
@@ -27,7 +27,7 @@ pub(crate) enum AgentOutputFormatArg {
 
 #[derive(Debug, Args)]
 pub(crate) struct CapabilitiesArgs {
-    /// Selects concise human text or schema-version-1 JSON.
+    /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -50,7 +50,7 @@ pub(crate) struct InspectArgs {
     #[arg(long = "type", value_enum)]
     model_type: Option<InspectModelTypeArg>,
 
-    /// Selects concise human text or schema-version-1 JSON.
+    /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -93,7 +93,7 @@ struct PlanSampleArgs {
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
 
-    /// Selects concise human text or schema-version-1 JSON.
+    /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -167,8 +167,10 @@ where
     let circuit = Circuit::from_stim_bytes(&input)?;
 
     // Compilation is intentionally performed for validation. No sampling method is called.
-    let _validated_sampler = CompiledSampler::compile(&circuit)?;
-    let request_fingerprint = CompilationRequestFingerprint::for_sampling(&circuit);
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .map_err(|error| CliError::Circuit(error.into_circuit_error()))?;
+    let request_fingerprint = plan.request_fingerprint();
     let mut estimates = ResourceEstimateReport::from(estimate_sampling_request(
         &circuit,
         args.shots,
@@ -194,10 +196,11 @@ where
         model: ModelIdentityReport::from(circuit.fingerprint()),
         compilation: CompilationReport {
             request_fingerprint: CompilationFingerprintReport::from(request_fingerprint),
+            plan_fingerprint: PlanFingerprintReport::from(plan.fingerprint()),
             compiler_schema_version: request_fingerprint.compiler_schema_version(),
             normalized_options: Vec::new(),
             configurable_limits: Vec::new(),
-            selectable_backend: None,
+            selected_backend: plan.backend().as_str(),
             validated: true,
         },
         run: SampleRunReport {
@@ -320,7 +323,7 @@ impl CapabilitiesReport {
     fn current() -> Self {
         let capabilities = CapabilitySet::current();
         Self {
-            schema_version: CapabilitySet::SCHEMA_VERSION,
+            schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
             stab_version: env!("CARGO_PKG_VERSION"),
             stim_compatibility_version: CapabilitySet::STIM_COMPATIBILITY_VERSION,
             commands: command_descriptions()
@@ -590,10 +593,11 @@ struct SamplePlanReport {
 #[derive(Serialize)]
 struct CompilationReport {
     request_fingerprint: CompilationFingerprintReport,
+    plan_fingerprint: PlanFingerprintReport,
     compiler_schema_version: u16,
     normalized_options: Vec<&'static str>,
     configurable_limits: Vec<&'static str>,
-    selectable_backend: Option<&'static str>,
+    selected_backend: &'static str,
     validated: bool,
 }
 
@@ -609,6 +613,29 @@ impl From<CompilationRequestFingerprint> for CompilationFingerprintReport {
         Self {
             schema_version: fingerprint.schema_version(),
             algorithm: CompilationRequestFingerprint::ALGORITHM,
+            digest: fingerprint.digest_hex(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct PlanFingerprintReport {
+    schema_version: u16,
+    algorithm: &'static str,
+    backend: &'static str,
+    executable_contract_schema_version: u16,
+    executable_contract_digest: String,
+    digest: String,
+}
+
+impl From<PlanFingerprint> for PlanFingerprintReport {
+    fn from(fingerprint: PlanFingerprint) -> Self {
+        Self {
+            schema_version: fingerprint.schema_version(),
+            algorithm: PlanFingerprint::ALGORITHM,
+            backend: fingerprint.backend().as_str(),
+            executable_contract_schema_version: fingerprint.executable_contract_schema_version(),
+            executable_contract_digest: fingerprint.executable_contract_digest_hex(),
             digest: fingerprint.digest_hex(),
         }
     }
@@ -755,9 +782,11 @@ fn render_inspect_human(report: &InspectReport) -> String {
 
 fn render_sample_plan_human(report: &SamplePlanReport) -> String {
     format!(
-        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nvalidated: yes\nexecutes: no\nshots: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\nselectable backend: none\n",
+        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nplan fingerprint: {}\nselected backend: {}\nvalidated: yes\nexecutes: no\nshots: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\n",
         report.model.digest,
         report.compilation.request_fingerprint.digest,
+        report.compilation.plan_fingerprint.digest,
+        report.compilation.selected_backend,
         report.run.shots,
         report.run.output_format,
         report.run.reference_mode,

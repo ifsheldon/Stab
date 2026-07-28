@@ -29,6 +29,47 @@ impl std::io::Write for FailingWriter {
     }
 }
 
+#[derive(Debug, Default)]
+struct FailAfterOneWrite {
+    writes: usize,
+}
+
+impl std::io::Write for FailAfterOneWrite {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.writes += 1;
+        if self.writes > 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "intentional second-batch stop",
+            ));
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct FlushFailWriter {
+    bytes: usize,
+}
+
+impl std::io::Write for FlushFailWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.bytes += buffer.len();
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::BrokenPipe,
+            "intentional finish failure",
+        ))
+    }
+}
+
 #[test]
 fn sample_streams_output_without_materializing_all_shots() {
     let mut stdout = FailingWriter;
@@ -44,8 +85,48 @@ fn sample_streams_output_without_materializing_all_shots() {
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("failed to write output: intentional write stop")
+            .contains("sampling sink write-batch failed after 0 committed shots while attempting 64 shots: intentional write stop")
     );
+}
+
+#[test]
+fn sample_reports_second_batch_writer_failure_with_exact_progress() {
+    let mut stdout = FailAfterOneWrite::default();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=128"],
+        "M 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout.writes, 2);
+    let stderr = String::from_utf8(stderr).expect("stderr is utf-8");
+    assert!(stderr.contains("sampling sink write-batch failed"));
+    assert!(stderr.contains("after 64 committed shots"));
+    assert!(stderr.contains("while attempting 64 shots"));
+    assert!(stderr.contains("intentional second-batch stop"));
+}
+
+#[test]
+fn sample_reports_flush_failure_as_sink_finalization() {
+    let mut stdout = FlushFailWriter::default();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=65"],
+        "M 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout.bytes, 130);
+    let stderr = String::from_utf8(stderr).expect("stderr is utf-8");
+    assert!(stderr.contains("sampling sink finish failed"));
+    assert!(stderr.contains("after 65 committed shots"));
+    assert!(stderr.contains("while attempting 0 shots"));
+    assert!(stderr.contains("intentional finish failure"));
 }
 
 #[test]

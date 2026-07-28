@@ -39,13 +39,14 @@ use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
-    Circuit, CircuitItem, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask,
-    CompiledSampler, GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
-    generate_repetition_code_circuit, generate_surface_code_circuit,
+    BitPlane64Batch, Circuit, CircuitItem, CircuitResult, CodeDistance, ColorCodeParams,
+    ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink, Probability,
+    RandomPolicy, ReferenceSampleMode, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    RunError, SampleFormat, SamplingCompiler, SamplingSession, Seed, ShotCount, SurfaceCodeParams,
+    SurfaceCodeTask, generate_color_code_circuit, generate_repetition_code_circuit,
+    generate_surface_code_circuit,
     result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
-use streaming::write_ptb64_group;
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 pub(crate) const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
@@ -261,6 +262,18 @@ impl SampleOutFormatArg {
             Self::Dets => Ok(SampleFormat::Dets),
             Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
         }
+    }
+
+    fn stream_writer(self) -> Option<MeasureRecordWriter> {
+        let format = match self {
+            Self::ZeroOne => SampleFormat::ZeroOne,
+            Self::B8 => SampleFormat::B8,
+            Self::R8 => SampleFormat::R8,
+            Self::Hits => SampleFormat::Hits,
+            Self::Dets => SampleFormat::Dets,
+            Self::Ptb64 => return None,
+        };
+        Some(MeasureRecordWriter::new(format))
     }
 }
 
@@ -729,6 +742,13 @@ where
     W: Write,
     E: Write,
 {
+    if args.shots == 0 {
+        PendingIo::reject_aliases_without_opening(
+            [(FileRole::Input, args.input.as_deref())],
+            [(FileRole::Output, args.output.as_deref())],
+        )?;
+        return Ok(());
+    }
     if args.out_format == SampleOutFormatArg::Ptb64 {
         validate_ptb64_shot_count(args.shots)?;
     }
@@ -749,39 +769,50 @@ where
         read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "sample circuit input")?
     };
     let circuit = Circuit::from_stim_bytes(&input_bytes)?;
-    let sampler = CompiledSampler::compile(&circuit)?;
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .map_err(stab_core::SamplingCompileError::into_circuit_error)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
         legacy_tableau_visible_measurements(&circuit)?
     } else {
         None
     };
+    let random_policy = args.seed.map_or(RandomPolicy::Entropy, |seed| {
+        RandomPolicy::Seeded(Seed::new(seed))
+    });
+    let reference_mode = if skip_reference_sample {
+        ReferenceSampleMode::SkipReferenceSample
+    } else {
+        ReferenceSampleMode::UseReferenceSample
+    };
+    let mut session = plan
+        .session_with_reference_mode(random_policy, reference_mode)
+        .map_err(stab_core::SamplingExecutionError::into_circuit_error)?;
+    let shots = ShotCount::try_from(args.shots)
+        .map_err(stab_core::SamplingExecutionError::into_circuit_error)?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(
-            &sampler,
-            args.shots,
+            &mut session,
+            shots,
             args.out_format,
-            args.seed,
-            skip_reference_sample,
             visible_measurements.as_deref(),
             &mut output,
         )
-        .map_err(|source| CliError::WritePath {
+        .map_err(|source| CliError::SamplePath {
             path: output.path().to_path_buf(),
             source,
         });
     }
     write_sample_output(
-        &sampler,
-        args.shots,
+        &mut session,
+        shots,
         args.out_format,
-        args.seed,
-        skip_reference_sample,
         visible_measurements.as_deref(),
         stdout,
     )
-    .map_err(CliError::WriteOutput)
+    .map_err(CliError::SampleOutput)
 }
 
 pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
@@ -789,73 +820,113 @@ pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
 }
 
 fn write_sample_output<W>(
-    sampler: &CompiledSampler,
-    shots: usize,
+    session: &mut SamplingSession,
+    shots: ShotCount,
     format: SampleOutFormatArg,
-    seed: Option<u64>,
-    skip_reference_sample: bool,
     visible_measurements: Option<&[usize]>,
     output: &mut W,
-) -> std::io::Result<()>
+) -> Result<(), RunError<std::io::Error>>
 where
     W: Write,
 {
-    match format {
-        SampleOutFormatArg::Ptb64 => {
-            write_ptb64_sample_output(sampler, shots, seed, skip_reference_sample, output)
-        }
-        _ => write_record_sample_output(
-            sampler,
-            shots,
-            format.sample_format().map_err(std::io::Error::other)?,
-            seed,
-            skip_reference_sample,
-            visible_measurements,
-            output,
-        ),
-    }
+    let mut sink = CliSampleSink {
+        format,
+        visible_measurements,
+        filtered_record: visible_measurements.map(|indices| Vec::with_capacity(indices.len())),
+        writer: format.stream_writer(),
+        output,
+    };
+    session.run(shots, &mut sink).map(|_| ())
 }
 
-fn write_record_sample_output<W>(
-    sampler: &CompiledSampler,
-    shots: usize,
-    format: SampleFormat,
-    seed: Option<u64>,
-    skip_reference_sample: bool,
-    visible_measurements: Option<&[usize]>,
-    output: &mut W,
-) -> std::io::Result<()>
+struct CliSampleSink<'a, W> {
+    format: SampleOutFormatArg,
+    visible_measurements: Option<&'a [usize]>,
+    filtered_record: Option<Vec<bool>>,
+    writer: Option<MeasureRecordWriter>,
+    output: &'a mut W,
+}
+
+impl<W> MeasurementSink for CliSampleSink<'_, W>
 where
     W: Write,
 {
-    let mut filtered_record = visible_measurements.map(|indices| Vec::with_capacity(indices.len()));
-    sampler.for_each_sample_with_seed_and_reference_mode(
-        shots,
-        seed,
-        skip_reference_sample,
-        |record| {
-            let record = if let (Some(indices), Some(filtered_record)) =
-                (visible_measurements, filtered_record.as_mut())
-            {
+    type Error = std::io::Error;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        if self.format == SampleOutFormatArg::Ptb64 {
+            if batch.shot_count() != 64 {
+                return Err(std::io::Error::other(format!(
+                    "ptb64 sample batch expected 64 shots, got {}",
+                    batch.shot_count()
+                )));
+            }
+            let converted;
+            let planes = if let Some(bit_planes) = batch.bit_planes() {
+                bit_planes
+            } else {
+                converted =
+                    BitPlane64Batch::from_shot_major(batch.shot_major_records().ok_or_else(
+                        || std::io::Error::other("measurement batch has no storage"),
+                    )?)
+                    .map_err(std::io::Error::other)?;
+                converted.view()
+            };
+            for bit_index in 0..planes.bits_per_shot() {
+                let plane = planes.plane(bit_index).map_err(std::io::Error::other)?;
+                let word = plane.words().first().copied().ok_or_else(|| {
+                    std::io::Error::other(
+                        "ptb64 sample plane has no backing word for a 64-shot batch",
+                    )
+                })?;
+                self.output.write_all(&word.to_le_bytes())?;
+            }
+            return Ok(());
+        }
+
+        let writer = self.writer.as_mut().ok_or_else(|| {
+            std::io::Error::other("non-ptb64 sample sink has no result-format writer")
+        })?;
+        if let (Some(indices), Some(filtered_record)) =
+            (self.visible_measurements, self.filtered_record.as_mut())
+        {
+            for shot_index in 0..batch.shot_count() {
                 filtered_record.clear();
                 for index in indices {
-                    filtered_record.push(*record.get(*index).ok_or_else(|| {
+                    let bit = batch.get(shot_index, *index).ok_or_else(|| {
                         std::io::Error::other(format!(
                             "internal sample layout index {index} exceeded record width {}",
-                            record.len()
+                            batch.width().get()
                         ))
-                    })?);
+                    })?;
+                    filtered_record.push(bit);
                 }
-                filtered_record.as_slice()
-            } else {
-                record
-            };
-            let mut writer = MeasureRecordWriter::new(format);
-            writer.write_bits(record);
-            writer.write_end();
-            output.write_all(&writer.into_bytes())
-        },
-    )
+                writer.write_bits(filtered_record);
+                writer.write_end();
+            }
+        } else if let Some(bit_planes) = batch.bit_planes() {
+            writer
+                .write_bit_plane_batch(bit_planes)
+                .map_err(std::io::Error::other)?;
+        } else {
+            writer
+                .write_packed_batch(
+                    batch
+                        .shot_major_records()
+                        .ok_or_else(|| std::io::Error::other("measurement batch has no storage"))?,
+                )
+                .map_err(std::io::Error::other)?;
+        }
+        self.output.write_all(writer.buffered_bytes())?;
+        writer
+            .clear_buffered_bytes()
+            .map_err(std::io::Error::other)?;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        self.output.flush()
+    }
 }
 
 fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
@@ -924,34 +995,6 @@ fn legacy_tableau_hidden_measurement_count(circuit: &Circuit) -> Result<u64, Cli
             .ok_or(CliError::MeasurementCountOverflow)?;
     }
     Ok(hidden)
-}
-
-fn write_ptb64_sample_output<W>(
-    sampler: &CompiledSampler,
-    shots: usize,
-    seed: Option<u64>,
-    skip_reference_sample: bool,
-    output: &mut W,
-) -> std::io::Result<()>
-where
-    W: Write,
-{
-    let mut group = Vec::with_capacity(64);
-    sampler.for_each_sample_with_seed_and_reference_mode(
-        shots,
-        seed,
-        skip_reference_sample,
-        |record| {
-            group.push(record.to_vec());
-            if group.len() == 64 {
-                write_ptb64_group(&group, output)?;
-                group.clear();
-            }
-            Ok::<(), std::io::Error>(())
-        },
-    )?;
-    debug_assert!(group.is_empty());
-    Ok(())
 }
 
 #[cfg(test)]

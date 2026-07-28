@@ -1,13 +1,13 @@
 use std::ffi::OsString;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::ValueEnum;
 use serde::Serialize;
 use serde_json::{Value, json};
 use stab_core::{
     ByteSpan, CircuitError, DetsResultType, DiagnosticSeverity, FormatError, FormatErrorContext,
-    ModelDialect, ParseError, ParseErrorContext, ResourceLimitError,
+    ModelDialect, ParseError, ParseErrorContext, ResourceLimitError, RunError,
 };
 use thiserror::Error;
 
@@ -31,6 +31,16 @@ pub(crate) enum CliError {
     WritePath {
         path: PathBuf,
         source: std::io::Error,
+    },
+
+    #[error("sampling failed while producing output: {0}")]
+    SampleOutput(#[source] RunError<std::io::Error>),
+
+    #[error("sampling failed while writing {path}: {source}")]
+    SamplePath {
+        path: PathBuf,
+        #[source]
+        source: RunError<std::io::Error>,
     },
 
     #[error("file roles {first} and {second} refer to the same file")]
@@ -329,6 +339,8 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::ReadPath { .. } => "path-read-failed",
         CliError::WriteOutput(_) => "stdout-write-failed",
         CliError::WritePath { .. } => "path-write-failed",
+        CliError::SampleOutput(source) => sample_run_error_code(source, false),
+        CliError::SamplePath { source, .. } => sample_run_error_code(source, true),
         CliError::ConflictingFileRoles { .. } => "conflicting-file-roles",
         CliError::IoPlanInvariant { .. } => "io-plan-invariant-failed",
         CliError::MissingInspectModelType => "missing-inspect-model-type",
@@ -354,6 +366,14 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::IncompletePtb64OutputGroup { .. } => "incomplete-ptb64-output-group",
         CliError::UnknownHelpTopic { .. } => "unknown-help-topic",
         CliError::MeasurementCountOverflow => "measurement-count-overflow",
+    }
+}
+
+fn sample_run_error_code(error: &RunError<std::io::Error>, writes_path: bool) -> &'static str {
+    match error {
+        RunError::Engine { .. } => "sampling-execution-failed",
+        RunError::Sink { .. } if writes_path => "path-write-failed",
+        RunError::Sink { .. } => "stdout-write-failed",
     }
 }
 
@@ -397,6 +417,10 @@ fn cli_error_context(error: &CliError) -> Value {
         CliError::ReadPath { path, .. } | CliError::WritePath { path, .. } => json!({
             "path": path.to_string_lossy(),
         }),
+        CliError::SampleOutput(source) => sample_run_error_context(source, None),
+        CliError::SamplePath { path, source } => {
+            sample_run_error_context(source, Some(path.as_path()))
+        }
         CliError::ConflictingFileRoles { first, second } => json!({
             "first_role": first,
             "second_role": second,
@@ -452,6 +476,30 @@ fn cli_error_context(error: &CliError) -> Value {
             "topic": topic,
         }),
     }
+}
+
+fn sample_run_error_context(error: &RunError<std::io::Error>, path: Option<&Path>) -> Value {
+    let progress = error.progress();
+    let mut context = match error {
+        RunError::Engine { .. } => json!({
+            "failure_kind": "engine",
+            "committed_shots": progress.committed_shots().get(),
+            "attempted_batch_shots": progress.attempted_batch_shots().get(),
+        }),
+        RunError::Sink { phase, .. } => json!({
+            "failure_kind": "sink",
+            "sink_phase": phase.as_str(),
+            "committed_shots": progress.committed_shots().get(),
+            "attempted_batch_shots": progress.attempted_batch_shots().get(),
+        }),
+    };
+    if let (Some(path), Value::Object(fields)) = (path, &mut context) {
+        fields.insert(
+            "path".to_owned(),
+            Value::String(path.to_string_lossy().into_owned()),
+        );
+    }
+    context
 }
 
 fn format_error_with_offset(error: &CliError) -> Option<(&FormatError, usize)> {

@@ -199,11 +199,28 @@ fn hardlink_file_role_aliases_fail_without_truncation() {
 
 #[test]
 fn zero_shot_commands_still_reject_explicit_input_output_aliases() {
-    for command in [
-        CommandFixture::Sample,
-        CommandFixture::Detect,
-        CommandFixture::SampleDem,
+    for kind in [
+        AliasKind::Direct,
+        AliasKind::NormalizedRelative,
+        AliasKind::Symlink,
+        AliasKind::Hardlink,
     ] {
+        let directory = tempdir().expect("temporary directory");
+        let mut fixture = Fixture::new(CommandFixture::Sample, directory.path());
+        fixture.alias("--out", "--in", kind);
+        if let Some(shots) = fixture
+            .args
+            .iter_mut()
+            .find(|argument| argument.to_string_lossy().starts_with("--shots="))
+        {
+            *shots = OsString::from("--shots=0");
+        } else {
+            fixture.args.push(OsString::from("--shots=0"));
+        }
+        fixture.assert_rejected("--in", "--out");
+    }
+
+    for command in [CommandFixture::Detect, CommandFixture::SampleDem] {
         let directory = tempdir().expect("temporary directory");
         let mut fixture = Fixture::new(command, directory.path());
         fixture.alias("--out", "--in", AliasKind::Direct);

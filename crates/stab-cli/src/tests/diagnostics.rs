@@ -241,7 +241,7 @@ fn json_invalid_utf8_diagnostics_are_consistent_across_model_inputs() {
             "stim-circuit",
         ),
         (
-            &["stab", "sample", "--shots=0", "--error-format=json"][..],
+            &["stab", "sample", "--shots=1", "--error-format=json"][..],
             "stim-circuit",
         ),
         (
@@ -655,11 +655,90 @@ fn json_mode_reports_the_original_output_writer_failure() {
     );
 }
 
+#[test]
+fn json_sample_writer_failure_preserves_phase_and_progress() {
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=128", "--error-format=json"],
+        b"M 0\n".as_slice(),
+        FailAfterOneWrite::default(),
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "stdout-write-failed");
+    assert_eq!(field(&diagnostic, "/context/failure_kind"), "sink");
+    assert_eq!(field(&diagnostic, "/context/sink_phase"), "write-batch");
+    assert_eq!(field(&diagnostic, "/context/committed_shots"), 64);
+    assert_eq!(field(&diagnostic, "/context/attempted_batch_shots"), 64);
+    assert!(
+        field(&diagnostic, "/message")
+            .as_str()
+            .is_some_and(|message| message.contains("injected second-batch failure"))
+    );
+}
+
+#[test]
+fn json_sample_flush_failure_preserves_finish_phase_and_progress() {
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=65", "--error-format=json"],
+        b"M 0\n".as_slice(),
+        FlushFailWriter,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "stdout-write-failed");
+    assert_eq!(field(&diagnostic, "/context/failure_kind"), "sink");
+    assert_eq!(field(&diagnostic, "/context/sink_phase"), "finish");
+    assert_eq!(field(&diagnostic, "/context/committed_shots"), 65);
+    assert_eq!(field(&diagnostic, "/context/attempted_batch_shots"), 0);
+    assert!(
+        field(&diagnostic, "/message")
+            .as_str()
+            .is_some_and(|message| message.contains("injected finish failure"))
+    );
+}
+
 struct FailingWriter;
 
 impl Write for FailingWriter {
     fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
         Err(io::Error::other("injected writer failure"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct FailAfterOneWrite {
+    writes: usize,
+}
+
+struct FlushFailWriter;
+
+impl Write for FlushFailWriter {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Err(io::Error::other("injected finish failure"))
+    }
+}
+
+impl Write for FailAfterOneWrite {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.writes += 1;
+        if self.writes > 1 {
+            return Err(io::Error::other("injected second-batch failure"));
+        }
+        Ok(buffer.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {

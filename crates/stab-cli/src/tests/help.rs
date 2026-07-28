@@ -66,6 +66,17 @@ fn help_topics_cover_commands_formats_and_gates() {
 }
 
 #[test]
+fn agent_command_help_names_the_current_success_schema() {
+    for topic in ["capabilities", "inspect", "plan"] {
+        let (status, stdout, stderr) = run_cli(&["stab", "help", topic]);
+        assert_eq!(status, 0, "{topic}");
+        assert_eq!(stderr, "", "{topic}");
+        assert!(stdout.contains("schema-version-2"), "{topic}: {stdout}");
+        assert!(!stdout.contains("schema-version-1"), "{topic}: {stdout}");
+    }
+}
+
+#[test]
 fn subcommand_clap_help_still_works() {
     let (status, stdout, stderr) = run_cli(&["stab", "sample", "--help"]);
 
