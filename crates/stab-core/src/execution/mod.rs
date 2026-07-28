@@ -7,6 +7,17 @@ mod circuit_adapters;
 mod reference_sample_tree;
 mod sampled_flow;
 
+pub use crate::dem_sampler::{
+    DemReplayBatchStatus, DemReplaySession, DemSamplingCancellation, DemSamplingCompiler,
+    DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress,
+    DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
+};
+pub use crate::detection::{
+    DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
+    DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
+    DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
+    MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter,
+};
 pub use crate::sampling::{
     BackendPreference, CompiledSampler, PlanFingerprint, RandomPolicy, ReferenceSampleMode,
     RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,

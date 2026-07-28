@@ -4,6 +4,29 @@
 )]
 
 use super::*;
+use crate::{DemSampleBatchView, DemSampleSink};
+use std::convert::Infallible;
+use std::sync::Arc;
+
+#[derive(Default)]
+struct CountingSink {
+    writes: usize,
+    finishes: usize,
+}
+
+impl DemSampleSink for CountingSink {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, _batch: DemSampleBatchView<'_>) -> Result<(), Self::Error> {
+        self.writes += 1;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        self.finishes += 1;
+        Ok(())
+    }
+}
 
 fn collect_streamed_samples(
     sampler: &CompiledDemSampler,
@@ -46,11 +69,15 @@ fn odd_parity_probability_matches_repeated_independent_error_parity() {
 #[test]
 fn replay_work_arithmetic_overflow_rejects_before_iteration() {
     let sampler = CompiledDemSampler {
-        detector_count: 1,
-        observable_count: 1,
-        operations: DemSampleBlock {
-            error_count: 1,
-            ..DemSampleBlock::default()
+        plan: DemSamplingPlan {
+            inner: Arc::new(plan::DemSamplingPlanInner {
+                detector_count: 1,
+                observable_count: 1,
+                operations: DemSampleBlock {
+                    error_count: 1,
+                    ..DemSampleBlock::default()
+                },
+            }),
         },
     };
     let error = sampler
@@ -97,4 +124,43 @@ fn dem_streaming_samples_match_materialized_seeded_samples() {
             .expect("streamed replay");
         assert_eq!(streamed_replay, replayed.records);
     }
+}
+
+#[test]
+fn execution_failure_preserves_first_error_progress_and_poisons_session() {
+    let plan = DemSamplingPlan {
+        inner: Arc::new(plan::DemSamplingPlanInner {
+            detector_count: 1,
+            observable_count: 0,
+            operations: DemSampleBlock {
+                operations: vec![DemSampleOperation::Error(DemSampleError {
+                    probability: 1.0,
+                    detectors: vec![1],
+                    observables: Vec::new(),
+                })],
+                error_count: 1,
+                direct_sample_effect_count: 1,
+                direct_sample_work_count: 1,
+                ..DemSampleBlock::default()
+            },
+        }),
+    };
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(3)))
+        .expect("construct malformed-program test session");
+    let mut sink = CountingSink::default();
+    let error = session
+        .run(ShotCount::new(1), &mut sink)
+        .expect_err("out-of-range lowered detector must fail execution");
+    assert!(
+        error
+            .to_string()
+            .contains("detector index 1 is out of range"),
+        "{error}"
+    );
+    assert_eq!(error.progress().committed_shots().get(), 0);
+    assert_eq!(error.progress().attempted_batch_shots().get(), 1);
+    assert_eq!(sink.writes, 0);
+    assert_eq!(sink.finishes, 0);
+    assert!(session.is_poisoned());
 }

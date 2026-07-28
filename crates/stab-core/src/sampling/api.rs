@@ -414,6 +414,13 @@ impl SamplingPlan {
     ) -> Result<SamplingSession, SamplingExecutionError> {
         SamplingSession::new(self.clone(), random_policy, reference_mode)
     }
+
+    pub(crate) fn estimated_session_storage_bytes(
+        &self,
+        reference_mode: ReferenceSampleMode,
+    ) -> u128 {
+        session_storage_bytes(&self.inner, reference_mode)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -999,6 +1006,17 @@ fn validate_session_storage(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
 ) -> Result<(), SamplingExecutionError> {
+    let estimated_bytes = session_storage_bytes(plan, reference_mode);
+    if estimated_bytes > u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES) {
+        return Err(SamplingExecutionError::SessionStorageLimit {
+            estimated_bytes,
+            limit_bytes: MAX_SAMPLING_SESSION_STORAGE_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn session_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSampleMode) -> u128 {
     let measurements = plan.measurement_count as u128;
     let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
     if !matches!(plan.kind, SamplingPlanKind::DirectZ(_)) {
@@ -1016,13 +1034,7 @@ fn validate_session_storage(
             .saturating_add(qubits.saturating_mul(qubits).saturating_mul(4))
             .saturating_add(qubits.saturating_mul(256));
     }
-    if estimated_bytes > u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES) {
-        return Err(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: MAX_SAMPLING_SESSION_STORAGE_BYTES,
-        });
-    }
-    Ok(())
+    estimated_bytes
 }
 
 pub(super) fn validate_legacy_adapter_plan(

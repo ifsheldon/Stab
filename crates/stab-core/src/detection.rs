@@ -1,3 +1,4 @@
+mod api;
 mod buffers;
 mod frame;
 mod limits;
@@ -6,6 +7,12 @@ mod prepared;
 mod reference;
 mod requirements;
 
+pub use api::{
+    DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
+    DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
+    DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
+    MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter,
+};
 pub use limits::DetectionConversionLimits;
 pub use output::{
     write_detection_records, write_observable_records, write_ptb64_detection_records,
@@ -16,10 +23,7 @@ use buffers::{
     resource_amount, try_clone_detection_record, try_false_vec, try_reserve_detection_record_slots,
     try_vec_with_capacity, validate_buffer_bits, validate_vector_capacity,
 };
-use frame::{
-    frame_conversion_plan_with_limits, sample_detection_events_with_frame_and_limits,
-    try_for_each_detection_event_with_frame_and_limits,
-};
+use frame::frame_conversion_plan_with_limits;
 use prepared::PreparedDetectionSampling;
 use reference::ReferenceSampleSource;
 use requirements::circuit_requires_detector_frame;
@@ -142,7 +146,10 @@ impl CompiledDetectionConverter {
     {
         let mut record = self.try_reusable_detection_record()?;
         let mut reference_sample = self.try_reusable_reference_sample()?;
-        let mut reference_scratch = self.reference_sample.reusable_scratch();
+        let mut reference_scratch = self
+            .reference_sample
+            .reusable_scratch()
+            .map_err(|error| E::from(error.into_circuit_error()))?;
         let sweep_record =
             try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
         for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
@@ -175,7 +182,10 @@ impl CompiledDetectionConverter {
         let mut sweep_iter = sweeps.into_iter();
         let mut record = self.try_reusable_detection_record()?;
         let mut reference_sample = self.try_reusable_reference_sample()?;
-        let mut reference_scratch = self.reference_sample.reusable_scratch();
+        let mut reference_scratch = self
+            .reference_sample
+            .reusable_scratch()
+            .map_err(|error| E::from(error.into_circuit_error()))?;
         let mut shot_index = 0usize;
         loop {
             match (measurement_iter.next(), sweep_iter.next()) {
@@ -247,7 +257,10 @@ impl CompiledDetectionConverter {
         reference_sample: &mut Vec<bool>,
         record: &mut DetectionEventRecord,
     ) -> CircuitResult<()> {
-        let mut reference_scratch = self.reference_sample.reusable_scratch();
+        let mut reference_scratch = self
+            .reference_sample
+            .reusable_scratch()
+            .map_err(crate::SamplingExecutionError::into_circuit_error)?;
         self.convert_record_with_sweep_and_scratch_into(
             measurement_record,
             sweep_record,
@@ -439,42 +452,7 @@ pub fn sample_detection_events_with_limits(
     seed: Option<u64>,
     limits: DetectionConversionLimits,
 ) -> CircuitResult<DetectionConversionOutput> {
-    if circuit_requires_detector_frame(circuit)? {
-        return sample_detection_events_with_frame_and_limits(circuit, shots, seed, limits);
-    }
-    let prepared = PreparedDetectionSampling::compile(circuit, limits)?;
-    let converter = &prepared.converter;
-    let sampler = &prepared.sampler;
-    converter.plan.validate_detection_record_shot_count(shots)?;
-    let mut records = Vec::new();
-    try_reserve_detection_record_slots(&mut records, shots)?;
-    let mut record = converter.try_reusable_detection_record()?;
-    let mut reference_sample = converter.try_reusable_reference_sample()?;
-    let sweep_record = try_false_vec(
-        converter.sweep_bit_count(),
-        "detection conversion sweep record",
-    )?;
-    sampler.for_each_sample_with_seed_and_reference_mode(
-        shots,
-        seed,
-        false,
-        |measurement_record| {
-            converter.validate_measurement_record_width(measurement_record, None)?;
-            converter.convert_record_with_sweep_into(
-                measurement_record,
-                &sweep_record,
-                &mut reference_sample,
-                &mut record,
-            )?;
-            records.push(try_clone_detection_record(&record)?);
-            Ok::<(), CircuitError>(())
-        },
-    )?;
-    Ok(DetectionConversionOutput {
-        records,
-        detector_count: converter.detector_count(),
-        observable_count: converter.observable_count(),
-    })
+    api::sample_materialized(circuit, shots, seed, limits)
 }
 
 pub fn try_for_each_sampled_detection_event<E, F>(
@@ -501,36 +479,13 @@ pub fn try_for_each_sampled_detection_event_with_limits<E, F>(
     shots: usize,
     seed: Option<u64>,
     limits: DetectionConversionLimits,
-    mut visit: F,
+    visit: F,
 ) -> Result<(), E>
 where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    if circuit_requires_detector_frame(circuit)? {
-        return try_for_each_detection_event_with_frame_and_limits(
-            circuit, shots, seed, limits, visit,
-        );
-    }
-    let prepared = PreparedDetectionSampling::compile(circuit, limits)?;
-    let converter = &prepared.converter;
-    let sampler = &prepared.sampler;
-    let mut record = converter.try_reusable_detection_record()?;
-    let mut reference_sample = converter.try_reusable_reference_sample()?;
-    let sweep_record = try_false_vec(
-        converter.sweep_bit_count(),
-        "detection conversion sweep record",
-    )?;
-    sampler.for_each_sample_with_seed_and_reference_mode(shots, seed, false, |measurement_record| {
-        converter.validate_measurement_record_width(measurement_record, None)?;
-        converter.convert_record_with_sweep_into(
-            measurement_record,
-            &sweep_record,
-            &mut reference_sample,
-            &mut record,
-        )?;
-        visit(&record)
-    })
+    api::try_for_each(circuit, shots, seed, limits, visit)
 }
 
 pub fn measurement_record_count(circuit: &Circuit) -> CircuitResult<usize> {
@@ -563,13 +518,7 @@ pub fn validate_detection_sampling_circuit_with_limits(
     circuit: &Circuit,
     limits: DetectionConversionLimits,
 ) -> CircuitResult<()> {
-    if circuit_requires_detector_frame(circuit)? {
-        frame_conversion_plan_with_limits(circuit, limits)?;
-        Ok(())
-    } else {
-        PreparedDetectionSampling::compile(circuit, limits)?;
-        Ok(())
-    }
+    api::validate(circuit, limits)
 }
 
 fn detection_conversion_plan_with_limits(

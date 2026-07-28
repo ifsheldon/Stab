@@ -69,13 +69,12 @@ pub(super) fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {
 pub(super) fn single_probability_argument(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<Probability> {
-    let Some(probabilities) = instruction.probability_arguments()? else {
+    if instruction.args().len() != 1 {
         return Err(unsupported_frame_instruction(instruction));
-    };
-    match probabilities.as_slice() {
-        [probability] => Ok(*probability),
-        _ => Err(unsupported_frame_instruction(instruction)),
     }
+    instruction
+        .probability_argument()?
+        .ok_or_else(|| unsupported_frame_instruction(instruction))
 }
 
 pub(super) fn measurement_flip_probability(instruction: &CircuitInstruction) -> CircuitResult<f64> {
@@ -88,16 +87,11 @@ pub(super) fn measurement_flip_probability(instruction: &CircuitInstruction) -> 
 pub(super) fn probability_list<const N: usize>(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<[f64; N]> {
-    let Some(probabilities) = instruction.probability_arguments()? else {
-        return Err(unsupported_frame_instruction(instruction));
-    };
-    if probabilities.len() != N {
+    if instruction.args().len() != N {
         return Err(unsupported_frame_instruction(instruction));
     }
     let mut values = [0.0; N];
-    for (slot, probability) in values.iter_mut().zip(probabilities) {
-        *slot = probability.get();
-    }
+    values.copy_from_slice(instruction.args());
     Ok(values)
 }
 
@@ -108,12 +102,10 @@ pub(super) fn zero_probability_noise(instruction: &CircuitInstruction) -> Circui
     ) {
         return Ok(false);
     }
-    let Some(probabilities) = instruction.probability_arguments()? else {
-        return Ok(false);
-    };
-    Ok(probabilities
+    Ok(instruction
+        .args()
         .iter()
-        .all(|probability| probability.get() == 0.0))
+        .all(|probability| *probability == 0.0))
 }
 
 pub(super) fn qubit_index(

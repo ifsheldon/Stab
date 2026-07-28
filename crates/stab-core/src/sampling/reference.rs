@@ -2,7 +2,7 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
 use super::stabilizer_frame::StabilizerFrame;
-use super::{CompiledSampler, ExecutionMode};
+use super::{CompiledSampler, ExecutionMode, SamplingExecutionError};
 use crate::{CircuitError, CircuitResult};
 
 #[derive(Debug)]
@@ -18,7 +18,9 @@ impl CompiledSampler {
         sweep_record: &[bool],
         record: &mut Vec<bool>,
     ) -> CircuitResult<()> {
-        let mut scratch = self.reusable_reference_sample_scratch();
+        let mut scratch = self
+            .try_reusable_reference_sample_scratch()
+            .map_err(SamplingExecutionError::into_circuit_error)?;
         self.reference_measurement_record_with_sweep_and_scratch_into(
             sweep_record,
             &mut scratch,
@@ -26,12 +28,28 @@ impl CompiledSampler {
         )
     }
 
-    pub(crate) fn reusable_reference_sample_scratch(&self) -> ReferenceSampleScratch {
-        ReferenceSampleScratch {
+    pub(crate) fn try_reusable_reference_sample_scratch(
+        &self,
+    ) -> Result<ReferenceSampleScratch, SamplingExecutionError> {
+        let frame = StabilizerFrame::try_new(self.plan.inner.qubit_count).map_err(|error| {
+            SamplingExecutionError::SessionStorageAllocation {
+                message: error.to_string(),
+            }
+        })?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.plan.inner.measurement_count)
+            .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
+                message: format!(
+                    "reference measurement output capacity {}: {error}",
+                    self.plan.inner.measurement_count
+                ),
+            })?;
+        Ok(ReferenceSampleScratch {
             rng: SmallRng::seed_from_u64(0),
-            frame: StabilizerFrame::new(self.plan.inner.qubit_count),
-            output: Vec::with_capacity(self.plan.inner.measurement_count),
-        }
+            frame,
+            output,
+        })
     }
 
     pub(crate) fn reference_measurement_record_with_sweep_and_scratch_into(

@@ -76,7 +76,9 @@ fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
 
     let reference_sampler =
         CompiledSampler::compile_allowing_sweep(&circuit).expect("compile sweep reference sampler");
-    let mut reference_scratch = reference_sampler.reusable_reference_sample_scratch();
+    let mut reference_scratch = reference_sampler
+        .try_reusable_reference_sample_scratch()
+        .expect("allocate reusable reference scratch");
     let mut reference_record = Vec::with_capacity(converter.measurement_count());
     let mut sample_reference = |shots| {
         for _ in 0..shots {

@@ -1,7 +1,9 @@
 use crate::sampling::ReferenceSampleScratch;
-use crate::{Circuit, CircuitError, CircuitResult, CompiledSampler};
+use crate::{Circuit, CircuitError, CircuitResult, CompiledSampler, SamplingExecutionError};
 
 use super::buffers::try_vec_with_capacity;
+
+const MAX_REFERENCE_SCRATCH_BYTES: u128 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum ReferenceSampleSource {
@@ -11,10 +13,19 @@ pub(super) enum ReferenceSampleSource {
 }
 
 impl ReferenceSampleSource {
-    pub(super) fn reusable_scratch(&self) -> Option<ReferenceSampleScratch> {
+    pub(super) fn reusable_scratch(
+        &self,
+    ) -> Result<Option<ReferenceSampleScratch>, SamplingExecutionError> {
         match self {
-            Self::Sweep(sampler) => Some(sampler.reusable_reference_sample_scratch()),
-            Self::Zero | Self::Static(_) => None,
+            Self::Sweep(sampler) => sampler.try_reusable_reference_sample_scratch().map(Some),
+            Self::Zero | Self::Static(_) => Ok(None),
+        }
+    }
+
+    pub(super) fn reusable_scratch_storage_bytes(&self) -> u128 {
+        match self {
+            Self::Sweep(sampler) => reference_scratch_storage_bytes(sampler),
+            Self::Zero | Self::Static(_) => 0,
         }
     }
 
@@ -51,11 +62,32 @@ pub(super) fn static_reference_sample(
     measurement_count: usize,
 ) -> CircuitResult<Vec<bool>> {
     let sampler = CompiledSampler::compile(circuit)?;
+    validate_reference_scratch_storage(&sampler)?;
     let mut reference_sample =
         try_vec_with_capacity(measurement_count, "detection conversion reference sample")?;
     sampler.reference_measurement_record_with_sweep_into(&[], &mut reference_sample)?;
     validate_reference_sample_len(&reference_sample, measurement_count)?;
     Ok(reference_sample)
+}
+
+fn validate_reference_scratch_storage(sampler: &CompiledSampler) -> CircuitResult<()> {
+    let estimated_bytes = reference_scratch_storage_bytes(sampler);
+    if estimated_bytes > MAX_REFERENCE_SCRATCH_BYTES {
+        return Err(CircuitError::invalid_sampler_compilation(format!(
+            "detection reference sampling needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {MAX_REFERENCE_SCRATCH_BYTES}-byte safety limit"
+        )));
+    }
+    Ok(())
+}
+
+fn reference_scratch_storage_bytes(sampler: &CompiledSampler) -> u128 {
+    let qubits = sampler.plan().qubit_count() as u128;
+    let measurements = sampler.plan().measurement_width().get() as u128;
+    qubits
+        .saturating_mul(qubits)
+        .saturating_mul(4)
+        .saturating_add(qubits.saturating_mul(256))
+        .saturating_add(measurements)
 }
 
 pub(super) fn validate_reference_sample_len(

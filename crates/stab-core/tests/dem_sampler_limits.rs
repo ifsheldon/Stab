@@ -398,7 +398,10 @@ fn public_validation_and_error_materialization_obey_custom_dem_sampler_limits() 
 #[test]
 fn detection_streaming_charges_one_scratch_record_not_total_shots() {
     let sampler = compile_dem("error(1) D0 L0\n");
-    let scratch_bytes = std::mem::size_of::<DetectionEventRecord>() + 2;
+    let visitor_scratch_bytes = std::mem::size_of::<DetectionEventRecord>() + 2;
+    let minimum_session_bytes =
+        std::mem::size_of::<DetectionEventRecord>() + 2 + 2 * std::mem::size_of::<u64>();
+    let scratch_bytes = visitor_scratch_bytes + minimum_session_bytes;
     let rejected_limits = sampler_limits!(1024, 1, scratch_bytes);
     let mut rejected_visits = 0;
 
@@ -429,6 +432,60 @@ fn detection_streaming_charges_one_scratch_record_not_total_shots() {
         })
         .expect("streaming should charge one reusable record instead of all shots");
     assert_eq!(accepted_visits, 3);
+}
+
+#[test]
+fn sampled_error_streaming_charges_both_compatibility_records() {
+    let sampler = compile_dem("error(1) D0 L0\n");
+    let compatibility_bytes =
+        std::mem::size_of::<DetectionEventRecord>() + 2 + std::mem::size_of::<Vec<bool>>() + 1;
+    let minimum_session_bytes = compatibility_bytes + 3 * std::mem::size_of::<u64>();
+    let exact_bytes = compatibility_bytes + minimum_session_bytes;
+    let exact_limits = sampler_limits!(1, 3, exact_bytes);
+    let mut accepted_visits = 0;
+
+    sampler
+        .try_for_each_detection_event_and_error_with_seed_and_limits(
+            1,
+            Some(5),
+            exact_limits,
+            |record, errors| {
+                accepted_visits += 1;
+                assert_eq!(record.detectors, [true]);
+                assert_eq!(record.observables, [true]);
+                assert_eq!(errors, [true]);
+                Ok::<(), CircuitError>(())
+            },
+        )
+        .expect("the exact compatibility and one-shot session byte boundary is admitted");
+    assert_eq!(accepted_visits, 1);
+
+    let rejected_limits = exact_limits.with_max_materialized_bytes(exact_bytes - 1);
+    let mut rejected_visits = 0;
+    let error = sampler
+        .try_for_each_detection_event_and_error_with_seed_and_limits(
+            1,
+            Some(5),
+            rejected_limits,
+            |_record, _errors| {
+                rejected_visits += 1;
+                Ok::<(), CircuitError>(())
+            },
+        )
+        .expect_err("the first byte above the combined compatibility envelope must fail");
+    assert_eq!(rejected_visits, 0);
+    let resource = error
+        .resource_limit_error()
+        .expect("sampled-error scratch rejection should expose typed context");
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(
+        resource.limit(),
+        u64::try_from(minimum_session_bytes - 1).expect("test byte limit fits u64")
+    );
+    assert!(
+        resource.actual() > resource.limit(),
+        "sampled-error session storage must remain above the post-sink byte budget"
+    );
 }
 
 #[test]

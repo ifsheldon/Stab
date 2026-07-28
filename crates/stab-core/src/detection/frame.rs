@@ -1,13 +1,8 @@
 use std::borrow::Cow;
 
-use rand::rngs::SmallRng;
-use rand::{Rng, RngExt as _, SeedableRng as _};
+use rand::{Rng, RngExt as _};
 
-use super::{
-    ConversionPlan, DetectionConversionLimits, DetectionConversionOutput, DetectionEventRecord,
-    try_clone_detection_record, try_false_vec, try_reserve_detection_record_slots,
-    try_vec_with_capacity,
-};
+use super::{ConversionPlan, DetectionConversionLimits, try_false_vec, try_vec_with_capacity};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, Pauli, PauliBasis,
     PauliSign, PauliString, RepeatBlock, Target,
@@ -42,6 +37,93 @@ impl AdmittedFrameConversion {
         append_frame_execution_circuit(circuit, &mut result)?;
         Ok(result)
     }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DirectDetectorFramePlan {
+    executable: Circuit,
+    conversion: ConversionPlan,
+    limits: DetectionConversionLimits,
+}
+
+impl DirectDetectorFramePlan {
+    pub(super) fn compile(
+        circuit: &Circuit,
+        limits: DetectionConversionLimits,
+    ) -> CircuitResult<Self> {
+        let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
+        let executable = admitted.materialize_execution_circuit(circuit)?;
+        Ok(Self {
+            executable,
+            conversion: admitted.plan,
+            limits,
+        })
+    }
+
+    pub(super) fn measurement_count(&self) -> usize {
+        self.conversion.measurement_count
+    }
+
+    pub(super) fn qubit_count(&self) -> usize {
+        self.executable.count_qubits()
+    }
+
+    pub(super) fn detector_count(&self) -> usize {
+        self.conversion.detector_terms.len()
+    }
+
+    pub(super) fn observable_count(&self) -> usize {
+        self.conversion.observable_terms.len()
+    }
+
+    pub(super) fn state(&self) -> CircuitResult<DirectDetectorFrameState> {
+        Ok(DirectDetectorFrameState {
+            frame: ScalarDetectionFrame::try_reusable(
+                self.executable.count_qubits(),
+                self.measurement_count(),
+                self.detector_count(),
+                self.observable_count(),
+            )?,
+        })
+    }
+
+    pub(super) fn sample<'a>(
+        &self,
+        state: &'a mut DirectDetectorFrameState,
+        rng: &mut impl Rng,
+    ) -> CircuitResult<(&'a [bool], &'a [bool])> {
+        state.frame.reset(rng);
+        state
+            .frame
+            .execute_circuit(&self.executable, self.limits.max_repeat_unroll(), rng)?;
+        if state.frame.measurements.len() != self.measurement_count() {
+            return Err(CircuitError::invalid_result_format(format!(
+                "frame detection sampled {} measurement bits but expected {}",
+                state.frame.measurements.len(),
+                self.measurement_count()
+            )));
+        }
+        if state.frame.detectors.len() != self.detector_count() {
+            return Err(CircuitError::invalid_result_format(format!(
+                "frame detection sampled {} detector bits but expected {}",
+                state.frame.detectors.len(),
+                self.detector_count()
+            )));
+        }
+        if state.frame.observables.len() != self.observable_count() {
+            return Err(CircuitError::invalid_result_format(format!(
+                "frame detection sampled {} observable bits but expected {}",
+                state.frame.observables.len(),
+                self.observable_count()
+            )));
+        }
+        Ok((&state.frame.detectors, &state.frame.observables))
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct DirectDetectorFrameState {
+    frame: ScalarDetectionFrame,
 }
 
 pub(super) fn frame_conversion_plan_with_limits(
@@ -178,59 +260,6 @@ fn validate_frame_x_or_y_controlled_z_targets(
     Ok(())
 }
 
-pub(super) fn sample_detection_events_with_frame_and_limits(
-    circuit: &Circuit,
-    shots: usize,
-    seed: Option<u64>,
-    limits: DetectionConversionLimits,
-) -> CircuitResult<DetectionConversionOutput> {
-    let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
-    admitted.plan.validate_detection_record_shot_count(shots)?;
-    let executable = admitted.materialize_execution_circuit(circuit)?;
-    let plan = &admitted.plan;
-    let detector_count = plan.detector_terms.len();
-    let observable_count = plan.observable_terms.len();
-    let mut records = Vec::new();
-    try_reserve_detection_record_slots(&mut records, shots)?;
-    let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
-    sample_detection_events_with_frame_plan(
-        &executable,
-        shots,
-        plan,
-        limits,
-        &mut rng,
-        |record| {
-            records.push(try_clone_detection_record(record)?);
-            Ok::<(), CircuitError>(())
-        },
-    )?;
-    Ok(DetectionConversionOutput {
-        records,
-        detector_count,
-        observable_count,
-    })
-}
-
-pub(super) fn try_for_each_detection_event_with_frame_and_limits<E, F>(
-    circuit: &Circuit,
-    shots: usize,
-    seed: Option<u64>,
-    limits: DetectionConversionLimits,
-    mut visit: F,
-) -> Result<(), E>
-where
-    E: From<CircuitError>,
-    F: FnMut(&DetectionEventRecord) -> Result<(), E>,
-{
-    let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
-    let executable = admitted.materialize_execution_circuit(circuit)?;
-    let plan = &admitted.plan;
-    let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
-    sample_detection_events_with_frame_plan(&executable, shots, plan, limits, &mut rng, |record| {
-        visit(record)
-    })
-}
-
 fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {
@@ -291,44 +320,7 @@ fn frame_execution_instruction<'a>(
     )?)))
 }
 
-fn sample_detection_events_with_frame_plan<E, F>(
-    circuit: &Circuit,
-    shots: usize,
-    plan: &ConversionPlan,
-    limits: DetectionConversionLimits,
-    rng: &mut SmallRng,
-    mut visit: F,
-) -> Result<(), E>
-where
-    E: From<CircuitError>,
-    F: FnMut(&DetectionEventRecord) -> Result<(), E>,
-{
-    for _ in 0..shots {
-        let mut frame = ScalarDetectionFrame::try_new(
-            circuit.count_qubits(),
-            plan.measurement_count,
-            plan.detector_terms.len(),
-            plan.observable_terms.len(),
-            rng,
-        )?;
-        frame.execute_circuit(circuit, limits.max_repeat_unroll(), rng)?;
-        if frame.measurements.len() != plan.measurement_count {
-            return Err(CircuitError::invalid_result_format(format!(
-                "frame detection sampled {} measurement bits but expected {}",
-                frame.measurements.len(),
-                plan.measurement_count
-            ))
-            .into());
-        }
-        let record = DetectionEventRecord {
-            detectors: frame.detectors,
-            observables: frame.observables,
-        };
-        visit(&record)?;
-    }
-    Ok(())
-}
-
+#[derive(Debug)]
 struct ScalarDetectionFrame {
     xs: Vec<bool>,
     zs: Vec<bool>,
@@ -339,30 +331,34 @@ struct ScalarDetectionFrame {
 }
 
 impl ScalarDetectionFrame {
-    fn try_new(
+    fn try_reusable(
         qubit_count: usize,
         measurement_count: usize,
         detector_count: usize,
         observable_count: usize,
-        rng: &mut impl Rng,
     ) -> CircuitResult<Self> {
-        let xs = try_false_vec(qubit_count, "detection frame X state")?;
-        let mut zs = try_false_vec(qubit_count, "detection frame Z state")?;
-        let measurements =
-            try_vec_with_capacity(measurement_count, "detection frame measurement record")?;
-        let detectors = try_vec_with_capacity(detector_count, "detection frame detector record")?;
-        let observables = try_false_vec(observable_count, "detection frame observable record")?;
-        for bit in &mut zs {
-            *bit = rng.random_bool(0.5);
-        }
         Ok(Self {
-            xs,
-            zs,
-            measurements,
-            detectors,
-            observables,
+            xs: try_false_vec(qubit_count, "detection frame X state")?,
+            zs: try_false_vec(qubit_count, "detection frame Z state")?,
+            measurements: try_vec_with_capacity(
+                measurement_count,
+                "detection frame measurement record",
+            )?,
+            detectors: try_vec_with_capacity(detector_count, "detection frame detector record")?,
+            observables: try_false_vec(observable_count, "detection frame observable record")?,
             correlated_error_occurred: false,
         })
+    }
+
+    fn reset(&mut self, rng: &mut impl Rng) {
+        self.xs.fill(false);
+        for bit in &mut self.zs {
+            *bit = rng.random_bool(0.5);
+        }
+        self.measurements.clear();
+        self.detectors.clear();
+        self.observables.fill(false);
+        self.correlated_error_occurred = false;
     }
 
     fn execute_circuit(
