@@ -1,13 +1,12 @@
+use crate::advanced::{circuit_repeat_nesting_limit_error, circuit_source_line_limit_error};
 use crate::diagnostics::bounded_parse_diagnostic_text;
-use crate::gate::{gate_from_name, lookup_simple_plain_gate, validate_gate};
 use crate::model_parse::{line_error, validation_error};
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{
-    ByteSpan, CircuitError, CircuitResult, Gate, ModelDialect, ParseErrorCode, ParseErrorContext,
-    ParseLimits, RepeatCount, Target,
+    ByteSpan, Gate, ModelDialect, ModelError, ModelResult, ParseErrorCode, ParseErrorContext,
+    ParseLimits, RepeatCount, Target, ValidationError,
 };
-use stab_model::advanced::{circuit_repeat_nesting_limit_error, circuit_source_line_limit_error};
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
@@ -17,11 +16,11 @@ const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 
 mod fast;
 
-pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> CircuitResult<Circuit> {
+pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
     Parser::new(input, limits, true).parse()
 }
 
-pub(super) fn parse_circuit_unfused(input: &str, limits: ParseLimits) -> CircuitResult<Circuit> {
+pub(super) fn parse_circuit_unfused(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
     Parser::new(input, limits, false).parse()
 }
 
@@ -44,11 +43,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse(mut self) -> CircuitResult<Circuit> {
+    fn parse(mut self) -> ModelResult<Circuit> {
         self.parse_block(false, 0)
     }
 
-    fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> CircuitResult<Circuit> {
+    fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> ModelResult<Circuit> {
         let mut circuit = if stop_on_terminator {
             Circuit::new()
         } else {
@@ -62,8 +61,7 @@ impl<'a> Parser<'a> {
                     line_number,
                     limit,
                     command.source().span(),
-                )
-                .into());
+                ));
             }
 
             let line = command.source().trim_ascii_start();
@@ -120,7 +118,7 @@ impl<'a> Parser<'a> {
         header_span: ByteSpan,
         end_error_span: ByteSpan,
         depth: usize,
-    ) -> CircuitResult<ParsedRepeatHeader> {
+    ) -> ModelResult<ParsedRepeatHeader> {
         let (name, rest) = parse_name(line_number, header)?;
         if !name.text().eq_ignore_ascii_case("REPEAT") {
             return Err(line_error(
@@ -182,10 +180,10 @@ impl<'a> Parser<'a> {
             .unwrap_or(rest.text().len());
         let count_token = rest
             .prefix(token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid repeat count"))?;
+            .ok_or_else(|| internal_parser_error(line_number, "invalid repeat count"))?;
         let trailing = rest
             .suffix(token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid repeat count"))?;
+            .ok_or_else(|| internal_parser_error(line_number, "invalid repeat count"))?;
         if !trailing
             .text()
             .as_bytes()
@@ -207,7 +205,6 @@ impl<'a> Parser<'a> {
         }
         let count = parse_repeat_count(line_number, count_token)?;
         let repeat_count = RepeatCount::try_new(count).map_err(|error| {
-            let error = CircuitError::from(error);
             validation_error(
                 ModelDialect::StimCircuit,
                 line_number,
@@ -221,15 +218,14 @@ impl<'a> Parser<'a> {
         let limit = self.limits.repeat_nesting_limit().get();
         if depth >= limit {
             let actual = depth.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_domain_value("circuit repeat nesting", "depth overflow")
+                ModelError::invalid_domain_value("circuit repeat nesting", "depth overflow")
             })?;
             return Err(circuit_repeat_nesting_limit_error(
                 line_number,
                 actual,
                 limit,
                 header_span,
-            )
-            .into());
+            ));
         }
         Ok(ParsedRepeatHeader {
             count: repeat_count,
@@ -274,7 +270,7 @@ fn parse_instruction(
     line_number: usize,
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
-) -> CircuitResult<CircuitInstruction> {
+) -> ModelResult<CircuitInstruction> {
     if let Some(Ok(instruction)) = fast::parse_common_plain_instruction(line.text()) {
         return Ok(instruction);
     }
@@ -290,8 +286,8 @@ fn parse_instruction_fully_generic_from_parts(
     name: SourceSlice<'_>,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
-) -> CircuitResult<CircuitInstruction> {
-    let gate = gate_from_name(name.text()).ok_or_else(|| {
+) -> ModelResult<CircuitInstruction> {
+    let gate = Gate::lookup_name(name.text()).ok_or_else(|| {
         let name_excerpt = bounded_parse_diagnostic_text(name.text());
         line_error(
             ModelDialect::StimCircuit,
@@ -309,19 +305,19 @@ fn parse_instruction_fully_generic_from_parts(
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
     let targets = parse_targets(line_number, name.text(), rest, end_error_span)?;
-    validate_gate(gate, &args.values, &targets.values).map_err(|error| {
-        let error = CircuitError::from(error);
-        let (code, span) = validation_span(&error, &args, &targets);
-        validation_error(
-            ModelDialect::StimCircuit,
-            line_number,
-            name.text(),
-            code,
-            span,
-            error,
-            true,
-        )
-    })?;
+    gate.validate(&args.values, &targets.values)
+        .map_err(|error| {
+            let (code, span) = validation_span(&error, &args, &targets);
+            validation_error(
+                ModelDialect::StimCircuit,
+                line_number,
+                name.text(),
+                code,
+                span,
+                error,
+                true,
+            )
+        })?;
     Ok(CircuitInstruction::from_validated_parts(
         gate,
         args.values,
@@ -334,7 +330,7 @@ fn parse_instruction_fully_generic_from_parts(
 fn parse_instruction_fully_generic(
     line_number: usize,
     line: &str,
-) -> CircuitResult<CircuitInstruction> {
+) -> ModelResult<CircuitInstruction> {
     let line = SourceSlice::new(line, 0);
     let (name, rest) = parse_name(line_number, line)?;
     parse_instruction_fully_generic_from_parts(line_number, name, rest, line.end_span())
@@ -343,7 +339,7 @@ fn parse_instruction_fully_generic(
 fn parse_name(
     line_number: usize,
     line: SourceSlice<'_>,
-) -> CircuitResult<(SourceSlice<'_>, SourceSlice<'_>)> {
+) -> ModelResult<(SourceSlice<'_>, SourceSlice<'_>)> {
     let mut end = None;
     for (index, byte) in line.text().bytes().enumerate() {
         let valid = if index == 0 {
@@ -371,10 +367,10 @@ fn parse_name(
     };
     let name = line
         .prefix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing instruction name"))?;
+        .ok_or_else(|| internal_parser_error(line_number, "missing instruction name"))?;
     let rest = line
         .suffix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing instruction name"))?;
+        .ok_or_else(|| internal_parser_error(line_number, "missing instruction name"))?;
     Ok((name, rest))
 }
 
@@ -383,7 +379,7 @@ fn parse_optional_tag<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
-) -> CircuitResult<(Option<String>, SourceSlice<'a>)> {
+) -> ModelResult<(Option<String>, SourceSlice<'a>)> {
     let Some(mut body) = rest.strip_prefix("[") else {
         return Ok((None, rest));
     };
@@ -410,7 +406,7 @@ fn parse_optional_tag<'a>(
             .unwrap_or_else(|| body.span());
         body = body
             .suffix(character_len)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated tag"))?;
+            .ok_or_else(|| internal_parser_error(line_number, "unterminated tag"))?;
         match character {
             ']' => return Ok((Some(tag), body)),
             '\\' => {
@@ -435,9 +431,9 @@ fn parse_optional_tag<'a>(
                     character_span.byte_length() + escaped_len,
                 )
                 .unwrap_or(character_span);
-                body = body.suffix(escaped_len).ok_or_else(|| {
-                    CircuitError::parse_line(line_number, "unterminated tag escape")
-                })?;
+                body = body
+                    .suffix(escaped_len)
+                    .ok_or_else(|| internal_parser_error(line_number, "unterminated tag escape"))?;
                 tag.push(match escaped {
                     'C' => ']',
                     'r' => '\r',
@@ -482,7 +478,7 @@ fn parse_optional_args<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
-) -> CircuitResult<(ParsedArguments, SourceSlice<'a>)> {
+) -> ModelResult<(ParsedArguments, SourceSlice<'a>)> {
     let Some(body) = rest.strip_prefix("(") else {
         return Ok((
             ParsedArguments {
@@ -505,10 +501,10 @@ fn parse_optional_args<'a>(
     };
     let raw_args = body
         .prefix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
+        .ok_or_else(|| internal_parser_error(line_number, "unterminated argument list"))?;
     let tail = body
         .suffix(end + 1)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
+        .ok_or_else(|| internal_parser_error(line_number, "unterminated argument list"))?;
     let mut values = Vec::new();
     let mut first_non_finite = None;
     let mut token_start = 0;
@@ -520,7 +516,7 @@ fn parse_optional_args<'a>(
             .unwrap_or(raw_args.text().len());
         let token = raw_args
             .slice(token_start, token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid argument"))?
+            .ok_or_else(|| internal_parser_error(line_number, "invalid argument"))?
             .trim_inline_ascii_start()
             .trim_inline_ascii_end();
         let value = if token.text().is_empty() {
@@ -549,7 +545,7 @@ fn parse_optional_args<'a>(
     if let Some(token) = first_non_finite {
         let token_excerpt = bounded_parse_diagnostic_text(token.text());
         let legacy_detail = Gate::from_name(instruction)
-            .and_then(|gate| validate_gate(gate, &values, &TargetVec::new()))
+            .and_then(|gate| gate.validate(&values, &TargetVec::new()))
             .err()
             .map_or_else(
                 || format!("invalid argument {token_excerpt}"),
@@ -588,7 +584,7 @@ fn parse_targets(
     instruction: &str,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
-) -> CircuitResult<ParsedTargets> {
+) -> ModelResult<ParsedTargets> {
     if rest.text().is_empty() {
         return Ok(ParsedTargets {
             values: TargetVec::new(),
@@ -651,9 +647,8 @@ fn parse_targets(
         }
         let token = content
             .slice(start, cursor)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid target"))?;
+            .ok_or_else(|| internal_parser_error(line_number, "invalid target"))?;
         parse_target_token_into(token.text(), &mut values).map_err(|error| {
-            let error = CircuitError::from(error);
             let code = target_parse_error_code(&error);
             validation_error(
                 ModelDialect::StimCircuit,
@@ -675,24 +670,28 @@ fn parse_targets(
 }
 
 fn validation_span(
-    error: &CircuitError,
+    error: &ModelError,
     args: &ParsedArguments,
     targets: &ParsedTargets,
 ) -> (ParseErrorCode, ByteSpan) {
     match error {
-        CircuitError::InvalidArgumentCount { .. } => {
+        ModelError::Validation(ValidationError::InvalidArgumentCount { .. }) => {
             (ParseErrorCode::InvalidArgumentCount, args.region)
         }
-        CircuitError::InvalidArgument { .. } => (ParseErrorCode::InvalidArgument, args.region),
-        CircuitError::InvalidTarget { .. } => (ParseErrorCode::InvalidTarget, targets.region),
-        CircuitError::InvalidTargetCount { .. } => {
+        ModelError::Validation(ValidationError::InvalidArgument { .. }) => {
+            (ParseErrorCode::InvalidArgument, args.region)
+        }
+        ModelError::Validation(ValidationError::InvalidTarget { .. }) => {
+            (ParseErrorCode::InvalidTarget, targets.region)
+        }
+        ModelError::Validation(ValidationError::InvalidTargetCount { .. }) => {
             (ParseErrorCode::InvalidTargetCount, targets.region)
         }
         _ => (ParseErrorCode::InvalidSyntax, targets.region),
     }
 }
 
-fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> CircuitResult<u64> {
+fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult<u64> {
     if token.text().is_empty() {
         return Err(line_error(
             ModelDialect::StimCircuit,
@@ -765,9 +764,9 @@ fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> CircuitResu
     Ok(value)
 }
 
-fn target_parse_error_code(error: &CircuitError) -> ParseErrorCode {
+fn target_parse_error_code(error: &ModelError) -> ParseErrorCode {
     match error {
-        CircuitError::InvalidDomainValue { value, .. } => {
+        ModelError::Validation(ValidationError::InvalidDomainValue { value, .. }) => {
             let digits = value.strip_prefix('-').unwrap_or(value);
             if !digits.is_empty() && digits.as_bytes().iter().all(u8::is_ascii_digit) {
                 ParseErrorCode::IntegerOutOfRange
@@ -784,7 +783,7 @@ fn invalid_number_error(
     instruction: &str,
     token: SourceSlice<'_>,
     message: &'static str,
-) -> CircuitError {
+) -> ModelError {
     let span = token.span();
     let token = bounded_parse_diagnostic_text(token.text());
     line_error(
@@ -834,8 +833,8 @@ fn trim_target_space_start(mut source: SourceSlice<'_>) -> SourceSlice<'_> {
 fn parse_simple_plain_instruction(
     name: &str,
     rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
-    let gate = lookup_simple_plain_gate(name)?;
+) -> Option<ModelResult<CircuitInstruction>> {
+    let gate = Gate::from_simple_plain_name(name)?;
     if rest.starts_with('[') || rest.starts_with('(') {
         return None;
     }
@@ -862,22 +861,31 @@ fn parse_simple_plain_instruction(
     )))
 }
 
-fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> CircuitResult<()> {
+fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> ModelResult<()> {
     if !targets.len().is_multiple_of(2) {
-        return Err(CircuitError::InvalidTargetCount {
+        return Err(ValidationError::InvalidTargetCount {
             gate,
             count: targets.len(),
-        });
+        }
+        .into());
     }
     for pair in targets.chunks_exact(2) {
         if let [left, right] = pair
             && left == right
         {
-            return Err(CircuitError::InvalidTarget {
+            return Err(ValidationError::InvalidTarget {
                 gate,
                 target: left.to_string(),
-            });
+            }
+            .into());
         }
     }
     Ok(())
+}
+
+fn internal_parser_error(line_number: usize, message: impl ToString) -> ModelError {
+    ModelError::invalid_domain_value(
+        "Stim circuit parser",
+        format!("line {line_number}: {}", message.to_string()),
+    )
 }

@@ -1,3 +1,5 @@
+//! Exact text and opaque-byte storage for Stim model tags.
+
 use std::io::{self, Write};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

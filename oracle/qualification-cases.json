@@ -64,48 +64,48 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemDetectorId"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemDetectorId"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemDetectorId::try_new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemDetectorId::try_new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemDetectorId::get"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemDetectorId::get"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemObservableId"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemObservableId"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemObservableId::try_new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemObservableId::try_new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemObservableId::get"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemObservableId::get"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemTarget"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemTarget"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemTarget::relative_detector"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemTarget::relative_detector"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemTarget::logical_observable"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemTarget::logical_observable"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemTarget::separator"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemTarget::separator"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemTarget::numeric"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemTarget::numeric"
         }
       ]
     },
@@ -176,48 +176,48 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstructionKind"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstructionKind"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::error"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::error"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::detector"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::detector"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::logical_observable"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::logical_observable"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::shift_detectors"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::shift_detectors"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::kind"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::kind"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::args"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::args"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::targets"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::targets"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::tag"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::tag"
         }
       ]
     },
@@ -256,8 +256,8 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemInstruction::target_groups"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemInstruction::target_groups"
         }
       ]
     },
@@ -312,12 +312,12 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::from_dem_str"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::from_dem_str"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::to_dem_string"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::to_dem_string"
         }
       ]
     },
@@ -463,96 +463,96 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::items"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::items"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::push_instruction"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::push_instruction"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::push_repeat_block"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::push_repeat_block"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::append_from_dem_text"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::append_from_dem_text"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::len"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::len"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::is_empty"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::is_empty"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::clear"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::clear"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::iter_items"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::iter_items"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::item_range"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::item_range"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::instruction_range"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::instruction_range"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemItem"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemItem"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemItem::as_instruction"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemItem::as_instruction"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemItem::as_repeat_block"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemItem::as_repeat_block"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatBlock"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatBlock"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatBlock::new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatBlock::new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatBlock::repeat_count"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatBlock::repeat_count"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatBlock::body"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatBlock::body"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatBlock::tag"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatBlock::tag"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatCount"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatCount"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatCount::new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatCount::new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemRepeatCount::get"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemRepeatCount::get"
         }
       ]
     },
@@ -606,24 +606,24 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::total_detector_shift"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::total_detector_shift"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::count_detectors"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::count_detectors"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::count_observables"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::count_observables"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::count_errors"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::count_errors"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::final_coordinate_shift"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::final_coordinate_shift"
         }
       ]
     },
@@ -665,16 +665,16 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::detector_coordinates"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::detector_coordinates"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::detector_coordinates_for"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::detector_coordinates_for"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::coordinates_of_detector"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::coordinates_of_detector"
         }
       ]
     },
@@ -753,12 +753,12 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DemFlattenedInstructionIter"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemFlattenedInstructionIter"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::iter_flattened_instructions"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::iter_flattened_instructions"
         },
         {
           "crate_name": "stab_core",
@@ -1063,12 +1063,12 @@
       },
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::from_stim_str"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Circuit::from_stim_str"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::to_stim_string"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Circuit::to_stim_string"
         }
       ]
     },
@@ -1083,7 +1083,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_from_text_contract_matches_stim",
@@ -1121,7 +1121,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_canonical_printer_contract_matches_stim",
@@ -1151,7 +1151,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_sweep_target_roles_match_stim",
@@ -1184,7 +1184,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_tag_escape_and_repeat_contract_matches_stim",
@@ -1333,8 +1333,8 @@
       },
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::append_from_stim_text"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Circuit::append_from_stim_text"
         }
       ],
       "oracle_fixture_owners": [
@@ -1372,8 +1372,8 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::append_from_stim_program_text"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Circuit::append_from_stim_program_text"
         }
       ]
     },
@@ -1582,7 +1582,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_repeat_validation_matches_stim",
@@ -1624,7 +1624,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_instruction_validation_matches_stim",
@@ -1662,7 +1662,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_probability_list_validation_matches_stim",
@@ -1737,7 +1737,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_instruction_and_concatenation_fusion_match_stim",
@@ -1775,7 +1775,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_validation_edges_match_stim",
@@ -1838,7 +1838,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_repeat_coordinate_and_newline_edges_match_stim",
@@ -1880,7 +1880,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_target_groups_cover_stim_gate_shapes",
@@ -1918,7 +1918,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_instruction_print_and_eager_validation_match_stim",
@@ -1988,56 +1988,56 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::new"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::new"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::gate"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::gate"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::args"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::args"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::targets"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::targets"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::probability_argument"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::probability_argument"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::probability_arguments"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::probability_arguments"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::observable_id_argument"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::observable_id_argument"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::coordinate_arguments"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::coordinate_arguments"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::tag"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::tag"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::target_groups"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::target_groups"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::disjoint_target_segments"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::disjoint_target_segments"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::CircuitInstruction::disjoint_target_segments_reversed"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::CircuitInstruction::disjoint_target_segments_reversed"
         }
       ]
     },
@@ -2102,9 +2102,9 @@
         {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId"},
         {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId::new"},
         {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId::get"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId::new"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId::get"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitDetectorId"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitDetectorId::new"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitDetectorId::get"},
         {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount"},
         {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount::try_new"},
         {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount::get"}
@@ -2140,16 +2140,16 @@
         {"path": "src/stim/circuit/circuit_repeat_block_test.py", "symbol": "test_init_and_equality"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::new"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem::as_instruction"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem::as_repeat_block"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::new"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::repeat_count"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::body"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::tag"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::new"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitItem"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitItem::as_instruction"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitItem::as_repeat_block"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::RepeatBlock"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::RepeatBlock::new"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::RepeatBlock::repeat_count"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::RepeatBlock::body"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::RepeatBlock::tag"}
       ],
       "oracle_fixture_owners": ["pf1-circuit-rust-api"]
     },
@@ -2178,8 +2178,8 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_fuse"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_instruction"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_repeat_block"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::append_instruction"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::append_repeat_block"}
       ]
     },
     {
@@ -2201,8 +2201,8 @@
         "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
       },
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitFlattenedInstructionIter"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitFlattenedInstructionRevIter"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitFlattenedInstructionIter"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::CircuitFlattenedInstructionRevIter"}
       ]
     },
     {
@@ -2256,13 +2256,13 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_num_ticks"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::len"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::is_empty"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_measurements"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_detectors"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_observables"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_ticks"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_sweep_bits"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::len"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::is_empty"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_measurements"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_detectors"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_observables"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_ticks"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_sweep_bits"}
       ],
       "oracle_fixture_owners": ["pf1-circuit-stats-coordinates"]
     },
@@ -2286,7 +2286,7 @@
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_qubits"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_qubits"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::count_qubits"}
       ]
     },
     {
@@ -2304,7 +2304,7 @@
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.final_coord_shift"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::final_coordinate_shift"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::final_coordinate_shift"}
       ]
     },
     {
@@ -2322,7 +2322,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_coords"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::final_qubit_coordinates"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::final_qubit_coordinates"}
       ]
     },
     {
@@ -2356,7 +2356,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_clear"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::clear"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::clear"}
       ]
     },
     {
@@ -2375,8 +2375,8 @@
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.big_rep_count"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::repeated"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::repeat_in_place"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::repeated"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::repeat_in_place"}
       ],
       "oracle_fixture_owners": ["pf1-circuit-repeat"]
     },
@@ -3686,7 +3686,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_fingerprints",
             "model_fingerprint_value_contract_is_domain_separated_and_frozen",
@@ -3708,32 +3708,32 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::SCHEMA_VERSION"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::SCHEMA_VERSION"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::ALGORITHM"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::ALGORITHM"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::schema_version"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::schema_version"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::dialect"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::dialect"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::digest"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::digest"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::ModelFingerprint::digest_hex"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelFingerprint::digest_hex"
           },
           {
             "crate_name": "stab_core",
@@ -3761,7 +3761,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_fingerprints",
             "circuit_fingerprint_is_canonical_and_deterministic",
@@ -3781,8 +3781,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::Circuit::fingerprint"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::Circuit::fingerprint"
           }
         ],
         "standalone": true
@@ -3798,7 +3798,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_fingerprints",
             "dem_fingerprint_is_canonical_and_deterministic",
@@ -3819,8 +3819,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DetectorErrorModel::fingerprint"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DetectorErrorModel::fingerprint"
           }
         ],
         "standalone": true
@@ -6654,8 +6654,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::Circuit::from_stim_str_with_limits"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::Circuit::from_stim_str_with_limits"
           },
           {
             "crate_name": "stab_core",
@@ -6722,8 +6722,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DetectorErrorModel::from_dem_str_with_limits"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DetectorErrorModel::from_dem_str_with_limits"
           }
         ],
         "standalone": true
@@ -6833,7 +6833,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "parse_error_codes_are_stable",
@@ -6873,7 +6873,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "circuit_parse_diagnostics_locate_crlf_utf8_arguments_targets_and_repeats",
@@ -6933,7 +6933,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "parse_error_context_variants_preserve_typed_fields_and_dialect",
@@ -6977,7 +6977,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "parse_error_decode_utf8_accepts_valid_and_locates_invalid_sequences",
@@ -7017,7 +7017,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "circuit_byte_entrypoint_reports_invalid_utf8_at_the_first_invalid_sequence",
@@ -7036,8 +7036,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::Circuit::from_stim_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::Circuit::from_stim_bytes"
           }
         ],
         "standalone": true
@@ -7053,7 +7053,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "dem_byte_entrypoint_reports_invalid_utf8_at_the_first_invalid_sequence",
@@ -7072,8 +7072,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DetectorErrorModel::from_dem_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DetectorErrorModel::from_dem_bytes"
           }
         ],
         "standalone": true
@@ -7089,7 +7089,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode",
@@ -7108,12 +7108,12 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::Circuit::from_stim_bytes_with_limits"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::Circuit::from_stim_bytes_with_limits"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DetectorErrorModel::from_dem_bytes_with_limits"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DetectorErrorModel::from_dem_bytes_with_limits"
           }
         ],
         "standalone": true
@@ -7159,7 +7159,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "byte_entrypoints_follow_source_order_and_accept_opaque_metadata_bytes",
@@ -7188,7 +7188,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "byte_parsers_report_earlier_repeat_limits_before_later_invalid_utf8",
@@ -7218,7 +7218,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "opaque_comments_do_not_shift_later_parser_diagnostics",
@@ -7248,7 +7248,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "opaque_unterminated_tags_report_the_exact_original_eof",
@@ -7278,7 +7278,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "attacker_controlled_parser_text_is_stored_as_bounded_utf8_excerpts",
@@ -7314,7 +7314,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "rejected_parser_diagnostic_allocation_is_independent_of_token_length",
@@ -7344,7 +7344,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--lib",
             "model_bytes::tests::opaque_metadata_classification_advances_monotonically",
             "--quiet",
@@ -7373,7 +7373,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "circuit_byte_tags_serialize_without_loss",
@@ -7391,8 +7391,8 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::Circuit::to_stim_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::Circuit::to_stim_bytes"
           }
         ],
         "standalone": true
@@ -7408,7 +7408,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "circuit_byte_tags_expose_exact_opaque_bytes",
@@ -7426,12 +7426,12 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitInstruction::tag_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::CircuitInstruction::tag_bytes"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::RepeatBlock::tag_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::RepeatBlock::tag_bytes"
           }
         ],
         "standalone": true
@@ -7447,7 +7447,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "dem_byte_tags_expose_and_serialize_exact_opaque_bytes",
@@ -7466,16 +7466,16 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DetectorErrorModel::to_dem_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DetectorErrorModel::to_dem_bytes"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DemInstruction::tag_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DemInstruction::tag_bytes"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::DemRepeatBlock::tag_bytes"
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::DemRepeatBlock::tag_bytes"
           }
         ],
         "standalone": true
@@ -7817,7 +7817,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
             "model_parse_diagnostics",
             "parse_resource_failures_carry_the_rejected_source_span",
@@ -12824,7 +12824,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_target_text_round_trip_matches_stim",
@@ -12874,7 +12874,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_target_accessors_match_stim",
@@ -12973,7 +12973,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_target_inversion_matches_stim",
@@ -13008,7 +13008,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "cq2_stim_format",
           "cq2_stim_format_target_classification_matches_stim",
@@ -18836,6 +18836,205 @@
         }
       ],
       "standalone": true
+    },
+    {
+      "id": "a6-model-folded-dem-traversal-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "folded_dem_traversal",
+          "folded_dem_traversal_contract_is_compact_semantic_and_cancellable",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The compact tree retains one node per source item, semantic traversal state advances checked detector and coordinate shifts without materializing repeats, and every repeat policy plus visitor cancellation has an exact model-owned contract."
+      },
+      "negative_axes": [
+        "compact-structure-expansion",
+        "detector-offset-drift",
+        "coordinate-shift-drift",
+        "repeat-policy-conflation",
+        "selected-iteration-order",
+        "late-cancellation"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary::detector_shift"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary::detector_count"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary::observable_count"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary::error_count"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemBlockSummary::max_repeat_depth"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal::new"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal::root"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal::try_visit"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal::try_visit_with_coordinates"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemTraversal::validate_repeat_depth"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemBlock"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemBlock::compact_id"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemBlock::items"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemBlock::summary"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemItem"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemTraversalState"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemTraversalState::detector_offset"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemTraversalState::coordinate_shift"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemTraversalState::folded_repeat_depth"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemTraversalState::folded_repeat_multiplicity"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::DemRepeatSelection"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor::Error"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::MAX_DEM_REPEAT_NESTING"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor::visit_instruction"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor::enter_repeat"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor::exit_repeat"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::shifted_detector"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::shifted_targets"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::shifted_coordinates"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a6-model-folded-dem-traversal-resource-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "folded_dem_traversal",
+          "folded_dem_traversal_enforces_exact_expansion_limit_before_callbacks",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The traversal admits the exact caller-selected cumulative repeat count, rejects the first excess before body callbacks, and delegates the typed operation error to the consumer exactly once."
+      },
+      "negative_axes": [
+        "repeat-expansion-off-by-one",
+        "callback-before-admission",
+        "consumer-error-hook-bypass"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::FoldedDemVisitor::repeat_expansion_limit_error"
+        }
+      ],
+      "standalone": true
     }
   ],
   "public_api_aliases": [
@@ -19461,8 +19660,8 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_append_circuit_to_circuit"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_circuit"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::concatenated"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::append_circuit"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::concatenated"}
       ]
     },
     {
@@ -19475,12 +19674,12 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_insert"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_item"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_instruction"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_circuit"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_repeat_block"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::pop_item"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::pop_last_item"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::insert_item"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::insert_instruction"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::insert_circuit"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::insert_repeat_block"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::pop_item"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::pop_last_item"}
       ]
     },
     {
@@ -19492,12 +19691,12 @@
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.for_each_operation_reverse"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::items"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_items"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::item_range"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::instruction_range"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_flattened_instructions"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_flattened_instructions_reverse"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::items"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::iter_items"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::item_range"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::instruction_range"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::iter_flattened_instructions"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::iter_flattened_instructions_reverse"}
       ]
     },
     {
@@ -19508,9 +19707,9 @@
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.coords_of_detector"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::coordinates_of_detector"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::detector_coordinates_for"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::detector_coordinates"}
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::coordinates_of_detector"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::detector_coordinates_for"},
+        {"crate_name": "stab_model", "owner_path": "stab_model::Circuit::detector_coordinates"}
       ]
     },
     {

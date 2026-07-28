@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "2a93cf312f51b814658f47e07fe0f89dbee94b9dd40f26816d827220e8db2d19",
+  "performance_inventory_sha256": "25285a77ebbf0c62bcf80d2502fe4743d785723aea545f7f4b25962165b8b45e",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -230,7 +230,7 @@
         "cq-evidence-qualification-e660819ae9a223c6",
         "cq-evidence-qualification-ef933925fb901877"
       ],
-      "owner": "stab-core/circuit-printer",
+      "owner": "stab-model/circuit-printer",
       "profiler_note": null
     },
     {
@@ -272,7 +272,7 @@
         "cq-evidence-qualification-633fa529edf5f549",
         "cq-evidence-qualification-e660819ae9a223c6"
       ],
-      "owner": "stab-core/circuit-parser",
+      "owner": "stab-model/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
         "sha256": "faf4355da06eecbadc22aa543c687af533d7a6aa2b08d932e3c654478f39a1ab"
@@ -1145,10 +1145,10 @@
     "cq-evidence-qualification-966ab53fd109b7b3",
     "cq-evidence-qualification-ae2cf29058be84b0"
       ],
-      "owner": "stab-core/dem-parser",
+      "owner": "stab-model/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "6042b4c97ffc7aa537b13dccc4e995600fd5b32706c13bfbfef18ab2721c7dde"
+        "sha256": "13273d49634bc7a77fa169d5a8a5f8e548408ad74c9b6f8b717c29a1cb82ea2e"
       },
       "comparator_sources": [
         {
@@ -1250,10 +1250,10 @@
     "cq-evidence-qualification-966ab53fd109b7b3",
     "cq-evidence-qualification-ae2cf29058be84b0"
       ],
-      "owner": "stab-core/dem-printer",
+      "owner": "stab-model/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "6042b4c97ffc7aa537b13dccc4e995600fd5b32706c13bfbfef18ab2721c7dde"
+        "sha256": "13273d49634bc7a77fa169d5a8a5f8e548408ad74c9b6f8b717c29a1cb82ea2e"
       },
       "comparator_sources": [
         {

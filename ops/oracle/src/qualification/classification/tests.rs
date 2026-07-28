@@ -251,6 +251,38 @@ fn classifications_distinguish_selected_execution_domains() {
     );
     assert_eq!(
         classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/circuit.rs"),
+            "stab_model::Circuit",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/circuit/api.rs"),
+            "stab_model::Circuit::from_stim_bytes",
+        ),
+        Some(FeatureId::StimFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/dem.rs"),
+            "stab_model::DetectorErrorModel",
+        ),
+        Some(FeatureId::DemFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/fingerprint.rs"),
+            "stab_model::ModelFingerprint",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
             "stab_core",
             Path::new("crates/stab-core/src/detection/output.rs"),
             "stab_core::write_detection_records",

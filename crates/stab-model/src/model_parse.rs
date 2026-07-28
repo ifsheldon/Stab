@@ -1,5 +1,7 @@
-use crate::{ByteSpan, CircuitError, ModelDialect, ParseErrorCode, ParseErrorContext};
-use stab_model::advanced::{byte_span_from_valid_range, parse_error_with_human_message};
+use crate::{
+    ByteSpan, ModelDialect, ModelError, ParseErrorCode, ParseErrorContext, ValidationError,
+    advanced::{byte_span_from_valid_range, parse_error_with_human_message},
+};
 
 pub(crate) fn line_error(
     dialect: ModelDialect,
@@ -9,7 +11,7 @@ pub(crate) fn line_error(
     legacy_detail: impl Into<String>,
     span: ByteSpan,
     context: ParseErrorContext,
-) -> CircuitError {
+) -> ModelError {
     debug_assert_eq!(context.dialect(), dialect);
     parse_error_with_human_message(
         code,
@@ -30,7 +32,7 @@ pub(crate) fn plain_error(
     human_message: impl Into<String>,
     span: ByteSpan,
     context: ParseErrorContext,
-) -> CircuitError {
+) -> ModelError {
     parse_error_with_human_message(code, message, human_message, span, context).into()
 }
 
@@ -40,36 +42,33 @@ pub(crate) fn validation_error(
     instruction: &str,
     code: ParseErrorCode,
     span: ByteSpan,
-    error: CircuitError,
+    error: ModelError,
     prefix_line: bool,
-) -> CircuitError {
-    if matches!(
-        error,
-        CircuitError::Parse(_) | CircuitError::ResourceLimit(_)
-    ) {
-        return error;
-    }
-    let message = match &error {
-        CircuitError::ParseLine { message, .. }
-        | CircuitError::InvalidDetectorErrorModel { message } => message.clone(),
-        _ => error.to_string(),
+) -> ModelError {
+    let validation = match error {
+        ModelError::Parse(_) | ModelError::ResourceLimit(_) => return error,
+        ModelError::Validation(validation) => validation,
+    };
+    let message = match &validation {
+        ValidationError::InvalidDetectorErrorModel { message } => message.clone(),
+        _ => validation.to_string(),
     };
     let human_message = if prefix_line {
-        format!("failed to parse line {line_number}: {error}")
+        format!("failed to parse line {line_number}: {validation}")
     } else {
-        error.to_string()
+        validation.to_string()
     };
-    let context = match &error {
-        CircuitError::UnknownGate(name) => ParseErrorContext::Instruction {
+    let context = match &validation {
+        ValidationError::UnknownGate(name) => ParseErrorContext::Instruction {
             dialect,
             instruction: name.clone(),
         },
-        CircuitError::InvalidDomainValue { kind, value } => ParseErrorContext::DomainValue {
+        ValidationError::InvalidDomainValue { kind, value } => ParseErrorContext::DomainValue {
             dialect,
             kind,
             value: value.clone(),
         },
-        CircuitError::InvalidArgumentCount {
+        ValidationError::InvalidArgumentCount {
             gate,
             expected,
             actual,
@@ -79,22 +78,31 @@ pub(crate) fn validation_error(
             expected,
             actual: *actual,
         },
-        CircuitError::InvalidArgument { gate, argument } => ParseErrorContext::Argument {
+        ValidationError::InvalidArgument { gate, argument } => ParseErrorContext::Argument {
             dialect,
             instruction: (*gate).to_string(),
             argument: argument.clone(),
         },
-        CircuitError::InvalidTarget { gate, target } => ParseErrorContext::Target {
+        ValidationError::InvalidTarget { gate, target } => ParseErrorContext::Target {
             dialect,
             instruction: (*gate).to_string(),
             target: target.clone(),
         },
-        CircuitError::InvalidTargetCount { gate, count } => ParseErrorContext::TargetCount {
+        ValidationError::InvalidTargetCount { gate, count } => ParseErrorContext::TargetCount {
             dialect,
             instruction: (*gate).to_string(),
             actual: *count,
         },
-        _ if instruction.is_empty() => ParseErrorContext::Model { dialect },
+        ValidationError::CircuitCountOverflow
+        | ValidationError::CoordinateShiftDimensionMissing
+        | ValidationError::CoordinateShiftOverflow
+        | ValidationError::DetectorCountOverflow
+        | ValidationError::DetectorIndexOutOfRange { .. }
+        | ValidationError::DetectorCoordinateLookupFailed
+            if instruction.is_empty() =>
+        {
+            ParseErrorContext::Model { dialect }
+        }
         _ => ParseErrorContext::Instruction {
             dialect,
             instruction: instruction.to_string(),
@@ -103,7 +111,7 @@ pub(crate) fn validation_error(
     parse_error_with_human_message(code, message, human_message, span, context).into()
 }
 
-pub(crate) fn unexpected_repeat_terminator(dialect: ModelDialect, span: ByteSpan) -> CircuitError {
+pub(crate) fn unexpected_repeat_terminator(dialect: ModelDialect, span: ByteSpan) -> ModelError {
     plain_error(
         ParseErrorCode::UnexpectedRepeatTerminator,
         "unexpected repeat block terminator",
@@ -113,7 +121,7 @@ pub(crate) fn unexpected_repeat_terminator(dialect: ModelDialect, span: ByteSpan
     )
 }
 
-pub(crate) fn unterminated_repeat_block(dialect: ModelDialect, input_len: usize) -> CircuitError {
+pub(crate) fn unterminated_repeat_block(dialect: ModelDialect, input_len: usize) -> ModelError {
     plain_error(
         ParseErrorCode::UnterminatedRepeatBlock,
         "unterminated repeat block",

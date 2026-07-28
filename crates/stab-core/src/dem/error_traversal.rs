@@ -71,6 +71,8 @@ impl<F> FoldedDemVisitor for SearchErrorVisitor<F>
 where
     F: FnMut(&DemInstruction, u64) -> CircuitResult<()>,
 {
+    type Error = CircuitError;
+
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
@@ -296,7 +298,11 @@ fn update_search_instruction_count(
                 )
             })
         }
-        DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => Ok(Some(count)),
+        DemInstructionKind::ShiftDetectors
+            if crate::dem::dem_instruction_detector_shift(instruction)? == 0 =>
+        {
+            Ok(Some(count))
+        }
         DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => Ok(Some(count)),
         DemInstructionKind::ShiftDetectors => Ok(None),
     }
@@ -452,7 +458,7 @@ fn shifted_detector(detector: DemDetectorId, detector_offset: u64) -> CircuitRes
     let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
         CircuitError::invalid_detector_error_model("DEM nonzero-error detector target overflowed")
     })?;
-    DemDetectorId::try_new(detector_id)
+    DemDetectorId::try_new(detector_id).map_err(Into::into)
 }
 
 #[derive(Clone, Debug)]

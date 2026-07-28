@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use stab_core::{
     ByteSpan, CircuitError, DetsResultType, DiagnosticSeverity, FormatError, FormatErrorContext,
-    ModelDialect, ParseError, ParseErrorContext, ResourceLimitError, RunError,
+    ModelDialect, ModelError, ParseError, ParseErrorContext, ResourceLimitError, RunError,
 };
 use thiserror::Error;
 
@@ -130,6 +130,12 @@ pub(crate) enum CliError {
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
+}
+
+impl From<ModelError> for CliError {
+    fn from(error: ModelError) -> Self {
+        Self::Circuit(error.into())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]

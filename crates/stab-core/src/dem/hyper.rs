@@ -367,7 +367,7 @@ impl Graph {
                         "hypergraph node index does not fit detector id",
                     )
                 })?;
-                DemDetectorId::try_new(index)
+                DemDetectorId::try_new(index).map_err(Into::into)
             }
             DetectorIndex::Sparse {
                 node_to_detector, ..

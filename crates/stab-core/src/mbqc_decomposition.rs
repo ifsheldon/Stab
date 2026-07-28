@@ -7,7 +7,7 @@ use crate::{Circuit, CircuitResult, Gate};
 /// return `Ok(None)` instead of a partial circuit.
 pub fn mbqc_decomposition(gate: Gate) -> CircuitResult<Option<Circuit>> {
     mbqc_decomposition_text(gate)
-        .map(Circuit::from_stim_str)
+        .map(|text| Circuit::from_stim_str(text).map_err(Into::into))
         .transpose()
 }
 

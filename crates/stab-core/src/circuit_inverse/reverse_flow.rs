@@ -197,7 +197,7 @@ impl ReverseFlowEngine {
                 )?;
             }
 
-            let tracker_instruction = CircuitInstruction::new_with_tag_bytes(
+            let tracker_instruction = crate::circuit::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
                 vec![target.clone()],
@@ -340,7 +340,7 @@ impl ReverseFlowEngine {
             "QUBIT_COORDS" => {
                 let shifted = shifted_coordinates(instruction.args(), &self.coordinate_shift);
                 self.qubit_coordinates
-                    .push(CircuitInstruction::new_with_tag_bytes(
+                    .push(crate::circuit::circuit_instruction_with_tag_bytes(
                         instruction.gate(),
                         shifted,
                         instruction.targets().to_vec(),
@@ -478,7 +478,7 @@ impl ReverseFlowEngine {
             return Ok(());
         }
         self.inverted
-            .append_instruction(CircuitInstruction::new_with_tag_bytes(
+            .append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
                 gate, args, targets, tag,
             )?);
         Ok(())

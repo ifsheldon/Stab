@@ -160,9 +160,9 @@ fn apply_dem_model(
     group.memory_policy = dem_memory_policy();
     group.threshold_policy = ThresholdPolicy::Primary1_25;
     group.owner = if serialize {
-        "stab-core/dem-printer"
+        "stab-model/dem-printer"
     } else {
-        "stab-core/dem-parser"
+        "stab-model/dem-parser"
     }
     .to_string();
     group.reason = if serialize {
@@ -806,7 +806,7 @@ fn apply_circuit_parse(group: &mut QualificationGroup) {
         "Process setup and peak RSS are reported separately at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/circuit-parser".to_string();
+    group.owner = "stab-model/circuit-parser".to_string();
     group.reason = "Implemented paired adapter and Rust parser workload with exact CQ2, input, output, scale, timing, and memory bindings."
         .to_string();
     group.status = QualificationStatus::Implemented;
@@ -834,7 +834,7 @@ fn apply_circuit_canonical_print(group: &mut QualificationGroup) {
         "Process setup RSS includes the parsed circuit and peak RSS includes canonical output allocation at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/circuit-printer".to_string();
+    group.owner = "stab-model/circuit-printer".to_string();
     group.reason = "Implemented paired adapter and Rust canonical circuit serialization workload with exact CQ2, input, output, scale, timing, and memory bindings."
         .to_string();
     group.status = QualificationStatus::Implemented;

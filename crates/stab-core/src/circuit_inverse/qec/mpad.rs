@@ -85,7 +85,7 @@ fn build_selected_mpad_record_tail_inverse(
     }
 
     let mut result = Circuit::new();
-    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         mpad.gate(),
         mpad.args().to_vec(),
         mpad.targets().iter().rev().cloned().collect(),
@@ -98,7 +98,7 @@ fn build_selected_mpad_record_tail_inverse(
         if output.targets.is_empty() {
             continue;
         }
-        result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+        result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
             output.gate,
             output.args,
             output.targets,

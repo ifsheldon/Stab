@@ -2,6 +2,7 @@ use std::path::Path;
 
 use super::model::{DeferredProduct, FeatureId, UpstreamDisposition};
 
+mod dem_api;
 mod gate_api;
 mod public_api_helpers;
 mod simulator;
@@ -228,7 +229,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return classify_circuit(&value, symbol);
     }
     if value.contains("/dem/") {
-        return classify_dem(&value, symbol);
+        return dem_api::classify(&value, symbol);
     }
     if value.contains("/gates/") {
         return classify_gates(&value, symbol);
@@ -432,7 +433,8 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::Search);
     }
-    if api_path_mentions_item(&api_lower, "demrepeatcount")
+    if api_path_mentions_item(&api_lower, "demdetectorid")
+        || api_path_mentions_item(&api_lower, "demrepeatcount")
         || api_path_mentions_item(&api_lower, "demobservableid")
     {
         return Some(FeatureId::DemFormat);
@@ -443,13 +445,30 @@ pub(super) fn classify_public_api_source(
     if api_path_mentions_item(&api_lower, "measurerecordoffset") {
         return Some(FeatureId::StimFormat);
     }
+    if ["stab_core::circuit", "stab_model::circuit"]
+        .iter()
+        .any(|prefix| {
+            api_lower == *prefix
+                || api_lower
+                    .strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
+        })
+    {
+        return Some(FeatureId::CircuitApi);
+    }
     if [
+        "circuitflattenedinstructioniter",
+        "circuitflattenedinstructionreviter",
+        "circuitinstruction",
+        "circuititem",
         "circuitdetectorid",
         "modeldialect",
         "modelerror",
+        "modelfingerprint",
         "modelresult",
         "observableid",
         "qubitid",
+        "repeatblock",
         "repeatcount",
         "validationerror",
         "validationerrorcode",
@@ -458,6 +477,22 @@ pub(super) fn classify_public_api_source(
     .any(|marker| api_path_mentions_item(&api_lower, marker))
     {
         return Some(FeatureId::CircuitApi);
+    }
+    if [
+        "demflattenedinstructioniter",
+        "deminstruction",
+        "deminstructionkind",
+        "deminstructiontype",
+        "demitem",
+        "demrepeatblock",
+        "demtarget",
+        "demtargettype",
+        "detectorerrormodel",
+    ]
+    .iter()
+    .any(|marker| api_path_mentions_item(&api_lower, marker))
+    {
+        return Some(FeatureId::DemFormat);
     }
     if ["pauli", "target"]
         .iter()
@@ -492,6 +527,15 @@ pub(super) fn classify_public_api_source(
     }
     if value.starts_with("crates/stab-records/src/") || api_lower.starts_with("stab_records::") {
         return Some(FeatureId::ResultFormats);
+    }
+    if value.starts_with("crates/stab-model/src/circuit") {
+        return Some(FeatureId::CircuitApi);
+    }
+    if value.starts_with("crates/stab-model/src/dem") {
+        return Some(FeatureId::DemFormat);
+    }
+    if value == "crates/stab-model/src/fingerprint.rs" {
+        return Some(FeatureId::CircuitApi);
     }
     if matches!(
         value.as_str(),
@@ -993,70 +1037,6 @@ fn circuit_case_has_stim_format_contract(symbol: &str) -> bool {
                 | "without_tags"
                 | "zero_repetitions_not_allowed"
         )
-}
-
-fn classify_dem(value: &str, symbol: &str) -> UpstreamClassification {
-    let leaf = symbol
-        .rsplit('.')
-        .next()
-        .unwrap_or(symbol)
-        .to_ascii_lowercase();
-
-    if value.ends_with("detector_error_model_pybind_test.py") && leaf.contains("shortest_graphlike")
-    {
-        return UpstreamClassification::selected(FeatureId::Search);
-    }
-
-    let binding_only_python_case = if value.ends_with("dem_instruction_pybind_test.py") {
-        matches!(
-            leaf.as_str(),
-            "test_args_copy" | "test_targets_copy" | "test_init_from_str"
-        )
-    } else if value.ends_with("detector_error_model_pybind_test.py") {
-        matches!(
-            leaf.as_str(),
-            "test_init_get"
-                | "test_approx_equals"
-                | "test_append"
-                | "test_append_bad"
-                | "test_coords"
-                | "test_dem_from_file"
-                | "test_dem_to_file"
-                | "test_append_dem_to_dem"
-                | "test_init_parse"
-        )
-    } else {
-        false
-    };
-    let deferred_convenience_case = value.ends_with("detector_error_model.test.cc")
-        && matches!(
-            leaf.as_str(),
-            "from_file" | "py_get_slice" | "mul" | "imul" | "add" | "iadd"
-        );
-    if binding_only_python_case || deferred_convenience_case {
-        return UpstreamClassification::deferred_for(
-            [FeatureId::DemFormat],
-            DeferredProduct::PythonBindings,
-            "Python-style DEM copying, indexing, operators, overloaded append, and file helpers are deferred with Python bindings; selected Rust APIs own their semantic contracts independently.",
-        );
-    }
-
-    if value.ends_with("detector_error_model.test.cc") && leaf == "movement" {
-        return UpstreamClassification::not_applicable(
-            "C++ moved-from object state has no Rust value-semantic compatibility contract.",
-        );
-    }
-
-    if value.ends_with("detector_error_model.test.cc")
-        && leaf == "general"
-        && symbol.to_ascii_lowercase().starts_with("dem_instruction.")
-    {
-        return UpstreamClassification::not_applicable(
-            "This mixed C++ utility case includes DemInstruction::approx_equals, which is not part of the selected Rust API; exact Rust instruction equality, validation, and canonical printing have independent API and semantic owners.",
-        );
-    }
-
-    UpstreamClassification::selected(FeatureId::DemFormat)
 }
 
 fn is_python_binding_shape_only(symbol: &str) -> bool {

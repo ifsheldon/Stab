@@ -3,7 +3,7 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{DemInstruction, DemTarget, DetectorErrorModel};
+use stab_model::{DemInstruction, DemTarget, DetectorErrorModel};
 
 #[test]
 fn dem_count_detectors_rejects_shifted_detector_count_overflow() {

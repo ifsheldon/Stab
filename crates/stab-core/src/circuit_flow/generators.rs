@@ -26,7 +26,7 @@ const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 /// Annotation-only identity output is guarded by an aggregate Pauli-bit budget; broader semantics fail closed.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     if circuit_is_ignored_only(circuit) {
-        let qubit_count = circuit.count_simulated_qubits();
+        let qubit_count = crate::circuit::circuit_simulated_qubit_count(circuit);
         validate_ignored_only_flow_generator_work(qubit_count)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
@@ -364,7 +364,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
 fn scoped_composed_measurement_flow_generators(
     circuit: &Circuit,
 ) -> CircuitResult<Option<Vec<Flow>>> {
-    let qubit_count = circuit.count_simulated_qubits();
+    let qubit_count = crate::circuit::circuit_simulated_qubit_count(circuit);
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         CircuitError::invalid_tableau_conversion(
             "circuit measurement count does not fit usize during flow generation",

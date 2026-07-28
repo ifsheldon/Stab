@@ -31,7 +31,7 @@ pub fn read_stim_circuit_file(path: impl AsRef<Path>) -> CircuitResult<Circuit> 
         return Err(circuit_file_size_error(CIRCUIT_FILE_READ_LIMIT));
     }
 
-    Circuit::from_stim_bytes(&bytes)
+    Circuit::from_stim_bytes(&bytes).map_err(Into::into)
 }
 
 /// Writes canonical `.stim` circuit text to a filesystem path.

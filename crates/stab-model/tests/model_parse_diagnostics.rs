@@ -5,8 +5,8 @@
 
 use std::hint::black_box;
 
-use stab_core::{
-    ByteSpan, Circuit, CircuitError, DetectorErrorModel, DiagnosticSeverity, ModelDialect,
+use stab_model::{
+    ByteSpan, Circuit, DetectorErrorModel, DiagnosticSeverity, ModelDialect, ModelError,
     ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, RepeatNestingLimit,
     SourceLineLimit,
 };
@@ -340,7 +340,7 @@ fn byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode() {
         let resource = error
             .resource_limit_error()
             .expect("byte parser line rejection should be structured");
-        assert_eq!(resource.resource(), stab_core::ResourceKind::SourceLines);
+        assert_eq!(resource.resource(), stab_model::ResourceKind::SourceLines);
         assert_eq!(resource.actual(), 3);
         assert_eq!(resource.limit(), 2);
     }
@@ -368,7 +368,7 @@ fn byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode() {
         let resource = error
             .resource_limit_error()
             .expect("byte parser nesting rejection should be structured");
-        assert_eq!(resource.resource(), stab_core::ResourceKind::RepeatNesting);
+        assert_eq!(resource.resource(), stab_model::ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), 2);
         assert_eq!(resource.limit(), 1);
     }
@@ -390,10 +390,10 @@ fn byte_parsers_report_earlier_repeat_limits_before_later_invalid_utf8() {
         let resource = error
             .resource_limit_error()
             .expect("repeat limit should precede later invalid UTF-8");
-        assert_eq!(resource.resource(), stab_core::ResourceKind::RepeatNesting);
+        assert_eq!(resource.resource(), stab_model::ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), 2);
         assert_eq!(resource.limit(), 1);
-        assert_eq!(resource.span(), Some(span(11, 10)));
+        assert_eq!(resource.span(), span(11, 10));
     }
 }
 
@@ -407,7 +407,7 @@ fn parse_resource_failures_carry_the_rejected_source_span() {
     let circuit_resource = circuit_error
         .resource_limit_error()
         .expect("typed circuit resource failure");
-    assert_eq!(circuit_resource.span(), Some(span(11, 10)));
+    assert_eq!(circuit_resource.span(), span(11, 10));
     assert_eq!(
         circuit_error.to_string(),
         "failed to parse line 2: repeat nesting exceeds current limit 1"
@@ -419,7 +419,7 @@ fn parse_resource_failures_carry_the_rejected_source_span() {
     let dem_resource = dem_error
         .resource_limit_error()
         .expect("typed DEM resource failure");
-    assert_eq!(dem_resource.span(), Some(span(11, 10)));
+    assert_eq!(dem_resource.span(), span(11, 10));
     assert_eq!(
         dem_error.to_string(),
         "invalid detector error model: DEM repeat nesting exceeds current limit 1"
@@ -627,7 +627,7 @@ fn circuit_byte_tags_expose_exact_opaque_bytes() {
     let instruction = circuit
         .items()
         .first()
-        .and_then(stab_core::CircuitItem::as_instruction)
+        .and_then(stab_model::CircuitItem::as_instruction)
         .expect("fixture instruction");
     assert_eq!(instruction.tag_bytes(), Some(b"\xff]\\\r\n".as_slice()));
 
@@ -636,7 +636,7 @@ fn circuit_byte_tags_expose_exact_opaque_bytes() {
     let repeat = circuit_repeat
         .items()
         .first()
-        .and_then(stab_core::CircuitItem::as_repeat_block)
+        .and_then(stab_model::CircuitItem::as_repeat_block)
         .expect("fixture repeat");
     assert_eq!(repeat.tag_bytes(), Some(b"\xff".as_slice()));
 }
@@ -659,8 +659,8 @@ fn dem_byte_tags_expose_and_serialize_exact_opaque_bytes() {
         .items()
         .iter()
         .find_map(|item| match item {
-            stab_core::DemItem::Instruction(instruction) => Some(instruction),
-            stab_core::DemItem::RepeatBlock(_) => None,
+            stab_model::DemItem::Instruction(instruction) => Some(instruction),
+            stab_model::DemItem::RepeatBlock(_) => None,
         })
         .expect("fixture instruction");
     assert_eq!(instruction.tag_bytes(), Some(b"\xff]\\\r\n".as_slice()));
@@ -675,8 +675,8 @@ fn dem_byte_tags_expose_and_serialize_exact_opaque_bytes() {
         .items()
         .iter()
         .find_map(|item| match item {
-            stab_core::DemItem::Instruction(_) => None,
-            stab_core::DemItem::RepeatBlock(repeat) => Some(repeat),
+            stab_model::DemItem::Instruction(_) => None,
+            stab_model::DemItem::RepeatBlock(repeat) => Some(repeat),
         })
         .expect("fixture repeat");
     assert_eq!(repeat.tag_bytes(), Some(b"\xff".as_slice()));
@@ -876,10 +876,10 @@ fn default_repeat_depth_rejects_the_first_unsafe_header_without_stack_overflow()
     );
     assert_eq!(
         circuit_resource.span(),
-        Some(span(
+        span(
             RepeatNestingLimit::HARD_MAX * "REPEAT 1 {\n".len(),
             "REPEAT 1 {".len(),
-        ))
+        )
     );
 
     let dem = nested_model(
@@ -898,15 +898,15 @@ fn default_repeat_depth_rejects_the_first_unsafe_header_without_stack_overflow()
     assert_eq!(dem_resource.limit(), RepeatNestingLimit::HARD_MAX as u64);
     assert_eq!(
         dem_resource.span(),
-        Some(span(
+        span(
             RepeatNestingLimit::HARD_MAX * "repeat 1 {\n".len(),
             "repeat 1 {".len(),
-        ))
+        )
     );
 }
 
 fn assert_parse_error(
-    error: CircuitError,
+    error: ModelError,
     expected_code: ParseErrorCode,
     expected_span: ByteSpan,
     expected_message: &str,
@@ -925,7 +925,7 @@ fn assert_parse_error(
 }
 
 fn assert_code_and_span(
-    error: &CircuitError,
+    error: &ModelError,
     expected_code: ParseErrorCode,
     expected_span: ByteSpan,
 ) {

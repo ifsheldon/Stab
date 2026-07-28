@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    CircuitDetectorId, CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount,
+    CircuitDetectorId, GateTargetGroupKind, ModelError, ModelResult, QubitId, RepeatCount,
     ValidationError,
 };
 
@@ -25,7 +25,7 @@ impl Circuit {
     /// The text is parsed into a temporary circuit before mutating `self`, so parse failures leave
     /// the existing circuit unchanged. Appended instructions use the normal append path, including
     /// Stim-style fusion with the previous instruction when applicable.
-    pub fn append_from_stim_text(&mut self, input: &str) -> CircuitResult<()> {
+    pub fn append_from_stim_text(&mut self, input: &str) -> ModelResult<()> {
         let parsed = Self::from_stim_str(input)?;
         for item in parsed.items {
             self.append_item(item);
@@ -34,7 +34,7 @@ impl Circuit {
     }
 
     /// Compatibility alias matching Stim's Python API name.
-    pub fn append_from_stim_program_text(&mut self, input: &str) -> CircuitResult<()> {
+    pub fn append_from_stim_program_text(&mut self, input: &str) -> ModelResult<()> {
         self.append_from_stim_text(input)
     }
 
@@ -53,7 +53,7 @@ impl Circuit {
     }
 
     /// Returns this circuit repeated using Stim's repeat-block special cases.
-    pub fn repeated(&self, repetitions: u64) -> CircuitResult<Self> {
+    pub fn repeated(&self, repetitions: u64) -> ModelResult<Self> {
         if repetitions == 0 {
             return Ok(Self::new());
         }
@@ -85,13 +85,13 @@ impl Circuit {
     }
 
     /// Mutates this circuit into its repeated form.
-    pub fn repeat_in_place(&mut self, repetitions: u64) -> CircuitResult<()> {
+    pub fn repeat_in_place(&mut self, repetitions: u64) -> ModelResult<()> {
         *self = self.repeated(repetitions)?;
         Ok(())
     }
 
     /// Inserts an item, fusing compatible instruction boundaries around the insertion point.
-    pub fn insert_item(&mut self, index: usize, item: CircuitItem) -> CircuitResult<()> {
+    pub fn insert_item(&mut self, index: usize, item: CircuitItem) -> ModelResult<()> {
         validate_insert_index(index, self.items.len())?;
         self.items.insert(index, item);
         self.fuse_inserted_range(index, 1);
@@ -103,17 +103,17 @@ impl Circuit {
         &mut self,
         index: usize,
         instruction: CircuitInstruction,
-    ) -> CircuitResult<()> {
+    ) -> ModelResult<()> {
         self.insert_item(index, CircuitItem::Instruction(instruction))
     }
 
     /// Inserts a repeat block at the requested top-level item index.
-    pub fn insert_repeat_block(&mut self, index: usize, repeat: RepeatBlock) -> CircuitResult<()> {
+    pub fn insert_repeat_block(&mut self, index: usize, repeat: RepeatBlock) -> ModelResult<()> {
         self.insert_item(index, CircuitItem::RepeatBlock(repeat))
     }
 
     /// Inserts a copy of another circuit, fusing compatible instruction boundaries.
-    pub fn insert_circuit(&mut self, index: usize, other: &Self) -> CircuitResult<()> {
+    pub fn insert_circuit(&mut self, index: usize, other: &Self) -> ModelResult<()> {
         validate_insert_index(index, self.items.len())?;
         let inserted_len = other.items.len();
         if inserted_len == 0 {
@@ -125,7 +125,7 @@ impl Circuit {
     }
 
     /// Removes and returns the top-level item at `index`.
-    pub fn pop_item(&mut self, index: usize) -> CircuitResult<CircuitItem> {
+    pub fn pop_item(&mut self, index: usize) -> ModelResult<CircuitItem> {
         if index >= self.items.len() {
             return Err(pop_index_error(index));
         }
@@ -133,7 +133,7 @@ impl Circuit {
     }
 
     /// Removes and returns the last top-level item.
-    pub fn pop_last_item(&mut self) -> CircuitResult<CircuitItem> {
+    pub fn pop_last_item(&mut self) -> ModelResult<CircuitItem> {
         let index = self
             .items
             .len()
@@ -142,8 +142,8 @@ impl Circuit {
         self.pop_item(index)
     }
 
-    pub fn count_measurements(&self) -> CircuitResult<u64> {
-        flat_sum_operations(self, |instruction| -> CircuitResult<u64> {
+    pub fn count_measurements(&self) -> ModelResult<u64> {
+        flat_sum_operations(self, |instruction| -> ModelResult<u64> {
             if instruction.gate().produces_measurements() {
                 u64::try_from(instruction_target_group_count(instruction))
                     .map_err(|_| circuit_count_overflow())
@@ -153,13 +153,13 @@ impl Circuit {
         })
     }
 
-    pub fn count_detectors(&self) -> CircuitResult<u64> {
+    pub fn count_detectors(&self) -> ModelResult<u64> {
         flat_sum_operations(self, |instruction| {
             Ok(u64::from(instruction.gate().canonical_name() == "DETECTOR"))
         })
     }
 
-    pub fn count_observables(&self) -> CircuitResult<u64> {
+    pub fn count_observables(&self) -> ModelResult<u64> {
         max_operation_property(self, |instruction| {
             if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE" {
                 instruction
@@ -171,13 +171,13 @@ impl Circuit {
         })
     }
 
-    pub fn count_ticks(&self) -> CircuitResult<u64> {
+    pub fn count_ticks(&self) -> ModelResult<u64> {
         flat_sum_operations(self, |instruction| {
             Ok(u64::from(instruction.gate().canonical_name() == "TICK"))
         })
     }
 
-    pub fn count_sweep_bits(&self) -> CircuitResult<u64> {
+    pub fn count_sweep_bits(&self) -> ModelResult<u64> {
         max_operation_property(self, |instruction| {
             let max_sweep = instruction.targets().iter().filter_map(|target| {
                 target
@@ -188,18 +188,18 @@ impl Circuit {
         })
     }
 
-    pub fn final_coordinate_shift(&self) -> CircuitResult<Vec<f64>> {
+    pub fn final_coordinate_shift(&self) -> ModelResult<Vec<f64>> {
         coordinate_shift_of(self)
     }
 
-    pub fn final_qubit_coordinates(&self) -> CircuitResult<BTreeMap<QubitId, Vec<f64>>> {
+    pub fn final_qubit_coordinates(&self) -> ModelResult<BTreeMap<QubitId, Vec<f64>>> {
         let mut coordinates = BTreeMap::new();
         let mut shift = Vec::new();
         apply_final_qubit_coordinates(self, &mut shift, &mut coordinates)?;
         Ok(coordinates)
     }
 
-    pub fn detector_coordinates(&self) -> CircuitResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
+    pub fn detector_coordinates(&self) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
         let detector_count = self.count_detectors()?;
         let detectors = (0..detector_count)
             .map(CircuitDetectorId::new)
@@ -210,7 +210,7 @@ impl Circuit {
     pub fn detector_coordinates_for(
         &self,
         detectors: impl IntoIterator<Item = CircuitDetectorId>,
-    ) -> CircuitResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
+    ) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
         let detectors = detectors.into_iter().collect::<BTreeSet<_>>();
         let mut scan = DetectorCoordinateScan::new(detectors);
         scan.visit_circuit(self, &mut Vec::new())?;
@@ -224,7 +224,7 @@ impl Circuit {
         Ok(scan.out)
     }
 
-    pub fn coordinates_of_detector(&self, detector: CircuitDetectorId) -> CircuitResult<Vec<f64>> {
+    pub fn coordinates_of_detector(&self, detector: CircuitDetectorId) -> ModelResult<Vec<f64>> {
         let mut coordinates = self.detector_coordinates_for([detector])?;
         coordinates
             .remove(&detector)
@@ -276,13 +276,13 @@ impl Circuit {
 
 fn flat_sum_operations(
     circuit: &Circuit,
-    mut count_instruction: impl FnMut(&CircuitInstruction) -> CircuitResult<u64>,
-) -> CircuitResult<u64> {
+    mut count_instruction: impl FnMut(&CircuitInstruction) -> ModelResult<u64>,
+) -> ModelResult<u64> {
     fn visit(
         circuit: &Circuit,
         multiplier: u64,
-        count_instruction: &mut impl FnMut(&CircuitInstruction) -> CircuitResult<u64>,
-    ) -> CircuitResult<u64> {
+        count_instruction: &mut impl FnMut(&CircuitInstruction) -> ModelResult<u64>,
+    ) -> ModelResult<u64> {
         let mut count = 0_u64;
         for item in circuit.items() {
             match item {
@@ -312,17 +312,17 @@ fn flat_sum_operations(
     visit(circuit, 1, &mut count_instruction)
 }
 
-fn circuit_count_overflow() -> CircuitError {
+fn circuit_count_overflow() -> ModelError {
     ValidationError::CircuitCountOverflow.into()
 }
 
-fn repetition_count_overflow() -> CircuitError {
-    CircuitError::invalid_domain_value("repetition count", "overflowed")
+fn repetition_count_overflow() -> ModelError {
+    ModelError::invalid_domain_value("repetition count", "overflowed")
 }
 
-fn validate_insert_index(index: usize, len: usize) -> CircuitResult<()> {
+fn validate_insert_index(index: usize, len: usize) -> ModelResult<()> {
     if index > len {
-        return Err(CircuitError::invalid_domain_value(
+        return Err(ModelError::invalid_domain_value(
             "circuit insertion index",
             index,
         ));
@@ -330,11 +330,11 @@ fn validate_insert_index(index: usize, len: usize) -> CircuitResult<()> {
     Ok(())
 }
 
-fn pop_index_error(index: impl ToString) -> CircuitError {
-    CircuitError::invalid_domain_value("circuit pop index", index)
+fn pop_index_error(index: impl ToString) -> ModelError {
+    ModelError::invalid_domain_value("circuit pop index", index)
 }
 
-fn detector_count_overflow() -> CircuitError {
+fn detector_count_overflow() -> ModelError {
     ValidationError::DetectorCountOverflow.into()
 }
 
@@ -366,12 +366,12 @@ fn pauli_product_target_group_count(instruction: &CircuitInstruction) -> usize {
 
 fn max_operation_property(
     circuit: &Circuit,
-    mut instruction_property: impl FnMut(&CircuitInstruction) -> CircuitResult<Option<u64>>,
-) -> CircuitResult<u64> {
+    mut instruction_property: impl FnMut(&CircuitInstruction) -> ModelResult<Option<u64>>,
+) -> ModelResult<u64> {
     fn visit(
         circuit: &Circuit,
-        instruction_property: &mut impl FnMut(&CircuitInstruction) -> CircuitResult<Option<u64>>,
-    ) -> CircuitResult<u64> {
+        instruction_property: &mut impl FnMut(&CircuitInstruction) -> ModelResult<Option<u64>>,
+    ) -> ModelResult<u64> {
         let mut max_value = 0_u64;
         for item in circuit.items() {
             match item {
@@ -391,13 +391,13 @@ fn max_operation_property(
     visit(circuit, &mut instruction_property)
 }
 
-fn coordinate_shift_of(circuit: &Circuit) -> CircuitResult<Vec<f64>> {
+fn coordinate_shift_of(circuit: &Circuit) -> ModelResult<Vec<f64>> {
     let mut shift = Vec::new();
     apply_coordinate_shift_of(circuit, &mut shift)?;
     Ok(shift)
 }
 
-fn apply_coordinate_shift_of(circuit: &Circuit, shift: &mut Vec<f64>) -> CircuitResult<()> {
+fn apply_coordinate_shift_of(circuit: &Circuit, shift: &mut Vec<f64>) -> ModelResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
@@ -420,7 +420,7 @@ fn apply_final_qubit_coordinates(
     circuit: &Circuit,
     shift: &mut Vec<f64>,
     coordinates: &mut BTreeMap<QubitId, Vec<f64>>,
-) -> CircuitResult<()> {
+) -> ModelResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => match instruction.gate().canonical_name() {
@@ -477,7 +477,7 @@ impl DetectorCoordinateScan {
         self.desired.get(self.desired_cursor).copied()
     }
 
-    fn visit_circuit(&mut self, circuit: &Circuit, shift: &mut Vec<f64>) -> CircuitResult<()> {
+    fn visit_circuit(&mut self, circuit: &Circuit, shift: &mut Vec<f64>) -> ModelResult<()> {
         for item in circuit.items() {
             if self.next_unresolved_detector().is_none() {
                 return Ok(());
@@ -492,7 +492,7 @@ impl DetectorCoordinateScan {
         Ok(())
     }
 
-    fn visit_repeat(&mut self, repeat: &RepeatBlock, shift: &mut Vec<f64>) -> CircuitResult<()> {
+    fn visit_repeat(&mut self, repeat: &RepeatBlock, shift: &mut Vec<f64>) -> ModelResult<()> {
         let body = repeat.body();
         let body_detector_count = body.count_detectors()?;
         let body_shift = coordinate_shift_of(body)?;
@@ -541,7 +541,7 @@ impl DetectorCoordinateScan {
         &mut self,
         instruction: &CircuitInstruction,
         shift: &mut Vec<f64>,
-    ) -> CircuitResult<()> {
+    ) -> ModelResult<()> {
         match instruction.gate().canonical_name() {
             "SHIFT_COORDS" => {
                 if let Some(args) = instruction.coordinate_arguments() {
@@ -558,7 +558,7 @@ impl DetectorCoordinateScan {
         &mut self,
         instruction: &CircuitInstruction,
         shift: &[f64],
-    ) -> CircuitResult<()> {
+    ) -> ModelResult<()> {
         let detector_id = CircuitDetectorId::new(self.next_detector_index);
         if self
             .next_unresolved_detector()
@@ -582,14 +582,14 @@ fn add_coordinate_shift_mul(
     shift: &mut Vec<f64>,
     delta: &[f64],
     multiplier: f64,
-) -> CircuitResult<()> {
+) -> ModelResult<()> {
     if shift.len() < delta.len() {
         shift.resize(delta.len(), 0.0);
     }
     for (index, value) in delta.iter().enumerate() {
         let coordinate = shift
             .get_mut(index)
-            .ok_or_else(|| CircuitError::from(ValidationError::CoordinateShiftDimensionMissing))?;
+            .ok_or_else(|| ModelError::from(ValidationError::CoordinateShiftDimensionMissing))?;
         *coordinate += value * multiplier;
         if !coordinate.is_finite() {
             return Err(ValidationError::CoordinateShiftOverflow.into());
@@ -598,7 +598,7 @@ fn add_coordinate_shift_mul(
     Ok(())
 }
 
-fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<f64>> {
+fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> ModelResult<Vec<f64>> {
     let mut shifted = coordinates.to_vec();
     for (index, coordinate) in shifted.iter_mut().enumerate() {
         if let Some(offset) = shift.get(index) {
@@ -611,7 +611,7 @@ fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitRe
     Ok(shifted)
 }
 
-fn shifted_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<f64>> {
+fn shifted_coordinates(coordinates: &[f64], shift: &[f64]) -> ModelResult<Vec<f64>> {
     let mut shifted = coordinates.to_vec();
     if shifted.len() < shift.len() {
         shifted.resize(shift.len(), 0.0);
@@ -619,7 +619,7 @@ fn shifted_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<
     for (index, value) in shift.iter().enumerate() {
         let coordinate = shifted
             .get_mut(index)
-            .ok_or_else(|| CircuitError::from(ValidationError::CoordinateShiftDimensionMissing))?;
+            .ok_or_else(|| ModelError::from(ValidationError::CoordinateShiftDimensionMissing))?;
         *coordinate += *value;
         if !coordinate.is_finite() {
             return Err(ValidationError::CoordinateShiftOverflow.into());

@@ -457,7 +457,7 @@ fn try_clone_execution_instruction(
             ))
         })?;
     targets.extend(instruction.targets().iter().cloned());
-    CircuitInstruction::new_with_tag_bytes(instruction.gate(), args, targets, None)
+    crate::circuit::circuit_instruction_with_tag_bytes(instruction.gate(), args, targets, None)
 }
 
 fn frame_execution_instruction<'a>(
@@ -498,12 +498,14 @@ fn frame_execution_instruction<'a>(
             ))
         })?;
     args.extend_from_slice(instruction.args());
-    Ok(Some(Cow::Owned(CircuitInstruction::new_with_tag_bytes(
-        instruction.gate(),
-        args,
-        targets,
-        None,
-    )?)))
+    Ok(Some(Cow::Owned(
+        crate::circuit::circuit_instruction_with_tag_bytes(
+            instruction.gate(),
+            args,
+            targets,
+            None,
+        )?,
+    )))
 }
 
 fn frame_execution_instruction_disposition(

@@ -4,7 +4,7 @@
     reason = "fuzz smoke uses direct assertions to keep failing generated cases readable"
 )]
 
-use stab_core::Circuit;
+use stab_model::Circuit;
 
 #[test]
 #[ignore = "local long-running M4 parser fuzz smoke"]

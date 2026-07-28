@@ -936,7 +936,8 @@ impl ConversionPlan {
     }
 
     fn add_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        let measurement_count = instruction.measurement_result_count();
+        let measurement_count =
+            crate::circuit::circuit_instruction_measurement_result_count(instruction);
         let next_measurement_count = self
             .measurement_count
             .checked_add(measurement_count)

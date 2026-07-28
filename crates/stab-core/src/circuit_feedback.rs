@@ -83,11 +83,13 @@ impl WithoutFeedbackHelper {
             let body =
                 CircuitAssembler::from_unfused_items(std::mem::take(&mut self.reversed_output))
                     .finish();
-            outer_output.push(CircuitItem::RepeatBlock(RepeatBlock::new_with_tag_bytes(
-                RepeatCount::try_new(1)?,
-                body,
-                repeat.tag_bytes(),
-            )));
+            outer_output.push(CircuitItem::RepeatBlock(
+                crate::circuit::repeat_block_with_tag_bytes(
+                    RepeatCount::try_new(1)?,
+                    body,
+                    repeat.tag_bytes(),
+                ),
+            ));
         }
         self.reversed_output = outer_output;
         Ok(())
@@ -209,7 +211,7 @@ impl WithoutFeedbackHelper {
             if records.is_empty() {
                 continue;
             }
-            let instruction = CircuitInstruction::new_with_tag_bytes(
+            let instruction = crate::circuit::circuit_instruction_with_tag_bytes(
                 Gate::from_name("OBSERVABLE_INCLUDE")?,
                 vec![observable as f64],
                 records
@@ -245,7 +247,11 @@ impl WithoutFeedbackHelper {
             match item {
                 CircuitItem::Instruction(instruction) => {
                     *measurements_in_past = measurements_in_past
-                        .checked_add(instruction.measurement_result_count())
+                        .checked_add(
+                            crate::circuit::circuit_instruction_measurement_result_count(
+                                instruction,
+                            ),
+                        )
                         .ok_or_else(|| {
                             CircuitError::invalid_detector_error_model(
                                 "measurement count overflowed while building feedback-free circuit",
@@ -276,7 +282,7 @@ impl WithoutFeedbackHelper {
                             measurements_in_past,
                             detectors_in_past,
                         )?;
-                        result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                        result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                             RepeatCount::try_new(1)?,
                             body,
                             repeat.tag_bytes(),
@@ -358,7 +364,7 @@ fn flush_growing_loop(
     if repetitions == 1 {
         append_items(result, fused_body.items().to_vec());
     } else {
-        result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+        result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
             RepeatCount::try_new(repetitions)?,
             fused_body,
             tag.as_deref(),
@@ -482,7 +488,7 @@ fn rewritten_detector(
         let index = absolute_record_index(measurements_in_past, offset)?;
         toggle_value(&mut targets, index);
     }
-    CircuitInstruction::new_with_tag_bytes(
+    crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets
@@ -526,7 +532,7 @@ fn instruction_with_targets(
     instruction: &CircuitInstruction,
     targets: Vec<Target>,
 ) -> CircuitResult<CircuitInstruction> {
-    CircuitInstruction::new_with_tag_bytes(
+    crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets,

@@ -250,7 +250,7 @@ fn collect_semantic_instruction(
             apply_coordinate_shift(&mut state.coordinate_shift, instruction.args());
             state.detector_offset = state
                 .detector_offset
-                .checked_add(instruction.detector_shift()?)
+                .checked_add(crate::dem::dem_instruction_detector_shift(instruction)?)
                 .ok_or_else(|| {
                     CircuitError::invalid_detector_error_model("detector shift overflowed")
                 })?;

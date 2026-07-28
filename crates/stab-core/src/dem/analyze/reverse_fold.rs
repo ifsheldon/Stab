@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstruction,
-    DemInstructionKind, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Pauli,
-    Probability, RepeatCount, Target,
+    DemInstructionKind, DemRepeatCount, DemTarget, DetectorErrorModel, Pauli, Probability,
+    RepeatCount, Target,
     sparse_rev_frame_tracker::{
         AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
         search_shifted_recurrence,
@@ -136,7 +136,7 @@ impl ReverseFoldAnalyzer {
             "DETECTOR" => {
                 self.tracker.undo_instruction(instruction)?;
                 self.reversed_model
-                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                    .push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::Detector,
                         instruction.args().to_vec(),
                         vec![DemTarget::relative_detector(self.tracker.detector_count())?],
@@ -151,7 +151,7 @@ impl ReverseFoldAnalyzer {
                     )
                 })?;
                 self.reversed_model
-                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                    .push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::LogicalObservable,
                         Vec::new(),
                         vec![DemTarget::logical_observable(observable.get())?],
@@ -160,7 +160,7 @@ impl ReverseFoldAnalyzer {
             }
             "SHIFT_COORDS" => {
                 self.reversed_model
-                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                    .push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::ShiftDetectors,
                         instruction.args().to_vec(),
                         vec![DemTarget::numeric(0)],
@@ -580,7 +580,7 @@ impl ReverseFoldAnalyzer {
         for ((targets, tag), probability) in probabilities.into_iter().rev() {
             if probability.get() != 0.0 && !targets.is_empty() {
                 self.reversed_model
-                    .push_instruction(DemInstruction::new_with_tag_bytes(
+                    .push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::Error,
                         vec![probability.get()],
                         targets,
@@ -743,7 +743,7 @@ impl ReverseFoldAnalyzer {
 
         self.reversed_model = outer_reversed;
         self.reversed_model
-            .push_repeat_block(DemRepeatBlock::new_with_tag_bytes(
+            .push_repeat_block(crate::dem::dem_repeat_block_with_tag_bytes(
                 DemRepeatCount::new(period_repetitions),
                 period_body,
                 tag,
@@ -797,15 +797,14 @@ fn prepend_detector_shift(
         Some(crate::DemItem::Instruction(instruction))
             if instruction.kind() == crate::DemInstructionKind::ShiftDetectors =>
         {
-            let combined = instruction
-                .detector_shift()?
+            let combined = crate::dem::dem_instruction_detector_shift(instruction)?
                 .checked_add(detector_shift)
                 .ok_or_else(|| {
                     CircuitError::invalid_detector_error_model(
                         "folded analyzer detector shift overflowed",
                     )
                 })?;
-            result.push_instruction(DemInstruction::new_with_tag_bytes(
+            result.push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                 DemInstructionKind::ShiftDetectors,
                 instruction.args().to_vec(),
                 vec![DemTarget::numeric(combined)],

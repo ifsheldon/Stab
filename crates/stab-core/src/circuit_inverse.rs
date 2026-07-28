@@ -1,6 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, StabilizerResource, Tableau, Target,
+    PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau, Target,
     circuit_flow::check_unsigned_flows_with_sparse_tracker,
 };
 
@@ -44,7 +44,7 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let inverse_body = circuit_inverse_unitary(repeat.body())?;
-                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     inverse_body,
                     repeat.tag_bytes(),
@@ -178,7 +178,7 @@ fn inverse_instruction(instruction: &CircuitInstruction) -> CircuitResult<Circui
     }
     let inverse_gate = gate.best_candidate_inverse()?;
     let targets = reversed_target_groups(instruction);
-    CircuitInstruction::new_with_tag_bytes(
+    crate::circuit::circuit_instruction_with_tag_bytes(
         inverse_gate,
         instruction.args().to_vec(),
         targets,

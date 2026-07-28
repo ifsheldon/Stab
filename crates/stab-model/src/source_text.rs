@@ -1,5 +1,4 @@
-use crate::ByteSpan;
-use stab_model::advanced::byte_span_from_valid_range;
+use crate::{ByteSpan, advanced::byte_span_from_valid_range};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SourceSlice<'a> {

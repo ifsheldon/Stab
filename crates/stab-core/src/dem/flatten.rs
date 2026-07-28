@@ -121,64 +121,63 @@ impl Default for DemFlattenLimits {
     }
 }
 
-impl DetectorErrorModel {
-    pub(crate) fn validate_flattening_budget_with_limits(
-        &self,
-        context: &'static str,
-        limits: DemFlattenLimits,
-    ) -> CircuitResult<DemFlatteningBudget> {
-        let mut budget = DemFlatteningBudget::new(limits);
-        self.validate_flattening_budget_items(1, 0, context, &mut budget)?;
-        Ok(budget)
-    }
+pub(crate) fn validate_flattening_budget_with_limits(
+    model: &DetectorErrorModel,
+    context: &'static str,
+    limits: DemFlattenLimits,
+) -> CircuitResult<DemFlatteningBudget> {
+    let mut budget = DemFlatteningBudget::new(limits);
+    validate_flattening_budget_items(model, 1, 0, context, &mut budget)?;
+    Ok(budget)
+}
 
-    fn validate_flattening_budget_items(
-        &self,
-        multiplier: u64,
-        depth: usize,
-        context: &'static str,
-        budget: &mut DemFlatteningBudget,
-    ) -> CircuitResult<()> {
-        if depth > MAX_DEM_REPEAT_NESTING {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-            )));
-        }
-        for item in &self.items {
-            match item {
-                DemItem::Instruction(instruction) => {
-                    budget.add_instruction(instruction, multiplier, context)?;
+fn validate_flattening_budget_items(
+    model: &DetectorErrorModel,
+    multiplier: u64,
+    depth: usize,
+    context: &'static str,
+    budget: &mut DemFlatteningBudget,
+) -> CircuitResult<()> {
+    if depth > MAX_DEM_REPEAT_NESTING {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+        )));
+    }
+    for item in model.items() {
+        match item {
+            DemItem::Instruction(instruction) => {
+                budget.add_instruction(instruction, multiplier, context)?;
+            }
+            DemItem::RepeatBlock(repeat) => {
+                let repeat_count = repeat.repeat_count().get();
+                if repeat_count == 0 {
+                    continue;
                 }
-                DemItem::RepeatBlock(repeat) => {
-                    let repeat_count = repeat.repeat_count.get();
-                    if repeat_count == 0 {
-                        continue;
-                    }
-                    if repeat_count > budget.limits.max_repeat_unroll {
-                        return Err(ResourceLimitError::dem_flatten_repeat_count(
-                            repeat_count,
-                            budget.limits.max_repeat_unroll,
-                        )
-                        .into());
-                    }
-                    let repeated_multiplier =
-                        multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(format!(
-                                "DEM {context} repeat expansion count overflowed"
-                            ))
-                        })?;
-                    budget.add_repeat_iterations(repeated_multiplier, context)?;
-                    repeat.body.validate_flattening_budget_items(
-                        repeated_multiplier,
-                        depth + 1,
-                        context,
-                        budget,
-                    )?;
+                if repeat_count > budget.limits.max_repeat_unroll {
+                    return Err(ResourceLimitError::dem_flatten_repeat_count(
+                        repeat_count,
+                        budget.limits.max_repeat_unroll,
+                    )
+                    .into());
                 }
+                let repeated_multiplier =
+                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(format!(
+                            "DEM {context} repeat expansion count overflowed"
+                        ))
+                    })?;
+                budget.add_repeat_iterations(repeated_multiplier, context)?;
+                validate_flattening_budget_items(
+                    repeat.body(),
+                    repeated_multiplier,
+                    depth + 1,
+                    context,
+                    budget,
+                )?;
             }
         }
-        Ok(())
     }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug)]

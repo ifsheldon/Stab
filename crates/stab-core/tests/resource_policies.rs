@@ -4,7 +4,7 @@
 )]
 
 use stab_core::{
-    Circuit, CircuitError, DetectorErrorModel, Estimate, EstimateClass, ParseLimits,
+    Circuit, CircuitError, DetectorErrorModel, Estimate, EstimateClass, ModelError, ParseLimits,
     RepeatNestingLimit, ResourceKind, ResourceOperation, SourceLineLimit,
 };
 
@@ -457,12 +457,13 @@ fn nested_repeat_text(header: &str, body: &str, depth: usize) -> String {
 }
 
 fn assert_resource_limit(
-    error: &CircuitError,
+    error: &ModelError,
     operation: ResourceOperation,
     resource: ResourceKind,
     actual: u64,
     limit: u64,
 ) {
+    let error = CircuitError::from(error.clone());
     let typed = error
         .resource_limit_error()
         .expect("expected typed resource-limit payload");

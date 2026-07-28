@@ -9,8 +9,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use stab_core::{
-    CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
-    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Probability,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
+    DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult, Probability,
     analysis::{
         detector_error_model_without_tags, flattened_detector_error_model,
         rounded_detector_error_model,
@@ -616,7 +616,7 @@ fn cq2_dem_flattened_iteration_contract_matches_stim() {
     .expect("flattened DEM");
     let instructions = model
         .iter_flattened_instructions()
-        .collect::<CircuitResult<Vec<_>>>()
+        .collect::<ModelResult<Vec<_>>>()
         .expect("lazy flattening");
     assert_eq!(instructions.len(), 6);
     let mut from_iterator = DetectorErrorModel::new();
@@ -644,7 +644,7 @@ fn cq2_dem_flattened_iteration_contract_matches_stim() {
     let first = huge
         .iter_flattened_instructions()
         .take(3)
-        .collect::<CircuitResult<Vec<_>>>()
+        .collect::<ModelResult<Vec<_>>>()
         .expect("bounded lazy prefix");
     assert_eq!(first.len(), 3);
     assert!(flattened_detector_error_model(&huge).is_err());

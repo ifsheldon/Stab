@@ -1,7 +1,7 @@
 use super::CompiledSampler;
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, Gate,
-    MeasureRecordOffset, PauliBasis, PauliSign, PauliString, QubitId, RepeatBlock, Target,
+    MeasureRecordOffset, PauliBasis, PauliSign, PauliString, QubitId, Target,
     circuit_flow::flow_record_index,
 };
 
@@ -167,7 +167,7 @@ fn append_flow_test_block_for_circuit(
             CircuitItem::RepeatBlock(repeat) => {
                 let mut body = Circuit::new();
                 append_flow_test_block_for_circuit(&mut body, repeat.body(), ancilla, observables)?;
-                output.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                output.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
                     repeat.tag_bytes(),
@@ -346,7 +346,7 @@ fn append_one_target_instruction(
     target: Target,
     tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
-    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         Gate::from_name(gate_name)?,
         args,
         vec![target],
@@ -362,7 +362,7 @@ fn append_two_target_instruction(
     second: Target,
     tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
-    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         Gate::from_name(gate_name)?,
         Vec::new(),
         vec![first, second],

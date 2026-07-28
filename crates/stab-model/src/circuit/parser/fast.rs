@@ -1,39 +1,33 @@
 use crate::target::TargetVec;
-use crate::{
-    CircuitResult, Gate, Target,
-    gate::{
-        plain_cx_gate, plain_detector_gate, plain_h_gate, plain_m_gate, plain_s_gate,
-        plain_tick_gate,
-    },
-};
+use crate::{Gate, ModelResult, Target};
 
 use super::CircuitInstruction;
 
 pub(super) fn parse_common_plain_instruction(
     line: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
+) -> Option<ModelResult<CircuitInstruction>> {
     if line == "TICK" {
         return Some(Ok(CircuitInstruction::from_validated_parts(
-            plain_tick_gate(),
+            Gate::plain_tick(),
             Vec::new(),
             TargetVec::new(),
             None,
         )));
     }
     if let Some(rest) = line.strip_prefix("H ") {
-        return parse_common_single_qubit_instruction(plain_h_gate(), rest);
+        return parse_common_single_qubit_instruction(Gate::plain_h(), rest);
     }
     if let Some(rest) = line.strip_prefix("S ") {
-        return parse_common_single_qubit_instruction(plain_s_gate(), rest);
+        return parse_common_single_qubit_instruction(Gate::plain_s(), rest);
     }
     if let Some(rest) = line.strip_prefix("M ").or_else(|| line.strip_prefix("MZ ")) {
-        return parse_common_single_qubit_instruction(plain_m_gate(), rest);
+        return parse_common_single_qubit_instruction(Gate::plain_m(), rest);
     }
     if let Some(rest) = line
         .strip_prefix("CX ")
         .or_else(|| line.strip_prefix("CNOT "))
     {
-        return parse_common_pair_instruction(plain_cx_gate(), rest);
+        return parse_common_pair_instruction(Gate::plain_cx(), rest);
     }
     if let Some(rest) = line.strip_prefix("DETECTOR ") {
         return parse_common_detector_instruction(rest);
@@ -44,7 +38,7 @@ pub(super) fn parse_common_plain_instruction(
 fn parse_common_single_qubit_instruction(
     gate: Gate,
     rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
+) -> Option<ModelResult<CircuitInstruction>> {
     let target = parse_common_qubit_id(rest)?;
     let mut targets = TargetVec::new();
     targets.push(Target::qubit(target, false));
@@ -59,7 +53,7 @@ fn parse_common_single_qubit_instruction(
 fn parse_common_pair_instruction(
     gate: Gate,
     rest: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
+) -> Option<ModelResult<CircuitInstruction>> {
     let (left, right) = rest.split_once(' ')?;
     let left = parse_common_qubit_id(left)?;
     let right = parse_common_qubit_id(right)?;
@@ -94,7 +88,7 @@ fn parse_common_qubit_id(text: &str) -> Option<crate::QubitId> {
     crate::QubitId::new(value).ok()
 }
 
-fn parse_common_detector_instruction(rest: &str) -> Option<CircuitResult<CircuitInstruction>> {
+fn parse_common_detector_instruction(rest: &str) -> Option<ModelResult<CircuitInstruction>> {
     if rest.chars().any(char::is_whitespace) || !rest.starts_with("rec[-") || !rest.ends_with(']') {
         return None;
     }
@@ -105,7 +99,7 @@ fn parse_common_detector_instruction(rest: &str) -> Option<CircuitResult<Circuit
     let mut targets = TargetVec::new();
     targets.push(target);
     Some(Ok(CircuitInstruction::from_validated_parts(
-        plain_detector_gate(),
+        Gate::plain_detector(),
         Vec::new(),
         targets,
         None,

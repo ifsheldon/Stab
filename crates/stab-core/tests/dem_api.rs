@@ -7,9 +7,9 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_core::{
-    CircuitResult, CodeDistance, DemDetectorId, DemInstruction, DemInstructionKind, DemItem,
-    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions,
-    Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    CodeDistance, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock,
+    DemRepeatCount, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, ModelResult, Probability,
+    RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     analysis::{
         detector_error_model_without_tags, flattened_detector_error_model,
         rounded_detector_error_model,
@@ -893,7 +893,7 @@ fn pf1_dem_iterators_item_ranges_and_flattened_iterator_are_typed() {
 
     let flattened = dem
         .iter_flattened_instructions()
-        .collect::<CircuitResult<Vec<_>>>()
+        .collect::<ModelResult<Vec<_>>>()
         .expect("flatten instructions");
     let mut flattened_dem = DetectorErrorModel::new();
     for instruction in flattened {
@@ -915,7 +915,7 @@ fn pf1_dem_iterators_item_ranges_and_flattened_iterator_are_typed() {
     let first_three = huge_repeat
         .iter_flattened_instructions()
         .take(3)
-        .collect::<CircuitResult<Vec<_>>>()
+        .collect::<ModelResult<Vec<_>>>()
         .expect("first flattened instructions");
     assert_eq!(first_three.len(), 3);
     assert!(first_three.iter().all(|instruction| {

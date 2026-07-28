@@ -3,10 +3,6 @@ use thiserror::Error;
 use crate::result_formats::DetsResultType;
 pub use stab_model::{ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext};
 
-pub(crate) fn bounded_parse_diagnostic_text(value: &str) -> String {
-    stab_model::advanced::bounded_parse_diagnostic_text(value)
-}
-
 /// Stable machine-readable result-format failure classes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]

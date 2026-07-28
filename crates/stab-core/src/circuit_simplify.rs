@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
-    Pauli, QubitId, RepeatBlock, SingleQubitClifford, StabilizerError, Target,
+    Pauli, QubitId, SingleQubitClifford, StabilizerError, Target,
 };
 
 /// Rewrites supported Clifford operations into the current base-gate subset.
@@ -37,7 +37,7 @@ fn append_simplified_circuit(circuit: &Circuit, result: &mut Circuit) -> Circuit
                 append_simplified_instruction(instruction, result)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     simplified_circuit(repeat.body())?,
                     repeat.tag_bytes(),
@@ -55,7 +55,7 @@ fn append_decomposed_circuit(circuit: &Circuit, result: &mut Circuit) -> Circuit
                 append_decomposed_instruction(instruction, result)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     decomposed_circuit(repeat.body())?,
                     repeat.tag_bytes(),
@@ -240,7 +240,7 @@ fn append_single_target_sequence(
     tag: Option<&[u8]>,
 ) -> CircuitResult<()> {
     for gate in sequence {
-        result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+        result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
             *gate,
             Vec::new(),
             vec![target.clone()],
@@ -409,7 +409,7 @@ fn append_gate_targets(
     if targets.is_empty() {
         return Ok(());
     }
-    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         gate,
         Vec::new(),
         targets,
@@ -423,7 +423,7 @@ fn append_instruction_group(
     instruction: &CircuitInstruction,
     targets: &[Target],
 ) -> CircuitResult<()> {
-    result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         targets.to_vec(),
@@ -459,7 +459,7 @@ fn append_two_target_sequence(
                     PairOrder::LeftRight => vec![left.clone(), right.clone()],
                     PairOrder::RightLeft => vec![right.clone(), left.clone()],
                 };
-                result.append_instruction(CircuitInstruction::new_with_tag_bytes(
+                result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
                     *gate,
                     Vec::new(),
                     pair,

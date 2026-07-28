@@ -1,21 +1,37 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
+mod circuit;
+mod dem;
 mod diagnostics;
 mod dialect;
 mod error;
+mod fingerprint;
 mod gate;
 mod ids;
+mod model_bytes;
+mod model_parse;
+mod model_tag;
 mod parse_limits;
 mod resource_limit;
 mod resources;
+mod source_text;
 mod target;
 mod validation;
 
+pub use circuit::{
+    Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
+    CircuitInstruction, CircuitItem, RepeatBlock,
+};
+pub use dem::{
+    DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
+    DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
+};
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
 };
 pub use dialect::ModelDialect;
 pub use error::{ModelError, ModelResult};
+pub use fingerprint::ModelFingerprint;
 pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
 };
@@ -36,9 +52,16 @@ pub mod advanced {
     use std::fmt::Display;
 
     use super::{
-        ByteSpan, Estimate, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect, ModelError,
-        ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, ResourceEstimate,
-        ResourceLimitError, Target,
+        ByteSpan, Circuit, CircuitInstruction, DemInstruction, DemInstructionKind, DemRepeatBlock,
+        DemTarget, DetectorErrorModel, Estimate, Gate, GateDecomposition, MeasureRecordOffset,
+        ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext,
+        Probability, RepeatBlock, RepeatCount, ResourceEstimate, ResourceLimitError, Target,
+    };
+    pub use crate::dem::MAX_DEM_REPEAT_NESTING;
+    pub use crate::dem::advanced::{
+        DemBlockSummary, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
+        FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_detector,
+        shifted_targets,
     };
     pub use crate::gate::GateUnitaryRows;
     use smallvec::SmallVec;
@@ -48,6 +71,118 @@ pub mod advanced {
 
     /// Stim's exclusive upper bound for encoded target values.
     pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
+
+    /// Fallible circuit builder used by analysis and execution lowering.
+    ///
+    /// This boundary preserves parser-style instruction fusion while keeping model storage private.
+    #[derive(Debug)]
+    pub struct CircuitBuilder(crate::circuit::CircuitAssembler);
+
+    impl CircuitBuilder {
+        pub fn new() -> Self {
+            Self(crate::circuit::CircuitAssembler::new())
+        }
+
+        pub fn from_unfused_items(items: Vec<crate::CircuitItem>) -> Self {
+            Self(crate::circuit::CircuitAssembler::from_unfused_items(items))
+        }
+
+        pub fn try_reserve_exact(&mut self, additional: usize) -> ModelResult<()> {
+            self.0.try_reserve_exact(additional)
+        }
+
+        pub fn try_append_instruction(
+            &mut self,
+            instruction: CircuitInstruction,
+        ) -> ModelResult<()> {
+            self.0.try_append_instruction(instruction)
+        }
+
+        pub fn try_append_repeat_block(&mut self, repeat: RepeatBlock) -> ModelResult<()> {
+            self.0.try_append_repeat_block(repeat)
+        }
+
+        pub fn finish(self) -> Circuit {
+            self.0.finish()
+        }
+    }
+
+    impl Default for CircuitBuilder {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// Constructs an instruction while preserving opaque tag bytes.
+    pub fn circuit_instruction_with_tag_bytes(
+        gate: Gate,
+        args: Vec<f64>,
+        targets: Vec<Target>,
+        tag: Option<&[u8]>,
+    ) -> ModelResult<CircuitInstruction> {
+        CircuitInstruction::new_with_tag_bytes(gate, args, targets, tag)
+    }
+
+    /// Constructs a repeat block while preserving opaque tag bytes.
+    pub fn repeat_block_with_tag_bytes(
+        repeat_count: RepeatCount,
+        body: Circuit,
+        tag: Option<&[u8]>,
+    ) -> RepeatBlock {
+        RepeatBlock::new_with_tag_bytes(repeat_count, body, tag)
+    }
+
+    /// Clones an instruction without its tag.
+    pub fn circuit_instruction_without_tag(instruction: &CircuitInstruction) -> CircuitInstruction {
+        instruction.without_tag()
+    }
+
+    /// Returns the qubit width required to simulate a circuit.
+    pub fn circuit_simulated_qubit_count(circuit: &Circuit) -> usize {
+        circuit.count_simulated_qubits()
+    }
+
+    /// Returns the number of measurement results produced by one instruction.
+    pub fn circuit_instruction_measurement_result_count(instruction: &CircuitInstruction) -> usize {
+        instruction.measurement_result_count()
+    }
+
+    /// Reserves exact model storage for a bounded materializing consumer.
+    pub fn dem_try_reserve_items_exact(
+        model: &mut DetectorErrorModel,
+        additional: usize,
+    ) -> ModelResult<()> {
+        model.try_reserve_items_exact(additional)
+    }
+
+    /// Constructs a DEM instruction while preserving opaque tag bytes.
+    pub fn dem_instruction_with_tag_bytes(
+        kind: DemInstructionKind,
+        args: Vec<f64>,
+        targets: Vec<DemTarget>,
+        tag: Option<&[u8]>,
+    ) -> ModelResult<DemInstruction> {
+        DemInstruction::new_with_tag_bytes(kind, args, targets, tag)
+    }
+
+    /// Constructs a DEM repeat block while preserving opaque tag bytes.
+    pub fn dem_repeat_block_with_tag_bytes(
+        repeat_count: crate::DemRepeatCount,
+        body: DetectorErrorModel,
+        tag: Option<&[u8]>,
+    ) -> DemRepeatBlock {
+        DemRepeatBlock::new_with_tag_bytes(repeat_count, body, tag)
+    }
+
+    /// Removes the tag from a DEM instruction in place.
+    pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
+        instruction.clear_tag();
+    }
+
+    /// Returns the numeric detector shift carried by a shift instruction.
+    pub fn dem_instruction_detector_shift(instruction: &DemInstruction) -> ModelResult<u64> {
+        instruction.detector_shift()
+    }
 
     /// Constructs a span after the caller has proved that the range does not overflow.
     pub const fn byte_span_from_valid_range(byte_start: usize, byte_length: usize) -> ByteSpan {

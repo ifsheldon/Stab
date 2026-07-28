@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{CircuitError, CircuitResult};
+use crate::{ModelError, ModelResult};
 
 use super::api::{
     FlatRepeatScan, add_coordinate_shift_mul, add_detector_shift_mul, apply_detector_shift,
@@ -14,7 +14,7 @@ pub(super) const MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS: u64 = 1_000
 pub(super) fn flattened_detector_declaration_count_up_to(
     block: &FoldedDemBlock<'_>,
     limit: u64,
-) -> CircuitResult<Option<u64>> {
+) -> ModelResult<Option<u64>> {
     Ok(block
         .summary()
         .detector_declaration_count()
@@ -29,7 +29,7 @@ pub(super) fn find_selected_detector_coordinates_in_bounded_flattened_repeat_bod
     detector_offset: u64,
     coordinate_shift: &[f64],
     geometry: RepeatScanGeometry<'_>,
-) -> CircuitResult<()> {
+) -> ModelResult<()> {
     let mut scan = FlatRepeatScan {
         detector_set,
         existing_coordinates: coordinates,
@@ -68,7 +68,7 @@ fn record_flattened_detector_declarations(
     coordinate_shift: &mut Vec<f64>,
     body_order: &mut usize,
     scan: &mut FlatRepeatScan<'_>,
-) -> CircuitResult<()> {
+) -> ModelResult<()> {
     for item in block.items() {
         match item {
             FoldedDemItem::Instruction(instruction) => match instruction.kind() {
@@ -77,7 +77,7 @@ fn record_flattened_detector_declarations(
                         if let DemTarget::RelativeDetector(detector) = target {
                             let local_detector =
                                 detector_offset.checked_add(detector.get()).ok_or_else(|| {
-                                    CircuitError::invalid_detector_error_model(
+                                    ModelError::invalid_detector_error_model(
                                         "flattened detector declaration id overflowed",
                                     )
                                 })?;
@@ -88,7 +88,7 @@ fn record_flattened_detector_declarations(
                                 *body_order,
                             )?;
                             *body_order = body_order.checked_add(1).ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
+                                ModelError::invalid_detector_error_model(
                                     "flattened detector declaration order overflowed",
                                 )
                             })?;

@@ -260,7 +260,7 @@ fn undo_detecting_region_instruction(
         return Ok(());
     }
 
-    let kept_instruction = CircuitInstruction::new_with_tag_bytes(
+    let kept_instruction = crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         instruction.args().to_vec(),
         kept_targets,

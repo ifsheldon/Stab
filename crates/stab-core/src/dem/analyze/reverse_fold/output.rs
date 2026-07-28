@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock,
-    DemTarget, DetectorErrorModel,
+    CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemItem, DemTarget,
+    DetectorErrorModel,
 };
 
 pub(super) fn unreverse_model(
@@ -23,7 +23,7 @@ pub(super) fn unreverse_model(
                 }
                 let old_base = *base_detector_id;
                 let body = unreverse_model(repeat.body(), base_detector_id, seen)?;
-                output.push_repeat_block(DemRepeatBlock::new_with_tag_bytes(
+                output.push_repeat_block(crate::dem::dem_repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
                     repeat.tag_bytes(),
@@ -66,7 +66,7 @@ fn unreverse_instruction(
 ) -> CircuitResult<()> {
     match instruction.kind() {
         DemInstructionKind::ShiftDetectors => {
-            let detector_shift = instruction.detector_shift()?;
+            let detector_shift = crate::dem::dem_instruction_detector_shift(instruction)?;
             *base_detector_id = base_detector_id
                 .checked_add(detector_shift)
                 .ok_or_else(|| {
@@ -114,14 +114,14 @@ fn rebased_instruction(
                             detector.get()
                         ))
                     })?;
-                DemTarget::relative_detector(detector)
+                DemTarget::relative_detector(detector).map_err(Into::into)
             }
             DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
                 Ok(*target)
             }
         })
         .collect::<CircuitResult<Vec<_>>>()?;
-    DemInstruction::new_with_tag_bytes(
+    crate::dem::dem_instruction_with_tag_bytes(
         instruction.kind(),
         instruction.args().to_vec(),
         targets,

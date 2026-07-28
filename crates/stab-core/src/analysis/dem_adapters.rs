@@ -1,6 +1,9 @@
 use std::convert::Infallible;
 
-use crate::dem::DemFlattenLimits;
+use crate::dem::{
+    DemFlattenLimits, dem_instruction_clear_tag, dem_try_reserve_items_exact,
+    validate_flattening_budget_with_limits,
+};
 use crate::{
     CircuitResult, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DetectorErrorModel,
 };
@@ -14,7 +17,7 @@ pub fn detector_error_model_without_tags(model: &DetectorErrorModel) -> Detector
     let transformed: Result<DetectorErrorModel, Infallible> =
         transform_compact_dem(model, false, |instruction| {
             let mut instruction = instruction.clone();
-            instruction.clear_tag();
+            dem_instruction_clear_tag(&mut instruction);
             Ok(instruction)
         });
     match transformed {
@@ -45,9 +48,9 @@ pub fn flattened_detector_error_model_with_limits(
     model: &DetectorErrorModel,
     limits: DemFlattenLimits,
 ) -> CircuitResult<DetectorErrorModel> {
-    let budget = model.validate_flattening_budget_with_limits("flattened", limits)?;
+    let budget = validate_flattening_budget_with_limits(model, "flattened", limits)?;
     let mut flattened = DetectorErrorModel::new();
-    flattened.try_reserve_items_exact(budget.materialized_capacity()?)?;
+    dem_try_reserve_items_exact(&mut flattened, budget.materialized_capacity()?)?;
     for instruction in model.iter_flattened_instructions() {
         flattened.push_instruction(instruction?);
     }
@@ -77,7 +80,7 @@ fn rounded_instruction(instruction: &DemInstruction, digits: u8) -> CircuitResul
         .iter()
         .map(|arg| rounded_probability_arg(*arg, digits))
         .collect::<Vec<_>>();
-    DemInstruction::new_with_tag_bytes(
+    crate::dem::dem_instruction_with_tag_bytes(
         instruction.kind(),
         args,
         instruction.targets().to_vec(),
@@ -132,8 +135,11 @@ fn transform_compact_dem<E>(
             return Ok(completed.output);
         };
         let tag = preserve_repeat_tags.then(|| repeat.tag_bytes()).flatten();
-        let transformed_repeat =
-            DemRepeatBlock::new_with_tag_bytes(repeat.repeat_count(), completed.output, tag);
+        let transformed_repeat = crate::dem::dem_repeat_block_with_tag_bytes(
+            repeat.repeat_count(),
+            completed.output,
+            tag,
+        );
         let Some(parent) = stack.last_mut() else {
             unreachable!("a repeated DEM transform body has a parent frame");
         };

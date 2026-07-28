@@ -8,7 +8,7 @@ use stab_core::{
 };
 
 fn dem(input: &str) -> CircuitResult<DetectorErrorModel> {
-    DetectorErrorModel::from_dem_str(input)
+    DetectorErrorModel::from_dem_str(input).map_err(Into::into)
 }
 
 #[test]

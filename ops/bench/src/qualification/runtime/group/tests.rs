@@ -42,7 +42,7 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
-            owner: ProtocolId::try_new("stab-core/circuit-printer").expect("owner"),
+            owner: ProtocolId::try_new("stab-model/circuit-printer").expect("owner"),
             profiler_note: None,
             comparator_sources: Vec::new(),
         },
@@ -63,7 +63,7 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-example".to_string()],
-            owner: ProtocolId::try_new("stab-core/circuit-parser").expect("owner"),
+            owner: ProtocolId::try_new("stab-model/circuit-parser").expect("owner"),
             profiler_note: Some(ProfilerNoteContract {
                 path: ProfilerNotePath::try_new(
                     "benchmarks/profiler-notes/qualification/example.md".to_string(),

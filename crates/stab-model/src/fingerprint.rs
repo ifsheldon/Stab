@@ -3,11 +3,11 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{
     Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, ModelDialect,
-    Pauli, Target,
+    Pauli, RepeatNestingLimit, Target,
 };
 
 const MODEL_FINGERPRINT_DOMAIN: &[u8] = b"stab:model-fingerprint\0";
-const INLINE_TRAVERSAL_FRAMES: usize = crate::RepeatNestingLimit::HARD_MAX + 1;
+const INLINE_TRAVERSAL_FRAMES: usize = RepeatNestingLimit::HARD_MAX + 1;
 
 /// Versioned SHA-256 identity of a circuit or detector error model.
 ///
@@ -75,7 +75,9 @@ impl StructuralEncoder {
         let mut hasher = Sha256::new();
         hasher.update(MODEL_FINGERPRINT_DOMAIN);
         hasher.update(ModelFingerprint::SCHEMA_VERSION.to_be_bytes());
-        hasher.update([stab_model::advanced::model_dialect_fingerprint_discriminator(dialect)]);
+        hasher.update([crate::advanced::model_dialect_fingerprint_discriminator(
+            dialect,
+        )]);
         Self { dialect, hasher }
     }
 

@@ -5,8 +5,9 @@
 
 use stab_core::{
     ByteSpan, Circuit, CircuitError, ModelDialect, ModelError, ParseError, ParseErrorCode,
-    ParseErrorContext, ParseLimits, RepeatNestingLimit, ResourceKind, SourceLineLimit,
+    ParseErrorContext, ParseLimits, RepeatNestingLimit, SourceLineLimit,
 };
+use stab_model::ResourceKind as ModelResourceKind;
 
 #[test]
 fn model_parse_error_conversion_preserves_the_complete_diagnostic() {
@@ -40,7 +41,7 @@ fn model_owned_parse_limits_remain_the_core_parser_policy() {
     let source_resource = source_error
         .resource_limit_error()
         .expect("source-line rejection remains structured");
-    assert_eq!(source_resource.resource(), ResourceKind::SourceLines);
+    assert_eq!(source_resource.resource(), ModelResourceKind::SourceLines);
     assert_eq!(source_resource.actual(), 2);
     assert_eq!(source_resource.limit(), 1);
     assert_eq!(
@@ -57,7 +58,7 @@ fn model_owned_parse_limits_remain_the_core_parser_policy() {
     let repeat_resource = repeat_error
         .resource_limit_error()
         .expect("repeat rejection remains structured");
-    assert_eq!(repeat_resource.resource(), ResourceKind::RepeatNesting);
+    assert_eq!(repeat_resource.resource(), ModelResourceKind::RepeatNesting);
     assert_eq!(repeat_resource.actual(), 2);
     assert_eq!(repeat_resource.limit(), 1);
     assert_eq!(

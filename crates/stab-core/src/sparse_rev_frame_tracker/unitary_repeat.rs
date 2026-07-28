@@ -235,7 +235,7 @@ fn remap_circuit_items(
                     })
                     .collect::<CircuitResult<Vec<_>>>()?;
                 Ok(CircuitItem::Instruction(
-                    CircuitInstruction::new_with_tag_bytes(
+                    crate::circuit::circuit_instruction_with_tag_bytes(
                         instruction.gate(),
                         instruction.args().to_vec(),
                         targets,
@@ -243,13 +243,13 @@ fn remap_circuit_items(
                     )?,
                 ))
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                Ok(CircuitItem::RepeatBlock(RepeatBlock::new_with_tag_bytes(
+            CircuitItem::RepeatBlock(repeat) => Ok(CircuitItem::RepeatBlock(
+                crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     remap_circuit_items(repeat.body(), dense_ids)?,
                     repeat.tag_bytes(),
-                )))
-            }
+                ),
+            )),
         })
         .collect::<CircuitResult<Vec<_>>>()?;
     Ok(CircuitAssembler::from_unfused_items(items).finish())
@@ -356,7 +356,7 @@ fn slot_target(slot: usize) -> CircuitResult<DemTarget> {
             "sparse reverse unitary repeat slot does not fit u64",
         )
     })?;
-    DemTarget::logical_observable(observable)
+    DemTarget::logical_observable(observable).map_err(Into::into)
 }
 
 fn toggle_slots(target: &mut BTreeSet<usize>, values: impl Iterator<Item = usize>) {

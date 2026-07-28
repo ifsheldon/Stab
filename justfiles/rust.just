@@ -16,4 +16,4 @@ test:
 # Run the ignored M4 parser fuzz smoke locally.
 [working-directory: '..']
 parser-fuzz:
-    cargo test -p stab-core --test parser_fuzz parser_fuzz_smoke -- --ignored
+    cargo test -p stab-model --test parser_fuzz parser_fuzz_smoke -- --ignored

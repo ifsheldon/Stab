@@ -18,6 +18,7 @@ pub enum ValidationErrorCode {
     DetectorCountOverflow,
     DetectorIndexOutOfRange,
     DetectorCoordinateLookupFailed,
+    InvalidDetectorErrorModel,
 }
 
 impl ValidationErrorCode {
@@ -35,6 +36,7 @@ impl ValidationErrorCode {
             Self::DetectorCountOverflow => "detector-count-overflow",
             Self::DetectorIndexOutOfRange => "detector-index-out-of-range",
             Self::DetectorCoordinateLookupFailed => "detector-coordinate-lookup-failed",
+            Self::InvalidDetectorErrorModel => "invalid-detector-error-model",
         }
     }
 }
@@ -84,6 +86,9 @@ pub enum ValidationError {
 
     #[error("detector coordinate lookup failed")]
     DetectorCoordinateLookupFailed,
+
+    #[error("invalid detector error model: {message}")]
+    InvalidDetectorErrorModel { message: String },
 }
 
 impl ValidationError {
@@ -111,6 +116,9 @@ impl ValidationError {
             Self::DetectorIndexOutOfRange { .. } => ValidationErrorCode::DetectorIndexOutOfRange,
             Self::DetectorCoordinateLookupFailed => {
                 ValidationErrorCode::DetectorCoordinateLookupFailed
+            }
+            Self::InvalidDetectorErrorModel { .. } => {
+                ValidationErrorCode::InvalidDetectorErrorModel
             }
         }
     }

@@ -8,7 +8,7 @@
 
 use std::str::FromStr;
 
-use stab_core::{
+use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind,
     GateTargetRule, MeasureRecordOffset, Pauli, QubitId, Target,
 };

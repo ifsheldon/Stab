@@ -29,13 +29,13 @@ enum PreparedState {
     CircuitParse(String),
     CircuitCanonicalPrint {
         input: String,
-        circuit: stab_core::Circuit,
+        circuit: stab_model::Circuit,
     },
     AgentDiagnostic(AgentDiagnosticFixture),
     DemParse(DemFixture),
     DemCanonicalPrint {
         fixture: DemFixture,
-        model: stab_core::DetectorErrorModel,
+        model: stab_model::DetectorErrorModel,
     },
     GateNameHash {
         names: Vec<String>,
@@ -87,7 +87,7 @@ impl PreparedWorkload {
             }
             WorkerWorkload::CircuitCanonicalPrint => {
                 let input = circuit_parse_fixture(work_items)?;
-                let circuit = stab_core::Circuit::from_stim_str(&input)?;
+                let circuit = stab_model::Circuit::from_stim_str(&input)?;
                 PreparedState::CircuitCanonicalPrint { input, circuit }
             }
             WorkerWorkload::CircuitModelFingerprint
@@ -103,7 +103,7 @@ impl PreparedWorkload {
             WorkerWorkload::DemCanonicalPrint => {
                 let fixture =
                     DemFixture::prepare(family.ok_or(WorkerError::MissingDemFamily)?, work_items)?;
-                let model = stab_core::DetectorErrorModel::from_dem_str(fixture.text())?;
+                let model = stab_model::DetectorErrorModel::from_dem_str(fixture.text())?;
                 PreparedState::DemCanonicalPrint { fixture, model }
             }
             WorkerWorkload::GateNameHash => {

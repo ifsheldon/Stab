@@ -1,4 +1,7 @@
-use crate::{Circuit, CircuitItem, RepeatBlock, circuit::CircuitAssembler};
+use crate::{
+    Circuit, CircuitItem, RepeatBlock,
+    circuit::{CircuitAssembler, circuit_instruction_without_tag},
+};
 
 /// Returns a compact copy of `circuit` with every instruction and repeat-block tag removed.
 ///
@@ -11,7 +14,7 @@ pub fn circuit_without_tags(circuit: &Circuit) -> Circuit {
             .iter()
             .map(|item| match item {
                 CircuitItem::Instruction(instruction) => {
-                    CircuitItem::Instruction(instruction.without_tag())
+                    CircuitItem::Instruction(circuit_instruction_without_tag(instruction))
                 }
                 CircuitItem::RepeatBlock(repeat) => CircuitItem::RepeatBlock(RepeatBlock::new(
                     repeat.repeat_count(),

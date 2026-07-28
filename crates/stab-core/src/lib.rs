@@ -22,14 +22,10 @@ mod diagnostics;
 mod error;
 mod error_matcher;
 pub mod execution;
-mod fingerprint;
 mod gate;
 mod ids;
 mod matched_error;
 mod mbqc_decomposition;
-mod model_bytes;
-mod model_parse;
-mod model_tag;
 mod probability_util;
 mod resources;
 pub mod result_formats;
@@ -37,7 +33,6 @@ pub mod result_streaming;
 mod sampling;
 mod sampling_estimate;
 mod sampling_output_compat;
-mod source_text;
 mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
@@ -119,7 +114,6 @@ pub use execution::{
     SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
     SinkFailurePhase, count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
-pub use fingerprint::ModelFingerprint;
 pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
     RepeatCount,
@@ -142,6 +136,7 @@ pub use result_formats::{
     PackedShotBatchView, RecordEncoding, RecordFormat, SampleFormat, SampledErrorWidth,
 };
 pub use sampling_estimate::estimate_sampling_request;
+pub use stab_model::ModelFingerprint;
 pub use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
     ModelDialect, ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit,

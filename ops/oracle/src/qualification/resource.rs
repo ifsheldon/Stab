@@ -45,6 +45,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-dem-flatten-default-repeat-boundaries",
     "a2-dem-programmatic-depth-257-compatibility",
     "a2-dem-programmatic-repeat-stack-safety",
+    "a6-model-folded-dem-traversal-resource-contract",
     "a2-detection-record-policy-admission",
     "a2-detection-default-record-boundary",
     "a2-detection-work-policy-admission",

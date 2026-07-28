@@ -717,8 +717,8 @@ fn pf1_circuit_repeat_rejects_fused_repeat_count_overflow() {
         .expect_err("reject repeat count overflow");
 
     assert_eq!(
-        error,
-        stab_core::CircuitError::InvalidDomainValue {
+        CircuitError::from(error),
+        CircuitError::InvalidDomainValue {
             kind: "repetition count",
             value: "overflowed".to_string()
         }

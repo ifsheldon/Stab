@@ -116,18 +116,14 @@ impl From<stab_model::ValidationError> for CircuitError {
             | stab_model::ValidationError::DetectorCoordinateLookupFailed => {
                 Self::invalid_detector_error_model(error.to_string())
             }
+            stab_model::ValidationError::InvalidDetectorErrorModel { message } => {
+                Self::invalid_detector_error_model(message)
+            }
         }
     }
 }
 
 impl CircuitError {
-    pub(crate) fn parse_line(line: usize, message: impl Into<String>) -> Self {
-        Self::ParseLine {
-            line,
-            message: message.into(),
-        }
-    }
-
     pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
         Self::InvalidDomainValue {
             kind,

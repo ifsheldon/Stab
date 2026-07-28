@@ -52,6 +52,8 @@ impl ErrorMatcherFilterVisitor<'_> {
 }
 
 impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
+    type Error = CircuitError;
+
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
@@ -148,21 +150,25 @@ fn summarize_filter_block_policy(
                 if repeat.repeat_count().get() == 0 {
                     continue;
                 }
-                compact_error_count = body.summary().detector_shift().and_then(|detector_shift| {
-                    if detector_shift != 0 {
-                        return Ok(None);
-                    }
-                    child.compact_error_count.clone().and_then(|child_count| {
-                        let Some(child_count) = child_count else {
+                compact_error_count = body
+                    .summary()
+                    .detector_shift()
+                    .map_err(CircuitError::from)
+                    .and_then(|detector_shift| {
+                        if detector_shift != 0 {
                             return Ok(None);
-                        };
-                        count.checked_add(child_count).map(Some).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "DEM ErrorMatcher filter compact-repeat error count overflowed",
-                            )
+                        }
+                        child.compact_error_count.clone().and_then(|child_count| {
+                            let Some(child_count) = child_count else {
+                                return Ok(None);
+                            };
+                            count.checked_add(child_count).map(Some).ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "DEM ErrorMatcher filter compact-repeat error count overflowed",
+                                )
+                            })
                         })
-                    })
-                });
+                    });
             }
         }
     }
@@ -200,7 +206,11 @@ fn update_filter_instruction_count(
                 )
             })
         }
-        DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => Ok(Some(count)),
+        DemInstructionKind::ShiftDetectors
+            if crate::dem::dem_instruction_detector_shift(instruction)? == 0 =>
+        {
+            Ok(Some(count))
+        }
         DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => Ok(Some(count)),
         DemInstructionKind::ShiftDetectors => Ok(None),
     }

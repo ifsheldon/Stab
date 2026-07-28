@@ -154,7 +154,7 @@ pub fn gate_has_h_s_cx_m_r_decomposition(gate: Gate) -> bool {
 
 /// Parses gate decomposition metadata into a validated circuit.
 pub fn gate_decomposition_to_circuit(decomposition: GateDecomposition) -> CircuitResult<Circuit> {
-    Circuit::from_stim_str(decomposition.as_stim_str())
+    Circuit::from_stim_str(decomposition.as_stim_str()).map_err(Into::into)
 }
 
 fn complex_matrix<const N: usize>(rows: [[(f32, f32); N]; N]) -> [[Complex32; N]; N] {

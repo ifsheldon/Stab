@@ -367,7 +367,8 @@ fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> CircuitR
             detector.get(),
             detector_offset,
             "detector id",
-        )?),
+        )?)
+        .map_err(Into::into),
         DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
             Ok(target)
         }

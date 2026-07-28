@@ -499,7 +499,7 @@ fn compile_block(source: &FoldedDemBlock<'_>) -> CircuitResult<DemSampleBlock> {
                 compile_instruction(instruction, current_shift, &mut block)?;
                 if instruction.kind() == DemInstructionKind::ShiftDetectors {
                     current_shift = current_shift
-                        .checked_add(instruction.detector_shift()?)
+                        .checked_add(crate::dem::dem_instruction_detector_shift(instruction)?)
                         .ok_or_else(|| {
                             CircuitError::invalid_sampler_compilation(
                                 "DEM sampler detector shift overflowed",

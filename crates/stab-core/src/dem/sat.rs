@@ -518,6 +518,8 @@ fn validate_shifted_target_ids(targets: &[DemTarget], detector_offset: u64) -> C
 }
 
 impl FoldedDemVisitor for SatErrorVisitor<'_> {
+    type Error = CircuitError;
+
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
@@ -731,7 +733,7 @@ p wcnf 3 8 9
 ";
 
     fn dem(input: &str) -> CircuitResult<DetectorErrorModel> {
-        DetectorErrorModel::from_dem_str(input)
+        DetectorErrorModel::from_dem_str(input).map_err(Into::into)
     }
 
     #[test]

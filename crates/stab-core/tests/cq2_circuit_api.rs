@@ -9,8 +9,8 @@ use std::io::ErrorKind;
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    ObservableId, ParseLimits, QubitId, RepeatBlock, RepeatCount, SourceLineLimit, Target,
-    ValidationError, analysis::circuit_without_tags,
+    ModelError, ObservableId, ParseLimits, QubitId, RepeatBlock, RepeatCount, SourceLineLimit,
+    Target, ValidationError, analysis::circuit_without_tags,
 };
 
 #[test]
@@ -124,10 +124,10 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
         overflowing_observable
             .observable_id_argument()
             .expect_err("2^64 is outside the ObservableId domain"),
-        CircuitError::InvalidArgument {
+        ModelError::from(ValidationError::InvalidArgument {
             gate: "OBSERVABLE_INCLUDE",
             argument: "18446744073709552000".to_string(),
-        }
+        })
     );
 
     let channel = instruction("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\n");
@@ -546,11 +546,13 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             "invalid result format data: bad width",
         ),
         (
-            Circuit::from_stim_str_with_limits(
-                "H 0\n",
-                ParseLimits::default().with_source_line_limit(SourceLineLimit::new(0)),
-            )
-            .expect_err("construct typed resource failure"),
+            CircuitError::from(
+                Circuit::from_stim_str_with_limits(
+                    "H 0\n",
+                    ParseLimits::default().with_source_line_limit(SourceLineLimit::new(0)),
+                )
+                .expect_err("construct typed resource failure"),
+            ),
             "failed to parse line 1: circuit input has more than 0 lines",
         ),
         (

@@ -3,7 +3,7 @@
     reason = "parser regression tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{DemInstruction, DemItem, DemTarget, DetectorErrorModel};
+use stab_model::{DemInstruction, DemItem, DemTarget, DetectorErrorModel};
 
 #[test]
 fn dem_model_layout_stays_bounded_for_large_parse_workloads() {

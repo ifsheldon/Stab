@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use clap::ValueEnum;
-use stab_core::DetectorErrorModel;
+use stab_model::DetectorErrorModel;
 
 use super::{WorkerError, byte_digest, semantic_digest};
 

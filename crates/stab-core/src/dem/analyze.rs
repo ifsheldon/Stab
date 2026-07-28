@@ -21,7 +21,7 @@ use crate::{
     Probability, QubitId, RepeatBlock, SingleQubitClifford,
 };
 
-use super::{DemInstruction, DemInstructionKind, DemTarget, DetectorErrorModel};
+use super::{DemInstructionKind, DemTarget, DetectorErrorModel};
 use budget::validate_analyzer_expansion_budget;
 use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
@@ -1131,7 +1131,7 @@ impl Analyzer {
             for observable in touched_observables {
                 touched_logical_observables.insert(observable);
             }
-            dem.push_instruction(DemInstruction::new_with_tag_bytes(
+            dem.push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                 DemInstructionKind::Error,
                 vec![probability.get()],
                 targets,
@@ -1152,7 +1152,7 @@ impl Analyzer {
                     {
                         continue;
                     }
-                    dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                    dem.push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::Detector,
                         coordinates,
                         vec![DemTarget::relative_detector(detector_id)?],
@@ -1161,7 +1161,7 @@ impl Analyzer {
                 }
                 Declaration::Observable { observable, tag } => {
                     if tag.is_some() || !touched_logical_observables.contains(&observable) {
-                        dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                        dem.push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                             DemInstructionKind::LogicalObservable,
                             Vec::new(),
                             vec![DemTarget::logical_observable(observable)?],
@@ -1174,7 +1174,7 @@ impl Analyzer {
                     detector_shift,
                     tag,
                 } => {
-                    dem.push_instruction(DemInstruction::new_with_tag_bytes(
+                    dem.push_instruction(crate::dem::dem_instruction_with_tag_bytes(
                         DemInstructionKind::ShiftDetectors,
                         coordinates,
                         vec![DemTarget::numeric(detector_shift)],

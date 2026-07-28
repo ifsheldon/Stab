@@ -312,13 +312,13 @@ fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
             "PERFQ-M10-DEM-PARSE-CONTRACT",
             "m10-dem-parse-contract",
             Phase::Parse,
-            "stab-core/dem-parser",
+            "stab-model/dem-parser",
         ),
         (
             "PERFQ-M10-DEM-PRINT-CONTRACT",
             "m10-dem-print-contract",
             Phase::Serialize,
-            "stab-core/dem-printer",
+            "stab-model/dem-printer",
         ),
     ];
     for (group_id, manifest_row, phase, owner) in expected {

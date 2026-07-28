@@ -1,6 +1,6 @@
 use std::ops::{Bound, Range, RangeBounds};
 
-use crate::{CircuitError, CircuitResult};
+use crate::{ModelError, ModelResult};
 
 use super::{Circuit, CircuitInstruction, CircuitItem};
 
@@ -164,7 +164,7 @@ impl<'a> ReverseInstructionFrame<'a> {
 pub(super) fn checked_item_range(
     range: impl RangeBounds<usize>,
     len: usize,
-) -> CircuitResult<Range<usize>> {
+) -> ModelResult<Range<usize>> {
     let start = match range.start_bound() {
         Bound::Included(start) => *start,
         Bound::Excluded(start) => start
@@ -188,6 +188,6 @@ pub(super) fn checked_item_range(
     Ok(start..end)
 }
 
-pub(super) fn circuit_item_range_error(value: impl ToString) -> CircuitError {
-    CircuitError::invalid_domain_value("circuit item range", value)
+pub(super) fn circuit_item_range_error(value: impl ToString) -> ModelError {
+    ModelError::invalid_domain_value("circuit item range", value)
 }

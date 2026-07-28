@@ -2187,6 +2187,7 @@ dependencies = [
  "signal-hook",
  "stab-cli",
  "stab-core",
+ "stab-model",
  "stab-records",
  "tempfile",
  "thiserror",
@@ -2250,6 +2251,10 @@ dependencies = [
 name = "stab-model"
 version = "0.1.1"
 dependencies = [
+ "allocation-counter",
+ "arrayvec",
+ "hex",
+ "sha2",
  "smallvec",
  "stab-algebra",
  "thiserror",

@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
-use crate::{CircuitError, ModelDialect, ParseError, ParseLimits};
-use stab_model::advanced::invalid_utf8_parse_error;
+use crate::{
+    ModelDialect, ModelError, ModelResult, ParseError, ParseLimits,
+    advanced::invalid_utf8_parse_error,
+};
 
 pub(crate) struct PreparedModelText<'a> {
     text: Cow<'a, str>,
@@ -15,7 +17,7 @@ impl<'a> PreparedModelText<'a> {
         input: &'a [u8],
         dialect: ModelDialect,
         limits: ParseLimits,
-    ) -> Result<Self, CircuitError> {
+    ) -> ModelResult<Self> {
         let input = admitted_source_prefix(input, limits.source_line_limit().get());
         if let Ok(text) = std::str::from_utf8(input) {
             return Ok(Self {
@@ -33,7 +35,7 @@ impl<'a> PreparedModelText<'a> {
 
         while cursor < sanitized.len() {
             let remaining = sanitized.get(cursor..).ok_or_else(|| {
-                CircuitError::invalid_domain_value(
+                ModelError::invalid_domain_value(
                     "model byte input",
                     "UTF-8 scan cursor escaped input",
                 )
@@ -43,17 +45,14 @@ impl<'a> PreparedModelText<'a> {
                 Err(error) => error,
             };
             let byte_start = cursor.checked_add(error.valid_up_to()).ok_or_else(|| {
-                CircuitError::invalid_domain_value(
-                    "model byte input",
-                    "UTF-8 error offset overflow",
-                )
+                ModelError::invalid_domain_value("model byte input", "UTF-8 error offset overflow")
             })?;
             let byte_length = error
                 .error_len()
                 .unwrap_or_else(|| sanitized.len().saturating_sub(byte_start))
                 .max(1);
             let byte_end = byte_start.checked_add(byte_length).ok_or_else(|| {
-                CircuitError::invalid_domain_value("model byte input", "UTF-8 error span overflow")
+                ModelError::invalid_domain_value("model byte input", "UTF-8 error span overflow")
             })?;
             let is_opaque_metadata = byte_range_is_opaque_metadata(
                 &metadata_ranges,
@@ -70,7 +69,7 @@ impl<'a> PreparedModelText<'a> {
                 ));
             }
             let Some(region) = sanitized.get_mut(byte_start..byte_end) else {
-                return Err(CircuitError::invalid_domain_value(
+                return Err(ModelError::invalid_domain_value(
                     "model byte input",
                     "UTF-8 error span escaped input",
                 ));
@@ -99,7 +98,7 @@ impl<'a> PreparedModelText<'a> {
         self.tags
     }
 
-    pub(crate) fn resolve<T>(&self, parsed: Result<T, CircuitError>) -> Result<T, CircuitError> {
+    pub(crate) fn resolve<T>(&self, parsed: ModelResult<T>) -> ModelResult<T> {
         let Some(invalid_utf8) = &self.invalid_utf8 else {
             return parsed;
         };
@@ -145,16 +144,14 @@ fn admitted_source_prefix(input: &[u8], admitted_lines: usize) -> &[u8] {
     input.get(..line_start.saturating_add(1)).unwrap_or(input)
 }
 
-fn error_precedes_invalid_utf8(error: &CircuitError, invalid_utf8: &ParseError) -> bool {
+fn error_precedes_invalid_utf8(error: &ModelError, invalid_utf8: &ParseError) -> bool {
     let invalid_start = invalid_utf8.span().byte_start();
     if let Some(parse_error) = error.parse_error() {
         return parse_error.span().byte_start() < invalid_start;
     }
-    error.resource_limit_error().is_some_and(|resource_error| {
-        resource_error
-            .span()
-            .is_some_and(|span| span.byte_start() <= invalid_start)
-    })
+    error
+        .resource_limit_error()
+        .is_some_and(|resource_error| resource_error.span().byte_start() <= invalid_start)
 }
 
 fn scan_metadata(input: &[u8]) -> (Vec<Range<usize>>, Vec<Vec<u8>>) {

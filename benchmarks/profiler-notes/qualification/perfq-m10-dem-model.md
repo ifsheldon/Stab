@@ -1,6 +1,6 @@
 # PERFQ-M10-DEM-MODEL Profiler Note
 
-Owners: `stab-core/dem-parser` for `PERFQ-M10-DEM-PARSE-CONTRACT` and `stab-core/dem-printer` for `PERFQ-M10-DEM-PRINT-CONTRACT`.
+Owners: `stab-model/dem-parser` for `PERFQ-M10-DEM-PARSE-CONTRACT` and `stab-model/dem-printer` for `PERFQ-M10-DEM-PRINT-CONTRACT`.
 
 Status: clean revisions `f23386bdc12258eab97b9997b3f478841caa050c` and `d8de73d50fbeb4e001ea38c784d1fdcfc76dad76` produced and replayed faithful parse/small/full reports under their exact source inventories. Their stable median failures were respectively `1.773450x` and `1.372971x`; neither was noisy or rerun from the same revision. Clean inventory-bound revision `ca9fd68d3856e9cac9cc6da16433947d056e8848` then passed parse/small/full and parse/medium/full, but its first parse/large/full report failed stably because the bootstrap confidence upper bound was `1.263920x`. Clean revision `61bf222` completed the repaired three-family matrix after the folded maximum was corrected: all print and folded-parse reports passed, while all flat-error and coordinate-sparse parse reports failed stably. A fourth source-owned optimization is implemented locally and has strong direct-probe diagnostics, but it has no clean formal evidence yet. The fixture, semantic-work denominator, comparator, output obligations, representative scales, common-iteration policy, and `1.25x` threshold remain unchanged and unwaived.
 

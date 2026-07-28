@@ -1,6 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, QubitId,
-    RepeatBlock, RepeatNestingLimit, ResourceLimitError, Target, circuit::CircuitAssembler,
+    RepeatNestingLimit, ResourceLimitError, Target, circuit::CircuitAssembler,
 };
 
 const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
@@ -180,7 +180,7 @@ pub fn circuit_without_noise(circuit: &Circuit) -> CircuitResult<Circuit> {
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let body = circuit_without_noise(repeat.body())?;
-                result.append_repeat_block(RepeatBlock::new_with_tag_bytes(
+                result.append_repeat_block(crate::circuit::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
                     repeat.tag_bytes(),
@@ -454,7 +454,7 @@ fn append_noiseless_instruction(
     let gate = instruction.gate();
     if gate.produces_measurements() {
         let noiseless = if is_heralded_noise(gate) {
-            CircuitInstruction::new_with_tag_bytes(
+            crate::circuit::circuit_instruction_with_tag_bytes(
                 Gate::from_name("MPAD")?,
                 Vec::new(),
                 vec![Target::qubit(QubitId::new(0)?, false); instruction.targets().len()],
@@ -543,7 +543,7 @@ fn clone_instruction_with_args(
     instruction: &CircuitInstruction,
     args: Vec<f64>,
 ) -> CircuitResult<CircuitInstruction> {
-    CircuitInstruction::new_with_tag_bytes(
+    crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         args,
         try_clone_slice(instruction.targets(), "flattened circuit target allocation")?,

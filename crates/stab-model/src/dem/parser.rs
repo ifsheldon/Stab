@@ -2,21 +2,21 @@ use super::{
     DemArgVec, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTag, DemTarget, DemTargetVec,
     DetectorErrorModel,
 };
+use crate::advanced::{dem_repeat_nesting_limit_error, dem_source_line_limit_error};
 use crate::diagnostics::bounded_parse_diagnostic_text;
 use crate::model_parse::{line_error, unexpected_repeat_terminator, unterminated_repeat_block};
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::{
-    ByteSpan, CircuitError, CircuitResult, DemRepeatCount, ModelDialect, ParseErrorCode,
-    ParseErrorContext, ParseLimits,
+    ByteSpan, DemRepeatCount, ModelDialect, ModelError, ModelResult, ParseErrorCode,
+    ParseErrorContext, ParseLimits, ValidationError,
 };
-use stab_model::advanced::{dem_repeat_nesting_limit_error, dem_source_line_limit_error};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
 const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 
-pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> CircuitResult<DetectorErrorModel> {
+pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> ModelResult<DetectorErrorModel> {
     DemParser::new(input, limits).parse()
 }
 
@@ -37,7 +37,7 @@ impl<'a> DemParser<'a> {
         }
     }
 
-    fn parse(mut self) -> CircuitResult<DetectorErrorModel> {
+    fn parse(mut self) -> ModelResult<DetectorErrorModel> {
         self.parse_block(false, 0)
     }
 
@@ -45,7 +45,7 @@ impl<'a> DemParser<'a> {
         &mut self,
         stop_on_terminator: bool,
         depth: usize,
-    ) -> CircuitResult<DetectorErrorModel> {
+    ) -> ModelResult<DetectorErrorModel> {
         let mut model = if stop_on_terminator {
             DetectorErrorModel::new()
         } else {
@@ -97,16 +97,18 @@ impl<'a> DemParser<'a> {
         }
     }
 
-    fn next_command(&mut self) -> CircuitResult<Option<crate::source_text::SourceCommand<'a>>> {
+    fn next_command(&mut self) -> ModelResult<Option<crate::source_text::SourceCommand<'a>>> {
         let Some(command) = self.commands.next() else {
             return Ok(None);
         };
         let line_number = command.line_number();
         let limit = self.limits.source_line_limit().get();
         if line_number > limit {
-            return Err(
-                dem_source_line_limit_error(line_number, limit, command.source().span()).into(),
-            );
+            return Err(dem_source_line_limit_error(
+                line_number,
+                limit,
+                command.source().span(),
+            ));
         }
         Ok(Some(command))
     }
@@ -118,7 +120,7 @@ impl<'a> DemParser<'a> {
         header_span: ByteSpan,
         end_error_span: ByteSpan,
         parent_depth: usize,
-    ) -> CircuitResult<ParsedRepeatHeader> {
+    ) -> ModelResult<ParsedRepeatHeader> {
         let (name, rest) = parse_name(line_number, header)?;
         if !name.text().eq_ignore_ascii_case("repeat") {
             return Err(line_error(
@@ -152,10 +154,10 @@ impl<'a> DemParser<'a> {
             .unwrap_or(rest.text().len());
         let count_token = rest
             .prefix(token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid repeat count"))?;
+            .ok_or_else(|| parse_line_error(line_number, "invalid repeat count"))?;
         let trailing = rest
             .suffix(token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid repeat count"))?;
+            .ok_or_else(|| parse_line_error(line_number, "invalid repeat count"))?;
         if !trailing
             .text()
             .as_bytes()
@@ -176,9 +178,9 @@ impl<'a> DemParser<'a> {
         let limit = self.limits.repeat_nesting_limit().get();
         if parent_depth >= limit {
             let actual = parent_depth.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
+                ModelError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
             })?;
-            return Err(dem_repeat_nesting_limit_error(actual, limit, header_span).into());
+            return Err(dem_repeat_nesting_limit_error(actual, limit, header_span));
         }
         Ok(ParsedRepeatHeader {
             count: DemRepeatCount::new(count),
@@ -220,7 +222,7 @@ fn parse_dem_instruction(
     line_number: usize,
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
-) -> CircuitResult<DemInstruction> {
+) -> ModelResult<DemInstruction> {
     let (name, rest) = parse_name(line_number, line)?;
     if name.text().eq_ignore_ascii_case("repeat") {
         return Err(line_error(
@@ -274,7 +276,7 @@ fn parse_dem_instruction(
 fn parse_name(
     line_number: usize,
     line: SourceSlice<'_>,
-) -> CircuitResult<(SourceSlice<'_>, SourceSlice<'_>)> {
+) -> ModelResult<(SourceSlice<'_>, SourceSlice<'_>)> {
     let mut end = None;
     for (index, byte) in line.text().bytes().enumerate() {
         let valid = if index == 0 {
@@ -302,10 +304,10 @@ fn parse_name(
     };
     let name = line
         .prefix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing DEM instruction name"))?;
+        .ok_or_else(|| parse_line_error(line_number, "missing DEM instruction name"))?;
     let rest = line
         .suffix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing DEM instruction name"))?;
+        .ok_or_else(|| parse_line_error(line_number, "missing DEM instruction name"))?;
     Ok((name, rest))
 }
 
@@ -314,14 +316,14 @@ fn parse_optional_tag<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
-) -> CircuitResult<(Option<DemTag>, SourceSlice<'a>)> {
+) -> ModelResult<(Option<DemTag>, SourceSlice<'a>)> {
     let Some(mut body) = rest.strip_prefix("[") else {
         return Ok((None, rest));
     };
     if let Some(end) = body.text().as_bytes().iter().position(|byte| *byte == b']') {
         let raw_tag = body
             .prefix(end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated tag"))?;
+            .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
         if !raw_tag
             .text()
             .as_bytes()
@@ -330,7 +332,7 @@ fn parse_optional_tag<'a>(
         {
             let tail = body
                 .suffix(end + 1)
-                .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated tag"))?;
+                .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
             return Ok((DemTag::from_text(raw_tag.text()), tail));
         }
     }
@@ -357,7 +359,7 @@ fn parse_optional_tag<'a>(
             .unwrap_or_else(|| body.span());
         body = body
             .suffix(character_len)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated tag"))?;
+            .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
         match character {
             ']' => return Ok((DemTag::from_string(tag), body)),
             '\\' => {
@@ -382,9 +384,9 @@ fn parse_optional_tag<'a>(
                     character_span.byte_length() + escaped_len,
                 )
                 .unwrap_or(character_span);
-                body = body.suffix(escaped_len).ok_or_else(|| {
-                    CircuitError::parse_line(line_number, "unterminated tag escape")
-                })?;
+                body = body
+                    .suffix(escaped_len)
+                    .ok_or_else(|| parse_line_error(line_number, "unterminated tag escape"))?;
                 tag.push(match escaped {
                     'C' => ']',
                     'r' => '\r',
@@ -430,7 +432,7 @@ fn parse_optional_args<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
-) -> CircuitResult<(ParsedDemArguments<'a>, SourceSlice<'a>)> {
+) -> ModelResult<(ParsedDemArguments<'a>, SourceSlice<'a>)> {
     let Some(body) = rest.strip_prefix("(") else {
         return Ok((
             ParsedDemArguments {
@@ -454,10 +456,10 @@ fn parse_optional_args<'a>(
     };
     let raw_args = body
         .prefix(end)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
+        .ok_or_else(|| parse_line_error(line_number, "unterminated argument list"))?;
     let tail = body
         .suffix(end + 1)
-        .ok_or_else(|| CircuitError::parse_line(line_number, "unterminated argument list"))?;
+        .ok_or_else(|| parse_line_error(line_number, "unterminated argument list"))?;
     let mut values = DemArgVec::new();
     let mut token_start = 0;
     loop {
@@ -468,7 +470,7 @@ fn parse_optional_args<'a>(
             .unwrap_or(raw_args.text().len());
         let token = raw_args
             .slice(token_start, token_end)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid argument"))?
+            .ok_or_else(|| parse_line_error(line_number, "invalid argument"))?
             .trim_inline_ascii_start()
             .trim_inline_ascii_end();
         let value = if token.text().is_empty() {
@@ -511,7 +513,7 @@ fn parse_dem_targets<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
-) -> CircuitResult<ParsedDemTargets<'a>> {
+) -> ModelResult<ParsedDemTargets<'a>> {
     if rest.text().is_empty() {
         return Ok(ParsedDemTargets {
             values: DemTargetVec::new(),
@@ -564,7 +566,7 @@ fn parse_dem_targets<'a>(
         }
         let token = content
             .slice(start, cursor)
-            .ok_or_else(|| CircuitError::parse_line(line_number, "invalid DEM target"))?;
+            .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
         let target = parse_arbitrary_target(line_number, instruction, token)?;
         values.push(target);
         region_start.get_or_insert(token.byte_start());
@@ -584,7 +586,7 @@ fn parse_arbitrary_target(
     line_number: usize,
     instruction: &str,
     token: SourceSlice<'_>,
-) -> CircuitResult<DemTarget> {
+) -> ModelResult<DemTarget> {
     let Some(prefix) = token.text().as_bytes().first().copied() else {
         return Err(target_syntax_error(
             line_number,
@@ -598,7 +600,7 @@ fn parse_arbitrary_target(
         b'D' | b'd' => {
             let number = token
                 .suffix(1)
-                .ok_or_else(|| CircuitError::parse_line(line_number, "invalid DEM target"))?;
+                .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
             let value = parse_source_uint60(number).map_err(|error| {
                 unsigned_target_error(
                     line_number,
@@ -624,7 +626,7 @@ fn parse_arbitrary_target(
         b'L' | b'l' => {
             let number = token
                 .suffix(1)
-                .ok_or_else(|| CircuitError::parse_line(line_number, "invalid DEM target"))?;
+                .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
             let value = parse_source_uint60(number).map_err(|error| {
                 unsigned_target_error(
                     line_number,
@@ -710,7 +712,7 @@ fn unsigned_target_error(
     number_token: SourceSlice<'_>,
     target_kind: &'static str,
     error: UnsignedSourceError,
-) -> CircuitError {
+) -> ModelError {
     let (code, span, message) = match error {
         UnsignedSourceError::InvalidDigit { byte_offset } => (
             ParseErrorCode::InvalidTargetSyntax,
@@ -726,7 +728,7 @@ fn unsigned_target_error(
             ),
         ),
     };
-    let legacy = CircuitError::invalid_detector_error_model(message.clone()).to_string();
+    let legacy = ModelError::invalid_detector_error_model(message.clone()).to_string();
     line_error(
         ModelDialect::DetectorErrorModel,
         line_number,
@@ -738,7 +740,7 @@ fn unsigned_target_error(
     )
 }
 
-fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> CircuitResult<u64> {
+fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult<u64> {
     parse_source_uint60(token).map_err(|error| {
         let (code, span, message, legacy_message) = match error {
             UnsignedSourceError::InvalidDigit { byte_offset } => (
@@ -762,7 +764,7 @@ fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> CircuitResu
             line_number,
             code,
             message,
-            CircuitError::invalid_detector_error_model(legacy_message).to_string(),
+            ModelError::invalid_detector_error_model(legacy_message).to_string(),
             span,
             ParseErrorContext::DomainValue {
                 dialect: ModelDialect::DetectorErrorModel,
@@ -966,7 +968,7 @@ fn invalid_number_error(
     line_number: usize,
     instruction: &str,
     token: SourceSlice<'_>,
-) -> CircuitError {
+) -> ModelError {
     let span = token.span();
     let token = bounded_parse_diagnostic_text(token.text());
     line_error(
@@ -990,7 +992,7 @@ fn target_syntax_error(
     target: &str,
     span: ByteSpan,
     message: &'static str,
-) -> CircuitError {
+) -> ModelError {
     line_error(
         ModelDialect::DetectorErrorModel,
         line_number,
@@ -1002,7 +1004,7 @@ fn target_syntax_error(
     )
 }
 
-fn missing_repeat_count_error(line_number: usize, span: ByteSpan) -> CircuitError {
+fn missing_repeat_count_error(line_number: usize, span: ByteSpan) -> ModelError {
     line_error(
         ModelDialect::DetectorErrorModel,
         line_number,
@@ -1014,6 +1016,21 @@ fn missing_repeat_count_error(line_number: usize, span: ByteSpan) -> CircuitErro
             dialect: ModelDialect::DetectorErrorModel,
             kind: "repeat count",
             value: String::new(),
+        },
+    )
+}
+
+fn parse_line_error(line_number: usize, message: impl Into<String>) -> ModelError {
+    let message = message.into();
+    line_error(
+        ModelDialect::DetectorErrorModel,
+        line_number,
+        ParseErrorCode::InvalidSyntax,
+        message.clone(),
+        message,
+        ByteSpan::from_valid_range(0, 0),
+        ParseErrorContext::Model {
+            dialect: ModelDialect::DetectorErrorModel,
         },
     )
 }
@@ -1033,10 +1050,9 @@ fn target_context(instruction: &str, target: &str) -> ParseErrorContext {
     }
 }
 
-fn dem_error_message(error: &CircuitError) -> String {
-    match error {
-        CircuitError::InvalidDetectorErrorModel { message }
-        | CircuitError::ParseLine { message, .. } => message.clone(),
+fn dem_error_message(error: &ModelError) -> String {
+    match error.validation_error() {
+        Some(ValidationError::InvalidDetectorErrorModel { message }) => message.clone(),
         _ => error.to_string(),
     }
 }
@@ -1091,26 +1107,26 @@ fn trim_command_space_end(source: SourceSlice<'_>) -> SourceSlice<'_> {
     source.prefix(keep).unwrap_or(source)
 }
 
-pub(super) fn parse_unsigned_dem_text_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
+pub(super) fn parse_unsigned_dem_text_value(text: &str, kind: &'static str) -> ModelResult<u64> {
     let value = parse_unsigned_dem_value(text, kind)?;
     if value > MAX_DEM_TEXT_INTEGER {
-        return Err(CircuitError::invalid_detector_error_model(format!(
+        return Err(ModelError::invalid_detector_error_model(format!(
             "{kind} {value} exceeds {MAX_DEM_TEXT_INTEGER}"
         )));
     }
     Ok(value)
 }
 
-fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64> {
+fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> ModelResult<u64> {
     if text.is_empty() {
-        return Err(CircuitError::invalid_detector_error_model(format!(
+        return Err(ModelError::invalid_detector_error_model(format!(
             "invalid {kind} {text:?}"
         )));
     }
     let mut value = 0_u64;
     for byte in text.bytes() {
         if !byte.is_ascii_digit() {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(ModelError::invalid_detector_error_model(format!(
                 "invalid {kind} {text:?}"
             )));
         }
@@ -1119,7 +1135,7 @@ fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64
             .checked_mul(10)
             .and_then(|value| value.checked_add(digit))
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!("invalid {kind} {text:?}"))
+                ModelError::invalid_detector_error_model(format!("invalid {kind} {text:?}"))
             })?;
     }
     Ok(value)

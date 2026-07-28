@@ -340,15 +340,15 @@ fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {
     Ok(fixture)
 }
 
-fn circuit_parse(iterations: u64, fixture: &str) -> Result<stab_core::Circuit, WorkerError> {
-    let mut parsed = stab_core::Circuit::new();
+fn circuit_parse(iterations: u64, fixture: &str) -> Result<stab_model::Circuit, WorkerError> {
+    let mut parsed = stab_model::Circuit::new();
     for _ in 0..iterations {
-        parsed = stab_core::Circuit::from_stim_bytes(fixture.as_bytes())?;
+        parsed = stab_model::Circuit::from_stim_bytes(fixture.as_bytes())?;
     }
     Ok(parsed)
 }
 
-fn circuit_canonical_print(iterations: u64, circuit: &stab_core::Circuit) -> String {
+fn circuit_canonical_print(iterations: u64, circuit: &stab_model::Circuit) -> String {
     let mut canonical = String::new();
     for _ in 0..iterations {
         canonical = black_box(black_box(circuit).to_stim_string());
@@ -358,7 +358,7 @@ fn circuit_canonical_print(iterations: u64, circuit: &stab_core::Circuit) -> Str
 
 fn gate_hash_names() -> Result<Vec<String>, WorkerError> {
     let names = std::iter::once("NOT_A_GATE")
-        .chain(stab_core::Gate::all().map(stab_core::Gate::canonical_name))
+        .chain(stab_model::Gate::all().map(stab_model::Gate::canonical_name))
         .map(str::to_string)
         .collect::<Vec<_>>();
     if u64::try_from(names.len()) != Ok(GATE_HASH_NAME_COUNT) {

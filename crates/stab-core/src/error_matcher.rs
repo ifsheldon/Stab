@@ -837,7 +837,7 @@ fn append_candidate_instruction(
                     })?
                     .to_vec(),
             };
-            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+            circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
                 gate,
                 args,
                 targets,
@@ -890,7 +890,7 @@ fn append_measurement_slice(
             )
         })?
         .to_vec();
-    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         instruction.gate(),
         args,
         targets,
@@ -906,7 +906,7 @@ fn append_sanitized_instruction(
     match instruction.gate().canonical_name() {
         name if is_pure_noise(name) => {}
         name if measurement_basis(name).is_some() || pair_measurement_basis(name).is_some() => {
-            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+            circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
                 instruction.targets().to_vec(),
@@ -914,7 +914,7 @@ fn append_sanitized_instruction(
             )?);
         }
         "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
-            circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+            circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 vec![0.0; instruction.args().len()],
                 instruction.targets().to_vec(),

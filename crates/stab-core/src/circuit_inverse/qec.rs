@@ -970,7 +970,7 @@ fn append_target_instruction(
     if targets.is_empty() {
         return Ok(());
     }
-    circuit.append_instruction(CircuitInstruction::new_with_tag_bytes(
+    circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
         gate,
         args.to_vec(),
         targets,

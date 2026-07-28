@@ -3,7 +3,7 @@
     reason = "fingerprint contract tests use direct fixture assertions"
 )]
 
-use stab_core::{
+use stab_model::{
     Circuit, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, ModelDialect, ModelFingerprint,
     RepeatBlock, RepeatCount, RepeatNestingLimit,
 };
