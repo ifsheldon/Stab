@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "cd3fc7a16bc5464b96c3d7148c3aa1c9105875e925753853f2ac2e84910ff4e4",
-  "semantic_digest": "29ad73efed98d4af5db0738ec1250a4dd5af7dfe238777f4e672806499c0b45f",
+  "correctness_digest": "6c6290729001447868115594b14fef7a9a8238378421f12c115def43d81c5247",
+  "semantic_digest": "21d2021c6c7669e058f27413167f94da6827afe714dc7cb825424502eb7f22f0",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -40515,6 +40515,17 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-c58410a6eb9ab13e",
+      "path": "stab_core::execution::DetectionExecutionError::DeliveryFinished",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-d3dba0df6eaf47ab",
       "path": "stab_core::execution::DetectionExecutionError::InternalInvariant",
       "kind": "variant",
@@ -41637,17 +41648,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-61f61afff4130013",
-      "path": "stab_core::execution::MeasurementToDetectionSession::finish",
-      "kind": "method",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-45762cc3588b2b64",
       "path": "stab_core::execution::MeasurementToDetectionSession::is_poisoned",
       "kind": "method",
@@ -41670,19 +41670,19 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-2fdd6c3340e0e430",
-      "path": "stab_core::execution::MeasurementToDetectionSession::total_committed_shots",
+      "id": "cq-api-item-3b187845cdabc0c0",
+      "path": "stab_core::execution::MeasurementToDetectionSession::start_delivery",
       "kind": "method",
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
+      "correctness_case_id": "cq-evidence-qualification-6f8b06bf5e7fab5d",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-6518d9b8216cc58f",
-      "path": "stab_core::execution::MeasurementToDetectionSession::write_batch",
+      "id": "cq-api-item-2fdd6c3340e0e430",
+      "path": "stab_core::execution::MeasurementToDetectionSession::total_committed_shots",
       "kind": "method",
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
@@ -41705,8 +41705,8 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
-      "id": "cq-api-item-f958929a23703169",
-      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as Debug for@d913cd1f8cb0",
+      "id": "cq-api-item-e315d471493c6dd6",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as Debug for@e692f3c35350",
       "kind": "trait-impl",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [
@@ -41718,8 +41718,21 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
-      "id": "cq-api-item-dda528d8cc2a6cd0",
-      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as MeasurementSink for@d913cd1f8cb0",
+      "id": "cq-api-item-391969d6000e198d",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as Drop for@e692f3c35350",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1d59d351ff9f5b26",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as MeasurementSink for@e692f3c35350",
       "kind": "trait-impl",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [
@@ -41733,19 +41746,6 @@
     {
       "id": "cq-api-item-588f8ffd8e25c1e8",
       "path": "stab_core::execution::MeasurementToDetectionSinkAdapter::finish",
-      "kind": "method",
-      "performance_feature": "PERF-RESULT-IO",
-      "supporting_performance_features": [
-        "PERF-CONVERT-CLI"
-      ],
-      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-186a8eaa30a241bd",
-      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter::new",
       "kind": "method",
       "performance_feature": "PERF-RESULT-IO",
       "supporting_performance_features": [

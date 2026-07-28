@@ -5324,11 +5324,11 @@
         },
         "resource_contract": {
           "kind": "streaming",
-          "detail": "The public measurement-sink adapter forwards a bounded measurement and sweep batch into one detector-sink lifecycle and preserves exact detector and observable records."
+          "detail": "The public measurement-sink adapter forwards a bounded measurement and sweep batch into one bound detector-sink lifecycle and preserves exact detector and observable records."
         },
         "negative_axes": [
           "sweep-plane-loss",
-          "double-finish",
+          "sink-substitution",
           "observable-routing-drift"
         ],
         "public_api_owners": [
@@ -5338,16 +5338,105 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::new"
-          },
-          {
-            "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::write_batch_with_sweep"
           },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::finish"
           }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-delivery-lifecycle-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::incremental_delivery_finalizes_once_and_rejects_post_finish_writes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "One incremental delivery binds one conversion session to one detector sink, finalizes exactly once, and rejects writes or finalization after finish with exact committed-prefix progress."
+        },
+        "negative_axes": [
+          "sink-substitution",
+          "double-finish",
+          "write-after-finish",
+          "committed-prefix-progress-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::start_delivery"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-finish-failure-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::incremental_finish_failure_reports_committed_prefix_and_poisons_session",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A detector-sink finish failure reports the exact delivery-local committed prefix, poisons the parent conversion session, and prevents any subsequent delivery."
+        },
+        "negative_axes": [
+          "zeroed-finish-progress",
+          "finish-failure-reuse",
+          "post-failure-sink-delivery"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-abandoned-delivery-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::dropping_a_committed_incremental_delivery_poisons_the_parent_session",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Dropping an unfinalized incremental delivery after it has committed output poisons the parent session, preventing a caller from silently abandoning one sink lifecycle and starting another."
+        },
+        "negative_axes": [
+          "abandoned-delivery-reuse",
+          "sink-lifecycle-split"
         ],
         "standalone": true
       },
@@ -5376,18 +5465,9 @@
         "negative_axes": [
           "valid-prefix-loss",
           "preflight-poisoning",
-          "post-error-write",
-          "double-finish"
+          "post-error-write"
         ],
         "public_api_owners": [
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::MeasurementToDetectionSession::write_batch"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::MeasurementToDetectionSession::finish"
-          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSession::is_poisoned"
@@ -5795,6 +5875,36 @@
         "negative_axes": [
           "individually-admitted-aggregate-overflow",
           "combined-session-off-by-one"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-direct-frame-compiled-storage-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::direct_frame_compilation_charges_executable_targets_before_materialization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Direct detector-frame compilation dry-runs the complete retained conversion and executable-circuit representation, strips nonsemantic tags, accepts the exact compiled-byte boundary, and rejects the first byte over before materialization."
+        },
+        "negative_axes": [
+          "executable-targets-unaccounted",
+          "repeat-storage-unaccounted",
+          "metadata-retention",
+          "compiled-byte-off-by-one"
         ],
         "standalone": true
       },
@@ -8875,6 +8985,36 @@
           "replay-work-product-overflow",
           "iteration-before-overflow-check",
           "overflow-resource-misclassification"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-replay-convenience-admission-order",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "replay_convenience_api_admits_session_and_work_before_record_widths",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-search",
+          "detail": "The materialized replay convenience API rejects a poisoned session or total replay work before scanning caller-owned record widths, allocating delivery storage, or touching the sink."
+        },
+        "negative_axes": [
+          "record-scan-before-poison-admission",
+          "record-scan-before-work-admission",
+          "sink-before-replay-admission"
         ],
         "standalone": true
       },

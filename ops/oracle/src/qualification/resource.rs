@@ -61,6 +61,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-dem-sampler-work-policy-admission",
     "a2-dem-sampler-replay-work-policy-admission",
     "a2-dem-sampler-replay-work-overflow",
+    "a5-dem-replay-convenience-admission-order",
     "a2-cli-dem-replay-work-policy",
     "a2-dem-sampler-unit-policy-admission",
     "a2-dem-sampler-byte-policy-admission",
@@ -98,6 +99,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a5-measurement-detection-allocation-contract",
     "a5-detection-sampling-allocation-contract",
     "a5-detection-combined-session-storage-contract",
+    "a5-direct-frame-compiled-storage-contract",
     "a5-dem-sampling-allocation-contract",
 ];
 
