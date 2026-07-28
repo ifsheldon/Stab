@@ -27,5 +27,6 @@ sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-core = { path = "../../crates/stab-core", features = ["ops-contracts"] }
+stab-records = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

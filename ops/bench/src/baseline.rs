@@ -34,6 +34,7 @@ mod pf4;
 mod pf5;
 mod pf6;
 mod rates;
+mod records;
 #[cfg(test)]
 mod tests;
 
@@ -491,6 +492,8 @@ pub(crate) fn run_stab_compare_row_with_root(
         _ => {
             if let Some(measurements) = convert::run_convert_compare_row(root, row)? {
                 Ok(Some(measurements))
+            } else if let Some(measurements) = records::run_record_compare_row(row)? {
+                Ok(Some(measurements))
             } else if let Some(measurements) = m8::run_sample_compare_row(row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m9::run_detection_compare_row(root, row)? {
@@ -832,6 +835,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = m8::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = records::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if let Some(work) = m9::measurement_work(row_id, name) {
         return Some(work);
     }
@@ -921,6 +927,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     if let Some(note) = m8::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = records::compare_note(row_id) {
         return Some(note);
     }
     if let Some(note) = m9::compare_note(row_id) {

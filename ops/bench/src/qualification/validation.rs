@@ -26,11 +26,11 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "7cab7ce523970408fdbcc437c190aede4ed16ba7921a33eb5e17bb2fbc455691";
+const CORRECTNESS_DIGEST: &str = "d85172a83661b35543c647d0fdf6b3e8752cb5024fc0ade480b8245709ec59a8";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_MANIFEST_ROWS: usize = 161;
+const EXPECTED_MANIFEST_ROWS: usize = 164;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
 const EXPECTED_WAIVERS: usize = 3;
@@ -1129,7 +1129,7 @@ fn validate_rows(
     let expected_primary_owners = BTreeMap::from([
         ("PERF-CIRCUIT-MODEL", 8),
         ("PERF-DEM-MODEL", 9),
-        ("PERF-RESULT-IO", 6),
+        ("PERF-RESULT-IO", 9),
         ("PERF-GATE-CONTRACT", 3),
         ("PERF-BIT-KERNELS", 5),
         ("PERF-STABILIZER-ALGEBRA", 6),
@@ -1150,25 +1150,25 @@ fn validate_rows(
         ));
     }
     validate_decision_count(suite, RowDecision::Retained, 9, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 133, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 13, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 14, issues);
-    validate_classification_count(suite, RowClassification::Diagnostic, 134, issues);
+    validate_classification_count(suite, RowClassification::Diagnostic, 137, issues);
     validate_classification_count(suite, RowClassification::Proxy, 11, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
-    validate_classification_count(suite, RowClassification::MissingScale, 123, issues);
+    validate_classification_count(suite, RowClassification::MissingScale, 126, issues);
     validate_classification_count(
         suite,
         RowClassification::MissingCorrectnessPreflight,
-        158,
+        161,
         issues,
     );
-    validate_classification_count(suite, RowClassification::MissingOutputDigest, 158, issues);
-    validate_classification_count(suite, RowClassification::MissingComparator, 73, issues);
-    validate_classification_count(suite, RowClassification::AdapterCandidate, 73, issues);
+    validate_classification_count(suite, RowClassification::MissingOutputDigest, 161, issues);
+    validate_classification_count(suite, RowClassification::MissingComparator, 76, issues);
+    validate_classification_count(suite, RowClassification::AdapterCandidate, 76, issues);
     validate_classification_count(
         suite,
         RowClassification::InProcessProcessMismatch,

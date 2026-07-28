@@ -21,7 +21,7 @@ pub(super) fn classify_manifest_row(row: &BenchmarkRow) -> Result<&'static str, 
         "m7-perf-harness" | "m7-cli-dispatch" | "pf7-cli-legacy-dispatch-startup"
     ) {
         "PERF-CLI-STARTUP-AND-ERRORS"
-    } else if id.starts_with("m8-measure-reader-") {
+    } else if id.starts_with("m8-measure-reader-") || id.starts_with("m8-record-") {
         "PERF-RESULT-IO"
     } else if id.starts_with("m7-convert-") || id == "m9-convert-measurements-dets" {
         "PERF-CONVERT-CLI"
@@ -130,11 +130,11 @@ pub(super) fn classify_phase(row: &BenchmarkRow) -> Phase {
         Phase::EndToEnd
     } else if row.phase == "startup" {
         Phase::Startup
-    } else if id.contains("parse") || id.contains("reader") {
+    } else if id.contains("parse") || id.contains("reader") || id.contains("dets-layout") {
         Phase::Parse
     } else if id.contains("print") || id.contains("write") {
         Phase::Serialize
-    } else if id.contains("convert") || id.contains("m2d") {
+    } else if id.contains("convert") || id.contains("m2d") || id.contains("transpose") {
         Phase::Convert
     } else if id.contains("search")
         || id.contains("graphlike")
