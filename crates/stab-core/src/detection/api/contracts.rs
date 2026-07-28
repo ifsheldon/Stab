@@ -25,6 +25,9 @@ pub enum DetectionExecutionError {
     #[error("detection session is poisoned")]
     SessionPoisoned,
 
+    #[error("detection delivery is already finalized")]
+    DeliveryFinished,
+
     #[error("detection session shot counter overflowed")]
     ShotCounterOverflow,
 

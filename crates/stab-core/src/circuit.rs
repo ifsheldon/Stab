@@ -168,6 +168,17 @@ impl Circuit {
         self.push(CircuitItem::RepeatBlock(repeat));
     }
 
+    pub(crate) fn try_append_repeat_block(&mut self, repeat: RepeatBlock) -> CircuitResult<()> {
+        self.items.try_reserve(1).map_err(|error| {
+            CircuitError::invalid_domain_value(
+                "circuit allocation",
+                format!("unable to reserve a repeat-block slot: {error}"),
+            )
+        })?;
+        self.items.push(CircuitItem::RepeatBlock(repeat));
+        Ok(())
+    }
+
     /// Returns canonical Stim text as UTF-8.
     ///
     /// Opaque tag bytes are represented with the UTF-8 replacement character. Use

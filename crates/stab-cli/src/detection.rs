@@ -9,7 +9,7 @@ use stab_core::{
     ReferenceSampleMode, Seed, ShotCount, circuit_with_inlined_feedback,
     execution::{
         DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
-        MeasurementToDetectionSession,
+        MeasurementToDetectionSinkAdapter,
     },
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
 };
@@ -271,6 +271,9 @@ where
         observable,
         encoder,
     };
+    let mut delivery = session
+        .start_delivery(&mut sink)
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
     if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
@@ -281,8 +284,7 @@ where
                         ));
                     };
                     write_m2d_record(
-                        &mut session,
-                        &mut sink,
+                        &mut delivery,
                         &mut measurement_batch,
                         &measurement_record,
                         sweep_batch.as_mut(),
@@ -291,10 +293,10 @@ where
                 }
                 None => {
                     if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
-                        return finish_m2d(&mut session, &mut sink);
+                        return finish_m2d(delivery);
                     }
                     if sweeps.next_record()?.is_none() {
-                        return finish_m2d(&mut session, &mut sink);
+                        return finish_m2d(delivery);
                     }
                     return Err(invalid_result_format(
                         "m2d sweep input has more records than measurement input",
@@ -305,15 +307,14 @@ where
     }
     while let Some(measurement_record) = measurements.next_record()? {
         write_m2d_record(
-            &mut session,
-            &mut sink,
+            &mut delivery,
             &mut measurement_batch,
             &measurement_record,
             None,
             None,
         )?;
     }
-    finish_m2d(&mut session, &mut sink)
+    finish_m2d(delivery)
 }
 
 struct M2dBatchSink<'a, W>
@@ -367,16 +368,15 @@ where
     }
 }
 
-fn write_m2d_record<W>(
-    session: &mut MeasurementToDetectionSession,
-    sink: &mut M2dBatchSink<'_, W>,
+fn write_m2d_record<Sink>(
+    delivery: &mut MeasurementToDetectionSinkAdapter<'_, '_, Sink>,
     measurement_batch: &mut PackedShotBatch,
     measurement_record: &[bool],
     sweep_batch: Option<&mut PackedShotBatch>,
     sweep_record: Option<&[bool]>,
 ) -> Result<(), CliError>
 where
-    W: Write,
+    Sink: DetectionSink<Error = CliError>,
 {
     measurement_batch
         .copy_shot_from_bools(0, measurement_record)
@@ -396,20 +396,19 @@ where
             });
         }
     };
-    session
-        .write_batch(measurements, sweeps, sink)
+    delivery
+        .write_batch_with_sweep(measurements, sweeps)
         .map(|_| ())
         .map_err(map_detection_run_error)
 }
 
-fn finish_m2d<W>(
-    session: &mut MeasurementToDetectionSession,
-    sink: &mut M2dBatchSink<'_, W>,
+fn finish_m2d<Sink>(
+    delivery: MeasurementToDetectionSinkAdapter<'_, '_, Sink>,
 ) -> Result<(), CliError>
 where
-    W: Write,
+    Sink: DetectionSink<Error = CliError>,
 {
-    session.finish(sink).map_err(map_detection_run_error)
+    delivery.finish().map_err(map_detection_run_error)
 }
 
 fn map_detection_run_error(error: DetectionRunError<CliError>) -> CliError {

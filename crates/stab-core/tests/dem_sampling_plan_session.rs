@@ -761,6 +761,55 @@ fn work_limits_reject_before_rng_or_sink_and_leave_session_reusable() {
 }
 
 #[test]
+fn replay_convenience_api_admits_session_and_work_before_record_widths() {
+    let sampler = compile_dem("error(0.25) D0\nerror(0.5) D1\n");
+    let limits = DemSamplerLimits::default().with_max_replay_work_units(2);
+    let malformed_records = vec![Vec::new(), Vec::new()];
+    let mut limited = sampler
+        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
+        .expect("create replay-order session");
+    let mut untouched = CollectSink::default();
+    let work_error = limited
+        .replay(&malformed_records, &mut untouched)
+        .expect_err("work admission must precede record widths");
+    let DemSamplingRunError::Engine { source, .. } = work_error else {
+        panic!("expected replay work engine error");
+    };
+    let DemSamplingExecutionError::InvalidRequest(source) = source else {
+        panic!("expected typed replay work request");
+    };
+    let resource = source
+        .resource_limit_error()
+        .expect("replay work error exposes typed context");
+    assert_eq!(resource.resource(), ResourceKind::ReplayWorkUnits);
+    assert_eq!(resource.actual(), 8);
+    assert_eq!(resource.limit(), 2);
+    assert_eq!(untouched.write_calls, 0);
+    assert_eq!(untouched.finish_calls, 0);
+
+    let mut poisoned = sampler
+        .session(RandomPolicy::Seeded(Seed::new(22)))
+        .expect("create poisoned replay-order session");
+    let mut failing = CollectSink::failing_finish();
+    poisoned
+        .run(ShotCount::new(1), &mut failing)
+        .expect_err("poison session through finish failure");
+    let mut second_untouched = CollectSink::default();
+    let poison_error = poisoned
+        .replay(&[Vec::new()], &mut second_untouched)
+        .expect_err("poison admission must precede record widths");
+    assert!(matches!(
+        poison_error,
+        DemSamplingRunError::Engine {
+            source: DemSamplingExecutionError::SessionPoisoned,
+            ..
+        }
+    ));
+    assert_eq!(second_untouched.write_calls, 0);
+    assert_eq!(second_untouched.finish_calls, 0);
+}
+
+#[test]
 fn post_warmup_session_execution_allocations_are_record_count_independent() {
     let sampler = compile_dem("repeat 3 {\n  error(0.25) D0 L0\n  shift_detectors 1\n}\n");
     let mut session = sampler

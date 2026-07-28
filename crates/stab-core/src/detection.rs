@@ -996,6 +996,18 @@ impl ConversionPlan {
             term_count,
             "detection conversion measurement references",
         )?;
+        let compiled_bytes = self.compiled_storage_bytes()?;
+        if compiled_bytes > self.limits.max_compiled_bytes {
+            return Err(ResourceLimitError::detection_compiled_bytes(
+                compiled_bytes,
+                self.limits.max_compiled_bytes,
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    fn compiled_storage_bytes(&self) -> CircuitResult<u64> {
         let outer_bytes = resource_amount(
             self.output_bit_count()?
                 .checked_mul(std::mem::size_of::<Vec<usize>>())
@@ -1019,14 +1031,7 @@ impl ConversionPlan {
                 "detection conversion compiled byte count overflowed",
             )
         })?;
-        if compiled_bytes > self.limits.max_compiled_bytes {
-            return Err(ResourceLimitError::detection_compiled_bytes(
-                compiled_bytes,
-                self.limits.max_compiled_bytes,
-            )
-            .into());
-        }
-        Ok(())
+        Ok(compiled_bytes)
     }
 
     fn validate_shot_count(&self, shots: usize) -> CircuitResult<()> {

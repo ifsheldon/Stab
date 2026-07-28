@@ -320,12 +320,13 @@ impl DemSamplingSession {
                 source: DemSamplingExecutionError::ShotCounterOverflow,
                 progress: DemSamplingRunProgress::new(0, 0),
             })?;
+        self.preflight_replay_request(shots)?;
         for (shot_index, error_record) in error_records.iter().enumerate() {
             self.plan
                 .validate_error_record_width(error_record, Some(shot_index))
                 .map_err(preflight_error)?;
         }
-        let mut replay = self.start_replay(shots, sink)?;
+        let mut replay = self.start_replay_after_preflight(shots, sink)?;
         for records in error_records.chunks(MAX_BATCH_SHOTS) {
             if replay.write_batch(records)? == DemReplayBatchStatus::Cancelled {
                 break;
@@ -347,6 +348,14 @@ impl DemSamplingSession {
     where
         Sink: DemSampleSink,
     {
+        self.preflight_replay_request(expected_shots)?;
+        self.start_replay_after_preflight(expected_shots, sink)
+    }
+
+    fn preflight_replay_request<SinkError>(
+        &self,
+        expected_shots: ShotCount,
+    ) -> Result<(), DemSamplingRunError<SinkError>> {
         self.preflight_common(expected_shots)?;
         let shots =
             usize::try_from(expected_shots.get()).map_err(|_| DemSamplingRunError::Engine {
@@ -357,6 +366,19 @@ impl DemSamplingSession {
             self.plan
                 .validate_replay_with_limits(expected_shots, self.limits)
                 .map_err(preflight_error)?;
+        }
+        Ok(())
+    }
+
+    fn start_replay_after_preflight<'session, 'sink, Sink>(
+        &'session mut self,
+        expected_shots: ShotCount,
+        sink: &'sink mut Sink,
+    ) -> Result<DemReplaySession<'session, 'sink, Sink>, DemSamplingRunError<Sink::Error>>
+    where
+        Sink: DemSampleSink,
+    {
+        if expected_shots.get() != 0 {
             self.ensure_sampled_error_storage()
                 .map_err(preflight_execution_error)?;
         }

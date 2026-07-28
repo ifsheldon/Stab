@@ -7,8 +7,8 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
 use stab_records::{
-    DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementSink,
-    MeasurementWidth, ObservableWidth, PackedShotBatch,
+    DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementWidth,
+    ObservableWidth, PackedShotBatch,
 };
 
 use super::frame::{DirectDetectorFramePlan, DirectDetectorFrameState};
@@ -23,12 +23,14 @@ use crate::{
 
 mod compat;
 mod contracts;
+mod delivery;
 
 pub(super) use compat::{sample_materialized, try_for_each, validate};
 pub use contracts::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
     DetectionRunStatus, DetectionRunSummary,
 };
+pub use delivery::MeasurementToDetectionSinkAdapter;
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_DETECTION_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
@@ -247,16 +249,29 @@ impl MeasurementToDetectionSession {
         ShotCount::new(self.total_committed_shots)
     }
 
-    /// Converts and immediately writes one validated batch without finalizing the sink.
+    /// Starts one incremental conversion and sink lifecycle.
     ///
-    /// This record-at-a-time seam lets `m2d` preserve already committed output when a later input
-    /// record is malformed. `measurements` and `sweeps`, when supplied, must contain the same
-    /// number of records and no more than 64 records.
-    pub fn write_batch<Sink>(
+    /// The returned adapter binds this session to exactly one sink, preserves already committed
+    /// output when a later input record is malformed, and must be finalized exactly once.
+    pub fn start_delivery<'session, 'sink, Sink>(
+        &'session mut self,
+        sink: &'sink mut Sink,
+    ) -> Result<MeasurementToDetectionSinkAdapter<'session, 'sink, Sink>, DetectionExecutionError>
+    where
+        Sink: DetectionSink,
+    {
+        if self.poisoned {
+            return Err(DetectionExecutionError::SessionPoisoned);
+        }
+        Ok(MeasurementToDetectionSinkAdapter::new(self, sink))
+    }
+
+    fn write_batch_with_progress<Sink>(
         &mut self,
         measurements: MeasurementBatchView<'_>,
         sweeps: Option<MeasurementBatchView<'_>>,
         sink: &mut Sink,
+        committed_shots: u64,
     ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
     where
         Sink: DetectionSink,
@@ -265,7 +280,7 @@ impl MeasurementToDetectionSession {
             .validate_request(measurements, sweeps)
             .map_err(|source| DetectionRunError::Engine {
                 source,
-                progress: DetectionRunProgress::new(0, 0),
+                progress: DetectionRunProgress::new(committed_shots, 0),
             })?;
         if shots.get() == 0 {
             return Ok(self.summary(DetectionRunStatus::Completed, shots, 0));
@@ -281,13 +296,13 @@ impl MeasurementToDetectionSession {
             source: DetectionExecutionError::InternalInvariant {
                 message: "bounded conversion batch did not fit usize".to_owned(),
             },
-            progress: DetectionRunProgress::new(0, shots.get()),
+            progress: DetectionRunProgress::new(committed_shots, shots.get()),
         })?;
         if let Err(source) = self.fill_batch(measurements, sweeps, shot_count) {
             self.poisoned = true;
             return Err(DetectionRunError::Engine {
                 source,
-                progress: DetectionRunProgress::new(0, shots.get()),
+                progress: DetectionRunProgress::new(committed_shots, shots.get()),
             });
         }
         let batch = match self.batch.view(shot_count) {
@@ -296,7 +311,7 @@ impl MeasurementToDetectionSession {
                 self.poisoned = true;
                 return Err(DetectionRunError::Engine {
                     source,
-                    progress: DetectionRunProgress::new(0, shots.get()),
+                    progress: DetectionRunProgress::new(committed_shots, shots.get()),
                 });
             }
         };
@@ -305,7 +320,7 @@ impl MeasurementToDetectionSession {
             return Err(DetectionRunError::Sink {
                 phase: SinkFailurePhase::WriteBatch,
                 source,
-                progress: DetectionRunProgress::new(0, shots.get()),
+                progress: DetectionRunProgress::new(committed_shots, shots.get()),
             });
         }
         self.total_committed_shots += shots.get();
@@ -328,23 +343,21 @@ impl MeasurementToDetectionSession {
                 progress: DetectionRunProgress::new(0, 0),
             }
         })?);
-        let summary = self.write_batch(measurements, sweeps, sink)?;
+        let mut delivery =
+            self.start_delivery(sink)
+                .map_err(|source| DetectionRunError::Engine {
+                    source,
+                    progress: DetectionRunProgress::new(0, 0),
+                })?;
+        let summary = delivery.write_batch_with_sweep(measurements, sweeps)?;
         if requested.get() == 0 {
             return Ok(summary);
         }
-        self.finish_with_progress(sink, summary.committed_shots().get())?;
+        delivery.finish()?;
         Ok(summary)
     }
 
-    /// Finalizes a sink after one or more successful [`Self::write_batch`] calls.
-    pub fn finish<Sink>(&mut self, sink: &mut Sink) -> Result<(), DetectionRunError<Sink::Error>>
-    where
-        Sink: DetectionSink,
-    {
-        self.finish_with_progress(sink, 0)
-    }
-
-    fn finish_with_progress<Sink>(
+    fn finish_sink<Sink>(
         &mut self,
         sink: &mut Sink,
         committed_shots: u64,
@@ -479,68 +492,6 @@ impl MeasurementToDetectionSession {
             committed_shots: ShotCount::new(committed_shots),
             total_committed_shots: ShotCount::new(self.total_committed_shots),
         }
-    }
-}
-
-/// Adapts a detection sink into the measurement-sink seam consumed by a sampling session.
-pub struct MeasurementToDetectionSinkAdapter<'a, Sink> {
-    session: &'a mut MeasurementToDetectionSession,
-    sink: &'a mut Sink,
-}
-
-impl<Sink> fmt::Debug for MeasurementToDetectionSinkAdapter<'_, Sink> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("MeasurementToDetectionSinkAdapter")
-            .field("session", &self.session)
-            .field("sink_type", &std::any::type_name::<Sink>())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'a, Sink> MeasurementToDetectionSinkAdapter<'a, Sink>
-where
-    Sink: DetectionSink,
-{
-    pub fn new(session: &'a mut MeasurementToDetectionSession, sink: &'a mut Sink) -> Self {
-        Self { session, sink }
-    }
-
-    pub fn write_batch_with_sweep(
-        &mut self,
-        measurements: MeasurementBatchView<'_>,
-        sweeps: Option<MeasurementBatchView<'_>>,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>> {
-        self.session.write_batch(measurements, sweeps, self.sink)
-    }
-
-    pub fn finish(&mut self) -> Result<(), DetectionRunError<Sink::Error>> {
-        self.session.finish(self.sink)
-    }
-}
-
-impl<Sink> MeasurementSink for MeasurementToDetectionSinkAdapter<'_, Sink>
-where
-    Sink: DetectionSink,
-{
-    type Error = DetectionRunError<Sink::Error>;
-
-    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
-        let summary = self.write_batch_with_sweep(batch, None)?;
-        if summary.status() == DetectionRunStatus::Cancelled {
-            return Err(DetectionRunError::Engine {
-                source: DetectionExecutionError::CancelledComposition,
-                progress: DetectionRunProgress::new(
-                    summary.committed_shots().get(),
-                    summary.requested_shots().get(),
-                ),
-            });
-        }
-        Ok(())
-    }
-
-    fn finish(&mut self) -> Result<(), Self::Error> {
-        MeasurementToDetectionSinkAdapter::finish(self)
     }
 }
 
@@ -1003,7 +954,13 @@ fn run_fused<Sink>(
 where
     Sink: DetectionSink,
 {
-    let mut adapter = MeasurementToDetectionSinkAdapter::new(conversion, sink);
+    let mut adapter =
+        conversion
+            .start_delivery(sink)
+            .map_err(|source| DetectionRunError::Engine {
+                source,
+                progress: DetectionRunProgress::new(0, 0),
+            })?;
     match sampling.run(shots, &mut adapter) {
         Ok(summary) => Ok(DetectionRunSummary {
             status: match summary.status() {

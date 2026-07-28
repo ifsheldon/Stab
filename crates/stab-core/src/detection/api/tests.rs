@@ -8,9 +8,11 @@
 
 use std::convert::Infallible;
 
+use stab_records::MeasurementSink;
+
 use super::*;
 use crate::{
-    Seed, convert_measurements_to_detection_events,
+    ResourceKind, Seed, convert_measurements_to_detection_events,
     convert_measurements_to_detection_events_with_sweep, sample_detection_events,
 };
 
@@ -220,7 +222,9 @@ fn measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle() {
     let mut session = plan.session().expect("create adapter session");
     let mut sink = CollectSink::default();
     {
-        let mut adapter = MeasurementToDetectionSinkAdapter::new(&mut session, &mut sink);
+        let mut adapter = session
+            .start_delivery(&mut sink)
+            .expect("start adapted delivery");
         let summary = adapter
             .write_batch_with_sweep(
                 MeasurementBatchView::new(measurement_batch.view()),
@@ -245,28 +249,22 @@ fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
     let cancellation = session.cancellation();
     cancellation.cancel();
     let mut untouched = CollectSink::default();
-    let summary = session
-        .write_batch(
-            MeasurementBatchView::new(input.view()),
-            None,
-            &mut untouched,
-        )
+    let mut delivery = session
+        .start_delivery(&mut untouched)
+        .expect("start cancellable delivery");
+    let summary = delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
         .expect("cancel conversion batch");
     assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
     assert_eq!(summary.committed_shots(), ShotCount::new(0));
-    assert!(untouched.records.is_empty());
-    assert!(!session.is_poisoned());
 
     cancellation.reset();
-    session
-        .write_batch(
-            MeasurementBatchView::new(input.view()),
-            None,
-            &mut untouched,
-        )
+    delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
         .expect("resume conversion batch");
-    session.finish(&mut untouched).expect("finish resumed sink");
+    delivery.finish().expect("finish resumed sink");
     assert_eq!(untouched.records.len(), 1);
+    assert!(!session.is_poisoned());
     assert_eq!(session.total_committed_shots(), ShotCount::new(1));
 }
 
@@ -320,11 +318,14 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
     let invalid = packed(&[vec![true, false]], 2);
     let mut sink = CollectSink::default();
 
-    session
-        .write_batch(MeasurementBatchView::new(valid.view()), None, &mut sink)
+    let mut delivery = session
+        .start_delivery(&mut sink)
+        .expect("start prefix delivery");
+    delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(valid.view()), None)
         .expect("write valid prefix");
-    let error = session
-        .write_batch(MeasurementBatchView::new(invalid.view()), None, &mut sink)
+    let error = delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(invalid.view()), None)
         .expect_err("reject malformed later record");
     assert!(matches!(
         error,
@@ -333,16 +334,118 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
             ..
         }
     ));
-    assert!(!session.is_poisoned());
-    assert_eq!(sink.records.len(), 1);
-    assert_eq!(session.total_committed_shots(), ShotCount::new(1));
+    assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
 
-    session
-        .write_batch(MeasurementBatchView::new(valid.view()), None, &mut sink)
+    delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(valid.view()), None)
         .expect("reuse after preflight rejection");
-    session.finish(&mut sink).expect("finish prefix sink");
+    delivery.finish().expect("finish prefix sink");
     assert_eq!(sink.records.len(), 2);
     assert_eq!(sink.finish_count, 1);
+    assert!(!session.is_poisoned());
+    assert_eq!(session.total_committed_shots(), ShotCount::new(2));
+}
+
+#[test]
+fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile delivery lifecycle");
+    let input = packed(&[vec![true]], 1);
+    let mut session = plan.session().expect("create delivery lifecycle session");
+    let mut sink = CollectSink::default();
+    let mut delivery = session
+        .start_delivery(&mut sink)
+        .expect("start delivery lifecycle");
+    delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
+        .expect("write delivery prefix");
+    MeasurementSink::finish(&mut delivery).expect("finish delivery once");
+
+    let repeated = MeasurementSink::finish(&mut delivery).expect_err("reject double finish");
+    assert!(matches!(
+        repeated,
+        DetectionRunError::Engine {
+            source: DetectionExecutionError::DeliveryFinished,
+            ..
+        }
+    ));
+    assert_eq!(repeated.progress().committed_shots(), ShotCount::new(1));
+    let post_finish = delivery
+        .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
+        .expect_err("reject write after finish");
+    assert!(matches!(
+        post_finish,
+        DetectionRunError::Engine {
+            source: DetectionExecutionError::DeliveryFinished,
+            ..
+        }
+    ));
+    assert_eq!(post_finish.progress().committed_shots(), ShotCount::new(1));
+    drop(delivery);
+
+    assert_eq!(sink.finish_count, 1);
+    assert!(!session.is_poisoned());
+    assert_eq!(session.total_committed_shots(), ShotCount::new(1));
+}
+
+#[test]
+fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile finish failure lifecycle");
+    let input = packed(&[vec![true]], 1);
+    let mut session = plan
+        .session()
+        .expect("create finish failure lifecycle session");
+    let mut sink = FailingSink {
+        fail_write: false,
+        fail_finish: true,
+        writes: 0,
+    };
+    let mut delivery = session
+        .start_delivery(&mut sink)
+        .expect("start finish failure delivery");
+    for _ in 0..2 {
+        delivery
+            .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
+            .expect("write committed prefix");
+    }
+    let error = delivery.finish().expect_err("surface finish failure");
+    assert!(matches!(
+        error,
+        DetectionRunError::Sink {
+            phase: SinkFailurePhase::Finish,
+            source: TestSinkError::Finish,
+            ..
+        }
+    ));
+    assert_eq!(error.progress().committed_shots(), ShotCount::new(2));
+    assert!(session.is_poisoned());
+    assert_eq!(session.total_committed_shots(), ShotCount::new(2));
+}
+
+#[test]
+fn dropping_a_committed_incremental_delivery_poisons_the_parent_session() {
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile abandoned delivery");
+    let input = packed(&[vec![true]], 1);
+    let mut session = plan.session().expect("create abandoned delivery session");
+    let mut sink = CollectSink::default();
+    {
+        let mut delivery = session
+            .start_delivery(&mut sink)
+            .expect("start abandoned delivery");
+        delivery
+            .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
+            .expect("write abandoned prefix");
+    }
+    assert!(session.is_poisoned());
+    assert_eq!(sink.finish_count, 0);
 }
 
 #[test]
@@ -620,6 +723,54 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
 }
 
 #[test]
+fn direct_frame_compilation_charges_executable_targets_before_materialization() {
+    let targets = (0..256)
+        .map(|qubit| format!("X{qubit}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let metadata = "tag".repeat(1_024);
+    let tagged = circuit(&format!("OBSERVABLE_INCLUDE[{metadata}](0) {targets}\n"));
+    let untagged = circuit(&format!("OBSERVABLE_INCLUDE(0) {targets}\n"));
+    let compiler = DetectionSamplingCompiler::new();
+    let tagged_plan = compiler
+        .compile_direct_for_test(&tagged)
+        .expect("compile tagged direct frame");
+    let untagged_plan = compiler
+        .compile_direct_for_test(&untagged)
+        .expect("compile untagged direct frame");
+    let direct_bytes = |plan: &DetectionSamplingPlan| {
+        let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
+            panic!("test compiler must select the direct detector frame");
+        };
+        direct
+            .compiled_bytes()
+            .expect("compute retained direct-plan bytes")
+    };
+    let exact_bytes = direct_bytes(&tagged_plan);
+    assert_eq!(
+        exact_bytes,
+        direct_bytes(&untagged_plan),
+        "nonsemantic tags must not be retained by the private executable"
+    );
+
+    DetectionSamplingCompiler::new()
+        .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
+        .compile_direct_for_test(&tagged)
+        .expect("accept exact combined direct-plan byte boundary");
+    let error = DetectionSamplingCompiler::new()
+        .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
+        .compile_direct_for_test(&tagged)
+        .expect_err("reject the first byte above the direct-plan boundary")
+        .into_circuit_error();
+    let resource = error
+        .resource_limit_error()
+        .expect("direct-plan byte rejection remains typed");
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(resource.actual(), exact_bytes);
+    assert_eq!(resource.limit(), exact_bytes - 1);
+}
+
+#[test]
 fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
     let circuit =
         circuit("H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
@@ -633,16 +784,20 @@ fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
     let sweep_view = MeasurementBatchView::new(sweeps.view());
     let mut sink = NullSink::default();
 
-    session
-        .write_batch(measurement_view, Some(sweep_view), &mut sink)
+    let mut delivery = session
+        .start_delivery(&mut sink)
+        .expect("start allocation delivery");
+    delivery
+        .write_batch_with_sweep(measurement_view, Some(sweep_view))
         .expect("warm conversion scratch");
     let measured = allocation_counter::measure(|| {
         for _ in 0..128 {
-            session
-                .write_batch(measurement_view, Some(sweep_view), &mut sink)
+            delivery
+                .write_batch_with_sweep(measurement_view, Some(sweep_view))
                 .expect("reuse conversion scratch");
         }
     });
+    delivery.finish().expect("finish allocation delivery");
     assert_eq!(
         measured.count_total, 0,
         "warmed conversion allocated while reusing bounded scratch: {measured:?}"
