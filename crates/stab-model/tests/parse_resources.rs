@@ -5,7 +5,8 @@
 
 use stab_model::{
     ByteSpan, DiagnosticSeverity, Estimate, EstimateClass, ModelDialect, ModelError, ParseError,
-    ParseErrorCode, ParseErrorContext, ParseLimits, RepeatNestingLimit, SourceLineLimit, advanced,
+    ParseErrorCode, ParseErrorContext, ParseLimits, RepeatNestingLimit, ResourceKind,
+    ResourceLimitContext, ResourceOperation, SourceLineLimit, advanced,
 };
 
 #[test]
@@ -114,4 +115,54 @@ fn parse_estimates_preserve_exact_line_and_byte_accounting() {
     let bytes = ParseLimits::default().estimate_bytes(b"H 0 # \xff\nM[\xfe] 0");
     assert_eq!(bytes.input_bytes(), Estimate::Exact(14));
     assert_eq!(bytes.input_items(), Estimate::Exact(2));
+}
+
+#[test]
+fn parser_resource_failures_preserve_typed_context_and_human_diagnostics() {
+    let span = ByteSpan::try_new(12, 3).expect("valid span");
+    let cases = [
+        (
+            advanced::circuit_source_line_limit_error(3, 2, span),
+            ResourceOperation::CircuitParse,
+            ResourceKind::SourceLines,
+            ResourceLimitContext::CircuitSourceLines,
+            "failed to parse line 3: circuit input has more than 2 lines",
+        ),
+        (
+            advanced::circuit_repeat_nesting_limit_error(7, 3, 2, span),
+            ResourceOperation::CircuitParse,
+            ResourceKind::RepeatNesting,
+            ResourceLimitContext::CircuitRepeatNesting { source_line: 7 },
+            "failed to parse line 7: repeat nesting exceeds current limit 2",
+        ),
+        (
+            advanced::dem_source_line_limit_error(3, 2, span),
+            ResourceOperation::DetectorErrorModelParse,
+            ResourceKind::SourceLines,
+            ResourceLimitContext::DetectorErrorModelSourceLines,
+            "invalid detector error model: DEM input has more than 2 lines",
+        ),
+        (
+            advanced::dem_repeat_nesting_limit_error(3, 2, span),
+            ResourceOperation::DetectorErrorModelParse,
+            ResourceKind::RepeatNesting,
+            ResourceLimitContext::DetectorErrorModelRepeatNesting,
+            "invalid detector error model: DEM repeat nesting exceeds current limit 2",
+        ),
+    ];
+
+    for (error, operation, resource, context, message) in cases {
+        let resource_error = error
+            .resource_limit_error()
+            .expect("advanced constructor returns a resource failure");
+        assert_eq!(resource_error.code(), "resource-limit-exceeded");
+        assert_eq!(resource_error.severity(), DiagnosticSeverity::Error);
+        assert_eq!(resource_error.operation(), operation);
+        assert_eq!(resource_error.resource(), resource);
+        assert_eq!(resource_error.context(), context);
+        assert_eq!(resource_error.actual(), 3);
+        assert_eq!(resource_error.limit(), 2);
+        assert_eq!(resource_error.span(), span);
+        assert_eq!(error.to_string(), message);
+    }
 }

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ParseError;
+use crate::{ParseError, ResourceLimitError};
 
 /// Result type for stable model construction and validation.
 pub type ModelResult<T> = Result<T, ModelError>;
@@ -10,6 +10,9 @@ pub type ModelResult<T> = Result<T, ModelError>;
 pub enum ModelError {
     #[error(transparent)]
     Parse(#[from] ParseError),
+
+    #[error(transparent)]
+    ResourceLimit(#[from] ResourceLimitError),
 
     #[error("unknown gate {0}")]
     UnknownGate(String),
@@ -42,6 +45,20 @@ impl ModelError {
         Self::InvalidDomainValue {
             kind,
             value: value.to_string(),
+        }
+    }
+
+    pub fn parse_error(&self) -> Option<&ParseError> {
+        match self {
+            Self::Parse(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    pub fn resource_limit_error(&self) -> Option<&ResourceLimitError> {
+        match self {
+            Self::ResourceLimit(error) => Some(error),
+            _ => None,
         }
     }
 }

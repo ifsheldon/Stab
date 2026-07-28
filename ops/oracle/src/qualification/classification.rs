@@ -574,6 +574,7 @@ pub(super) fn classify_public_api_source(
         "crates/stab-core/src/parse_limits.rs"
             | "crates/stab-core/src/resources.rs"
             | "crates/stab-model/src/parse_limits.rs"
+            | "crates/stab-model/src/resource_limit.rs"
             | "crates/stab-model/src/resources.rs"
     ) || value == "crates/stab-core/src/sampling_estimate.rs"
     {

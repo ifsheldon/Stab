@@ -18631,8 +18631,117 @@
       ],
       "standalone": true
     },
-    {
-      "id": "a6-model-gate-validation-contract",
+      {
+        "id": "a6-model-parse-resource-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-model",
+            "--test",
+            "parse_resources",
+            "parser_resource_failures_preserve_typed_context_and_human_diagnostics",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The four real circuit and DEM parse-admission causes retain fixed typed operation, dimension, context, values, spans, and compatibility human diagnostics without input-sized storage."
+        },
+        "negative_axes": [
+          "circuit-dem-operation-confusion",
+          "line-repeat-dimension-confusion",
+          "repeat-source-line-loss",
+          "facade-display-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceOperation"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceOperation::as_str"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceKind"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceKind::as_str"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitContext"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::code"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::severity"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::operation"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::resource"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::context"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::actual"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::limit"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceLimitError::span"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelError::resource_limit_error"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::circuit_source_line_limit_error"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::circuit_repeat_nesting_limit_error"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::dem_source_line_limit_error"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::dem_repeat_nesting_limit_error"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-model-gate-validation-contract",
       "feature_id": "CQ-GATE-CONTRACT",
       "comparator": "error-class",
       "primary_selector": {

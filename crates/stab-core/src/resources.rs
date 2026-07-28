@@ -209,44 +209,26 @@ pub struct ResourceLimitError {
 }
 
 impl ResourceLimitError {
-    pub(crate) const fn circuit_source_lines(actual: usize, limit: usize, span: ByteSpan) -> Self {
+    pub(crate) fn from_model_parse(error: stab_model::ResourceLimitError) -> Self {
+        let cause = match error.context() {
+            stab_model::ResourceLimitContext::CircuitSourceLines => {
+                ResourceLimitCause::CircuitSourceLines
+            }
+            stab_model::ResourceLimitContext::CircuitRepeatNesting { source_line } => {
+                ResourceLimitCause::CircuitRepeatNesting { source_line }
+            }
+            stab_model::ResourceLimitContext::DetectorErrorModelSourceLines => {
+                ResourceLimitCause::DetectorErrorModelSourceLines
+            }
+            stab_model::ResourceLimitContext::DetectorErrorModelRepeatNesting => {
+                ResourceLimitCause::DetectorErrorModelRepeatNesting
+            }
+        };
         Self {
-            cause: ResourceLimitCause::CircuitSourceLines,
-            actual: actual as u64,
-            limit: limit as u64,
-            span: Some(span),
-        }
-    }
-
-    pub(crate) const fn circuit_repeat_nesting(
-        source_line: usize,
-        actual: usize,
-        limit: usize,
-        span: ByteSpan,
-    ) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitRepeatNesting { source_line },
-            actual: actual as u64,
-            limit: limit as u64,
-            span: Some(span),
-        }
-    }
-
-    pub(crate) const fn dem_source_lines(actual: usize, limit: usize, span: ByteSpan) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelSourceLines,
-            actual: actual as u64,
-            limit: limit as u64,
-            span: Some(span),
-        }
-    }
-
-    pub(crate) const fn dem_repeat_nesting(actual: usize, limit: usize, span: ByteSpan) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelRepeatNesting,
-            actual: actual as u64,
-            limit: limit as u64,
-            span: Some(span),
+            cause,
+            actual: error.actual(),
+            limit: error.limit(),
+            span: Some(error.span()),
         }
     }
 
@@ -675,6 +657,12 @@ impl ResourceLimitError {
 
     pub const fn span(&self) -> Option<ByteSpan> {
         self.span
+    }
+}
+
+impl From<stab_model::ResourceLimitError> for ResourceLimitError {
+    fn from(error: stab_model::ResourceLimitError) -> Self {
+        Self::from_model_parse(error)
     }
 }
 

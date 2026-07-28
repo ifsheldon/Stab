@@ -73,6 +73,9 @@ impl From<stab_model::ModelError> for CircuitError {
     fn from(error: stab_model::ModelError) -> Self {
         match error {
             stab_model::ModelError::Parse(error) => Self::Parse(error),
+            stab_model::ModelError::ResourceLimit(error) => {
+                Self::ResourceLimit(ResourceLimitError::from(error))
+            }
             stab_model::ModelError::UnknownGate(gate) => Self::UnknownGate(gate),
             stab_model::ModelError::InvalidDomainValue { kind, value } => {
                 Self::InvalidDomainValue { kind, value }

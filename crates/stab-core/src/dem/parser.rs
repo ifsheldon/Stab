@@ -7,8 +7,9 @@ use crate::model_parse::{line_error, unexpected_repeat_terminator, unterminated_
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::{
     ByteSpan, CircuitError, CircuitResult, DemRepeatCount, ModelDialect, ParseErrorCode,
-    ParseErrorContext, ParseLimits, ResourceLimitError,
+    ParseErrorContext, ParseLimits,
 };
+use stab_model::advanced::{dem_repeat_nesting_limit_error, dem_source_line_limit_error};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
@@ -103,12 +104,9 @@ impl<'a> DemParser<'a> {
         let line_number = command.line_number();
         let limit = self.limits.source_line_limit().get();
         if line_number > limit {
-            return Err(ResourceLimitError::dem_source_lines(
-                line_number,
-                limit,
-                command.source().span(),
-            )
-            .into());
+            return Err(
+                dem_source_line_limit_error(line_number, limit, command.source().span()).into(),
+            );
         }
         Ok(Some(command))
     }
@@ -180,7 +178,7 @@ impl<'a> DemParser<'a> {
             let actual = parent_depth.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
             })?;
-            return Err(ResourceLimitError::dem_repeat_nesting(actual, limit, header_span).into());
+            return Err(dem_repeat_nesting_limit_error(actual, limit, header_span).into());
         }
         Ok(ParsedRepeatHeader {
             count: DemRepeatCount::new(count),

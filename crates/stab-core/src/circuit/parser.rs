@@ -5,8 +5,9 @@ use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{
     ByteSpan, CircuitError, CircuitResult, Gate, ModelDialect, ParseErrorCode, ParseErrorContext,
-    ParseLimits, RepeatCount, ResourceLimitError, Target,
+    ParseLimits, RepeatCount, Target,
 };
+use stab_model::advanced::{circuit_repeat_nesting_limit_error, circuit_source_line_limit_error};
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
@@ -57,7 +58,7 @@ impl<'a> Parser<'a> {
             let line_number = command.line_number();
             let limit = self.limits.source_line_limit().get();
             if line_number > limit {
-                return Err(ResourceLimitError::circuit_source_lines(
+                return Err(circuit_source_line_limit_error(
                     line_number,
                     limit,
                     command.source().span(),
@@ -222,7 +223,7 @@ impl<'a> Parser<'a> {
             let actual = depth.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_domain_value("circuit repeat nesting", "depth overflow")
             })?;
-            return Err(ResourceLimitError::circuit_repeat_nesting(
+            return Err(circuit_repeat_nesting_limit_error(
                 line_number,
                 actual,
                 limit,

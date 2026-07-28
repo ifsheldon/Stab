@@ -14,6 +14,7 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
         || api_lower.ends_with("::validate_replay_work_units")
         || api_lower.ends_with("::try_for_each_detection_event_from_error_records")
         || api_lower.contains("resource_estimate")
+        || api_lower.contains("_limit_error")
         || [
             "parselimits",
             "repeatnestinglimit",

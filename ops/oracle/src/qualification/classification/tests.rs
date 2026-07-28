@@ -212,6 +212,22 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_model",
+            Path::new("crates/stab-model/src/resource_limit.rs"),
+            "stab_model::ResourceLimitError",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/lib.rs"),
+            "stab_model::advanced::circuit_source_line_limit_error",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
             Path::new("crates/stab-model/src/lib.rs"),
             "stab_model::advanced::resource_estimate_for_sampling_request",
         ),

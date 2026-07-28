@@ -6,6 +6,7 @@ mod error;
 mod gate;
 mod ids;
 mod parse_limits;
+mod resource_limit;
 mod resources;
 mod target;
 
@@ -22,6 +23,9 @@ pub use ids::{
     Probability, QubitId, RepeatCount,
 };
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
+pub use resource_limit::{
+    ResourceKind, ResourceLimitContext, ResourceLimitError, ResourceOperation,
+};
 pub use resources::{Estimate, EstimateClass, ResourceEstimate};
 pub use target::{Pauli, Target};
 
@@ -30,9 +34,9 @@ pub mod advanced {
     use std::fmt::Display;
 
     use super::{
-        ByteSpan, Estimate, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
+        ByteSpan, Estimate, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect, ModelError,
         ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, ResourceEstimate,
-        Target,
+        ResourceLimitError, Target,
     };
     pub use crate::gate::GateUnitaryRows;
     use smallvec::SmallVec;
@@ -92,6 +96,39 @@ pub mod advanced {
             folded_traversal,
             output_bytes,
         )
+    }
+
+    /// Constructs the circuit source-line admission failure used by the exact parser.
+    pub fn circuit_source_line_limit_error(
+        actual: usize,
+        limit: usize,
+        span: ByteSpan,
+    ) -> ModelError {
+        ResourceLimitError::circuit_source_lines(actual, limit, span).into()
+    }
+
+    /// Constructs the circuit repeat-depth admission failure used by the exact parser.
+    pub fn circuit_repeat_nesting_limit_error(
+        source_line: usize,
+        actual: usize,
+        limit: usize,
+        span: ByteSpan,
+    ) -> ModelError {
+        ResourceLimitError::circuit_repeat_nesting(source_line, actual, limit, span).into()
+    }
+
+    /// Constructs the DEM source-line admission failure used by the exact parser.
+    pub fn dem_source_line_limit_error(actual: usize, limit: usize, span: ByteSpan) -> ModelError {
+        ResourceLimitError::dem_source_lines(actual, limit, span).into()
+    }
+
+    /// Constructs the DEM repeat-depth admission failure used by the exact parser.
+    pub fn dem_repeat_nesting_limit_error(
+        actual: usize,
+        limit: usize,
+        span: ByteSpan,
+    ) -> ModelError {
+        ResourceLimitError::dem_repeat_nesting(actual, limit, span).into()
     }
 
     /// Constructs a probability after the caller has proved its domain.

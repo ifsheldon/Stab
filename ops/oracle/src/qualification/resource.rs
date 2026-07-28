@@ -18,6 +18,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     BOUNDED_TEXT_LINE_SOURCE_ID,
     "a2-parse-policy-default-contract",
     "a2-parse-estimate-contract",
+    "a6-model-parse-resource-contract",
     "a2-resource-identifier-contract",
     "a2-circuit-parse-policy-admission",
     "a2-dem-parse-policy-admission",
