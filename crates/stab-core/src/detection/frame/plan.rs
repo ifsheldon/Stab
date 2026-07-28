@@ -10,7 +10,7 @@ use super::helpers::{
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, RepeatBlock,
-    ResourceLimitError, Target,
+    ResourceLimitError, Target, circuit::CircuitAssembler,
 };
 
 struct AdmittedFrameConversion {
@@ -42,9 +42,9 @@ impl AdmittedFrameConversion {
     }
 
     fn materialize_execution_circuit(&self, circuit: &Circuit) -> CircuitResult<Circuit> {
-        let mut result = Circuit::new();
+        let mut result = CircuitAssembler::new();
         append_frame_execution_circuit(circuit, &mut result, self.execution_storage.root_items)?;
-        Ok(result)
+        Ok(result.finish())
     }
 }
 
@@ -394,14 +394,17 @@ fn admit_combined_compiled_storage(
 
 fn append_frame_execution_circuit(
     circuit: &Circuit,
-    result: &mut Circuit,
+    result: &mut CircuitAssembler,
     root_item_capacity: usize,
 ) -> CircuitResult<()> {
-    result.try_reserve_items_exact(root_item_capacity)?;
+    result.try_reserve_exact(root_item_capacity)?;
     append_frame_execution_items(circuit, result)
 }
 
-fn append_frame_execution_items(circuit: &Circuit, result: &mut Circuit) -> CircuitResult<()> {
+fn append_frame_execution_items(
+    circuit: &Circuit,
+    result: &mut CircuitAssembler,
+) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction)
@@ -419,11 +422,11 @@ fn append_frame_execution_items(circuit: &Circuit, result: &mut Circuit) -> Circ
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let shape = frame_execution_storage(repeat.body())?;
-                let mut body = Circuit::new();
+                let mut body = CircuitAssembler::new();
                 append_frame_execution_circuit(repeat.body(), &mut body, shape.root_items)?;
                 result.try_append_repeat_block(RepeatBlock::new(
                     repeat.repeat_count(),
-                    body,
+                    body.finish(),
                     None,
                 ))?;
             }

@@ -1,11 +1,11 @@
-use crate::{Circuit, CircuitItem, RepeatBlock};
+use crate::{Circuit, CircuitItem, RepeatBlock, circuit::CircuitAssembler};
 
 /// Returns a compact copy of `circuit` with every instruction and repeat-block tag removed.
 ///
 /// Item order, instruction boundaries, arguments, targets, repeat counts, and repeat nesting are
 /// preserved. Removing tags does not fuse adjacent instructions that previously had distinct tags.
 pub fn circuit_without_tags(circuit: &Circuit) -> Circuit {
-    Circuit::from_items(
+    CircuitAssembler::from_unfused_items(
         circuit
             .items()
             .iter()
@@ -21,4 +21,5 @@ pub fn circuit_without_tags(circuit: &Circuit) -> Circuit {
             })
             .collect(),
     )
+    .finish()
 }

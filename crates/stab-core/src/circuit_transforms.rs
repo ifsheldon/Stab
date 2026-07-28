@@ -1,6 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, QubitId,
-    RepeatBlock, RepeatNestingLimit, ResourceLimitError, Target,
+    RepeatBlock, RepeatNestingLimit, ResourceLimitError, Target, circuit::CircuitAssembler,
 };
 
 const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
@@ -107,12 +107,12 @@ pub fn flattened_circuit_with_limits(
 ) -> CircuitResult<Circuit> {
     let estimate = validate_flattening_budget(circuit, limits)?;
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
-    let mut result = Circuit::new();
-    result.try_reserve_items_exact(capacity)?;
+    let mut result = CircuitAssembler::new();
+    result.try_reserve_exact(capacity)?;
     visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
         result.try_append_instruction(instruction)
     })?;
-    Ok(result)
+    Ok(result.finish())
 }
 
 /// Returns owned flattened instructions without Stim-style adjacent-instruction fusion.
@@ -584,9 +584,9 @@ mod tests {
         reason = "the test must fail if an impossible reservation unexpectedly succeeds"
     )]
     fn circuit_item_reservation_failure_is_a_domain_error() {
-        let mut circuit = Circuit::new();
+        let mut circuit = CircuitAssembler::new();
         let error = circuit
-            .try_reserve_items_exact(usize::MAX)
+            .try_reserve_exact(usize::MAX)
             .expect_err("an impossible vector capacity must not panic");
         assert!(
             error

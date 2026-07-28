@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Gate,
     GateCategory, MeasureRecordOffset, Pauli, RepeatBlock, RepeatCount, Target,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    circuit::CircuitAssembler, sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const MAX_FEEDBACK_REPEAT_COUNT: u64 = 100_000;
@@ -80,7 +80,9 @@ impl WithoutFeedbackHelper {
         for _ in 0..repeat_count {
             self.reversed_output.clear();
             self.undo_circuit(repeat.body())?;
-            let body = Circuit::from_unfused_items(std::mem::take(&mut self.reversed_output));
+            let body =
+                CircuitAssembler::from_unfused_items(std::mem::take(&mut self.reversed_output))
+                    .finish();
             outer_output.push(CircuitItem::RepeatBlock(RepeatBlock::new_with_tag_bytes(
                 RepeatCount::try_new(1)?,
                 body,

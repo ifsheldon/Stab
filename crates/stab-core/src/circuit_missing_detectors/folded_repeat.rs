@@ -1,4 +1,7 @@
-use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, RepeatBlock};
+use crate::{
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, RepeatBlock,
+    circuit::CircuitAssembler,
+};
 
 use super::{
     MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS, MAX_MISSING_DETECTOR_REPEAT_ITERATIONS,
@@ -51,7 +54,10 @@ fn final_repeat_with_prefix(circuit: &Circuit) -> Option<(Circuit, &RepeatBlock)
     let CircuitItem::RepeatBlock(repeat) = last else {
         return None;
     };
-    Some((Circuit::from_unfused_items(prefix_items.to_vec()), repeat))
+    Some((
+        CircuitAssembler::from_unfused_items(prefix_items.to_vec()).finish(),
+        repeat,
+    ))
 }
 
 fn repeat_exceeds_materialized_budget(repeat: &RepeatBlock) -> CircuitResult<bool> {
@@ -110,7 +116,9 @@ fn repeat_body_proof_circuit(circuit: &Circuit) -> CircuitResult<Option<Circuit>
             }
         }
     }
-    Ok(Some(Circuit::from_unfused_items(proof_items)))
+    Ok(Some(
+        CircuitAssembler::from_unfused_items(proof_items).finish(),
+    ))
 }
 
 fn circuit_record_targets_are_local(

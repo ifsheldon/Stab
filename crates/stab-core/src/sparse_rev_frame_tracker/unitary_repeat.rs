@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
-    RepeatBlock, Target,
+    RepeatBlock, Target, circuit::CircuitAssembler,
 };
 
 use super::{SparseReverseFrameTracker, qubit_index, replace_qubit_set, toggle_targets};
@@ -252,7 +252,7 @@ fn remap_circuit_items(
             }
         })
         .collect::<CircuitResult<Vec<_>>>()?;
-    Ok(Circuit::from_unfused_items(items))
+    Ok(CircuitAssembler::from_unfused_items(items).finish())
 }
 
 fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {

@@ -24,6 +24,43 @@ pub struct Circuit {
     items: Vec<CircuitItem>,
 }
 
+pub(crate) struct CircuitAssembler {
+    circuit: Circuit,
+}
+
+impl CircuitAssembler {
+    pub(crate) fn new() -> Self {
+        Self {
+            circuit: Circuit::new(),
+        }
+    }
+
+    pub(crate) fn from_unfused_items(items: Vec<CircuitItem>) -> Self {
+        Self {
+            circuit: Circuit { items },
+        }
+    }
+
+    pub(crate) fn try_reserve_exact(&mut self, additional: usize) -> CircuitResult<()> {
+        self.circuit.try_reserve_items_exact(additional)
+    }
+
+    pub(crate) fn try_append_instruction(
+        &mut self,
+        instruction: CircuitInstruction,
+    ) -> CircuitResult<()> {
+        self.circuit.try_append_instruction(instruction)
+    }
+
+    pub(crate) fn try_append_repeat_block(&mut self, repeat: RepeatBlock) -> CircuitResult<()> {
+        self.circuit.try_append_repeat_block(repeat)
+    }
+
+    pub(crate) fn finish(self) -> Circuit {
+        self.circuit
+    }
+}
+
 impl Circuit {
     pub fn new() -> Self {
         Self { items: Vec::new() }
@@ -33,10 +70,6 @@ impl Circuit {
         Self {
             items: Vec::with_capacity(capacity),
         }
-    }
-
-    pub(crate) fn from_unfused_items(items: Vec<CircuitItem>) -> Self {
-        Self { items }
     }
 
     pub fn from_stim_str(input: &str) -> CircuitResult<Self> {
@@ -199,10 +232,6 @@ impl Circuit {
             Ok(()) => out,
             Err(error) => unreachable!("writing a circuit into Vec<u8> failed: {error}"),
         }
-    }
-
-    pub(crate) fn from_items(items: Vec<CircuitItem>) -> Self {
-        Self { items }
     }
 
     fn push(&mut self, item: CircuitItem) {
