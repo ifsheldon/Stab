@@ -9,8 +9,10 @@ Finish milestone A5 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 - A0 through A4 are complete.
 - `stab-bits` and `stab-records` are physical Stable Rust 1.97.1 crates.
 - Circuit sampling uses the public compiler, plan, session, and sink path; `CompiledSampler` remains only a compatibility adapter.
-- Detection conversion and DEM sampling still have older materialized or command-specific centers that A5 must replace.
-- A5 keeps detector-frame execution and the detector-only and sampled-error DEM algorithms as distinct private variants because their work and random consumption differ.
+- A5 implementation is present: measurement conversion, detection sampling, and DEM sampling expose separate compiler, immutable-plan, mutable-session, typed-batch, cancellation, progress, and sink families through `stab_core::execution`.
+- `detect`, `m2d`, and `sample_dem` use those public execution seams. Finite-shot sampling materializers and visitors delegate through compatibility adapters; the public per-record detection converter and unknown-length DEM replay iterator remain explicit low-level compatibility kernels.
+- Direct detector-frame and fused sample-convert execution remain distinct private variants. Detector-only, sampled-error, and replay DEM execution also remain distinct because their work and random consumption differ.
+- Correctness and performance inventories are regenerated, and dirty diagnostic phase probes have completed. The first milestone audit found replay output-creation, direct resource-evidence, format-matrix, documentation-scope, and benchmark-classification gaps; their fixes are being verified before full-code-review, focused commits, clean revision evidence, and closure synchronization.
 - Physical extraction of the remaining model, algebra, analysis, engine, facade, and SIMD components belongs to A6, after A5 proves these execution boundaries inside `stab-core`.
 
 ## Sources Of Truth
@@ -26,13 +28,12 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 
 ## Execution Sequence
 
-1. Inventory the existing detection converter, detector sampler, DEM sampler, replay, CLI, oracle, and benchmark call paths; freeze exact compatibility and resource behavior before moving code.
-2. Introduce three operation-specific compiler, immutable-plan, mutable-session, request, summary, cancellation, and error families without a universal execution trait or public executable IR.
-3. Add typed measurement-to-detection composition and distinct detector, observable, and sampled-error batch planes using `stab-records` sinks.
-4. Migrate `detect`, `m2d`, and `sample_dem`, retaining command-wide path preflight, replay validation before output activation, valid-prefix `m2d` output, writer-error propagation, and existing Stim-compatible bytes.
-5. Port materialized conveniences to thin adapters, regenerate correctness and performance ownership, and add phase-separated benchmarks plus affected process-symmetric CLI comparisons.
-6. Run milestone-audit and full-code-review, fix every confirmed finding, then commit source, CLI, tests, benchmark contracts, and documentation in focused commits.
-7. Produce clean source-current evidence with unique artifact paths and close A5 only when every comparable row passes the unchanged `1.25x` Stim gate and every new unlike measurement is explicitly unseeded for Stab self-regression.
+1. Run milestone-audit against every A5 task, test, benchmark, and done criterion; fix implementation findings and amend only genuine specification gaps.
+2. Run full-code-review across core execution, CLI/file safety, compatibility adapters, benchmark semantics, qualification ownership, tests, and documentation; fix every confirmed finding.
+3. Commit core, CLI, benchmark, qualification, and documentation changes in focused commits after their relevant checks pass.
+4. From the resulting clean revision, run source-current A5 phase diagnostics and all affected comparable CLI rows into new artifact paths.
+5. Keep unlike phase identities report-only and unseeded. Require every comparable process row to pass the unchanged `1.25x` Stim gate without waivers.
+6. Run the complete required checks, synchronize the progress report and generated dashboard, commit closure documentation, and hand A6 the physical crate extraction.
 
 ## Nonnegotiable Contracts
 
@@ -41,6 +42,8 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 - Plans are immutable and shareable; sessions own reusable mutable state and poison after execution or sink failure.
 - Batch sizes are bounded implementation details and cannot change semantic output.
 - Conversion and reference-sample scratch scale with width and active batch size, not total shots or input record count.
+- DEM caller byte limits cover the active reusable record, error, packed-plane, and compatibility-sink storage; fused detection applies the private session limit to the combined sampling and conversion estimate.
+- The DEM byte policy covers width-dependent heap storage and compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are outside that dynamic scratch budget.
 - `m2d` consumes initial input record-at-a-time so a later malformed record cannot suppress already committed valid-prefix output.
 - Replay input is validated and rewound through the retained preflight handle before any output sink can create or truncate a file.
 - Detector-only and sampled-error DEM paths stay separate and preserve their established random-consumption semantics.
@@ -51,8 +54,8 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 ## Done Criteria
 
 - Every `detect`, `m2d`, and `sample_dem` product path delegates to its public compiler, plan, session, and sink architecture.
-- Streamed and materialized results agree across formats, reference modes, sweep-conditioned conversion, observable routing, correlated DEM events, replay, and sampled-error output.
-- Same-session partitioning, cancellation, poisoning, valid-prefix delivery, replay-before-output safety, writer failures, path aliases, and bounded allocation have direct tests.
+- Streamed and materialized results agree across formats, reference modes, sweep-conditioned conversion, observable routing, correlated DEM events, replay, and sampled-error output; a 4,096-record matrix crosses multiple batches for every supported command format and side-output route.
+- Same-session partitioning, cancellation including replay finish-time cancellation, poisoning, valid-prefix delivery and progress, replay-before-output safety, writer failures, path aliases, caller byte admission, aggregate fused-session admission, and bounded allocation have direct tests.
 - Qualification inventories regenerate exactly and no implemented A5 behavior has only planned ownership.
 - Clean phase and affected CLI benchmarks show no unexplained material regression.
 - Milestone-audit, full-code-review, workspace verification, architecture enforcement, implemented oracles, qualification checks, benchmark smoke, and pre-commit have no open A5 finding.

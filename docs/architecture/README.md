@@ -66,7 +66,7 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A4 product graph is:
+The current A5 product graph is:
 
 ```text
 stab-cli -> stab-core
@@ -74,7 +74,7 @@ stab-core -> stab-bits + stab-records
 stab-records -> stab-bits
 ```
 
-`stab-bits` and `stab-records` are physical Cargo packages. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. `stab-core` retains compatibility re-exports and lossless error conversion while engine callers migrate. The remaining target component crates have not yet been extracted. The completed target graph below remains normative for A4 through A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits` and `stab-records` are physical Cargo packages. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. Inside `stab-core`, circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling now expose operation-specific compiler, immutable-plan, mutable-session, cancellation, progress, and typed-sink APIs through `stab_core::execution`; legacy root APIs remain compatibility facades. This is a logical ownership split, not a claim that `stab-engine` exists yet. The remaining target component crates are extracted in A6. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate

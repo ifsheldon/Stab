@@ -9,7 +9,7 @@ Current as of 2026-07-28.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
 - A3 stable packed records and codecs: complete; product timing and allocation evidence binds clean revision `cb0f2ddbb19a99e16f27471b91966312a4404f79`, and the final oracle ownership repair is commit `07df4b33`.
 - A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
-- A5 detection and DEM batch pipelines: next.
+- A5 detection and DEM batch pipelines: implementation complete in the working tree; closure audit and clean-revision evidence pending.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -420,3 +420,40 @@ Each accepted process row records exactly three timed Stim launches and three ti
 The clean revision passed formatting, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture enforcement, the complete implemented oracle run, the live 62-case result-format oracle, correctness and performance check/regeneration, generated-status checking, benchmark smoke, and staged pre-commit validation. A dirty development probe and the asymmetric `88d95a3f` process comparison remain non-promotable and are not used for closure.
 
 A4 is complete. Sampling execution imports no codec, filesystem, CLI, or ops API; the CLI does not bypass the plan/session/sink architecture; process-equivalent rows remain inside the unchanged Stim gate; and unlike phase identities are explicitly unseeded instead of being compared to a misleading historical operation.
+
+## A5 Detection And DEM Batch Pipelines
+
+A5 implementation is complete in the working tree and is undergoing closure audit. This checkpoint is deliberately not a clean-revision completion claim.
+
+`stab_core::execution` now owns three distinct public families:
+
+- `MeasurementToDetectionCompiler` -> `MeasurementToDetectionPlan` -> `MeasurementToDetectionSession` -> `DetectionSink`
+- `DetectionSamplingCompiler` -> `DetectionSamplingPlan` -> `DetectionSamplingSession` -> `DetectionSink`
+- `DemSamplingCompiler` -> `DemSamplingPlan` -> `DemSamplingSession` or incremental `DemReplaySession` -> `DemSampleSink`
+
+Plans are immutable and shareable. Sessions own reusable mutable conversion, reference, detector-frame, RNG, error-record, and bounded 64-shot batch state, plus exact progress, cancellation, and poisoning. Direct detector-frame and fused sample-convert implementations remain private detection variants. Detector-only sampling, sampled-error sampling, and replay remain distinct DEM algorithms. Finite-shot sampling materializers and visitors delegate through the new execution paths. `CompiledDetectionConverter` remains the public low-level per-record kernel used by conversion sessions, while unknown-length iterator DEM replay retains direct folded traversal; neither compatibility exception is used by the CLI.
+
+The CLI now routes `detect`, `m2d`, and `sample_dem` through typed session sinks. `m2d` retains record-at-a-time initial delivery so a malformed later record preserves already committed output. `sample_dem` opens and retains only its inputs, validates replay work and the complete replay prefix, rewinds the retained replay handle, and only then creates, identity-checks, and activates output sinks. Detector, observable, and sampled-error planes remain separate until CLI encoding; PTB64 routing buffers exactly one complete 64-record group per output stream.
+
+Focused correctness evidence covers materialized equivalence, sweep-conditioned conversion, adapter composition, valid-prefix delivery, direct-versus-fused detection, seeded partitioning, cancellation including the replay finish boundary, sink failure progress, poisoning, DEM families, incremental replay without RNG advance, replay abandonment, exact malformed-prefix progress, caller active-byte admission including sampled-error compatibility scratch, aggregate fused-session admission before component construction, zero-shot behavior, and record-count-independent allocation. A 4,096-record matrix crosses multiple batches for every supported primary and side-output format of `detect`, `m2d`, and `sample_dem`; malformed text, packed, and PTB64 replay prefixes prove all three output roles remain absent or retain sentinel bytes, and a delayed hardlink substitution proves retained input identities close the path-check race. The regenerated correctness inventory contains 2,886 upstream cases, 4,761 exported API items, and 1,986 evidence parents with digest `cd3fc7a16bc5464b96c3d7148c3aa1c9105875e925753853f2ac2e84910ff4e4`.
+
+The regenerated performance inventory contains 127 checklist rows, 4,761 exported API items, 179 groups, and 167 inherited rows with digest `29ad73efed98d4af5db0738ec1250a4dd5af7dfe238777f4e672806499c0b45f`. A5 adds no formal runtime group. Three non-primary report-only legacy-manifest rows expose source-owned phases and remain future candidates in the comprehensive inventory, preserving the finite release matrix.
+
+Dirty local diagnostics, retained only as development evidence, observed:
+
+| Phase | Median observation |
+| --- | ---: |
+| Detection-plan compile-and-release | 0.688 us |
+| Detection session sample-to-detection | 56.19 million shots/s |
+| Detect PTB64 routing | 20.09 million shots/s |
+| Measurement-to-detection plan compile-and-release | 0.816 us |
+| Measurement-to-detection bounded batch conversion | 55.56 million shots/s |
+| DEM-plan compile-and-release | 4.816 us |
+| DEM detector-only session | 2.861 million shots/s |
+| DEM sampled-error session | 2.380 million shots/s |
+| DEM replay session | 3.382 million shots/s |
+| Sample-dem PTB64 routing | 19.76 million shots/s |
+
+The combined dirty phase artifact is `target/benchmarks/a5-phase-compare-20260728`. It binds local modifications and makes no Stim parity or Stab self-regression claim. The new phase identities remain report-only and unseeded.
+
+The dirty process-symmetric probe at `target/benchmarks/a5-cli-contract-compare-20260728` observed `detect` at `0.975x`, `m2d` at `0.977x`, and `sample_dem` at `0.983x` pinned Stim. Each row contains exactly one Stab process measurement and one Stim process measurement, uses the same command shape and launch count, and validates the complete Stab output outside timing. The eleven process-equivalent rows are `m9-detect-text-cli`, `m9-detect-bitpacked-cli`, `m9-detect-primary-matrix-contract`, `m9-m2d-text-cli`, `m9-m2d-bitpacked-contract`, `m9-m2d-primary-matrix-contract`, `m11-sample-dem-cli`, `m11-sample-dem-sparse-contract`, `m11-sample-dem-dense-contract`, `m11-sample-dem-repeated-contract`, and `m11-sample-dem-high-detector-contract`. Allocation-enabled runs keep process timing but use an untimed in-process mirror with the same command and witness for product-semantic allocation and retained-memory fields. The historical memory baselines for these rows came from their former core proxies, so A5 treats this as a memory-measurement identity migration and will seed replacements only from reviewed clean-revision evidence. These local-modification results are diagnostic only. Clean revision-named evidence, full-code-review, and final workspace verification remain before A5 can be marked complete.

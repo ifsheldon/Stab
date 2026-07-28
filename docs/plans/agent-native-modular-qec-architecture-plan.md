@@ -670,7 +670,7 @@ Clean pre-A4 revision `18099bf3` owned only `stab_sample_compile_noisy_1q` and t
 
 ## Milestone A5: Detection And DEM Batch Pipelines
 
-Status: Active.
+Status: Active; implementation complete, closure audit and clean evidence pending.
 
 ### Tasks
 
@@ -685,6 +685,8 @@ Status: Active.
 - Preserve replay semantics and bounded folded DEM traversal.
 - Migrate `detect`, `m2d`, and `sample_dem`.
 
+Compatibility scope is explicit. Finite-shot sampling materializers and visitors delegate through sessions. `CompiledDetectionConverter` remains the public low-level per-record kernel used by `MeasurementToDetectionSession`, and the unknown-length iterator form of DEM replay retains direct folded traversal because it cannot declare a shot count before iteration. These two compatibility kernels do not expose an alternate CLI path.
+
 ### Tests
 
 - Streamed versus materialized equivalence.
@@ -694,8 +696,10 @@ Status: Active.
 - Replay input and sampled-error output.
 - Correlated DEM events.
 - Cancellation, sink error, and poisoned sessions.
+- Replay cancellation immediately before finish and exact malformed-prefix progress.
+- Caller active-byte admission for DEM batch storage and aggregate fused-detection session admission.
 - Same-session partitioning.
-- Large bounded streams across all supported formats.
+- A source-owned 4,096-record, multi-batch matrix across every supported primary and side-output format for `detect`, `m2d`, and `sample_dem`.
 - Existing path-alias preflight and writer-error propagation.
 - `m2d` valid-prefix output before a later malformed record.
 - Replay validation before any output creation or truncation.
@@ -713,7 +717,10 @@ Status: Active.
 ### Done Criteria
 
 - Sample-to-detection and DEM sampling memory scale with width and batch size, not total shots.
+- Caller byte limits account for all retained DEM session and compatibility-sink storage, while fused detection enforces one aggregate private session envelope.
 - No CLI command bypasses the public plan, session, and sink path.
+
+The caller byte policy accounts for width-dependent heap capacity retained by reusable detection, observable, sampled-error, and packed batch planes plus compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are not charged to this dynamic scratch budget.
 
 ## Milestone A6: Physical Component Extraction And Nightly Isolation
 
