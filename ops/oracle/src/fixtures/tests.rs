@@ -8,6 +8,8 @@ use super::{
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
 
+mod extracted_packages;
+
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
 const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
 
