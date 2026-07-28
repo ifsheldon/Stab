@@ -256,13 +256,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "m9-detect-text-cli" | "m9-detect-bitpacked-cli" => Some(
-            "report-only: Stab and pinned Stim execute the same seeded detect command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
+            "report-only: Stab and pinned Stim execute the same seeded detect command as bounded subprocesses with identical input, launch count, discarded timed stdout, and independent untimed frozen output witnesses",
         ),
         "m9-m2d-text-cli" => Some(
-            "report-only: Stab and pinned Stim execute the same m2d command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
+            "report-only: Stab and pinned Stim execute the same m2d command as bounded subprocesses with identical input, launch count, discarded timed stdout, and independent untimed frozen output witnesses",
         ),
         "m9-m2d-bitpacked-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on the same fixture with an untimed frozen Stab output witness",
+            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on the same fixture with independent untimed frozen output witnesses",
         ),
         "m9-detection-batch-phases" => Some(
             "report-only: source-owned Stab diagnostics separately measure detection plan compile-and-release, bounded session execution, and PTB64 CLI routing without claiming a Stim ratio",
@@ -292,10 +292,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
         ),
         "m9-detect-primary-matrix-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same seeded b8 detect command as bounded subprocesses on the source-owned generated repetition-code d3/r3 fixture",
+            "cli-baseline: Stab and pinned Stim execute the same seeded b8 detect command as bounded subprocesses on the source-owned generated repetition-code d3/r3 fixture with independent untimed frozen output witnesses",
         ),
         "m9-m2d-primary-matrix-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on source-owned generated repetition-code d3/r3 measurement records",
+            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on source-owned generated repetition-code d3/r3 measurement records with independent untimed frozen output witnesses",
         ),
         "pf3-m2d-sweep-b8" => Some(
             "report-only: Stab measures the public m2d --sweep packed b8 path using the source-owned M9 sweep fixture; threshold ownership awaits repeated probe evidence",

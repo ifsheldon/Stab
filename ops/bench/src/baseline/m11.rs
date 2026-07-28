@@ -139,19 +139,19 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures a precompiled surface-like DEM sampler; upstream Stim perf uses a generated d11/r100 surface-code DEM with 1024 stripes",
         ),
         "m11-sample-dem-cli" => Some(
-            "report-only: Stab and pinned Stim execute the same seeded sample_dem command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
+            "report-only: Stab and pinned Stim execute the same seeded sample_dem command as bounded subprocesses with identical input, launch count, discarded timed stdout, and independent untimed frozen output witnesses",
         ),
         "m11-sample-dem-sparse-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for sparse detector-id b8 output on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for sparse detector-id b8 output on the same fixture with independent untimed frozen output witnesses",
         ),
         "m11-sample-dem-dense-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for dense detector-target b8 output on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for dense detector-target b8 output on the same fixture with independent untimed frozen output witnesses",
         ),
         "m11-sample-dem-repeated-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for repeated detector-shift b8 output on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for repeated detector-shift b8 output on the same fixture with independent untimed frozen output witnesses",
         ),
         "m11-sample-dem-high-detector-contract" => Some(
-            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for high detector index b8 output on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for high detector index b8 output on the same fixture with independent untimed frozen output witnesses",
         ),
         "m11-dem-batch-phases" => Some(
             "report-only: source-owned Stab diagnostics separately measure DEM plan compile-and-release, detector-only execution, sampled-error execution, replay, and PTB64 CLI routing without claiming a Stim ratio",
