@@ -11,6 +11,42 @@ use crate::SampleFormat;
 #[cfg(feature = "ops-contracts")]
 use std::hint::black_box;
 
+#[test]
+fn conversion_admission_does_not_allocate_detector_term_storage() {
+    let circuit =
+        Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) X0 rec[-1]\n")
+            .expect("parse fixture");
+    let detector = circuit
+        .items()
+        .get(1)
+        .and_then(CircuitItem::as_instruction)
+        .expect("fixture must contain detector instruction");
+    let mut admission = ConversionPlan::new(DetectionConversionLimits::default(), false);
+    admission.measurement_count = 1;
+    let measured = allocation_counter::measure(|| {
+        for _ in 0..4_096 {
+            admission
+                .record_detector(detector)
+                .expect("dry detector admission");
+        }
+    });
+    assert_eq!(measured.count_total, 0, "{measured:?}");
+
+    let observable = circuit
+        .items()
+        .get(2)
+        .and_then(CircuitItem::as_instruction)
+        .expect("fixture must contain observable instruction");
+    let measured = allocation_counter::measure(|| {
+        for _ in 0..4_096 {
+            admission
+                .record_observable(observable)
+                .expect("dry observable admission");
+        }
+    });
+    assert_eq!(measured.count_total, 0, "{measured:?}");
+}
+
 fn convert(
     circuit_text: &str,
     measurements: &[&[bool]],

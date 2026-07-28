@@ -23,15 +23,18 @@ impl AdmittedFrameConversion {
         circuit: &Circuit,
         limits: DetectionConversionLimits,
     ) -> CircuitResult<AdmittedFrameConversion> {
-        let plan = ConversionPlan::from_visitor(limits, |plan| {
+        let admission = ConversionPlan::admission_from_visitor(limits, |plan| {
             append_frame_conversion_plan(circuit, plan)
         })?;
         let execution_storage = frame_execution_storage(circuit)?;
         admit_combined_compiled_storage(
-            plan.compiled_storage_bytes()?,
+            admission.compiled_storage_bytes()?,
             execution_storage.retained_bytes,
             limits.max_compiled_bytes(),
         )?;
+        let plan = ConversionPlan::materialize_from_admission(admission, |plan| {
+            append_frame_conversion_plan(circuit, plan)
+        })?;
         Ok(Self {
             plan,
             execution_storage,
@@ -49,6 +52,13 @@ impl AdmittedFrameConversion {
 struct FrameExecutionStorage {
     root_items: usize,
     retained_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrameExecutionInstructionDisposition {
+    Borrowed,
+    Filtered { retained_targets: usize },
+    Omitted,
 }
 
 #[derive(Clone, Debug)]
@@ -163,11 +173,17 @@ fn append_frame_conversion_plan(circuit: &Circuit, plan: &mut ConversionPlan) ->
                 append_frame_conversion_plan(&decomposed, plan)?;
             }
             CircuitItem::Instruction(instruction) => {
-                let Some(instruction) = frame_execution_instruction(instruction)? else {
-                    continue;
-                };
-                validate_frame_detection_instruction(instruction.as_ref())?;
-                plan.visit_instruction(instruction.as_ref())?;
+                match frame_execution_instruction_disposition(instruction)? {
+                    FrameExecutionInstructionDisposition::Borrowed => {
+                        validate_frame_detection_instruction(instruction)?;
+                        plan.visit_instruction(instruction)?;
+                    }
+                    FrameExecutionInstructionDisposition::Filtered { .. } => {
+                        validate_frame_detection_instruction(instruction)?;
+                        plan.visit_frame_instruction_without_sweep(instruction)?;
+                    }
+                    FrameExecutionInstructionDisposition::Omitted => continue,
+                }
             }
             CircuitItem::RepeatBlock(repeat) => {
                 plan.visit_repeated_body(repeat.repeat_count().get(), |plan| {
@@ -234,7 +250,7 @@ pub(super) fn decomposed_frame_instruction(
 }
 
 fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    for target_group in instruction.target_groups() {
+    for target_group in instruction.targets().chunks(2) {
         let [control, target] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
         };
@@ -249,7 +265,7 @@ fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> 
 }
 
 fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    for target_group in instruction.target_groups() {
+    for target_group in instruction.targets().chunks(2) {
         let [left, right] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
         };
@@ -264,7 +280,7 @@ fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<
 fn validate_frame_x_or_y_controlled_z_targets(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<()> {
-    for target_group in instruction.target_groups() {
+    for target_group in instruction.targets().chunks(2) {
         let [left, right] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
         };
@@ -293,8 +309,12 @@ fn frame_execution_storage(circuit: &Circuit) -> CircuitResult<FrameExecutionSto
                 storage = checked_add_storage(storage, frame_execution_storage(&decomposed)?)?;
             }
             CircuitItem::Instruction(instruction) => {
-                let Some(instruction) = frame_execution_instruction(instruction)? else {
-                    continue;
+                let target_count = match frame_execution_instruction_disposition(instruction)? {
+                    FrameExecutionInstructionDisposition::Borrowed => instruction.targets().len(),
+                    FrameExecutionInstructionDisposition::Filtered { retained_targets } => {
+                        retained_targets
+                    }
+                    FrameExecutionInstructionDisposition::Omitted => continue,
                 };
                 storage.root_items = storage
                     .root_items
@@ -302,7 +322,7 @@ fn frame_execution_storage(circuit: &Circuit) -> CircuitResult<FrameExecutionSto
                     .ok_or_else(storage_overflow)?;
                 storage.retained_bytes = checked_add_bytes(
                     storage.retained_bytes,
-                    instruction_retained_bytes(instruction.as_ref())?,
+                    instruction_retained_bytes(instruction.args().len(), target_count)?,
                 )?;
             }
             CircuitItem::RepeatBlock(repeat) => {
@@ -323,10 +343,10 @@ fn frame_execution_storage(circuit: &Circuit) -> CircuitResult<FrameExecutionSto
     Ok(storage)
 }
 
-fn instruction_retained_bytes(instruction: &CircuitInstruction) -> CircuitResult<u64> {
+fn instruction_retained_bytes(arg_count: usize, target_count: usize) -> CircuitResult<u64> {
     let item = u64::try_from(size_of::<CircuitItem>()).map_err(|_| storage_overflow())?;
-    let args = byte_product(instruction.args().len(), size_of::<f64>())?;
-    let targets = byte_product(instruction.targets().len(), size_of::<Target>())?;
+    let args = byte_product(arg_count, size_of::<f64>())?;
+    let targets = byte_product(target_count, size_of::<Target>())?;
     checked_add_bytes(checked_add_bytes(item, args)?, targets)
 }
 
@@ -440,36 +460,32 @@ fn try_clone_execution_instruction(
 fn frame_execution_instruction<'a>(
     instruction: &'a CircuitInstruction,
 ) -> CircuitResult<Option<Cow<'a, CircuitInstruction>>> {
-    if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
-        return Ok(Some(Cow::Borrowed(instruction)));
-    }
+    let retained_targets = match frame_execution_instruction_disposition(instruction)? {
+        FrameExecutionInstructionDisposition::Borrowed => {
+            return Ok(Some(Cow::Borrowed(instruction)));
+        }
+        FrameExecutionInstructionDisposition::Filtered { retained_targets } => retained_targets,
+        FrameExecutionInstructionDisposition::Omitted => return Ok(None),
+    };
 
     let mut targets = Vec::new();
     targets
-        .try_reserve_exact(instruction.targets().len())
+        .try_reserve_exact(retained_targets)
         .map_err(|error| {
             CircuitError::invalid_sampler_compilation(format!(
-                "unable to reserve {} filtered direct-frame targets: {error}",
-                instruction.targets().len()
+                "unable to reserve {retained_targets} filtered direct-frame targets: {error}"
             ))
         })?;
-    let mut removed_sweep_target = false;
-    for target_group in instruction.target_groups() {
+    for target_group in instruction.targets().chunks(2) {
         let [left, right] = target_group else {
-            return Ok(Some(Cow::Borrowed(instruction)));
+            return Err(unsupported_frame_instruction(instruction));
         };
         if left.qubit_id().is_some() && right.is_sweep_bit_target() {
-            removed_sweep_target = true;
             continue;
         }
         targets.extend(target_group.iter().cloned());
     }
-    if !removed_sweep_target {
-        return Ok(Some(Cow::Borrowed(instruction)));
-    }
-    if targets.is_empty() {
-        return Ok(None);
-    }
+    debug_assert_eq!(targets.len(), retained_targets);
     let mut args = Vec::new();
     args.try_reserve_exact(instruction.args().len())
         .map_err(|error| {
@@ -485,4 +501,34 @@ fn frame_execution_instruction<'a>(
         targets,
         None,
     )?)))
+}
+
+fn frame_execution_instruction_disposition(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<FrameExecutionInstructionDisposition> {
+    if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
+        return Ok(FrameExecutionInstructionDisposition::Borrowed);
+    }
+
+    let mut retained_targets = 0_usize;
+    let mut removed_sweep_target = false;
+    for target_group in instruction.targets().chunks(2) {
+        let [left, right] = target_group else {
+            return Ok(FrameExecutionInstructionDisposition::Borrowed);
+        };
+        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
+            removed_sweep_target = true;
+            continue;
+        }
+        retained_targets = retained_targets
+            .checked_add(target_group.len())
+            .ok_or_else(storage_overflow)?;
+    }
+    if !removed_sweep_target {
+        return Ok(FrameExecutionInstructionDisposition::Borrowed);
+    }
+    if retained_targets == 0 {
+        return Ok(FrameExecutionInstructionDisposition::Omitted);
+    }
+    Ok(FrameExecutionInstructionDisposition::Filtered { retained_targets })
 }

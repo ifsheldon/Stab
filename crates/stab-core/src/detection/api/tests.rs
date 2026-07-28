@@ -738,18 +738,10 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
     let untagged_plan = compiler
         .compile_direct_for_test(&untagged)
         .expect("compile untagged direct frame");
-    let direct_bytes = |plan: &DetectionSamplingPlan| {
-        let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
-            panic!("test compiler must select the direct detector frame");
-        };
-        direct
-            .compiled_bytes()
-            .expect("compute retained direct-plan bytes")
-    };
-    let exact_bytes = direct_bytes(&tagged_plan);
+    let exact_bytes = direct_compiled_bytes(&tagged_plan);
     assert_eq!(
         exact_bytes,
-        direct_bytes(&untagged_plan),
+        direct_compiled_bytes(&untagged_plan),
         "nonsemantic tags must not be retained by the private executable"
     );
 
@@ -768,6 +760,78 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert_eq!(resource.actual(), exact_bytes);
     assert_eq!(resource.limit(), exact_bytes - 1);
+}
+
+#[test]
+fn direct_frame_compilation_admits_repeats_and_filtered_targets_before_materialization() {
+    let repeated =
+        circuit("REPEAT 4096 {\n M 0\n DETECTOR rec[-1]\n OBSERVABLE_INCLUDE(0) X0 rec[-1]\n}\n");
+    let filtered_targets = (0..512)
+        .flat_map(|index| {
+            let qubit = index * 3;
+            [
+                format!("{qubit} sweep[{index}]"),
+                format!("{} {}", qubit + 1, qubit + 2),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let filtered = circuit(&format!(
+        "XCZ {filtered_targets}\nOBSERVABLE_INCLUDE(0) X0\n"
+    ));
+
+    let baseline = circuit("OBSERVABLE_INCLUDE(0) X0\n");
+    let baseline_exact = direct_compiled_bytes(
+        &DetectionSamplingCompiler::new()
+            .compile_direct_for_test(&baseline)
+            .expect("compile rejection-overhead baseline"),
+    );
+    let baseline_allocations = rejected_direct_frame_allocations(&baseline, baseline_exact);
+
+    for circuit in [&repeated, &filtered] {
+        let exact_plan = DetectionSamplingCompiler::new()
+            .compile_direct_for_test(circuit)
+            .expect("compile exact-byte probe");
+        let exact_bytes = direct_compiled_bytes(&exact_plan);
+        DetectionSamplingCompiler::new()
+            .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
+            .compile_direct_for_test(circuit)
+            .expect("accept exact combined direct-plan byte boundary");
+
+        let measured = rejected_direct_frame_allocations(circuit, exact_bytes);
+        assert_eq!(
+            measured.count_max, baseline_allocations.count_max,
+            "aggregate byte rejection retained plan allocations concurrently"
+        );
+        assert_eq!(
+            measured.bytes_max, baseline_allocations.bytes_max,
+            "aggregate byte rejection allocated a retained plan buffer"
+        );
+    }
+}
+
+fn rejected_direct_frame_allocations(
+    circuit: &Circuit,
+    exact_bytes: u64,
+) -> allocation_counter::AllocationInfo {
+    let mut rejected = false;
+    let measured = allocation_counter::measure(|| {
+        rejected = DetectionSamplingCompiler::new()
+            .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
+            .compile_direct_for_test(circuit)
+            .is_err();
+    });
+    assert!(rejected, "reject first byte beyond retained-plan limit");
+    measured
+}
+
+fn direct_compiled_bytes(plan: &DetectionSamplingPlan) -> u64 {
+    let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
+        panic!("test compiler must select the direct detector frame");
+    };
+    direct
+        .compiled_bytes()
+        .expect("compute retained direct-plan bytes")
 }
 
 #[test]

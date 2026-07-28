@@ -559,11 +559,25 @@ impl ConversionPlan {
         limits: DetectionConversionLimits,
         mut visit: impl FnMut(&mut Self) -> CircuitResult<()>,
     ) -> CircuitResult<Self> {
+        let admission = Self::admission_from_visitor(limits, &mut visit)?;
+        Self::materialize_from_admission(admission, visit)
+    }
+
+    fn admission_from_visitor(
+        limits: DetectionConversionLimits,
+        mut visit: impl FnMut(&mut Self) -> CircuitResult<()>,
+    ) -> CircuitResult<Self> {
         let mut admission = Self::new(limits, false);
         visit(&mut admission)?;
         admission.validate_compiled_shape()?;
+        Ok(admission)
+    }
 
-        let mut plan = Self::new(limits, true);
+    fn materialize_from_admission(
+        admission: Self,
+        mut visit: impl FnMut(&mut Self) -> CircuitResult<()>,
+    ) -> CircuitResult<Self> {
+        let mut plan = Self::new(admission.limits, true);
         plan.detector_terms
             .try_reserve_exact(admission.detector_count)
             .map_err(|error| {
@@ -667,6 +681,20 @@ impl ConversionPlan {
     }
 
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        self.record_expanded_instruction()?;
+        self.record_sweep_bits(instruction)?;
+        self.visit_instruction_semantics(instruction)
+    }
+
+    fn visit_frame_instruction_without_sweep(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        self.record_expanded_instruction()?;
+        self.visit_instruction_semantics(instruction)
+    }
+
+    fn record_expanded_instruction(&mut self) -> CircuitResult<()> {
         let next_expanded_instruction_count = self
             .expanded_instruction_count
             .checked_add(1)
@@ -683,7 +711,13 @@ impl ConversionPlan {
             .into());
         }
         self.expanded_instruction_count = next_expanded_instruction_count;
-        self.record_sweep_bits(instruction)?;
+        Ok(())
+    }
+
+    fn visit_instruction_semantics(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
