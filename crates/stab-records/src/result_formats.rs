@@ -24,6 +24,27 @@ pub enum SampleFormat {
     Dets,
 }
 
+const ZERO_ONE_LINES_BY_BYTE: [[u8; 16]; 256] = zero_one_lines_by_byte();
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "const table indices are bounded by the byte and bit loop limits"
+)]
+const fn zero_one_lines_by_byte() -> [[u8; 16]; 256] {
+    let mut table = [[0_u8; 16]; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        let mut bit = 0;
+        while bit < 8 {
+            table[byte][bit * 2] = if byte & (1 << bit) == 0 { b'0' } else { b'1' };
+            table[byte][bit * 2 + 1] = b'\n';
+            bit += 1;
+        }
+        byte += 1;
+    }
+    table
+}
+
 pub fn write_records(records: &[Vec<bool>], format: SampleFormat) -> Vec<u8> {
     let mut writer = MeasureRecordWriter::new(format);
     for record in records {
@@ -389,6 +410,7 @@ impl MeasureRecordWriter {
         }
     }
 
+    #[inline]
     pub(crate) fn reserve_output(&mut self, additional: usize) -> RecordResult<()> {
         self.output.try_reserve(additional).map_err(|error| {
             FormatError::invalid_result_format(format!(
@@ -429,10 +451,88 @@ impl MeasureRecordWriter {
     }
 
     pub fn write_packed_batch(&mut self, batch: PackedShotBatchView<'_>) -> RecordResult<()> {
+        if self.format == SampleFormat::ZeroOne
+            && batch.bits_per_shot() == 1
+            && self.is_at_record_boundary()
+        {
+            for shot_index in 0..batch.shot_count() {
+                let bit = batch.get(shot_index, 0).ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "packed record bit index escaped the declared width",
+                    )
+                })?;
+                self.output
+                    .extend_from_slice(if bit { b"1\n" } else { b"0\n" });
+            }
+            return Ok(());
+        }
         for shot_index in 0..batch.shot_count() {
             self.write_packed_record(batch.shot(shot_index)?)?;
             self.write_end();
         }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write_bit_plane_batch(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
+        if self.format == SampleFormat::ZeroOne
+            && batch.bits_per_shot() == 1
+            && self.is_at_record_boundary()
+        {
+            let word = batch.plane(0)?.words().first().copied().unwrap_or_default();
+            return self.write_zero_one_single_plane(word, batch.shot_count());
+        }
+        for shot_index in 0..batch.shot_count() {
+            for bit_index in 0..batch.bits_per_shot() {
+                let bit = batch.get(bit_index, shot_index).ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "bit-plane record index escaped the declared dimensions",
+                    )
+                })?;
+                self.write_bit(bit);
+            }
+            self.write_end();
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn write_zero_one_single_plane(&mut self, word: u64, shot_count: usize) -> RecordResult<()> {
+        let mut encoded = [0_u8; 128];
+        let mut encoded_len = 0_usize;
+        let mut remaining_shots = shot_count;
+        for input_byte in word.to_le_bytes() {
+            if remaining_shots == 0 {
+                break;
+            }
+            let shots_in_byte = remaining_shots.min(8);
+            let bytes_in_chunk = shots_in_byte * 2;
+            let pattern = ZERO_ONE_LINES_BY_BYTE
+                .get(usize::from(input_byte))
+                .and_then(|line| line.get(..bytes_in_chunk))
+                .ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "single-plane 01 lookup escaped its fixed table",
+                    )
+                })?;
+            let next_len = encoded_len.checked_add(bytes_in_chunk).ok_or_else(|| {
+                FormatError::invalid_result_format("single-plane 01 output length overflowed")
+            })?;
+            encoded
+                .get_mut(encoded_len..next_len)
+                .ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "single-plane 01 output escaped its fixed batch",
+                    )
+                })?
+                .copy_from_slice(pattern);
+            encoded_len = next_len;
+            remaining_shots -= shots_in_byte;
+        }
+        self.output
+            .extend_from_slice(encoded.get(..encoded_len).ok_or_else(|| {
+                FormatError::invalid_result_format("single-plane 01 output escaped its fixed batch")
+            })?);
         Ok(())
     }
 
@@ -442,6 +542,37 @@ impl MeasureRecordWriter {
                 self.write_bit(byte & (1u8 << bit_index) != 0);
             }
         }
+    }
+
+    /// Returns encoded bytes currently retained by this compatibility writer.
+    ///
+    /// Streaming adapters should inspect this only at record boundaries.
+    pub fn buffered_bytes(&self) -> &[u8] {
+        &self.output
+    }
+
+    /// Clears emitted bytes while retaining allocation and completed-record encoding state.
+    ///
+    /// Clearing an incomplete record is rejected so streaming adapters cannot silently discard a
+    /// prefix and continue with corrupt state.
+    pub fn clear_buffered_bytes(&mut self) -> RecordResult<()> {
+        if !self.is_at_record_boundary() {
+            return Err(FormatError::invalid_result_format(
+                "result writer bytes can be cleared only at a completed record boundary",
+            ));
+        }
+        self.output.clear();
+        Ok(())
+    }
+
+    fn is_at_record_boundary(&self) -> bool {
+        self.index == 0
+            && self.b8_byte == 0
+            && self.b8_bit_index == 0
+            && self.r8_false_run == 0
+            && self.hits_first
+            && !self.dets_started
+            && self.dets_type == b'M'
     }
 
     pub fn write_bit(&mut self, bit: bool) {
@@ -529,8 +660,7 @@ impl MeasureRecordWriter {
             self.output.push(b',');
         }
         self.hits_first = false;
-        self.output
-            .extend_from_slice(self.index.to_string().as_bytes());
+        append_usize_decimal(&mut self.output, self.index);
     }
 
     fn write_dets_bit(&mut self, bit: bool) {
@@ -540,8 +670,7 @@ impl MeasureRecordWriter {
         }
         self.output.push(b' ');
         self.output.push(self.dets_type);
-        self.output
-            .extend_from_slice(self.index.to_string().as_bytes());
+        append_usize_decimal(&mut self.output, self.index);
     }
 
     fn ensure_dets_started(&mut self) {
@@ -550,6 +679,25 @@ impl MeasureRecordWriter {
             self.dets_started = true;
         }
     }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "value modulo 10 is always representable as u8"
+)]
+fn append_usize_decimal(output: &mut Vec<u8>, mut value: usize) {
+    let mut digits = [0_u8; size_of::<usize>() * 3];
+    let mut used = 0_usize;
+    for digit in digits.iter_mut().rev() {
+        *digit = b'0' + (value % 10) as u8;
+        used += 1;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    let start = digits.len() - used;
+    output.extend(digits.into_iter().skip(start));
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -779,57 +927,6 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert!(record.storage_len() <= 40);
-    }
-
-    #[test]
-    fn measure_record_writer_matches_stim_byte_layouts() {
-        let bytes = [0xF8];
-
-        let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
-        writer.write_bytes(&bytes);
-        writer.write_bit(false);
-        writer.write_bytes(&bytes);
-        writer.write_bit(true);
-        writer.write_end();
-        assert_eq!(writer.into_bytes(), b"000111110000111111\n");
-
-        let mut writer = MeasureRecordWriter::new(SampleFormat::B8);
-        writer.write_bytes(&bytes);
-        writer.write_bit(false);
-        writer.write_bytes(&bytes);
-        writer.write_bit(true);
-        writer.write_end();
-        assert_eq!(writer.into_bytes(), [0xF8, 0xF0, 0x03]);
-
-        let mut writer = MeasureRecordWriter::new(SampleFormat::Hits);
-        writer.write_bytes(&bytes);
-        writer.write_bit(false);
-        writer.write_bytes(&bytes);
-        writer.write_bit(true);
-        writer.write_end();
-        assert_eq!(writer.into_bytes(), b"3,4,5,6,7,12,13,14,15,16,17\n");
-
-        let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
-        writer.begin_dets_result_type(DetsResultType::Detector);
-        writer.write_bytes(&bytes);
-        writer.write_bit(false);
-        writer.write_bytes(&bytes);
-        writer.begin_dets_result_type(DetsResultType::Observable);
-        writer.write_bit(false);
-        writer.write_bit(true);
-        writer.write_end();
-        assert_eq!(
-            writer.into_bytes(),
-            b"shot D3 D4 D5 D6 D7 D12 D13 D14 D15 D16 L1\n"
-        );
-
-        let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
-        writer.write_bytes(&bytes);
-        writer.write_bit(false);
-        writer.write_bytes(&bytes);
-        writer.write_bit(true);
-        writer.write_end();
-        assert_eq!(writer.into_bytes(), [3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]

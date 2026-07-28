@@ -7,11 +7,11 @@
 )]
 
 use stab_records::{
-    DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView, DetectionCodecSink,
-    DetectionSink, DetectorWidth, FormatErrorCode, MeasureRecordWriter, MeasurementBatchView,
-    MeasurementCodecSink, MeasurementSink, MeasurementWidth, ObservableWidth, PackedShotBatch,
-    RecordFormat, RecordResult, SampleFormat, SampledErrorWidth, write_ptb64_records_checked,
-    write_records,
+    BitPlane64Batch, DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView,
+    DetectionCodecSink, DetectionSink, DetectorWidth, DetsResultType, FormatErrorCode,
+    MeasureRecordWriter, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
+    MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat, RecordResult, SampleFormat,
+    SampledErrorWidth, write_ptb64_records_checked, write_records,
 };
 
 #[test]
@@ -27,10 +27,13 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
         let batch = PackedShotBatch::from_records(&records, 17)?;
         let mut sink = MeasurementCodecSink::try_new(format, MeasurementWidth::new(17))?;
         sink.write_batch(MeasurementBatchView::new(batch.view()))?;
-        assert_eq!(
-            sink.into_bytes()?,
-            write_records(&records, sample_format(format))
-        );
+        let expected = write_records(&records, sample_format(format));
+        assert_eq!(sink.into_bytes()?, expected);
+
+        let planes = BitPlane64Batch::from_shot_major(batch.view())?;
+        let mut plane_sink = MeasurementCodecSink::try_new(format, MeasurementWidth::new(17))?;
+        plane_sink.write_batch(MeasurementBatchView::from_bit_planes(planes.view()))?;
+        assert_eq!(plane_sink.into_bytes()?, expected);
     }
 
     let first = PackedShotBatch::from_records(&records[..10], 17)?;
@@ -39,6 +42,139 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
     sink.write_batch(MeasurementBatchView::new(first.view()))?;
     sink.write_batch(MeasurementBatchView::new(second.view()))?;
     assert_eq!(sink.into_bytes()?, write_ptb64_records_checked(&records)?);
+
+    let planes =
+        BitPlane64Batch::from_shot_major(PackedShotBatch::from_records(&records, 17)?.view())?;
+    let mut plane_sink =
+        MeasurementCodecSink::try_new(RecordFormat::Ptb64, MeasurementWidth::new(17))?;
+    plane_sink.write_batch(MeasurementBatchView::from_bit_planes(planes.view()))?;
+    assert_eq!(
+        plane_sink.into_bytes()?,
+        write_ptb64_records_checked(&records)?
+    );
+    Ok(())
+}
+
+#[test]
+fn compatibility_writer_matches_stim_byte_layouts() {
+    let bytes = [0xF8];
+
+    let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    writer.write_bytes(&bytes);
+    writer.write_bit(false);
+    writer.write_bytes(&bytes);
+    writer.write_bit(true);
+    writer.write_end();
+    assert_eq!(writer.into_bytes(), b"000111110000111111\n");
+
+    let mut writer = MeasureRecordWriter::new(SampleFormat::B8);
+    writer.write_bytes(&bytes);
+    writer.write_bit(false);
+    writer.write_bytes(&bytes);
+    writer.write_bit(true);
+    writer.write_end();
+    assert_eq!(writer.into_bytes(), [0xF8, 0xF0, 0x03]);
+
+    let mut writer = MeasureRecordWriter::new(SampleFormat::Hits);
+    writer.write_bytes(&bytes);
+    writer.write_bit(false);
+    writer.write_bytes(&bytes);
+    writer.write_bit(true);
+    writer.write_end();
+    assert_eq!(writer.into_bytes(), b"3,4,5,6,7,12,13,14,15,16,17\n");
+
+    let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+    writer.begin_dets_result_type(DetsResultType::Detector);
+    writer.write_bytes(&bytes);
+    writer.write_bit(false);
+    writer.write_bytes(&bytes);
+    writer.begin_dets_result_type(DetsResultType::Observable);
+    writer.write_bit(false);
+    writer.write_bit(true);
+    writer.write_end();
+    assert_eq!(
+        writer.into_bytes(),
+        b"shot D3 D4 D5 D6 D7 D12 D13 D14 D15 D16 L1\n"
+    );
+
+    let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
+    writer.write_bytes(&bytes);
+    writer.write_bit(false);
+    writer.write_bytes(&bytes);
+    writer.write_bit(true);
+    writer.write_end();
+    assert_eq!(writer.into_bytes(), [3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]);
+}
+
+#[test]
+fn compatibility_writer_can_drain_completed_chunks_and_continue() {
+    for (format, first, second) in [
+        (
+            SampleFormat::ZeroOne,
+            b"101\n".as_slice(),
+            b"010\n".as_slice(),
+        ),
+        (SampleFormat::B8, &[0x05], &[0x02]),
+        (SampleFormat::R8, &[0, 1, 0], &[1, 1]),
+        (SampleFormat::Hits, b"0,2\n".as_slice(), b"1\n".as_slice()),
+        (
+            SampleFormat::Dets,
+            b"shot M0 M2\n".as_slice(),
+            b"shot M1\n".as_slice(),
+        ),
+    ] {
+        let mut writer = MeasureRecordWriter::new(format);
+        writer.write_bits(&[true, false, true]);
+        writer.write_end();
+        assert_eq!(writer.buffered_bytes(), first);
+
+        writer
+            .clear_buffered_bytes()
+            .expect("clear completed record bytes");
+        assert!(writer.buffered_bytes().is_empty());
+
+        writer.write_bits(&[false, true, false]);
+        writer.write_end();
+        assert_eq!(writer.buffered_bytes(), second);
+    }
+
+    let mut incomplete = MeasureRecordWriter::new(SampleFormat::B8);
+    incomplete.write_bit(true);
+    assert!(incomplete.clear_buffered_bytes().is_err());
+}
+
+#[test]
+fn single_bit_zero_one_shortcuts_compose_with_incremental_writer_state() -> RecordResult<()> {
+    let packed = PackedShotBatch::from_records(&[vec![false]], 1)?;
+    let planes = BitPlane64Batch::from_shot_major(packed.view())?;
+
+    let mut packed_writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    packed_writer.write_bit(true);
+    packed_writer.write_packed_batch(packed.view())?;
+    assert_eq!(packed_writer.buffered_bytes(), b"10\n");
+    packed_writer.clear_buffered_bytes()?;
+
+    let mut plane_writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    plane_writer.write_bit(true);
+    plane_writer.write_bit_plane_batch(planes.view())?;
+    assert_eq!(plane_writer.buffered_bytes(), b"10\n");
+    plane_writer.clear_buffered_bytes()?;
+    Ok(())
+}
+
+#[test]
+fn measurement_codec_reserves_known_record_counts_without_changing_bytes() -> RecordResult<()> {
+    let records = patterned_records(65, 1, 3);
+    let batch = PackedShotBatch::from_records(&records, 1)?;
+    let mut sink = MeasurementCodecSink::try_new(RecordFormat::ZeroOne, MeasurementWidth::new(1))?;
+    sink.reserve_records(records.len())?;
+    sink.write_batch(MeasurementBatchView::new(batch.view()))?;
+    sink.finish()?;
+    assert!(sink.reserve_records(1).is_err());
+    assert_eq!(
+        sink.into_bytes()?,
+        write_records(&records, SampleFormat::ZeroOne)
+    );
     Ok(())
 }
 

@@ -382,6 +382,31 @@ fn bits_bit_matrix_row_operations_match_stim_bit_table_cases() {
 #[test]
 fn bits_bit_matrix_rejects_storage_size_overflow() {
     assert!(BitMatrix::zeros(usize::MAX, 65).is_err());
+    assert!(BitMatrix::zeros(1, usize::MAX).is_err());
+}
+
+#[test]
+fn bits_bit_matrix_copies_complete_rows_and_rejects_width_mismatches() {
+    let first = patterned_bools(130, 3);
+    let second = patterned_bools(130, 9);
+    let mut matrix = BitMatrix::zeros(2, 130).expect("matrix");
+
+    matrix
+        .copy_row_from_bools(1, &first)
+        .expect("copy first row");
+    for (column, expected) in first.iter().copied().enumerate() {
+        assert_eq!(matrix.get(1, column), Some(expected));
+    }
+
+    matrix
+        .copy_row_from_bools(1, &second)
+        .expect("replace complete row");
+    for (column, expected) in second.iter().copied().enumerate() {
+        assert_eq!(matrix.get(1, column), Some(expected));
+    }
+
+    assert!(matrix.copy_row_from_bools(1, &second[..129]).is_err());
+    assert!(matrix.copy_row_from_bools(2, &second).is_err());
 }
 
 #[test]

@@ -57,6 +57,10 @@ impl MeasurementCodecSink {
         self.width
     }
 
+    pub fn reserve_records(&mut self, record_count: usize) -> RecordResult<()> {
+        self.encoder.reserve_upfront_records(record_count)
+    }
+
     pub fn into_bytes(mut self) -> RecordResult<Vec<u8>> {
         self.finish()?;
         self.encoder.into_bytes()
@@ -66,6 +70,7 @@ impl MeasurementCodecSink {
 impl MeasurementSink for MeasurementCodecSink {
     type Error = FormatError;
 
+    #[inline(always)]
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> RecordResult<()> {
         if batch.width() != self.width {
             return Err(width_mismatch(
@@ -74,15 +79,15 @@ impl MeasurementSink for MeasurementCodecSink {
                 self.width.get(),
             ));
         }
-        self.encoder.reserve_records(batch.records().shot_count())?;
-        for shot_index in 0..batch.records().shot_count() {
-            let record = batch.records().shot(shot_index)?;
-            self.encoder.write_parts(&[RecordPart {
-                result_type: DetsResultType::Measurement,
-                bits: record,
-            }])?;
+        self.encoder.prepare_records(batch.shot_count())?;
+        if let Some(records) = batch.shot_major_records() {
+            return self.encoder.write_measurement_batch(records);
         }
-        Ok(())
+        self.encoder.write_measurement_bit_planes(
+            batch
+                .bit_planes()
+                .ok_or_else(|| FormatError::invalid_data("measurement batch has no storage"))?,
+        )
     }
 
     fn finish(&mut self) -> RecordResult<()> {
@@ -160,7 +165,7 @@ impl DetectionSink for DetectionCodecSink {
 
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> RecordResult<()> {
         self.validate_batch(batch)?;
-        self.encoder.reserve_records(batch.shot_count())?;
+        self.encoder.prepare_records(batch.shot_count())?;
         for shot_index in 0..batch.shot_count() {
             let detectors = batch.detectors().shot(shot_index)?;
             let observables = batch.observables().shot(shot_index)?;
@@ -287,7 +292,7 @@ impl DemSampleSink for DemSampleCodecSink {
         if let (Some(records), Some((_, encoder))) =
             (batch.sampled_errors(), self.sampled_errors.as_mut())
         {
-            encoder.reserve_records(records.shot_count())?;
+            encoder.prepare_records(records.shot_count())?;
             for shot_index in 0..records.shot_count() {
                 encoder.write_parts(&[RecordPart {
                     result_type: DetsResultType::Measurement,
@@ -323,6 +328,7 @@ struct PackedRecordEncoder {
     width: usize,
     record_writer: Option<MeasureRecordWriter>,
     ptb64: Option<Ptb64Buffer>,
+    reserved_records: usize,
     finished: bool,
 }
 
@@ -344,6 +350,7 @@ impl PackedRecordEncoder {
             width,
             record_writer,
             ptb64,
+            reserved_records: 0,
             finished: false,
         })
     }
@@ -352,7 +359,34 @@ impl PackedRecordEncoder {
         self.format
     }
 
-    fn reserve_records(&mut self, record_count: usize) -> RecordResult<()> {
+    fn reserve_upfront_records(&mut self, record_count: usize) -> RecordResult<()> {
+        if self.finished {
+            return Err(FormatError::invalid_data(
+                "cannot reserve result records after sink finalization",
+            ));
+        }
+        let additional_records = record_count.saturating_sub(self.reserved_records);
+        self.reserve_output_for_records(additional_records)?;
+        self.reserved_records = self.reserved_records.max(record_count);
+        Ok(())
+    }
+
+    #[inline]
+    fn prepare_records(&mut self, record_count: usize) -> RecordResult<()> {
+        if self.finished {
+            return Err(FormatError::invalid_data(
+                "cannot write a result batch after sink finalization",
+            ));
+        }
+        if self.reserved_records >= record_count {
+            self.reserved_records -= record_count;
+            return Ok(());
+        }
+        self.reserved_records = 0;
+        self.reserve_output_for_records(record_count)
+    }
+
+    fn reserve_output_for_records(&mut self, record_count: usize) -> RecordResult<()> {
         let additional = if let Some(buffer) = &self.ptb64 {
             let complete_groups = buffer
                 .pending_shots
@@ -382,6 +416,55 @@ impl PackedRecordEncoder {
             })?;
         }
         Ok(())
+    }
+
+    fn write_measurement_batch(
+        &mut self,
+        batch: crate::PackedShotBatchView<'_>,
+    ) -> RecordResult<()> {
+        if self.finished {
+            return Err(FormatError::invalid_data(
+                "cannot write a result batch after sink finalization",
+            ));
+        }
+        if batch.bits_per_shot() != self.width {
+            return Err(width_mismatch("result", batch.bits_per_shot(), self.width));
+        }
+        if self.ptb64.is_some() {
+            for shot_index in 0..batch.shot_count() {
+                self.write_parts(&[RecordPart {
+                    result_type: DetsResultType::Measurement,
+                    bits: batch.shot(shot_index)?,
+                }])?;
+            }
+            return Ok(());
+        }
+        self.record_writer
+            .as_mut()
+            .ok_or_else(|| FormatError::invalid_data("record codec has no active encoding state"))?
+            .write_packed_batch(batch)
+    }
+
+    #[inline]
+    fn write_measurement_bit_planes(
+        &mut self,
+        batch: crate::BitPlane64BatchView<'_>,
+    ) -> RecordResult<()> {
+        if self.finished {
+            return Err(FormatError::invalid_data(
+                "cannot write a result batch after sink finalization",
+            ));
+        }
+        if batch.bits_per_shot() != self.width {
+            return Err(width_mismatch("result", batch.bits_per_shot(), self.width));
+        }
+        if let Some(buffer) = &mut self.ptb64 {
+            return buffer.write_bit_planes(batch);
+        }
+        self.record_writer
+            .as_mut()
+            .ok_or_else(|| FormatError::invalid_data("record codec has no active encoding state"))?
+            .write_bit_plane_batch(batch)
     }
 
     fn write_parts(&mut self, parts: &[RecordPart<'_>]) -> RecordResult<()> {
@@ -483,6 +566,43 @@ impl Ptb64Buffer {
             self.output
                 .extend_from_slice(&write_bit_plane_64_batch(planes.view())?);
             self.pending_shots = 0;
+        }
+        Ok(())
+    }
+
+    fn write_bit_planes(&mut self, batch: crate::BitPlane64BatchView<'_>) -> RecordResult<()> {
+        if self.pending_shots == 0 && batch.shot_count() == 64 {
+            for bit_index in 0..batch.bits_per_shot() {
+                let word = batch
+                    .plane(bit_index)?
+                    .words()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| {
+                        FormatError::invalid_data(
+                            "64-shot bit plane did not contain its required storage word",
+                        )
+                    })?;
+                self.output.extend_from_slice(&word.to_le_bytes());
+            }
+            return Ok(());
+        }
+        for shot_index in 0..batch.shot_count() {
+            for bit_index in 0..batch.bits_per_shot() {
+                let value = batch.get(bit_index, shot_index).ok_or_else(|| {
+                    FormatError::invalid_data(
+                        "bit-plane record escaped its declared dimensions while buffering ptb64",
+                    )
+                })?;
+                self.records.set(self.pending_shots, bit_index, value)?;
+            }
+            self.pending_shots += 1;
+            if self.pending_shots == 64 {
+                let planes = BitPlane64Batch::from_shot_major(self.records.view())?;
+                self.output
+                    .extend_from_slice(&write_bit_plane_64_batch(planes.view())?);
+                self.pending_shots = 0;
+            }
         }
         Ok(())
     }

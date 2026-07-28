@@ -40,6 +40,9 @@ pub enum BitError {
     #[error("matrix size {rows}x{cols} overflows addressable storage")]
     MatrixSizeOverflow { rows: usize, cols: usize },
 
+    #[error("could not allocate packed storage for {words} words")]
+    StorageAllocationFailed { words: usize },
+
     #[error("bit range {start}..{end} is outside length {len}")]
     BitRangeOutOfRange {
         start: usize,
@@ -56,7 +59,7 @@ impl BitLen {
         Self(bits)
     }
 
-    pub fn get(self) -> usize {
+    pub const fn get(self) -> usize {
         self.0
     }
 
@@ -138,6 +141,7 @@ pub struct BitSlice<'a> {
 }
 
 impl<'a> BitSlice<'a> {
+    #[inline]
     pub fn new(words: &'a [u64], bit_len: impl Into<BitLen>) -> BitResult<Self> {
         let bit_len = bit_len.into();
         if words.len() != bit_len.word_count() {
@@ -149,6 +153,7 @@ impl<'a> BitSlice<'a> {
         Ok(Self { words, bit_len })
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.bit_len.get()
     }
@@ -157,6 +162,11 @@ impl<'a> BitSlice<'a> {
         self.len() == 0
     }
 
+    /// Returns the borrowed storage words.
+    ///
+    /// Bits at or beyond [`Self::len`] in the final word are outside the logical slice and may be
+    /// nonzero. Use [`Self::get`] or [`Self::popcount`] when inactive tail bits must be ignored.
+    #[inline]
     pub fn words(&self) -> &'a [u64] {
         self.words
     }
@@ -384,11 +394,16 @@ impl BitMatrix {
                 rows,
                 cols: cols.get(),
             })?;
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(word_count)
+            .map_err(|_| BitError::StorageAllocationFailed { words: word_count })?;
+        words.resize(word_count, 0);
         Ok(Self {
             rows,
             cols,
             row_words,
-            words: vec![0; word_count],
+            words,
         })
     }
 
@@ -400,11 +415,11 @@ impl BitMatrix {
         Ok(matrix)
     }
 
-    pub fn rows(&self) -> usize {
+    pub const fn rows(&self) -> usize {
         self.rows
     }
 
-    pub fn cols(&self) -> usize {
+    pub const fn cols(&self) -> usize {
         self.cols.get()
     }
 
@@ -430,6 +445,30 @@ impl BitMatrix {
                 rows: self.rows,
             })?;
         set_bit(row_words, self.cols, col, value)
+    }
+
+    pub fn copy_row_from_bools(&mut self, row: usize, bits: &[bool]) -> BitResult<()> {
+        if bits.len() != self.cols() {
+            return Err(BitError::LengthMismatch {
+                left: bits.len(),
+                right: self.cols(),
+            });
+        }
+        let row_words = self.row_words_mut(row)?;
+        row_words.fill(0);
+        for (index, bit) in bits.iter().copied().enumerate() {
+            if bit {
+                let word =
+                    row_words
+                        .get_mut(index / WORD_BITS)
+                        .ok_or(BitError::BitIndexOutOfRange {
+                            index,
+                            len: bits.len(),
+                        })?;
+                *word |= 1_u64 << (index % WORD_BITS);
+            }
+        }
+        Ok(())
     }
 
     pub fn row(&self, row: usize) -> BitResult<BitSlice<'_>> {
