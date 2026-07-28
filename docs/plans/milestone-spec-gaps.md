@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-27 - A3: Typed Writer And Codec Memory Boundaries
+
+Status: Resolved
+Revealed by: milestone audit of the extracted records package
+Current text: A3 required every result writer to be a typed sink and required allocation and retained capacity to be bounded by width and batch size rather than record count.
+Gap: the text did not distinguish new component-facing writers from public byte-oriented compatibility adapters, working scratch from caller-requested materialized output, or width-bounded dense readers from duplicate-preserving sparse and token visitors. It also named cancellation separately without defining whether callback failure was the cancellation signal.
+Proposed amendment: require every new component-facing writer to use the typed sink traits; retain the two legacy writers only as documented adapters pending A4 and A6; define a visitor error as immediate cancellation with first-error preservation; require dense and packed scratch to be independent of record and duplicate count; permit raw sparse and token visitors to retain one record; and exclude explicitly requested in-memory output bytes from the working-scratch bound.
+Resolution: the A3 plan, component contract, migration inventory, architecture guide, event-driven HITS and DETS readers, typed DETS writer entry point, duplicate-heavy allocation regressions, and first-error visitor tests now implement the amended boundary.
+
 ## 2026-07-27 - A2: Detection Aggregate And Compiled-Plan Defaults
 
 Status: Resolved

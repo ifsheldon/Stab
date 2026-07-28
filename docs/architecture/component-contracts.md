@@ -63,7 +63,7 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Invariants: explicit width, namespace, layout, tail-bit, record-boundary, and PTB64 grouping contracts.
 - Dependencies: packed bit storage.
 - Forbidden: circuit execution, filesystem paths, CLI, ops.
-- Resource behavior: bounded by record width and batch size, never total stream length.
+- Resource behavior: dense and packed codec scratch is bounded by declared record width and the active batch, never total stream length or duplicate-token count. Raw sparse and typed-token visitors may retain one encoded record because duplicate order is their returned value. An explicitly in-memory codec sink may retain its caller-requested encoded output bytes; that materialized result is reported separately from bounded working scratch.
 - Extension points: typed record sinks and bounded record visitors.
 
 ### Algebra
@@ -114,7 +114,8 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `crates/stab-core/src/bits/clifford.rs`, `crates/stab-core/src/bits/scalar.rs` | Algebra and SIMD kernel bridge | Quantum-specific Clifford and Pauli-word operations remain in core until A6. Direct portable SIMD is confined to the Clifford implementation; the scalar Pauli-word operation consumes `stab-bits` storage without moving quantum semantics into the storage crate. |
 | `diagnostics.rs` | Facade, temporarily | A2 owns shared byte-span, severity, stable code, parse, format, and resource-context primitives here. Validation, compile, execution, and analysis errors wait for their owning A3 through A6 boundaries instead of adding placeholder variants. Serialization remains CLI-owned. A6 must place the shared stable primitives without making model, records, analysis, or execution depend on the facade. |
 | `resources.rs` | Facade, temporarily | A2 owns shared estimate classifications and lossless resource-limit context here while operation-owned policies are introduced beside their model, engine, or analysis operations. A6 must place the shared vocabulary without creating a global resource-policy dependency. |
-| `result_formats.rs`, `result_formats/**`, `result_packed.rs`, `result_streaming.rs`, `result_text.rs` | Records | These modules become strict typed codecs and bounded record streams in A3. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. The codec capability registry lives beside these implementations and is consumed by the facade and CLI instead of being copied into a status manifest. |
+| `crates/stab-records/src/**` | Records | Stable Rust 1.97.1 strict codecs, typed semantic widths, shot-major and 64-shot bit-plane batches, typed DETS layouts, bounded visitors, and measurement, detection, and DEM-sample sinks are physically extracted. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. The codec capability registry lives beside these implementations and is consumed by the facade and CLI instead of being copied into a status manifest. |
+| `crates/stab-core/src/result_formats.rs`, `crates/stab-core/src/result_streaming.rs` | Facade compatibility adapters | These wrappers re-export canonical `stab-records` types, convert structured format failures losslessly into `CircuitError`, and preserve established callback signatures while callers migrate. `MeasureRecordWriter` and `MeasureRecordBatchWriter` remain byte-oriented compatibility adapters for existing core and CLI paths; new component code uses typed sink traits and typed DETS namespace selection. The wrappers must not reimplement codec grammar, layout, or buffering policy. |
 | `stabilizers/**` | Algebra | Pauli, Clifford, Tableau, and Flow mathematics do not own gate syntax. |
 | `sampling.rs`, `sampling/**`, `execution/**`, `detection.rs`, `detection/**`, `dem_sampler.rs`, `probability_util.rs` | Engine | Simulator-backed helpers, randomized bit generation, compilation, reusable state, detection conversion, and DEM sampling are execution concerns. |
 | `analysis/**` | Analysis | Cross-model semantic adapters live here even when their implementation delegates to a source module awaiting extraction. |
@@ -126,6 +127,6 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 
 `stab-cli/src/agent.rs` is a CLI adapter, not a new product component. It discovers commands from Clap, renders core descriptors and identities, reuses retained-handle input admission, and may compose parsing, compilation validation, and estimates. It must not become an alternate source of gate, codec, compiler, backend, or qualification truth.
 
-The `stab-core::bits` module and root bit-type paths are compatibility re-exports of canonical `stab_bits` items. Result codecs remain implemented in `stab-core` only until the second A3 extraction creates `stab-records`.
+The `stab-core::bits` module and root bit-type paths are compatibility re-exports of canonical `stab_bits` items. The `stab-core::result_formats` and `stab-core::result_streaming` modules similarly adapt canonical `stab_records` behavior without owning a second codec implementation.
 
 New source modules must fit exactly one row or update this table and the architecture decision record in the same change.

@@ -1,12 +1,12 @@
 # Contributing to Stab
 
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-The full workspace and `stab-core` still require Nightly for the quantum-specific Clifford `std::simd` implementation. The extracted `stab-bits` package is a Stable Rust 1.97.1 leaf with scalar packed-storage kernels; the later `stab-kernels-simd` extraction will isolate direct portable-SIMD use behind the architecture's Nightly boundary.
+The full workspace and `stab-core` still require Nightly for the quantum-specific Clifford `std::simd` implementation. The extracted `stab-bits` and `stab-records` packages form a Stable Rust 1.97.1 component stack for packed storage, typed result batches, and Stim-compatible codecs; the later `stab-kernels-simd` extraction will isolate direct portable-SIMD use behind the architecture's Nightly boundary.
 
 Check the Stable component directly with:
 
 ```sh
-cargo +1.97.1 test -p stab-bits
+cargo +1.97.1 test -p stab-bits -p stab-records
 ```
 
 The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.

@@ -7,7 +7,7 @@ Current as of 2026-07-27.
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
-- A3 stable packed records and codecs: in progress; `stab-bits` was physically extracted at clean revision `3de29da0c177c150f74b1fa93ed5217db186ead1`, while `stab-records` remains pending.
+- A3 stable packed records and codecs: in progress; `stab-bits` is committed, and the physical `stab-records` extraction has passed direct Stable tests, the 62-case live Stim differential, architecture enforcement, and dirty-worktree diagnostic benchmarks while clean post-commit evidence and closure audits remain pending.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -293,4 +293,28 @@ The clean post-extraction reports are:
 
 Stable package checks, warnings-denied workspace Clippy, complete workspace tests, warnings-denied `stab-bits` rustdoc, architecture enforcement, correctness and performance inventory regeneration, generated-status checking, the complete implemented oracle fixture run, and staged pre-commit validation passed at the extraction revision.
 
-A3 is not complete. `stab-records`, typed shot-major and bit-plane batches, direct component corpus ownership, and post-extraction M7/M8 codec evidence remain required before A3 closure.
+A3 was not complete at the bits-only checkpoint. The records extraction below addresses the remaining implementation work; clean post-commit evidence and closure audits still determine milestone completion.
+
+## A3 Stable Records Extraction
+
+`stab-records` is now a physical Stable Rust 1.97.1 package with the sole product dependency `stab-records -> stab-bits`. `stab-core` depends on both leaf crates and retains compatibility re-exports and lossless conversion from records diagnostics into `CircuitError`. The shared compatibility corpus moved from `ops/` to `test-support/compat-corpus`; product crates may use it only as a development dependency, so qualification plumbing is not a runtime product dependency.
+
+The component owns strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs; structured format diagnostics; typed `DetsLayout`; shot-major and at-most-64-shot bit-plane batches; distinct measurement, detector, observable, sampled-error, and correction widths; generic first-error-preserving visitors; and typed measurement, detection, and DEM-sample sink traits with in-memory codec implementations. Detector and observable planes remain separate until explicit encoding. PTB64 sinks reuse one 64-shot buffer, reject incomplete final groups recoverably, and preserve zero-shot, nonzero-width behavior.
+
+The records package runs all 62 checked corpus cases directly. Focused tests cover typed namespace semantics, exact bytes for all six formats, layout transpose round trips across zero through 64 shots, width mismatch rejection, visitor cancellation, and allocation growth independent of record count. A workspace-wide pass caught and repaired one facade issue before commit: `CircuitError` now converts both the facade and canonical records `FormatError`, preserving existing `?`-based callers of re-exported constructors.
+
+Qualification rustdoc identity now resolves generic trait arguments through fully qualified rustdoc paths. This is necessary because `stab_core::FormatError` and `stab_records::FormatError` legitimately have the same terminal type name but distinct `From` implementations. Compatibility re-exports now share the canonical records evidence owner instead of creating hundreds of duplicate planned facade owners. The current correctness inventory has digest `d85172a83661b35543c647d0fdf6b3e8752cb5024fc0ade480b8245709ec59a8`, 2,886 upstream cases, 4,009 exported API items, and 1,917 evidence cases. The current performance inventory has digest `d97eabbde9e260f1cc4a2fa3a97b24e36ae9ec573175ea02d6fc51b5bde929a0`, 127 checklist rows, 4,009 exported API items, 176 groups, and 164 inherited rows. No behavioral `stab_records::*` item remains assigned only to planned correctness evidence.
+
+Three source-owned report-only component rows were added without inventing a Stim ratio:
+
+- `m8-record-writer-contract` measures typed B8 shot-major writing and PTB64 bit-plane writing.
+- `m8-record-batch-transpose-contract` measures both public shot-major and bit-plane conversions.
+- `m8-record-dets-layout-contract` measures typed detector and observable DETS parsing.
+
+The initial dirty timing diagnostic is `target/benchmarks/a3-records-dirty-compare`. It records 490 million bits per second for typed B8 output, 31.08 billion bits per second for direct PTB64 bit-plane output, and 29.81 and 27.08 billion bits per second for the two transpose directions. Its DETS row incorrectly derived “bits” from namespace width even though the parser consumes nine tokens per record; that historical rate is review-rejected and must not be cited. The source-owned runner now reports DETS records per second. The post-reservation allocation diagnostic is `target/benchmarks/a3-records-dirty-allocations-v2`; both writers and both transpose directions perform exactly one measured allocation, while the DETS parser remains at four allocations and 464 total allocated bytes for 4,096 records. Both reports identify source revision `a848775937abe65f1d6270a9738600cccb9788fc` with `local_modifications=true`, so they are development diagnostics only and make no promotable regression or Stim-parity claim.
+
+`SampleFormat` remains the five-format legacy writer enum, while `RecordFormat` is the six-format component registry that includes PTB64. The overlap is recorded migration debt, not an equivalence claim. Specialized `for_each_*` functions remain convenience adapters; generic `try_for_each_*` functions are the modular error-preserving visitor boundary.
+
+The A3 audit found two under-specified resource phrases. Returning a generic visitor error is now the defined cancellation signal and preserves the first error without delivering another record. Dense and packed HITS/DETS readers now consume strict lexer events directly, so their allocation is independent of duplicate-token count; a 16,384-duplicate regression proves this for both representations. Raw sparse and typed-token visitors still retain one encoded record because duplicate order is their semantic result. In-memory codec sinks may retain caller-requested encoded output bytes, while all additional scratch remains width- and batch-bounded. `MeasureRecordWriter::begin_dets_result_type` gives component code a typed namespace selector; the raw byte selector remains an explicitly documented compatibility adapter.
+
+The final pre-commit milestone audit and full-code review found no P0/P1 compatibility, resource-safety, benchmark-semantics, or crate-boundary defect. Their only code-quality finding was that three touched qualification modules sat just above the 1,200-line project threshold. Simulator classification, stable case-ID generation, and evidence-only export policy now have separate owned modules; the three parent files are 1,082, 1,197, and 1,197 lines. The extraction is committed at `46abdac2`, and the record benchmark contracts are committed at `b8dff63c`. Clean post-commit timing and allocation evidence remains the only A3 closure blocker.

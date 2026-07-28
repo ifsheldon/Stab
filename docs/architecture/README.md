@@ -68,10 +68,11 @@ The current A3 product graph is:
 
 ```text
 stab-cli -> stab-core
-stab-core -> stab-bits
+stab-core -> stab-bits + stab-records
+stab-records -> stab-bits
 ```
 
-`stab-bits` was physically extracted at revision `3de29da0c177c150f74b1fa93ed5217db186ead1`. `stab-records` and the remaining target component crates have not yet been extracted. The completed target graph below remains normative for later A3 through A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits` and `stab-records` are physical Cargo packages. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. `stab-core` retains compatibility re-exports and lossless error conversion while engine callers migrate. The remaining target component crates have not yet been extracted. The completed target graph below remains normative for A4 through A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -91,25 +92,31 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-`just architecture::check` currently enforces every edge that exists in the workspace, rejects product dependencies on operational crates, and will enforce the target edges as the component crates are extracted.
+`just architecture::check` currently enforces every edge that exists in the workspace, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, and will enforce the remaining target edges as later component crates are extracted.
 
-The checker classifies workspace packages from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects product dependencies on operational crates.
+The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code.
 
-During the pre-0.2 migration it reports three exact temporary allowances instead of hiding them: the dev-only `stab-core` and `stab-cli` dependencies on `stab-compat-corpus`, plus direct portable-SIMD use in `crates/stab-core/src/bits/clifford.rs`.
+The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-Any additional product-to-ops edge or direct `std::simd` source site fails the check.
+During the pre-0.2 migration the checker reports one exact temporary allowance instead of hiding it: direct portable-SIMD use in `crates/stab-core/src/bits/clifford.rs`. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, or additional direct `std::simd` source site fails the check.
 
 The record-boundary and Nightly-isolation milestones remove these allowances; they are not permanent permitted dependencies.
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits` package already builds and tests on that compiler.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits` and `stab-records` packages build and test together on that compiler.
 
 `stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
 
 Every direct `std::simd` use will belong to `stab-kernels-simd` after A6.
 
 Generic packed storage and scalar kernels now live in Stable `stab-bits`. The remaining direct SIMD site is the quantum-specific Clifford kernel in `stab-core`; it moves behind the later kernel boundary without making Stable storage depend on Nightly.
+
+Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs now live in Stable `stab-records`. `SampleFormat` remains the five-format compatibility enum used by legacy record-at-a-time APIs, while `RecordFormat` is the six-format component registry that also represents PTB64. The overlap is explicit migration debt rather than an assertion that the two enums are interchangeable.
+
+The specialized `for_each_*` visitors remain bounded convenience adapters for callers already using records diagnostics. The generic `try_for_each_*` variants are the modular sink boundary because they preserve an arbitrary visitor error and stop immediately after the first callback failure; returning that error is the explicit cancellation mechanism.
+
+Dense and packed readers apply HITS and DETS token events directly, so duplicate-heavy input cannot make their scratch grow beyond the declared width. Raw sparse and typed-token visitors intentionally preserve one record's token order and duplicates. `MeasurementCodecSink`, `DetectionCodecSink`, and `DemSampleCodecSink` are explicitly in-memory sinks, so their encoded output grows with requested output bytes while their additional scratch stays bounded by one active batch or PTB64 group.
 
 `stab-kernels-simd` has no Stab dependency and accepts only raw word slices and fixed word blocks.
 

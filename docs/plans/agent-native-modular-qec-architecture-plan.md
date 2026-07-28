@@ -550,7 +550,8 @@ These four reports are independent Stab-only phase timings with no Stim ratio, n
 - Add owned and borrowed shot-major and bit-plane batch types.
 - Keep detector and observable planes separate.
 - Implement bounded layout conversion.
-- Make every result writer a typed sink.
+- Make every new component-facing result writer a typed sink.
+- Retain `MeasureRecordWriter` and `MeasureRecordBatchWriter` only as documented byte-oriented compatibility adapters until the A4 execution migration and A6 facade closure remove their remaining product call sites.
 - Keep record-at-a-time visitors as adapters.
 - Preserve strict text lexers and typed DETS parsing.
 
@@ -559,8 +560,10 @@ These four reports are independent Stab-only phase timings with no Stim ratio, n
 - Run all 62 checked result-format corpus cases through the extracted crates.
 - Cover every format, width boundary, tail bit, empty record, namespace, duplicate, and PTB64 group rule.
 - Property-test shot-major to bit-plane conversions and round trips.
-- Prove cancellation and first-error behavior.
-- Prove allocation and retained capacity are bounded by width and batch size, not record count.
+- Prove that returning a visitor error is the record-visitor cancellation mechanism, stops before another record is delivered, and preserves the first visitor error.
+- Prove dense and packed working allocation and retained scratch are bounded by width and active batch size, not record count or duplicate-token count.
+- Permit raw sparse and typed-token visitors to retain one encoded record because preserving token order and duplicates is their public result; they must not retain prior records.
+- Treat bytes retained by an explicitly in-memory codec sink as caller-requested materialized output, not working scratch; all additional working storage remains bounded by width and at most one active batch or PTB64 group.
 - Verify Stable Rust 1.97.1 builds.
 
 ### Benchmarks
@@ -574,7 +577,7 @@ These four reports are independent Stab-only phase timings with no Stim ratio, n
 
 ### Done Criteria
 
-- Codecs operate on typed batches.
+- Component-facing codecs operate on typed batches and sink traits; legacy byte-oriented writers remain labeled compatibility adapters instead of becoming new modular extension points.
 - Exact Stim bytes remain unchanged.
 - Stable users can parse and convert result records without `stab-core` or Nightly.
 
