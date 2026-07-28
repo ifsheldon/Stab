@@ -594,6 +594,8 @@ These four reports are independent Stab-only phase timings with no Stim ratio, n
 
 ## Milestone A4: Sampling Compiler, Plan, Session, And Sink
 
+Status: Complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`; accepted evidence and verification are recorded in [the progress report](agent-native-modular-qec-progress-report.md#a4-sampling-plan-session-and-sink).
+
 ### Tasks
 
 - Replace `CompiledSampler` as the architectural center.
@@ -667,6 +669,8 @@ Clean pre-A4 revision `18099bf3` owned only `stab_sample_compile_noisy_1q` and t
 - Process-equivalent rows retain the `1.25x` Stim gate, report-only rows make no Stim-ratio claim, and the clean A4 phase report establishes explicit unseeded baseline candidates for later 15% self-regression checks without inventing a pre-A4 mapping.
 
 ## Milestone A5: Detection And DEM Batch Pipelines
+
+Status: Active.
 
 ### Tasks
 

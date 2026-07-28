@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Progress Report
 
-Current as of 2026-07-27.
+Current as of 2026-07-28.
 
 ## Status
 
@@ -8,7 +8,8 @@ Current as of 2026-07-27.
 - A1 logical ownership and dependency enforcement: complete.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
 - A3 stable packed records and codecs: complete; product timing and allocation evidence binds clean revision `cb0f2ddbb19a99e16f27471b91966312a4404f79`, and the final oracle ownership repair is commit `07df4b33`.
-- A4 sampling compiler, plan, session, and sink: next.
+- A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
+- A5 detection and DEM batch pipelines: next.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -369,3 +370,53 @@ The final closure run of `just oracle::run --implemented-only` caught one integr
 The final independent milestone audit and full-code-review found no P0, P1, or P2 A3 issue. They identified two P3 documentation precision problems, now corrected: baseline files bind pinned Stim rather than a Stab commit, and the packed DETS allocation artifact must not be cited as the sole proof of the broader dense-allocation invariant.
 
 A3 is complete. Stable users can consume `stab-bits` and `stab-records` without `stab-core` or Nightly, exact Stim result bytes remain unchanged, and the facade retains compatibility adapters without owning a second implementation. Formal post-refactor correctness and performance qualification remains a later program-level task rather than an A3 claim.
+
+## A4 Sampling Plan, Session, And Sink
+
+A4 completed at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
+
+| Commit | Purpose |
+| --- | --- |
+| `f984f577` | Add reusable typed bit-plane sampling batches to `stab-records`. |
+| `37063c68` | Introduce the sampling compiler, immutable plans, mutable sessions, typed sinks, cancellation, poisoning, and backend-bearing plan fingerprints. |
+| `043408a6` | Route `stab sample` through the public plan, session, and sink path while preserving the CLI contract. |
+| `67f10314` | Separate sampling phases and make the four Stim-comparable rows process-symmetric. |
+| `750fd6f7` | Assign direct correctness and performance ownership to the new sampling contracts. |
+| `88d95a3f` | Define the sampling component boundary and its compatibility-adapter policy. |
+| `af71182e` | Repair the process-comparison repetition schedule after final review found a three-Stim-versus-nine-Stab asymmetry. |
+
+`SamplingCompiler` now lowers a typed request into an immutable, cloneable, `Send + Sync` `SamplingPlan`. A mutable non-`Sync` `SamplingSession` owns the RNG, reference state, private simulator frame, bounded reusable bit-plane batch, progress, cancellation, and poison state. Direct-Z, small-frame, and general-frame execution remain private plan variants. Scalar is the only registered backend in A4; an explicit portable-SIMD request fails before lowering instead of pretending that a second implementation exists.
+
+The session constructor performs checked fallible reservation and rejects conservative reusable storage estimates above 256 MiB before allocation. Empty runs consume no randomness and do not touch the sink. Successful and cancelled runs finalize one sink lifecycle; sink or engine failures preserve the first error, report exact committed progress, stop immediately, and poison the session. Pre-execution validation and counter-overflow errors do not poison a reusable session. `CompiledSampler` remains a documented compatibility adapter until the A6 facade curation.
+
+The public CLI path now uses the same compiler, plan, session, and typed records sink. Exact zero-shot no-I/O behavior, writer and flush error propagation, path preflight, reference-sample modes, seeded chunking, every private execution variant, frozen pre-A4 vectors, cancellation, poisoning, bounded post-warmup allocation, and wide HITS, DETS, and PTB64 output have direct regression coverage.
+
+The regenerated correctness inventory contains 2,886 upstream cases, 4,501 exported API items, and 1,957 evidence parents. Its digest is `091a03280f829e783d1c5acd7b1dbd5fb8bd37ccdea85bfcc0ddec9a9e8b863b`. The regenerated performance inventory contains 127 checklist rows, 4,501 exported API items, 176 groups, and 164 inherited rows. Its digest is `4aa88447f230845873bcc44657f037e48f2f2147c0260412d055efc2c221bc95`.
+
+### A4 Clean Evidence
+
+The accepted A4 reports bind clean revision `af71182ea60146986c4b4aac9d5713484eb7e449` with `local_modifications=false`.
+
+| Evidence | Artifact | SHA-256 |
+| --- | --- | --- |
+| Phase-diagnostic baseline | `target/benchmarks/a4-sampling-diagnostic-baseline-af71182e/baseline.json` | `48514c304bd50b12cc1646621464e7ce33ff8ea031bfdc9d45da85dea467c23b` |
+| Phase-diagnostic comparison | `target/benchmarks/a4-sampling-diagnostic-compare-af71182e/compare.json` | `f3df3db2a7e0ee6561bd0493a9e696c751b9be72a1aa701e396e9f150398909e` |
+| Process-parity baseline | `target/benchmarks/a4-sampling-parity-baseline-af71182e-matched/baseline.json` | `ee78234fa38b7028b24ac6add2e22437b37e6ec88b62f4be3349caa08f7b472e` |
+| Process-parity comparison | `target/benchmarks/a4-sampling-parity-compare-af71182e-matched/compare.json` | `478425eb8aa774c1662c9718a1328220c6fb670a5f08addfc61bfa3af23dea52` |
+
+The report-only phase diagnostic records 2.155 million automatic or explicit-scalar compilations per second, 6.944 million session constructions per second, 444.4 million 64-shot witness-sink shots per second, 800.0 million prebuilt-batch consumptions per second, 181.8 million B8 encodes per second, 285.7 million shots per second across sixteen four-shot runs on one session, 447.6 million shots per second for the 1,024-shot in-process row, and 500.9 million shots per second for the one-million-shot row. These isolated workloads have no faithful Stim comparator and make no Stim-parity claim. Their new identities are unseeded candidates; the 15% Stab self-regression policy starts only with a later identity-matched controlled-host measurement.
+
+The four process-symmetric rows use the same bounded supervisor, standard input, command arguments, iteration policy, and discarded standard output for Stim and Stab. An untimed Stab preflight checks a frozen pre-A4 output witness. All four pass the unchanged `1.25x` gate:
+
+| Row | Stab over Stim |
+| --- | ---: |
+| Repetition contract | `1.025x` |
+| Rotated surface-code contract | `1.012x` |
+| Unrotated surface-code contract | `0.998x` |
+| High-repeat contract | `1.005x` |
+
+Each accepted process row records exactly three timed Stim launches and three timed Stab launches. Final review found that the earlier `88d95a3f` comparison instead nested the Stab runner's three launches inside three outer recorded runs, producing three Stim launches versus nine Stab launches despite an identical-iteration claim. That comparison is review-rejected and retained only as history. Commit `af71182e` makes one runner invocation own one process launch, lets the shared outer `--measurement-runs 3` policy own the median population, and strengthens report-only throughput witnesses with boundary output bytes.
+
+The clean revision passed formatting, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture enforcement, the complete implemented oracle run, the live 62-case result-format oracle, correctness and performance check/regeneration, generated-status checking, benchmark smoke, and staged pre-commit validation. A dirty development probe and the asymmetric `88d95a3f` process comparison remain non-promotable and are not used for closure.
+
+A4 is complete. Sampling execution imports no codec, filesystem, CLI, or ops API; the CLI does not bypass the plan/session/sink architecture; process-equivalent rows remain inside the unchanged Stim gate; and unlike phase identities are explicitly unseeded instead of being compared to a misleading historical operation.
