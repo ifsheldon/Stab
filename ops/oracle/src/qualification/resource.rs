@@ -85,6 +85,11 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-sat-input-policy-admission",
     "a2-sat-cnf-policy-admission",
     "a2-sat-output-policy-admission",
+    "a4-sampling-prework-rejection-contract",
+    "a4-sampling-session-storage-admission-contract",
+    "a4-sampling-session-allocation-contract",
+    "a4-cli-sampling-codec-allocation-contract",
+    "a4-cli-sampling-projection-allocation-contract",
 ];
 
 struct PlannedResourceCaseSpec {

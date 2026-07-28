@@ -251,7 +251,7 @@ fn classifications_distinguish_selected_execution_domains() {
             "stab_core::ResourceEstimate",
         ),
         (
-            "crates/stab-core/src/sampling/estimate.rs",
+            "crates/stab-core/src/sampling_estimate.rs",
             "stab_core::estimate_sampling_request",
         ),
         (

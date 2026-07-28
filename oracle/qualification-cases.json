@@ -4228,11 +4228,724 @@
           "repeat-lowering-drift",
           "compiled-semantic-drift"
         ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-compiler-backend-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "compiler_selects_only_registered_backends_and_fingerprints_the_plan",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "One bounded circuit proves deterministic Auto-to-scalar selection, explicit scalar selection, identical immutable plan identity, and typed rejection of the not-yet-registered portable-SIMD backend before execution."
+        },
+        "negative_axes": [
+          "automatic-backend-drift",
+          "explicit-backend-drift",
+          "unavailable-backend-advertisement",
+          "request-plan-identity-confusion"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::BackendPreference" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::BackendPreference::as_str" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingBackend" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingBackend::as_str" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::new" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::backend" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::compile" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::CompiledSampler::compile" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-plan-fingerprint-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "plan_fingerprint_schema_one_has_an_independently_reconstructed_vector",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The test reconstructs executable and final SHA-256 material independently for a frozen scalar direct-Z plan and compares every public plan-identity projection."
+        },
+        "negative_axes": [
+          "domain-drift",
+          "endianness-drift",
+          "backend-discriminator-drift",
+          "executable-variant-drift",
+          "hex-rendering-drift"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::SCHEMA_VERSION" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::ALGORITHM" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::schema_version" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::request_fingerprint" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::backend" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::executable_contract_schema_version" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::executable_contract_digest" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::executable_contract_digest_hex" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::digest" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::PlanFingerprint::digest_hex" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::backend" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::request_fingerprint" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::fingerprint" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::measurement_width" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::qubit_count" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-compile-diagnostic-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "compilation_failures_keep_invalid_circuits_distinct_from_missing_backends",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Sweep rejection and unavailable-backend rejection occur during compilation, retain distinct stable codes, and convert explicitly into compatibility diagnostics without executing work."
+        },
+        "negative_axes": [
+          "error-code-collapse",
+          "backend-name-loss",
+          "invalid-circuit-cause-loss",
+          "execution-before-rejection"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError::code" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError::into_circuit_error" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileErrorCode" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileErrorCode::as_str" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-plan-sharing-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "state-equivalence",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "plans_share_across_threads_while_sessions_keep_rng_state_isolated",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "One immutable plan crosses two threads while each thread creates an isolated seeded mutable session and produces the same complete record sequence."
+        },
+        "negative_axes": [
+          "plan-not-send-sync",
+          "shared-session-state",
+          "seeded-thread-drift"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::session" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-chunking-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "same_seeded_session_chunking_matches_one_combined_run",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Seeded run(31) followed by run(100) produces the exact run(131) record stream while summaries retain per-call and cumulative committed-shot counts."
+        },
+        "negative_axes": [
+          "chunk-boundary-rng-drift",
+          "summary-progress-drift",
+          "batch-tail-loss"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::RandomPolicy" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::Seed" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::Seed::new" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::Seed::get" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::ShotCount" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::ShotCount::new" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::ShotCount::get" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingSession" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingSession::run" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingSession::total_committed_shots" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunStatus" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunSummary" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunSummary::status" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunSummary::requested_shots" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunSummary::committed_shots" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunSummary::total_committed_shots" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-codec-lifecycle-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "chunked_codec_output_composes_from_fresh_finalized_sinks",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Seeded 01, b8, r8, HITS, and DETS streams partitioned across two execution calls and independently finalized sinks concatenate to exact combined-run bytes; PTB64 proves the same contract across two complete 64-record groups."
+        },
+        "negative_axes": [
+          "finalized-sink-reuse",
+          "chunk-boundary-byte-drift",
+          "chunk-boundary-rng-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-zero-and-reference-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "zero_shots_do_not_touch_the_sink_or_advance_the_rng",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A zero-shot call performs no sink or RNG work, and a later call on the same session produces the exact sequence from a fresh equivalently seeded session."
+        },
+        "negative_axes": [
+          "zero-shot-sink-call",
+          "zero-shot-rng-advance"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-reference-mode-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "sampling::api::tests::direct_small_and_general_variants_match_the_previous_general_frame_stream",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Normal and skip-reference modes produce the exact previous general-frame seeded stream across direct-Z, small-frame, and general-frame private plan variants."
+        },
+        "negative_axes": [
+          "reference-mode-drift",
+          "direct-z-specialization-drift",
+          "small-frame-specialization-drift",
+          "general-frame-drift"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::ReferenceSampleMode" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::session_with_reference_mode" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-cancellation-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "state-equivalence",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "cancellation_stops_between_batches_and_leaves_the_session_resumable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Cooperative cancellation stops after one 64-shot batch, finalizes that accepted prefix, resets explicitly, and resumes the same session to the exact uninterrupted seeded sequence."
+        },
+        "negative_axes": [
+          "mid-batch-cancellation",
+          "accepted-prefix-loss",
+          "cancelled-session-poisoning",
+          "resume-rng-drift"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCancellation" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCancellation::cancel" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCancellation::reset" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCancellation::is_cancelled" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingSession::cancellation" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-pre-cancelled-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "state-equivalence",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "pre_cancelled_run_performs_no_work_and_remains_resumable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A session cancelled before execution performs no RNG or batch-delivery work, finalizes the nonempty request's sink lifecycle, remains unpoisoned, and resumes to the exact fresh-session seeded stream after reset."
+        },
+        "negative_axes": [
+          "pre-cancelled-rng-advance",
+          "pre-cancelled-batch-call",
+          "pre-cancelled-finalization-omission",
+          "pre-cancelled-session-poisoning"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-pre-cancelled-finish-failure-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "pre_cancelled_finish_failure_reports_zero_progress_and_poisons",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A pre-cancelled nonempty request preserves a finalization failure with zero committed and attempted shots, performs no batch write, and poisons the session because sink state is no longer trustworthy."
+        },
+        "negative_axes": [
+          "finish-error-erasure",
+          "zero-progress-overclaim",
+          "finish-failure-without-poison"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-failure-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "sink_write_and_finish_errors_poison_with_exact_progress",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Second-batch write failure and finalization failure preserve phase, first sink error, committed prefix, attempted size, immediate stop, and poison state."
+        },
+        "negative_axes": [
+          "sink-error-erasure",
+          "progress-overclaim",
+          "post-failure-execution",
+          "missing-finalization-poison"
+        ],
+        "public_api_owners": [
+          { "crate_name": "stab_core", "owner_path": "stab_core::RunError" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::RunError::progress" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingExecutionError" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingExecutionError::into_circuit_error" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress::committed_shots" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress::attempted_batch_shots" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SinkFailurePhase" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SinkFailurePhase::as_str" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingSession::is_poisoned" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-prework-rejection-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "sampling::api::tests::counter_overflow_rejects_before_work_without_poisoning",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "A total-shot counter overflow is rejected before sink or engine work and leaves the reusable session unpoisoned."
+        },
+        "negative_axes": [
+          "counter-wrap",
+          "execution-before-validation",
+          "sink-call-before-validation",
+          "pre-work-poisoning"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-callback-adapter-failure-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "callback_adapters_stop_at_the_exact_visitor_error_across_batches",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The error-aware legacy visitor crosses one 64-shot batch, stops on callback 65, preserves the exact caller error and 64-shot committed prefix, invokes no later callback, and the source-compatible adapter preserves the same sentinel."
+        },
+        "negative_axes": [
+          "visitor-error-erasure",
+          "callback-after-error",
+          "committed-progress-overclaim",
+          "legacy-adapter-panic"
+        ],
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledSampler::compile"
+            "owner_path": "stab_core::CompiledSampler::try_for_each_sample_with_seed_and_reference_mode"
           }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-storage-admission-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "compact_huge_measurement_count_returns_a_typed_storage_error",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "A compact repeat declaring more than nine quintillion measurements compiles structurally for the plan/session API, the legacy compiler rejects the deterministic unsupported session requirement, and direct session construction returns the exact 256 MiB storage-limit error with zero measured allocation before any output plane or callback record reservation."
+        },
+        "negative_axes": [
+          "capacity-overflow-panic",
+          "unbounded-bit-plane-allocation",
+          "execution-before-storage-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-internal-failure-poison-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "sampling::api::tests::internal_batch_invariant_failure_poisons_with_exact_progress",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "A test-only mismatched private batch variant induces an engine invariant failure before delivery, records zero committed and one attempted shot, poisons the session, and rejects the next run as poisoned."
+        },
+        "negative_axes": [
+          "engine-failure-without-poison",
+          "internal-progress-overclaim",
+          "post-invariant-execution"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-general-frame-frozen-vector-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "general_frame_seeded_stream_matches_the_pre_plan_frozen_vector",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A 32-shot exact 01 vector captured from clean pre-A4 CompiledSampler execution freezes the general-frame seed stream independently of the new plan/session implementation."
+        },
+        "negative_axes": [
+          "general-frame-rng-drift",
+          "batch-transpose-drift",
+          "reference-sample-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-specialized-frame-frozen-vector-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "direct_and_small_frame_reference_modes_match_pre_plan_frozen_vectors",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Exact noisy direct-Z and entangled random small-frame 01 vectors captured from clean pre-A4 revision 18099bf3 cover normal and skip-reference modes for 65 shots, independently freezing both specialized random streams across the 64-shot internal batch boundary."
+        },
+        "negative_axes": [
+          "direct-z-reference-drift",
+          "small-frame-reference-drift",
+          "specialized-batch-boundary-drift"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-sampling-session-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "sampling::api::tests::warmed_session_allocation_does_not_scale_with_shot_count",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "After one warmup batch, direct-Z, small-frame, random general-frame, and deterministic-product general-frame sessions retain equal allocation count, total bytes, and peak allocation for 64 and 512 additional shots while a reusable sink consumes every delivered bit."
+        },
+        "negative_axes": [
+          "per-shot-allocation",
+          "deterministic-span-allocation",
+          "random-pivot-allocation",
+          "record-count-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-cli-sampling-codec-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::sample::warmed_cli_sample_encoding_has_no_record_count_dependent_allocation",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "After one wide 2,048-bit warmup batch, 01, b8, r8, HITS, DETS, and PTB64 CLI sample encoding performs no measured allocation for one or eight additional 64-shot batches."
+        },
+        "negative_axes": [
+          "per-batch-writer-allocation",
+          "per-hit-decimal-allocation",
+          "ptb64-copy-allocation"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a4-cli-sampling-projection-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::sample::warmed_filtered_cli_sample_encoding_reuses_projection_storage",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A warmed 1,024-column legacy-visible projection over a 2,048-bit typed batch reuses both projection and B8 writer storage across eight additional batches."
+        },
+        "negative_axes": [
+          "projection-buffer-growth",
+          "filtered-record-allocation"
         ],
         "standalone": true
       },
@@ -9915,10 +10628,179 @@
       },
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "Zero-shot sample, detect, and sample_dem still execute role preflight before their empty-output shortcut."
+        "detail": "Zero-shot sample rejects lexical and existing-file aliases without opening paths, while detect and sample_dem retain their declared role preflight before the empty-output shortcut."
       },
       "negative_axes": [
         "zero-shot-preflight-bypass"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-zero-shot-path-no-io-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::sample::zero_shot_sample_ignores_distinct_paths_without_creating_or_truncating_output",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A zero-shot sample request leaves an existing output sentinel unchanged, does not create a missing output, and performs no explicit path I/O when the roles are distinct."
+      },
+      "negative_axes": [
+        "zero-shot-output-truncation",
+        "zero-shot-output-creation",
+        "zero-shot-path-open"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-zero-shot-stdin-no-io-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::sample::zero_shot_sample_ignores_invalid_stdin",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A zero-shot sample request succeeds without parsing malformed standard input and emits no output or diagnostics."
+      },
+      "negative_axes": [
+        "zero-shot-stdin-read",
+        "zero-shot-parse",
+        "zero-shot-diagnostic"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-sample-writer-progress-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::resource::sample_reports_second_batch_writer_failure_with_exact_progress",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "A writer failure on the second typed batch stops immediately and reports the exact accepted 64-shot prefix and attempted failing batch without a later write or flush."
+      },
+      "negative_axes": [
+        "writer-error-erasure",
+        "committed-progress-overclaim",
+        "write-after-failure",
+        "flush-after-write-failure"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-sample-finish-progress-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::resource::sample_reports_flush_failure_as_sink_finalization",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "A terminal writer flush failure is classified as sink finalization after every requested shot was committed, preserves the first I/O error, and poisons the session."
+      },
+      "negative_axes": [
+        "flush-error-erasure",
+        "finish-phase-loss",
+        "committed-progress-underclaim"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-json-sample-writer-diagnostic-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_sample_writer_failure_preserves_phase_and_progress",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The stable JSON diagnostic preserves the sample write phase, exact committed and attempted shot counts, command identity, error code, and I/O cause."
+      },
+      "negative_axes": [
+        "json-write-phase-loss",
+        "json-progress-loss",
+        "json-code-drift"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a4-cli-json-sample-finish-diagnostic-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::diagnostics::json_sample_flush_failure_preserves_finish_phase_and_progress",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The stable JSON diagnostic distinguishes terminal sink finalization from batch writing and reports the fully committed request without losing the underlying flush error."
+      },
+      "negative_axes": [
+        "json-finish-phase-loss",
+        "json-progress-loss",
+        "json-cause-loss"
       ],
       "standalone": true
     },
@@ -9960,7 +10842,7 @@
           "test",
           "-p",
           "stab-records",
-          "result_formats::tests::measure_record_writer_matches_stim_byte_layouts",
+          "compatibility_writer_matches_stim_byte_layouts",
           "--quiet",
           "--exact"
         ]
@@ -11147,6 +12029,40 @@
       ],
       "oracle_fixture_owners": [
         "coverage-mem-simd-bit-table"
+      ]
+    },
+    {
+      "id": "a4-bit-matrix-row-copy-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-bits",
+          "--test",
+          "bits",
+          "bits_bit_matrix_copies_complete_rows_and_rejects_width_mismatches",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Two complete 130-bit row replacements prove exact copied values, stale-bit clearing, checked row bounds, and exact width admission without reallocating matrix storage."
+      },
+      "negative_axes": [
+        "stale-row-bit",
+        "row-width-mismatch",
+        "row-index-out-of-range"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::copy_row_from_bools" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::copy_row_from_bools" },
+        { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::copy_row_from_bools" }
       ]
     },
     {
@@ -15348,8 +16264,9 @@
           "test",
           "-p",
           "stab-records",
-          "--lib",
-          "result_formats::tests::measure_record_writer_matches_stim_byte_layouts",
+          "--test",
+          "typed_sinks",
+          "compatibility_writer_matches_stim_byte_layouts",
           "--quiet",
           "--exact"
         ]
@@ -15376,6 +16293,71 @@
         { "crate_name": "stab_records", "owner_path": "stab_records::SampleFormat" },
         { "crate_name": "stab_records", "owner_path": "stab_records::write_records" }
       ]
+    },
+    {
+      "id": "a4-record-writer-drain-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "compatibility_writer_can_drain_completed_chunks_and_continue",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Two completed records in each non-PTB64 format prove that emitted bytes can be consumed and cleared while the writer retains valid record state for the next bounded chunk."
+      },
+      "negative_axes": [
+        "record-state-leak",
+        "completed-byte-replay",
+        "format-drift-after-clear"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::buffered_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::clear_buffered_bytes" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::result_formats::MeasureRecordWriter::buffered_bytes" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::result_formats::MeasureRecordWriter::clear_buffered_bytes" }
+      ]
+    },
+    {
+      "id": "a4-record-writer-single-bit-state-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "single_bit_zero_one_shortcuts_compose_with_incremental_writer_state",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Packed-shot and bit-plane single-bit 01 fast paths compose with an existing partial record, preserve the writer cursor, emit exact bytes, and leave the writer at a valid record boundary."
+      },
+      "negative_axes": [
+        "shortcut-cursor-drift",
+        "partial-record-loss",
+        "false-mid-record-finalization"
+      ],
+      "standalone": true
     },
     {
       "id": "a3-record-typed-writer-contract",
@@ -15605,7 +16587,134 @@
         { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::bits_per_shot" },
         { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::get" },
         { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::shot" },
-        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::shot_count" }
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::from_bit_planes" }
+      ]
+    },
+    {
+      "id": "a4-record-packed-prefix-view-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::packed_prefix_view_limits_access_without_reallocating_storage",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One fixed-capacity packed batch exposes only the requested active shot prefix, rejects a prefix beyond retained storage, and preserves access to every admitted row without constructing another batch."
+      },
+      "negative_axes": [
+        "prefix-beyond-storage",
+        "inactive-row-access",
+        "width-drift"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::view_prefix" }
+      ]
+    },
+    {
+      "id": "a4-record-packed-shot-replacement-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::packed_batch_replaces_complete_shots_without_retaining_old_bits",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed packed batch proves complete row replacement, stale-bit clearing, exact width validation, and shot-index validation without reallocating storage."
+      },
+      "negative_axes": [
+        "stale-row-bit",
+        "record-width-mismatch",
+        "shot-index-out-of-range"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::copy_shot_from_bools" }
+      ]
+    },
+    {
+      "id": "a4-record-bit-plane-prefix-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::bit_plane_prefix_and_word_copy_hide_inactive_storage",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One 64-shot bit-plane batch proves packed-word replacement, complete-shot replacement, active-prefix access, and width and shot bounds without per-record allocation."
+      },
+      "negative_axes": [
+        "inactive-shot-leak",
+        "record-width-mismatch",
+        "shot-index-out-of-range"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::copy_plane_from_word" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::copy_shot_from_bools" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::view_prefix" }
+      ]
+    },
+    {
+      "id": "a4-record-borrowed-bit-plane-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::borrowed_bit_plane_words_validate_layout_and_hide_tail_bits",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A borrowed two-plane word slice proves layout validation, tail-bit masking, checked bit access, and rejection of impossible shot and width combinations without allocation."
+      },
+      "negative_axes": [
+        "word-count-mismatch",
+        "shot-count-over-64",
+        "tail-bit-leak"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView::try_from_words" }
       ]
     },
     {
@@ -15679,8 +16788,11 @@
         { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::shot_count" },
         { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::try_new" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::bit_planes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::get" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::new" },
-        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::shot_major_records" },
         { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch" },
         { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::records" },
         { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::records_mut" },
@@ -15779,10 +16891,42 @@
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::into_bytes" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::try_new" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_bit_plane_batch" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::Error" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::finish" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::write_batch" }
+      ]
+    },
+    {
+      "id": "a4-record-measurement-sink-reservation-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "measurement_codec_reserves_known_record_counts_without_changing_bytes",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A 65-record codec run proves that pre-reservation preserves exact bytes and that a finalized sink rejects later capacity mutation."
+      },
+      "negative_axes": [
+        "reservation-byte-drift",
+        "reserve-after-finish"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::reserve_records" }
       ]
     },
     {
@@ -16155,6 +17299,16 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::BackendPreference",
+      "canonical_owner_path": "stab_core::BackendPreference"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::BackendPreference::as_str",
+      "canonical_owner_path": "stab_core::BackendPreference::as_str"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::CompiledSampler",
       "canonical_owner_path": "stab_core::CompiledSampler"
     },
@@ -16225,6 +17379,71 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint",
+      "canonical_owner_path": "stab_core::PlanFingerprint"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::ALGORITHM",
+      "canonical_owner_path": "stab_core::PlanFingerprint::ALGORITHM"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::SCHEMA_VERSION",
+      "canonical_owner_path": "stab_core::PlanFingerprint::SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::backend",
+      "canonical_owner_path": "stab_core::PlanFingerprint::backend"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::digest",
+      "canonical_owner_path": "stab_core::PlanFingerprint::digest"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::digest_hex",
+      "canonical_owner_path": "stab_core::PlanFingerprint::digest_hex"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_digest",
+      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_digest"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_digest_hex",
+      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_digest_hex"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_schema_version",
+      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_schema_version"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::request_fingerprint",
+      "canonical_owner_path": "stab_core::PlanFingerprint::request_fingerprint"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::PlanFingerprint::schema_version",
+      "canonical_owner_path": "stab_core::PlanFingerprint::schema_version"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::RandomPolicy",
+      "canonical_owner_path": "stab_core::RandomPolicy"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::ReferenceSampleMode",
+      "canonical_owner_path": "stab_core::ReferenceSampleMode"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::ReferenceSampleTree",
       "canonical_owner_path": "stab_core::ReferenceSampleTree"
     },
@@ -16262,6 +17481,256 @@
       "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::ReferenceSampleTree::stim_string",
       "canonical_owner_path": "stab_core::ReferenceSampleTree::stim_string"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::RunError",
+      "canonical_owner_path": "stab_core::RunError"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::RunError::progress",
+      "canonical_owner_path": "stab_core::RunError::progress"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingBackend",
+      "canonical_owner_path": "stab_core::SamplingBackend"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingBackend::as_str",
+      "canonical_owner_path": "stab_core::SamplingBackend::as_str"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCancellation",
+      "canonical_owner_path": "stab_core::SamplingCancellation"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCancellation::cancel",
+      "canonical_owner_path": "stab_core::SamplingCancellation::cancel"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCancellation::is_cancelled",
+      "canonical_owner_path": "stab_core::SamplingCancellation::is_cancelled"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCancellation::reset",
+      "canonical_owner_path": "stab_core::SamplingCancellation::reset"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompileError",
+      "canonical_owner_path": "stab_core::SamplingCompileError"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompileError::code",
+      "canonical_owner_path": "stab_core::SamplingCompileError::code"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompileError::into_circuit_error",
+      "canonical_owner_path": "stab_core::SamplingCompileError::into_circuit_error"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompileErrorCode",
+      "canonical_owner_path": "stab_core::SamplingCompileErrorCode"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompileErrorCode::as_str",
+      "canonical_owner_path": "stab_core::SamplingCompileErrorCode::as_str"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompiler",
+      "canonical_owner_path": "stab_core::SamplingCompiler"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompiler::backend",
+      "canonical_owner_path": "stab_core::SamplingCompiler::backend"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompiler::compile",
+      "canonical_owner_path": "stab_core::SamplingCompiler::compile"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingCompiler::new",
+      "canonical_owner_path": "stab_core::SamplingCompiler::new"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingExecutionError",
+      "canonical_owner_path": "stab_core::SamplingExecutionError"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingExecutionError::into_circuit_error",
+      "canonical_owner_path": "stab_core::SamplingExecutionError::into_circuit_error"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan",
+      "canonical_owner_path": "stab_core::SamplingPlan"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION",
+      "canonical_owner_path": "stab_core::SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::backend",
+      "canonical_owner_path": "stab_core::SamplingPlan::backend"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::fingerprint",
+      "canonical_owner_path": "stab_core::SamplingPlan::fingerprint"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::measurement_width",
+      "canonical_owner_path": "stab_core::SamplingPlan::measurement_width"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::qubit_count",
+      "canonical_owner_path": "stab_core::SamplingPlan::qubit_count"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::request_fingerprint",
+      "canonical_owner_path": "stab_core::SamplingPlan::request_fingerprint"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::session",
+      "canonical_owner_path": "stab_core::SamplingPlan::session"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingPlan::session_with_reference_mode",
+      "canonical_owner_path": "stab_core::SamplingPlan::session_with_reference_mode"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunProgress",
+      "canonical_owner_path": "stab_core::SamplingRunProgress"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunProgress::attempted_batch_shots",
+      "canonical_owner_path": "stab_core::SamplingRunProgress::attempted_batch_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunProgress::committed_shots",
+      "canonical_owner_path": "stab_core::SamplingRunProgress::committed_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunStatus",
+      "canonical_owner_path": "stab_core::SamplingRunStatus"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunSummary",
+      "canonical_owner_path": "stab_core::SamplingRunSummary"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunSummary::committed_shots",
+      "canonical_owner_path": "stab_core::SamplingRunSummary::committed_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunSummary::requested_shots",
+      "canonical_owner_path": "stab_core::SamplingRunSummary::requested_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunSummary::status",
+      "canonical_owner_path": "stab_core::SamplingRunSummary::status"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingRunSummary::total_committed_shots",
+      "canonical_owner_path": "stab_core::SamplingRunSummary::total_committed_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingSession",
+      "canonical_owner_path": "stab_core::SamplingSession"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingSession::cancellation",
+      "canonical_owner_path": "stab_core::SamplingSession::cancellation"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingSession::is_poisoned",
+      "canonical_owner_path": "stab_core::SamplingSession::is_poisoned"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingSession::run",
+      "canonical_owner_path": "stab_core::SamplingSession::run"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SamplingSession::total_committed_shots",
+      "canonical_owner_path": "stab_core::SamplingSession::total_committed_shots"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::Seed",
+      "canonical_owner_path": "stab_core::Seed"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::Seed::get",
+      "canonical_owner_path": "stab_core::Seed::get"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::Seed::new",
+      "canonical_owner_path": "stab_core::Seed::new"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::ShotCount",
+      "canonical_owner_path": "stab_core::ShotCount"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::ShotCount::get",
+      "canonical_owner_path": "stab_core::ShotCount::get"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::ShotCount::new",
+      "canonical_owner_path": "stab_core::ShotCount::new"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SinkFailurePhase",
+      "canonical_owner_path": "stab_core::SinkFailurePhase"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_owner_path": "stab_core::execution::SinkFailurePhase::as_str",
+      "canonical_owner_path": "stab_core::SinkFailurePhase::as_str"
     },
     {
       "crate_name": "stab_core",

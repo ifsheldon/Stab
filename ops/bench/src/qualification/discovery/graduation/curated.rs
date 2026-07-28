@@ -84,7 +84,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             manifest_row: "perfq-a2-circuit-model-fingerprint",
             performance_feature: "PERF-CIRCUIT-MODEL",
             phase: Phase::Transform,
-            correctness_case: "cq-evidence-qualification-e16abe30d8c7992c",
+            correctness_cases: &["cq-evidence-qualification-e16abe30d8c7992c"],
             owner: "stab-core/model-fingerprint",
             reason: "Measures only Circuit::fingerprint over a pre-parsed deterministic circuit; the result is compared with an untimed typed fingerprint witness.",
         },
@@ -93,7 +93,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             manifest_row: "perfq-a2-sampling-request-fingerprint",
             performance_feature: "PERF-SAMPLING",
             phase: Phase::Compile,
-            correctness_case: "cq-evidence-qualification-d63aa8cd2dc62e63",
+            correctness_cases: &["cq-evidence-qualification-d63aa8cd2dc62e63"],
             owner: "stab-core/compilation-request",
             reason: "Measures the inclusive CompilationRequestFingerprint::for_sampling call, including its model fingerprint, over a pre-parsed deterministic circuit.",
         },
@@ -102,7 +102,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             manifest_row: "perfq-a2-sampling-request-estimate",
             performance_feature: "PERF-RESOURCE-BOUNDARIES",
             phase: Phase::Compile,
-            correctness_case: "cq-evidence-qualification-d65b079751fe7119",
+            correctness_cases: &["cq-evidence-qualification-d65b079751fe7119"],
             owner: "stab-core/resource-estimation",
             reason: "Measures only estimate_sampling_request over a pre-parsed deterministic circuit and compares the complete ResourceEstimate with an untimed typed witness.",
         },
@@ -111,9 +111,9 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             manifest_row: "perfq-a2-sampler-compile",
             performance_feature: "PERF-SAMPLING",
             phase: Phase::Compile,
-            correctness_case: "cq-evidence-qualification-c05d9e9942e9284c",
+            correctness_cases: &["cq-evidence-qualification-7bcf8fcdbbfa6d68"],
             owner: "stab-core/sampling-compiler",
-            reason: "Measures the complete CompiledSampler compile-and-release lifecycle over a pre-parsed deterministic circuit. Untimed recompilation compares the complete compiled plan with a typed witness, and no sampling method is called.",
+            reason: "Measures the complete SamplingCompiler compile-and-release lifecycle over a pre-parsed deterministic circuit. Untimed recompilation compares the exact PlanFingerprint with a typed witness, the legacy CompiledSampler adapter is covered by the same correctness parent, and no sampling method is called.",
         },
     ]
     .into_iter()
@@ -126,7 +126,7 @@ struct AgentDiagnosticSpec {
     manifest_row: &'static str,
     performance_feature: &'static str,
     phase: Phase,
-    correctness_case: &'static str,
+    correctness_cases: &'static [&'static str],
     owner: &'static str,
     reason: &'static str,
 }
@@ -146,7 +146,11 @@ fn agent_diagnostic_group(
     group.disposition = PerformanceDisposition::Measured;
     group.phase = spec.phase;
     group.runner_fidelity = RunnerFidelity::StabReportOnly;
-    group.correctness_cases = vec![spec.correctness_case.to_string()];
+    group.correctness_cases = spec
+        .correctness_cases
+        .iter()
+        .map(|case| (*case).to_string())
+        .collect();
     group.correctness_binding = CorrectnessBinding::ExactCases;
     group.planned_correctness_case_id = None;
     group.workload_family.source =

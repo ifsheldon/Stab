@@ -459,7 +459,7 @@ pub(super) fn classify_public_api_source(
     if matches!(
         value.as_str(),
         "crates/stab-core/src/parse_limits.rs" | "crates/stab-core/src/resources.rs"
-    ) || value == "crates/stab-core/src/sampling/estimate.rs"
+    ) || value == "crates/stab-core/src/sampling_estimate.rs"
     {
         return Some(FeatureId::Resource);
     }
