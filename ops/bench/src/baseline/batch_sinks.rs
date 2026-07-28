@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 
+use sha2::{Digest, Sha256};
 use stab_core::{
     DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, FormatError,
     PackedShotBatchView,
@@ -69,6 +70,24 @@ impl Write for ByteDigestWriter {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+pub(super) fn u64_sequence_digest<const WIDTH: usize>(
+    domain: &[u8],
+    witnesses: &[[u64; WIDTH]],
+) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"stab-benchmark-witness-sequence-v1\0");
+    digest.update((domain.len() as u64).to_be_bytes());
+    digest.update(domain);
+    digest.update((WIDTH as u64).to_be_bytes());
+    digest.update((witnesses.len() as u64).to_be_bytes());
+    for witness in witnesses {
+        for value in witness {
+            digest.update(value.to_be_bytes());
+        }
+    }
+    hex::encode(digest.finalize())
 }
 
 #[derive(Default)]
@@ -162,4 +181,26 @@ fn observe_records(records: PackedShotBatchView<'_>, digest: &mut u64) -> Result
 #[inline]
 const fn mix(digest: u64, value: u64) -> u64 {
     digest.rotate_left(11) ^ value.wrapping_mul(0x9E37_79B1_85EB_CA87)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::u64_sequence_digest;
+
+    #[test]
+    fn sequence_digest_detects_a_later_witness_mutation() {
+        const EXPECTED: &str = "1bc80251470de05ebca13c5661586baa9d219f7d156c8fef80540d481b4d1c05";
+        let original = [[1_u64, 2_u64], [3, 4], [5, 6]];
+        assert_eq!(
+            u64_sequence_digest(b"later-mutation-test", &original),
+            EXPECTED
+        );
+
+        let mut mutated = original;
+        mutated[1][0] ^= 1;
+        assert_ne!(
+            u64_sequence_digest(b"later-mutation-test", &mutated),
+            EXPECTED
+        );
+    }
 }

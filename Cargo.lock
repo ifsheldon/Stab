@@ -2165,6 +2165,7 @@ dependencies = [
  "allocation-counter",
  "clap",
  "csv",
+ "hex",
  "memory-stats",
  "rand 0.10.1",
  "rustix",
