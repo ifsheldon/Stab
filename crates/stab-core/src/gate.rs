@@ -329,20 +329,22 @@ impl TargetRule {
                 }
             }
             Self::AnySingleQubit => validate_targets(gate, targets, is_plain_qubit_target),
-            Self::MeasurementQubits => validate_targets(gate, targets, Target::is_qubit_like),
+            Self::MeasurementQubits => validate_targets(gate, targets, Target::is_qubit_target),
             Self::MeasurementPads => validate_targets(gate, targets, is_measurement_pad_target),
             Self::PlainPairs => validate_pair_targets(gate, targets, is_plain_qubit_target),
             Self::ClassicalControlPairs => {
                 validate_pair_targets(gate, targets, is_plain_qubit_or_classical_target)
             }
             Self::MeasurementPairs => validate_pair_targets(gate, targets, Target::is_qubit_target),
-            Self::RecOnly => validate_targets(gate, targets, Target::is_measurement_record),
+            Self::RecOnly => validate_targets(gate, targets, Target::is_measurement_record_target),
             Self::RecOrPauli => validate_targets(gate, targets, |target| {
                 target.is_measurement_record_target() || target.is_pauli_target()
             }),
             Self::QubitCoords => validate_targets(gate, targets, is_plain_qubit_target),
             Self::PauliProducts => {
-                validate_targets(gate, targets, Target::is_pauli_product_part)?;
+                validate_targets(gate, targets, |target| {
+                    target.is_pauli_target() || target.is_combiner()
+                })?;
                 validate_combiners(gate, targets)
             }
             Self::PauliList => validate_targets(gate, targets, |target| {

@@ -298,7 +298,11 @@ fn build_selected_mpp_detector_inverse(
         expected_detector_offsets
             .iter()
             .rev()
-            .map(|offset| MeasureRecordOffset::try_new(*offset).map(Target::measurement_record))
+            .map(|offset| {
+                MeasureRecordOffset::try_new(*offset)
+                    .map(Target::measurement_record)
+                    .map_err(CircuitError::from)
+            })
             .collect::<CircuitResult<Vec<_>>>()?,
         detector.tag_bytes(),
     )?;

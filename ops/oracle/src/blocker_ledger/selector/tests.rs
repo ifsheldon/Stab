@@ -29,3 +29,37 @@ fn accepts_the_extracted_algebra_package() {
         ]
     );
 }
+
+#[test]
+fn accepts_the_extracted_model_package() {
+    let selector = [
+        "cargo",
+        "test",
+        "-p",
+        "stab-model",
+        "--test",
+        "value_boundaries",
+        "typed_model_values_preserve_stim_boundaries",
+        "--quiet",
+        "--exact",
+    ]
+    .map(String::from);
+
+    let parsed = CargoTestSelector::parse(&selector).expect("model selector");
+
+    assert!(parsed.is_exact());
+    assert_eq!(
+        parsed.run_args(),
+        [
+            "test",
+            "-p",
+            "stab-model",
+            "--test",
+            "value_boundaries",
+            "--quiet",
+            "--",
+            "typed_model_values_preserve_stim_boundaries",
+            "--exact",
+        ]
+    );
+}

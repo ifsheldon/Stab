@@ -150,7 +150,11 @@ fn remapped_mpad_record_targets(
 
     parity
         .into_iter()
-        .map(|offset| MeasureRecordOffset::try_new(offset).map(Target::measurement_record))
+        .map(|offset| {
+            MeasureRecordOffset::try_new(offset)
+                .map(Target::measurement_record)
+                .map_err(CircuitError::from)
+        })
         .collect()
 }
 
@@ -171,7 +175,11 @@ fn merge_record_targets_by_parity(
 
     *existing = parity
         .into_iter()
-        .map(|offset| MeasureRecordOffset::try_new(offset).map(Target::measurement_record))
+        .map(|offset| {
+            MeasureRecordOffset::try_new(offset)
+                .map(Target::measurement_record)
+                .map_err(CircuitError::from)
+        })
         .collect::<CircuitResult<_>>()?;
     Ok(())
 }

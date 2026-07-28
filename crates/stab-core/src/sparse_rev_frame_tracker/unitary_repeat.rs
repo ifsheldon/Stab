@@ -343,11 +343,11 @@ fn collect_target_slots(
 }
 
 fn qubit_id_from_index(index: usize) -> CircuitResult<QubitId> {
-    QubitId::new(u32::try_from(index).map_err(|_| {
+    Ok(QubitId::new(u32::try_from(index).map_err(|_| {
         CircuitError::invalid_detector_error_model(format!(
             "unitary repeat qubit index {index} does not fit u32"
         ))
-    })?)
+    })?)?)
 }
 
 fn slot_target(slot: usize) -> CircuitResult<DemTarget> {

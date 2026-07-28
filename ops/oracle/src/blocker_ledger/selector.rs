@@ -373,6 +373,7 @@ fn is_allowed_test_package(package: &str) -> bool {
         package,
         "stab-algebra"
             | "stab-bits"
+            | "stab-model"
             | "stab-records"
             | "stab-core"
             | "stab-cli"

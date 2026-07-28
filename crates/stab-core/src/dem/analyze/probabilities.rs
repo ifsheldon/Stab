@@ -37,5 +37,7 @@ pub(super) fn merge_disjoint_probability<K: Ord>(
 }
 
 pub(super) fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
-    Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
+    Ok(Probability::try_new(
+        left.get() + right.get() - 2.0 * left.get() * right.get(),
+    )?)
 }

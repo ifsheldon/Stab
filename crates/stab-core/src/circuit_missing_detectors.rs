@@ -1090,11 +1090,13 @@ fn relative_offset(index: usize, total: usize) -> CircuitResult<MeasureRecordOff
             "relative detector offset overflowed during missing-detector output",
         )
     })?;
-    MeasureRecordOffset::try_new(i32::try_from(offset).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
-            "relative detector offset {offset} does not fit i32"
-        ))
-    })?)
+    Ok(MeasureRecordOffset::try_new(
+        i32::try_from(offset).map_err(|_| {
+            CircuitError::invalid_detector_error_model(format!(
+                "relative detector offset {offset} does not fit i32"
+            ))
+        })?,
+    )?)
 }
 
 #[cfg(test)]

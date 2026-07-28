@@ -218,7 +218,7 @@ fn cq2_circuit_api_typed_ids_enforce_value_boundaries() {
     assert!(zero < largest);
     assert_eq!(
         QubitId::new(1 << 24),
-        Err(CircuitError::InvalidDomainValue {
+        Err(stab_core::ModelError::InvalidDomainValue {
             kind: "qubit id",
             value: (1 << 24).to_string(),
         })
@@ -245,7 +245,7 @@ fn cq2_circuit_api_typed_ids_enforce_value_boundaries() {
 
     assert_eq!(
         RepeatCount::try_new(0),
-        Err(CircuitError::InvalidDomainValue {
+        Err(stab_core::ModelError::InvalidDomainValue {
             kind: "repeat count",
             value: "0".to_string(),
         })

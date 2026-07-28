@@ -205,6 +205,7 @@ impl<'a> Parser<'a> {
         }
         let count = parse_repeat_count(line_number, count_token)?;
         let repeat_count = RepeatCount::try_new(count).map_err(|error| {
+            let error = CircuitError::from(error);
             validation_error(
                 ModelDialect::StimCircuit,
                 line_number,
@@ -650,6 +651,7 @@ fn parse_targets(
             .slice(start, cursor)
             .ok_or_else(|| CircuitError::parse_line(line_number, "invalid target"))?;
         parse_target_token_into(token.text(), &mut values).map_err(|error| {
+            let error = CircuitError::from(error);
             let code = target_parse_error_code(&error);
             validation_error(
                 ModelDialect::StimCircuit,

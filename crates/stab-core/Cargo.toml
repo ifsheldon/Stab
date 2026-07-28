@@ -23,6 +23,7 @@ sha2 = { workspace = true }
 smallvec = { workspace = true }
 stab-bits = { workspace = true }
 stab-algebra = { workspace = true }
+stab-model = { workspace = true }
 stab-records = { workspace = true }
 thiserror = { workspace = true }
 

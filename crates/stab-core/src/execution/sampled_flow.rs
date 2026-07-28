@@ -375,7 +375,7 @@ fn qubit_id_from_index(index: usize, context: &'static str) -> CircuitResult<Qub
     let index = u32::try_from(index).map_err(|_| {
         CircuitError::invalid_detector_error_model(format!("{context} index {index} exceeds u32"))
     })?;
-    QubitId::new(index)
+    Ok(QubitId::new(index)?)
 }
 
 fn sampled_flow_seed(seed: Option<u64>, flow_index: usize) -> Option<u64> {

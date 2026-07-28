@@ -16,14 +16,25 @@ pub(super) fn extract(root: &RepoRoot) -> Result<ExtractedApis, InventoryError> 
     let mut algebra = generate_rustdoc_inventory(&root.path, "stab-algebra", "stab_algebra")?;
     let mut external_aliases =
         resolve_external_reexports(&mut algebra, std::slice::from_ref(&bits))?;
+    let mut model = generate_rustdoc_inventory(&root.path, "stab-model", "stab_model")?;
+    external_aliases.extend(resolve_external_reexports(
+        &mut model,
+        std::slice::from_ref(&algebra),
+    )?);
     let mut facade = generate_rustdoc_inventory(&root.path, "stab-core", "stab_core")?;
     external_aliases.extend(resolve_external_reexports(
         &mut facade,
-        &[bits.clone(), records.clone(), algebra.clone()],
+        &[
+            bits.clone(),
+            records.clone(),
+            algebra.clone(),
+            model.clone(),
+        ],
     )?);
     if facade.format_version != bits.format_version
         || facade.format_version != records.format_version
         || facade.format_version != algebra.format_version
+        || facade.format_version != model.format_version
     {
         return Err(PublicApiError::InvalidField("rustdoc format version mismatch").into());
     }
@@ -31,6 +42,7 @@ pub(super) fn extract(root: &RepoRoot) -> Result<ExtractedApis, InventoryError> 
     facade.items.extend(bits.items);
     facade.items.extend(records.items);
     facade.items.extend(algebra.items);
+    facade.items.extend(model.items);
     let cli = generate_rustdoc_inventory(&root.path, "stab-cli", "stab_cli")?;
     if facade.format_version != cli.format_version {
         return Err(PublicApiError::InvalidField("rustdoc format version mismatch").into());

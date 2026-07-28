@@ -271,6 +271,15 @@ pub(super) fn classify_upstream_path(path: &Path) -> UpstreamClassification {
     classify_upstream_case(path, "")
 }
 
+fn api_path_mentions_item(api_path: &str, item: &str) -> bool {
+    api_path.split("::").any(|segment| {
+        segment == item
+            || segment
+                .strip_prefix(item)
+                .is_some_and(|suffix| suffix.starts_with(" as "))
+    })
+}
+
 pub(super) fn classify_public_api_source(
     crate_name: &str,
     source_path: &Path,
@@ -416,8 +425,41 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::Search);
     }
+    if api_path_mentions_item(&api_lower, "demrepeatcount")
+        || api_path_mentions_item(&api_lower, "demobservableid")
+    {
+        return Some(FeatureId::DemFormat);
+    }
+    if api_path_mentions_item(&api_lower, "probability") {
+        return Some(FeatureId::Sampling);
+    }
+    if api_path_mentions_item(&api_lower, "measurerecordoffset") {
+        return Some(FeatureId::StimFormat);
+    }
+    if [
+        "circuitdetectorid",
+        "modelerror",
+        "modelresult",
+        "observableid",
+        "qubitid",
+        "repeatcount",
+    ]
+    .iter()
+    .any(|marker| api_path_mentions_item(&api_lower, marker))
+    {
+        return Some(FeatureId::CircuitApi);
+    }
+    if ["pauli", "target"]
+        .iter()
+        .any(|name| api_path_mentions_item(&api_lower, name))
+    {
+        return Some(FeatureId::GateContract);
+    }
 
-    if value == "crates/stab-core/src/ids.rs" {
+    if matches!(
+        value.as_str(),
+        "crates/stab-core/src/ids.rs" | "crates/stab-model/src/ids.rs"
+    ) {
         if api_lower.contains("demrepeatcount") {
             return Some(FeatureId::DemFormat);
         } else if api_lower.contains("probability") {
@@ -437,6 +479,12 @@ pub(super) fn classify_public_api_source(
     }
     if value.starts_with("crates/stab-records/src/") || api_lower.starts_with("stab_records::") {
         return Some(FeatureId::ResultFormats);
+    }
+    if matches!(
+        value.as_str(),
+        "crates/stab-model/src/lib.rs" | "crates/stab-model/src/error.rs"
+    ) {
+        return Some(FeatureId::CircuitApi);
     }
     if value.starts_with("crates/stab-core/src/circuit_generation") {
         return Some(FeatureId::Generation);
@@ -481,7 +529,12 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::Detection);
     }
-    if value.starts_with("crates/stab-core/src/gate") || value == "crates/stab-core/src/target.rs" {
+    if value.starts_with("crates/stab-core/src/gate")
+        || matches!(
+            value.as_str(),
+            "crates/stab-core/src/target.rs" | "crates/stab-model/src/target.rs"
+        )
+    {
         return Some(FeatureId::GateContract);
     }
     if value.starts_with("crates/stab-algebra/src/")

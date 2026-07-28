@@ -807,7 +807,11 @@ fn qubit_targets(targets: &[u32]) -> CircuitResult<Vec<Target>> {
     targets
         .iter()
         .copied()
-        .map(|target| QubitId::new(target).map(|id| Target::qubit(id, false)))
+        .map(|target| {
+            QubitId::new(target)
+                .map(|id| Target::qubit(id, false))
+                .map_err(CircuitError::from)
+        })
         .collect()
 }
 

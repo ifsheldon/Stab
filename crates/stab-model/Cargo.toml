@@ -1,0 +1,16 @@
+[package]
+name = "stab-model"
+version.workspace = true
+edition.workspace = true
+description = "Stable typed Stim circuit and detector-error-model values for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+smallvec = { workspace = true }
+stab-algebra = { workspace = true }
+thiserror = { workspace = true }

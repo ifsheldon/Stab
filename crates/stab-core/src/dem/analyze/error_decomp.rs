@@ -52,9 +52,9 @@ pub fn independent_to_disjoint_xyz_errors(
 ) -> CircuitResult<DisjointPauliProbabilities> {
     let [x, y, z] = independent_to_disjoint_xyz_raw(x.get(), y.get(), z.get());
     Ok(DisjointPauliProbabilities {
-        x: Probability::from_valid_probability(x),
-        y: Probability::from_valid_probability(y),
-        z: Probability::from_valid_probability(z),
+        x: stab_model::advanced::probability_from_valid(x),
+        y: stab_model::advanced::probability_from_valid(y),
+        z: stab_model::advanced::probability_from_valid(z),
     })
 }
 
@@ -70,9 +70,9 @@ pub fn try_disjoint_to_independent_xyz_errors(
     match solve_disjoint_to_independent_xyz_exact(x, y, z) {
         Some(ExactXyzSolution::Solved([x, y, z])) => {
             return Ok(Some(IndependentPauliProbabilities {
-                x: Probability::from_valid_probability(x),
-                y: Probability::from_valid_probability(y),
-                z: Probability::from_valid_probability(z),
+                x: stab_model::advanced::probability_from_valid(x),
+                y: stab_model::advanced::probability_from_valid(y),
+                z: stab_model::advanced::probability_from_valid(z),
             }));
         }
         Some(ExactXyzSolution::Impossible) => return Ok(None),
@@ -84,9 +84,9 @@ pub fn try_disjoint_to_independent_xyz_errors(
     let [x, y, z] = solution.probabilities;
     if solution.proven_probability_bounds {
         Ok(Some(IndependentPauliProbabilities {
-            x: Probability::from_valid_probability(x),
-            y: Probability::from_valid_probability(y),
-            z: Probability::from_valid_probability(z),
+            x: stab_model::advanced::probability_from_valid(x),
+            y: stab_model::advanced::probability_from_valid(y),
+            z: stab_model::advanced::probability_from_valid(z),
         }))
     } else {
         Ok(Some(IndependentPauliProbabilities {
@@ -242,7 +242,9 @@ pub(super) fn depolarize1_independent_channel_probability(
             "cannot analyze over-mixing DEPOLARIZE1 probability above 3/4",
         ));
     }
-    Probability::try_new(0.5 - 0.5 * (1.0 - (4.0 * probability.get()) / 3.0).sqrt())
+    Ok(Probability::try_new(
+        0.5 - 0.5 * (1.0 - (4.0 * probability.get()) / 3.0).sqrt(),
+    )?)
 }
 
 pub(super) fn depolarize2_independent_channel_probability(
@@ -253,7 +255,9 @@ pub(super) fn depolarize2_independent_channel_probability(
             "cannot analyze over-mixing DEPOLARIZE2 probability above 15/16",
         ));
     }
-    Probability::try_new(0.5 - 0.5 * (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125))
+    Ok(Probability::try_new(
+        0.5 - 0.5 * (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125),
+    )?)
 }
 
 pub(super) fn pauli_channel2_components(

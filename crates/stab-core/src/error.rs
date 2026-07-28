@@ -1,4 +1,5 @@
 use crate::{FormatError, ParseError, ResourceLimitError};
+pub use stab_model::{ModelError, ModelResult};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -66,6 +67,35 @@ pub enum CircuitError {
 
     #[error("unexpected repeat block terminator")]
     UnexpectedRepeatTerminator,
+}
+
+impl From<stab_model::ModelError> for CircuitError {
+    fn from(error: stab_model::ModelError) -> Self {
+        match error {
+            stab_model::ModelError::UnknownGate(gate) => Self::UnknownGate(gate),
+            stab_model::ModelError::InvalidDomainValue { kind, value } => {
+                Self::InvalidDomainValue { kind, value }
+            }
+            stab_model::ModelError::InvalidArgumentCount {
+                gate,
+                expected,
+                actual,
+            } => Self::InvalidArgumentCount {
+                gate,
+                expected,
+                actual,
+            },
+            stab_model::ModelError::InvalidArgument { gate, argument } => {
+                Self::InvalidArgument { gate, argument }
+            }
+            stab_model::ModelError::InvalidTarget { gate, target } => {
+                Self::InvalidTarget { gate, target }
+            }
+            stab_model::ModelError::InvalidTargetCount { gate, count } => {
+                Self::InvalidTargetCount { gate, count }
+            }
+        }
+    }
 }
 
 impl CircuitError {

@@ -105,7 +105,7 @@ impl PendingSingleQubitPauliChannel {
             AnalyzerBasis::Y => self.x_probability.get() + self.z_probability.get(),
             AnalyzerBasis::Z => self.x_probability.get() + self.y_probability.get(),
         };
-        Probability::try_new(probability)
+        Ok(Probability::try_new(probability)?)
     }
 }
 

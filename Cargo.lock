@@ -2241,7 +2241,17 @@ dependencies = [
  "stab-algebra",
  "stab-bits",
  "stab-compat-corpus",
+ "stab-model",
  "stab-records",
+ "thiserror",
+]
+
+[[package]]
+name = "stab-model"
+version = "0.1.1"
+dependencies = [
+ "smallvec",
+ "stab-algebra",
  "thiserror",
 ]
 

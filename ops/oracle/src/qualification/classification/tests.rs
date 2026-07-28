@@ -131,6 +131,30 @@ fn classifications_distinguish_selected_execution_domains() {
     );
     assert_eq!(
         classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/ids.rs"),
+            "stab_model::ObservableId",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/lib.rs"),
+            "stab_core::stab_core::DemObservableId",
+        ),
+        Some(FeatureId::DemFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/target.rs"),
+            "stab_model::Target::measurement_record",
+        ),
+        Some(FeatureId::GateContract)
+    );
+    assert_eq!(
+        classify_public_api_source(
             "stab_core",
             Path::new("crates/stab-core/src/diagnostics.rs"),
             "stab_core::FormatError",

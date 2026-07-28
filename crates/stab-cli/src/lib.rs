@@ -660,7 +660,7 @@ fn parse_color_task(task: &str) -> Result<ColorCodeTask, CliError> {
 }
 
 fn probability_arg(value: f64) -> CircuitResult<Probability> {
-    Probability::try_new(value)
+    Ok(Probability::try_new(value)?)
 }
 
 fn write_probability_header(out: &mut String, name: &str, value: Probability) {
