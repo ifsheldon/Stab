@@ -155,25 +155,46 @@ impl PendingIo {
         inputs: impl IntoIterator<Item = (FileRole, Option<&'input Path>)>,
         outputs: impl IntoIterator<Item = (FileRole, Option<&'output Path>)>,
     ) -> Result<Self, CliError> {
+        Self::preflight_inputs(inputs)?.with_outputs(outputs)
+    }
+
+    pub(crate) fn preflight_inputs<'input>(
+        inputs: impl IntoIterator<Item = (FileRole, Option<&'input Path>)>,
+    ) -> Result<Self, CliError> {
         let inputs = inputs
             .into_iter()
             .filter_map(|(role, path)| path.map(|path| (role, path)))
             .map(|(role, path)| open_input(role, path))
             .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            inputs,
+            outputs: Vec::new(),
+        })
+    }
+
+    pub(crate) fn with_outputs<'output>(
+        mut self,
+        outputs: impl IntoIterator<Item = (FileRole, Option<&'output Path>)>,
+    ) -> Result<Self, CliError> {
         let outputs = outputs
             .into_iter()
             .filter_map(|(role, path)| path.map(|path| (role, path)))
             .map(|(role, path)| open_output(role, path))
             .collect::<Result<Vec<_>, _>>()?;
 
-        reject_input_output_aliases(&inputs, &outputs)?;
+        reject_input_output_aliases(&self.inputs, &outputs)?;
         reject_output_aliases(&outputs)?;
-        Ok(Self { inputs, outputs })
+        self.outputs = outputs;
+        Ok(self)
     }
 
     pub(crate) fn take_input(&mut self, role: FileRole) -> Option<InputFile> {
         let index = self.inputs.iter().position(|input| input.role == role)?;
         Some(self.inputs.remove(index))
+    }
+
+    pub(crate) fn input_mut(&mut self, role: FileRole) -> Option<&mut InputFile> {
+        self.inputs.iter_mut().find(|input| input.role == role)
     }
 
     pub(crate) fn activate(mut self) -> Result<ActiveOutputs, CliError> {
@@ -334,4 +355,40 @@ fn reject_output_aliases(outputs: &[PendingOutput]) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::{FileRole, PendingIo};
+    use crate::CliError;
+
+    #[test]
+    fn delayed_output_open_rechecks_retained_input_identity() {
+        let dir = tempdir().expect("tempdir");
+        let input_path = dir.path().join("input.dem");
+        let output_path = dir.path().join("output.01");
+        std::fs::write(&input_path, b"sentinel\n").expect("write input");
+        let io = PendingIo::preflight_inputs([(FileRole::Input, Some(input_path.as_path()))])
+            .expect("retain input identity");
+
+        std::fs::hard_link(&input_path, &output_path)
+            .expect("replace delayed output path with input hardlink");
+        let error = io
+            .with_outputs([(FileRole::Output, Some(output_path.as_path()))])
+            .expect_err("delayed identity comparison must reject the new alias");
+
+        assert!(matches!(
+            error,
+            CliError::ConflictingFileRoles {
+                first: "--in",
+                second: "--out"
+            }
+        ));
+        assert_eq!(
+            std::fs::read(input_path).expect("read preserved input"),
+            b"sentinel\n"
+        );
+    }
 }

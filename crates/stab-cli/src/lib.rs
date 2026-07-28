@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 mod agent;
 mod analyze_errors;
+mod batch_output;
 mod convert;
 mod detection;
 mod diagnostics;
@@ -250,17 +251,6 @@ impl SampleOutFormatArg {
             Self::Ptb64 => stab_core::RecordFormat::Ptb64,
             Self::Hits => stab_core::RecordFormat::Hits,
             Self::Dets => stab_core::RecordFormat::Dets,
-        }
-    }
-
-    fn sample_format(self) -> Result<SampleFormat, CliError> {
-        match self {
-            Self::ZeroOne => Ok(SampleFormat::ZeroOne),
-            Self::B8 => Ok(SampleFormat::B8),
-            Self::R8 => Ok(SampleFormat::R8),
-            Self::Hits => Ok(SampleFormat::Hits),
-            Self::Dets => Ok(SampleFormat::Dets),
-            Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
         }
     }
 

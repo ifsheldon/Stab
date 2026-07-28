@@ -3,20 +3,19 @@ use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
 use stab_core::{
-    CircuitError, CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
-    DetectorErrorModel, SampleFormat,
+    CircuitError, DemSampleBatchView, DemSampleSink, DetectionObservableOutputMode,
+    DetectorErrorModel, RandomPolicy, RecordFormat, SampleFormat, Seed, ShotCount,
+    execution::{DemSamplingCompiler, DemSamplingRunError},
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
     result_streaming::for_each_sparse_record,
 };
 
 use super::{
     CliError, SampleOutFormatArg,
+    batch_output::DemSampleBatchEncoder,
     input::{read_limited_input_file, read_limited_line, read_limited_stdin},
     io_plan::{FileRole, InputFile, PendingIo},
-    streaming::{
-        FileOutputSink, OutputSink, detection_record_bits, write_bits_record,
-        write_detection_record, write_observable_record, write_ptb64_group,
-    },
+    streaming::{FileOutputSink, OutputSink},
 };
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -39,6 +38,17 @@ enum SampleDemRecordFormatArg {
 }
 
 impl SampleDemRecordFormatArg {
+    const fn record_format(self) -> RecordFormat {
+        match self {
+            Self::ZeroOne => RecordFormat::ZeroOne,
+            Self::B8 => RecordFormat::B8,
+            Self::R8 => RecordFormat::R8,
+            Self::Ptb64 => RecordFormat::Ptb64,
+            Self::Hits => RecordFormat::Hits,
+            Self::Dets => RecordFormat::Dets,
+        }
+    }
+
     fn sample_format(self) -> Result<SampleFormat, CliError> {
         match self {
             Self::ZeroOne => Ok(SampleFormat::ZeroOne),
@@ -117,21 +127,22 @@ where
 {
     validate_observable_routing(&args)?;
     validate_ptb64_routing(&args)?;
-    let mut io = PendingIo::preflight(
-        [
-            (FileRole::Input, args.input.as_deref()),
-            (
-                FileRole::ReplayErrorInput,
-                args.replay_error_input.as_deref(),
-            ),
-        ],
-        [
-            (FileRole::Output, args.output.as_deref()),
-            (FileRole::ObservableOutput, args.obs_output.as_deref()),
-            (FileRole::ErrorOutput, args.error_output.as_deref()),
-        ],
-    )?;
+    let input_roles = [
+        (FileRole::Input, args.input.as_deref()),
+        (
+            FileRole::ReplayErrorInput,
+            args.replay_error_input.as_deref(),
+        ),
+    ];
+    let output_roles = [
+        (FileRole::Output, args.output.as_deref()),
+        (FileRole::ObservableOutput, args.obs_output.as_deref()),
+        (FileRole::ErrorOutput, args.error_output.as_deref()),
+    ];
+    PendingIo::reject_aliases_without_opening(input_roles, output_roles)?;
+    let mut io = PendingIo::preflight_inputs(input_roles)?;
     if args.shots == 0 {
+        let io = io.with_outputs(output_roles)?;
         let mut outputs = io.activate()?;
         let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
         primary_output.write_with(|writer| writer.write_all(&[]))?;
@@ -143,91 +154,149 @@ where
         }
         return Ok(());
     }
-    let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(
-            &mut input_file,
-            MAX_SAMPLE_DEM_INPUT_BYTES,
-            "sample_dem input",
-        )?
+    let input_bytes = if let Some(input_file) = io.input_mut(FileRole::Input) {
+        read_limited_input_file(input_file, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
     } else {
         read_limited_stdin(input, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
     };
     let dem = parse_dem_bytes(&input_bytes)?;
-    let sampler = CompiledDemSampler::compile(&dem)?;
-    let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
-    if let Some(replay_input) = replay_input.as_mut() {
-        sampler.validate_replay_work_units(args.shots)?;
+    let plan = DemSamplingCompiler::new().compile(&dem)?;
+    let shots = dem_shot_count(args.shots)?;
+    if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
+        plan.validate_replay(shots)?;
         validate_replay_prefix(
             replay_input,
             args.replay_err_in_format,
-            sampler.error_count(),
+            plan.error_count(),
             args.shots,
         )?;
     }
     let observable_mode = observable_output_mode(&args);
-    let stream_formats = SampleDemStreamFormats::from_args(&args, observable_mode);
+    let encoder = DemSampleBatchEncoder::try_new(
+        plan.detector_count(),
+        plan.observable_count(),
+        plan.error_count(),
+        observable_mode,
+        args.out_format.record_format(),
+        args.obs_output
+            .as_ref()
+            .map(|_| args.obs_out_format.record_format()),
+        args.error_output
+            .as_ref()
+            .map(|_| args.err_out_format.record_format()),
+    )?;
+    let mut session = plan
+        .session(dem_random_policy(args.seed))
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+    let mut io = io.with_outputs(output_roles)?;
+    let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
     let mut outputs = io.activate()?;
-    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    let mut observable_output = outputs
+    let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let observable = outputs
         .take(FileRole::ObservableOutput)
         .map(FileOutputSink::from_output);
-    let mut error_output = outputs
+    let sampled_errors = outputs
         .take(FileRole::ErrorOutput)
         .map(FileOutputSink::from_output);
-    let mut stream_state = SampleDemStreamState::default();
+    let mut sink = SampleDemBatchSink {
+        primary,
+        observable,
+        sampled_errors,
+        encoder,
+    };
     if let Some(replay_input) = replay_input.as_mut() {
+        let mut replay_record = Vec::new();
+        replay_record
+            .try_reserve_exact(plan.error_count())
+            .map_err(|error| {
+                invalid_result_format(format!(
+                    "sample_dem replay record could not reserve {} bits: {error}",
+                    plan.error_count()
+                ))
+            })?;
+        let mut replay = session
+            .start_replay(shots, &mut sink)
+            .map_err(map_dem_run_error)?;
         for_each_replay_error_record(
             replay_input,
             args.replay_err_in_format,
-            sampler.error_count(),
+            plan.error_count(),
             args.shots,
             |error_record| {
-                sampler.try_for_each_detection_event_from_error_records(
-                    std::iter::once(error_record),
-                    |record, replayed_error_record| {
-                        write_sample_dem_stream_record(
-                            record,
-                            Some(replayed_error_record),
-                            stream_formats,
-                            &mut primary_output,
-                            observable_output.as_mut(),
-                            error_output.as_mut(),
-                            &mut stream_state,
-                        )
-                    },
-                )
+                replay_record.clear();
+                replay_record.extend_from_slice(error_record);
+                replay
+                    .write_batch(std::slice::from_ref(&replay_record))
+                    .map(|_| ())
+                    .map_err(map_dem_run_error)
             },
         )?;
+        replay.finish().map(|_| ()).map_err(map_dem_run_error)
     } else if args.error_output.is_some() {
-        sampler.try_for_each_detection_event_and_error_with_seed(
-            args.shots,
-            args.seed,
-            |record, error_record| {
-                write_sample_dem_stream_record(
-                    record,
-                    Some(error_record),
-                    stream_formats,
-                    &mut primary_output,
-                    observable_output.as_mut(),
-                    error_output.as_mut(),
-                    &mut stream_state,
-                )
-            },
-        )?;
+        session
+            .run_with_sampled_errors(shots, &mut sink)
+            .map(|_| ())
+            .map_err(map_dem_run_error)
     } else {
-        sampler.try_for_each_detection_event_with_seed(args.shots, args.seed, |record| {
-            write_sample_dem_stream_record(
-                record,
-                None,
-                stream_formats,
-                &mut primary_output,
-                observable_output.as_mut(),
-                error_output.as_mut(),
-                &mut stream_state,
-            )
-        })?;
+        session
+            .run(shots, &mut sink)
+            .map(|_| ())
+            .map_err(map_dem_run_error)
     }
-    stream_state.finish()
+}
+
+struct SampleDemBatchSink<'a, W>
+where
+    W: Write,
+{
+    primary: OutputSink<'a, W>,
+    observable: Option<FileOutputSink>,
+    sampled_errors: Option<FileOutputSink>,
+    encoder: DemSampleBatchEncoder,
+}
+
+impl<W> DemSampleSink for SampleDemBatchSink<'_, W>
+where
+    W: Write,
+{
+    type Error = CliError;
+
+    fn write_batch(&mut self, batch: DemSampleBatchView<'_>) -> Result<(), Self::Error> {
+        self.encoder.write_batch(
+            batch,
+            &mut self.primary,
+            self.observable.as_mut(),
+            self.sampled_errors.as_mut(),
+        )
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        self.encoder.finish(
+            &mut self.primary,
+            self.observable.as_mut(),
+            self.sampled_errors.as_mut(),
+        )
+    }
+}
+
+fn map_dem_run_error(error: DemSamplingRunError<CliError>) -> CliError {
+    match error {
+        DemSamplingRunError::Engine { source, .. } => CliError::from(source.into_circuit_error()),
+        DemSamplingRunError::Sink { source, .. } => source,
+    }
+}
+
+fn dem_shot_count(shots: usize) -> Result<ShotCount, CliError> {
+    u64::try_from(shots)
+        .map(ShotCount::new)
+        .map_err(|_| CliError::MeasurementCountOverflow)
+}
+
+fn dem_random_policy(seed: Option<u64>) -> RandomPolicy {
+    match seed {
+        Some(seed) => RandomPolicy::Seeded(Seed::new(seed)),
+        None => RandomPolicy::Entropy,
+    }
 }
 
 fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
@@ -647,184 +716,6 @@ fn read_r8_replay_record(
         *bit = true;
         bit_index += 1;
     }
-}
-
-#[derive(Default)]
-struct SampleDemStreamState {
-    primary_ptb64_records: Vec<Vec<bool>>,
-    observable_ptb64_records: Vec<Vec<bool>>,
-    error_ptb64_records: Vec<Vec<bool>>,
-}
-
-impl SampleDemStreamState {
-    fn finish(self) -> Result<(), CliError> {
-        if self.primary_ptb64_records.is_empty()
-            && self.observable_ptb64_records.is_empty()
-            && self.error_ptb64_records.is_empty()
-        {
-            return Ok(());
-        }
-        Err(invalid_result_format(
-            "internal ptb64 stream ended with an incomplete 64-record group",
-        ))
-    }
-}
-
-#[derive(Clone, Copy)]
-struct SampleDemStreamFormats {
-    observable_mode: DetectionObservableOutputMode,
-    out_format: SampleOutFormatArg,
-    obs_out_format: SampleDemRecordFormatArg,
-    err_out_format: SampleDemRecordFormatArg,
-}
-
-impl SampleDemStreamFormats {
-    fn from_args(args: &SampleDemArgs, observable_mode: DetectionObservableOutputMode) -> Self {
-        Self {
-            observable_mode,
-            out_format: args.out_format,
-            obs_out_format: args.obs_out_format,
-            err_out_format: args.err_out_format,
-        }
-    }
-}
-
-fn write_sample_dem_stream_record<W>(
-    record: &DetectionEventRecord,
-    error_record: Option<&[bool]>,
-    formats: SampleDemStreamFormats,
-    primary_output: &mut OutputSink<'_, W>,
-    observable_output: Option<&mut FileOutputSink>,
-    error_output: Option<&mut FileOutputSink>,
-    state: &mut SampleDemStreamState,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    write_primary_detection_stream_record(
-        record,
-        formats.observable_mode,
-        formats.out_format,
-        primary_output,
-        &mut state.primary_ptb64_records,
-    )?;
-    if let Some(output) = observable_output {
-        write_observable_stream_record(
-            record,
-            formats.obs_out_format,
-            output,
-            &mut state.observable_ptb64_records,
-        )?;
-    }
-    if let (Some(output), Some(error_record)) = (error_output, error_record) {
-        write_error_stream_record(
-            error_record,
-            formats.err_out_format,
-            output,
-            &mut state.error_ptb64_records,
-        )?;
-    }
-    Ok(())
-}
-
-fn write_primary_detection_stream_record<W>(
-    record: &DetectionEventRecord,
-    observable_mode: DetectionObservableOutputMode,
-    format: SampleOutFormatArg,
-    output: &mut OutputSink<'_, W>,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    match format {
-        SampleOutFormatArg::Ptb64 => write_ptb64_stream_record(
-            detection_record_bits(record, observable_mode),
-            output,
-            ptb64_records,
-        ),
-        SampleOutFormatArg::ZeroOne
-        | SampleOutFormatArg::B8
-        | SampleOutFormatArg::R8
-        | SampleOutFormatArg::Hits
-        | SampleOutFormatArg::Dets => {
-            let sample_format = format.sample_format()?;
-            output.write_with(|writer| {
-                write_detection_record(record, observable_mode, sample_format, writer)
-            })
-        }
-    }
-}
-
-fn write_observable_stream_record(
-    record: &DetectionEventRecord,
-    format: SampleDemRecordFormatArg,
-    output: &mut FileOutputSink,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError> {
-    match format {
-        SampleDemRecordFormatArg::Ptb64 => {
-            write_ptb64_file_stream_record(record.observables.clone(), output, ptb64_records)
-        }
-        SampleDemRecordFormatArg::ZeroOne
-        | SampleDemRecordFormatArg::B8
-        | SampleDemRecordFormatArg::R8
-        | SampleDemRecordFormatArg::Hits
-        | SampleDemRecordFormatArg::Dets => {
-            let sample_format = format.sample_format()?;
-            output.write_with(|writer| write_observable_record(record, sample_format, writer))
-        }
-    }
-}
-
-fn write_error_stream_record(
-    error_record: &[bool],
-    format: SampleDemRecordFormatArg,
-    output: &mut FileOutputSink,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError> {
-    match format {
-        SampleDemRecordFormatArg::Ptb64 => {
-            write_ptb64_file_stream_record(error_record.to_vec(), output, ptb64_records)
-        }
-        SampleDemRecordFormatArg::ZeroOne
-        | SampleDemRecordFormatArg::B8
-        | SampleDemRecordFormatArg::R8
-        | SampleDemRecordFormatArg::Hits
-        | SampleDemRecordFormatArg::Dets => {
-            let sample_format = format.sample_format()?;
-            output.write_with(|writer| write_bits_record(error_record, sample_format, writer))
-        }
-    }
-}
-
-fn write_ptb64_stream_record<W>(
-    bits: Vec<bool>,
-    output: &mut OutputSink<'_, W>,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    ptb64_records.push(bits);
-    if ptb64_records.len() == 64 {
-        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
-        ptb64_records.clear();
-    }
-    Ok(())
-}
-
-fn write_ptb64_file_stream_record(
-    bits: Vec<bool>,
-    output: &mut FileOutputSink,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError> {
-    ptb64_records.push(bits);
-    if ptb64_records.len() == 64 {
-        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
-        ptb64_records.clear();
-    }
-    Ok(())
 }
 
 fn observable_output_mode(args: &SampleDemArgs) -> DetectionObservableOutputMode {

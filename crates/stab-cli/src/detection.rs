@@ -4,22 +4,23 @@ use std::path::PathBuf;
 
 use clap::Args;
 use stab_core::{
-    ByteSpan, CircuitError, CompiledDetectionConverter, DetectionConversionOptions,
-    DetectionEventRecord, DetectionObservableOutputMode, FormatError, FormatErrorCode,
-    circuit_with_inlined_feedback,
+    ByteSpan, CircuitError, DetectionBatchView, DetectionObservableOutputMode, DetectionSink,
+    FormatError, FormatErrorCode, MeasurementBatchView, PackedShotBatch, RandomPolicy,
+    ReferenceSampleMode, Seed, ShotCount, circuit_with_inlined_feedback,
+    execution::{
+        DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
+        MeasurementToDetectionSession,
+    },
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
-    try_for_each_sampled_detection_event,
 };
 
 use crate::{
     CliError, ErrorFormatArg, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
+    batch_output::DetectionBatchEncoder,
     input::{read_limited_input_file, read_limited_line, read_limited_stdin},
     io_plan::{FileRole, InputFile, PendingIo},
     parse_circuit_bytes,
-    streaming::{
-        FileOutputSink, OutputSink, detection_record_bits, write_detection_record,
-        write_observable_record, write_ptb64_group,
-    },
+    streaming::{FileOutputSink, OutputSink},
 };
 
 const MAX_M2D_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -160,21 +161,30 @@ where
     };
     let circuit = parse_circuit_bytes(&input_bytes)?;
     let observable_mode = detect_observable_output_mode(&args);
-    let mut outputs = DeferredDetectOutputs::new(io, stdout);
-    let mut state = DetectionStreamState::default();
-    try_for_each_sampled_detection_event(&circuit, args.shots, args.seed, |record| {
-        let (primary_output, observable_output) = outputs.activate()?;
-        write_detect_stream_record(
-            record,
-            observable_mode,
-            args.out_format,
-            args.obs_out_format,
-            primary_output,
-            observable_output,
-            &mut state,
-        )
-    })?;
-    state.finish()
+    let plan = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+    let encoder = DetectionBatchEncoder::try_new(
+        plan.detector_width().get(),
+        plan.observable_width().get(),
+        observable_mode,
+        args.out_format.record_format(),
+        args.obs_output
+            .as_ref()
+            .map(|_| detection_record_format(args.obs_out_format))
+            .transpose()?,
+    )?;
+    let mut sink = DeferredDetectionBatchSink {
+        outputs: DeferredDetectOutputs::new(io, stdout),
+        encoder,
+    };
+    let mut session = plan
+        .session(random_policy(args.seed))
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+    session
+        .run(shot_count(args.shots)?, &mut sink)
+        .map(|_| ())
+        .map_err(map_detection_run_error)
 }
 
 pub(crate) fn run_m2d<R, W>(args: M2dArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
@@ -213,33 +223,54 @@ where
     let measurement_input = open_m2d_input_or_stdin(io.take_input(FileRole::Input), input);
     let observable_mode = observable_output_mode(args.append_observables);
     let sweep_input = io.take_input(FileRole::Sweep).map(open_m2d_input);
-    let converter = CompiledDetectionConverter::compile(
-        &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: args.skip_reference_sample,
-        },
+    let plan = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
+        .compile(&circuit)
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+    let mut session = plan
+        .session()
+        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+    let encoder = DetectionBatchEncoder::try_new(
+        plan.detector_width().get(),
+        plan.observable_width().get(),
+        observable_mode,
+        detection_record_format(args.out_format)?,
+        args.obs_output
+            .as_ref()
+            .map(|_| detection_record_format(args.obs_out_format))
+            .transpose()?,
     )?;
-    let mut outputs = io.activate()?;
-    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    let mut observable_output = outputs
-        .take(FileRole::ObservableOutput)
-        .map(FileOutputSink::from_output);
     let mut measurements = M2dRecordStream::from_open_input(
         measurement_input,
         args.in_format,
-        converter.measurement_count(),
+        plan.measurement_width().get(),
         "m2d measurement input",
     );
     let mut sweeps = sweep_input.map(|sweep_input| {
         M2dRecordStream::from_open_input(
             sweep_input,
             args.sweep_format,
-            converter.sweep_bit_count(),
+            plan.sweep_width().get(),
             "m2d sweep input",
         )
     });
-    let mut reference_sample = converter.reusable_reference_sample();
-    let mut detection_record = converter.reusable_detection_record();
+    let mut measurement_batch = PackedShotBatch::zeros(1, plan.measurement_width().get())
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+    let mut sweep_batch = sweeps
+        .as_ref()
+        .map(|_| PackedShotBatch::zeros(1, plan.sweep_width().get()))
+        .transpose()
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+    let mut outputs = io.activate()?;
+    let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    let observable = outputs
+        .take(FileRole::ObservableOutput)
+        .map(FileOutputSink::from_output);
+    let mut sink = M2dBatchSink {
+        primary,
+        observable,
+        encoder,
+    };
     if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
@@ -249,27 +280,21 @@ where
                             "m2d measurement input has more records than sweep input",
                         ));
                     };
-                    converter.convert_record_with_sweep_into(
+                    write_m2d_record(
+                        &mut session,
+                        &mut sink,
+                        &mut measurement_batch,
                         &measurement_record,
-                        &sweep_record,
-                        &mut reference_sample,
-                        &mut detection_record,
-                    )?;
-                    write_m2d_stream_record(
-                        &detection_record,
-                        observable_mode,
-                        args.out_format,
-                        args.obs_out_format,
-                        &mut primary_output,
-                        observable_output.as_mut(),
+                        sweep_batch.as_mut(),
+                        Some(&sweep_record),
                     )?;
                 }
                 None => {
                     if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
-                        return Ok(());
+                        return finish_m2d(&mut session, &mut sink);
                     }
                     if sweeps.next_record()?.is_none() {
-                        return Ok(());
+                        return finish_m2d(&mut session, &mut sink);
                     }
                     return Err(invalid_result_format(
                         "m2d sweep input has more records than measurement input",
@@ -278,24 +303,147 @@ where
             }
         }
     }
-    let sweep_record = vec![false; converter.sweep_bit_count()];
     while let Some(measurement_record) = measurements.next_record()? {
-        converter.convert_record_with_sweep_into(
+        write_m2d_record(
+            &mut session,
+            &mut sink,
+            &mut measurement_batch,
             &measurement_record,
-            &sweep_record,
-            &mut reference_sample,
-            &mut detection_record,
-        )?;
-        write_m2d_stream_record(
-            &detection_record,
-            observable_mode,
-            args.out_format,
-            args.obs_out_format,
-            &mut primary_output,
-            observable_output.as_mut(),
+            None,
+            None,
         )?;
     }
-    Ok(())
+    finish_m2d(&mut session, &mut sink)
+}
+
+struct M2dBatchSink<'a, W>
+where
+    W: Write,
+{
+    primary: OutputSink<'a, W>,
+    observable: Option<FileOutputSink>,
+    encoder: DetectionBatchEncoder,
+}
+
+impl<W> DetectionSink for M2dBatchSink<'_, W>
+where
+    W: Write,
+{
+    type Error = CliError;
+
+    fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
+        self.encoder
+            .write_batch(batch, &mut self.primary, self.observable.as_mut())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        self.encoder
+            .finish(&mut self.primary, self.observable.as_mut())
+    }
+}
+
+struct DeferredDetectionBatchSink<'a, W>
+where
+    W: Write,
+{
+    outputs: DeferredDetectOutputs<'a, W>,
+    encoder: DetectionBatchEncoder,
+}
+
+impl<W> DetectionSink for DeferredDetectionBatchSink<'_, W>
+where
+    W: Write,
+{
+    type Error = CliError;
+
+    fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
+        let (primary, observable) = self.outputs.activate()?;
+        self.encoder.write_batch(batch, primary, observable)
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        let (primary, observable) = self.outputs.activate()?;
+        self.encoder.finish(primary, observable)
+    }
+}
+
+fn write_m2d_record<W>(
+    session: &mut MeasurementToDetectionSession,
+    sink: &mut M2dBatchSink<'_, W>,
+    measurement_batch: &mut PackedShotBatch,
+    measurement_record: &[bool],
+    sweep_batch: Option<&mut PackedShotBatch>,
+    sweep_record: Option<&[bool]>,
+) -> Result<(), CliError>
+where
+    W: Write,
+{
+    measurement_batch
+        .copy_shot_from_bools(0, measurement_record)
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+    let measurements = MeasurementBatchView::new(measurement_batch.view());
+    let sweeps = match (sweep_batch, sweep_record) {
+        (Some(batch), Some(record)) => {
+            batch
+                .copy_shot_from_bools(0, record)
+                .map_err(|error| CliError::from(CircuitError::from(error)))?;
+            Some(MeasurementBatchView::new(batch.view()))
+        }
+        (None, None) => None,
+        _ => {
+            return Err(CliError::IoPlanInvariant {
+                message: "m2d sweep batch and record presence disagree",
+            });
+        }
+    };
+    session
+        .write_batch(measurements, sweeps, sink)
+        .map(|_| ())
+        .map_err(map_detection_run_error)
+}
+
+fn finish_m2d<W>(
+    session: &mut MeasurementToDetectionSession,
+    sink: &mut M2dBatchSink<'_, W>,
+) -> Result<(), CliError>
+where
+    W: Write,
+{
+    session.finish(sink).map_err(map_detection_run_error)
+}
+
+fn map_detection_run_error(error: DetectionRunError<CliError>) -> CliError {
+    match error {
+        DetectionRunError::Engine { source, .. } => CliError::from(source.into_circuit_error()),
+        DetectionRunError::Sink { source, .. } => source,
+    }
+}
+
+fn random_policy(seed: Option<u64>) -> RandomPolicy {
+    match seed {
+        Some(seed) => RandomPolicy::Seeded(Seed::new(seed)),
+        None => RandomPolicy::Entropy,
+    }
+}
+
+fn shot_count(shots: usize) -> Result<ShotCount, CliError> {
+    u64::try_from(shots)
+        .map(ShotCount::new)
+        .map_err(|_| CliError::MeasurementCountOverflow)
+}
+
+fn reference_sample_mode(skip_reference_sample: bool) -> ReferenceSampleMode {
+    if skip_reference_sample {
+        ReferenceSampleMode::SkipReferenceSample
+    } else {
+        ReferenceSampleMode::UseReferenceSample
+    }
+}
+
+fn detection_record_format(format: RecordFormatArg) -> Result<stab_core::RecordFormat, CliError> {
+    format
+        .record_format()
+        .ok_or(CliError::UnsupportedDetectionFormat { format: "stim" })
 }
 
 fn validate_m2d_output_formats(args: &M2dArgs) -> Result<(), CliError> {
@@ -765,118 +913,4 @@ where
         };
         Ok((primary, observable.as_mut()))
     }
-}
-
-#[derive(Default)]
-struct DetectionStreamState {
-    primary_ptb64_records: Vec<Vec<bool>>,
-    observable_ptb64_records: Vec<Vec<bool>>,
-}
-
-impl DetectionStreamState {
-    fn finish(self) -> Result<(), CliError> {
-        if self.primary_ptb64_records.is_empty() && self.observable_ptb64_records.is_empty() {
-            return Ok(());
-        }
-        Err(invalid_result_format(
-            "internal ptb64 stream ended with an incomplete 64-record group",
-        ))
-    }
-}
-
-fn write_detect_stream_record<W>(
-    record: &DetectionEventRecord,
-    observable_mode: DetectionObservableOutputMode,
-    out_format: SampleOutFormatArg,
-    obs_format: RecordFormatArg,
-    primary_output: &mut OutputSink<'_, W>,
-    observable_output: Option<&mut FileOutputSink>,
-    state: &mut DetectionStreamState,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    match out_format {
-        SampleOutFormatArg::Ptb64 => write_ptb64_output_record(
-            detection_record_bits(record, observable_mode),
-            primary_output,
-            &mut state.primary_ptb64_records,
-        )?,
-        SampleOutFormatArg::ZeroOne
-        | SampleOutFormatArg::B8
-        | SampleOutFormatArg::R8
-        | SampleOutFormatArg::Hits
-        | SampleOutFormatArg::Dets => {
-            let sample_format = out_format.sample_format()?;
-            primary_output.write_with(|writer| {
-                write_detection_record(record, observable_mode, sample_format, writer)
-            })?;
-        }
-    }
-    if let Some(output) = observable_output {
-        match obs_format {
-            RecordFormatArg::Ptb64 => write_ptb64_file_output_record(
-                record.observables.clone(),
-                output,
-                &mut state.observable_ptb64_records,
-            )?,
-            _ => {
-                let sample_format = obs_format.sample_format()?;
-                output
-                    .write_with(|writer| write_observable_record(record, sample_format, writer))?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn write_m2d_stream_record<W>(
-    record: &DetectionEventRecord,
-    observable_mode: DetectionObservableOutputMode,
-    out_format: RecordFormatArg,
-    obs_format: RecordFormatArg,
-    primary_output: &mut OutputSink<'_, W>,
-    observable_output: Option<&mut FileOutputSink>,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let out_sample_format = out_format.sample_format()?;
-    primary_output.write_with(|writer| {
-        write_detection_record(record, observable_mode, out_sample_format, writer)
-    })?;
-    if let Some(output) = observable_output {
-        let obs_sample_format = obs_format.sample_format()?;
-        output.write_with(|writer| write_observable_record(record, obs_sample_format, writer))?;
-    }
-    Ok(())
-}
-
-fn write_ptb64_output_record<W>(
-    bits: Vec<bool>,
-    output: &mut OutputSink<'_, W>,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    ptb64_records.push(bits);
-    if ptb64_records.len() == 64 {
-        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
-        ptb64_records.clear();
-    }
-    Ok(())
-}
-
-fn write_ptb64_file_output_record(
-    bits: Vec<bool>,
-    output: &mut FileOutputSink,
-    ptb64_records: &mut Vec<Vec<bool>>,
-) -> Result<(), CliError> {
-    ptb64_records.push(bits);
-    if ptb64_records.len() == 64 {
-        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
-        ptb64_records.clear();
-    }
-    Ok(())
 }

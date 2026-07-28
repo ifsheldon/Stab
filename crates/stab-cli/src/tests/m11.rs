@@ -23,6 +23,24 @@ impl std::io::Write for FailingWriter {
     }
 }
 
+#[derive(Debug, Default)]
+struct CountingWriter {
+    bytes: usize,
+    nonempty_writes: usize,
+}
+
+impl std::io::Write for CountingWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.bytes += buffer.len();
+        self.nonempty_writes += usize::from(!buffer.is_empty());
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[test]
 fn sample_dem_deterministic_matches_m11_oracle_golden() {
     let mut stdout = Vec::new();
@@ -538,6 +556,74 @@ fn sample_dem_rejects_truncated_ptb64_replay_input() {
 }
 
 #[test]
+fn malformed_replay_prefix_does_not_create_or_truncate_outputs() {
+    let cases = [
+        ("01", 2usize, b"1\nx\n".to_vec()),
+        ("b8", 2usize, vec![1]),
+        ("ptb64", 64usize, ptb64_words(&[u64::MAX])),
+    ];
+    for (format, shots, replay_bytes) in cases {
+        for seed_outputs in [false, true] {
+            let dir = tempdir().expect("tempdir");
+            let replay_path = dir.path().join(format!("errors.{format}"));
+            let output_path = dir.path().join("detections.out");
+            let obs_path = dir.path().join("observables.out");
+            let err_path = dir.path().join("sampled-errors.out");
+            std::fs::write(&replay_path, replay_bytes.as_slice()).expect("write replay input");
+            if seed_outputs {
+                for path in [&output_path, &obs_path, &err_path] {
+                    std::fs::write(path, b"sentinel\n").expect("seed output");
+                }
+            }
+            let args = vec![
+                OsString::from("stab"),
+                OsString::from("sample_dem"),
+                OsString::from("--replay_err_in"),
+                replay_path.into_os_string(),
+                OsString::from("--replay_err_in_format"),
+                OsString::from(format),
+                OsString::from("--out"),
+                output_path.clone().into_os_string(),
+                OsString::from("--obs_out"),
+                obs_path.clone().into_os_string(),
+                OsString::from("--err_out"),
+                err_path.clone().into_os_string(),
+                OsString::from("--shots"),
+                OsString::from(shots.to_string()),
+            ];
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_from(
+                args,
+                b"error(0.25) D0 L0\nerror(0.25) D1\n".as_slice(),
+                &mut stdout,
+                &mut stderr,
+            );
+
+            assert_eq!(status, 1, "format={format}, seeded={seed_outputs}");
+            assert!(stdout.is_empty());
+            assert!(!stderr.is_empty());
+            for path in [&output_path, &obs_path, &err_path] {
+                if seed_outputs {
+                    assert_eq!(
+                        std::fs::read(path).expect("read preserved output"),
+                        b"sentinel\n",
+                        "format={format}, path={}",
+                        path.display()
+                    );
+                } else {
+                    assert!(
+                        !path.exists(),
+                        "format={format} created {} before replay validation",
+                        path.display()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn sample_dem_rejects_ptb64_shots_that_are_not_multiple_of_64() {
     let dir = tempdir().expect("tempdir");
     let output_path = dir.path().join("out.ptb64");
@@ -662,6 +748,72 @@ fn sample_dem_streams_huge_output_until_writer_failure() {
             .unwrap()
             .contains("failed to write output: intentional write stop")
     );
+}
+
+#[test]
+fn sample_dem_routes_4096_shots_through_every_supported_batch_format() {
+    const SHOTS: &str = "4096";
+    let dem = b"error(1) D0 L0\n".as_slice();
+    for format in ["01", "b8", "r8", "hits", "dets", "ptb64"] {
+        let mut stdout = CountingWriter::default();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "sample_dem",
+                "--shots",
+                SHOTS,
+                "--out_format",
+                format,
+            ],
+            dem,
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 0, "primary format={format}");
+        assert!(stderr.is_empty(), "primary format={format}");
+        assert!(stdout.bytes > 0, "primary format={format}");
+        assert!(
+            stdout.nonempty_writes > 1,
+            "primary format={format} did not cross a batch boundary"
+        );
+    }
+
+    for (role_flag, format_flag, stem) in [
+        ("--obs_out", "--obs_out_format", "observables"),
+        ("--err_out", "--err_out_format", "sampled-errors"),
+    ] {
+        for format in ["01", "b8", "r8", "hits", "dets", "ptb64"] {
+            let dir = tempdir().expect("tempdir");
+            let side_path = dir.path().join(format!("{stem}.{format}"));
+            let args = vec![
+                OsString::from("stab"),
+                OsString::from("sample_dem"),
+                OsString::from("--shots"),
+                OsString::from(SHOTS),
+                OsString::from("--out_format=01"),
+                OsString::from(role_flag),
+                side_path.clone().into_os_string(),
+                OsString::from(format_flag),
+                OsString::from(format),
+            ];
+            let mut stdout = CountingWriter::default();
+            let mut stderr = Vec::new();
+            let status = run_from(args, dem, &mut stdout, &mut stderr);
+
+            assert_eq!(status, 0, "{role_flag} format={format}");
+            assert!(stderr.is_empty(), "{role_flag} format={format}");
+            assert!(stdout.nonempty_writes > 1, "{role_flag} format={format}");
+            assert!(
+                std::fs::metadata(side_path)
+                    .expect("side output metadata")
+                    .len()
+                    > 0,
+                "{role_flag} format={format}"
+            );
+        }
+    }
 }
 
 #[test]

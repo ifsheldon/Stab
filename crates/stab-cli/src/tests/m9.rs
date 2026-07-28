@@ -4,6 +4,7 @@ use std::path::Path;
 use super::run_from;
 use tempfile::tempdir;
 
+mod batch_formats;
 mod path_io;
 mod pf7_cli;
 mod sweep;
@@ -507,6 +508,36 @@ fn m2d_basic_matches_m9_oracle_golden() {
         include_str!("../../../../oracle/fixtures/expected/m9_m2d_basic.stdout")
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_preserves_a_valid_prefix_before_a_later_malformed_record() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            concat!(
+                "--circuit=",
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../oracle/fixtures/inputs/m2d_basic.stim"
+            ),
+        ],
+        b"1\nx\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"shot D0\n");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("01 record contains non-bit byte")
+    );
 }
 
 #[test]
@@ -1057,36 +1088,6 @@ fn m2d_rejects_zero_width_ptb64_input() {
                 .contains("ptb64 input cannot infer a shot count for zero-width records")
         );
     }
-}
-
-#[test]
-fn m2d_streams_large_ptb64_input_until_writer_failure() {
-    let temp_dir = tempdir().expect("temp dir");
-    let circuit_path = temp_dir.path().join("input.stim");
-    std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
-
-    let mut stdout = FailingWriter;
-    let mut stderr = Vec::new();
-    let status = run_from(
-        [
-            "stab",
-            "m2d",
-            "--in_format=ptb64",
-            "--out_format=01",
-            "--circuit",
-            circuit_path.to_str().expect("utf-8 path"),
-        ],
-        vec![0; 125_008].as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 1);
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("failed to write output: intentional write stop")
-    );
 }
 
 #[test]
