@@ -1,15 +1,27 @@
 use crate::{
-    ByteSpan, CircuitError, CircuitResult, FormatErrorCode, FormatErrorContext,
+    ByteSpan, FormatError, FormatErrorCode, FormatErrorContext, RecordResult,
     result_formats::{DetsLayout, DetsResultType, DetsToken},
 };
+
+pub(crate) enum HitsEvent {
+    RecordStart,
+    Hit(u64),
+    RecordEnd,
+}
+
+pub(crate) enum DetsEvent {
+    RecordStart,
+    Token(DetsToken),
+    RecordEnd,
+}
 
 pub(crate) fn for_each_zero_one_line<F>(
     input: &[u8],
     bits_per_record: usize,
     mut visit: F,
-) -> CircuitResult<()>
+) -> RecordResult<()>
 where
-    F: FnMut(&[u8]) -> CircuitResult<()>,
+    F: FnMut(&[u8]) -> RecordResult<()>,
 {
     let mut offset = 0usize;
     while offset < input.len() {
@@ -61,7 +73,7 @@ where
         let end = offset;
         consume_required_newline(input, &mut offset, "01")?;
         let line = input.get(start..end).ok_or_else(|| {
-            CircuitError::invalid_result_format("01 record byte range was out of bounds")
+            FormatError::invalid_result_format("01 record byte range was out of bounds")
         })?;
         visit(line)?;
     }
@@ -72,16 +84,37 @@ pub(crate) fn for_each_hits<F>(
     input: &[u8],
     bits_per_record: usize,
     mut visit: F,
-) -> CircuitResult<()>
+) -> RecordResult<()>
 where
-    F: FnMut(&[u64]) -> CircuitResult<()>,
+    F: FnMut(&[u64]) -> RecordResult<()>,
+{
+    let mut hits = Vec::new();
+    for_each_hits_event(input, bits_per_record, |event| match event {
+        HitsEvent::RecordStart => {
+            hits.clear();
+            Ok(())
+        }
+        HitsEvent::Hit(index) => {
+            hits.push(index);
+            Ok(())
+        }
+        HitsEvent::RecordEnd => visit(&hits),
+    })
+}
+
+pub(crate) fn for_each_hits_event<F>(
+    input: &[u8],
+    bits_per_record: usize,
+    mut visit: F,
+) -> RecordResult<()>
+where
+    F: FnMut(HitsEvent) -> RecordResult<()>,
 {
     let mut offset = 0usize;
-    let mut hits = Vec::new();
     while offset < input.len() {
-        hits.clear();
+        visit(HitsEvent::RecordStart)?;
         if consume_empty_record_newline(input, &mut offset, "HITS")? {
-            visit(&hits)?;
+            visit(HitsEvent::RecordEnd)?;
             continue;
         }
 
@@ -89,14 +122,14 @@ where
             let parsed = parse_u64(input, &mut offset, "HITS index")?;
             let value = parsed.value;
             let index = usize::try_from(value).map_err(|_| {
-                CircuitError::invalid_result_format_diagnostic(
+                FormatError::invalid_result_format_diagnostic(
                     FormatErrorCode::IntegerOverflow,
                     format!("HITS index {value} does not fit usize"),
                     Some(parsed.span),
                 )
             })?;
             if index >= bits_per_record {
-                return Err(CircuitError::invalid_result_format_diagnostic_with_context(
+                return Err(FormatError::invalid_result_format_diagnostic_with_context(
                     FormatErrorCode::IndexOutOfRange,
                     format!("HITS index {value} exceeds record width {bits_per_record}"),
                     Some(parsed.span),
@@ -107,7 +140,7 @@ where
                     },
                 ));
             }
-            hits.push(value);
+            visit(HitsEvent::Hit(value))?;
 
             let delimiter = input.get(offset).copied().ok_or_else(|| {
                 invalid_at(
@@ -151,7 +184,7 @@ where
                 }
             }
         }
-        visit(&hits)?;
+        visit(HitsEvent::RecordEnd)?;
     }
     Ok(())
 }
@@ -160,12 +193,33 @@ pub(crate) fn for_each_dets_tokens<F>(
     input: &[u8],
     layout: DetsLayout,
     mut visit: F,
-) -> CircuitResult<()>
+) -> RecordResult<()>
 where
-    F: FnMut(&[DetsToken]) -> CircuitResult<()>,
+    F: FnMut(&[DetsToken]) -> RecordResult<()>,
+{
+    let mut tokens = Vec::new();
+    for_each_dets_event(input, layout, |event| match event {
+        DetsEvent::RecordStart => {
+            tokens.clear();
+            Ok(())
+        }
+        DetsEvent::Token(token) => {
+            tokens.push(token);
+            Ok(())
+        }
+        DetsEvent::RecordEnd => visit(&tokens),
+    })
+}
+
+pub(crate) fn for_each_dets_event<F>(
+    input: &[u8],
+    layout: DetsLayout,
+    mut visit: F,
+) -> RecordResult<()>
+where
+    F: FnMut(DetsEvent) -> RecordResult<()>,
 {
     let mut offset = 0usize;
-    let mut tokens = Vec::new();
     loop {
         while input
             .get(offset)
@@ -177,28 +231,28 @@ where
             return Ok(());
         }
         let prefix_end = offset.checked_add(4).ok_or_else(|| {
-            CircuitError::invalid_result_format("DETS prefix byte offset overflowed")
+            FormatError::invalid_result_format("DETS prefix byte offset overflowed")
         })?;
         if input.get(offset..prefix_end) != Some(b"shot".as_slice()) {
             let available = input.len().saturating_sub(offset).min(4);
-            return Err(CircuitError::invalid_result_format_diagnostic(
+            return Err(FormatError::invalid_result_format_diagnostic(
                 FormatErrorCode::InvalidPrefix,
                 "DETS data did not start with 'shot'",
                 ByteSpan::try_new(offset, available),
             ));
         }
         offset = prefix_end;
-        tokens.clear();
+        visit(DetsEvent::RecordStart)?;
 
         loop {
             let Some(mut next) = input.get(offset).copied() else {
-                visit(&tokens)?;
+                visit(DetsEvent::RecordEnd)?;
                 return Ok(());
             };
             if next == b'\r' {
                 offset += 1;
                 let Some(after_carriage_return) = input.get(offset).copied() else {
-                    visit(&tokens)?;
+                    visit(DetsEvent::RecordEnd)?;
                     return Ok(());
                 };
                 next = after_carriage_return;
@@ -227,7 +281,7 @@ where
                     let parsed = parse_u64(input, &mut offset, "DETS token index")?;
                     let value = parsed.value;
                     let index = usize::try_from(value).map_err(|_| {
-                        CircuitError::invalid_result_format_diagnostic(
+                        FormatError::invalid_result_format_diagnostic(
                             FormatErrorCode::IntegerOverflow,
                             format!("DETS index {value} does not fit usize"),
                             Some(parsed.span),
@@ -239,7 +293,7 @@ where
                         DetsResultType::Observable => layout.observables(),
                     };
                     if index >= namespace_width {
-                        return Err(CircuitError::invalid_result_format_diagnostic_with_context(
+                        return Err(FormatError::invalid_result_format_diagnostic_with_context(
                             FormatErrorCode::IndexOutOfRange,
                             format!(
                                 "DETS token {}{index} exceeds namespace width {namespace_width}",
@@ -254,7 +308,7 @@ where
                         ));
                     }
                     layout.resolve(result_type, index)?;
-                    tokens.push(DetsToken::new(result_type, index));
+                    visit(DetsEvent::Token(DetsToken::new(result_type, index)))?;
                 }
                 _ => {
                     return Err(invalid_at(
@@ -266,7 +320,7 @@ where
                 }
             }
         }
-        visit(&tokens)?;
+        visit(DetsEvent::RecordEnd)?;
     }
 }
 
@@ -274,7 +328,7 @@ fn consume_required_newline(
     input: &[u8],
     offset: &mut usize,
     format: &'static str,
-) -> CircuitResult<()> {
+) -> RecordResult<()> {
     match input.get(*offset).copied() {
         Some(b'\n') => {
             *offset += 1;
@@ -297,7 +351,7 @@ fn consume_empty_record_newline(
     input: &[u8],
     offset: &mut usize,
     format: &'static str,
-) -> CircuitResult<bool> {
+) -> RecordResult<bool> {
     match input.get(*offset).copied() {
         Some(b'\n') => {
             *offset += 1;
@@ -312,7 +366,7 @@ fn consume_empty_record_newline(
     }
 }
 
-fn require_lf(input: &[u8], offset: &mut usize, format: &'static str) -> CircuitResult<()> {
+fn require_lf(input: &[u8], offset: &mut usize, format: &'static str) -> RecordResult<()> {
     if input.get(*offset).copied() != Some(b'\n') {
         return Err(invalid_at(
             input,
@@ -330,7 +384,7 @@ struct ParsedU64 {
     span: ByteSpan,
 }
 
-fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> CircuitResult<ParsedU64> {
+fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> RecordResult<ParsedU64> {
     let start = *offset;
     let mut value = 0u64;
     while let Some(byte @ b'0'..=b'9') = input.get(*offset).copied() {
@@ -338,7 +392,7 @@ fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> CircuitRes
             .checked_mul(10)
             .and_then(|value| value.checked_add(u64::from(byte - b'0')))
         else {
-            return Err(CircuitError::invalid_result_format_diagnostic(
+            return Err(FormatError::invalid_result_format_diagnostic(
                 FormatErrorCode::IntegerOverflow,
                 format!("{kind} overflowed u64"),
                 ByteSpan::try_new(start, (*offset).saturating_sub(start).saturating_add(1)),
@@ -358,7 +412,7 @@ fn parse_u64(input: &[u8], offset: &mut usize, kind: &'static str) -> CircuitRes
     Ok(ParsedU64 {
         value,
         span: ByteSpan::try_new(start, *offset - start).ok_or_else(|| {
-            CircuitError::invalid_result_format("parsed integer byte span overflowed")
+            FormatError::invalid_result_format("parsed integer byte span overflowed")
         })?,
     })
 }
@@ -368,8 +422,8 @@ fn invalid_at(
     offset: usize,
     code: FormatErrorCode,
     message: impl Into<String>,
-) -> CircuitError {
-    CircuitError::invalid_result_format_diagnostic(
+) -> FormatError {
+    FormatError::invalid_result_format_diagnostic(
         code,
         message,
         ByteSpan::try_new(offset, usize::from(offset < input.len())),
@@ -382,8 +436,8 @@ fn invalid_at_with_context(
     code: FormatErrorCode,
     message: impl Into<String>,
     context: FormatErrorContext,
-) -> CircuitError {
-    CircuitError::invalid_result_format_diagnostic_with_context(
+) -> FormatError {
+    FormatError::invalid_result_format_diagnostic_with_context(
         code,
         message,
         ByteSpan::try_new(offset, usize::from(offset < input.len())),

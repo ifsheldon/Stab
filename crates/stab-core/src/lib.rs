@@ -35,9 +35,7 @@ mod parse_limits;
 mod probability_util;
 mod resources;
 pub mod result_formats;
-mod result_packed;
 pub mod result_streaming;
-mod result_text;
 mod sampling;
 mod source_text;
 mod sparse_rev_frame_tracker;
@@ -144,8 +142,12 @@ pub use resources::{
     Estimate, EstimateClass, ResourceEstimate, ResourceKind, ResourceLimitError, ResourceOperation,
 };
 pub use result_formats::{
-    CodecCapability, DetsLayout, DetsResultType, DetsToken, RecordEncoding, RecordFormat,
-    SampleFormat,
+    BitPlane64Batch, BitPlane64BatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,
+    DemSampleCodecSink, DemSampleEncodedRecords, DemSampleSink, DetectionBatchView,
+    DetectionCodecSink, DetectionSink, DetectorWidth, DetsLayout, DetsResultType, DetsToken,
+    EncodedSizeEstimate, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
+    MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
+    PackedShotBatchView, RecordEncoding, RecordFormat, SampleFormat, SampledErrorWidth,
 };
 pub use sampling::estimate_sampling_request;
 pub use stabilizers::{

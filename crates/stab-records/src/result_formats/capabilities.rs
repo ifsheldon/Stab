@@ -1,4 +1,4 @@
-use crate::Estimate;
+use crate::EncodedSizeEstimate as Estimate;
 
 /// Physical encoding used by a registered result-record codec.
 #[non_exhaustive]
@@ -90,7 +90,7 @@ impl RecordFormat {
     }
 }
 
-/// One result codec registration exposed through [`crate::CapabilitySet`].
+/// One result codec registration exposed through the codec registry.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CodecCapability {
     format: RecordFormat,
@@ -136,6 +136,6 @@ const CODECS: [CodecCapability; 6] = [
     CodecCapability::new(RecordFormat::Ptb64),
 ];
 
-pub(crate) const fn codec_capabilities() -> &'static [CodecCapability; 6] {
+pub const fn codec_capabilities() -> &'static [CodecCapability; 6] {
     &CODECS
 }

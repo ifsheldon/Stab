@@ -215,36 +215,32 @@ pub(super) fn apply(
 
         for owner in &spec.public_api_owners {
             validate_text("public API crate", &owner.crate_name)?;
-            let matches = evidence_cases
-                .iter()
-                .filter(|case| {
-                    case.provenance == EvidenceProvenance::PublicRustApi
-                        && case.feature_id == spec.feature_id
-                        && case.source_id == owner.owner_path.as_str()
-                })
-                .map(|case| case.id.clone())
-                .collect::<Vec<_>>();
-            let [old_owner] = matches.as_slice() else {
-                return invalid(format!(
-                    "qualification case {:?} public API owner {}::{} resolved {} evidence records",
-                    spec.id,
-                    owner.crate_name,
-                    owner.owner_path,
-                    matches.len()
-                ));
+            let Some(old_owner) = resolve_direct_public_api_owner(
+                "qualification case",
+                &owner.crate_name,
+                &owner.owner_path,
+                spec.feature_id,
+                &qualification_id,
+                public_api_items,
+                evidence_cases,
+            )?
+            else {
+                owner_count = owner_count.saturating_add(1);
+                continue;
             };
             claim_planned_evidence(
                 &spec.id,
                 spec.feature_id,
-                old_owner,
+                &old_owner,
                 EvidenceProvenance::PublicRustApi,
                 evidence_cases,
                 &mut claimed_evidence,
             )?;
             let mut mapped_items = 0usize;
-            for item in public_api_items.iter_mut().filter(|item| {
-                item.crate_name == owner.crate_name && item.owner_case_id == *old_owner
-            }) {
+            for item in public_api_items
+                .iter_mut()
+                .filter(|item| item.owner_case_id == old_owner)
+            {
                 item.owner_case_id = qualification_id.clone();
                 mapped_items = mapped_items.saturating_add(1);
             }
@@ -668,28 +664,22 @@ fn apply_existing_parent_mapping(
 
     for owner in &mapping.public_api_owners {
         validate_text("public API crate", &owner.crate_name)?;
-        let matches = evidence_cases
-            .iter()
-            .filter(|case| {
-                case.provenance == EvidenceProvenance::PublicRustApi
-                    && case.feature_id == mapping.feature_id
-                    && case.source_id == owner.owner_path.as_str()
-            })
-            .map(|case| case.id.clone())
-            .collect::<Vec<_>>();
-        let [old_owner] = matches.as_slice() else {
-            return invalid(format!(
-                "qualification mapping {:?} public API owner {}::{} resolved {} evidence records",
-                mapping.id,
-                owner.crate_name,
-                owner.owner_path,
-                matches.len()
-            ));
+        let Some(old_owner) = resolve_direct_public_api_owner(
+            "qualification mapping",
+            &owner.crate_name,
+            &owner.owner_path,
+            mapping.feature_id,
+            &parent_id,
+            public_api_items,
+            evidence_cases,
+        )?
+        else {
+            continue;
         };
         claim_planned_evidence(
             &mapping.id,
             mapping.feature_id,
-            old_owner,
+            &old_owner,
             EvidenceProvenance::PublicRustApi,
             evidence_cases,
             claimed_evidence,
@@ -697,7 +687,7 @@ fn apply_existing_parent_mapping(
         let mut mapped_items = 0usize;
         for item in public_api_items
             .iter_mut()
-            .filter(|item| item.crate_name == owner.crate_name && item.owner_case_id == *old_owner)
+            .filter(|item| item.owner_case_id == old_owner)
         {
             item.owner_case_id = parent_id.clone();
             mapped_items = mapped_items.saturating_add(1);
@@ -806,6 +796,9 @@ fn apply_public_api_aliases(
                 alias.canonical_owner_path,
                 canonical_feature.as_str()
             ));
+        }
+        if alias_owner == canonical_owner {
+            continue;
         }
 
         let alias_evidence = evidence_cases
@@ -932,6 +925,51 @@ fn exact_public_api_owner(
         ));
     };
     Ok((item.feature_id, item.owner_case_id.clone()))
+}
+
+fn resolve_direct_public_api_owner(
+    role: &str,
+    crate_name: &str,
+    owner_path: &ApiPath,
+    expected_feature: FeatureId,
+    target_owner: &CaseId,
+    public_api_items: &[PublicApiItem],
+    evidence_cases: &[EvidenceCase],
+) -> Result<Option<CaseId>, InventoryError> {
+    let (feature_id, owner_case_id) =
+        exact_public_api_owner(role, crate_name, owner_path, public_api_items)?;
+    if feature_id != expected_feature {
+        return invalid(format!(
+            "{role} public API owner {crate_name}::{owner_path} has feature {}, expected {}",
+            feature_id.as_str(),
+            expected_feature.as_str()
+        ));
+    }
+    if owner_case_id == *target_owner {
+        return Ok(None);
+    }
+    let matches = evidence_cases
+        .iter()
+        .filter(|case| case.id == owner_case_id)
+        .collect::<Vec<_>>();
+    let [evidence] = matches.as_slice() else {
+        return invalid(format!(
+            "{role} public API owner {crate_name}::{owner_path} resolved {} evidence records",
+            matches.len()
+        ));
+    };
+    if evidence.provenance != EvidenceProvenance::PublicRustApi
+        || evidence.feature_id != expected_feature
+    {
+        return invalid(format!(
+            "{role} public API owner {crate_name}::{owner_path} resolved incompatible evidence {}",
+            evidence.id
+        ));
+    }
+    if evidence.source_id != owner_path.as_str() {
+        return Ok(None);
+    }
+    Ok(Some(owner_case_id))
 }
 
 fn claim_planned_evidence(

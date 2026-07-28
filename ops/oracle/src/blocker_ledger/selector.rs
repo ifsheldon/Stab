@@ -249,7 +249,7 @@ impl<'a> CargoTestSelector<'a> {
         };
         if !matches!(
             package,
-            "stab-bits" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
+            "stab-bits" | "stab-records" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
         ) {
             return Err("uses a package outside the blocker-test allowlist");
         }
@@ -361,7 +361,7 @@ fn is_test_name(value: &str) -> bool {
 fn validate_package_and_test_name(package: &str, filter: Option<&str>) -> Result<(), &'static str> {
     if !matches!(
         package,
-        "stab-bits" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
+        "stab-bits" | "stab-records" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
     ) {
         return Err("uses a package outside the blocker-test allowlist");
     }

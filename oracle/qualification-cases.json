@@ -9206,6 +9206,10 @@
         },
         {
           "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::write_bit_plane_64_batch"
+        },
+        {
+          "crate_name": "stab_core",
           "owner_path": "stab_core::result_formats::write_ptb64_records_checked"
         },
         {
@@ -9955,7 +9959,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::measure_record_writer_matches_stim_byte_layouts",
           "--quiet",
           "--exact"
@@ -9983,7 +9987,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::measure_record_reader_round_trips_writer_output",
           "--quiet",
           "--exact"
@@ -10011,7 +10015,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::measure_record_records_lookback_and_writes_unwritten_results",
           "--quiet",
           "--exact"
@@ -10039,7 +10043,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::measure_record_batch_records_zero_result_to_edit",
           "--quiet",
           "--exact"
@@ -10067,7 +10071,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::measure_record_batch_writes_shot_major_01_records",
           "--quiet",
           "--exact"
@@ -10095,7 +10099,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-records",
           "result_formats::tests::sparse_shot_matches_upstream_equality_string_and_mask_behavior",
           "--quiet",
           "--exact"
@@ -15074,6 +15078,913 @@
           ]
         }
       ]
+    },
+    {
+      "id": "a3-record-diagnostic-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "api_contracts",
+          "record_diagnostics_preserve_machine_readable_failure_context",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Fixed diagnostics prove checked spans, stable codes, typed contexts, severity, and messages without an input-sized resource claim."
+      },
+      "negative_axes": [
+        "span-overflow",
+        "invalid-byte-context-loss"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::ByteSpan" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ByteSpan::byte_end" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ByteSpan::byte_length" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ByteSpan::byte_start" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ByteSpan::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DiagnosticSeverity" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DiagnosticSeverity::as_str" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::code" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::context" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::message" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::severity" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatError::span" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatErrorCode" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatErrorCode::as_str" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::FormatErrorContext" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordResult" }
+      ]
+    },
+    {
+      "id": "a3-record-capability-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "api_contracts",
+          "record_capabilities_report_exact_formats_layouts_and_sizes",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The six-entry codec registry and checked size arithmetic are fixed metadata; sparse and incomplete grouped sizes remain explicitly unknown."
+      },
+      "negative_axes": [
+        "duplicate-format",
+        "incomplete-ptb64-group",
+        "sparse-size-guess"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::CodecCapability" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CodecCapability::can_decode" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CodecCapability::can_encode" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CodecCapability::format" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CodecCapability::requires_typed_layout" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::EncodedSizeEstimate" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::EncodedSizeEstimate::value" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordEncoding" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordEncoding::as_str" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat::all" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat::as_str" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat::encoding" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat::estimate_output_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordFormat::records_per_group" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::codec_capabilities" }
+      ]
+    },
+    {
+      "id": "a3-record-corpus-acceptance-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "result_format_corpus",
+          "checked_accepted_corpus_matches_every_applicable_record_reader",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The frozen accepted corpus drives materialized, dense, packed, sparse, and typed DETS readers with reusable storage bounded by declared record width."
+      },
+      "negative_axes": [
+        "namespace-collapse",
+        "duplicate-dets-toggle",
+        "reader-path-drift"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::detectors" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::measurement_only" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::measurements" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::observables" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::total_bits" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsResultType" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsResultType::prefix" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsToken" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsToken::index" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsToken::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsToken::result_type" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_dets_packed_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_dets_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_dets_sparse_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_dets_token_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_packed_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_sparse_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::read_dets_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::read_measurement_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::read_records" }
+      ]
+    },
+    {
+      "id": "a3-record-corpus-rejection-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "result_format_corpus",
+          "checked_rejected_corpus_matches_every_applicable_record_reader",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The frozen rejected corpus proves strict termination, separators, prefixes, numeric bounds, and namespace bounds before input-proportional retention."
+      },
+      "negative_axes": [
+        "unterminated-record",
+        "malformed-separator",
+        "numeric-overflow",
+        "namespace-out-of-range"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a3-record-generic-stream-error-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_streaming::tests::generic_streaming_preserves_the_first_visitor_error",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Every generic dense, packed, sparse, PTB64, and typed DETS visitor stops after the first callback failure and preserves that error without reading later records."
+      },
+      "negative_axes": [
+        "visitor-error-erasure",
+        "post-error-callback",
+        "format-error-misclassification"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::RecordStreamError" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_dets_packed_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_dets_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_dets_sparse_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_dets_token_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_packed_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_ptb64_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_ptb64_record_all" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::try_for_each_sparse_record" }
+      ]
+    },
+    {
+      "id": "a3-record-ptb64-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::ptb64_records_are_measurement_major_over_64_shot_groups",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One exact 64-shot group proves measurement-major bytes, complete-group admission, prefix reads, width rejection, and exact group counting."
+      },
+      "negative_axes": [
+        "partial-group",
+        "zero-width",
+        "truncated-plane"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_ptb64_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::for_each_ptb64_record_all" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ptb64_record_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::read_ptb64_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::read_ptb64_records_all" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::validate_ptb64_shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::write_ptb64_records_checked" }
+      ]
+    },
+    {
+      "id": "a3-record-writer-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::measure_record_writer_matches_stim_byte_layouts",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed bit sequence proves exact 01, b8, r8, HITS, and typed DETS output through the stable component writer."
+      },
+      "negative_axes": [
+        "bit-order",
+        "result-namespace",
+        "record-terminator"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::begin_dets_result_type" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::begin_result_type" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::into_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::with_capacity" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_bit" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_end" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SampleFormat" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::write_records" }
+      ]
+    },
+    {
+      "id": "a3-record-typed-writer-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::typed_writers_match_record_adapters",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Typed shot-major and bit-plane writers consume checked views and produce the same exact bytes as the established record adapters."
+      },
+      "negative_axes": [
+        "typed-path-byte-drift",
+        "partial-packed-record"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_bits" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_packed_batch" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::write_packed_record" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::write_bit_plane_64_batch" }
+      ]
+    },
+    {
+      "id": "a3-record-state-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::measure_record_records_lookback_and_writes_unwritten_results",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The record buffer proves measurement lookback, append order, unwritten flushing, and post-flush compaction under a fixed lookback."
+      },
+      "negative_axes": [
+        "lookback-order",
+        "unwritten-loss",
+        "failed-compaction"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord::lookback" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord::record_result" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord::storage_len" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecord::write_unwritten_results_to" }
+      ]
+    },
+    {
+      "id": "a3-record-batch-state-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::measure_record_batch_writes_shot_major_01_records",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A five-shot batch proves width validation, shot-major lookback, intermediate state, final flushing, and bounded retained history."
+      },
+      "negative_axes": [
+        "shot-width-mismatch",
+        "lookback-order",
+        "flush-order"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::final_write_unwritten_results_to" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::intermediate_write_unwritten_results_to" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::lookback" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::record_result" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::stored" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::unwritten" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatchWriter" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatchWriter::batch_write_bit" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatchWriter::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatchWriter::write_end" }
+      ]
+    },
+    {
+      "id": "a3-record-batch-zero-edit-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::measure_record_batch_records_zero_result_to_edit",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed five-shot batch proves that zero-result editing appends one independently mutable record and preserves lookback order."
+      },
+      "negative_axes": [
+        "shared-edit-buffer"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordBatch::record_zero_result_to_edit" }
+      ]
+    },
+    {
+      "id": "a3-record-sparse-shot-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "result_formats::tests::sparse_shot_matches_upstream_equality_string_and_mask_behavior",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Fixed sparse hits and observable masks prove construction, Stim text, low-64 mask conversion, and wide-mask truncation."
+      },
+      "negative_axes": [
+        "observable-high-bit-leak",
+        "hit-order-drift"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::SparseShot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SparseShot::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SparseShot::obs_mask_as_u64" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SparseShot::stim_debug_string" }
+      ]
+    },
+    {
+      "id": "a3-record-packed-batch-access-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::packed_and_prediction_batches_preserve_checked_dimensions_and_access",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Two small shot-major records and their bit planes prove checked dimensions, access, mutation, views, width rejection, and prediction storage."
+      },
+      "negative_axes": [
+        "record-width-mismatch",
+        "out-of-range-access",
+        "layout-index-swap"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::bits_per_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::plane" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::set" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::view" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::zeros" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView::bits_per_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView::plane" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64BatchView::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::bits_per_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::from_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::set" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::to_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::view" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::zeros" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::bits_per_shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::shot" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatchView::shot_count" }
+      ]
+    },
+    {
+      "id": "a3-record-packed-batch-conversion-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "state-equivalence",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::shot_major_and_bit_plane_round_trip",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Property-generated widths through 130 bits and shot counts through 64 prove checked shot-major to bit-plane conversion and exact round trips."
+      },
+      "negative_axes": [
+        "zero-width",
+        "tail-bit",
+        "sixty-four-shot-boundary"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::from_shot_major" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::BitPlane64Batch::to_shot_major" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::PackedShotBatch::from_bit_planes" }
+      ]
+    },
+    {
+      "id": "a3-record-semantic-batch-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::detection_and_dem_views_keep_planes_separate",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Fixed measurement, detector, observable, and sampled-error views prove distinct planes and reject every shot-count mismatch before construction."
+      },
+      "negative_axes": [
+        "detector-observable-conflation",
+        "sampled-error-conflation",
+        "shot-count-mismatch"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleBatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleBatchView::detection" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleBatchView::sampled_errors" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleBatchView::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::detectors" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::observables" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::shot_count" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::records_mut" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::view" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::zeros" }
+      ]
+    },
+    {
+      "id": "a3-record-semantic-width-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "batches::tests::semantic_widths_bind_each_record_plane_and_dets_namespace",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Two fixed shots prove that measurement, detector, observable, sampled-error, and correction widths remain attached to their semantic planes and DETS namespaces."
+      },
+      "negative_axes": [
+        "semantic-width-conflation",
+        "dets-namespace-width-conflation"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::CorrectionWidth" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CorrectionWidth::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CorrectionWidth::is_zero" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::CorrectionWidth::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectorWidth" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectorWidth::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectorWidth::is_zero" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectorWidth::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementWidth" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementWidth::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementWidth::is_zero" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementWidth::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservableWidth" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservableWidth::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservableWidth::is_zero" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservableWidth::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SampledErrorWidth" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SampledErrorWidth::get" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SampledErrorWidth::is_zero" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::SampledErrorWidth::new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleBatchView::sampled_error_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::detector_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionBatchView::observable_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::detector_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::from_widths" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::measurement_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetsLayout::observable_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementBatchView::width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::ObservablePredictionBatch::correction_width" }
+      ]
+    },
+    {
+      "id": "a3-record-measurement-sink-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "measurement_codec_sinks_match_every_legacy_encoding",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A 64-shot typed measurement batch proves exact output for all six codecs while PTB64 scratch remains bounded to one complete group."
+      },
+      "negative_axes": [
+        "typed-measurement-byte-drift",
+        "ptb64-cross-batch-grouping"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::format" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::into_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementCodecSink::width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::Error" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::finish" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::MeasurementSink::write_batch" }
+      ]
+    },
+    {
+      "id": "a3-record-detection-sink-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "detection_codec_keeps_dets_namespaces_until_encoding",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Typed detector and observable planes remain separate until exact 01, b8, r8, HITS, DETS, and PTB64 encoding over a fixed 64-shot batch."
+      },
+      "negative_axes": [
+        "detector-observable-namespace-collapse",
+        "typed-detection-byte-drift"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink::detector_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink::format" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink::into_bytes" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink::observable_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionCodecSink::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionSink::Error" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionSink::finish" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DetectionSink::write_batch" }
+      ]
+    },
+    {
+      "id": "a3-record-dem-sink-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "dem_codec_routes_sampled_errors_to_their_own_stream",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed DEM sample batch proves exact detector and observable DETS output while sampled-error HITS records remain in an independent encoded stream."
+      },
+      "negative_axes": [
+        "sampled-error-stream-conflation",
+        "observable-stream-loss"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink::detector_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink::into_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink::observable_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink::sampled_error_width" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleCodecSink::try_new" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleEncodedRecords" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleEncodedRecords::detection_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleEncodedRecords::into_parts" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleEncodedRecords::sampled_error_records" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleSink" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleSink::Error" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleSink::finish" },
+        { "crate_name": "stab_records", "owner_path": "stab_records::DemSampleSink::write_batch" }
+      ]
+    },
+    {
+      "id": "a3-record-sink-layout-rejection-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "typed_sinks_reject_layout_mismatches_before_writing",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Typed sink layout mismatches fail before any record bytes are emitted and leave the in-memory sink reusable for a valid batch."
+      },
+      "negative_axes": [
+        "measurement-width-mismatch",
+        "missing-sampled-error-plane"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a3-record-ptb64-sink-lifecycle-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "state-equivalence",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "typed_sinks",
+          "ptb64_finish_is_bounded_recoverable_and_final",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A 63-record partial group proves recoverable finalization rejection, exact completion with the final record, post-finish write rejection, and zero-width handling."
+      },
+      "negative_axes": [
+        "partial-group-finalization",
+        "write-after-finish",
+        "zero-width-group"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a3-record-allocation-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "resource_contracts",
+          "dets_visitors_keep_allocation_bounded_by_width_not_record_count",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Dense, packed, token, and sparse DETS visitors allocate by declared width once; one and 256 records have identical allocation counts and total bytes."
+      },
+      "negative_axes": [
+        "per-record-allocation",
+        "record-count-capacity-growth"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a3-record-duplicate-allocation-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "resource_contracts",
+          "dense_text_readers_bound_scratch_by_width_not_duplicate_count",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "Dense and packed HITS and DETS readers allocate only width-derived scratch; a one-token record and a 16,384-duplicate record have identical measured allocation counts, bytes, and width-bounded peak allocation."
+      },
+      "negative_axes": [
+        "duplicate-count-allocation",
+        "duplicate-count-capacity-growth"
+      ],
+      "standalone": true
     }
   ],
   "public_api_aliases": [

@@ -5,11 +5,12 @@
 )]
 
 use stab_core::{
-    BitSlice, CircuitError, CircuitResult, SampleFormat,
+    BitPlane64Batch, BitSlice, CircuitError, CircuitResult, PackedShotBatch, SampleFormat,
     result_formats::{
         MeasureRecordBatchWriter, MeasureRecordWriter, SparseShot, ptb64_record_count,
         read_measurement_records, read_ptb64_records, read_ptb64_records_all, read_records,
-        validate_ptb64_shot_count, write_ptb64_records_checked, write_records,
+        validate_ptb64_shot_count, write_bit_plane_64_batch, write_ptb64_records_checked,
+        write_records,
     },
     result_streaming::{
         for_each_packed_record, for_each_ptb64_record, for_each_ptb64_record_all, for_each_record,
@@ -444,6 +445,12 @@ fn cq_result_reader_rejects_malformed_widths_and_indices() {
 fn cq_result_ptb64_dense_sparse_prefix_and_validation_match_stim() {
     let records = deterministic_records(128, 71);
     let encoded = write_ptb64_records_checked(&records).unwrap();
+    let first_group = PackedShotBatch::from_records(&records[..64], 71).unwrap();
+    let first_group_planes = BitPlane64Batch::from_shot_major(first_group.view()).unwrap();
+    assert_eq!(
+        write_bit_plane_64_batch(first_group_planes.view()).unwrap(),
+        encoded[..71 * size_of::<u64>()]
+    );
     assert_eq!(ptb64_record_count(&encoded, 71).unwrap(), 128);
     assert_eq!(streaming_ptb64_record_count(&encoded, 71).unwrap(), 128);
     assert_eq!(read_ptb64_records(&encoded, 71, 64).unwrap(), records[..64]);
@@ -467,6 +474,10 @@ fn cq_result_ptb64_dense_sparse_prefix_and_validation_match_stim() {
 
     assert!(validate_ptb64_shot_count(63).is_err());
     assert!(write_ptb64_records_checked(&records[..63]).is_err());
+    assert!(matches!(
+        for_each_ptb64_record(&encoded, 71, 63, |_| Ok(())).unwrap_err(),
+        CircuitError::InvalidSamplerCompilation { .. }
+    ));
     let mut mixed_widths = vec![vec![false; 2]; 64];
     mixed_widths[63] = vec![false; 3];
     assert!(write_ptb64_records_checked(&mixed_widths).is_err());

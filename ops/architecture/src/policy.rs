@@ -64,6 +64,7 @@ pub(super) struct PolicyReport {
 enum PackageClass {
     Product,
     Ops,
+    TestSupport,
     Unclassified,
 }
 
@@ -87,7 +88,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             violations.push(Violation::new(
                 "unclassified-package",
                 format!(
-                    "workspace package {} at {} is neither under crates/ nor ops/",
+                    "workspace package {} at {} is not under crates/, ops/, or test-support/",
                     package.name,
                     package.relative_path.display()
                 ),
@@ -132,29 +133,47 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             .copied()
             .unwrap_or(PackageClass::Unclassified);
 
-        if from_class != PackageClass::Product {
-            continue;
-        }
-        if to_class == PackageClass::Ops {
-            if is_legacy_test_support_edge(edge) {
-                migration_allowances.push(MigrationAllowance::new(
-                    "legacy-product-test-support",
-                    format!(
-                        "{} retains its exact dev-only dependency on {} until the compatibility corpus moves to the records boundary",
-                        edge.from, edge.to
-                    ),
-                ));
-            } else {
+        if from_class == PackageClass::TestSupport {
+            if matches!(to_class, PackageClass::Product | PackageClass::Ops) {
                 violations.push(Violation::new(
-                    "product-to-ops",
+                    "test-support-upward-dependency",
                     format!(
-                        "product package {} has a {} dependency on ops package {}",
+                        "test-support package {} has a {} dependency on workspace package {}",
                         edge.from,
                         edge.kind.as_str(),
                         edge.to
                     ),
                 ));
             }
+            continue;
+        }
+        if from_class != PackageClass::Product {
+            continue;
+        }
+        if to_class == PackageClass::TestSupport {
+            if edge.kind != DependencyKind::Development {
+                violations.push(Violation::new(
+                    "product-test-support-runtime-edge",
+                    format!(
+                        "product package {} has a {} dependency on test-support package {}",
+                        edge.from,
+                        edge.kind.as_str(),
+                        edge.to
+                    ),
+                ));
+            }
+            continue;
+        }
+        if to_class == PackageClass::Ops {
+            violations.push(Violation::new(
+                "product-to-ops",
+                format!(
+                    "product package {} has a {} dependency on ops package {}",
+                    edge.from,
+                    edge.kind.as_str(),
+                    edge.to
+                ),
+            ));
             continue;
         }
         if to_class == PackageClass::Product && !is_permitted_product_edge(&edge.from, &edge.to) {
@@ -184,6 +203,9 @@ fn classify_path(path: &std::path::Path) -> PackageClass {
     match path.components().next() {
         Some(Component::Normal(component)) if component == "crates" => PackageClass::Product,
         Some(Component::Normal(component)) if component == "ops" => PackageClass::Ops,
+        Some(Component::Normal(component)) if component == "test-support" => {
+            PackageClass::TestSupport
+        }
         _ => PackageClass::Unclassified,
     }
 }
@@ -236,12 +258,6 @@ fn is_permitted_product_edge(from: &str, to: &str) -> bool {
     }
 }
 
-fn is_legacy_test_support_edge(edge: &WorkspaceEdge) -> bool {
-    edge.kind == DependencyKind::Development
-        && edge.to == "stab-compat-corpus"
-        && matches!(edge.from.as_str(), "stab-core" | "stab-cli")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,13 +270,13 @@ mod tests {
     }
 
     #[test]
-    fn exact_legacy_corpus_edges_are_development_only() {
+    fn test_support_edges_are_development_only_and_downward() {
         let graph = WorkspaceGraph {
             packages: vec![
                 package("stab-core", "crates"),
                 PackageSpec {
                     name: "stab-compat-corpus".to_owned(),
-                    relative_path: PathBuf::from("ops/compat-corpus"),
+                    relative_path: PathBuf::from("test-support/compat-corpus"),
                 },
             ],
             edges: vec![WorkspaceEdge {
@@ -271,30 +287,47 @@ mod tests {
         };
         let report = validate_graph(&graph);
         assert!(report.violations.is_empty());
-        assert_eq!(report.migration_allowances.len(), 1);
+        assert!(report.migration_allowances.is_empty());
 
-        let legacy_edge = graph
+        let support_edge = graph
             .edges
             .first()
-            .expect("fixture should contain its legacy edge")
+            .expect("fixture should contain its test-support edge")
             .clone();
         let normal_graph = WorkspaceGraph {
             edges: vec![WorkspaceEdge {
                 kind: DependencyKind::Normal,
-                ..legacy_edge
+                ..support_edge
             }],
-            ..graph
+            ..graph.clone()
         };
         let report = validate_graph(&normal_graph);
         assert_eq!(
             report
                 .violations
                 .first()
-                .expect("normal product-to-ops edge should fail")
+                .expect("normal product-to-test-support edge should fail")
                 .code,
-            "product-to-ops"
+            "product-test-support-runtime-edge"
         );
         assert!(report.migration_allowances.is_empty());
+
+        let upward_graph = WorkspaceGraph {
+            packages: graph.packages,
+            edges: vec![WorkspaceEdge {
+                from: "stab-compat-corpus".to_owned(),
+                to: "stab-core".to_owned(),
+                kind: DependencyKind::Development,
+            }],
+        };
+        assert_eq!(
+            validate_graph(&upward_graph)
+                .violations
+                .first()
+                .expect("test support must not depend on product code")
+                .code,
+            "test-support-upward-dependency"
+        );
     }
 
     #[test]

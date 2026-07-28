@@ -27,18 +27,20 @@ pub(in crate::qualification) fn resolve_external_reexports(
             .iter()
             .find(|dependency| dependency.crate_name == reexport.canonical_crate_name)
             .ok_or_else(|| unresolved(reexport))?;
+        let canonical_prefix = dependency
+            .visible_reexports
+            .get(&reexport.canonical_path)
+            .map_or(reexport.canonical_path.as_str(), String::as_str);
         let mut matched = false;
         for canonical in &dependency.items {
-            let Some(path) = rebase_api_path(
-                &canonical.path,
-                &reexport.canonical_path,
-                &reexport.alias_path,
-            ) else {
+            let Some(path) =
+                rebase_api_path(&canonical.path, canonical_prefix, &reexport.alias_path)
+            else {
                 continue;
             };
             let Some(owner_path) = rebase_api_path(
                 &canonical.owner_path,
-                &reexport.canonical_path,
+                canonical_prefix,
                 &reexport.alias_path,
             ) else {
                 continue;
@@ -53,6 +55,8 @@ pub(in crate::qualification) fn resolve_external_reexports(
                 source_path: reexport.source_path.clone(),
                 source_line: reexport.source_line,
                 owner_path,
+                evidence_crate_name: canonical.evidence_crate_name.clone(),
+                evidence_owner_path: canonical.evidence_owner_path.clone(),
             };
             match items.entry((path.clone(), canonical.kind)) {
                 std::collections::btree_map::Entry::Vacant(entry) => {

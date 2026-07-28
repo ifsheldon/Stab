@@ -1,0 +1,1083 @@
+use crate::{
+    BitPlane64BatchView, FormatError, PackedShotBatchView, RecordResult,
+    result_packed::{
+        b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout,
+        ptb64_record_count as packed_ptb64_record_count,
+    },
+    result_text::HitsEvent,
+};
+use stab_bits::BitSlice;
+
+mod capabilities;
+mod dets;
+
+pub use capabilities::codec_capabilities;
+pub use capabilities::{CodecCapability, RecordEncoding, RecordFormat};
+pub use dets::{DetsLayout, DetsResultType, DetsToken, read_dets_records};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SampleFormat {
+    ZeroOne,
+    B8,
+    R8,
+    Hits,
+    Dets,
+}
+
+pub fn write_records(records: &[Vec<bool>], format: SampleFormat) -> Vec<u8> {
+    let mut writer = MeasureRecordWriter::new(format);
+    for record in records {
+        writer.write_bits(record);
+        writer.write_end();
+    }
+    writer.into_bytes()
+}
+
+fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
+    let mut output = Vec::new();
+    for shot_group in records.chunks_exact(64) {
+        let bits_per_shot = shot_group.first().map_or(0, Vec::len);
+        for measurement_index in 0..bits_per_shot {
+            let mut word = 0u64;
+            for (shot_index, shot) in shot_group.iter().enumerate() {
+                if shot.get(measurement_index).copied().unwrap_or(false) {
+                    word |= 1u64 << shot_index;
+                }
+            }
+            output.extend_from_slice(&word.to_le_bytes());
+        }
+    }
+    output
+}
+
+pub fn write_ptb64_records_checked(records: &[Vec<bool>]) -> RecordResult<Vec<u8>> {
+    validate_ptb64_shot_count(records.len())?;
+    validate_uniform_record_width(records, "ptb64")?;
+    Ok(write_ptb64_records(records))
+}
+
+pub fn write_bit_plane_64_batch(batch: BitPlane64BatchView<'_>) -> RecordResult<Vec<u8>> {
+    validate_ptb64_shot_count(batch.shot_count())?;
+    if batch.shot_count() == 0 {
+        return Ok(Vec::new());
+    }
+    let byte_capacity = batch
+        .bits_per_shot()
+        .checked_mul(size_of::<u64>())
+        .ok_or_else(|| FormatError::invalid_result_format("ptb64 output size overflowed"))?;
+    let mut output = Vec::with_capacity(byte_capacity);
+    for bit_index in 0..batch.bits_per_shot() {
+        let plane = batch.plane(bit_index)?;
+        let word = plane.words().first().copied().ok_or_else(|| {
+            FormatError::invalid_result_format(
+                "64-shot bit plane did not contain its required storage word",
+            )
+        })?;
+        output.extend_from_slice(&word.to_le_bytes());
+    }
+    Ok(output)
+}
+
+pub fn read_ptb64_records(
+    input: &[u8],
+    bits_per_record: usize,
+    max_shots: usize,
+) -> RecordResult<Vec<Vec<bool>>> {
+    validate_ptb64_shot_count(max_shots)?;
+    if max_shots == 0 {
+        return Ok(Vec::new());
+    }
+    let shot_groups = max_shots / 64;
+    let (bytes_per_group, expected_bytes) =
+        ptb64_prefix_layout(input.len(), bits_per_record, max_shots)?;
+
+    let input = input.get(..expected_bytes).ok_or_else(|| {
+        FormatError::invalid_result_format("ptb64 expected byte range was out of bounds")
+    })?;
+    let mut records = vec![vec![false; bits_per_record]; max_shots];
+    for (group_records, group_bytes) in records
+        .chunks_exact_mut(64)
+        .zip(input.chunks_exact(bytes_per_group))
+        .take(shot_groups)
+    {
+        for (bit_index, word_chunk) in group_bytes.chunks_exact(8).enumerate() {
+            let mut word_bytes = [0u8; 8];
+            word_bytes.copy_from_slice(word_chunk);
+            let word = u64::from_le_bytes(word_bytes);
+            for (shot_offset, record) in group_records.iter_mut().enumerate() {
+                if word & (1u64 << shot_offset) != 0 {
+                    let bit = record.get_mut(bit_index).ok_or_else(|| {
+                        FormatError::invalid_result_format(
+                            "ptb64 bit index was out of decoded record bounds",
+                        )
+                    })?;
+                    *bit = true;
+                }
+            }
+        }
+    }
+    Ok(records)
+}
+
+pub fn read_ptb64_records_all(
+    input: &[u8],
+    bits_per_record: usize,
+) -> RecordResult<Vec<Vec<bool>>> {
+    let shots = ptb64_record_count(input, bits_per_record)?;
+    read_ptb64_records(input, bits_per_record, shots)
+}
+
+pub fn ptb64_record_count(input: &[u8], bits_per_record: usize) -> RecordResult<usize> {
+    packed_ptb64_record_count(input.len(), bits_per_record)
+}
+
+pub fn validate_ptb64_shot_count(shots: usize) -> RecordResult<()> {
+    if !shots.is_multiple_of(64) {
+        return Err(FormatError::invalid_data(
+            "shots must be a multiple of 64 to use ptb64 format",
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MeasureRecord {
+    storage: Vec<bool>,
+    unwritten_start: usize,
+    max_lookback: usize,
+}
+
+impl MeasureRecord {
+    pub fn new(max_lookback: usize) -> Self {
+        Self {
+            storage: Vec::new(),
+            unwritten_start: 0,
+            max_lookback,
+        }
+    }
+
+    pub fn record_result(&mut self, value: bool) {
+        self.storage.push(value);
+    }
+
+    pub fn lookback(&self, lookback: usize) -> Option<bool> {
+        if lookback == 0 || lookback > self.max_lookback || lookback > self.storage.len() {
+            return None;
+        }
+        self.storage.get(self.storage.len() - lookback).copied()
+    }
+
+    pub fn storage_len(&self) -> usize {
+        self.storage.len()
+    }
+
+    pub fn write_unwritten_results_to(
+        &mut self,
+        writer: &mut MeasureRecordWriter,
+    ) -> RecordResult<()> {
+        let unwritten = self.storage.get(self.unwritten_start..).ok_or_else(|| {
+            FormatError::invalid_result_format("measure record unwritten cursor is out of range")
+        })?;
+        for bit in unwritten {
+            writer.write_bit(*bit);
+        }
+        self.unwritten_start = self.storage.len();
+        self.compact_written_prefix();
+        Ok(())
+    }
+
+    fn compact_written_prefix(&mut self) {
+        let keep = self.max_lookback.min(self.storage.len());
+        let remove = self.storage.len() - keep;
+        if remove == 0 {
+            return;
+        }
+        self.storage.drain(..remove);
+        self.unwritten_start = self.unwritten_start.saturating_sub(remove);
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MeasureRecordBatch {
+    records: Vec<Vec<bool>>,
+    unwritten_start: usize,
+    written_count: usize,
+    max_lookback: usize,
+    shot_count: usize,
+}
+
+impl MeasureRecordBatch {
+    pub fn new(shot_count: usize, max_lookback: usize) -> Self {
+        Self {
+            records: Vec::new(),
+            unwritten_start: 0,
+            written_count: 0,
+            max_lookback,
+            shot_count,
+        }
+    }
+
+    pub fn stored(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn unwritten(&self) -> usize {
+        self.records.len() - self.unwritten_start
+    }
+
+    pub fn record_result(&mut self, shot_bits: Vec<bool>) -> RecordResult<()> {
+        if shot_bits.len() != self.shot_count {
+            return Err(FormatError::invalid_result_format(format!(
+                "batch record expected {} shot bits, got {}",
+                self.shot_count,
+                shot_bits.len()
+            )));
+        }
+        self.records.push(shot_bits);
+        Ok(())
+    }
+
+    pub fn record_zero_result_to_edit(&mut self) -> &mut [bool] {
+        self.records.push(vec![false; self.shot_count]);
+        match self.records.last_mut() {
+            Some(record) => record.as_mut_slice(),
+            None => unreachable!("record_zero_result_to_edit just pushed a record"),
+        }
+    }
+
+    pub fn lookback(&self, lookback: usize) -> Option<&[bool]> {
+        if lookback == 0 || lookback > self.max_lookback || lookback > self.records.len() {
+            return None;
+        }
+        self.records
+            .get(self.records.len() - lookback)
+            .map(Vec::as_slice)
+    }
+
+    pub fn intermediate_write_unwritten_results_to(
+        &mut self,
+        writer: &mut MeasureRecordBatchWriter,
+        reference_sample: &[bool],
+    ) -> RecordResult<()> {
+        const WRITE_SIZE: usize = 256;
+        self.validate_unwritten_cursor()?;
+        while self.unwritten() >= WRITE_SIZE {
+            let end = self
+                .unwritten_start
+                .checked_add(WRITE_SIZE)
+                .ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "measure record batch write range overflowed",
+                    )
+                })?;
+            self.write_range(writer, reference_sample, self.unwritten_start, end)?;
+            self.unwritten_start = end;
+            self.written_count = self.written_count.checked_add(WRITE_SIZE).ok_or_else(|| {
+                FormatError::invalid_result_format("measure record batch written count overflowed")
+            })?;
+        }
+        self.compact_written_prefix();
+        Ok(())
+    }
+
+    pub fn final_write_unwritten_results_to(
+        &mut self,
+        writer: &mut MeasureRecordBatchWriter,
+        reference_sample: &[bool],
+    ) -> RecordResult<()> {
+        self.validate_unwritten_cursor()?;
+        let unwritten = self.unwritten();
+        self.write_range(
+            writer,
+            reference_sample,
+            self.unwritten_start,
+            self.records.len(),
+        )?;
+        self.written_count = self.written_count.checked_add(unwritten).ok_or_else(|| {
+            FormatError::invalid_result_format("measure record batch written count overflowed")
+        })?;
+        self.unwritten_start = self.records.len();
+        self.compact_written_prefix();
+        Ok(())
+    }
+
+    fn validate_unwritten_cursor(&self) -> RecordResult<()> {
+        if self.unwritten_start > self.records.len() {
+            return Err(FormatError::invalid_result_format(
+                "measure record batch unwritten cursor is out of range",
+            ));
+        }
+        Ok(())
+    }
+
+    fn write_range(
+        &self,
+        writer: &mut MeasureRecordBatchWriter,
+        reference_sample: &[bool],
+        start: usize,
+        end: usize,
+    ) -> RecordResult<()> {
+        let records = self.records.get(start..end).ok_or_else(|| {
+            FormatError::invalid_result_format("measure record batch write range is out of bounds")
+        })?;
+        let mut inverted = vec![false; self.shot_count];
+        for (offset, record) in records.iter().enumerate() {
+            let measurement_index = self.written_count.checked_add(offset).ok_or_else(|| {
+                FormatError::invalid_result_format(
+                    "measure record batch reference index overflowed",
+                )
+            })?;
+            if reference_sample
+                .get(measurement_index)
+                .copied()
+                .unwrap_or(false)
+            {
+                for (output, bit) in inverted.iter_mut().zip(record) {
+                    *output = !*bit;
+                }
+                writer.batch_write_bit(&inverted)?;
+            } else {
+                writer.batch_write_bit(record)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn compact_written_prefix(&mut self) {
+        let keep = self
+            .max_lookback
+            .max(self.unwritten())
+            .min(self.records.len());
+        let remove = self.records.len() - keep;
+        if remove == 0 {
+            return;
+        }
+        self.records.drain(..remove);
+        self.unwritten_start = self.unwritten_start.saturating_sub(remove);
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MeasureRecordWriter {
+    format: SampleFormat,
+    output: Vec<u8>,
+    index: usize,
+    b8_byte: u8,
+    b8_bit_index: u8,
+    r8_false_run: u8,
+    hits_first: bool,
+    dets_started: bool,
+    dets_type: u8,
+}
+
+impl MeasureRecordWriter {
+    pub fn new(format: SampleFormat) -> Self {
+        Self::with_capacity(format, 0)
+    }
+
+    pub fn with_capacity(format: SampleFormat, capacity: usize) -> Self {
+        Self {
+            format,
+            output: Vec::with_capacity(capacity),
+            index: 0,
+            b8_byte: 0,
+            b8_bit_index: 0,
+            r8_false_run: 0,
+            hits_first: true,
+            dets_started: false,
+            dets_type: b'M',
+        }
+    }
+
+    pub(crate) fn reserve_output(&mut self, additional: usize) -> RecordResult<()> {
+        self.output.try_reserve(additional).map_err(|error| {
+            FormatError::invalid_result_format(format!(
+                "result writer could not reserve {additional} output bytes: {error}"
+            ))
+        })
+    }
+
+    pub fn begin_dets_result_type(&mut self, result_type: DetsResultType) {
+        self.begin_result_type(result_type.prefix());
+    }
+
+    /// Selects a raw DETS namespace prefix for compatibility adapters.
+    ///
+    /// New component code should use [`Self::begin_dets_result_type`] so invalid prefixes are not
+    /// representable.
+    pub fn begin_result_type(&mut self, result_type: u8) {
+        self.dets_type = result_type;
+        self.index = 0;
+    }
+
+    pub fn write_bits(&mut self, bits: &[bool]) {
+        for bit in bits {
+            self.write_bit(*bit);
+        }
+    }
+
+    pub fn write_packed_record(&mut self, record: BitSlice<'_>) -> RecordResult<()> {
+        for bit_index in 0..record.len() {
+            let bit = record.get(bit_index).ok_or_else(|| {
+                FormatError::invalid_result_format(
+                    "packed record bit index escaped the declared width",
+                )
+            })?;
+            self.write_bit(bit);
+        }
+        Ok(())
+    }
+
+    pub fn write_packed_batch(&mut self, batch: PackedShotBatchView<'_>) -> RecordResult<()> {
+        for shot_index in 0..batch.shot_count() {
+            self.write_packed_record(batch.shot(shot_index)?)?;
+            self.write_end();
+        }
+        Ok(())
+    }
+
+    pub fn write_bytes(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            for bit_index in 0..8 {
+                self.write_bit(byte & (1u8 << bit_index) != 0);
+            }
+        }
+    }
+
+    pub fn write_bit(&mut self, bit: bool) {
+        match self.format {
+            SampleFormat::ZeroOne => {
+                self.output.push(if bit { b'1' } else { b'0' });
+            }
+            SampleFormat::B8 => self.write_b8_bit(bit),
+            SampleFormat::R8 => self.write_r8_bit(bit),
+            SampleFormat::Hits => self.write_hits_bit(bit),
+            SampleFormat::Dets => self.write_dets_bit(bit),
+        }
+        self.index += 1;
+    }
+
+    pub fn write_end(&mut self) {
+        match self.format {
+            SampleFormat::ZeroOne | SampleFormat::Hits => {
+                self.output.push(b'\n');
+            }
+            SampleFormat::Dets => {
+                self.ensure_dets_started();
+                self.output.push(b'\n');
+            }
+            SampleFormat::B8 => {
+                if self.b8_bit_index != 0 {
+                    self.output.push(self.b8_byte);
+                }
+            }
+            SampleFormat::R8 => {
+                if self.r8_false_run == u8::MAX {
+                    self.output.push(u8::MAX);
+                    self.r8_false_run = 0;
+                }
+                self.output.push(self.r8_false_run);
+            }
+        }
+        self.index = 0;
+        self.b8_byte = 0;
+        self.b8_bit_index = 0;
+        self.r8_false_run = 0;
+        self.hits_first = true;
+        self.dets_started = false;
+        self.dets_type = b'M';
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.output
+    }
+
+    fn write_b8_bit(&mut self, bit: bool) {
+        if bit {
+            self.b8_byte |= 1u8 << self.b8_bit_index;
+        }
+        self.b8_bit_index += 1;
+        if self.b8_bit_index == 8 {
+            self.output.push(self.b8_byte);
+            self.b8_byte = 0;
+            self.b8_bit_index = 0;
+        }
+    }
+
+    fn write_r8_bit(&mut self, bit: bool) {
+        if bit {
+            if self.r8_false_run == u8::MAX {
+                self.output.push(u8::MAX);
+                self.r8_false_run = 0;
+            }
+            self.output.push(self.r8_false_run);
+            self.r8_false_run = 0;
+            return;
+        }
+        if self.r8_false_run == u8::MAX {
+            self.output.push(u8::MAX);
+            self.r8_false_run = 0;
+        }
+        self.r8_false_run += 1;
+    }
+
+    fn write_hits_bit(&mut self, bit: bool) {
+        if !bit {
+            return;
+        }
+        if !self.hits_first {
+            self.output.push(b',');
+        }
+        self.hits_first = false;
+        self.output
+            .extend_from_slice(self.index.to_string().as_bytes());
+    }
+
+    fn write_dets_bit(&mut self, bit: bool) {
+        self.ensure_dets_started();
+        if !bit {
+            return;
+        }
+        self.output.push(b' ');
+        self.output.push(self.dets_type);
+        self.output
+            .extend_from_slice(self.index.to_string().as_bytes());
+    }
+
+    fn ensure_dets_started(&mut self) {
+        if !self.dets_started {
+            self.output.extend_from_slice(b"shot");
+            self.dets_started = true;
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MeasureRecordBatchWriter {
+    format: SampleFormat,
+    records: Vec<Vec<bool>>,
+}
+
+impl MeasureRecordBatchWriter {
+    pub fn new(shots: usize, format: SampleFormat) -> Self {
+        Self {
+            format,
+            records: vec![Vec::new(); shots],
+        }
+    }
+
+    pub fn batch_write_bit(&mut self, shot_bits: &[bool]) -> RecordResult<()> {
+        if shot_bits.len() != self.records.len() {
+            return Err(FormatError::invalid_result_format(format!(
+                "batch writer expected {} shot bits, got {}",
+                self.records.len(),
+                shot_bits.len()
+            )));
+        }
+        for (record, bit) in self.records.iter_mut().zip(shot_bits) {
+            record.push(*bit);
+        }
+        Ok(())
+    }
+
+    pub fn write_end(&self) -> Vec<u8> {
+        write_records(&self.records, self.format)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SparseShot {
+    pub hits: Vec<u64>,
+    pub obs_mask: Vec<bool>,
+}
+
+impl SparseShot {
+    pub fn new(hits: Vec<u64>, obs_mask: Vec<bool>) -> Self {
+        Self { hits, obs_mask }
+    }
+
+    pub fn obs_mask_as_u64(&self) -> u64 {
+        self.obs_mask
+            .iter()
+            .take(64)
+            .enumerate()
+            .fold(
+                0u64,
+                |acc, (index, bit)| {
+                    if *bit { acc | (1u64 << index) } else { acc }
+                },
+            )
+    }
+
+    pub fn stim_debug_string(&self) -> String {
+        let hits = self
+            .hits
+            .iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let obs_mask = self
+            .obs_mask
+            .iter()
+            .map(|bit| if *bit { '1' } else { '_' })
+            .collect::<String>();
+        format!("SparseShot{{{{{hits}}}, {obs_mask}}}")
+    }
+}
+
+pub fn read_records(
+    input: &[u8],
+    format: SampleFormat,
+    bits_per_record: usize,
+) -> RecordResult<Vec<Vec<bool>>> {
+    match format {
+        SampleFormat::ZeroOne => read_zero_one_records(input, bits_per_record),
+        SampleFormat::B8 => read_b8_records(input, bits_per_record),
+        SampleFormat::R8 => read_r8_records(input, bits_per_record),
+        SampleFormat::Hits => read_hits_records(input, bits_per_record),
+        SampleFormat::Dets => {
+            read_dets_records(input, DetsLayout::measurement_only(bits_per_record))
+        }
+    }
+}
+
+pub fn read_measurement_records(
+    input: &[u8],
+    format: SampleFormat,
+    bits_per_record: usize,
+) -> RecordResult<Vec<Vec<bool>>> {
+    read_records(input, format, bits_per_record)
+}
+
+fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> RecordResult<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
+        let record = line.iter().map(|byte| *byte == b'1').collect();
+        records.push(record);
+        Ok(())
+    })?;
+    Ok(records)
+}
+
+fn read_b8_records(input: &[u8], bits_per_record: usize) -> RecordResult<Vec<Vec<bool>>> {
+    let bytes_per_record = b8_bytes_per_record(input.len(), bits_per_record)?;
+    input
+        .chunks_exact(bytes_per_record)
+        .map(|chunk| Ok(unpack_b8_chunk(chunk, bits_per_record)))
+        .collect()
+}
+
+fn read_r8_records(input: &[u8], bits_per_record: usize) -> RecordResult<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut offset = 0usize;
+    while offset < input.len() {
+        let mut record = vec![false; bits_per_record];
+        decode_next_r8_record(input, bits_per_record, &mut offset, |bit_index| {
+            let Some(bit) = record.get_mut(bit_index) else {
+                return Err(FormatError::invalid_result_format(format!(
+                    "r8 hit index {bit_index} exceeds record width {bits_per_record}"
+                )));
+            };
+            *bit = true;
+            Ok(())
+        })?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
+fn read_hits_records(input: &[u8], bits_per_record: usize) -> RecordResult<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut record = None;
+    crate::result_text::for_each_hits_event(input, bits_per_record, |event| match event {
+        HitsEvent::RecordStart => {
+            record = Some(vec![false; bits_per_record]);
+            Ok(())
+        }
+        HitsEvent::Hit(index) => {
+            let index = usize::try_from(index).map_err(|_| {
+                FormatError::invalid_result_format(format!("HITS index {index} does not fit usize"))
+            })?;
+            let bit = record
+                .as_mut()
+                .and_then(|record| record.get_mut(index))
+                .ok_or_else(|| {
+                    FormatError::invalid_result_format(format!(
+                        "HITS index {index} exceeds record width {bits_per_record}"
+                    ))
+                })?;
+            *bit = !*bit;
+            Ok(())
+        }
+        HitsEvent::RecordEnd => {
+            records.push(record.take().ok_or_else(|| {
+                FormatError::invalid_result_format("HITS record ended before it started")
+            })?);
+            Ok(())
+        }
+    })?;
+    Ok(records)
+}
+
+fn unpack_b8_chunk(chunk: &[u8], bits_per_record: usize) -> Vec<bool> {
+    (0..bits_per_record)
+        .map(|bit_index| {
+            chunk.get(bit_index / 8).copied().unwrap_or(0) & (1u8 << (bit_index % 8)) != 0
+        })
+        .collect()
+}
+
+fn validate_uniform_record_width(records: &[Vec<bool>], kind: &'static str) -> RecordResult<()> {
+    let Some(first) = records.first() else {
+        return Ok(());
+    };
+    let expected = first.len();
+    for (index, record) in records.iter().enumerate() {
+        if record.len() != expected {
+            return Err(FormatError::invalid_result_format(format!(
+                "{kind} record {index} expected {expected} bits, got {}",
+                record.len()
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        reason = "result-format unit tests use direct fixture assertions for compact diagnostics"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn measure_record_records_lookback_and_writes_unwritten_results() {
+        let mut record = MeasureRecord::new(20);
+        record.record_result(true);
+        assert_eq!(record.lookback(1), Some(true));
+        record.record_result(false);
+        assert_eq!(record.lookback(1), Some(false));
+        assert_eq!(record.lookback(2), Some(true));
+        for _ in 0..50 {
+            record.record_result(true);
+            record.record_result(false);
+        }
+        assert_eq!(record.storage_len(), 102);
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+        record
+            .write_unwritten_results_to(&mut writer)
+            .expect("write unwritten results");
+        assert_eq!(
+            writer.into_bytes(),
+            (0..102)
+                .map(|index| if index % 2 == 0 { b'1' } else { b'0' })
+                .collect::<Vec<_>>()
+        );
+        assert!(record.storage_len() <= 40);
+    }
+
+    #[test]
+    fn measure_record_writer_matches_stim_byte_layouts() {
+        let bytes = [0xF8];
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+        writer.write_bytes(&bytes);
+        writer.write_bit(false);
+        writer.write_bytes(&bytes);
+        writer.write_bit(true);
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), b"000111110000111111\n");
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::B8);
+        writer.write_bytes(&bytes);
+        writer.write_bit(false);
+        writer.write_bytes(&bytes);
+        writer.write_bit(true);
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), [0xF8, 0xF0, 0x03]);
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::Hits);
+        writer.write_bytes(&bytes);
+        writer.write_bit(false);
+        writer.write_bytes(&bytes);
+        writer.write_bit(true);
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), b"3,4,5,6,7,12,13,14,15,16,17\n");
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+        writer.begin_dets_result_type(DetsResultType::Detector);
+        writer.write_bytes(&bytes);
+        writer.write_bit(false);
+        writer.write_bytes(&bytes);
+        writer.begin_dets_result_type(DetsResultType::Observable);
+        writer.write_bit(false);
+        writer.write_bit(true);
+        writer.write_end();
+        assert_eq!(
+            writer.into_bytes(),
+            b"shot D3 D4 D5 D6 D7 D12 D13 D14 D15 D16 L1\n"
+        );
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
+        writer.write_bytes(&bytes);
+        writer.write_bit(false);
+        writer.write_bytes(&bytes);
+        writer.write_bit(true);
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), [3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn measure_record_writer_handles_empty_dets_records_and_long_r8_gaps() {
+        let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+        writer.write_end();
+        writer.write_end();
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), b"shot\nshot\nshot\n");
+
+        let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
+        for _ in 0..(8 * 64) {
+            writer.write_bit(false);
+        }
+        writer.write_bit(true);
+        for _ in 0..32 {
+            writer.write_bit(false);
+        }
+        writer.write_end();
+        assert_eq!(writer.into_bytes(), [255, 255, 2, 32]);
+    }
+
+    #[test]
+    fn measure_record_reader_loads_all_supported_record_formats() {
+        let expected = [
+            false, false, false, true, true, true, true, true, false, false, false, false, true,
+            true, true, true, true, true,
+        ]
+        .to_vec();
+
+        for (format, input) in [
+            (SampleFormat::ZeroOne, b"000111110000111111\n".as_slice()),
+            (SampleFormat::B8, &[0xF8, 0xF0, 0x03]),
+            (
+                SampleFormat::Hits,
+                b"3,4,5,6,7,12,13,14,15,16,17\n".as_slice(),
+            ),
+            (SampleFormat::R8, &[3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]),
+        ] {
+            assert_eq!(
+                read_records(input, format, 18).unwrap(),
+                vec![expected.clone()]
+            );
+        }
+
+        assert!(read_records(&[], SampleFormat::B8, 0).is_err());
+    }
+
+    #[test]
+    fn measure_record_reader_round_trips_writer_output() {
+        let source = [0, 1, 2, 3, 4, 0xFF, 0xBF, 0xFE, 80, 0, 0, 1, 20];
+        let bits = unpack_b8_chunk(&source, source.len() * 8);
+        for format in [
+            SampleFormat::ZeroOne,
+            SampleFormat::B8,
+            SampleFormat::R8,
+            SampleFormat::Hits,
+            SampleFormat::Dets,
+        ] {
+            let encoded = write_records(std::slice::from_ref(&bits), format);
+            let width = if matches!(format, SampleFormat::Hits | SampleFormat::Dets) {
+                bits.len() - 1
+            } else {
+                bits.len()
+            };
+            assert_eq!(
+                read_records(&encoded, format, width).unwrap(),
+                vec![bits[..width].to_vec()]
+            );
+        }
+    }
+
+    #[test]
+    fn ptb64_reader_round_trips_writer_output() {
+        let records = (0..64)
+            .map(|shot_index| {
+                (0..17)
+                    .map(|bit_index| (shot_index * 7 + bit_index * 11) % 13 == 0)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let encoded = write_ptb64_records_checked(&records).unwrap();
+
+        assert_eq!(read_ptb64_records(&encoded, 17, 64).unwrap(), records);
+        assert_eq!(read_ptb64_records_all(&encoded, 17).unwrap(), records);
+        assert_eq!(ptb64_record_count(&encoded, 17).unwrap(), 64);
+    }
+
+    #[test]
+    fn measure_record_reader_handles_multiple_records() {
+        let records = read_records(
+            b"111011001\n010000000\n101100011\n",
+            SampleFormat::ZeroOne,
+            9,
+        )
+        .unwrap();
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            read_records(b"shot M0\nshot M1\nshot M0\nshot\n", SampleFormat::Dets, 2).unwrap(),
+            vec![
+                vec![true, false],
+                vec![false, true],
+                vec![true, false],
+                vec![false, false],
+            ]
+        );
+        assert_eq!(
+            read_measurement_records(b"shot M0\nshot\n", SampleFormat::Dets, 2).unwrap(),
+            vec![vec![true, false], vec![false, false]]
+        );
+        assert!(read_measurement_records(b"shot D0\n", SampleFormat::Dets, 2).is_err());
+        assert!(read_measurement_records(b"shot L0\n", SampleFormat::Dets, 2).is_err());
+    }
+
+    #[test]
+    fn measure_record_reader_accepts_stim_windows_newline_text_records() {
+        assert_eq!(
+            read_records(b"01\r\n01\r\n", SampleFormat::ZeroOne, 2).unwrap(),
+            vec![vec![false, true], vec![false, true]]
+        );
+        assert_eq!(
+            read_records(b"3\r\n1\r\n", SampleFormat::Hits, 4).unwrap(),
+            vec![
+                vec![false, false, false, true],
+                vec![false, true, false, false],
+            ]
+        );
+        assert_eq!(
+            read_measurement_records(b"shot M3\r\n\r\n\n   shot M1\r\n\n", SampleFormat::Dets, 4,)
+                .unwrap(),
+            vec![
+                vec![false, false, false, true],
+                vec![false, true, false, false],
+            ]
+        );
+    }
+
+    #[test]
+    fn measure_record_reader_rejects_unterminated_01_records_and_non_bits() {
+        assert!(read_records(b"10", SampleFormat::ZeroOne, 2).is_err());
+        assert!(read_records(&[b'0', 0xFF], SampleFormat::ZeroOne, 2).is_err());
+    }
+
+    #[test]
+    fn measure_record_batch_writes_shot_major_01_records() {
+        let s0 = vec![true, false, true, false, true];
+        let s1 = vec![false, true, false, true, false];
+        let mut batch = MeasureRecordBatch::new(5, 20);
+        assert_eq!(batch.stored(), 0);
+        batch.record_result(s0.clone()).unwrap();
+        assert_eq!(batch.lookback(1), Some(s0.as_slice()));
+        batch.record_result(s1.clone()).unwrap();
+        assert_eq!(batch.lookback(1), Some(s1.as_slice()));
+        assert_eq!(batch.lookback(2), Some(s0.as_slice()));
+        for _ in 0..50 {
+            batch.record_result(s0.clone()).unwrap();
+            batch.record_result(s1.clone()).unwrap();
+        }
+        assert_eq!(batch.unwritten(), 102);
+
+        let mut writer = MeasureRecordBatchWriter::new(5, SampleFormat::ZeroOne);
+        batch
+            .final_write_unwritten_results_to(&mut writer, &[false; 5])
+            .unwrap();
+        let output = writer.write_end();
+        for shot_index in 0..5 {
+            for sample_index in 0..102 {
+                assert_eq!(
+                    output[shot_index * 103 + sample_index],
+                    b'0' + u8::from((shot_index + sample_index + 1) % 2 == 1)
+                );
+            }
+            assert_eq!(output[shot_index * 103 + 102], b'\n');
+        }
+        assert!(batch.stored() <= 20);
+    }
+
+    #[test]
+    fn measure_record_batch_records_zero_result_to_edit() {
+        let mut batch = MeasureRecordBatch::new(5, 2);
+        batch.record_zero_result_to_edit()[2] = true;
+        assert_eq!(batch.stored(), 1);
+        assert_eq!(
+            batch.lookback(1),
+            Some([false, false, true, false, false].as_slice())
+        );
+        batch.record_zero_result_to_edit()[3] = true;
+        assert_eq!(
+            batch.lookback(1),
+            Some([false, false, false, true, false].as_slice())
+        );
+    }
+
+    #[test]
+    fn sparse_shot_matches_upstream_equality_string_and_mask_behavior() {
+        assert_eq!(
+            SparseShot::new(Vec::new(), vec![false; 64]),
+            SparseShot::new(Vec::new(), vec![false; 64])
+        );
+        assert_ne!(
+            SparseShot::new(Vec::new(), vec![false; 64]),
+            SparseShot::new(vec![2], vec![false; 64])
+        );
+        let mut mask = vec![false; 64];
+        mask[2] = true;
+        let shot = SparseShot::new(vec![1, 2, 3], mask.clone());
+        assert_eq!(
+            shot.stim_debug_string(),
+            "SparseShot{{1, 2, 3}, __1_____________________________________________________________}"
+        );
+        assert_eq!(shot.obs_mask_as_u64(), 4);
+
+        let mut wide_mask = vec![false; 125];
+        wide_mask[1] = true;
+        wide_mask[64] = true;
+        assert_eq!(SparseShot::new(Vec::new(), wide_mask).obs_mask_as_u64(), 2);
+    }
+
+    #[test]
+    fn ptb64_records_are_measurement_major_over_64_shot_groups() {
+        let mut records = vec![vec![false, false, false, false]; 64];
+        for record in records.iter_mut().take(5) {
+            record[1] = true;
+        }
+        assert_eq!(
+            write_ptb64_records(&records),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0x1F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
+            ]
+        );
+        let encoded = write_ptb64_records_checked(&records).unwrap();
+        assert_eq!(read_ptb64_records(&encoded, 4, 64).unwrap(), records);
+
+        let mut encoded_with_extra_group = encoded.clone();
+        encoded_with_extra_group.extend_from_slice(&encoded);
+        assert_eq!(
+            read_ptb64_records(&encoded_with_extra_group, 4, 64).unwrap(),
+            records
+        );
+        assert!(write_ptb64_records_checked(&records[..63]).is_err());
+        assert!(read_ptb64_records(&encoded[..31], 4, 64).is_err());
+        assert!(read_ptb64_records(&encoded, 0, 64).is_err());
+        assert_eq!(read_ptb64_records_all(&encoded, 4).unwrap(), records);
+        assert!(read_ptb64_records_all(&encoded[..31], 4).is_err());
+        assert!(read_ptb64_records_all(&encoded, 0).is_err());
+        assert!(read_ptb64_records_all(&[], 0).is_err());
+        assert_eq!(ptb64_record_count(&encoded, 4).unwrap(), 64);
+    }
+}

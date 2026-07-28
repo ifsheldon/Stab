@@ -19,7 +19,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
-stab-compat-corpus = { path = "../compat-corpus" }
+stab-compat-corpus = { path = "../../test-support/compat-corpus" }
 stab-core = { path = "../../crates/stab-core", features = ["ops-contracts"] }
 statrs = { workspace = true }
 tempfile = { workspace = true }

@@ -23,7 +23,9 @@ pub fn estimate_sampling_request(
         .ok()
         .and_then(|measurements| usize::try_from(measurements).ok())
         .map_or(Estimate::Unknown, |measurements| {
-            output_format.estimate_output_bytes(shots, measurements)
+            output_format
+                .estimate_output_bytes(shots, measurements)
+                .into()
         });
 
     ResourceEstimate::for_sampling_request(

@@ -1,8 +1,9 @@
 [package]
-name = "stab-core"
+name = "stab-records"
 version.workspace = true
 edition.workspace = true
-description = "Core circuit, detector error model, and simulator primitives for Stab."
+rust-version = "1.97.1"
+description = "Stable typed result records and Stim-compatible codecs for Stab."
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -10,19 +11,8 @@ homepage.workspace = true
 [lints]
 workspace = true
 
-[features]
-ops-contracts = []
-
 [dependencies]
-arrayvec = { workspace = true }
-hashbrown = { workspace = true }
-hex = { workspace = true }
-num-complex = { workspace = true }
-rand = { workspace = true }
-sha2 = { workspace = true }
-smallvec = { workspace = true }
 stab-bits = { workspace = true }
-stab-records = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

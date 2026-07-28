@@ -36,6 +36,15 @@ impl<T> Estimate<T> {
     }
 }
 
+impl<T> From<stab_records::EncodedSizeEstimate<T>> for Estimate<T> {
+    fn from(estimate: stab_records::EncodedSizeEstimate<T>) -> Self {
+        match estimate {
+            stab_records::EncodedSizeEstimate::Exact(value) => Self::Exact(value),
+            stab_records::EncodedSizeEstimate::Unknown => Self::Unknown,
+        }
+    }
+}
+
 /// Cheap resource information collected without executing the described operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ResourceEstimate {

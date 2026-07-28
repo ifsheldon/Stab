@@ -198,6 +198,7 @@ impl ConvertLayout {
                 0
             },
         )
+        .map_err(CircuitError::from)
         .map_err(CliError::from)
     }
 }

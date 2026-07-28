@@ -1,9 +1,6 @@
-use crate::{ByteSpan, CircuitError, CircuitResult, FormatErrorCode, FormatErrorContext};
+use crate::{ByteSpan, FormatError, FormatErrorCode, FormatErrorContext, RecordResult};
 
-pub(crate) fn b8_bytes_per_record(
-    input_len: usize,
-    bits_per_record: usize,
-) -> CircuitResult<usize> {
+pub(crate) fn b8_bytes_per_record(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
     let bytes_per_record = bits_per_record.div_ceil(8);
     if bytes_per_record == 0 {
         return Err(format_error(
@@ -37,7 +34,7 @@ pub(crate) fn ptb64_prefix_layout(
     input_len: usize,
     bits_per_record: usize,
     max_shots: usize,
-) -> CircuitResult<(usize, usize)> {
+) -> RecordResult<(usize, usize)> {
     if bits_per_record == 0 {
         return Err(format_error(
             FormatErrorCode::InvalidRecordWidth,
@@ -75,7 +72,7 @@ pub(crate) fn ptb64_prefix_layout(
     Ok((bytes_per_group, expected_bytes))
 }
 
-pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> CircuitResult<usize> {
+pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
     if bits_per_record == 0 {
         return Err(format_error(
             FormatErrorCode::InvalidRecordWidth,
@@ -113,7 +110,7 @@ pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> Ci
     })
 }
 
-fn ptb64_bytes_per_group(bits_per_record: usize) -> CircuitResult<usize> {
+fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usize> {
     bits_per_record.checked_mul(8).ok_or_else(|| {
         format_error(
             FormatErrorCode::ArithmeticOverflow,
@@ -130,9 +127,9 @@ pub(crate) fn decode_next_r8_record<F>(
     bits_per_record: usize,
     offset: &mut usize,
     mut record_hit: F,
-) -> CircuitResult<bool>
+) -> RecordResult<bool>
 where
-    F: FnMut(usize) -> CircuitResult<()>,
+    F: FnMut(usize) -> RecordResult<()>,
 {
     if *offset == input.len() {
         return Ok(false);
@@ -188,6 +185,6 @@ fn format_error(
     message: impl Into<String>,
     span: Option<ByteSpan>,
     context: FormatErrorContext,
-) -> CircuitError {
-    CircuitError::invalid_result_format_diagnostic_with_context(code, message, span, context)
+) -> FormatError {
+    FormatError::invalid_result_format_diagnostic_with_context(code, message, span, context)
 }

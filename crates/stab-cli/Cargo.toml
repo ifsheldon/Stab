@@ -19,5 +19,5 @@ stab-core = { path = "../stab-core" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-stab-compat-corpus = { path = "../../ops/compat-corpus" }
+stab-compat-corpus = { path = "../../test-support/compat-corpus" }
 tempfile = { workspace = true }

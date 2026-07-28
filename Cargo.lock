@@ -2174,6 +2174,7 @@ dependencies = [
  "signal-hook",
  "stab-cli",
  "stab-core",
+ "stab-records",
  "tempfile",
  "thiserror",
 ]
@@ -2225,6 +2226,7 @@ dependencies = [
  "smallvec",
  "stab-bits",
  "stab-compat-corpus",
+ "stab-records",
  "thiserror",
 ]
 
@@ -2256,6 +2258,17 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "stab-records"
+version = "0.1.1"
+dependencies = [
+ "allocation-counter",
+ "proptest",
+ "stab-bits",
+ "stab-compat-corpus",
+ "thiserror",
 ]
 
 [[package]]

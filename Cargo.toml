@@ -4,11 +4,12 @@ members = [
     "crates/stab-bits",
     "crates/stab-cli",
     "crates/stab-core",
+    "crates/stab-records",
     "ops/architecture",
     "ops/bench",
-    "ops/compat-corpus",
     "ops/oracle",
     "ops/pre-commit",
+    "test-support/compat-corpus",
 ]
 default-members = [
     "crates/stab-core",
@@ -43,6 +44,7 @@ sha2 = "0.11.0"
 signal-hook = "0.4.4"
 smallvec = { version = "1.15.2", features = ["union"] }
 stab-bits = { path = "crates/stab-bits", version = "0.1.1" }
+stab-records = { path = "crates/stab-records", version = "0.1.1" }
 statrs = { version = "0.18.0", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.18"

@@ -25,10 +25,12 @@ use super::public_api::{
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::CargoTestSelector;
 
+mod case_id;
 mod evidence;
 mod property_plan;
 mod qualification_cases;
 
+pub(super) use case_id::stable_id;
 use evidence::{
     behavioral_surface_for_feature, infer_feature_from_oracle_argv, make_planned_evidence_case,
     oracle_behavioral_surface, planned_api_selector, planned_selector,
@@ -103,7 +105,7 @@ pub(crate) enum InventoryError {
     StableIdCollision(String),
 
     #[error(
-        "public API item {crate_name}::{path} from {source_path} has no source-owned qualification feature"
+        "public API item {path} in crate {crate_name} from {source_path} has no source-owned qualification feature"
     )]
     UnclassifiedPublicApi {
         crate_name: String,
@@ -258,14 +260,18 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         .collect::<Vec<_>>();
 
     let bits_api = generate_rustdoc_inventory(&root.path, "stab-bits", "stab_bits")?;
+    let records_api = generate_rustdoc_inventory(&root.path, "stab-records", "stab_records")?;
     let mut extracted_api = generate_rustdoc_inventory(&root.path, "stab-core", "stab_core")?;
-    resolve_external_reexports(&mut extracted_api, std::slice::from_ref(&bits_api))?;
-    if extracted_api.format_version != bits_api.format_version {
+    resolve_external_reexports(&mut extracted_api, &[bits_api.clone(), records_api.clone()])?;
+    if extracted_api.format_version != bits_api.format_version
+        || extracted_api.format_version != records_api.format_version
+    {
         return Err(InventoryError::PublicApi(PublicApiError::InvalidField(
             "rustdoc format version mismatch",
         )));
     }
     extracted_api.items.extend(bits_api.items);
+    extracted_api.items.extend(records_api.items);
     let cli_api = generate_rustdoc_inventory(&root.path, "stab-cli", "stab_cli")?;
     if extracted_api.format_version != cli_api.format_version {
         return Err(InventoryError::PublicApi(PublicApiError::InvalidField(
@@ -556,26 +562,37 @@ fn make_public_api_records(
     let mut evidence_by_id = BTreeMap::<CaseId, EvidenceCase>::new();
     let mut ids = BTreeSet::new();
     let mut owner_features = BTreeMap::new();
-    for item in extracted.iter().filter(|item| item.path == item.owner_path) {
-        let feature_id =
-            classify_public_api_source(&item.crate_name, &item.source_path, &item.owner_path)
-                .ok_or_else(|| InventoryError::UnclassifiedPublicApi {
-                    crate_name: item.crate_name.clone(),
-                    path: item.owner_path.clone(),
-                    source_path: item.source_path.clone(),
-                })?;
+    for item in extracted.iter().filter(|item| {
+        item.crate_name == item.evidence_crate_name && item.path == item.evidence_owner_path
+    }) {
+        let feature_id = classify_public_api_source(
+            &item.evidence_crate_name,
+            &item.source_path,
+            &item.evidence_owner_path,
+        )
+        .ok_or_else(|| InventoryError::UnclassifiedPublicApi {
+            crate_name: item.evidence_crate_name.clone(),
+            path: item.evidence_owner_path.clone(),
+            source_path: item.source_path.clone(),
+        })?;
         owner_features.insert(
-            (item.crate_name.as_str(), item.owner_path.as_str()),
+            (
+                item.evidence_crate_name.as_str(),
+                item.evidence_owner_path.as_str(),
+            ),
             feature_id,
         );
     }
     for item in extracted {
         let owner_feature_id = owner_features
-            .get(&(item.crate_name.as_str(), item.owner_path.as_str()))
+            .get(&(
+                item.evidence_crate_name.as_str(),
+                item.evidence_owner_path.as_str(),
+            ))
             .copied()
             .ok_or_else(|| InventoryError::UnclassifiedPublicApi {
-                crate_name: item.crate_name.clone(),
-                path: item.owner_path.clone(),
+                crate_name: item.evidence_crate_name.clone(),
+                path: item.evidence_owner_path.clone(),
                 source_path: item.source_path.clone(),
             })?;
         let feature_id =
@@ -590,12 +607,12 @@ fn make_public_api_records(
         if !ids.insert(item_id.clone()) {
             return Err(InventoryError::StableIdCollision(item_id.to_string()));
         }
-        let evidence_owner_path = if feature_id == owner_feature_id {
-            &item.owner_path
+        let (evidence_crate_name, evidence_owner_path) = if feature_id == owner_feature_id {
+            (&item.evidence_crate_name, &item.evidence_owner_path)
         } else {
-            &item.path
+            (&item.crate_name, &item.path)
         };
-        let owner_key = format!("{}\0{}", item.crate_name, evidence_owner_path);
+        let owner_key = format!("{evidence_crate_name}\0{evidence_owner_path}");
         let owner_case_id = stable_id(StableCaseDomain::EvidenceApi, &owner_key);
         evidence_by_id
             .entry(owner_case_id.clone())
@@ -1173,16 +1190,6 @@ fn ensure_limit(kind: &'static str, actual: usize) -> Result<(), InventoryError>
     } else {
         Ok(())
     }
-}
-
-pub(super) fn stable_id(domain: StableCaseDomain, key: &str) -> CaseId {
-    let digest = Sha256::digest(key.as_bytes());
-    let suffix = digest
-        .iter()
-        .take(8)
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    CaseId::from_stable_suffix(domain, &suffix)
 }
 
 #[cfg(test)]

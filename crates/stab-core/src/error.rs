@@ -1,4 +1,4 @@
-use crate::{FormatError, FormatErrorCode, FormatErrorContext, ParseError, ResourceLimitError};
+use crate::{FormatError, ParseError, ResourceLimitError};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -105,23 +105,6 @@ impl CircuitError {
         Self::InvalidResultFormat(FormatError::invalid_data(message))
     }
 
-    pub(crate) fn invalid_result_format_diagnostic(
-        code: FormatErrorCode,
-        message: impl Into<String>,
-        span: Option<crate::ByteSpan>,
-    ) -> Self {
-        Self::InvalidResultFormat(FormatError::new(code, message, span))
-    }
-
-    pub(crate) fn invalid_result_format_diagnostic_with_context(
-        code: FormatErrorCode,
-        message: impl Into<String>,
-        span: Option<crate::ByteSpan>,
-        context: FormatErrorContext,
-    ) -> Self {
-        Self::InvalidResultFormat(FormatError::with_context(code, message, span, context))
-    }
-
     pub const fn format_error(&self) -> Option<&FormatError> {
         match self {
             Self::InvalidResultFormat(error) => Some(error),
@@ -161,5 +144,11 @@ impl CircuitError {
 impl From<FormatError> for CircuitError {
     fn from(error: FormatError) -> Self {
         Self::InvalidResultFormat(error)
+    }
+}
+
+impl From<stab_records::FormatError> for CircuitError {
+    fn from(error: stab_records::FormatError) -> Self {
+        Self::InvalidResultFormat(error.into())
     }
 }

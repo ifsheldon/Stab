@@ -310,9 +310,10 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .iter()
             .all(|case| case.status == EvidenceStatus::Implemented)
     );
-    let sample_format_parent = result_qualification_cases
+    let sample_format_parent = manifest
+        .evidence_cases
         .iter()
-        .find(|case| case.source_id == "cq2-result-writer-exact-format-contract")
+        .find(|case| case.source_id == "a3-record-writer-contract")
         .expect("SampleFormat writer-byte qualification parent");
     let result_api_items = manifest
         .public_api_items
@@ -325,11 +326,13 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .iter()
             .any(|case| case.id == item.owner_case_id && case.status == EvidenceStatus::Implemented)
     }));
-    let sample_format = result_api_items
-        .iter()
-        .find(|item| item.path.as_str() == "stab_core::SampleFormat")
-        .expect("SampleFormat API item");
-    assert_eq!(sample_format.owner_case_id, sample_format_parent.id);
+    for path in ["stab_records::SampleFormat", "stab_core::SampleFormat"] {
+        let sample_format = result_api_items
+            .iter()
+            .find(|item| item.path.as_str() == path)
+            .expect("SampleFormat API item");
+        assert_eq!(sample_format.owner_case_id, sample_format_parent.id);
+    }
     assert!(result_api_items.iter().any(|item| {
         item.path
             .as_str()
@@ -337,11 +340,15 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             && item.owner_case_id == sample_format_parent.id
     }));
 
-    let dets_type_parent = result_qualification_cases
+    let dets_type_parent = manifest
+        .evidence_cases
         .iter()
-        .find(|case| case.source_id == "cq2-result-dets-public-type-contract")
+        .find(|case| case.source_id == "a3-record-corpus-acceptance-contract")
         .expect("typed DETS qualification parent");
     for path in [
+        "stab_records::DetsLayout",
+        "stab_records::DetsResultType",
+        "stab_records::DetsToken",
         "stab_core::DetsLayout",
         "stab_core::DetsResultType",
         "stab_core::DetsToken",

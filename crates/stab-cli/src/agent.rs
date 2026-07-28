@@ -181,9 +181,9 @@ where
         None
     };
     if let Some(visible_measurement_count) = visible_measurements {
-        estimates.output_bytes = EstimateReport::from(
+        estimates.output_bytes = EstimateReport::from(Estimate::from(
             output_format.estimate_output_bytes(args.shots, visible_measurement_count),
-        );
+        ));
     }
 
     let report = SamplePlanReport {

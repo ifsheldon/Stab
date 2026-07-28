@@ -492,3 +492,96 @@ impl FormatError {
         self.context
     }
 }
+
+impl From<stab_records::FormatError> for FormatError {
+    fn from(error: stab_records::FormatError) -> Self {
+        let span = error
+            .span()
+            .map(|span| ByteSpan::from_valid_range(span.byte_start(), span.byte_length()));
+        Self::with_context(
+            format_error_code_from_records(error.code()),
+            error.message(),
+            span,
+            format_error_context_from_records(error.context()),
+        )
+    }
+}
+
+const fn format_error_code_from_records(code: stab_records::FormatErrorCode) -> FormatErrorCode {
+    match code {
+        stab_records::FormatErrorCode::InvalidData => FormatErrorCode::InvalidData,
+        stab_records::FormatErrorCode::UnexpectedEndOfInput => {
+            FormatErrorCode::UnexpectedEndOfInput
+        }
+        stab_records::FormatErrorCode::InvalidRecordWidth => FormatErrorCode::InvalidRecordWidth,
+        stab_records::FormatErrorCode::InvalidByte => FormatErrorCode::InvalidByte,
+        stab_records::FormatErrorCode::MissingRecordTerminator => {
+            FormatErrorCode::MissingRecordTerminator
+        }
+        stab_records::FormatErrorCode::InvalidRecordSeparator => {
+            FormatErrorCode::InvalidRecordSeparator
+        }
+        stab_records::FormatErrorCode::InvalidPrefix => FormatErrorCode::InvalidPrefix,
+        stab_records::FormatErrorCode::MissingIndex => FormatErrorCode::MissingIndex,
+        stab_records::FormatErrorCode::IntegerOverflow => FormatErrorCode::IntegerOverflow,
+        stab_records::FormatErrorCode::IndexOutOfRange => FormatErrorCode::IndexOutOfRange,
+        stab_records::FormatErrorCode::InvalidPackedLength => FormatErrorCode::InvalidPackedLength,
+        stab_records::FormatErrorCode::RunLengthOvershoot => FormatErrorCode::RunLengthOvershoot,
+        stab_records::FormatErrorCode::ArithmeticOverflow => FormatErrorCode::ArithmeticOverflow,
+    }
+}
+
+const fn format_error_context_from_records(
+    context: stab_records::FormatErrorContext,
+) -> FormatErrorContext {
+    match context {
+        stab_records::FormatErrorContext::None => FormatErrorContext::None,
+        stab_records::FormatErrorContext::RecordWidth {
+            actual_bits,
+            expected_bits,
+        } => FormatErrorContext::RecordWidth {
+            actual_bits,
+            expected_bits,
+        },
+        stab_records::FormatErrorContext::MinimumRecordWidth {
+            actual_bits,
+            minimum_bits,
+        } => FormatErrorContext::MinimumRecordWidth {
+            actual_bits,
+            minimum_bits,
+        },
+        stab_records::FormatErrorContext::InvalidByte { byte } => {
+            FormatErrorContext::InvalidByte { byte }
+        }
+        stab_records::FormatErrorContext::Index {
+            result_type,
+            index,
+            exclusive_bound,
+        } => FormatErrorContext::Index {
+            result_type,
+            index,
+            exclusive_bound,
+        },
+        stab_records::FormatErrorContext::InputLengthMultiple {
+            actual_bytes,
+            byte_multiple,
+        } => FormatErrorContext::InputLengthMultiple {
+            actual_bytes,
+            byte_multiple,
+        },
+        stab_records::FormatErrorContext::MinimumInputLength {
+            actual_bytes,
+            minimum_bytes,
+        } => FormatErrorContext::MinimumInputLength {
+            actual_bytes,
+            minimum_bytes,
+        },
+        stab_records::FormatErrorContext::RunLength {
+            decoded_bits,
+            expected_bits,
+        } => FormatErrorContext::RunLength {
+            decoded_bits,
+            expected_bits,
+        },
+    }
+}

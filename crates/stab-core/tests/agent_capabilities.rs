@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 
 use stab_core::{
     CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint, CompiledSampler,
-    Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat, SampleFormat,
-    estimate_sampling_request,
+    EncodedSizeEstimate, Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
+    SampleFormat, estimate_sampling_request,
     result_formats::{
         read_ptb64_records_all, read_records, write_ptb64_records_checked, write_records,
     },
@@ -102,23 +102,23 @@ fn record_codec_descriptors_are_unique_and_structurally_truthful() {
     assert_eq!(RecordFormat::Ptb64.records_per_group(), 64);
     assert_eq!(
         RecordFormat::ZeroOne.estimate_output_bytes(3, 9),
-        Estimate::Exact(30)
+        EncodedSizeEstimate::Exact(30)
     );
     assert_eq!(
         RecordFormat::B8.estimate_output_bytes(3, 9),
-        Estimate::Exact(6)
+        EncodedSizeEstimate::Exact(6)
     );
     assert_eq!(
         RecordFormat::Ptb64.estimate_output_bytes(64, 9),
-        Estimate::Exact(72)
+        EncodedSizeEstimate::Exact(72)
     );
     assert_eq!(
         RecordFormat::Ptb64.estimate_output_bytes(63, 9),
-        Estimate::Unknown
+        EncodedSizeEstimate::Unknown
     );
     assert_eq!(
         RecordFormat::Dets.estimate_output_bytes(3, 9),
-        Estimate::Unknown
+        EncodedSizeEstimate::Unknown
     );
 
     let records = (0usize..64)
