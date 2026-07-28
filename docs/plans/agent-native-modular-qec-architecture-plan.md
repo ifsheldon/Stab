@@ -720,7 +720,8 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 - PTB64 routing.
 - Affected CLI rows.
 - Independent untimed output witnesses for both pinned Stim and Stab on every affected process-symmetric CLI row.
-- Source-owned shot-count and digest witnesses for every report-only A5 phase measurement.
+- Source-owned exact plan dimensions or a frozen plan fingerprint for every report-only compile-and-release phase.
+- Source-owned shot-count plus a frozen per-result witness or ordered sequence digest for every output-producing report-only A5 phase.
 
 ### Done Criteria
 
@@ -728,7 +729,7 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 - Caller byte limits account for all retained DEM session and compatibility-sink storage, while fused detection enforces one aggregate private session envelope.
 - Direct detector-frame compilation accounts for the complete retained conversion and executable representation before materialization.
 - Incremental conversion cannot split one logical delivery across sinks or silently reuse an abandoned or failed lifecycle.
-- Timed A5 diagnostics cannot accept empty, truncated, reordered, or misrouted output from either side of a process comparison or from a report-only phase.
+- Timed A5 compile diagnostics reject changed plan dimensions or fingerprints, and output-producing diagnostics cannot accept empty, truncated, reordered, or misrouted results from either side of a process comparison or from a report-only phase.
 - No CLI command bypasses the public plan, session, and sink path.
 
 The caller byte policy accounts for width-dependent heap capacity retained by reusable detection, observable, sampled-error, and packed batch planes plus compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are not charged to this dynamic scratch budget.
