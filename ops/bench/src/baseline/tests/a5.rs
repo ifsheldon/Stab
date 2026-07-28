@@ -1,7 +1,10 @@
 use super::*;
 use crate::{
     allocations::AllocationTrackingGuard,
-    baseline::{m9, m11, measure_stab_iterations_with_memory_operation},
+    baseline::{
+        batch_sinks::OutputWitness, cli_process, m9, m11,
+        measure_stab_iterations_with_memory_operation,
+    },
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -116,5 +119,47 @@ fn affected_detection_and_dem_cli_rows_retain_one_process_ratio() {
         );
         assert_eq!(result.stim_median_seconds, Some(1.0), "{row_id}");
         assert_eq!(result.stab_median_seconds, Some(1.0), "{row_id}");
+    }
+}
+
+#[test]
+fn affected_detection_and_dem_cli_rows_validate_pinned_stim_output() {
+    let root = RepoRoot::resolve(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repository root"),
+    )
+    .expect("resolve repository root");
+    let manifest = BenchmarkManifest::read(&root).expect("read benchmark manifest");
+    for row_id in [
+        "m9-detect-text-cli",
+        "m9-detect-bitpacked-cli",
+        "m9-detect-primary-matrix-contract",
+        "m9-m2d-text-cli",
+        "m9-m2d-bitpacked-contract",
+        "m9-m2d-primary-matrix-contract",
+        "m11-sample-dem-cli",
+        "m11-sample-dem-sparse-contract",
+        "m11-sample-dem-dense-contract",
+        "m11-sample-dem-repeated-contract",
+        "m11-sample-dem-high-detector-contract",
+    ] {
+        let row = manifest
+            .rows
+            .iter()
+            .find(|row| row.id == row_id)
+            .expect("affected CLI manifest row");
+        let expected =
+            cli_process::stim_cli_expected_witness(row_id).expect("pinned Stim output witness");
+        cli_process::ensure_stim_cli_witness(row, expected).expect("matching witness");
+
+        let changed = OutputWitness::new(expected.bytes.saturating_add(1), expected.digest);
+        let error =
+            cli_process::ensure_stim_cli_witness(row, changed).expect_err("changed witness");
+        assert!(
+            error.to_string().contains("pinned Stim CLI output changed"),
+            "{row_id}: {error}"
+        );
     }
 }

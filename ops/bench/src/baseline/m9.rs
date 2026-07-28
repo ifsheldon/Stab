@@ -54,6 +54,14 @@ const FLOW_CHECK_CASES: usize = 4;
 const FLOW_CHECK_FLOWS: usize = 27;
 const M2D_PHASE_BATCH_SHOTS: usize = 64;
 #[cfg(not(test))]
+const DETECTION_PHASE_FIRST_WITNESS: (u64, u64) = (1_703_389_565_409_843_255, DETECT_SHOTS as u64);
+#[cfg(test)]
+const DETECTION_PHASE_FIRST_WITNESS: (u64, u64) = (3_477_855_591_213_421_345, DETECT_SHOTS as u64);
+#[cfg(not(test))]
+const M2D_PHASE_WITNESS: (u64, u64) = (13_532_626_590_392_138_993, M2D_PHASE_BATCH_SHOTS as u64);
+#[cfg(test)]
+const M2D_PHASE_WITNESS: (u64, u64) = (13_532_626_590_392_138_993, M2D_PHASE_BATCH_SHOTS as u64);
+#[cfg(not(test))]
 const DETECT_PTB64_SHOTS: usize = 1024;
 #[cfg(test)]
 const DETECT_PTB64_SHOTS: usize = 64;
@@ -826,10 +834,12 @@ fn measure_detection_session(
     let plan = DetectionSamplingCompiler::new()
         .compile(circuit)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let expected = detection_phase_witnesses(row, &plan)?;
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let mut sink = DetectionDigestSink::default();
+    let mut iteration = 0_usize;
     measure_stab_iterations(
         "stab_detection_session_sample_to_detection",
         super::STAB_COMPARE_ITERATIONS,
@@ -838,10 +848,51 @@ fn measure_detection_session(
             let summary = session
                 .run(ShotCount::new(DETECT_SHOTS as u64), &mut sink)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((summary.committed_shots(), sink.witness()));
+            let actual = sink.witness();
+            let expected = expected.get(iteration).copied().ok_or_else(|| {
+                stab_runner_error(&row.id, "detection witness sequence exhausted")
+            })?;
+            ensure_detection_phase_witness(
+                row,
+                "detection session",
+                expected,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            iteration += 1;
+            black_box(actual);
             Ok(())
         },
     )
+}
+
+fn detection_phase_witnesses(
+    row: &BenchmarkRow,
+    plan: &stab_core::execution::DetectionSamplingPlan,
+) -> Result<Vec<(u64, u64)>, BenchError> {
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DetectionDigestSink::default();
+    let mut witnesses = Vec::with_capacity(super::STAB_COMPARE_ITERATIONS);
+    for _ in 0..super::STAB_COMPARE_ITERATIONS {
+        sink.reset();
+        let summary = session
+            .run(ShotCount::new(DETECT_SHOTS as u64), &mut sink)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        let actual = sink.witness();
+        if witnesses.is_empty() {
+            ensure_detection_phase_witness(
+                row,
+                "detection session preflight",
+                DETECTION_PHASE_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+        }
+        witnesses.push(actual);
+    }
+    Ok(witnesses)
 }
 
 fn measure_m2d_plan_compile(
@@ -890,6 +941,24 @@ fn measure_m2d_session_batch(
     let plan = MeasurementToDetectionCompiler::new()
         .compile(circuit)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut preflight_session = plan
+        .session()
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut preflight_sink = DetectionDigestSink::default();
+    let preflight_summary = preflight_session
+        .run(
+            MeasurementBatchView::new(batch.view()),
+            None,
+            &mut preflight_sink,
+        )
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    ensure_detection_phase_witness(
+        row,
+        "m2d session preflight",
+        M2D_PHASE_WITNESS,
+        preflight_summary.committed_shots().get(),
+        preflight_sink.witness(),
+    )?;
     let mut session = plan
         .session()
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -900,12 +969,38 @@ fn measure_m2d_session_batch(
         || {
             sink.reset();
             let summary = session
-                .write_batch(MeasurementBatchView::new(batch.view()), None, &mut sink)
+                .run(MeasurementBatchView::new(batch.view()), None, &mut sink)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((summary.committed_shots(), sink.witness()));
+            let actual = sink.witness();
+            ensure_detection_phase_witness(
+                row,
+                "m2d session",
+                M2D_PHASE_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            black_box(actual);
             Ok(())
         },
     )
+}
+
+fn ensure_detection_phase_witness(
+    row: &BenchmarkRow,
+    phase: &str,
+    expected: (u64, u64),
+    committed_shots: u64,
+    actual: (u64, u64),
+) -> Result<(), BenchError> {
+    if committed_shots == expected.1 && actual == expected {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        &row.id,
+        format!(
+            "{phase} witness changed: expected digest/shots {expected:?}, got {actual:?} with {committed_shots} committed shots"
+        ),
+    ))
 }
 
 fn m2d_measurements(row_id: &str, circuit: &Circuit) -> Result<Vec<Vec<bool>>, BenchError> {

@@ -14,6 +14,48 @@ use super::{
 
 const CLI_PROCESS_LAUNCHES_PER_MEASUREMENT: usize = 1;
 
+pub(super) fn stim_cli_expected_witness(row_id: &str) -> Option<OutputWitness> {
+    match row_id {
+        "m9-detect-text-cli" => Some(OutputWitness::new(5_120, 18_083_487_476_645_872_421)),
+        "m9-detect-bitpacked-cli" => Some(OutputWitness::new(1_024, 5_897_611_217_847_481_125)),
+        "m9-detect-primary-matrix-contract" | "m9-m2d-primary-matrix-contract" => {
+            Some(OutputWitness::new(64, 13_380_826_962_402_805_797))
+        }
+        "m9-m2d-text-cli" => Some(OutputWitness::new(13, 9_428_886_782_815_705_459)),
+        "m9-m2d-bitpacked-contract" => Some(OutputWitness::new(2, 590_682_968_308_805_178)),
+        "m11-sample-dem-cli" => Some(OutputWitness::new(2_048, 16_023_368_928_971_082_172)),
+        "m11-sample-dem-sparse-contract" => {
+            Some(OutputWitness::new(16_448, 16_538_930_641_999_726_324))
+        }
+        "m11-sample-dem-dense-contract" => {
+            Some(OutputWitness::new(1_024, 5_897_611_217_847_481_125))
+        }
+        "m11-sample-dem-repeated-contract" => {
+            Some(OutputWitness::new(1_088, 16_957_738_793_241_521_456))
+        }
+        "m11-sample-dem-high-detector-contract" => {
+            Some(OutputWitness::new(32_768, 10_333_885_101_303_931_685))
+        }
+        _ => None,
+    }
+}
+
+pub(super) fn ensure_stim_cli_witness(
+    row: &BenchmarkRow,
+    actual: OutputWitness,
+) -> Result<(), BenchError> {
+    let Some(expected) = stim_cli_expected_witness(&row.id) else {
+        return Ok(());
+    };
+    if actual == expected {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        &row.id,
+        format!("pinned Stim CLI output changed: expected {expected:?}, got {actual:?}"),
+    ))
+}
+
 pub(super) fn run_stab_cli_process_row(
     root: &RepoRoot,
     profile: &str,

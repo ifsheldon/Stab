@@ -1012,6 +1012,14 @@ fn run_stim_cli_row(
         .map(OsString::from)
         .collect::<Vec<_>>();
     let stdin = row.stdin(root)?;
+    if cli_process::stim_cli_expected_witness(&row.id).is_some() {
+        let preflight = run_process(&root.stim_binary(), &args, &stdin, &root.path, true)?;
+        check_success(&root.stim_binary(), &preflight)?;
+        cli_process::ensure_stim_cli_witness(
+            row,
+            batch_sinks::OutputWitness::from_bytes(&preflight.stdout),
+        )?;
+    }
     let mut timings = Vec::new();
     for _ in 0..iterations {
         let start = Instant::now();

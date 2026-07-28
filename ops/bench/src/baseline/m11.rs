@@ -36,6 +36,36 @@ const M11_CONTRACT_ITERATIONS: usize = 8;
 #[cfg(test)]
 const M11_CONTRACT_ITERATIONS: usize = 1;
 #[cfg(not(test))]
+const DEM_DETECTOR_FIRST_WITNESS: (u64, u64, u64) =
+    (10_655_702_427_225_054_044, 0, M11_SAMPLE_DEM_SHOTS as u64);
+#[cfg(test)]
+const DEM_DETECTOR_FIRST_WITNESS: (u64, u64, u64) =
+    (6_865_066_094_078_859_835, 0, M11_SAMPLE_DEM_SHOTS as u64);
+#[cfg(not(test))]
+const DEM_SAMPLED_ERROR_FIRST_WITNESS: (u64, u64, u64) = (
+    10_655_702_427_225_054_044,
+    19_048_448_694_863_617,
+    M11_SAMPLE_DEM_SHOTS as u64,
+);
+#[cfg(test)]
+const DEM_SAMPLED_ERROR_FIRST_WITNESS: (u64, u64, u64) = (
+    6_865_066_094_078_859_835,
+    15_198_978_754_495_808_650,
+    M11_SAMPLE_DEM_SHOTS as u64,
+);
+#[cfg(not(test))]
+const DEM_REPLAY_WITNESS: (u64, u64, u64) = (
+    6_915_694_862_520_406_541,
+    13_241_288_651_169_304_623,
+    M11_SAMPLE_DEM_SHOTS as u64,
+);
+#[cfg(test)]
+const DEM_REPLAY_WITNESS: (u64, u64, u64) = (
+    13_834_261_287_016_441_736,
+    7_322_621_584_440_746_172,
+    M11_SAMPLE_DEM_SHOTS as u64,
+);
+#[cfg(not(test))]
 const DENSE_DETECTOR_COUNT: usize = 128;
 #[cfg(test)]
 const DENSE_DETECTOR_COUNT: usize = 16;
@@ -286,10 +316,12 @@ fn measure_dem_session_detector_only(
     let plan = DemSamplingCompiler::new()
         .compile(model)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let expected = detector_phase_witnesses(row, &plan)?;
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let mut sink = DemDigestSink::default();
+    let mut iteration = 0_usize;
     measure_stab_iterations(
         "stab_dem_session_detector_only",
         M11_CONTRACT_ITERATIONS,
@@ -298,10 +330,52 @@ fn measure_dem_session_detector_only(
             let summary = session
                 .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((summary.committed_shots(), sink.witness()));
+            let actual = sink.witness();
+            let expected = expected
+                .get(iteration)
+                .copied()
+                .ok_or_else(|| stab_runner_error(&row.id, "detector witness sequence exhausted"))?;
+            ensure_dem_phase_witness(
+                row,
+                "DEM detector-only session",
+                expected,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            iteration += 1;
+            black_box(actual);
             Ok(())
         },
     )
+}
+
+fn detector_phase_witnesses(
+    row: &BenchmarkRow,
+    plan: &stab_core::execution::DemSamplingPlan,
+) -> Result<Vec<(u64, u64, u64)>, BenchError> {
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    let mut witnesses = Vec::with_capacity(M11_CONTRACT_ITERATIONS);
+    for _ in 0..M11_CONTRACT_ITERATIONS {
+        sink.reset();
+        let summary = session
+            .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        let actual = sink.witness();
+        if witnesses.is_empty() {
+            ensure_dem_phase_witness(
+                row,
+                "DEM detector-only preflight",
+                DEM_DETECTOR_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+        }
+        witnesses.push(actual);
+    }
+    Ok(witnesses)
 }
 
 fn measure_dem_session_with_sampled_errors(
@@ -311,10 +385,12 @@ fn measure_dem_session_with_sampled_errors(
     let plan = DemSamplingCompiler::new()
         .compile(model)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let expected = sampled_error_phase_witnesses(row, &plan)?;
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let mut sink = DemDigestSink::default();
+    let mut iteration = 0_usize;
     measure_stab_iterations(
         "stab_dem_session_with_sampled_errors",
         M11_CONTRACT_ITERATIONS,
@@ -323,10 +399,51 @@ fn measure_dem_session_with_sampled_errors(
             let summary = session
                 .run_with_sampled_errors(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((summary.committed_shots(), sink.witness()));
+            let actual = sink.witness();
+            let expected = expected.get(iteration).copied().ok_or_else(|| {
+                stab_runner_error(&row.id, "sampled-error witness sequence exhausted")
+            })?;
+            ensure_dem_phase_witness(
+                row,
+                "DEM sampled-error session",
+                expected,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            iteration += 1;
+            black_box(actual);
             Ok(())
         },
     )
+}
+
+fn sampled_error_phase_witnesses(
+    row: &BenchmarkRow,
+    plan: &stab_core::execution::DemSamplingPlan,
+) -> Result<Vec<(u64, u64, u64)>, BenchError> {
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    let mut witnesses = Vec::with_capacity(M11_CONTRACT_ITERATIONS);
+    for _ in 0..M11_CONTRACT_ITERATIONS {
+        sink.reset();
+        let summary = session
+            .run_with_sampled_errors(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        let actual = sink.witness();
+        if witnesses.is_empty() {
+            ensure_dem_phase_witness(
+                row,
+                "DEM sampled-error preflight",
+                DEM_SAMPLED_ERROR_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+        }
+        witnesses.push(actual);
+    }
+    Ok(witnesses)
 }
 
 fn measure_dem_session_replay(
@@ -343,6 +460,20 @@ fn measure_dem_session_replay(
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
+    let mut preflight_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut preflight_sink = DemDigestSink::default();
+    let preflight_summary = preflight_session
+        .replay(&replay_records, &mut preflight_sink)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    ensure_dem_phase_witness(
+        row,
+        "DEM replay preflight",
+        DEM_REPLAY_WITNESS,
+        preflight_summary.committed_shots().get(),
+        preflight_sink.witness(),
+    )?;
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -352,9 +483,35 @@ fn measure_dem_session_replay(
         let summary = session
             .replay(&replay_records, &mut sink)
             .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box((summary.committed_shots(), sink.witness()));
+        let actual = sink.witness();
+        ensure_dem_phase_witness(
+            row,
+            "DEM replay session",
+            DEM_REPLAY_WITNESS,
+            summary.committed_shots().get(),
+            actual,
+        )?;
+        black_box(actual);
         Ok(())
     })
+}
+
+fn ensure_dem_phase_witness(
+    row: &BenchmarkRow,
+    phase: &str,
+    expected: (u64, u64, u64),
+    committed_shots: u64,
+    actual: (u64, u64, u64),
+) -> Result<(), BenchError> {
+    if committed_shots == expected.2 && actual == expected {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        &row.id,
+        format!(
+            "{phase} witness changed: expected detection/error/shots {expected:?}, got {actual:?} with {committed_shots} committed shots"
+        ),
+    ))
 }
 
 fn parse_dem(row_id: &str, fixture: &str) -> Result<DetectorErrorModel, BenchError> {
