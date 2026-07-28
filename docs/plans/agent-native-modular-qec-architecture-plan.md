@@ -678,11 +678,14 @@ Status: Active; implementation complete, closure audit and clean evidence pendin
 - Preserve detector-frame execution as a first-class private detection-sampling plan variant.
 - Reuse conversion and reference-sample scratch across batches.
 - Add a measurement-to-detection sink adapter.
+- Bind incremental measurement-to-detection delivery to one sink for its complete lifecycle; reject double finish and write-after-finish, retain exact delivery-local progress on finish failure, and poison a parent session when committed output is abandoned.
 - Represent detectors, observables, and optional sampled errors as distinct batch planes.
 - Preserve distinct DEM detector-only and sampled-error algorithms because they consume randomness differently.
 - Validate and rewind replay input before activating output sinks, preserving existing malformed-replay file safety.
 - Keep initial `m2d` input delivery record-at-a-time so a later malformed record cannot suppress already valid output.
 - Preserve replay semantics and bounded folded DEM traversal.
+- Admit DEM replay poison state and total traversal work before scanning caller-owned record widths.
+- Charge the complete retained direct detector-frame conversion plan and executable circuit representation to `max_compiled_bytes` before materialization, and construct the admitted executable through fallible reservations.
 - Migrate `detect`, `m2d`, and `sample_dem`.
 
 Compatibility scope is explicit. Finite-shot sampling materializers and visitors delegate through sessions. `CompiledDetectionConverter` remains the public low-level per-record kernel used by `MeasurementToDetectionSession`, and the unknown-length iterator form of DEM replay retains direct folded traversal because it cannot declare a shot count before iteration. These two compatibility kernels do not expose an alternate CLI path.
@@ -703,6 +706,9 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 - Existing path-alias preflight and writer-error propagation.
 - `m2d` valid-prefix output before a later malformed record.
 - Replay validation before any output creation or truncation.
+- One-sink incremental conversion lifecycle, including double finish, write-after-finish, finish-failure progress, and abandoned-delivery poisoning.
+- Direct detector-frame exact compiled-byte acceptance and first-byte-over rejection with executable targets, repeat bodies, and stripped nonsemantic metadata.
+- Replay convenience admission before caller-record traversal.
 
 ### Benchmarks
 
@@ -713,11 +719,16 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 - Replay.
 - PTB64 routing.
 - Affected CLI rows.
+- Independent untimed output witnesses for both pinned Stim and Stab on every affected process-symmetric CLI row.
+- Source-owned shot-count and digest witnesses for every report-only A5 phase measurement.
 
 ### Done Criteria
 
 - Sample-to-detection and DEM sampling memory scale with width and batch size, not total shots.
 - Caller byte limits account for all retained DEM session and compatibility-sink storage, while fused detection enforces one aggregate private session envelope.
+- Direct detector-frame compilation accounts for the complete retained conversion and executable representation before materialization.
+- Incremental conversion cannot split one logical delivery across sinks or silently reuse an abandoned or failed lifecycle.
+- Timed A5 diagnostics cannot accept empty, truncated, reordered, or misrouted output from either side of a process comparison or from a report-only phase.
 - No CLI command bypasses the public plan, session, and sink path.
 
 The caller byte policy accounts for width-dependent heap capacity retained by reusable detection, observable, sampled-error, and packed batch planes plus compatibility record containers. Immutable plans, caller-owned returned materializations, RNG state, and fixed session metadata are not charged to this dynamic scratch budget.
