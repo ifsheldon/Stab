@@ -48,13 +48,6 @@ fn circuit_inverse_qec_supports_selected_mpp_detector_flow() {
             expected,
             "{input_text}"
         );
-        assert_eq!(
-            input
-                .inverse_qec()
-                .expect("method inverse selected MPP detector flow"),
-            expected,
-            "{input_text}"
-        );
     }
 }
 

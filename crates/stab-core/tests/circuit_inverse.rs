@@ -3,7 +3,10 @@
     reason = "M6 inverse-circuit parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, Tableau};
+use stab_core::{
+    Circuit, Tableau,
+    analysis::{circuit_inverse_unitary, circuit_to_tableau},
+};
 
 #[test]
 fn circuit_inverse_unitary_matches_stim_example() {
@@ -23,12 +26,12 @@ fn circuit_inverse_unitary_matches_stim_example() {
     ",
     );
 
-    assert_eq!(input.inverse_unitary().expect("inverse"), expected);
+    assert_eq!(circuit_inverse_unitary(&input).expect("inverse"), expected);
 }
 
 #[test]
 fn circuit_inverse_unitary_rejects_measurements_like_stim() {
-    assert!(circuit("M 0").inverse_unitary().is_err());
+    assert!(circuit_inverse_unitary(&circuit("M 0")).is_err());
 }
 
 #[test]
@@ -41,13 +44,10 @@ fn circuit_inverse_unitary_composes_to_identity_tableau() {
         S 0
     ",
     );
-    let inverse = input.inverse_unitary().expect("inverse");
-    let input_tableau = input
-        .to_tableau(false, false, false)
-        .expect("input tableau");
-    let inverse_tableau = inverse
-        .to_tableau(false, false, false)
-        .expect("inverse tableau");
+    let inverse = circuit_inverse_unitary(&input).expect("inverse");
+    let input_tableau = circuit_to_tableau(&input, false, false, false).expect("input tableau");
+    let inverse_tableau =
+        circuit_to_tableau(&inverse, false, false, false).expect("inverse tableau");
     assert_eq!(
         input_tableau
             .then(&inverse_tableau)

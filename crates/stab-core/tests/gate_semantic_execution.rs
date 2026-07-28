@@ -7,7 +7,7 @@
 use stab_core::{
     Circuit, CircuitError, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
     DetectionEventRecord, ErrorAnalyzerOptions, Gate,
-    analysis::{gate_has_tableau, gate_tableau},
+    analysis::{decomposed_circuit, gate_has_tableau, gate_tableau},
     circuit_to_detector_error_model, sample_detection_events,
 };
 
@@ -469,7 +469,7 @@ fn variable_target_spp_execution_matches_decomposed_circuit() {
     ];
     for circuit_text in cases {
         let circuit = Circuit::from_stim_str(circuit_text).expect("parse SPP circuit");
-        let decomposed = circuit.decomposed().expect("decompose SPP circuit");
+        let decomposed = decomposed_circuit(&circuit).expect("decompose SPP circuit");
 
         let sampler = CompiledSampler::compile(&circuit)
             .unwrap_or_else(|error| panic!("sampler rejected {circuit_text}: {error}"));

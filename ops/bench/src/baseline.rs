@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use stab_core::{
     BitMatrix, BitVec, Circuit, PauliBasis, PauliSign, PauliString, PauliStringIterator,
-    SparseXorVec, TableauIterator, stabilizers_to_tableau,
+    SparseXorVec, TableauIterator, analysis::circuit_to_tableau, stabilizers_to_tableau,
 };
 
 use crate::allocations::measure_tracked_memory;
@@ -440,14 +440,12 @@ pub(crate) fn run_stab_compare_row_with_root(
         ])),
         "m6-tableau" => {
             let circuit = m6_tableau_circuit(&row.id)?;
-            let tableau = circuit
-                .to_tableau(false, false, false)
+            let tableau = circuit_to_tableau(&circuit, false, false, false)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             let pauli = m6_pauli_string(&row.id, M6_TABLEAU_QUBITS, 0x07ab_1ea7)?;
             Ok(Some(vec![
                 measure_stab("stab_tableau_from_circuit_32q", || {
-                    let result = circuit
-                        .to_tableau(false, false, false)
+                    let result = circuit_to_tableau(&circuit, false, false, false)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
                     black_box(result);
                     Ok(())

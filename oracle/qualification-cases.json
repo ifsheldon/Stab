@@ -764,7 +764,7 @@
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::flattened"
+          "owner_path": "stab_core::analysis::flattened_detector_error_model"
         }
       ]
     },
@@ -812,11 +812,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::rounded"
+          "owner_path": "stab_core::analysis::rounded_detector_error_model"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::DetectorErrorModel::without_tags"
+          "owner_path": "stab_core::analysis::detector_error_model_without_tags"
         }
       ]
     },
@@ -2399,7 +2399,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_tags"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::without_tags"}
+        {"crate_name": "stab_core", "owner_path": "stab_core::analysis::circuit_without_tags"}
       ]
     },
     {
@@ -2420,8 +2420,8 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_flattened_operations"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::flattened"},
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::flattened_operations"}
+        {"crate_name": "stab_core", "owner_path": "stab_core::analysis::flattened_circuit"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::analysis::flattened_circuit_operations"}
       ],
       "oracle_fixture_owners": ["pf2-circuit-flatten-without-noise-rust"]
     },
@@ -2442,7 +2442,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_noise_removes_id_errors"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::without_noise"}
+        {"crate_name": "stab_core", "owner_path": "stab_core::analysis::circuit_without_noise"}
       ]
     },
     {
@@ -2460,7 +2460,6 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_decomposed"}
       ],
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::decomposed"},
         {"crate_name": "stab_core", "owner_path": "stab_core::decomposed_circuit"}
       ],
       "oracle_fixture_owners": ["pf2-circuit-decomposed-public-rust"]
@@ -2476,7 +2475,6 @@
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed selected-scope aggregate proves single- and two-qubit Clifford simplification, recursive repeats, unsupported-gate preservation, and classical-control preservation."},
       "static_property_plan": {"generator_domain": "single-qubit, two-qubit, repeated, unsupported, and classical-control simplification cases", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_simplify.rs"},
       "public_api_owners": [
-        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::simplified"},
         {"crate_name": "stab_core", "owner_path": "stab_core::simplified_circuit"}
       ],
       "oracle_fixture_owners": ["coverage-util-top-simplified-circuit"]
@@ -12672,11 +12670,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::unitary_matrix"
+          "owner_path": "stab_core::analysis::gate_unitary_matrix"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::has_unitary_matrix"
+          "owner_path": "stab_core::analysis::gate_has_unitary_matrix"
         },
         {
           "crate_name": "stab_core",
@@ -12750,11 +12748,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::h_s_cx_m_r_decomposition"
+          "owner_path": "stab_core::analysis::gate_h_s_cx_m_r_decomposition"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::has_h_s_cx_m_r_decomposition"
+          "owner_path": "stab_core::analysis::gate_has_h_s_cx_m_r_decomposition"
         },
         {
           "crate_name": "stab_core",
@@ -12766,7 +12764,7 @@
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::GateDecomposition::to_circuit"
+          "owner_path": "stab_core::analysis::gate_decomposition_to_circuit"
         }
       ],
       "oracle_fixture_owners": [
@@ -17038,10 +17036,6 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::to_tableau"
-        },
-        {
-          "crate_name": "stab_core",
           "owner_path": "stab_core::circuit_to_tableau"
         }
       ]
@@ -18669,88 +18663,8 @@
     },
     {
       "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::circuit_without_noise",
-      "canonical_owner_path": "stab_core::Circuit::without_noise"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::circuit_without_tags",
-      "canonical_owner_path": "stab_core::Circuit::without_tags"
-    },
-    {
-      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::analysis::decomposed_circuit",
       "canonical_owner_path": "stab_core::decomposed_circuit"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::detector_error_model_without_tags",
-      "canonical_owner_path": "stab_core::DetectorErrorModel::without_tags"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::flattened_circuit",
-      "canonical_owner_path": "stab_core::Circuit::flattened"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::flattened_circuit_operations",
-      "canonical_owner_path": "stab_core::Circuit::flattened_operations"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::flattened_detector_error_model",
-      "canonical_owner_path": "stab_core::DetectorErrorModel::flattened"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_decomposition_to_circuit",
-      "canonical_owner_path": "stab_core::GateDecomposition::to_circuit"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_flows",
-      "canonical_owner_path": "stab_core::Gate::flows"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_h_s_cx_m_r_decomposition",
-      "canonical_owner_path": "stab_core::Gate::h_s_cx_m_r_decomposition"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_has_flows",
-      "canonical_owner_path": "stab_core::Gate::has_flows"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_has_h_s_cx_m_r_decomposition",
-      "canonical_owner_path": "stab_core::Gate::has_h_s_cx_m_r_decomposition"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_has_tableau",
-      "canonical_owner_path": "stab_core::Gate::has_tableau"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_has_unitary_matrix",
-      "canonical_owner_path": "stab_core::Gate::has_unitary_matrix"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_tableau",
-      "canonical_owner_path": "stab_core::Gate::tableau"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::gate_unitary_matrix",
-      "canonical_owner_path": "stab_core::Gate::unitary_matrix"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::rounded_detector_error_model",
-      "canonical_owner_path": "stab_core::DetectorErrorModel::rounded"
     },
     {
       "crate_name": "stab_core",
@@ -19199,16 +19113,6 @@
     },
     {
       "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::circuit_reference_sample",
-      "canonical_owner_path": "stab_core::Circuit::reference_sample"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::circuit_reference_sample_tree",
-      "canonical_owner_path": "stab_core::Circuit::reference_sample_tree"
-    },
-    {
-      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::count_determined_measurements",
       "canonical_owner_path": "stab_core::count_determined_measurements"
     },
@@ -19527,11 +19431,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::tableau"
+          "owner_path": "stab_core::analysis::gate_tableau"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::has_tableau"
+          "owner_path": "stab_core::analysis::gate_has_tableau"
         }
       ]
     },
@@ -19571,11 +19475,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::flows"
+          "owner_path": "stab_core::analysis::gate_flows"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::has_flows"
+          "owner_path": "stab_core::analysis::gate_has_flows"
         }
       ]
     },

@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use stab_core::{
     Circuit, CircuitItem, Gate, GateCategory, MeasureRecordOffset, ObservableId, Pauli,
-    Probability, QubitId, RepeatCount, Target,
+    Probability, QubitId, RepeatCount, Target, analysis::circuit_without_tags,
 };
 
 #[test]
@@ -222,7 +222,7 @@ fn strips_tags_recursively_like_stim() {
     .expect("parse tagged circuit");
 
     assert_eq!(
-        initial.without_tags().to_stim_string(),
+        circuit_without_tags(&initial).to_stim_string(),
         concat!(
             "H 0\n",
             "REPEAT 100 {\n",

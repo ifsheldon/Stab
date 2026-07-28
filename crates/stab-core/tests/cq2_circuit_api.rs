@@ -424,7 +424,7 @@ fn cq2_circuit_api_without_tags_is_recursive_and_non_mutating() {
         stripped.to_string(),
         "H 0\nREPEAT 2 {\n    M(0.125) 0\n    DETECTOR rec[-1]\n}\n"
     );
-    assert_eq!(original.without_tags(), stripped);
+    assert_eq!(circuit_without_tags(&original), stripped);
     assert!(original.to_string().contains("[loop]"));
     for tag in ["[top]", "[loop]", "[measure]", "[det]"] {
         assert!(!stripped.to_string().contains(tag));

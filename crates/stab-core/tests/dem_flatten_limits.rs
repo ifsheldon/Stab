@@ -341,11 +341,9 @@ fn repeat_nesting_remains_a_fixed_non_configurable_invariant() {
 fn default_entry_points_are_equivalent_and_keep_default_error_text() -> CircuitResult<()> {
     let model = nested_repeat_model();
     let free = flattened_detector_error_model(&model)?;
-    let compatibility = model.flattened()?;
     let explicit_defaults =
         flattened_detector_error_model_with_limits(&model, DemFlattenLimits::default())?;
 
-    assert_eq!(free, compatibility);
     assert_eq!(free, explicit_defaults);
     assert_eq!(
         model,
@@ -358,8 +356,7 @@ fn default_entry_points_are_equivalent_and_keep_default_error_text() -> CircuitR
              error(0.125) D0\n\
          }\n",
     )?;
-    let error = excessive
-        .flattened()
+    let error = flattened_detector_error_model(&excessive)
         .expect_err("default compatibility entry point rejects excessive repeat");
     let explicit_error =
         flattened_detector_error_model_with_limits(&excessive, DemFlattenLimits::default())

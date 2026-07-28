@@ -26,12 +26,6 @@ fn circuit_inverse_qec_supports_selected_observable_pauli_include() {
         circuit_inverse_qec(&input).expect("inverse selected observable Pauli include"),
         expected
     );
-    assert_eq!(
-        input
-            .inverse_qec()
-            .expect("method inverse selected observable Pauli include"),
-        expected
-    );
 }
 
 #[test]

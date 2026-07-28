@@ -107,13 +107,6 @@ fn circuit_inverse_qec_supports_selected_mpad_record_tail() {
             expected,
             "{input_text}"
         );
-        assert_eq!(
-            input
-                .inverse_qec()
-                .expect("method inverse selected MPAD record-tail flow"),
-            expected,
-            "{input_text}"
-        );
     }
 }
 

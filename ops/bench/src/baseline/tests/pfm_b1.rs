@@ -67,11 +67,10 @@ mod allocations {
     use std::hint::black_box;
     use std::str::FromStr;
 
-    use stab_core::{Circuit, Flow};
+    use stab_core::{Circuit, Flow, circuit_time_reversed_for_flows};
 
     fn reverse(circuit: &Circuit, flows: &[Flow]) {
-        let reversed = circuit
-            .time_reversed_for_flows(flows)
+        let reversed = circuit_time_reversed_for_flows(circuit, flows)
             .expect("PFM-B1 allocation fixture must reverse");
         black_box(reversed);
     }

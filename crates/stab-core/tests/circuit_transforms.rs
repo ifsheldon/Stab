@@ -4,11 +4,49 @@
 )]
 
 use stab_core::{
-    Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions,
-    analysis::{circuit_without_noise, flattened_circuit, flattened_circuit_operations},
+    Circuit, CircuitError, CircuitItem, DetectorErrorModel, ErrorAnalyzerOptions,
+    analysis::{
+        circuit_without_noise, decomposed_circuit, flattened_circuit, flattened_circuit_operations,
+        flattened_detector_error_model,
+    },
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback, decomposed_circuit,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback,
 };
+
+trait CircuitTransformTestExt {
+    fn flattened(&self) -> stab_core::CircuitResult<Circuit>;
+    fn without_noise(&self) -> stab_core::CircuitResult<Circuit>;
+    fn decomposed(&self) -> stab_core::CircuitResult<Circuit>;
+    fn with_inlined_feedback(&self) -> stab_core::CircuitResult<Circuit>;
+}
+
+impl CircuitTransformTestExt for Circuit {
+    fn flattened(&self) -> stab_core::CircuitResult<Circuit> {
+        flattened_circuit(self)
+    }
+
+    fn without_noise(&self) -> stab_core::CircuitResult<Circuit> {
+        circuit_without_noise(self)
+    }
+
+    fn decomposed(&self) -> stab_core::CircuitResult<Circuit> {
+        decomposed_circuit(self)
+    }
+
+    fn with_inlined_feedback(&self) -> stab_core::CircuitResult<Circuit> {
+        circuit_with_inlined_feedback(self)
+    }
+}
+
+trait DemTransformTestExt {
+    fn flattened(&self) -> stab_core::CircuitResult<DetectorErrorModel>;
+}
+
+impl DemTransformTestExt for DetectorErrorModel {
+    fn flattened(&self) -> stab_core::CircuitResult<DetectorErrorModel> {
+        flattened_detector_error_model(self)
+    }
+}
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
@@ -355,11 +393,7 @@ fn decomposed_matches_public_stim_iswap_mpp_example() {
         MPP X1*Z2*Y3
     ",
     );
-    let decomposed = original.decomposed().expect("decompose through method");
-    assert_eq!(
-        decomposed,
-        decomposed_circuit(&original).expect("decompose through free function")
-    );
+    let decomposed = decomposed_circuit(&original).expect("decompose");
 
     assert_eq!(
         decomposed.to_stim_string(),
@@ -501,12 +535,10 @@ fn with_inlined_feedback_exposes_supported_transform_subset() {
     ",
     );
 
-    let method_output = circuit.with_inlined_feedback().expect("inline feedback");
-    let helper_output = circuit_with_inlined_feedback(&circuit).expect("inline feedback");
+    let output = circuit_with_inlined_feedback(&circuit).expect("inline feedback");
 
-    assert_eq!(method_output, helper_output);
     assert_eq!(
-        method_output.to_stim_string(),
+        output.to_stim_string(),
         "\
 MR 0
 H 0

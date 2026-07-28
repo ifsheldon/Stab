@@ -1,10 +1,10 @@
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf4-dem-flatten-repeat" => Some(
-            "contract-only: Stab measures the Rust DetectorErrorModel::flattened public API over repeat, tag, detector-shift, coordinate-shift, separator, and observable cases; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+            "contract-only: Stab measures the Rust analysis::flattened_detector_error_model public API over repeat, tag, detector-shift, coordinate-shift, separator, and observable cases; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-rounded" => Some(
-            "contract-only: Stab measures the direct compact DetectorErrorModel::rounded transform over top-level and nested error probabilities while preserving repeat structure and non-error coordinate args without auxiliary traversal-tree allocation; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+            "contract-only: Stab measures the direct compact analysis::rounded_detector_error_model transform over top-level and nested error probabilities while preserving repeat structure and non-error coordinate args without auxiliary traversal-tree allocation; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-coordinate-map" => Some(
             "contract-only: Stab measures the shared folded cursor behind bounded all-detector DEM coordinate maps, selected detector lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",

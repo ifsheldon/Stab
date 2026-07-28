@@ -848,17 +848,13 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
 
     let simple_reference = Circuit::from_stim_str("X 0\nM 0\n").expect("parse");
     assert_eq!(
-        simple_reference
-            .reference_sample()
-            .expect("reference sample"),
+        circuit_reference_sample(&simple_reference).expect("reference sample"),
         vec![true]
     );
 
     let sweep_controlled = Circuit::from_stim_str("X 0\nCX sweep[0] 0\nM 0\n").expect("parse");
     assert_eq!(
-        sweep_controlled
-            .reference_sample()
-            .expect("reference sample"),
+        circuit_reference_sample(&sweep_controlled).expect("reference sample"),
         vec![true]
     );
     assert_eq!(sweep_controlled.count_sweep_bits().expect("sweep bits"), 1);
@@ -866,8 +862,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
     for source in ["X 0\nCX 0 sweep[0]\nM 0\n", "X 0\nCY 0 sweep[0]\nM 0\n"] {
         let invalid_sweep_order =
             Circuit::from_stim_str(source).expect("parse invalid sweep order");
-        let error = invalid_sweep_order
-            .reference_sample()
+        let error = circuit_reference_sample(&invalid_sweep_order)
             .expect_err("reject invalid sampler sweep target order")
             .to_string();
         assert!(error.contains("does not support"), "{source}\n{error}");
@@ -886,7 +881,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
         .reference_sample();
 
     assert_eq!(
-        circuit.reference_sample().expect("reference sample"),
+        circuit_reference_sample(&circuit).expect("reference sample"),
         expected
     );
     assert_eq!(
@@ -904,7 +899,7 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
 
     assert_eq!(
         tree.decompress(),
-        circuit.reference_sample().expect("reference sample")
+        circuit_reference_sample(&circuit).expect("reference sample")
     );
     assert_eq!(tree.size(), 2);
     assert_eq!(tree.get(0), Some(false));
@@ -920,9 +915,7 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
          }\n",
     )
     .expect("parse repeated circuit");
-    let repeated_tree = repeated
-        .reference_sample_tree()
-        .expect("reference sample tree");
+    let repeated_tree = circuit_reference_sample_tree(&repeated).expect("reference sample tree");
     assert_eq!(
         repeated_tree.decompress(),
         vec![false, true, false, true, false, true]
@@ -950,29 +943,23 @@ fn pf1_circuit_reference_determined_count_determined_measurements_matches_public
     )
     .expect("parse unknown-input circuit");
     assert_eq!(
-        unknown_input
-            .count_determined_measurements(true)
-            .expect("count with unknown input"),
+        count_determined_measurements(&unknown_input, true).expect("count with unknown input"),
         2
     );
     assert_eq!(
-        unknown_input
-            .count_determined_measurements(false)
-            .expect("count with known zero input"),
+        count_determined_measurements(&unknown_input, false).expect("count with known zero input"),
         3
     );
 
     let sweep_controlled =
         Circuit::from_stim_str("X 0\nCX sweep[0] 0\nM 0\n").expect("parse sweep circuit");
     assert_eq!(
-        sweep_controlled
-            .count_determined_measurements(false)
+        count_determined_measurements(&sweep_controlled, false)
             .expect("count deterministic sweep circuit"),
         1
     );
     assert_eq!(
-        sweep_controlled
-            .count_determined_measurements(true)
+        count_determined_measurements(&sweep_controlled, true)
             .expect("count unknown-input sweep circuit"),
         0
     );

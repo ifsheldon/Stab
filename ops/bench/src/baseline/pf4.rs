@@ -2,8 +2,10 @@ use std::hint::black_box;
 
 use stab_core::{
     Circuit, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    ErrorAnalyzerOptions, circuit_to_detector_error_model, explain_errors_from_circuit,
-    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
+    ErrorAnalyzerOptions,
+    analysis::{flattened_detector_error_model, rounded_detector_error_model},
+    circuit_to_detector_error_model, explain_errors_from_circuit, find_undetectable_logical_error,
+    likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 
@@ -242,8 +244,7 @@ fn run_dem_flatten_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
         "stab_pf4_dem_flatten_repeat",
         TRANSFORM_REPETITIONS,
         || {
-            let flattened = dem
-                .flattened()
+            let flattened = flattened_detector_error_model(&dem)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem_model_checksum(&flattened));
             Ok(())
@@ -259,8 +260,7 @@ fn run_dem_rounded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErro
         "stab_pf4_dem_rounded",
         TRANSFORM_REPETITIONS,
         || {
-            let rounded = dem
-                .rounded(3)
+            let rounded = rounded_detector_error_model(&dem, 3)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem_model_checksum(&rounded));
             Ok(())

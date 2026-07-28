@@ -4,9 +4,9 @@ use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
     DetectorErrorModel, Flow, Gate, GateArgumentRule, GateUnitaryMatrix, PauliString, Tableau,
     analysis::{
-        gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
-        gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
-        gate_unitary_matrix,
+        detector_error_model_without_tags, gate_decomposition_to_circuit, gate_flows,
+        gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
+        gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
     },
 };
 
@@ -242,7 +242,7 @@ pub(super) fn run_dem_without_tags_row(row: &BenchmarkRow) -> Result<Vec<Measure
         "stab_dem_without_tags_nested_repeat",
         TINY_DIRECT_COMPARE_REPETITIONS,
         || {
-            let stripped = dem.without_tags();
+            let stripped = detector_error_model_without_tags(&dem);
             black_box(dem_model_checksum(&stripped));
             Ok(())
         },

@@ -7,7 +7,8 @@ use stab_core::{
     Circuit, CircuitError, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
     PauliBasis, PauliSign, PauliString, PauliStringIterator, RepeatBlock, RepeatCount,
     SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
-    TableauIterator, circuit_flow_generators, stabilizers_to_tableau, unitary_to_tableau,
+    TableauIterator, analysis::circuit_to_tableau, circuit_flow_generators, stabilizers_to_tableau,
+    unitary_to_tableau,
 };
 
 fn assert_resource_limit<T>(
@@ -265,7 +266,7 @@ fn cq2_algebra_tableau_admission_precedes_materialization_and_rng_use() {
 )]
 fn cq2_algebra_circuit_tableau_and_flow_generation_admit_limits_before_dense_work() {
     let accepted_tableau = Circuit::from_stim_str("H 511\n")
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .and_then(|circuit| circuit_to_tableau(&circuit, false, false, false))
         .expect("maximum circuit-to-Tableau width");
     assert_eq!(
         accepted_tableau.len(),
@@ -274,7 +275,7 @@ fn cq2_algebra_circuit_tableau_and_flow_generation_admit_limits_before_dense_wor
 
     let rejected_tableau = Circuit::from_stim_str("H 512\n").expect("rejected-width circuit");
     let tableau_allocations = allocation_counter::measure(|| {
-        let result = rejected_tableau.to_tableau(false, false, false);
+        let result = circuit_to_tableau(&rejected_tableau, false, false, false);
         assert!(matches!(
             result,
             Err(CircuitError::InvalidTableauConversion { ref message })
@@ -322,21 +323,20 @@ fn cq2_algebra_circuit_tableau_and_flow_generation_admit_limits_before_dense_wor
 )]
 fn cq2_algebra_circuit_tableau_repeat_work_is_logarithmic_and_bounded() {
     let folded = Circuit::from_stim_str("H 0\nREPEAT 37 {\nS 0\nH 0\n}\nSQRT_X 0\n")
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .and_then(|circuit| circuit_to_tableau(&circuit, false, false, false))
         .expect("folded noncommuting repeat");
     let unrolled = Circuit::from_stim_str(&format!("H 0\n{}SQRT_X 0\n", "S 0\nH 0\n".repeat(37)))
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .and_then(|circuit| circuit_to_tableau(&circuit, false, false, false))
         .expect("unrolled noncommuting repeat");
     assert_eq!(folded, unrolled);
 
     let huge_repeat =
         Circuit::from_stim_str("REPEAT 1000000000001 {\nREPEAT 1000000000001 {\nH 0\n}\n}\n")
             .expect("parse nested huge repeat");
-    let actual = huge_repeat
-        .to_tableau(false, false, false)
-        .expect("fold nested huge repeat");
+    let actual =
+        circuit_to_tableau(&huge_repeat, false, false, false).expect("fold nested huge repeat");
     let expected = Circuit::from_stim_str("H 0\n")
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .and_then(|circuit| circuit_to_tableau(&circuit, false, false, false))
         .expect("H tableau");
     assert_eq!(actual, expected);
 
@@ -361,14 +361,13 @@ fn cq2_algebra_circuit_tableau_repeat_work_is_logarithmic_and_bounded() {
         result.append_circuit(&body);
         result
     };
-    let accepted = nested(accepted_depth)
-        .to_tableau(false, false, false)
+    let accepted = circuit_to_tableau(&nested(accepted_depth), false, false, false)
         .expect("last accepted aggregate compact-repeat work");
     let accepted_expected = Circuit::from_stim_str("I 511\nH 0\n")
-        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .and_then(|circuit| circuit_to_tableau(&circuit, false, false, false))
         .expect("wide H tableau");
     assert_eq!(accepted, accepted_expected);
-    let rejected = nested(accepted_depth + 1).to_tableau(false, false, false);
+    let rejected = circuit_to_tableau(&nested(accepted_depth + 1), false, false, false);
     assert!(matches!(
         rejected,
         Err(CircuitError::InvalidTableauConversion { ref message })

@@ -27,12 +27,6 @@ fn circuit_inverse_qec_supports_selected_noisy_measurement_only_reverse() {
         circuit_inverse_qec(&input).expect("inverse selected noisy measurements"),
         expected
     );
-    assert_eq!(
-        input
-            .inverse_qec()
-            .expect("method inverse selected noisy measurements"),
-        expected
-    );
 }
 
 #[test]

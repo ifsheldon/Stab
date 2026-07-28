@@ -1,7 +1,7 @@
 use stab_core::{
     Circuit, Gate, MissingDetectorOptions, PauliBasis, PauliSign, PauliString, RepeatBlock,
     RepeatCount, SingleQubitClifford,
-    analysis::{gate_has_tableau, gate_tableau},
+    analysis::{decomposed_circuit, gate_has_tableau, gate_tableau},
     missing_detectors,
 };
 
@@ -316,7 +316,8 @@ fn pf5_missing_detectors_spp_supports_unitary_products() -> Result<(), Box<dyn s
         ),
     ] {
         let circuit = Circuit::from_stim_str(text)?;
-        let expected = missing_circuit_with_options(&circuit.decomposed()?, true)?;
+        let decomposed = decomposed_circuit(&circuit)?;
+        let expected = missing_circuit_with_options(&decomposed, true)?;
         let actual = missing_circuit_with_options(&circuit, true)?;
         if actual != expected {
             return Err(std::io::Error::other(format!(

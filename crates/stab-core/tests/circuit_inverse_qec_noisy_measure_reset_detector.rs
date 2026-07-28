@@ -34,12 +34,6 @@ fn circuit_inverse_qec_supports_selected_noisy_measure_reset_detector_flow() {
         circuit_inverse_qec(&input).expect("inverse selected noisy measure-reset detector flow"),
         expected
     );
-    assert_eq!(
-        input
-            .inverse_qec()
-            .expect("method inverse selected noisy measure-reset detector flow"),
-        expected
-    );
 }
 
 #[test]

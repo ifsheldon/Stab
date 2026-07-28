@@ -5,6 +5,31 @@
 
 use stab_core::{Circuit, Tableau};
 
+trait CircuitTableauTestExt {
+    fn to_tableau(
+        &self,
+        ignore_noise: bool,
+        ignore_measurement: bool,
+        ignore_reset: bool,
+    ) -> stab_core::CircuitResult<Tableau>;
+}
+
+impl CircuitTableauTestExt for Circuit {
+    fn to_tableau(
+        &self,
+        ignore_noise: bool,
+        ignore_measurement: bool,
+        ignore_reset: bool,
+    ) -> stab_core::CircuitResult<Tableau> {
+        stab_core::analysis::circuit_to_tableau(
+            self,
+            ignore_noise,
+            ignore_measurement,
+            ignore_reset,
+        )
+    }
+}
+
 #[test]
 fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_vs_tableau.test.cc.

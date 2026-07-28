@@ -14,7 +14,10 @@ use super::super::{
 use crate::{
     Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,
     DetectionConversionOptions, ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString,
-    Probability, analysis::gate_tableau, circuit_flow_generators, circuit_to_detector_error_model,
+    Probability,
+    analysis::{decomposed_circuit, gate_tableau},
+    circuit_flow_generators, circuit_to_detector_error_model,
+    execution::circuit_reference_sample,
     sample_detection_events,
 };
 
@@ -492,7 +495,7 @@ fn gate_surface_contract_spp() {
     );
     for text in ["SPP X0\nM 0\n", "SPP_DAG Y0\nM 0\n"] {
         let original = circuit(text);
-        let decomposed = original.decomposed().expect("decompose SPP");
+        let decomposed = decomposed_circuit(&original).expect("decompose SPP");
         assert_circuit_semantics_equal(&original, &decomposed, text);
         assert_all_semantic_surfaces_execute(text);
     }
@@ -509,7 +512,7 @@ fn gate_surface_contract_spp_multiple() {
         "SPP Z0*Z0\nM 0\n",
     ] {
         let original = circuit(text);
-        let decomposed = original.decomposed().expect("decompose grouped SPP");
+        let decomposed = decomposed_circuit(&original).expect("decompose grouped SPP");
         assert_circuit_semantics_equal(&original, &decomposed, text);
         assert_all_semantic_surfaces_execute(text);
     }
@@ -754,9 +757,9 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
                 sampler.sample_zero_one_with_seed(4, Some(7)),
             ))
         }
-        GateSurface::ReferenceSampler => {
-            Ok(SurfaceFingerprint::Reference(circuit.reference_sample()?))
-        }
+        GateSurface::ReferenceSampler => Ok(SurfaceFingerprint::Reference(
+            circuit_reference_sample(&circuit)?,
+        )),
         GateSurface::DetectionConverter => {
             let converter = CompiledDetectionConverter::compile(
                 &circuit,
@@ -827,7 +830,7 @@ fn assert_all_semantic_surfaces_execute(text: &str) {
 fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
     let circuit = circuit(text);
     assert_eq!(
-        circuit.reference_sample().expect("reference sample"),
+        circuit_reference_sample(&circuit).expect("reference sample"),
         expected
     );
     let sampler = CompiledSampler::compile(&circuit).expect("compile deterministic sampler");
@@ -910,8 +913,8 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         "measurement sampler: {label}"
     );
     assert_eq!(
-        actual.reference_sample().expect("actual reference"),
-        expected.reference_sample().expect("expected reference"),
+        circuit_reference_sample(actual).expect("actual reference"),
+        circuit_reference_sample(expected).expect("expected reference"),
         "reference sampler: {label}"
     );
     assert_eq!(

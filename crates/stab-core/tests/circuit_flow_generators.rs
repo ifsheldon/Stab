@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use stab_core::{
     Circuit, Flow, PauliBasis, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_flow_generators,
+    circuit_flow_generators, decomposed_circuit,
 };
 
 #[test]
@@ -637,10 +637,10 @@ fn circuit_flow_generators_measurement_subset_composes_spp_unitaries() {
     ] {
         let original = circuit(text);
         let flows = circuit_flow_generators(&original).expect(text);
+        let decomposed = decomposed_circuit(&original).expect("decompose SPP circuit");
         assert_eq!(
             flows,
-            circuit_flow_generators(&original.decomposed().expect("decompose SPP circuit"))
-                .expect("decomposed generators"),
+            circuit_flow_generators(&decomposed).expect("decomposed generators"),
             "{text}"
         );
         assert_eq!(

@@ -36,12 +36,6 @@ fn circuit_inverse_qec_supports_selected_m_det_detector_flow() {
         circuit_inverse_qec(&input).expect("inverse selected m_det detector flow"),
         expected
     );
-    assert_eq!(
-        input
-            .inverse_qec()
-            .expect("method inverse selected m_det detector flow"),
-        expected
-    );
 }
 
 #[test]

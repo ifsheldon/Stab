@@ -4,7 +4,14 @@
     reason = "regression tests use compact exact model fixtures and public item inspection"
 )]
 
-use stab_core::{Circuit, CircuitInstruction, CircuitItem, DemItem, DetectorErrorModel};
+use stab_core::{
+    Circuit, CircuitInstruction, CircuitItem, DemItem, DetectorErrorModel,
+    analysis::{
+        circuit_inverse_qec, circuit_inverse_unitary, circuit_with_inlined_feedback,
+        circuit_without_noise, decomposed_circuit, flattened_circuit,
+        flattened_detector_error_model, rounded_detector_error_model, simplified_circuit,
+    },
+};
 
 fn circuit_from_bytes(bytes: &[u8]) -> Circuit {
     Circuit::from_stim_bytes(bytes).expect("parse opaque-tag circuit")
@@ -43,7 +50,7 @@ fn dem_top_level_tags(model: &DetectorErrorModel) -> Vec<Option<&[u8]>> {
 #[test]
 fn flattened_circuit_preserves_opaque_instruction_tags() {
     let circuit = circuit_from_bytes(b"REPEAT[\xfc] 2 {\n    H[\xff] 0\n    S[\xfe] 0\n}\n");
-    let flattened = circuit.flattened().expect("flatten tagged circuit");
+    let flattened = flattened_circuit(&circuit).expect("flatten tagged circuit");
 
     assert_eq!(
         flattened.to_stim_bytes(),
@@ -69,7 +76,7 @@ fn circuit_without_noise_preserves_opaque_tags_on_surviving_records() {
           DEPOLARIZE1[\xfb](0.25) 0\n\
           MR[\xfd](0.5) 1\n",
     );
-    let noiseless = circuit.without_noise().expect("strip noisy behavior");
+    let noiseless = circuit_without_noise(&circuit).expect("strip noisy behavior");
 
     assert_eq!(
         noiseless.to_stim_bytes(),
@@ -87,9 +94,8 @@ fn circuit_without_noise_preserves_opaque_tags_on_surviving_records() {
 
 #[test]
 fn simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations() {
-    let simplified = circuit_from_bytes(b"H_XY[\xff] 0\nCZ[\xfe] 0 1\n")
-        .simplified()
-        .expect("simplify tagged circuit");
+    let source = circuit_from_bytes(b"H_XY[\xff] 0\nCZ[\xfe] 0 1\n");
+    let simplified = simplified_circuit(&source).expect("simplify tagged circuit");
 
     assert_eq!(
         simplified.to_stim_bytes(),
@@ -109,9 +115,8 @@ fn simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operation
         ]
     );
 
-    let decomposed = circuit_from_bytes(b"SQRT_X[\xfd] 0\n")
-        .decomposed()
-        .expect("decompose tagged circuit");
+    let source = circuit_from_bytes(b"SQRT_X[\xfd] 0\n");
+    let decomposed = decomposed_circuit(&source).expect("decompose tagged circuit");
 
     assert_eq!(
         decomposed.to_stim_bytes(),
@@ -132,7 +137,7 @@ fn inverse_circuits_preserve_opaque_tags_in_reversed_models() {
           CX[\xfd] 0 1\n\
           REPEAT[\xfc] 2 {\n    H[\xfb] 2\n    S[\xfa] 2\n}\n",
     );
-    let inverse = circuit.inverse_unitary().expect("invert tagged circuit");
+    let inverse = circuit_inverse_unitary(&circuit).expect("invert tagged circuit");
 
     assert_eq!(
         inverse.to_stim_bytes(),
@@ -158,9 +163,8 @@ fn inverse_circuits_preserve_opaque_tags_in_reversed_models() {
         ]
     );
 
-    let inverse_qec = circuit_from_bytes(b"M[\xff](0.125) 0 1\nMX[\xfe](0.25) 2\n")
-        .inverse_qec()
-        .expect("QEC-invert tagged measurements");
+    let source = circuit_from_bytes(b"M[\xff](0.125) 0 1\nMX[\xfe](0.25) 2\n");
+    let inverse_qec = circuit_inverse_qec(&source).expect("QEC-invert tagged measurements");
     assert_eq!(
         inverse_qec.to_stim_bytes(),
         b"MX[\xfe](0.25) 2\nM[\xff](0.125) 1 0\n"
@@ -182,9 +186,7 @@ fn feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operation
           DETECTOR[\xfa] rec[-1] rec[-2]\n\
           OBSERVABLE_INCLUDE[\xf9](0) rec[-1]\n",
     );
-    let inlined = circuit
-        .with_inlined_feedback()
-        .expect("inline supported feedback");
+    let inlined = circuit_with_inlined_feedback(&circuit).expect("inline supported feedback");
 
     assert_eq!(
         inlined.to_stim_bytes(),
@@ -216,7 +218,7 @@ fn rounded_dem_preserves_opaque_instruction_and_repeat_tags() {
         b"error[\xff](0.49) D0\n\
           repeat[\xfe] 2 {\n    error[\xfd](0.51) D1\n}\n",
     );
-    let rounded = model.rounded(0).expect("round tagged DEM");
+    let rounded = rounded_detector_error_model(&model, 0).expect("round tagged DEM");
 
     assert_eq!(
         rounded.to_dem_bytes(),
@@ -247,7 +249,7 @@ fn flattened_dem_preserves_opaque_tags_on_materialized_instructions() {
           shift_detectors[\xfc] 3\n\
           repeat[\xfe] 2 {\n    error[\xfd](0.25) D0 L1\n    detector[\xfb] D1\n    shift_detectors[\xfa] 2\n}\n",
     );
-    let flattened = model.flattened().expect("flatten tagged DEM");
+    let flattened = flattened_detector_error_model(&model).expect("flatten tagged DEM");
 
     assert_eq!(
         flattened.to_dem_bytes(),

@@ -6,6 +6,7 @@
 use stab_core::{
     DemInstruction, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
     Probability,
+    analysis::{detector_error_model_without_tags, rounded_detector_error_model},
 };
 
 fn leaf_model() -> DetectorErrorModel {
@@ -89,8 +90,9 @@ fn programmatic_folded_traversal_and_source_drop_use_bounded_stack() {
         .stack_size(64 * 1024)
         .spawn(move || {
             let cloned = model.clone();
-            let rounded = model.rounded(2).map_err(|error| error.to_string())?;
-            let stripped = model.without_tags();
+            let rounded =
+                rounded_detector_error_model(&model, 2).map_err(|error| error.to_string())?;
+            let stripped = detector_error_model_without_tags(&model);
             let result = (
                 model.count_detectors().map_err(|error| error.to_string()),
                 model.count_observables().map_err(|error| error.to_string()),

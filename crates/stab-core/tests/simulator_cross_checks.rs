@@ -5,7 +5,7 @@
 )]
 
 use num_complex::Complex32;
-use stab_core::{Circuit, Tableau, unitary_to_tableau};
+use stab_core::{Circuit, Tableau, analysis::circuit_to_tableau, unitary_to_tableau};
 
 #[test]
 fn graph_simulator_normal_form_examples_preserve_tableau_semantics() {
@@ -109,8 +109,7 @@ fn graph_simulator_normal_form_examples_preserve_tableau_semantics() {
     ] {
         assert_eq!(
             graph_prepared_tableau(case.qubits, case.input),
-            circuit(case.graph_normal_form)
-                .to_tableau(false, true, true)
+            circuit_to_tableau(&circuit(case.graph_normal_form), false, true, true)
                 .expect(case.name),
             "{}",
             case.name
@@ -170,9 +169,7 @@ fn graph_prepared_tableau(qubits: usize, input: &str) -> Tableau {
     }
     text.push('\n');
     text.push_str(input);
-    circuit(&text)
-        .to_tableau(false, true, true)
-        .expect("prepared tableau")
+    circuit_to_tableau(&circuit(&text), false, true, true).expect("prepared tableau")
 }
 
 #[derive(Clone, Copy)]
@@ -187,9 +184,7 @@ fn assert_vector_unitary_matches_circuit(circuit_text: &str, qubits: usize, ops:
     let matrix = unitary_matrix(qubits, ops);
     assert_eq!(
         unitary_to_tableau(&matrix, true).expect(circuit_text),
-        circuit(circuit_text)
-            .to_tableau(false, false, false)
-            .expect(circuit_text)
+        circuit_to_tableau(&circuit(circuit_text), false, false, false).expect(circuit_text)
     );
 }
 

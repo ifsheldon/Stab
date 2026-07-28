@@ -13,9 +13,9 @@ use stab_core::{
     Circuit, CircuitItem, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
     ErrorAnalyzerOptions, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
     analysis::{
-        gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
-        gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
-        gate_unitary_matrix,
+        circuit_to_tableau, gate_decomposition_to_circuit, gate_flows,
+        gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
+        gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
     },
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
     convert_measurements_to_detection_events, unitary_to_tableau,
@@ -581,9 +581,7 @@ fn gate_decomposition_metadata_matches_tableau_where_defined() {
         )
         .expect("parse decomposition");
         assert_eq!(
-            decomposition
-                .to_tableau(false, false, false)
-                .expect("decomposition tableau"),
+            circuit_to_tableau(&decomposition, false, false, false).expect("decomposition tableau"),
             gate_tableau(gate).expect("gate tableau"),
             "{gate_name} decomposition should match gate tableau"
         );

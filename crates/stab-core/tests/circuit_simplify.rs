@@ -4,7 +4,7 @@
     reason = "M6 simplified-circuit parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, CircuitItem, simplified_circuit};
+use stab_core::{Circuit, CircuitItem, analysis::circuit_to_tableau, simplified_circuit};
 
 #[test]
 fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
@@ -38,10 +38,6 @@ fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
     );
 
     let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_eq!(
-        circuit.simplified().expect("simplify through method"),
-        simplified
-    );
     assert_h_s_cx_base(&simplified);
     assert_tableau_equivalent(&circuit, &simplified);
     assert!(!simplified.to_stim_string().contains("H_XY"));
@@ -122,12 +118,8 @@ fn circuit(text: &str) -> Circuit {
 
 fn assert_tableau_equivalent(original: &Circuit, simplified: &Circuit) {
     assert_eq!(
-        original
-            .to_tableau(false, true, true)
-            .expect("original tableau"),
-        simplified
-            .to_tableau(false, true, true)
-            .expect("simplified tableau")
+        circuit_to_tableau(original, false, true, true).expect("original tableau"),
+        circuit_to_tableau(simplified, false, true, true).expect("simplified tableau")
     );
 }
 

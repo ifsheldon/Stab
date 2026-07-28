@@ -37,12 +37,6 @@ fn circuit_inverse_qec_supports_selected_mzz_detector_flow() {
         circuit_inverse_qec(&input).expect("inverse selected MZZ detector flow"),
         expected
     );
-    assert_eq!(
-        input
-            .inverse_qec()
-            .expect("method inverse selected MZZ detector flow"),
-        expected
-    );
 }
 
 #[test]

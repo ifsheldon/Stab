@@ -44,16 +44,16 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
-            Path::new("crates/stab-core/src/circuit/api.rs"),
-            "stab_core::Circuit::reference_sample",
+            Path::new("crates/stab-core/src/execution/circuit_adapters.rs"),
+            "stab_core::execution::circuit_reference_sample",
         ),
         Some(FeatureId::Sampling)
     );
     assert_eq!(
         classify_public_api_source(
             "stab_core",
-            Path::new("crates/stab-core/src/circuit.rs"),
-            "stab_core::Circuit::time_reversed_for_flows",
+            Path::new("crates/stab-core/src/circuit_inverse.rs"),
+            "stab_core::circuit_time_reversed_for_flows",
         ),
         Some(FeatureId::FlowUtils)
     );
@@ -76,8 +76,8 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_core",
-            Path::new("crates/stab-core/src/analysis/circuit_adapters.rs"),
-            "stab_core::Circuit::flattened",
+            Path::new("crates/stab-core/src/circuit_transforms.rs"),
+            "stab_core::analysis::flattened_circuit",
         ),
         Some(FeatureId::CircuitApi)
     );
@@ -101,7 +101,7 @@ fn classifications_distinguish_selected_execution_domains() {
         classify_public_api_source(
             "stab_core",
             Path::new("crates/stab-core/src/analysis/dem_adapters.rs"),
-            "stab_core::DetectorErrorModel::flattened",
+            "stab_core::analysis::flattened_detector_error_model",
         ),
         Some(FeatureId::DemFormat)
     );

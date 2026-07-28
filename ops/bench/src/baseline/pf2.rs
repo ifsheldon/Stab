@@ -3,7 +3,13 @@ use std::str::FromStr;
 
 use stab_core::{
     Circuit, CircuitInstruction, CircuitItem, CodeDistance, Flow, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, Target, TimeReversedForFlowsOptions, generate_surface_code_circuit,
+    SurfaceCodeTask, Target, TimeReversedForFlowsOptions,
+    analysis::{
+        circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
+        circuit_with_inlined_feedback, circuit_without_noise, decomposed_circuit,
+        flattened_circuit,
+    },
+    generate_surface_code_circuit,
 };
 
 use crate::error::BenchError;
@@ -237,9 +243,8 @@ pub(super) fn run_circuit_flatten_repeat_row(
         "stab_circuit_flatten_repeat_shifted_coords",
         TRANSFORM_REPETITIONS,
         || {
-            let flattened = circuit
-                .flattened()
-                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let flattened =
+                flattened_circuit(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(circuit_checksum(&flattened));
             Ok(())
         },
@@ -254,8 +259,7 @@ pub(super) fn run_circuit_without_noise_row(
         "stab_circuit_without_noise_top_level",
         TRANSFORM_REPETITIONS,
         || {
-            let noiseless = circuit
-                .without_noise()
+            let noiseless = circuit_without_noise(&circuit)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(circuit_checksum(&noiseless));
             Ok(())
@@ -274,8 +278,7 @@ pub(super) fn run_feedback_inline_batch_row(
             "stab_circuit_with_inlined_feedback_mpp",
             TRANSFORM_REPETITIONS,
             || {
-                let inlined = mpp_circuit
-                    .with_inlined_feedback()
+                let inlined = circuit_with_inlined_feedback(&mpp_circuit)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(circuit_checksum(&inlined));
                 Ok(())
@@ -285,8 +288,7 @@ pub(super) fn run_feedback_inline_batch_row(
             "stab_circuit_with_inlined_feedback_repeat_loop",
             TRANSFORM_REPETITIONS,
             || {
-                let inlined = repeat_loop_circuit
-                    .with_inlined_feedback()
+                let inlined = circuit_with_inlined_feedback(&repeat_loop_circuit)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(circuit_checksum(&inlined));
                 Ok(())
@@ -296,8 +298,7 @@ pub(super) fn run_feedback_inline_batch_row(
             "stab_circuit_with_inlined_feedback_xcz_ycz",
             TRANSFORM_REPETITIONS,
             || {
-                let inlined = xcz_ycz_circuit
-                    .with_inlined_feedback()
+                let inlined = circuit_with_inlined_feedback(&xcz_ycz_circuit)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(circuit_checksum(&inlined));
                 Ok(())
@@ -314,9 +315,8 @@ pub(super) fn run_circuit_decompose_mpp_spp_row(
         "stab_circuit_decompose_mpp_spp",
         TRANSFORM_REPETITIONS,
         || {
-            let decomposed = circuit
-                .decomposed()
-                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let decomposed =
+                decomposed_circuit(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(circuit_checksum(&decomposed));
             Ok(())
         },
@@ -332,8 +332,7 @@ pub(super) fn run_time_reverse_flow_row(
         "stab_circuit_time_reversed_for_flows_unitary",
         TRANSFORM_REPETITIONS,
         || {
-            let (reversed, reversed_flows) = circuit
-                .time_reversed_for_flows(&flows)
+            let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&circuit, &flows)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box((circuit_checksum(&reversed), reversed_flows.len()));
             Ok(())
@@ -352,9 +351,9 @@ pub(super) fn run_time_reverse_flow_measurement_row(
             let mut checksum = 0_u64;
             let mut reversed_flow_count = 0_usize;
             for (circuit, flows, options) in &cases {
-                let (reversed, reversed_flows) = circuit
-                    .time_reversed_for_flows_with_options(flows, *options)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                let (reversed, reversed_flows) =
+                    circuit_time_reversed_for_flows_with_options(circuit, flows, *options)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
                 checksum ^= circuit_checksum(&reversed);
                 reversed_flow_count += reversed_flows.len();
             }
@@ -390,8 +389,7 @@ pub(super) fn run_time_reverse_flow_generated_surface_row(
             &format!("stab_circuit_time_reversed_for_flows_generated_surface_{suffix}"),
             TRANSFORM_REPETITIONS,
             || {
-                let (reversed, reversed_flows) = circuit
-                    .time_reversed_for_flows(&[])
+                let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&circuit, &[])
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box((circuit_checksum(&reversed), reversed_flows.len()));
                 Ok(())
@@ -410,8 +408,7 @@ pub(super) fn run_time_reverse_flow_mpad_matrix_row(
         "stab_circuit_time_reversed_for_flows_mpad_matrix",
         TRANSFORM_REPETITIONS,
         || {
-            let (reversed, reversed_flows) = circuit
-                .time_reversed_for_flows(&flows)
+            let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&circuit, &flows)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box((circuit_checksum(&reversed), reversed_flows.len()));
             Ok(())
@@ -423,8 +420,7 @@ pub(super) fn run_time_reverse_flow_mpad_matrix_row(
             &format!("stab_circuit_time_reversed_for_flows_mpad_scale_{size}"),
             TRANSFORM_REPETITIONS,
             || {
-                let (reversed, reversed_flows) = circuit
-                    .time_reversed_for_flows(&flows)
+                let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&circuit, &flows)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box((circuit_checksum(&reversed), reversed_flows.len()));
                 Ok(())
@@ -450,9 +446,9 @@ pub(super) fn run_time_reverse_flow_large_repeat_row(
             &format!("stab_circuit_time_reversed_for_flows_unitary_repeat_{suffix}"),
             TRANSFORM_REPETITIONS,
             || {
-                let (reversed, reversed_flows) = circuit
-                    .time_reversed_for_flows(&small_flows)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                let (reversed, reversed_flows) =
+                    circuit_time_reversed_for_flows(&circuit, &small_flows)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box((circuit_checksum(&reversed), reversed_flows.len()));
                 Ok(())
             },
@@ -471,9 +467,9 @@ pub(super) fn run_time_reverse_flow_large_repeat_row(
         "stab_circuit_time_reversed_for_flows_unitary_repeat_wide_body_1b",
         TRANSFORM_REPETITIONS,
         || {
-            let (reversed, reversed_flows) = wide_circuit
-                .time_reversed_for_flows(&wide_flows)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let (reversed, reversed_flows) =
+                circuit_time_reversed_for_flows(&wide_circuit, &wide_flows)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box((circuit_checksum(&reversed), reversed_flows.len()));
             Ok(())
         },
@@ -492,8 +488,7 @@ pub(super) fn run_time_reverse_flow_sparse_high_qubit_row(
             "stab_circuit_time_reversed_for_flows_sparse_qubit_0",
             TRANSFORM_REPETITIONS,
             || {
-                let (reversed, reversed_flows) = low
-                    .time_reversed_for_flows(&flows)
+                let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&low, &flows)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box((circuit_checksum(&reversed), reversed_flows.len()));
                 Ok(())
@@ -503,8 +498,7 @@ pub(super) fn run_time_reverse_flow_sparse_high_qubit_row(
             "stab_circuit_time_reversed_for_flows_sparse_qubit_1000000",
             TRANSFORM_REPETITIONS,
             || {
-                let (reversed, reversed_flows) = high
-                    .time_reversed_for_flows(&flows)
+                let (reversed, reversed_flows) = circuit_time_reversed_for_flows(&high, &flows)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box((circuit_checksum(&reversed), reversed_flows.len()));
                 Ok(())
@@ -679,22 +673,22 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf2-circuit-flatten-repeat" => Some(
-            "contract-only: Stab measures Rust Circuit::flattened repeat unrolling and coordinate-shift application; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures Rust analysis::flattened_circuit repeat unrolling and coordinate-shift application; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-circuit-without-noise" => Some(
-            "contract-only: Stab measures Rust Circuit::without_noise over top-level noisy, heralded, measurement, detector, and annotation instructions; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures Rust analysis::circuit_without_noise over top-level noisy, heralded, measurement, detector, and annotation instructions; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-feedback-inline-batch" => Some(
-            "contract-only: Stab measures Rust Circuit::with_inlined_feedback on the scoped MPP feedback subset, selected bounded repeat-loop refolding case, and selected XCZ/YCZ feedback case; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures Rust analysis::circuit_with_inlined_feedback on the scoped MPP feedback subset, selected bounded repeat-loop refolding case, and selected XCZ/YCZ feedback case; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-circuit-decompose-mpp-spp" => Some(
-            "contract-only: Stab measures Rust Circuit::decomposed over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures Rust decomposed_circuit over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow" => Some(
-            "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the scoped Rust circuit_time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the historical pinned measurement-rich Rust Circuit::time_reversed_for_flows corpus through the shared gate-family engine; pinned Stim has no faithful in-process Rust baseline in this harness",
+            "contract-only: Stab measures the historical pinned measurement-rich Rust circuit_time_reversed_for_flows corpus through the shared gate-family engine; pinned Stim has no faithful in-process Rust baseline in this harness",
         ),
         "pfm-b1-time-reverse-generated-surface" => Some(
             "contract-only: Stab measures a no-repeat distance matrix of rotated-memory-X reverse-flow transforms with fixture generation, repeat absence, and literal compact source-instruction validation outside each sample; pinned Stim has no faithful in-process Rust baseline in this harness",

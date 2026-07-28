@@ -11,6 +11,10 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use stab_core::{
     CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
     DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, Probability,
+    analysis::{
+        detector_error_model_without_tags, flattened_detector_error_model,
+        rounded_detector_error_model,
+    },
 };
 
 #[test]
@@ -295,8 +299,7 @@ fn cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim() {
     assert_eq!(zero_repeat.count_errors(), Ok(0));
     assert_eq!(zero_repeat.final_coordinate_shift(), Ok(vec![0.0]));
     assert_eq!(
-        zero_repeat
-            .flattened()
+        flattened_detector_error_model(&zero_repeat)
             .expect("flatten zero-count repeat")
             .to_dem_string(),
         ""
@@ -630,8 +633,7 @@ fn cq2_dem_flattened_iteration_contract_matches_stim() {
     );
     assert_eq!(from_iterator.to_dem_string(), expected);
     assert_eq!(
-        model
-            .flattened()
+        flattened_detector_error_model(&model)
             .expect("materialized flattening")
             .to_dem_string(),
         expected
@@ -645,7 +647,7 @@ fn cq2_dem_flattened_iteration_contract_matches_stim() {
         .collect::<CircuitResult<Vec<_>>>()
         .expect("bounded lazy prefix");
     assert_eq!(first.len(), 3);
-    assert!(huge.flattened().is_err());
+    assert!(flattened_detector_error_model(&huge).is_err());
 }
 
 #[test]
@@ -659,7 +661,7 @@ fn cq2_dem_compact_transform_contract_matches_stim() {
     )
     .expect("transform DEM");
     assert_eq!(
-        model.rounded(2).expect("rounded DEM"),
+        rounded_detector_error_model(&model, 2).expect("rounded DEM"),
         DetectorErrorModel::from_dem_str(
             "error[first](0.01) D0 D1\n\
              repeat[outer] 2 {\n\
@@ -669,7 +671,7 @@ fn cq2_dem_compact_transform_contract_matches_stim() {
         )
         .expect("rounded reference")
     );
-    let stripped = model.without_tags();
+    let stripped = detector_error_model_without_tags(&model);
     assert_eq!(
         stripped,
         DetectorErrorModel::from_dem_str(
@@ -684,11 +686,12 @@ fn cq2_dem_compact_transform_contract_matches_stim() {
     assert!(!stripped.to_dem_string().contains('['));
     assert!(model.to_dem_string().contains("[first]"));
     assert_eq!(
-        DetectorErrorModel::from_dem_str("error(0.000001) D0\n")
-            .expect("tiny error")
-            .rounded(2)
-            .expect("round tiny error")
-            .to_dem_string(),
+        rounded_detector_error_model(
+            &DetectorErrorModel::from_dem_str("error(0.000001) D0\n").expect("tiny error"),
+            2,
+        )
+        .expect("round tiny error")
+        .to_dem_string(),
         "error(0) D0\n"
     );
 }

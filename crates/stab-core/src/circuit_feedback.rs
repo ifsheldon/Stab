@@ -785,14 +785,14 @@ DETECTOR rec[-3] rec[-2] rec[-1]
 "
         );
 
-        let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
-            .unwrap()
-            .flattened()
+        let expected_dem =
+            circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default()).unwrap();
+        let expected_dem = crate::analysis::flattened_detector_error_model(&expected_dem)
             .unwrap()
             .to_dem_string();
-        let actual_dem = circuit_to_detector_error_model(&actual, ErrorAnalyzerOptions::default())
-            .unwrap()
-            .flattened()
+        let actual_dem =
+            circuit_to_detector_error_model(&actual, ErrorAnalyzerOptions::default()).unwrap();
+        let actual_dem = crate::analysis::flattened_detector_error_model(&actual_dem)
             .unwrap()
             .to_dem_string();
         assert_eq!(actual_dem, expected_dem);

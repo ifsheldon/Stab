@@ -29,7 +29,7 @@ pub fn detector_error_model_without_tags(model: &DetectorErrorModel) -> Detector
 /// applied to following instructions. Instruction tags are preserved, while repeat-block tags
 /// disappear with the expanded repeat blocks. The transform validates the existing Stab
 /// flattening budget before materialization and returns the same overflow or resource-limit errors
-/// as [`DetectorErrorModel::flattened`].
+/// as [`flattened_detector_error_model`].
 pub fn flattened_detector_error_model(
     model: &DetectorErrorModel,
 ) -> CircuitResult<DetectorErrorModel> {
@@ -66,37 +66,6 @@ pub fn rounded_detector_error_model(
     transform_compact_dem(model, true, |instruction| {
         rounded_instruction(instruction, digits)
     })
-}
-
-// Temporary pre-0.2 method adapters. The free analysis functions own these transforms; the
-// adapters preserve source compatibility until the model and analysis crates are extracted.
-impl DetectorErrorModel {
-    /// Returns a compact copy with every instruction and repeat-block tag removed.
-    ///
-    /// Item order, semantic instruction data, repeat counts, and repeat nesting are preserved, and
-    /// the source model is not mutated. This compatibility method delegates to
-    /// [`detector_error_model_without_tags`].
-    pub fn without_tags(&self) -> Self {
-        detector_error_model_without_tags(self)
-    }
-
-    /// Returns a materialized DEM with repeat blocks expanded and detector shifts applied.
-    ///
-    /// Instruction tags are preserved, repeat-block tags are removed with their blocks, and
-    /// excessive expansion or arithmetic overflow is rejected before returning a partial model.
-    /// This compatibility method delegates to [`flattened_detector_error_model`].
-    pub fn flattened(&self) -> CircuitResult<Self> {
-        flattened_detector_error_model(self)
-    }
-
-    /// Returns a compact copy with error probabilities rounded to `digits` decimal places.
-    ///
-    /// Non-error arguments, tags, targets, separators, repeat counts, and repeat structure are
-    /// preserved. Errors rounded to zero remain in the result. This compatibility method delegates
-    /// to [`rounded_detector_error_model`].
-    pub fn rounded(&self, digits: u8) -> CircuitResult<Self> {
-        rounded_detector_error_model(self, digits)
-    }
 }
 
 fn rounded_instruction(instruction: &DemInstruction, digits: u8) -> CircuitResult<DemInstruction> {

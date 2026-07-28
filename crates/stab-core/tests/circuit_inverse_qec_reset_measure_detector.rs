@@ -19,7 +19,6 @@ fn circuit_inverse_qec_supports_reset_measure_detector_triplet() {
     );
 
     assert_eq!(circuit_inverse_qec(&input).expect("inverse R/M/D"), input);
-    assert_eq!(input.inverse_qec().expect("method inverse R/M/D"), input);
 }
 
 #[test]
@@ -46,12 +45,6 @@ fn circuit_inverse_qec_with_options_keeps_selected_reset_measure_detector_measur
 
     assert_eq!(
         circuit_inverse_qec_with_options(&input, options).expect("inverse R/M/D keep M"),
-        expected
-    );
-    assert_eq!(
-        input
-            .inverse_qec_with_options(options)
-            .expect("method inverse R/M/D keep M"),
         expected
     );
     assert_eq!(

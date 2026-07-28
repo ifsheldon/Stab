@@ -7,9 +7,33 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_core::{
     Circuit, CompiledDemSampler, DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel,
+    analysis::{
+        detector_error_model_without_tags, flattened_detector_error_model,
+        rounded_detector_error_model,
+    },
     explain_errors_from_circuit, find_undetectable_logical_error, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
+
+trait DemTransformTestExt {
+    fn flattened(&self) -> stab_core::CircuitResult<DetectorErrorModel>;
+    fn rounded(&self, digits: u8) -> stab_core::CircuitResult<DetectorErrorModel>;
+    fn without_tags(&self) -> DetectorErrorModel;
+}
+
+impl DemTransformTestExt for DetectorErrorModel {
+    fn flattened(&self) -> stab_core::CircuitResult<DetectorErrorModel> {
+        flattened_detector_error_model(self)
+    }
+
+    fn rounded(&self, digits: u8) -> stab_core::CircuitResult<DetectorErrorModel> {
+        rounded_detector_error_model(self, digits)
+    }
+
+    fn without_tags(&self) -> DetectorErrorModel {
+        detector_error_model_without_tags(self)
+    }
+}
 
 const GENERATED_DIFFERENTIAL_CASES: u32 = 96;
 const GENERATED_DIFFERENTIAL_SEED: [u8; 32] = [0xB3; 32];

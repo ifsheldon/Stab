@@ -385,7 +385,7 @@ fn public_api_alias_validation_fails_closed() {
 }
 
 #[test]
-fn source_ledger_maps_exact_a1_replacements_to_existing_semantic_parents() {
+fn source_ledger_separates_owner_functions_from_facade_reexports() {
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let root_path = manifest_dir
         .parent()
@@ -404,47 +404,23 @@ fn source_ledger_maps_exact_a1_replacements_to_existing_semantic_parents() {
         })
         .collect::<std::collections::BTreeMap<_, _>>();
 
+    for owner_function in [
+        "stab_core::analysis::circuit_without_tags",
+        "stab_core::analysis::detector_error_model_without_tags",
+        "stab_core::analysis::flattened_detector_error_model",
+        "stab_core::analysis::gate_decomposition_to_circuit",
+        "stab_core::analysis::rounded_detector_error_model",
+        "stab_core::analysis::flattened_circuit",
+        "stab_core::analysis::gate_tableau",
+        "stab_core::execution::circuit_reference_sample",
+    ] {
+        assert!(
+            !aliases.contains_key(owner_function),
+            "owner function {owner_function} must not alias a removed foreign method"
+        );
+    }
+
     for (index, (alias, canonical, feature_id)) in [
-        (
-            "stab_core::analysis::circuit_without_tags",
-            "stab_core::Circuit::without_tags",
-            FeatureId::CircuitApi,
-        ),
-        (
-            "stab_core::analysis::detector_error_model_without_tags",
-            "stab_core::DetectorErrorModel::without_tags",
-            FeatureId::DemFormat,
-        ),
-        (
-            "stab_core::analysis::flattened_detector_error_model",
-            "stab_core::DetectorErrorModel::flattened",
-            FeatureId::DemFormat,
-        ),
-        (
-            "stab_core::analysis::gate_decomposition_to_circuit",
-            "stab_core::GateDecomposition::to_circuit",
-            FeatureId::GateContract,
-        ),
-        (
-            "stab_core::analysis::rounded_detector_error_model",
-            "stab_core::DetectorErrorModel::rounded",
-            FeatureId::DemFormat,
-        ),
-        (
-            "stab_core::analysis::flattened_circuit",
-            "stab_core::Circuit::flattened",
-            FeatureId::CircuitApi,
-        ),
-        (
-            "stab_core::analysis::gate_tableau",
-            "stab_core::Gate::tableau",
-            FeatureId::GateContract,
-        ),
-        (
-            "stab_core::execution::circuit_reference_sample",
-            "stab_core::Circuit::reference_sample",
-            FeatureId::CircuitApi,
-        ),
         (
             "stab_core::analysis::GateUnitaryMatrix",
             "stab_core::GateUnitaryMatrix",
@@ -528,8 +504,8 @@ fn assert_alias_error(
 fn test_alias() -> PublicApiAliasSpec {
     PublicApiAliasSpec {
         crate_name: "stab_core".to_string(),
-        alias_owner_path: api_path("stab_core::analysis::gate_tableau"),
-        canonical_owner_path: api_path("stab_core::Gate::tableau"),
+        alias_owner_path: api_path("stab_core::analysis::GateUnitaryMatrix"),
+        canonical_owner_path: api_path("stab_core::GateUnitaryMatrix"),
     }
 }
 

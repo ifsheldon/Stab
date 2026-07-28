@@ -30,7 +30,6 @@ fn circuit_inverse_qec_unitary_matches_stim() {
     );
 
     assert_eq!(circuit_inverse_qec(&input).expect("inverse QEC"), expected);
-    assert_eq!(input.inverse_qec().expect("method inverse QEC"), expected);
 }
 
 #[test]
@@ -93,13 +92,6 @@ fn circuit_inverse_qec_supports_selected_two_to_one_detector_flow() {
 
         assert_eq!(
             circuit_inverse_qec(&input).expect("inverse selected two_to_one flow"),
-            expected,
-            "{input_text}"
-        );
-        assert_eq!(
-            input
-                .inverse_qec()
-                .expect("method inverse selected two_to_one flow"),
             expected,
             "{input_text}"
         );
@@ -417,9 +409,8 @@ fn time_reversed_for_flows_unitary_subset_supports_flow_past_end() {
     let input = circuit("H 0\n");
     let flows = [flow("X300*Z0 -> X300*X0")];
 
-    let (actual_circuit, actual_flows) = input
-        .time_reversed_for_flows(&flows)
-        .expect("time reverse flows");
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse flows");
 
     assert_eq!(actual_circuit, input);
     assert_eq!(actual_flows, vec![flow("X300*X0 -> X300*Z0")]);
@@ -674,11 +665,6 @@ fn time_reversed_for_flows_measurement_rich_subset_can_keep_measurements() {
 
     assert_eq!(actual_circuit, input);
     assert_eq!(actual_flows, vec![flow("1 -> Z0 xor rec[-1]")]);
-
-    let method_result = input
-        .time_reversed_for_flows_with_options(&flows, options)
-        .expect("method time reverse measurement without converting to reset");
-    assert_eq!(method_result, (actual_circuit, actual_flows));
 }
 
 #[test]

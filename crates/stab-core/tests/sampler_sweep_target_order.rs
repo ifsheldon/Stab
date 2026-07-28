@@ -6,7 +6,8 @@
 
 use stab_core::{
     Circuit, DetectionConversionOptions, convert_measurements_to_detection_events_with_sweep,
-    sample_detection_events, validate_detection_sampling_circuit,
+    execution::circuit_reference_sample, sample_detection_events,
+    validate_detection_sampling_circuit,
 };
 
 #[test]
@@ -17,8 +18,7 @@ fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse invalid sweep order");
 
-        let reference_error = circuit
-            .reference_sample()
+        let reference_error = circuit_reference_sample(&circuit)
             .expect_err("reject reference sampling")
             .to_string();
         assert!(
@@ -68,9 +68,7 @@ fn pf3_sampler_sweep_target_order_keeps_accepted_orders() {
         "CZ 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n",
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse accepted sweep order");
-        circuit
-            .reference_sample()
-            .expect("reference sample accepted order");
+        circuit_reference_sample(&circuit).expect("reference sample accepted order");
         validate_detection_sampling_circuit(&circuit).expect("validate accepted order");
         convert_measurements_to_detection_events_with_sweep(
             &circuit,
