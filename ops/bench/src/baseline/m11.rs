@@ -15,7 +15,7 @@ use super::{
     batch_sinks::{ByteDigestWriter, DemDigestSink, OutputWitness, u64_sequence_digest},
     cli_process::run_stab_cli_process_row,
     measure_stab_iterations, measure_stab_iterations_with_postprocess_and_memory_operation,
-    stab_runner_error,
+    measure_stab_preflighted_compile_and_release, stab_runner_error,
 };
 
 const SAMPLE_DEM_NOISY_FIXTURE: &str =
@@ -169,7 +169,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for high detector index b8 output on the same fixture with independent untimed frozen output witnesses",
         ),
         "m11-dem-batch-phases" => Some(
-            "report-only: source-owned Stab diagnostics separately measure DEM plan compile-and-release with exact plan-dimension witnesses, detector-only and sampled-error execution with frozen ordered SHA-256 output sequences, replay with a frozen output witness, and PTB64 CLI routing with a frozen output witness, without claiming a Stim ratio",
+            "report-only: source-owned Stab diagnostics separately measure DEM plan compile-and-release with exact plan-dimension witnesses, detector-only and sampled-error execution with frozen ordered SHA-256 sequences of 64-bit output witnesses, replay with a frozen output witness, and PTB64 CLI routing with a frozen output witness, without claiming a Stim ratio",
         ),
         _ => None,
     }
@@ -254,7 +254,7 @@ fn measure_sample_dem_ptb64_routing(
     let expected = sample_dem_ptb64_witness();
     let preflight = run_sample_dem_cli(args.clone());
     ensure_sample_dem_cli_output(row, expected, &preflight)?;
-    black_box(preflight.2);
+    black_box(preflight.2.witness());
     let mut timing_state = ();
     measure_stab_iterations_with_postprocess_and_memory_operation(
         measurement_name,
@@ -263,13 +263,13 @@ fn measure_sample_dem_ptb64_routing(
         |_| Ok(run_sample_dem_cli(args.clone())),
         |_, actual| {
             ensure_sample_dem_cli_output(row, expected, &actual)?;
-            black_box(actual.2);
+            black_box(actual.2.witness());
             Ok(())
         },
         || {
             let actual = run_sample_dem_cli(args.clone());
             ensure_sample_dem_cli_output(row, expected, &actual)?;
-            black_box(actual.2);
+            black_box(actual.2.witness());
             Ok(())
         },
     )
@@ -285,7 +285,7 @@ const fn sample_dem_ptb64_witness() -> OutputWitness {
     OutputWitness::new(8, 0x095a_8dff_6d98_bcea)
 }
 
-type SampleDemCliOutput = (i32, Vec<u8>, OutputWitness);
+type SampleDemCliOutput = (i32, Vec<u8>, ByteDigestWriter);
 
 fn run_sample_dem_cli(args: [OsString; 6]) -> SampleDemCliOutput {
     let mut stdout = ByteDigestWriter::default();
@@ -296,7 +296,7 @@ fn run_sample_dem_cli(args: [OsString; 6]) -> SampleDemCliOutput {
         &mut stdout,
         &mut stderr,
     );
-    (status, stderr, stdout.witness())
+    (status, stderr, stdout)
 }
 
 fn ensure_sample_dem_cli_output(
@@ -314,12 +314,12 @@ fn ensure_sample_dem_cli_output(
             ),
         });
     }
-    if actual.2 != expected {
+    let actual_witness = actual.2.witness();
+    if actual_witness != expected {
         return Err(stab_runner_error(
             &row.id,
             format!(
-                "sample_dem PTB64 output changed: expected {expected:?}, got {:?}",
-                actual.2
+                "sample_dem PTB64 output changed: expected {expected:?}, got {actual_witness:?}"
             ),
         ));
     }
@@ -330,37 +330,35 @@ fn measure_dem_plan_compile(
     row: &BenchmarkRow,
     model: &DetectorErrorModel,
 ) -> Result<Measurement, BenchError> {
-    let mut timing_state = ();
-    measure_stab_iterations_with_postprocess_and_memory_operation(
+    measure_stab_preflighted_compile_and_release(
         "stab_dem_plan_compile_and_release_surface_like",
         M11_CONTRACT_ITERATIONS,
-        &mut timing_state,
-        |_| compile_dem_plan_dimensions(row, model),
-        |_, actual| ensure_dem_plan_witness(row, actual),
         || {
-            let actual = compile_dem_plan_dimensions(row, model)?;
-            ensure_dem_plan_witness(row, actual)?;
-            Ok(())
+            DemSamplingCompiler::new()
+                .compile(black_box(model))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |plan| {
+            ensure_dem_plan_witness(
+                row,
+                (
+                    plan.detector_width().get(),
+                    plan.observable_width().get(),
+                    plan.sampled_error_width().get(),
+                ),
+            )
+        },
+        || {
+            DemSamplingCompiler::new()
+                .compile(black_box(model))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        || {
+            DemSamplingCompiler::new()
+                .compile(black_box(model))
+                .map_err(|error| stab_runner_error(&row.id, error))
         },
     )
-}
-
-fn compile_dem_plan_dimensions(
-    row: &BenchmarkRow,
-    model: &DetectorErrorModel,
-) -> Result<(usize, usize, usize), BenchError> {
-    let actual = {
-        let plan = DemSamplingCompiler::new()
-            .compile(black_box(model))
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(&plan);
-        (
-            plan.detector_width().get(),
-            plan.observable_width().get(),
-            plan.sampled_error_width().get(),
-        )
-    };
-    Ok(actual)
 }
 
 fn measure_dem_session_detector_only(

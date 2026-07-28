@@ -23,7 +23,7 @@ use super::{
     batch_sinks::{ByteDigestWriter, DetectionDigestSink, OutputWitness, u64_sequence_digest},
     cli_process::run_stab_cli_process_row,
     measure_stab_iterations, measure_stab_iterations_with_postprocess_and_memory_operation,
-    stab_runner_error,
+    measure_stab_preflighted_compile_and_release, stab_runner_error,
 };
 
 mod detecting_region_rows;
@@ -273,7 +273,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on the same fixture with independent untimed frozen output witnesses",
         ),
         "m9-detection-batch-phases" => Some(
-            "report-only: source-owned Stab diagnostics separately measure detection plan compile-and-release with exact plan-dimension witnesses, bounded session execution with a frozen ordered SHA-256 output sequence, and PTB64 CLI routing with a frozen output witness, without claiming a Stim ratio",
+            "report-only: source-owned Stab diagnostics separately measure detection plan compile-and-release with exact plan-dimension witnesses, bounded session execution with a frozen ordered SHA-256 sequence of 64-bit output witnesses, and PTB64 CLI routing with a frozen output witness, without claiming a Stim ratio",
         ),
         "m9-m2d-batch-phases" => Some(
             "report-only: source-owned Stab diagnostics separately measure measurement-to-detection plan compile-and-release with exact plan-dimension witnesses and bounded session conversion with a frozen shot-count and output witness, without claiming a Stim ratio",
@@ -775,7 +775,7 @@ fn measure_detect_cli(
     ];
     let preflight = run_detect_cli(args.clone());
     ensure_detect_cli_output(row, expected, &preflight)?;
-    black_box(preflight.2);
+    black_box(preflight.2.witness());
     let mut timing_state = ();
     measure_stab_iterations_with_postprocess_and_memory_operation(
         measurement_name,
@@ -784,19 +784,19 @@ fn measure_detect_cli(
         |_| Ok(run_detect_cli(args.clone())),
         |_, actual| {
             ensure_detect_cli_output(row, expected, &actual)?;
-            black_box(actual.2);
+            black_box(actual.2.witness());
             Ok(())
         },
         || {
             let actual = run_detect_cli(args.clone());
             ensure_detect_cli_output(row, expected, &actual)?;
-            black_box(actual.2);
+            black_box(actual.2.witness());
             Ok(())
         },
     )
 }
 
-type DetectCliOutput = (i32, Vec<u8>, OutputWitness);
+type DetectCliOutput = (i32, Vec<u8>, ByteDigestWriter);
 
 fn run_detect_cli(args: [OsString; 7]) -> DetectCliOutput {
     let mut stdout = ByteDigestWriter::default();
@@ -807,7 +807,7 @@ fn run_detect_cli(args: [OsString; 7]) -> DetectCliOutput {
         &mut stdout,
         &mut stderr,
     );
-    (status, stderr, stdout.witness())
+    (status, stderr, stdout)
 }
 
 fn ensure_detect_cli_output(
@@ -825,13 +825,11 @@ fn ensure_detect_cli_output(
             ),
         });
     }
-    if actual.2 != expected {
+    let actual_witness = actual.2.witness();
+    if actual_witness != expected {
         return Err(stab_runner_error(
             &row.id,
-            format!(
-                "detect PTB64 output changed: expected {expected:?}, got {:?}",
-                actual.2
-            ),
+            format!("detect PTB64 output changed: expected {expected:?}, got {actual_witness:?}"),
         ));
     }
     Ok(())
@@ -841,37 +839,35 @@ fn measure_detection_plan_compile(
     row: &BenchmarkRow,
     circuit: &Circuit,
 ) -> Result<Measurement, BenchError> {
-    let mut timing_state = ();
-    measure_stab_iterations_with_postprocess_and_memory_operation(
+    measure_stab_preflighted_compile_and_release(
         "stab_detection_plan_compile_and_release_basic",
         super::STAB_COMPARE_ITERATIONS,
-        &mut timing_state,
-        |_| compile_detection_plan_dimensions(row, circuit),
-        |_, actual| ensure_detection_plan_witness(row, actual),
         || {
-            let actual = compile_detection_plan_dimensions(row, circuit)?;
-            ensure_detection_plan_witness(row, actual)?;
-            Ok(())
+            DetectionSamplingCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |plan| {
+            ensure_detection_plan_witness(
+                row,
+                (
+                    plan.measurement_width().get(),
+                    plan.detector_width().get(),
+                    plan.observable_width().get(),
+                ),
+            )
+        },
+        || {
+            DetectionSamplingCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        || {
+            DetectionSamplingCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
         },
     )
-}
-
-fn compile_detection_plan_dimensions(
-    row: &BenchmarkRow,
-    circuit: &Circuit,
-) -> Result<(usize, usize, usize), BenchError> {
-    let actual = {
-        let plan = DetectionSamplingCompiler::new()
-            .compile(black_box(circuit))
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(&plan);
-        (
-            plan.measurement_width().get(),
-            plan.detector_width().get(),
-            plan.observable_width().get(),
-        )
-    };
-    Ok(actual)
 }
 
 fn measure_detection_session(
@@ -961,38 +957,36 @@ fn measure_m2d_plan_compile(
     row: &BenchmarkRow,
     circuit: &Circuit,
 ) -> Result<Measurement, BenchError> {
-    let mut timing_state = ();
-    measure_stab_iterations_with_postprocess_and_memory_operation(
+    measure_stab_preflighted_compile_and_release(
         "stab_m2d_plan_compile_and_release_basic",
         super::STAB_COMPARE_ITERATIONS,
-        &mut timing_state,
-        |_| compile_m2d_plan_dimensions(row, circuit),
-        |_, actual| ensure_m2d_plan_witness(row, actual),
         || {
-            let actual = compile_m2d_plan_dimensions(row, circuit)?;
-            ensure_m2d_plan_witness(row, actual)?;
-            Ok(())
+            MeasurementToDetectionCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |plan| {
+            ensure_m2d_plan_witness(
+                row,
+                (
+                    plan.measurement_width().get(),
+                    plan.sweep_width().get(),
+                    plan.detector_width().get(),
+                    plan.observable_width().get(),
+                ),
+            )
+        },
+        || {
+            MeasurementToDetectionCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        || {
+            MeasurementToDetectionCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))
         },
     )
-}
-
-fn compile_m2d_plan_dimensions(
-    row: &BenchmarkRow,
-    circuit: &Circuit,
-) -> Result<(usize, usize, usize, usize), BenchError> {
-    let actual = {
-        let plan = MeasurementToDetectionCompiler::new()
-            .compile(black_box(circuit))
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(&plan);
-        (
-            plan.measurement_width().get(),
-            plan.sweep_width().get(),
-            plan.detector_width().get(),
-            plan.observable_width().get(),
-        )
-    };
-    Ok(actual)
 }
 
 fn ensure_detection_plan_witness(

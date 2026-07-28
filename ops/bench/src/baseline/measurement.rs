@@ -1,3 +1,4 @@
+use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use crate::allocations::measure_tracked_memory;
@@ -44,6 +45,37 @@ pub(super) fn measure_stab_iterations_with_memory_operation(
         variance_seconds,
         tracked_memory,
     ))
+}
+
+pub(super) fn measure_stab_preflighted_compile_and_release<Product>(
+    name: &str,
+    iterations: usize,
+    mut preflight_compile: impl FnMut() -> Result<Product, BenchError>,
+    mut validate_preflight: impl FnMut(&Product) -> Result<(), BenchError>,
+    mut timed_compile: impl FnMut() -> Result<Product, BenchError>,
+    mut memory_compile: impl FnMut() -> Result<Product, BenchError>,
+) -> Result<Measurement, BenchError> {
+    let preflight = preflight_compile()?;
+    validate_preflight(&preflight)?;
+    black_box(&preflight);
+    drop(preflight);
+
+    measure_stab_iterations_with_memory_operation(
+        name,
+        iterations,
+        || {
+            let product = timed_compile()?;
+            black_box(&product);
+            drop(product);
+            Ok(())
+        },
+        || {
+            let product = memory_compile()?;
+            black_box(&product);
+            drop(product);
+            Ok(())
+        },
+    )
 }
 
 pub(super) fn measure_stab_iterations_with_postprocess_and_memory_operation<State, Output>(
@@ -190,9 +222,13 @@ mod tests {
     )]
 
     use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
     use std::time::{Duration, Instant};
 
-    use super::measure_stab_timings_with_postprocess_and_clock;
+    use super::{
+        measure_stab_preflighted_compile_and_release,
+        measure_stab_timings_with_postprocess_and_clock,
+    };
     use crate::error::BenchError;
 
     #[test]
@@ -254,5 +290,81 @@ mod tests {
         .expect_err("reject a backwards finish clock");
 
         assert!(matches!(error, BenchError::NonMonotonicClock));
+    }
+
+    #[test]
+    fn compile_witness_is_preflighted_before_timed_products() {
+        struct Product {
+            label: &'static str,
+            events: Rc<RefCell<Vec<&'static str>>>,
+        }
+
+        impl Drop for Product {
+            fn drop(&mut self) {
+                self.events.borrow_mut().push(self.label);
+            }
+        }
+
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let measurement = measure_stab_preflighted_compile_and_release(
+            "preflighted-compile",
+            2,
+            {
+                let events = Rc::clone(&events);
+                move || {
+                    events.borrow_mut().push("preflight-compile");
+                    Ok(Product {
+                        label: "preflight-drop",
+                        events: Rc::clone(&events),
+                    })
+                }
+            },
+            {
+                let events = Rc::clone(&events);
+                move |_| {
+                    events.borrow_mut().push("preflight-witness");
+                    Ok(())
+                }
+            },
+            {
+                let events = Rc::clone(&events);
+                move || {
+                    events.borrow_mut().push("timed-compile");
+                    Ok(Product {
+                        label: "timed-drop",
+                        events: Rc::clone(&events),
+                    })
+                }
+            },
+            {
+                let events = Rc::clone(&events);
+                move || {
+                    events.borrow_mut().push("memory-compile");
+                    Ok(Product {
+                        label: "memory-drop",
+                        events: Rc::clone(&events),
+                    })
+                }
+            },
+        )
+        .expect("measure preflighted compile");
+
+        let events = events.borrow();
+        assert!(events.starts_with(&["preflight-compile", "preflight-witness", "preflight-drop",]));
+        assert_eq!(
+            events
+                .windows(2)
+                .filter(|window| window == &["timed-compile", "timed-drop"])
+                .count(),
+            2
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| **event == "preflight-witness")
+                .count(),
+            1
+        );
+        assert_eq!(measurement.iterations, Some(2));
     }
 }

@@ -740,7 +740,7 @@ mod tests {
             Path::new("/bin/sh"),
             [
                 "-c",
-                "dd if=/dev/zero bs=1048577 count=1 2>/dev/null; printf '\\377\\000' >&2",
+                "printf '\\377\\000' >&2; dd if=/dev/zero bs=1048577 count=1 2>/dev/null",
             ],
             &[],
             None,
