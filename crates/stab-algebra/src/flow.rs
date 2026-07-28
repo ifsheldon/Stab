@@ -44,7 +44,8 @@ pub struct Flow {
 }
 
 impl Flow {
-    pub(crate) fn from_paulis(input: PauliString, output: PauliString) -> Self {
+    /// Creates a flow without measurement or observable terms.
+    pub fn from_paulis(input: PauliString, output: PauliString) -> Self {
         Self {
             input,
             output,

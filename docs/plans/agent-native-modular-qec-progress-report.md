@@ -489,3 +489,21 @@ The source-current process comparison is `target/benchmarks/a5-clean-cli-beta-b8
 The first isolated source-current memory attempts under `target/benchmarks/a5-clean-cli-memory-b8e3f459-*` intentionally remain failed evidence because they omitted the benchmark's declared `--warmup`; ten rows therefore charged 68–86 KiB of initialization RSS against a 64 KiB page-noise allowance. Observer and extra-product-warmup experiments under the `a5-memory-*-probe-20260728-*` paths were falsified and removed from source. The clean three-run candidates under `target/benchmarks/a5-memory-isolated-baseline-candidate-b8e3f459-*` showed that matching the source-owned warmup restores the established measurement identity without changing its baseline. Final gated reports under `target/benchmarks/a5-clean-cli-memory-b8e3f459-warm-*` all pass, with exact product allocation peaks of 120,859–123,204 bytes and resident deltas of 0–8 KiB against unchanged allowances.
 
 Every final phase, timing, and memory report records commit `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c` with `local_modifications=false`. Formatting, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture enforcement, API docs, Stim version validation, the live 62-case result-format corpus, the complete implemented oracle run, correctness and performance check/regeneration, generated-status checking, and benchmark smoke all passed. A5 is closed; A6 owns the remaining physical crate extraction.
+
+## A6 Physical Component Extraction
+
+A6 is active.
+
+The exact source, API, feature, test, and benchmark destinations were frozen first in [the A6 physical component extraction map](../architecture/a6-component-extraction-map.md).
+
+The first physical slice extracts `stab-algebra` as a Stable Rust 1.97.1 package over `stab-bits`. Pauli, Clifford, tableau, flow, conversion, algebra-error, algebra-resource, and scalar quantum-word implementations now have one canonical owner. `stab_core::stabilizers` contains only compatibility reexports.
+
+The extraction removes the previous direct `std::simd` Clifford implementation from `stab-core` instead of allowing Nightly code into the Stable algebra crate. Portable SIMD remains intentionally unavailable until `stab-kernels-simd` owns a dependency-free raw implementation and scalar-versus-SIMD equivalence plus performance evidence justify registering it.
+
+Cross-crate analysis and execution callers use ordinary public algebra operations where the operation is a meaningful safe algebra API. Constructors that deliberately bypass repeated resource admission remain under `stab_algebra::advanced`, making the low-level boundary explicit without exposing storage fields.
+
+Correctness-manifest schema version 5 records 107 cross-crate reexport relationships instead of treating facade paths as independent implementations. Existing exact evidence mappings follow a rustdoc-proven external alias only when the canonical dependency path has no explicit ledger owner, preserving the established `stab-bits` and `stab-records` ownership while transferring algebra facade evidence to the new canonical crate. The regenerated correctness inventory contains 2,886 upstream cases, 5,111 exported API items, 2,003 evidence parents, and digest `5d0054d91e9bb21a662d695884c1eb598226ac9451598c6c021bac27001da4d5`.
+
+The corresponding performance inventory still contains 127 checklist rows, 179 groups, and 167 inherited rows. It now covers all 5,111 API items without adding a speculative workload, and its digest is `41f0545f26529c554e4bf152f40833e7b7928613dd9e699360d551ea3fe3e7e9`. Existing M6 Pauli, iterator, and Clifford-string workload families own both canonical `stab_algebra` paths and their facade aliases.
+
+The scalar algebra package passes `cargo +1.97.1 check -p stab-algebra`, its focused tests, warnings-denied Clippy and rustdoc, the complete `stab-core` compatibility suite, and architecture enforcement. A6 remains open for model, analysis, engine, raw SIMD, facade, feature, ops-contract, fixture, inventory, and benchmark closure.

@@ -312,6 +312,52 @@ pub(super) fn classify_public_api_source(
     if api_lower.ends_with("::to_tableau") {
         return Some(FeatureId::Algebra);
     }
+    if [
+        "cliffordstring",
+        "commutingpaulistringiterator",
+        "flexpaulistring",
+        "flowmeasurementindex",
+        "paulibasis",
+        "pauliphase",
+        "paulisign",
+        "paulistring",
+        "singlequbitclifford",
+        "stabilizererror",
+        "stabilizerresource",
+        "stabilizerresult",
+        "tableauiterator",
+    ]
+    .iter()
+    .any(|marker| api_lower.contains(marker))
+        || [
+            "stab_algebra::flow",
+            "stab_core::flow",
+            "stab_core::stabilizers::flow",
+        ]
+        .iter()
+        .any(|prefix| {
+            api_lower == *prefix
+                || api_lower
+                    .strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
+        })
+        || [
+            "stab_algebra::tableau",
+            "stab_core::stabilizers::tableau",
+            "stab_core::tableau",
+        ]
+        .iter()
+        .any(|prefix| {
+            api_lower == *prefix
+                || api_lower
+                    .strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
+        })
+        || api_lower.contains("stabilizers_to_tableau")
+        || api_lower.contains("unitary_to_tableau")
+    {
+        return Some(FeatureId::Algebra);
+    }
     if api_lower.contains("from_stim")
         || api_lower.contains("to_stim")
         || api_lower.contains("write_stim")
@@ -438,7 +484,9 @@ pub(super) fn classify_public_api_source(
     if value.starts_with("crates/stab-core/src/gate") || value == "crates/stab-core/src/target.rs" {
         return Some(FeatureId::GateContract);
     }
-    if value.starts_with("crates/stab-core/src/stabilizers/")
+    if value.starts_with("crates/stab-algebra/src/")
+        || api_lower.starts_with("stab_algebra::")
+        || value.starts_with("crates/stab-core/src/stabilizers/")
         || matches!(
             value.as_str(),
             "crates/stab-core/src/analysis/gate_semantics.rs"

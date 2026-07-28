@@ -1,6 +1,9 @@
 const MAX_SELECTOR_PARTS: usize = 11;
 const MAX_SELECTOR_PART_BYTES: usize = 128;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CargoTestSelector<'a> {
     package: &'a str,
@@ -247,10 +250,7 @@ impl<'a> CargoTestSelector<'a> {
             }
             _ => return Err("must use the allowlisted cargo test selector shape"),
         };
-        if !matches!(
-            package,
-            "stab-bits" | "stab-records" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
-        ) {
+        if !is_allowed_test_package(package) {
             return Err("uses a package outside the blocker-test allowlist");
         }
         if features.is_some_and(|value| value != "ops-contracts") {
@@ -359,14 +359,24 @@ fn is_test_name(value: &str) -> bool {
 }
 
 fn validate_package_and_test_name(package: &str, filter: Option<&str>) -> Result<(), &'static str> {
-    if !matches!(
-        package,
-        "stab-bits" | "stab-records" | "stab-core" | "stab-cli" | "stab-oracle" | "stab-bench"
-    ) {
+    if !is_allowed_test_package(package) {
         return Err("uses a package outside the blocker-test allowlist");
     }
     if filter.is_some_and(|value| !is_test_name(value)) {
         return Err("contains an invalid test target or filter");
     }
     Ok(())
+}
+
+fn is_allowed_test_package(package: &str) -> bool {
+    matches!(
+        package,
+        "stab-algebra"
+            | "stab-bits"
+            | "stab-records"
+            | "stab-core"
+            | "stab-cli"
+            | "stab-oracle"
+            | "stab-bench"
+    )
 }

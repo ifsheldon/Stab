@@ -1,5 +1,3 @@
-#![feature(portable_simd)]
-
 //! Core circuit, detector error model, and simulator primitives for Stab.
 
 pub mod analysis;

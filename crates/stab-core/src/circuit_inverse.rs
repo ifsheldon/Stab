@@ -347,5 +347,5 @@ fn unitary_flow_is_satisfied_by_tableau(tableau: &Tableau, flow: &Flow) -> Circu
 
 fn pauli_prefix(pauli: &PauliString, len: usize) -> PauliString {
     let bases = (0..len).map(|index| pauli.get(index).unwrap_or(PauliBasis::I));
-    PauliString::from_bases_unchecked(PauliSign::Plus, bases)
+    stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases)
 }

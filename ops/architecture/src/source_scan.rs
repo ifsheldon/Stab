@@ -3,10 +3,6 @@ use std::path::{Path, PathBuf};
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
-const LEGACY_SIMD_PATHS: &[&str] = &[
-    "crates/stab-core/src/bits/clifford.rs",
-    "crates/stab-core/src/bits/simd.rs",
-];
 
 pub(super) struct SourceReport {
     pub rust_source_count: usize,
@@ -31,7 +27,6 @@ pub(super) fn scan_workspace_sources(
     rust_sources.sort();
     rust_sources.dedup();
 
-    let mut migration_allowances = Vec::new();
     for source_path in &rust_sources {
         let source = std::fs::read_to_string(root.join(source_path)).map_err(|source| {
             CheckError::ReadSource {
@@ -45,15 +40,6 @@ pub(super) fn scan_workspace_sources(
         let package = package_for_source(source_path, packages);
         match classify_simd_site(source_path, package) {
             SimdSite::Kernel => {}
-            SimdSite::Legacy => {
-                migration_allowances.push(MigrationAllowance::new(
-                    "legacy-portable-simd-source",
-                    format!(
-                        "{} retains its current direct portable-SIMD use until stab-kernels-simd is extracted",
-                        source_path.display()
-                    ),
-                ));
-            }
             SimdSite::Forbidden => {
                 violations.push(Violation::new(
                     "direct-std-simd-outside-kernel",
@@ -70,27 +56,21 @@ pub(super) fn scan_workspace_sources(
     Ok(SourceReport {
         rust_source_count: rust_sources.len(),
         violations,
-        migration_allowances,
+        migration_allowances: Vec::new(),
     })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SimdSite {
     Kernel,
-    Legacy,
     Forbidden,
 }
 
-fn classify_simd_site(source_path: &Path, package: Option<&PackageSpec>) -> SimdSite {
+fn classify_simd_site(_source_path: &Path, package: Option<&PackageSpec>) -> SimdSite {
     if package.is_some_and(|package| package.name == SIMD_PACKAGE) {
         return SimdSite::Kernel;
     }
-    let normalized = source_path.to_string_lossy().replace('\\', "/");
-    if LEGACY_SIMD_PATHS.contains(&normalized.as_str()) {
-        SimdSite::Legacy
-    } else {
-        SimdSite::Forbidden
-    }
+    SimdSite::Forbidden
 }
 
 fn collect_rust_sources(
@@ -226,14 +206,14 @@ mod tests {
     }
 
     #[test]
-    fn only_exact_legacy_simd_paths_are_grandfathered() {
+    fn former_legacy_simd_paths_are_forbidden() {
         let core = PackageSpec {
             name: "stab-core".to_owned(),
             relative_path: PathBuf::from("crates/stab-core"),
         };
         assert_eq!(
             classify_simd_site(Path::new("crates/stab-core/src/bits/simd.rs"), Some(&core)),
-            SimdSite::Legacy
+            SimdSite::Forbidden
         );
         assert_eq!(
             classify_simd_site(

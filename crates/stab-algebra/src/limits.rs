@@ -55,7 +55,8 @@ impl StabilizerResource {
         }
     }
 
-    pub(crate) fn ensure(self, requested: usize) -> StabilizerResult<()> {
+    /// Checks `requested` against this algebra resource limit.
+    pub fn ensure(self, requested: usize) -> StabilizerResult<()> {
         let limit = self.limit();
         if requested <= limit {
             Ok(())

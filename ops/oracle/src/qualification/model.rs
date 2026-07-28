@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use serde::de::{Error as _, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub(super) const SCHEMA_VERSION: u32 = 4;
+pub(super) const SCHEMA_VERSION: u32 = 5;
 
 const MAX_CASE_ID_BYTES: usize = 128;
 const MAX_API_PATH_BYTES: usize = 1_024;
@@ -385,7 +385,21 @@ pub(super) struct PublicApiAlias {
     #[serde(deserialize_with = "deserialize_text")]
     pub(super) crate_name: String,
     pub(super) alias_path: ApiPath,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_text",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) canonical_crate_name: Option<String>,
     pub(super) canonical_path: ApiPath,
+}
+
+impl PublicApiAlias {
+    pub(super) fn canonical_crate_name(&self) -> &str {
+        self.canonical_crate_name
+            .as_deref()
+            .unwrap_or(&self.crate_name)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

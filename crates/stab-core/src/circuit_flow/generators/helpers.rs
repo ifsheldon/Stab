@@ -49,7 +49,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
     local_tableau: &crate::Tableau,
     qubit_count: usize,
 ) -> CircuitResult<PauliString> {
-    let local = PauliString::from_bases_unchecked(
+    let local = stab_algebra::advanced::pauli_from_bases_unchecked(
         input.sign(),
         targets
             .iter()
@@ -72,7 +72,10 @@ pub(super) fn apply_local_tableau_to_global_pauli(
         };
         *slot = basis;
     }
-    Ok(PauliString::from_bases_unchecked(transformed.sign(), bases))
+    Ok(stab_algebra::advanced::pauli_from_bases_unchecked(
+        transformed.sign(),
+        bases,
+    ))
 }
 
 pub(super) fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
@@ -195,7 +198,7 @@ pub(super) fn input_measurement_flow(
 ) -> CircuitResult<Flow> {
     Flow::new(
         single_pauli(qubit_count, qubit, basis),
-        PauliString::from_bases_unchecked(record_sign, []),
+        stab_algebra::advanced::pauli_from_bases_unchecked(record_sign, []),
         [record_index_i32(record_index)?],
         [],
     )
@@ -204,8 +207,8 @@ pub(super) fn input_measurement_flow(
 
 pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
     Flow::new(
-        PauliString::identity_unchecked(0),
-        PauliString::identity_unchecked(0),
+        stab_algebra::advanced::pauli_identity_unchecked(0),
+        stab_algebra::advanced::pauli_identity_unchecked(0),
         [record_index_i32(record_index)?],
         [],
     )
@@ -214,8 +217,8 @@ pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
 
 pub(super) fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
     Flow::new(
-        PauliString::identity_unchecked(0),
-        PauliString::from_bases_unchecked(PauliSign::Minus, []),
+        stab_algebra::advanced::pauli_identity_unchecked(0),
+        stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Minus, []),
         [record_index_i32(record_index)?],
         [],
     )

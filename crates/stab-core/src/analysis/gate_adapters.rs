@@ -231,7 +231,7 @@ fn complex_matrix<const N: usize>(rows: [[(f32, f32); N]; N]) -> [[Complex32; N]
 }
 
 fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    PauliString::from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unchecked(
         PauliSign::Plus,
         (0..len).map(|candidate| {
             if candidate == index {

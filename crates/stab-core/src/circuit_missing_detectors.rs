@@ -2,8 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
-    MeasureRecordOffset, Pauli, PauliBasis, PauliSign, PauliString, QubitId, RepeatBlock, Tableau,
-    Target,
+    MeasureRecordOffset, Pauli, PauliBasis, PauliSign, QubitId, RepeatBlock, Tableau, Target,
 };
 use folded_repeat::try_missing_detectors_folded_final_repeat;
 
@@ -875,7 +874,7 @@ impl TrackedGenerator {
         tableau: &Tableau,
         targets: &[usize],
     ) -> CircuitResult<()> {
-        let input = PauliString::from_bases_unchecked(
+        let input = stab_algebra::advanced::pauli_from_bases_unchecked(
             PauliSign::Plus,
             targets.iter().map(|target| self.basis(*target)),
         );

@@ -7,8 +7,8 @@ use std::sync::LazyLock;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
-    FlexPauliString, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
-    SingleQubitClifford, Tableau, Target,
+    FlexPauliString, Pauli, PauliBasis, PauliPhase, PauliSign, QubitId, SingleQubitClifford,
+    Tableau, Target,
 };
 
 mod error_analysis;
@@ -753,7 +753,7 @@ impl SparseReverseFrameTracker {
         let mut new_right_xs = BTreeSet::new();
         let mut new_right_zs = BTreeSet::new();
         for target in tracked_targets {
-            let input = PauliString::from_bases_unchecked(
+            let input = stab_algebra::advanced::pauli_from_bases_unchecked(
                 PauliSign::Plus,
                 [
                     basis_from_sets(&old_left_xs, &old_left_zs, target),

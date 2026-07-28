@@ -2,9 +2,7 @@ use std::fmt;
 
 use rand::{Rng, RngExt as _};
 
-use crate::{
-    CircuitError, CircuitResult, PauliBasis, PauliSign, PauliString, StabilizerError, Tableau,
-};
+use crate::{CircuitError, CircuitResult, PauliBasis, PauliSign, StabilizerError, Tableau};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct LocalTableauTransform {
@@ -19,7 +17,8 @@ impl LocalTableauTransform {
         let mut outputs = Vec::with_capacity(output_count);
         for input_index in 0..output_count {
             let input_bases = bases_from_index(input_index, target_count);
-            let input = PauliString::from_bases_unchecked(PauliSign::Plus, input_bases);
+            let input =
+                stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, input_bases);
             let output = tableau.apply(&input).map_err(map_stabilizer_error)?;
             let mut output_bases = Vec::with_capacity(target_count);
             for target in 0..target_count {

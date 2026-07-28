@@ -45,15 +45,6 @@ pub struct MigrationAllowance {
     pub message: String,
 }
 
-impl MigrationAllowance {
-    fn new(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-        }
-    }
-}
-
 /// Successful architecture-check counts and reported migration debt.
 #[derive(Debug)]
 pub struct CheckSummary {

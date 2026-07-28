@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::{PauliPhase, StabilizerResource};
-use crate::BitError;
+use stab_bits::BitError;
 
 pub type StabilizerResult<T> = Result<T, StabilizerError>;
 

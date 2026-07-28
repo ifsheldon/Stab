@@ -169,11 +169,56 @@ fn validation_requires_exact_public_api_alias_ownership() {
         .public_api_aliases
         .first_mut()
         .expect("repository alias");
+    alias.canonical_crate_name = None;
     alias.canonical_path = alias.alias_path.clone();
     refresh_digest(&mut self_referential);
     let error =
         validate(&self_referential, "UNFROZEN").expect_err("self-referential alias must fail");
     assert!(error.to_string().contains("self-referential"), "{error}");
+}
+
+#[test]
+fn validation_requires_declared_cross_crate_reexport_ownership() {
+    let mut manifest = repository_manifest();
+    let alias_index = manifest
+        .public_api_aliases
+        .iter()
+        .position(|alias| {
+            alias.crate_name == "stab_core"
+                && alias.alias_path.as_str() == "stab_core::PauliString"
+                && alias.canonical_crate_name() == "stab_algebra"
+                && alias.canonical_path.as_str() == "stab_algebra::PauliString"
+        })
+        .expect("algebra facade alias");
+    manifest.public_api_aliases.remove(alias_index);
+    refresh_digest(&mut manifest);
+
+    let error =
+        validate(&manifest, "UNFROZEN").expect_err("undeclared cross-crate ownership must fail");
+    assert!(
+        error.to_string().contains("stab_core::PauliString"),
+        "{error}"
+    );
+}
+
+#[test]
+fn validation_rejects_wrong_cross_crate_reexport_target() {
+    let mut manifest = repository_manifest();
+    let alias = manifest
+        .public_api_aliases
+        .iter_mut()
+        .find(|alias| {
+            alias.crate_name == "stab_core" && alias.alias_path.as_str() == "stab_core::PauliString"
+        })
+        .expect("algebra facade alias");
+    alias.canonical_crate_name = Some("stab_records".to_string());
+    refresh_digest(&mut manifest);
+
+    let error = validate(&manifest, "UNFROZEN").expect_err("wrong dependency owner must fail");
+    assert!(
+        error.to_string().contains("resolves no mapped API items"),
+        "{error}"
+    );
 }
 
 #[test]

@@ -3,7 +3,7 @@ use rand::{Rng, RngExt as _};
 use super::{try_false_vec, try_vec_with_capacity};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, Pauli, PauliBasis,
-    PauliSign, PauliString, Target,
+    PauliSign, Target,
 };
 
 mod helpers;
@@ -470,7 +470,7 @@ impl ScalarDetectionFrame {
             .iter()
             .map(|qubit| self.qubit_basis(*qubit))
             .collect::<CircuitResult<Vec<_>>>()?;
-        let input = PauliString::from_bases_unchecked(PauliSign::Plus, bases);
+        let input = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
         let output = tableau
             .apply(&input)
             .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;

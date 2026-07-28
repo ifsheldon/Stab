@@ -466,6 +466,7 @@ fn validate_public_api_aliases(
         let key = (
             alias.crate_name.as_str(),
             alias.alias_path.as_str(),
+            alias.canonical_crate_name(),
             alias.canonical_path.as_str(),
         );
         if previous.is_some_and(|previous| previous > key) {
@@ -479,6 +480,13 @@ fn validate_public_api_aliases(
             ));
         }
         validate_text("public API alias crate", &alias.crate_name, violations);
+        if let Some(canonical_crate_name) = &alias.canonical_crate_name {
+            validate_text(
+                "public API canonical crate",
+                canonical_crate_name,
+                violations,
+            );
+        }
         validate_text(
             "public API alias path",
             alias.alias_path.as_str(),
@@ -490,56 +498,65 @@ fn validate_public_api_aliases(
             violations,
         );
 
-        let crate_prefix = format!("{}::", alias.crate_name);
-        if !alias.alias_path.as_str().starts_with(&crate_prefix)
-            || !alias.canonical_path.as_str().starts_with(&crate_prefix)
+        if !api_path_is_owned_by(&alias.crate_name, alias.alias_path.as_str())
+            || !api_path_is_owned_by(alias.canonical_crate_name(), alias.canonical_path.as_str())
         {
             violations.push(format!(
-                "public API alias {} -> {} is not rooted in crate {}",
-                alias.alias_path, alias.canonical_path, alias.crate_name
+                "public API alias {} -> {} is not rooted in crates {} and {}",
+                alias.alias_path,
+                alias.canonical_path,
+                alias.crate_name,
+                alias.canonical_crate_name()
             ));
         }
-        if alias.alias_path == alias.canonical_path {
+        if alias.crate_name == alias.canonical_crate_name()
+            && alias.alias_path == alias.canonical_path
+        {
             violations.push(format!(
                 "public API alias {}::{} is self-referential",
                 alias.crate_name, alias.alias_path
             ));
         }
-        if alias_paths.contains(&(alias.crate_name.as_str(), alias.canonical_path.as_str())) {
+        if alias_paths.contains(&(alias.canonical_crate_name(), alias.canonical_path.as_str())) {
             violations.push(format!(
                 "public API alias {}::{} uses another alias as canonical path {}",
                 alias.crate_name, alias.alias_path, alias.canonical_path
             ));
         }
 
-        let alias_items = manifest
+        let has_shared_owner_pair = manifest
             .public_api_items
             .iter()
-            .filter(|item| item.crate_name == alias.crate_name && item.path == alias.alias_path)
-            .collect::<Vec<_>>();
-        let canonical_items = manifest
-            .public_api_items
-            .iter()
-            .filter(|item| item.crate_name == alias.crate_name && item.path == alias.canonical_path)
-            .collect::<Vec<_>>();
-        let ([alias_item], [canonical_item]) = (alias_items.as_slice(), canonical_items.as_slice())
-        else {
+            .filter(|item| {
+                item.crate_name == alias.crate_name
+                    && api_path_is_owned_by(alias.alias_path.as_str(), item.path.as_str())
+            })
+            .filter_map(|alias_item| {
+                let suffix = alias_item
+                    .path
+                    .as_str()
+                    .strip_prefix(alias.alias_path.as_str())?;
+                let canonical_path = format!("{}{}", alias.canonical_path, suffix);
+                let mut canonical_items = manifest.public_api_items.iter().filter(|candidate| {
+                    candidate.crate_name == alias.canonical_crate_name()
+                        && candidate.path.as_str() == canonical_path
+                });
+                let canonical_item = canonical_items.next()?;
+                canonical_items
+                    .next()
+                    .is_none()
+                    .then_some((alias_item, canonical_item))
+            })
+            .any(|(alias_item, canonical_item)| {
+                alias_item.feature_id == canonical_item.feature_id
+                    && alias_item.owner_case_id == canonical_item.owner_case_id
+            });
+        if !has_shared_owner_pair {
             violations.push(format!(
-                "public API alias {}::{} -> {} resolves {} alias and {} canonical items",
+                "public API alias {}::{} -> {} resolves no mapped API items with one feature and semantic owner",
                 alias.crate_name,
                 alias.alias_path,
-                alias.canonical_path,
-                alias_items.len(),
-                canonical_items.len()
-            ));
-            continue;
-        };
-        if alias_item.feature_id != canonical_item.feature_id
-            || alias_item.owner_case_id != canonical_item.owner_case_id
-        {
-            violations.push(format!(
-                "public API alias {}::{} -> {} does not share one feature and semantic owner",
-                alias.crate_name, alias.alias_path, alias.canonical_path
+                alias.canonical_path
             ));
         }
     }
@@ -717,7 +734,8 @@ fn public_api_alias_owns_item(
     };
     let canonical_item_path = format!("{}{}", alias.canonical_path, suffix);
     let mut canonical_items = manifest.public_api_items.iter().filter(|candidate| {
-        candidate.crate_name == item.crate_name && candidate.path.as_str() == canonical_item_path
+        candidate.crate_name == alias.canonical_crate_name()
+            && candidate.path.as_str() == canonical_item_path
     });
     let Some(canonical_item) = canonical_items.next() else {
         return false;

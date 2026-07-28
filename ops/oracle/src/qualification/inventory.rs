@@ -14,20 +14,20 @@ use super::extract::{
 };
 use super::model::{
     ApiPath, CaseId, EvidenceCase, EvidenceProvenance, EvidenceSelector, EvidenceState,
-    EvidenceStatus, FeatureId, FeatureRecord, Parameterization, PublicApiItem,
+    EvidenceStatus, FeatureId, FeatureRecord, Parameterization, PublicApiAlias, PublicApiItem,
     QualificationManifest, RelativeSourcePath, ResourceContract, ResourceKind, SCHEMA_VERSION,
     SelectorKind, SemanticDigest, StableCaseDomain, UpstreamCase, UpstreamOwnership,
     UpstreamProvenance,
 };
-use super::public_api::{
-    ExtractedPublicApiItem, PublicApiError, generate_rustdoc_inventory, resolve_external_reexports,
-};
+use super::public_api::{ExtractedPublicApiItem, PublicApiError};
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::CargoTestSelector;
 
 mod case_id;
 mod evidence;
+mod limits;
 mod property_plan;
+mod public_apis;
 mod qualification_cases;
 
 pub(super) use case_id::stable_id;
@@ -36,6 +36,7 @@ use evidence::{
     oracle_behavioral_surface, planned_api_selector, planned_selector,
     semantic_only_resource_contract, statistical_plan_reference,
 };
+use limits::ensure_limit;
 
 const RUST_TOOLCHAIN: &str = "nightly-2026-06-20";
 const CPP_TEST_FILE_COUNT: usize = 103;
@@ -259,27 +260,8 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         .flat_map(make_upstream_evidence_cases)
         .collect::<Vec<_>>();
 
-    let bits_api = generate_rustdoc_inventory(&root.path, "stab-bits", "stab_bits")?;
-    let records_api = generate_rustdoc_inventory(&root.path, "stab-records", "stab_records")?;
-    let mut extracted_api = generate_rustdoc_inventory(&root.path, "stab-core", "stab_core")?;
-    resolve_external_reexports(&mut extracted_api, &[bits_api.clone(), records_api.clone()])?;
-    if extracted_api.format_version != bits_api.format_version
-        || extracted_api.format_version != records_api.format_version
-    {
-        return Err(InventoryError::PublicApi(PublicApiError::InvalidField(
-            "rustdoc format version mismatch",
-        )));
-    }
-    extracted_api.items.extend(bits_api.items);
-    extracted_api.items.extend(records_api.items);
-    let cli_api = generate_rustdoc_inventory(&root.path, "stab-cli", "stab_cli")?;
-    if extracted_api.format_version != cli_api.format_version {
-        return Err(InventoryError::PublicApi(PublicApiError::InvalidField(
-            "rustdoc format version mismatch",
-        )));
-    }
-    extracted_api.items.extend(cli_api.items);
-    extracted_api.items.sort();
+    let extracted_api = public_apis::extract(root)?;
+    let external_aliases = extracted_api.external_aliases;
     ensure_limit("public API items", extracted_api.items.len())?;
     let (mut public_api_items, api_evidence) = make_public_api_records(&extracted_api.items)?;
     evidence_cases.extend(api_evidence);
@@ -289,14 +271,37 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         &mut blocker_evidence,
     )?);
     evidence_cases.extend(blocker_evidence);
-    let public_api_aliases = qualification_cases::apply(
+    let mut public_api_aliases = qualification_cases::apply(
         root,
         &stim.tag,
         &stim.commit,
         &mut upstream_cases,
         &mut public_api_items,
         &mut evidence_cases,
+        &external_aliases,
     )?;
+    public_api_aliases.extend(
+        external_aliases
+            .into_iter()
+            .map(|alias| {
+                Ok(PublicApiAlias {
+                    crate_name: alias.alias_crate_name,
+                    alias_path: ApiPath::try_new(alias.alias_path).map_err(|_| {
+                        InventoryError::InvalidQualificationCases(
+                            "external public API alias path is invalid".to_string(),
+                        )
+                    })?,
+                    canonical_crate_name: Some(alias.canonical_crate_name),
+                    canonical_path: ApiPath::try_new(alias.canonical_path).map_err(|_| {
+                        InventoryError::InvalidQualificationCases(
+                            "external public API canonical path is invalid".to_string(),
+                        )
+                    })?,
+                })
+            })
+            .collect::<Result<Vec<_>, InventoryError>>()?,
+    );
+    public_api_aliases.sort();
     evidence_cases.extend(super::resource::planned_evidence());
     evidence_cases.push(super::resource::existing_regression());
     evidence_cases.push(super::resource::existing_property_regression());
@@ -1178,18 +1183,6 @@ fn read_utf8_bounded(path: &Path, limit: usize) -> Result<String, InventoryError
     String::from_utf8(bytes).map_err(|_| InventoryError::NonUtf8 {
         path: path.to_path_buf(),
     })
-}
-
-fn ensure_limit(kind: &'static str, actual: usize) -> Result<(), InventoryError> {
-    if actual > MAX_CASES {
-        Err(InventoryError::TooManyRecords {
-            kind,
-            actual,
-            limit: MAX_CASES,
-        })
-    } else {
-        Ok(())
-    }
 }
 
 #[cfg(test)]

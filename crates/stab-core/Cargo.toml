@@ -22,6 +22,7 @@ rand = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
 stab-bits = { workspace = true }
+stab-algebra = { workspace = true }
 stab-records = { workspace = true }
 thiserror = { workspace = true }
 

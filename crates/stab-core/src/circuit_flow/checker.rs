@@ -248,7 +248,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 &mut bases,
                 tracker.compact_region_for_target(tracked_target)?.value(),
             );
-            let actual = PauliString::from_bases_unchecked(PauliSign::Plus, bases);
+            let actual = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
             if paulis_match_unsigned(&actual, flow.input()) {
                 Ok(UnsignedStabilizerFlowCheck::passed())
             } else {

@@ -14,9 +14,12 @@ use crate::qualification::model::{
     RelativeSourcePath, ResourceContract, SelectorKind, SemanticDigest, StableCaseDomain,
     UpstreamCase, UpstreamDisposition,
 };
+use crate::qualification::public_api::ResolvedExternalReexport;
 
+mod external_owner;
 mod owner_expansion;
 
+use external_owner::{ExternalAliasPolicy, resolve_direct_public_api_owner};
 use owner_expansion::{MAX_OWNERS_PER_CASE, OwnerEntryKind, expand_upstream_owners};
 
 const LEDGER_SCHEMA_VERSION: u32 = 3;
@@ -131,9 +134,24 @@ pub(super) fn apply(
     upstream_cases: &mut [UpstreamCase],
     public_api_items: &mut [PublicApiItem],
     evidence_cases: &mut Vec<EvidenceCase>,
+    external_aliases: &[ResolvedExternalReexport],
 ) -> Result<Vec<PublicApiAlias>, InventoryError> {
     let ledger = load(root)?;
     validate_header(&ledger, stim_version, stim_commit)?;
+    let explicit_public_api_owners = ledger
+        .cases
+        .iter()
+        .flat_map(|case| case.public_api_owners.iter())
+        .chain(
+            ledger
+                .existing_parent_mappings
+                .iter()
+                .flat_map(|mapping| mapping.public_api_owners.iter()),
+        )
+        .map(|owner| (owner.crate_name.clone(), owner.owner_path.to_string()))
+        .collect::<BTreeSet<_>>();
+    let external_alias_policy =
+        ExternalAliasPolicy::new(external_aliases, &explicit_public_api_owners);
 
     let mut source_ids = BTreeSet::new();
     let mut qualification_ids = BTreeSet::new();
@@ -221,8 +239,7 @@ pub(super) fn apply(
                 &owner.owner_path,
                 spec.feature_id,
                 &qualification_id,
-                public_api_items,
-                evidence_cases,
+                external_alias_policy.bind(public_api_items, evidence_cases),
             )?
             else {
                 owner_count = owner_count.saturating_add(1);
@@ -341,6 +358,7 @@ pub(super) fn apply(
             public_api_items,
             evidence_cases,
             &mut claimed_evidence,
+            external_alias_policy,
         )?;
     }
 
@@ -360,6 +378,7 @@ pub(super) fn apply(
         .map(|alias| PublicApiAlias {
             crate_name: alias.crate_name,
             alias_path: alias.alias_owner_path,
+            canonical_crate_name: None,
             canonical_path: alias.canonical_owner_path,
         })
         .collect())
@@ -559,6 +578,7 @@ fn apply_existing_parent_mapping(
     public_api_items: &mut [PublicApiItem],
     evidence_cases: &mut [EvidenceCase],
     claimed_evidence: &mut BTreeSet<CaseId>,
+    external_alias_policy: ExternalAliasPolicy<'_>,
 ) -> Result<(), InventoryError> {
     let parent_matches = evidence_cases
         .iter()
@@ -670,8 +690,7 @@ fn apply_existing_parent_mapping(
             &owner.owner_path,
             mapping.feature_id,
             &parent_id,
-            public_api_items,
-            evidence_cases,
+            external_alias_policy.bind(public_api_items, evidence_cases),
         )?
         else {
             continue;
@@ -925,51 +944,6 @@ fn exact_public_api_owner(
         ));
     };
     Ok((item.feature_id, item.owner_case_id.clone()))
-}
-
-fn resolve_direct_public_api_owner(
-    role: &str,
-    crate_name: &str,
-    owner_path: &ApiPath,
-    expected_feature: FeatureId,
-    target_owner: &CaseId,
-    public_api_items: &[PublicApiItem],
-    evidence_cases: &[EvidenceCase],
-) -> Result<Option<CaseId>, InventoryError> {
-    let (feature_id, owner_case_id) =
-        exact_public_api_owner(role, crate_name, owner_path, public_api_items)?;
-    if feature_id != expected_feature {
-        return invalid(format!(
-            "{role} public API owner {crate_name}::{owner_path} has feature {}, expected {}",
-            feature_id.as_str(),
-            expected_feature.as_str()
-        ));
-    }
-    if owner_case_id == *target_owner {
-        return Ok(None);
-    }
-    let matches = evidence_cases
-        .iter()
-        .filter(|case| case.id == owner_case_id)
-        .collect::<Vec<_>>();
-    let [evidence] = matches.as_slice() else {
-        return invalid(format!(
-            "{role} public API owner {crate_name}::{owner_path} resolved {} evidence records",
-            matches.len()
-        ));
-    };
-    if evidence.provenance != EvidenceProvenance::PublicRustApi
-        || evidence.feature_id != expected_feature
-    {
-        return invalid(format!(
-            "{role} public API owner {crate_name}::{owner_path} resolved incompatible evidence {}",
-            evidence.id
-        ));
-    }
-    if evidence.source_id != owner_path.as_str() {
-        return Ok(None);
-    }
-    Ok(Some(owner_case_id))
 }
 
 fn claim_planned_evidence(

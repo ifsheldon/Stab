@@ -68,15 +68,16 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The post-A5, pre-A6 product graph is:
+The current A6 product graph after the scalar algebra extraction is:
 
 ```text
 stab-cli -> stab-core
-stab-core -> stab-bits + stab-records
+stab-core -> stab-algebra + stab-bits + stab-records
+stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
 
-`stab-bits` and `stab-records` are physical Cargo packages. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. Inside `stab-core`, circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling now expose operation-specific compiler, immutable-plan, mutable-session, cancellation, progress, and typed-sink APIs through `stab_core::execution`; incremental conversion binds one session to one sink lifecycle, direct detector-frame compilation admits its complete retained plan before materialization, and DEM replay admits total work before caller-record traversal. Legacy root APIs remain compatibility facades. This is a logical ownership split, not a claim that `stab-engine` exists yet. The remaining target component crates are extracted in A6. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits`, `stab-records`, and `stab-algebra` are physical Cargo packages. `stab-algebra` owns Pauli, Clifford, tableau, and stabilizer-flow values over Stable scalar word kernels; `stab_core::stabilizers` is now a reexport-only compatibility module. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. Inside `stab-core`, circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling expose operation-specific compiler, immutable-plan, mutable-session, cancellation, progress, and typed-sink APIs through `stab_core::execution`; incremental conversion binds one session to one sink lifecycle, direct detector-frame compilation admits its complete retained plan before materialization, and DEM replay admits total work before caller-record traversal. Legacy root APIs remain compatibility facades. Model, analysis, engine, and SIMD-kernel ownership is still logical until their later A6 extraction steps. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -108,13 +109,13 @@ The record-boundary and Nightly-isolation milestones remove these allowances; th
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits` and `stab-records` packages build and test together on that compiler.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits`, `stab-records`, and scalar-default `stab-algebra` packages build on that compiler.
 
 `stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
 
 Every direct `std::simd` use will belong to `stab-kernels-simd` after A6.
 
-Generic packed storage and scalar kernels now live in Stable `stab-bits`. The remaining direct SIMD site is the quantum-specific Clifford kernel in `stab-core`; it moves behind the later kernel boundary without making Stable storage depend on Nightly.
+Generic packed storage and scalar kernels live in Stable `stab-bits`, while quantum-specific scalar Clifford and Pauli-word kernels live in Stable `stab-algebra`. The former direct SIMD implementation has been removed from `stab-core`; portable SIMD is registered again only after the dependency-free raw kernel crate provides a distinct tested implementation.
 
 Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs now live in Stable `stab-records`. `SampleFormat` remains the five-format compatibility enum used by legacy record-at-a-time APIs, while `RecordFormat` is the six-format component registry that also represents PTB64. The overlap is explicit migration debt rather than an assertion that the two enums are interchangeable.
 

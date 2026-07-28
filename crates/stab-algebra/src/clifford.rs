@@ -5,10 +5,10 @@ use rand::{Rng, RngExt as _};
 use super::{
     PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
 };
-use crate::bits::{
+use crate::kernels::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
 };
-use crate::{BitError, BitVec};
+use stab_bits::{BitError, BitVec};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct SignedPauli {
@@ -180,7 +180,8 @@ impl SingleQubitClifford {
             .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
     }
 
-    pub(crate) fn inverse(self) -> StabilizerResult<Self> {
+    /// Returns the inverse Clifford.
+    pub fn inverse(self) -> StabilizerResult<Self> {
         for candidate in Self::all() {
             if self.multiply(candidate)? == Self::I && candidate.multiply(self)? == Self::I {
                 return Ok(candidate);
@@ -189,14 +190,16 @@ impl SingleQubitClifford {
         Err(StabilizerError::InvalidSingleQubitCliffordProduct)
     }
 
-    pub(crate) fn tableau(self) -> Tableau {
+    /// Returns the one-qubit tableau represented by this Clifford.
+    pub fn tableau(self) -> Tableau {
         Tableau::from_output_columns_unchecked(
             vec![signed_pauli_string(self.x_output())],
             vec![signed_pauli_string(self.z_output())],
         )
     }
 
-    pub(crate) fn apply_basis(self, basis: PauliBasis) -> StabilizerResult<PauliBasis> {
+    /// Applies this Clifford to one Pauli basis.
+    pub fn apply_basis(self, basis: PauliBasis) -> StabilizerResult<PauliBasis> {
         Ok(self
             .apply_signed(SignedPauli::new(PauliSign::Plus, basis))?
             .basis)

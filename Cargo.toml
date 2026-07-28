@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/stab-algebra",
     "crates/stab-bits",
     "crates/stab-cli",
     "crates/stab-core",
@@ -44,6 +45,7 @@ sha2 = "0.11.0"
 signal-hook = "0.4.4"
 smallvec = { version = "1.15.2", features = ["union"] }
 stab-bits = { path = "crates/stab-bits", version = "0.1.1" }
+stab-algebra = { path = "crates/stab-algebra", version = "0.1.1" }
 stab-records = { path = "crates/stab-records", version = "0.1.1" }
 statrs = { version = "0.18.0", default-features = false }
 tempfile = "3.27.0"

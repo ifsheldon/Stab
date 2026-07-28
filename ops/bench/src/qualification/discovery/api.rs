@@ -166,7 +166,8 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
     if performance_feature == "PERF-STABILIZER-ALGEBRA"
         && matches!(
             item.path.as_str(),
-            "stab_core::CliffordString::right_multiply_in_place"
+            "stab_algebra::CliffordString::right_multiply_in_place"
+                | "stab_core::CliffordString::right_multiply_in_place"
                 | "stab_core::stabilizers::CliffordString::right_multiply_in_place"
         )
     {
@@ -175,7 +176,8 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
     if performance_feature == "PERF-STABILIZER-ALGEBRA"
         && matches!(
             item.path.as_str(),
-            "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar"
+            "stab_algebra::PauliString::right_multiply_in_place_returning_log_i_scalar"
+                | "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar"
                 | "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar"
         )
     {
@@ -184,7 +186,10 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
     if performance_feature == "PERF-STABILIZER-ALGEBRA"
         && matches!(
             item.path.as_str(),
-            "stab_core::PauliStringIterator::new"
+            "stab_algebra::PauliStringIterator::new"
+                | "stab_algebra::PauliStringIterator::iter_next"
+                | "stab_algebra::PauliStringIterator::result"
+                | "stab_core::PauliStringIterator::new"
                 | "stab_core::PauliStringIterator::iter_next"
                 | "stab_core::PauliStringIterator::result"
                 | "stab_core::stabilizers::PauliStringIterator::new"
@@ -275,6 +280,45 @@ mod tests {
             PerformanceDisposition::FutureCandidate,
             "{path}"
         );
+    }
+
+    #[test]
+    fn extracted_algebra_and_facade_paths_share_release_workloads() {
+        for path in [
+            "stab_algebra::CliffordString::right_multiply_in_place",
+            "stab_core::CliffordString::right_multiply_in_place",
+            "stab_core::stabilizers::CliffordString::right_multiply_in_place",
+        ] {
+            assert_eq!(
+                qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),
+                Some(CLIFFORD_STRING_NON_IDENTITY_GROUP_ID),
+                "{path}"
+            );
+        }
+        for path in [
+            "stab_algebra::PauliString::right_multiply_in_place_returning_log_i_scalar",
+            "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar",
+            "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar",
+        ] {
+            assert_eq!(
+                qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),
+                Some(PAULI_STRING_MULTIPLY_GROUP_ID),
+                "{path}"
+            );
+        }
+        for path in [
+            "stab_algebra::PauliStringIterator::new",
+            "stab_algebra::PauliStringIterator::iter_next",
+            "stab_algebra::PauliStringIterator::result",
+            "stab_core::PauliStringIterator::new",
+            "stab_core::stabilizers::PauliStringIterator::new",
+        ] {
+            assert_eq!(
+                qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),
+                Some(PAULI_STRING_ITER_GROUP_ID),
+                "{path}"
+            );
+        }
     }
 
     fn api(path: &str, kind: &str) -> CorrectnessApi {

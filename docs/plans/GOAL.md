@@ -7,10 +7,10 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 ## Current State
 
 - A0 through A5 are complete. A5 closes at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
-- The physical product crates are currently `stab-bits`, `stab-records`, `stab-core`, and `stab-cli`.
-- `stab-bits` and `stab-records` build on Stable Rust 1.97.1. `stab-core` still contains model, algebra, analysis, execution, and the remaining direct portable-SIMD kernel.
+- The physical product crates are currently `stab-algebra`, `stab-bits`, `stab-records`, `stab-core`, and `stab-cli`.
+- `stab-algebra`, `stab-bits`, and `stab-records` build on Stable Rust 1.97.1. `stab-core` still contains model, analysis, and execution; portable SIMD is temporarily absent until `stab-kernels-simd` is extracted as a dependency-free raw kernel owner.
 - Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
-- A6 must extract `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-kernels-simd`; `stab-core` becomes the curated facade rather than another implementation owner.
+- A6 must still extract `stab-model`, `stab-analysis`, `stab-engine`, and `stab-kernels-simd`; `stab-core` becomes the curated facade rather than another implementation owner.
 
 ## Sources Of Truth
 
@@ -27,7 +27,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 ## Execution Sequence
 
 1. Freeze an exact module-to-crate move map, public replacement map, feature map, and dependency DAG before moving files.
-2. Extract scalar `stab-algebra` after removing its remaining `Gate` dependency; prove Stable default and external-consumer builds.
+2. Keep the extracted scalar `stab-algebra` green on Stable and add its external-consumer fixture with the consolidated A6 fixture matrix.
 3. Extract `stab-model` after moving foreign inherent algorithms to analysis or engine owners; preserve exact parsing, printing, fingerprint, tag, and resource behavior.
 4. Extract `stab-analysis` over model and algebra only; keep pure transforms and semantic projections free of records, execution, CLI, and ops.
 5. Extract `stab-engine` over model, records, algebra, and analysis; move every A4/A5 compiler, plan, session, and compatibility adapter without changing public behavior.

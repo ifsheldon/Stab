@@ -14,7 +14,7 @@ pub fn circuit_to_tableau(
     StabilizerResource::TableauQubits
         .ensure(num_qubits)
         .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
-    let mut result = Tableau::identity_unchecked(num_qubits);
+    let mut result = stab_algebra::advanced::tableau_identity_unchecked(num_qubits);
     let mut repeat_work = TableauRepeatWork::default();
     apply_circuit_to_tableau(
         circuit,
@@ -46,7 +46,7 @@ fn apply_circuit_to_tableau(
                 result,
             )?,
             CircuitItem::RepeatBlock(repeat) => {
-                let mut body = Tableau::identity_unchecked(result.len());
+                let mut body = stab_algebra::advanced::tableau_identity_unchecked(result.len());
                 apply_circuit_to_tableau(
                     repeat.body(),
                     ignore_noise,
@@ -55,7 +55,7 @@ fn apply_circuit_to_tableau(
                     repeat_work,
                     &mut body,
                 )?;
-                let identity = Tableau::identity_unchecked(result.len());
+                let identity = stab_algebra::advanced::tableau_identity_unchecked(result.len());
                 if body != identity {
                     let repeated = tableau_power(&body, repeat.repeat_count().get(), repeat_work)?;
                     if repeated != identity {
@@ -142,7 +142,7 @@ fn tableau_power(
     mut exponent: u64,
     repeat_work: &mut TableauRepeatWork,
 ) -> CircuitResult<Tableau> {
-    let identity = Tableau::identity_unchecked(base.len());
+    let identity = stab_algebra::advanced::tableau_identity_unchecked(base.len());
     if exponent == 0 || *base == identity {
         return Ok(identity);
     }
@@ -319,7 +319,7 @@ fn scatter_tableau(
             ));
         }
     }
-    Ok(Tableau::from_output_columns_unchecked(xs, zs))
+    Ok(stab_algebra::advanced::tableau_from_output_columns_unchecked(xs, zs))
 }
 
 fn expand_pauli(
@@ -341,7 +341,10 @@ fn expand_pauli(
             )));
         }
     }
-    Ok(PauliString::from_bases_unchecked(local.sign(), bases))
+    Ok(stab_algebra::advanced::pauli_from_bases_unchecked(
+        local.sign(),
+        bases,
+    ))
 }
 
 fn local_index_for_global(targets: &[QubitId], global_index: usize) -> Option<usize> {
@@ -351,7 +354,7 @@ fn local_index_for_global(targets: &[QubitId], global_index: usize) -> Option<us
 }
 
 fn single_pauli(len: usize, index: usize, basis: PauliBasis, sign: PauliSign) -> PauliString {
-    PauliString::from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unchecked(
         sign,
         (0..len).map(|candidate| {
             if candidate == index {

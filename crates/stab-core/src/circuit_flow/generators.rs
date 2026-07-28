@@ -149,7 +149,7 @@ fn simple_measurement_flows(
                         PauliSign::Plus
                     },
                 ),
-                PauliString::identity_unchecked(qubit_count),
+                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
                 [record_index],
                 [],
             )
@@ -245,8 +245,8 @@ fn duplicate_measure_reset_flows(
         } else {
             flows.push(
                 Flow::new(
-                    PauliString::identity_unchecked(qubit_count),
-                    PauliString::from_bases_unchecked(
+                    stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
+                    stab_algebra::advanced::pauli_from_bases_unchecked(
                         if inverted ^ final_inverted {
                             PauliSign::Minus
                         } else {
@@ -305,7 +305,7 @@ fn simple_pair_measurement_flows(
                         PauliSign::Plus
                     },
                 ),
-                PauliString::identity_unchecked(qubit_count),
+                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
                 [record_index],
                 [],
             )
@@ -502,7 +502,7 @@ impl MeasurementFeedbackFlowSolver {
                             PauliSign::Plus
                         },
                     ),
-                    PauliString::identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
                     [record_index],
                     [],
                 )
@@ -558,7 +558,7 @@ impl MeasurementFeedbackFlowSolver {
                 self.flows.push(
                     Flow::new(
                         single_pauli(self.qubit_count, qubit, basis),
-                        PauliString::from_bases_unchecked(
+                        stab_algebra::advanced::pauli_from_bases_unchecked(
                             if inverted {
                                 PauliSign::Minus
                             } else {
@@ -574,8 +574,8 @@ impl MeasurementFeedbackFlowSolver {
             } else {
                 self.flows.push(
                     Flow::new(
-                        PauliString::identity_unchecked(self.qubit_count),
-                        PauliString::from_bases_unchecked(
+                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                        stab_algebra::advanced::pauli_from_bases_unchecked(
                             if inverted ^ final_inverted {
                                 PauliSign::Minus
                             } else {
@@ -629,7 +629,7 @@ impl MeasurementFeedbackFlowSolver {
                             PauliSign::Plus
                         },
                     ),
-                    PauliString::identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
                     [record_index],
                     [],
                 )
@@ -676,8 +676,8 @@ impl MeasurementFeedbackFlowSolver {
             match target.qubit_id().map(|id| id.get()) {
                 Some(0) => self.flows.push(
                     Flow::new(
-                        PauliString::identity_unchecked(self.qubit_count),
-                        PauliString::identity_unchecked(self.qubit_count),
+                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
                         [record_index],
                         [],
                     )
@@ -685,8 +685,8 @@ impl MeasurementFeedbackFlowSolver {
                 ),
                 Some(1) => self.flows.push(
                     Flow::new(
-                        PauliString::identity_unchecked(self.qubit_count),
-                        PauliString::from_bases_unchecked(
+                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                        stab_algebra::advanced::pauli_from_bases_unchecked(
                             PauliSign::Minus,
                             vec![PauliBasis::I; self.qubit_count],
                         ),
@@ -720,8 +720,8 @@ impl MeasurementFeedbackFlowSolver {
             }
             self.flows.push(
                 Flow::new(
-                    PauliString::identity_unchecked(self.qubit_count),
-                    PauliString::identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
                     [record_index],
                     [],
                 )
@@ -853,7 +853,7 @@ fn measured_pauli_product(
     qubit_count: usize,
     targets: &[Target],
 ) -> CircuitResult<PauliString> {
-    let mut product = PauliString::identity_unchecked(qubit_count);
+    let mut product = stab_algebra::advanced::pauli_identity_unchecked(qubit_count);
     for target in targets {
         if target.is_combiner() {
             continue;
@@ -987,8 +987,8 @@ fn add_pauli_product_measurement_flow(
     if measured_product.has_no_pauli_terms() {
         flows.push(
             Flow::new(
-                PauliString::identity_unchecked(qubit_count),
-                PauliString::from_bases_unchecked(
+                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
+                stab_algebra::advanced::pauli_from_bases_unchecked(
                     measured_product.sign(),
                     vec![PauliBasis::I; qubit_count],
                 ),
@@ -1003,7 +1003,7 @@ fn add_pauli_product_measurement_flow(
     flows.push(
         Flow::new(
             measured_product.clone(),
-            PauliString::identity_unchecked(qubit_count),
+            stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
             [record_index],
             [],
         )
@@ -1102,7 +1102,7 @@ fn pair_pauli(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    PauliString::from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unchecked(
         sign,
         (0..qubit_count).map(|qubit| {
             if qubit == left || qubit == right {
@@ -1120,7 +1120,7 @@ fn single_pauli_with_sign(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    PauliString::from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unchecked(
         sign,
         (0..len).map(|candidate| {
             if candidate == index {
@@ -1175,7 +1175,7 @@ fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {
 }
 
 pub(super) fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    PauliString::from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unchecked(
         PauliSign::Plus,
         (0..len).map(|candidate| {
             if candidate == index {

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
-    Pauli, QubitId, RepeatBlock, SingleQubitClifford, StabilizerError, Tableau, Target,
+    Pauli, QubitId, RepeatBlock, SingleQubitClifford, StabilizerError, Target,
 };
 
 /// Rewrites supported Clifford operations into the current base-gate subset.
@@ -527,7 +527,10 @@ fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> Circuit
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );
-    let mut queue = VecDeque::from([(Tableau::identity_unchecked(1), Vec::<Gate>::new())]);
+    let mut queue = VecDeque::from([(
+        stab_algebra::advanced::tableau_identity_unchecked(1),
+        Vec::<Gate>::new(),
+    )]);
     let mut seen = BTreeSet::new();
     while let Some((tableau, sequence)) = queue.pop_front() {
         if tableau == target {

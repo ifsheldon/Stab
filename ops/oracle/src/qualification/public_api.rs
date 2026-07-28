@@ -15,7 +15,7 @@ mod schema;
 use identity::{canonical_value_digest, resolved_path_id, resolved_path_name};
 use policy::is_evidence_only_stab_core_export;
 use reexports::ExternalReexport;
-pub(super) use reexports::resolve_external_reexports;
+pub(super) use reexports::{ResolvedExternalReexport, resolve_external_reexports};
 use schema::{
     direct_kind, first_key, inner, is_doc_hidden, is_public, item, join_path, json_id,
     rustc_host_target, rustdoc_path, source_span, validate_api_path,

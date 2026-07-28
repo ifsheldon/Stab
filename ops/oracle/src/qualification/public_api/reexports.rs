@@ -12,15 +12,24 @@ pub(super) struct ExternalReexport {
     pub(super) source_line: u32,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::qualification) struct ResolvedExternalReexport {
+    pub(in crate::qualification) alias_crate_name: String,
+    pub(in crate::qualification) alias_path: String,
+    pub(in crate::qualification) canonical_crate_name: String,
+    pub(in crate::qualification) canonical_path: String,
+}
+
 pub(in crate::qualification) fn resolve_external_reexports(
     inventory: &mut RustdocInventory,
     dependencies: &[RustdocInventory],
-) -> Result<(), PublicApiError> {
+) -> Result<Vec<ResolvedExternalReexport>, PublicApiError> {
     let mut items = inventory
         .items
         .drain(..)
         .map(|item| ((item.path.clone(), item.kind), item))
         .collect::<BTreeMap<_, _>>();
+    let mut resolved = Vec::with_capacity(inventory.external_reexports.len());
 
     for reexport in &inventory.external_reexports {
         let dependency = dependencies
@@ -73,11 +82,19 @@ pub(in crate::qualification) fn resolve_external_reexports(
         if !matched {
             return Err(unresolved(reexport));
         }
+        resolved.push(ResolvedExternalReexport {
+            alias_crate_name: inventory.crate_name.clone(),
+            alias_path: reexport.alias_path.clone(),
+            canonical_crate_name: dependency.crate_name.clone(),
+            canonical_path: canonical_prefix.to_string(),
+        });
     }
 
     inventory.items = items.into_values().collect();
     inventory.external_reexports.clear();
-    Ok(())
+    resolved.sort();
+    resolved.dedup();
+    Ok(resolved)
 }
 
 fn unresolved(reexport: &ExternalReexport) -> PublicApiError {

@@ -4,8 +4,8 @@ use std::str::FromStr;
 use rand::{Rng, RngExt as _};
 
 use super::{StabilizerError, StabilizerResource, StabilizerResult};
-use crate::bits::pauli_right_multiply_words;
-use crate::{BitError, BitVec};
+use crate::kernels::pauli_right_multiply_words;
+use stab_bits::{BitError, BitVec};
 
 const WORD_BITS: usize = 64;
 
@@ -99,7 +99,8 @@ impl PauliPhase {
         }
     }
 
-    pub(crate) fn multiply(self, rhs: Self) -> Self {
+    /// Multiplies two Pauli phases.
+    pub fn multiply(self, rhs: Self) -> Self {
         Self::from_exponent(self.exponent().wrapping_add(rhs.exponent()))
     }
 }
@@ -298,7 +299,8 @@ impl PauliString {
         self.sign
     }
 
-    pub(crate) fn with_sign(&self, sign: PauliSign) -> Self {
+    /// Returns this Pauli string with the requested real sign.
+    pub fn with_sign(&self, sign: PauliSign) -> Self {
         let mut result = self.clone();
         result.sign = sign;
         result
