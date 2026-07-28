@@ -14,7 +14,7 @@ use evidence::{
 };
 use gate_contract::{
     GateContractFamily, GateContractSurface, validate_gate_contract_case,
-    validate_gate_family_coverage, validate_gate_schema,
+    validate_gate_family_coverage,
 };
 use oracle::validate_oracle_reference;
 use provenance::validate_upstream_source;
@@ -35,8 +35,8 @@ mod support;
 const SCHEMA_VERSION: u32 = 3;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0xb0, 0x98, 0x01, 0x0e, 0xcf, 0xa6, 0x7b, 0x07, 0xa8, 0x81, 0x74, 0xd4, 0x56, 0xe5, 0x8a, 0xef,
-    0xc7, 0x54, 0xff, 0x56, 0x75, 0x44, 0xda, 0x37, 0x2d, 0x65, 0xc7, 0x93, 0x49, 0x31, 0xe8, 0x82,
+    0xb2, 0xa5, 0xa8, 0x2a, 0x9f, 0x84, 0x73, 0x93, 0x42, 0x3a, 0x3f, 0x43, 0x7b, 0x51, 0x32, 0xe5,
+    0x00, 0x02, 0x67, 0x56, 0x66, 0xd4, 0x55, 0x2c, 0x7f, 0xa3, 0x21, 0x8f, 0x28, 0xdc, 0x99, 0xbe,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -755,7 +755,6 @@ impl BlockerLedger {
             benchmark_rows: &benchmark_rows,
             tracked_stim_paths: &tracked_stim_paths,
         };
-        validate_gate_schema(&mut violations);
         for blocker in &self.blockers {
             if !blocker_ids.insert(blocker.id.as_str()) {
                 violations.push(format!("duplicate blocker id {:?}", blocker.id));
@@ -1044,47 +1043,6 @@ fn validate_resource_contract(case: &BlockerCase, violations: &mut Vec<String>) 
     if case.resource_contract.trim().len() < 20 {
         violations.push(format!(
             "case {:?} resource_contract must describe a concrete boundary",
-            case.id
-        ));
-    }
-}
-
-fn validate_gate_statistical_plan(
-    case: &BlockerCase,
-    plan: &StatisticalPlan,
-    violations: &mut Vec<String>,
-) {
-    let Some(expected) = stab_core::__gate_contract_statistical_plans()
-        .iter()
-        .find(|expected| expected.case_id == case.id)
-    else {
-        if !case.gate_families.is_empty() {
-            violations.push(format!(
-                "gate contract case {:?} has no canonical core statistical plan",
-                case.id
-            ));
-        }
-        return;
-    };
-    let scalar_fields_match = plan.shots == expected.shots
-        && plan.seed == expected.seed
-        && plan.sigma_multiplier == expected.sigma_multiplier
-        && plan.absolute_probability_floor == expected.absolute_probability_floor
-        && plan.familywise_false_positive_budget == expected.familywise_false_positive_budget
-        && plan.independent_comparisons_per_attempt == expected.independent_comparisons_per_attempt
-        && plan.shot_batches_per_attempt == expected.shot_batches_per_attempt;
-    let buckets_match = plan.buckets.len() == expected.buckets.len()
-        && plan
-            .buckets
-            .iter()
-            .zip(expected.buckets)
-            .all(|(actual, expected)| {
-                actual.name == expected.name
-                    && actual.expected_probability == expected.expected_probability
-            });
-    if !scalar_fields_match || !buckets_match {
-        violations.push(format!(
-            "case {:?} statistical plan differs from the canonical core gate contract",
             case.id
         ));
     }

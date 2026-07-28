@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "f67cb94d5029a4a331f32fc0c16ef2629dfcf379b13c97f8fe3ed55968d8dde4",
-  "semantic_digest": "cbd3151df95bb9a898bb1537a25dfde30caae14bb5bd5792fdc80894b5c8947b",
+  "correctness_digest": "66a985cb2710efcdcd3a04d9513507c57e07b94efa203e953b8247d294547ea2",
+  "semantic_digest": "87f8bbac381417b37f753109f2412c3856bcbdc000cb3206425004752bdeff1e",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -78136,7 +78136,7 @@
             "id": "inherited",
             "family_id": "default",
             "size_class": "small",
-            "parameters": "PFM-B5 generic transient short-period long-period nested gauge and coordinate loop-folding matrix with production diagnostics",
+            "parameters": "PFM-B5 generic transient short-period long-period nested gauge and coordinate loop-folding matrix with public compact-output witnesses",
             "input_bytes": {
               "kind": "not-applicable"
             }
@@ -78197,7 +78197,7 @@
             "id": "inherited",
             "family_id": "default",
             "size_class": "small",
-            "parameters": "PFM-B5 repetition r100000 and rotated-surface d11/r100000000 compact analyzer workloads with production diagnostics",
+            "parameters": "PFM-B5 repetition r100000 and rotated-surface d11/r100000000 compact analyzer workloads with public compact-output witnesses",
             "input_bytes": {
               "kind": "not-applicable"
             }

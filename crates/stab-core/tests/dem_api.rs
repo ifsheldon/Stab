@@ -6,8 +6,6 @@
 use std::collections::BTreeMap;
 use std::ops::Bound;
 
-#[cfg(feature = "ops-contracts")]
-use stab_core::__circuit_to_detector_error_model_with_diagnostics;
 use stab_core::{
     CircuitResult, CodeDistance, DemDetectorId, DemInstruction, DemInstructionKind, DemItem,
     DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions,
@@ -660,14 +658,12 @@ fn pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit() {
     };
     let dem = circuit_to_detector_error_model(circuit, options)
         .expect("analyze generated surface-code circuit");
-    #[cfg(feature = "ops-contracts")]
-    {
-        let (_, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(circuit, options)
-            .expect("analyze generated surface-code circuit with diagnostics");
-        assert!(diagnostics.used_reverse_fold);
-        assert!(!diagnostics.used_bounded_fallback);
-        assert!(diagnostics.recurrences_found > 0);
-    }
+    assert!(
+        dem.items()
+            .iter()
+            .any(|item| matches!(item, DemItem::RepeatBlock(_))),
+        "folded surface-code DEM must preserve a compact repeat block"
+    );
     let dem_coordinates = dem
         .detector_coordinates()
         .expect("all DEM detector coordinates");

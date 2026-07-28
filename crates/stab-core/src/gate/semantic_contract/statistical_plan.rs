@@ -1,25 +1,11 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(
-    not(feature = "ops-contracts"),
-    allow(
-        unreachable_pub,
-        reason = "the type is exported only by the ops-contracts feature"
-    )
-)]
-pub struct GateContractStatisticalBucket {
+pub(crate) struct GateContractStatisticalBucket {
     pub name: &'static str,
     pub expected_probability: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(
-    not(feature = "ops-contracts"),
-    allow(
-        unreachable_pub,
-        reason = "the type is exported only by the ops-contracts feature"
-    )
-)]
-pub struct GateContractStatisticalPlan {
+pub(crate) struct GateContractStatisticalPlan {
     pub case_id: &'static str,
     pub shots: u64,
     pub seed: u64,
@@ -231,12 +217,6 @@ pub(crate) fn gate_contract_statistical_plan(
         .find(|plan| plan.case_id == case_id)
 }
 
-#[cfg(feature = "ops-contracts")]
-pub(crate) fn gate_contract_statistical_plans() -> &'static [GateContractStatisticalPlan] {
-    GATE_CONTRACT_STATISTICAL_PLANS
-}
-
-#[cfg(any(test, feature = "ops-contracts"))]
 pub(crate) fn gate_contract_statistical_count_is_accepted(
     count: u64,
     shots: u64,
@@ -250,7 +230,6 @@ pub(crate) fn gate_contract_statistical_count_is_accepted(
     (observed - expected_probability).abs() <= allowed_delta
 }
 
-#[cfg(any(test, feature = "ops-contracts"))]
 pub(crate) fn gate_contract_statistical_rejection_boundaries(
     shots: u64,
     expected_probability: f64,

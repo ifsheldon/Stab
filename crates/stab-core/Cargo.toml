@@ -10,9 +10,6 @@ homepage.workspace = true
 [lints]
 workspace = true
 
-[features]
-ops-contracts = []
-
 [dependencies]
 arrayvec = { workspace = true }
 hashbrown = { workspace = true }

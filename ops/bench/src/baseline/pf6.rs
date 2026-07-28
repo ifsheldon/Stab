@@ -1,10 +1,10 @@
 use std::hint::black_box;
 
 use stab_core::{
-    __circuit_to_detector_error_model_with_diagnostics, Circuit, CodeDistance, DetectorErrorModel,
-    ErrorAnalyzerDiagnostics, ErrorAnalyzerOptions, Probability, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, find_undetectable_logical_error, generate_surface_code_circuit,
-    likeliest_error_sat_problem, shortest_error_sat_problem,
+    Circuit, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    ErrorAnalyzerOptions, Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    circuit_to_detector_error_model, find_undetectable_logical_error,
+    generate_surface_code_circuit, likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 
@@ -190,7 +190,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pfm-b5-analyzer-cycle-folding" => Some(
-            "report-only: generic reverse-state analyzer cycle discovery across transient short-period long-period nested gauge and coordinate-shift workloads; observations come from the feature-gated production diagnostics seam",
+            "report-only: generic reverse-state analyzer cycle discovery across transient short-period long-period nested gauge and coordinate-shift workloads; observations are derived from the public compact DEM output",
         ),
         "pfm-b5-analyzer-generated-qec" => Some(
             "report-only: generic folded analysis of source-owned repetition r100000 and rotated-surface d11/r100000000 workloads; pinned Stim has related perf filters but no faithful aggregate two-case baseline for this row",
@@ -286,59 +286,79 @@ fn measure_analyzer_case(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> Result<Measurement, BenchError> {
-    let (_, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(circuit, options)
+    let model = circuit_to_detector_error_model(circuit, options)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    validate_fold_diagnostics(row, name, &diagnostics)?;
+    let evidence = analyzer_output_evidence(&model);
+    validate_fold_output(row, name, &evidence)?;
     let mut measurement = measure_stab_iterations(name, PF6_MEASUREMENT_ITERATIONS, || {
-        let (model, diagnostics) =
-            __circuit_to_detector_error_model_with_diagnostics(circuit, options)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box((model.items().len(), diagnostics.folded_repeat_iterations));
+        let model = circuit_to_detector_error_model(circuit, options)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(model.items().len());
         Ok(())
     })?;
-    measurement.observations = analyzer_observations(&diagnostics);
+    measurement.observations = analyzer_observations(&evidence);
     Ok(measurement)
 }
 
-fn validate_fold_diagnostics(
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct AnalyzerOutputEvidence {
+    compact_items: u64,
+    repeat_blocks: u64,
+    max_repeat_detector_shift: u64,
+}
+
+fn validate_fold_output(
     row: &BenchmarkRow,
     name: &str,
-    diagnostics: &ErrorAnalyzerDiagnostics,
+    evidence: &AnalyzerOutputEvidence,
 ) -> Result<(), BenchError> {
-    if diagnostics.used_reverse_fold
-        && !diagnostics.used_bounded_fallback
-        && diagnostics.recurrences_found > 0
-        && diagnostics.folded_repeat_iterations > 0
-        && diagnostics.emitted_compact_dem_items > 0
-    {
+    if evidence.repeat_blocks > 0 && evidence.compact_items > evidence.repeat_blocks {
         return Ok(());
     }
     Err(BenchError::StabRunner {
         row_id: row.id.clone(),
-        message: format!("{name} did not exercise generic compact loop folding: {diagnostics:?}"),
+        message: format!("{name} did not produce a nonempty compact folded DEM: {evidence:?}"),
     })
 }
 
-fn analyzer_observations(diagnostics: &ErrorAnalyzerDiagnostics) -> Vec<MeasurementObservation> {
+fn analyzer_output_evidence(model: &DetectorErrorModel) -> AnalyzerOutputEvidence {
+    let mut evidence = AnalyzerOutputEvidence::default();
+    collect_analyzer_output_evidence(model, false, &mut evidence);
+    evidence
+}
+
+fn collect_analyzer_output_evidence(
+    model: &DetectorErrorModel,
+    inside_repeat: bool,
+    evidence: &mut AnalyzerOutputEvidence,
+) {
+    for item in model.items() {
+        evidence.compact_items = evidence.compact_items.saturating_add(1);
+        match item {
+            DemItem::Instruction(instruction)
+                if inside_repeat && instruction.kind() == DemInstructionKind::ShiftDetectors =>
+            {
+                if let [DemTarget::Numeric(detector_shift)] = instruction.targets() {
+                    evidence.max_repeat_detector_shift =
+                        evidence.max_repeat_detector_shift.max(*detector_shift);
+                }
+            }
+            DemItem::Instruction(_) => {}
+            DemItem::RepeatBlock(repeat) => {
+                evidence.repeat_blocks = evidence.repeat_blocks.saturating_add(1);
+                collect_analyzer_output_evidence(repeat.body(), true, evidence);
+            }
+        }
+    }
+}
+
+fn analyzer_observations(evidence: &AnalyzerOutputEvidence) -> Vec<MeasurementObservation> {
     [
+        ("compact_dem_items", evidence.compact_items),
+        ("repeat_blocks", evidence.repeat_blocks),
         (
-            "recurrence_search_steps",
-            diagnostics.recurrence_search_steps,
-        ),
-        ("recurrences_found", diagnostics.recurrences_found),
-        ("max_recurrence_period", diagnostics.max_recurrence_period),
-        (
-            "represented_repeat_iterations",
-            diagnostics.represented_repeat_iterations,
-        ),
-        (
-            "folded_repeat_iterations",
-            diagnostics.folded_repeat_iterations,
-        ),
-        ("max_boundary_entries", diagnostics.max_boundary_entries),
-        (
-            "emitted_compact_dem_items",
-            diagnostics.emitted_compact_dem_items,
+            "max_repeat_detector_shift",
+            evidence.max_repeat_detector_shift,
         ),
     ]
     .into_iter()

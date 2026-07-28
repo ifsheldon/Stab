@@ -8,9 +8,6 @@ pub use decomposition::GateDecomposition;
 pub(crate) use decomposition::gate_decomposition_text;
 pub(crate) use flows::gate_flow_descriptors;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub use semantic_contract::{GateContractStatisticalBucket, GateContractStatisticalPlan};
 pub(crate) use unitary::{GateUnitaryRows, gate_unitary_rows};
 
 use crate::{CircuitError, CircuitResult, Probability, Target};
@@ -150,38 +147,6 @@ impl Gate {
     pub(crate) fn plain_tick() -> Self {
         Self { info: &GATES[2] }
     }
-}
-
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub fn __gate_contract_family_names() -> &'static [&'static str] {
-    semantic_contract::gate_contract_family_names()
-}
-
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub fn __gate_contract_surface_names() -> &'static [&'static str] {
-    semantic_contract::gate_contract_surface_names()
-}
-
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub fn __gate_contract_statistical_plans() -> &'static [GateContractStatisticalPlan] {
-    semantic_contract::gate_contract_statistical_plans()
-}
-
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub fn __gate_contract_statistical_rejection_boundaries(
-    shots: u64,
-    expected_probability: f64,
-    allowed_delta: f64,
-) -> (Option<u64>, Option<u64>) {
-    semantic_contract::gate_contract_statistical_rejection_boundaries(
-        shots,
-        expected_probability,
-        allowed_delta,
-    )
 }
 
 #[derive(Debug, Eq, PartialEq)]

@@ -135,13 +135,6 @@ fn blocker_ledger_rejects_unknown_schema_version() {
 }
 
 #[test]
-fn blocker_ledger_gate_schema_matches_canonical_core_metadata() {
-    let mut violations = Vec::new();
-    super::gate_contract::validate_gate_schema(&mut violations);
-    assert!(violations.is_empty(), "{violations:#?}");
-}
-
-#[test]
 fn blocker_ledger_requires_all_gate_contract_surfaces() {
     let ledger = mutated_ledger(|value| {
         case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
@@ -915,26 +908,6 @@ fn blocker_ledger_rejects_weak_statistical_false_positive_budget() {
 }
 
 #[test]
-fn blocker_ledger_rejects_statistical_probability_drift_from_core_contract() {
-    let ledger = mutated_ledger(|value| {
-        let buckets = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-channels")
-            .get_mut("statistical_plan")
-            .and_then(|plan| plan.get_mut("buckets"))
-            .and_then(Value::as_array_mut)
-            .expect("statistical buckets");
-        *buckets
-            .first_mut()
-            .and_then(|bucket| bucket.get_mut("expected_probability"))
-            .expect("first expected probability") = Value::from(0.39);
-    });
-
-    let error = ledger
-        .check(&repo_root())
-        .expect_err("statistical probability drift");
-    assert!(validation_text(error).contains("differs from the canonical core gate contract"));
-}
-
-#[test]
 fn blocker_ledger_rejects_out_of_range_statistical_probability() {
     let ledger = mutated_ledger(|value| {
         let buckets = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
@@ -1035,7 +1008,7 @@ fn blocker_ledger_caps_aggregate_statistical_bucket_work() {
 }
 
 #[test]
-fn blocker_ledger_rejects_gate_statistical_case_without_core_owner() {
+fn blocker_ledger_rejects_gate_statistical_case_outside_the_owned_set() {
     let ledger = mutated_ledger(|value| {
         *case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
             .get_mut("id")
@@ -1043,7 +1016,7 @@ fn blocker_ledger_rejects_gate_statistical_case_without_core_owner() {
     });
 
     let error = ledger.check(&repo_root()).expect_err("unowned plan");
-    assert!(validation_text(error).contains("has no canonical core statistical plan"));
+    assert!(validation_text(error).contains("differs from the oracle-owned expectation"));
 }
 
 #[test]
@@ -1144,10 +1117,20 @@ fn blocker_ledger_does_not_count_the_gtest_declaration_as_a_gate_marker() {
 }
 
 #[test]
-fn blocker_ledger_core_statistical_plans_meet_their_exact_tail_budgets() {
-    for expected in stab_core::__gate_contract_statistical_plans() {
+fn blocker_ledger_statistical_plans_meet_their_exact_tail_budgets() {
+    let ledger = parsed_source_ledger();
+    for case in ledger
+        .blockers
+        .iter()
+        .flat_map(|blocker| &blocker.cases)
+        .filter(|case| case.comparator == ComparatorKind::Statistical)
+    {
+        let expected = case
+            .statistical_plan
+            .as_ref()
+            .expect("statistical comparator plan");
         let mut familywise_bound = 0.0;
-        for bucket in expected.buckets {
+        for bucket in &expected.buckets {
             let standard_deviation = (bucket.expected_probability
                 * (1.0 - bucket.expected_probability)
                 / expected.shots as f64)
@@ -1164,7 +1147,7 @@ fn blocker_ledger_core_statistical_plans_meet_their_exact_tail_budgets() {
         assert!(
             familywise_bound <= expected.familywise_false_positive_budget,
             "{} exact familywise bound {familywise_bound:.6e} exceeds {:.6e}",
-            expected.case_id,
+            case.id,
             expected.familywise_false_positive_budget
         );
     }

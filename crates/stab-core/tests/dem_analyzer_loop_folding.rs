@@ -5,9 +5,6 @@
 
 use stab_core::{Circuit, ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
-#[cfg(feature = "ops-contracts")]
-use stab_core::__circuit_to_detector_error_model_with_diagnostics;
-
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
@@ -464,9 +461,8 @@ fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
     assert!(!actual.contains("repeat"), "{actual}");
 }
 
-#[cfg(feature = "ops-contracts")]
 #[test]
-fn pf6_dem_analyzer_fallback_reports_unsupported_instruction_path() {
+fn pf6_dem_analyzer_fallback_preserves_unsupported_instruction_semantics() {
     let circuit = Circuit::from_stim_str(
         "\
 REPEAT 2 {
@@ -476,7 +472,7 @@ REPEAT 2 {
 ",
     )
     .expect("valid heralded fallback circuit");
-    let (model, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(
+    let model = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
@@ -487,9 +483,6 @@ REPEAT 2 {
         },
     )
     .expect("bounded heralded fallback");
-
-    assert!(diagnostics.used_bounded_fallback);
-    assert!(!diagnostics.used_reverse_fold);
     assert_eq!(model.to_dem_string(), "error(0.125) D0\nerror(0.125) D1\n");
 }
 

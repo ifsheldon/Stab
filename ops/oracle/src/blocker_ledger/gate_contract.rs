@@ -4,6 +4,22 @@ use serde::Deserialize;
 
 use super::{BlockerCase, BlockerRecord};
 
+const EXPECTED_GATE_STATISTICAL_CASES: [&str; 13] = [
+    "pfm3-contract-mpp-stochastic",
+    "pfm3-contract-mpad-stochastic",
+    "pfm3-contract-pauli-noise",
+    "pfm3-contract-pauli-channels",
+    "pfm3-contract-depolarization",
+    "pfm3-contract-correlated-errors",
+    "pfm3-contract-heralded-noise",
+    "pfm3-contract-heralded-channel",
+    "pfm3-contract-heralded-erase-offset",
+    "pfm3-contract-heralded-channel-offset",
+    "pfm3-contract-measure-reset-x",
+    "pfm3-contract-measure-reset-y",
+    "pfm3-contract-measure-reset-z",
+];
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum GateContractFamily {
@@ -172,36 +188,6 @@ pub(super) fn validate_gate_contract_case(
     }
 }
 
-pub(super) fn validate_gate_schema(violations: &mut Vec<String>) {
-    let core_surfaces = stab_core::__gate_contract_surface_names()
-        .iter()
-        .copied()
-        .collect::<BTreeSet<_>>();
-    let ledger_surfaces = GateContractSurface::ALL
-        .into_iter()
-        .map(GateContractSurface::as_str)
-        .collect::<BTreeSet<_>>();
-    if ledger_surfaces != core_surfaces {
-        violations.push(format!(
-            "gate contract surface schema differs from canonical core metadata; ledger={ledger_surfaces:?} core={core_surfaces:?}"
-        ));
-    }
-
-    let core_families = stab_core::__gate_contract_family_names()
-        .iter()
-        .copied()
-        .collect::<BTreeSet<_>>();
-    let ledger_families = GateContractFamily::ALL
-        .into_iter()
-        .map(GateContractFamily::as_str)
-        .collect::<BTreeSet<_>>();
-    if ledger_families != core_families {
-        violations.push(format!(
-            "gate contract family schema differs from canonical core metadata; ledger={ledger_families:?} core={core_families:?}"
-        ));
-    }
-}
-
 pub(super) fn validate_gate_family_coverage(blocker: &BlockerRecord, violations: &mut Vec<String>) {
     if blocker.id != "pfm3-gate-execution" {
         return;
@@ -237,17 +223,16 @@ pub(super) fn validate_gate_family_coverage(blocker: &BlockerRecord, violations:
         })
         .map(|case| case.id.as_str())
         .collect::<BTreeSet<_>>();
-    let core_statistical_plans = stab_core::__gate_contract_statistical_plans();
-    let expected_statistical_cases = core_statistical_plans
+    let expected_statistical_cases = EXPECTED_GATE_STATISTICAL_CASES
         .iter()
-        .map(|plan| plan.case_id)
+        .copied()
         .collect::<BTreeSet<_>>();
-    if expected_statistical_cases.len() != core_statistical_plans.len() {
-        violations.push("canonical core gate contract repeats a statistical case id".to_string());
+    if expected_statistical_cases.len() != EXPECTED_GATE_STATISTICAL_CASES.len() {
+        violations.push("oracle gate contract repeats a statistical case id".to_string());
     }
     if actual_statistical_cases != expected_statistical_cases {
         violations.push(format!(
-            "gate contract statistical case set differs from canonical core metadata; ledger={actual_statistical_cases:?} core={expected_statistical_cases:?}"
+            "gate contract statistical case set differs from the oracle-owned expectation; ledger={actual_statistical_cases:?} expected={expected_statistical_cases:?}"
         ));
     }
 }

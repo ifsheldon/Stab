@@ -3425,8 +3425,6 @@
               "test",
               "-p",
               "stab-core",
-              "--features",
-              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_counts",
@@ -3470,8 +3468,6 @@
               "test",
               "-p",
               "stab-core",
-              "--features",
-              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_coordinates",
@@ -3593,8 +3589,6 @@
               "test",
               "-p",
               "stab-core",
-              "--features",
-              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_sampler",
@@ -3609,7 +3603,7 @@
             "signature": {
               "parity_mode": "statistical",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--features|ops-contracts|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler|--|--exact",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler|--|--exact",
               "upstream_source": "src/stim/simulators/dem_sampler.test.cc"
             }
           },
@@ -6643,12 +6637,12 @@
         },
         {
           "id": "pfm6-analyzer-diagnostic-saturation",
-          "surface": "circuit_to_detector_error_model analyzer diagnostics",
+          "surface": "circuit_to_detector_error_model saturating repeat accounting",
           "upstream": {
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.loop_folding",
-            "subcase": "multiple maximum-count repeats whose aggregate diagnostic count exceeds u64"
+            "subcase": "multiple maximum-count repeats whose aggregate represented work exceeds u64"
           },
           "comparator": "exact",
           "status": "implemented",
@@ -6661,7 +6655,7 @@
               "stab-core",
               "--test",
               "dem_analyzer_pfm_b5",
-              "pfm_b5_repeat_diagnostics_never_reject_valid_analysis",
+              "pfm_b5_saturating_repeat_accounting_never_rejects_valid_analysis",
               "--quiet",
               "--exact"
             ]
@@ -6683,9 +6677,9 @@
           },
           "benchmark": {
             "state": "not-applicable",
-            "value": "Diagnostic saturation is a constant-time correctness contract rather than a distinct throughput workload."
+            "value": "Saturating repeat accounting is a constant-time correctness contract rather than a distinct throughput workload."
           },
-          "resource_contract": "Observational diagnostic counters saturate and never change analyzer success or output."
+          "resource_contract": "Aggregate represented-work accounting cannot overflow or change analyzer success or exact output."
         },
         {
           "id": "pfm6-analyzer-local-decomposition-boundary",

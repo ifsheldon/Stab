@@ -63,3 +63,25 @@ fn accepts_the_extracted_model_package() {
         ]
     );
 }
+
+#[test]
+fn rejects_feature_specific_product_selectors() {
+    let selector = [
+        "cargo",
+        "test",
+        "-p",
+        "stab-core",
+        "--features",
+        "qualification-policy",
+        "--test",
+        "dem_api",
+        "exact_owner",
+        "--quiet",
+        "--exact",
+    ]
+    .map(String::from);
+
+    let error = CargoTestSelector::parse(&selector).expect_err("feature-specific selector");
+
+    assert_eq!(error, "must use the allowlisted cargo test selector shape");
+}

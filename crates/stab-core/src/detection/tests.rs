@@ -8,7 +8,6 @@
 use super::*;
 use crate::SampleFormat;
 
-#[cfg(feature = "ops-contracts")]
 use std::hint::black_box;
 
 #[test]
@@ -93,7 +92,6 @@ fn convert_with_sweep(
     .expect("convert measurements with sweep")
 }
 
-#[cfg(feature = "ops-contracts")]
 #[test]
 fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
     let circuit = Circuit::from_stim_str(

@@ -17,12 +17,12 @@ macro_rules! define_gate_contract_enum {
             pub(super) const ALL: [Self; [$(stringify!($variant)),+].len()] = [
                 $(Self::$variant),+
             ];
-            #[cfg(any(test, feature = "ops-contracts"))]
+            #[cfg(test)]
             pub(super) const NAMES: [&'static str; [$(stringify!($variant)),+].len()] = [
                 $(Self::$variant.as_str()),+
             ];
 
-            #[cfg(any(test, feature = "ops-contracts"))]
+            #[cfg(test)]
             pub(super) const fn as_str(self) -> &'static str {
                 match self {
                     $(Self::$variant => $wire_name),+
@@ -57,7 +57,7 @@ define_gate_contract_enum! {
     }
 }
 
-#[cfg(any(test, feature = "ops-contracts"))]
+#[cfg(test)]
 define_gate_contract_enum! {
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     pub(crate) enum GateSurface {
@@ -80,30 +80,14 @@ pub(crate) use surface::{
     GateShapeExclusion, GateSurfaceBehavior, GateSurfaceContract, GateTargetPattern,
 };
 
-#[cfg(feature = "ops-contracts")]
-pub(super) fn gate_contract_family_names() -> &'static [&'static str] {
-    &GateSemanticFamily::NAMES
-}
-
-#[cfg(feature = "ops-contracts")]
-pub(super) fn gate_contract_surface_names() -> &'static [&'static str] {
-    &GateSurface::NAMES
-}
-
-#[cfg(any(test, feature = "ops-contracts"))]
+#[cfg(test)]
 mod statistical_plan;
 
-#[cfg(all(test, not(feature = "ops-contracts")))]
+#[cfg(test)]
 pub(crate) use statistical_plan::GateContractStatisticalPlan;
-#[cfg(feature = "ops-contracts")]
-pub use statistical_plan::{GateContractStatisticalBucket, GateContractStatisticalPlan};
 #[cfg(test)]
 pub(crate) use statistical_plan::{
     gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
-};
-#[cfg(feature = "ops-contracts")]
-pub(super) use statistical_plan::{
-    gate_contract_statistical_plans, gate_contract_statistical_rejection_boundaries,
 };
 
 pub(super) const fn gate(

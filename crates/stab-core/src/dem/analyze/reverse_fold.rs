@@ -41,50 +41,10 @@ const MAX_BOUNDED_REPEAT_UNROLL: u64 = 100_000;
 
 type ErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(super) struct ReverseFoldDiagnostics {
-    pub(super) recurrence_search_steps: u64,
-    pub(super) recurrences_found: u64,
-    pub(super) max_recurrence_period: u64,
-    pub(super) represented_repeat_iterations: u64,
-    pub(super) folded_repeat_iterations: u64,
-    pub(super) max_boundary_entries: u64,
-    pub(super) emitted_compact_dem_items: u64,
-}
-
-#[cfg(feature = "ops-contracts")]
-impl From<ReverseFoldDiagnostics> for super::ErrorAnalyzerDiagnostics {
-    fn from(diagnostics: ReverseFoldDiagnostics) -> Self {
-        Self {
-            used_reverse_fold: true,
-            used_bounded_fallback: false,
-            recurrence_search_steps: diagnostics.recurrence_search_steps,
-            recurrences_found: diagnostics.recurrences_found,
-            max_recurrence_period: diagnostics.max_recurrence_period,
-            represented_repeat_iterations: diagnostics.represented_repeat_iterations,
-            folded_repeat_iterations: diagnostics.folded_repeat_iterations,
-            max_boundary_entries: diagnostics.max_boundary_entries,
-            emitted_compact_dem_items: diagnostics.emitted_compact_dem_items,
-        }
-    }
-}
-
 pub(super) fn try_analyze(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> CircuitResult<Option<DetectorErrorModel>> {
-    if contains_unsupported_reverse_fold_instruction(circuit) {
-        return Ok(None);
-    }
-    let (model, _) = ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)?;
-    Ok(Some(model))
-}
-
-#[cfg(feature = "ops-contracts")]
-pub(super) fn try_analyze_with_diagnostics(
-    circuit: &Circuit,
-    options: ErrorAnalyzerOptions,
-) -> CircuitResult<Option<(DetectorErrorModel, ReverseFoldDiagnostics)>> {
     if contains_unsupported_reverse_fold_instruction(circuit) {
         return Ok(None);
     }
@@ -100,7 +60,6 @@ struct ReverseFoldAnalyzer {
     reversed_model: DetectorErrorModel,
     error_probabilities: BTreeMap<ErrorKey, Probability>,
     probe_budget: AnalyzerProbeBudget,
-    diagnostics: ReverseFoldDiagnostics,
 }
 
 impl ReverseFoldAnalyzer {
@@ -123,26 +82,17 @@ impl ReverseFoldAnalyzer {
             reversed_model: DetectorErrorModel::new(),
             error_probabilities: BTreeMap::new(),
             probe_budget: AnalyzerProbeBudget::new(MAX_LOOP_CYCLE_STEPS),
-            diagnostics: ReverseFoldDiagnostics {
-                represented_repeat_iterations: represented_repeat_iterations(circuit, 1),
-                ..ReverseFoldDiagnostics::default()
-            },
         })
     }
 
-    fn analyze(
-        mut self,
-        circuit: &Circuit,
-    ) -> CircuitResult<(DetectorErrorModel, ReverseFoldDiagnostics)> {
+    fn analyze(mut self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
         self.undo_circuit(circuit)?;
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
         self.collect_gauge_errors()?;
         self.flush()?;
         let mut base_detector_id = 0_u64;
         let mut seen = BTreeSet::new();
-        let model = unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)?;
-        self.diagnostics.emitted_compact_dem_items = compact_dem_item_count(&model);
-        Ok((model, self.diagnostics))
+        unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)
     }
 
     fn undo_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
@@ -651,7 +601,6 @@ impl ReverseFoldAnalyzer {
         if iterations == 0 {
             return Ok(());
         }
-        self.observe_boundary_entries(self.tracker.boundary_entry_count());
         if !self.options.fold_loops {
             return self.undo_loop_by_unrolling(body, iterations);
         }
@@ -661,20 +610,9 @@ impl ReverseFoldAnalyzer {
             iterations.min(MAX_LOOP_CYCLE_STEPS),
             |probe| probe.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget),
         )?;
-        self.diagnostics.recurrence_search_steps = self.probe_budget.consumed_steps();
         let recurrence = match search {
-            ShiftedRecurrenceSearch::Found {
-                recurrence,
-                max_boundary_entries,
-            } => {
-                self.observe_boundary_entries(max_boundary_entries);
-                recurrence
-            }
-            ShiftedRecurrenceSearch::Exhausted {
-                max_boundary_entries,
-                ..
-            } => {
-                self.observe_boundary_entries(max_boundary_entries);
+            ShiftedRecurrenceSearch::Found { recurrence, .. } => recurrence,
+            ShiftedRecurrenceSearch::Exhausted { .. } => {
                 if iterations > MAX_BOUNDED_REPEAT_UNROLL {
                     return Err(CircuitError::invalid_detector_error_model(format!(
                         "analyze_errors found no loop-state recurrence within {MAX_LOOP_CYCLE_STEPS} iterations for repeat count {iterations}"
@@ -703,10 +641,6 @@ impl ReverseFoldAnalyzer {
                     "folded analyzer recurrence period was zero",
                 ));
             }
-            self.diagnostics.recurrences_found =
-                self.diagnostics.recurrences_found.saturating_add(1);
-            self.diagnostics.max_recurrence_period =
-                self.diagnostics.max_recurrence_period.max(period);
             let remaining = iterations.checked_sub(tortoise_iterations).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "folded analyzer repeat remainder underflowed",
@@ -731,11 +665,6 @@ impl ReverseFoldAnalyzer {
             )
         })?;
         self.undo_loop_by_unrolling(body, remaining)
-    }
-
-    fn observe_boundary_entries(&mut self, entries: usize) {
-        let entries = u64::try_from(entries).unwrap_or(u64::MAX);
-        self.diagnostics.max_boundary_entries = self.diagnostics.max_boundary_entries.max(entries);
     }
 
     fn capture_repeated_period(
@@ -775,10 +704,6 @@ impl ReverseFoldAnalyzer {
         })?;
         let folded_iterations =
             checked_product_u64(period, skipped_periods, "folded repeat iteration")?;
-        self.diagnostics.folded_repeat_iterations = self
-            .diagnostics
-            .folded_repeat_iterations
-            .saturating_add(folded_iterations);
         let skipped_measurements =
             checked_product_usize(measurements_per_period, skipped_periods, "measurement skip")?;
         let skipped_detectors =
@@ -844,19 +769,6 @@ fn contains_unsupported_reverse_fold_instruction(circuit: &Circuit) -> bool {
             contains_unsupported_reverse_fold_instruction(repeat.body())
         }
     })
-}
-
-fn represented_repeat_iterations(circuit: &Circuit, multiplier: u64) -> u64 {
-    let mut total = 0_u64;
-    for item in circuit.items() {
-        let CircuitItem::RepeatBlock(repeat) = item else {
-            continue;
-        };
-        let repeated = multiplier.saturating_mul(repeat.repeat_count().get());
-        total = total.saturating_add(repeated);
-        total = total.saturating_add(represented_repeat_iterations(repeat.body(), repeated));
-    }
-    total
 }
 
 fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {
@@ -931,17 +843,6 @@ fn push_items(target: &mut DetectorErrorModel, items: &[crate::DemItem]) {
             crate::DemItem::RepeatBlock(repeat) => target.push_repeat_block(repeat.clone()),
         }
     }
-}
-
-pub(super) fn compact_dem_item_count(model: &DetectorErrorModel) -> u64 {
-    let mut count = 0_u64;
-    for item in model.items() {
-        count = count.saturating_add(1);
-        if let crate::DemItem::RepeatBlock(repeat) = item {
-            count = count.saturating_add(compact_dem_item_count(repeat.body()));
-        }
-    }
-    count
 }
 
 fn checked_add(left: u64, right: u64, context: &str) -> CircuitResult<u64> {

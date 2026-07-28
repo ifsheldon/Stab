@@ -731,22 +731,7 @@ fn pfm_b3_folded_traversal_sampler() {
 fn assert_probability(observed: usize, shots: usize, expected: f64) {
     let sigma = (expected * (1.0 - expected) / shots as f64).sqrt();
     let tolerance = 0.01_f64.max(6.0 * sigma);
-    #[cfg(feature = "ops-contracts")]
-    {
-        let shots = u64::try_from(shots).expect("statistical shots fit u64");
-        let observed = u64::try_from(observed).expect("statistical count fits u64");
-        let (minimum, maximum) =
-            stab_core::__gate_contract_statistical_rejection_boundaries(shots, expected, tolerance);
-        let minimum = minimum.map_or(0, |boundary| boundary + 1);
-        let maximum = maximum.map_or(shots, |boundary| boundary - 1);
-        assert!(
-            (minimum..=maximum).contains(&observed),
-            "observed={observed}/{shots} expected={expected} accepted={minimum}..={maximum}"
-        );
-    }
-    #[cfg(not(feature = "ops-contracts"))]
     let observed = observed as f64 / shots as f64;
-    #[cfg(not(feature = "ops-contracts"))]
     assert!(
         (observed - expected).abs() <= tolerance,
         "observed={observed} expected={expected} tolerance={tolerance}"

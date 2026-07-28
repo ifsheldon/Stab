@@ -77,9 +77,6 @@ pub use circuit_generation::{
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_transforms::CircuitFlattenLimits;
 pub use compilation_fingerprint::{CompilationOperation, CompilationRequestFingerprint};
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub use dem::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
 pub use dem::{
     DemDetectorId, DemFlattenLimits, DemFlattenedInstructionIter, DemInstruction,
     DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
@@ -120,13 +117,6 @@ pub use execution::{
     SinkFailurePhase, count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
 pub use fingerprint::{ModelDialect, ModelFingerprint};
-#[cfg(feature = "ops-contracts")]
-#[doc(hidden)]
-pub use gate::{
-    __gate_contract_family_names, __gate_contract_statistical_plans,
-    __gate_contract_statistical_rejection_boundaries, __gate_contract_surface_names,
-    GateContractStatisticalBucket, GateContractStatisticalPlan,
-};
 pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
 };

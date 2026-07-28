@@ -10,9 +10,6 @@ use stab_core::{
     ErrorAnalyzerOptions, circuit_to_detector_error_model,
 };
 
-#[cfg(feature = "ops-contracts")]
-use stab_core::__circuit_to_detector_error_model_with_diagnostics;
-
 const NESTED_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_nested_loop.stim");
 const NESTED_EXPECTED: &str =
@@ -93,7 +90,7 @@ fn pfm_b5_nested_gauge_probe_consumes_transient_output() {
 }
 
 #[test]
-fn pfm_b5_repeat_diagnostics_never_reject_valid_analysis() {
+fn pfm_b5_saturating_repeat_accounting_never_rejects_valid_analysis() {
     assert_eq!(
         analyze(
             DIAGNOSTIC_SATURATION_CIRCUIT,
@@ -145,22 +142,6 @@ fn pfm_b5_folded_noisy_mpad_matches_stim() {
         analyze(FOLDED_MPAD_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
         FOLDED_MPAD_EXPECTED
     );
-}
-
-#[cfg(feature = "ops-contracts")]
-#[test]
-fn pfm_b5_repeat_diagnostics_saturate() {
-    let circuit =
-        Circuit::from_stim_str(DIAGNOSTIC_SATURATION_CIRCUIT).expect("valid repeated circuit");
-    let (_, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(
-        &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .expect("diagnostics must not alter analysis semantics");
-    assert_eq!(diagnostics.represented_repeat_iterations, u64::MAX);
 }
 
 #[test]

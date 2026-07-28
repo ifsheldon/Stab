@@ -286,10 +286,16 @@ fn assert_benchmark_measurements(id: &str, row: BenchmarkRow, expected_measureme
             .iter()
             .find(|measurement| measurement.name == "stab_pfm_b5_analyzer_long_period")
             .expect("long-period analyzer measurement");
-        assert_eq!(observation_value(short_period, "max_recurrence_period"), 8);
-        assert_eq!(observation_value(long_period, "max_recurrence_period"), 127);
-        assert!(observation_value(short_period, "folded_repeat_iterations") > 0);
-        assert!(observation_value(long_period, "folded_repeat_iterations") > 0);
+        assert_eq!(
+            observation_value(short_period, "max_repeat_detector_shift"),
+            8
+        );
+        assert_eq!(
+            observation_value(long_period, "max_repeat_detector_shift"),
+            127
+        );
+        assert!(observation_value(short_period, "repeat_blocks") > 0);
+        assert!(observation_value(long_period, "repeat_blocks") > 0);
     }
     for measurement in &measurements {
         assert!(

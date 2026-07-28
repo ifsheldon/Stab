@@ -60,8 +60,8 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 - Public traits are introduced only after a real built-in implementation and a separate external implementation prove the common contract.
 - Plan fingerprints are versioned reproducibility identities, not promises that compiled-plan hashes remain stable across Stab versions or backends.
 - Seeded execution guarantees successful chunking equivalence on one session, but not random-access shot ranges, cross-backend identity, or exact Stim random streams.
-- The current `ops-contracts` feature is contained debt, not a product dependency inversion.
-- It is removed only after its useful product capability data and its qualification-only plans have distinct owners.
+- At plan freeze, the `ops-contracts` feature was contained debt rather than an accepted product dependency inversion.
+- A6 removes it before the complete model extraction because its gate-family metadata obstructs moving the canonical gate registry; the oracle owns qualification policy, and analyzer benchmarks use public compact-output witnesses instead of private product counters.
 
 ### Recommendations Deferred
 

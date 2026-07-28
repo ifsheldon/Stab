@@ -7,7 +7,6 @@ mod tests;
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CargoTestSelector<'a> {
     package: &'a str,
-    features: Option<&'a str>,
     target: Option<&'a str>,
     lib: bool,
     filter: Option<&'a str>,
@@ -71,7 +70,6 @@ impl<'a> CargoTestSelector<'a> {
             validate_package_and_test_name(package, Some(filter))?;
             return Ok(Self {
                 package,
-                features: None,
                 target: None,
                 lib: true,
                 filter: Some(filter),
@@ -79,61 +77,7 @@ impl<'a> CargoTestSelector<'a> {
             });
         }
 
-        let (package, features, target, filter, exact) = match parts {
-            [
-                cargo,
-                test,
-                package_flag,
-                package,
-                features_flag,
-                features,
-                target_flag,
-                target,
-                filter,
-                quiet,
-                exact,
-            ] if cargo == "cargo"
-                && test == "test"
-                && package_flag == "-p"
-                && features_flag == "--features"
-                && target_flag == "--test"
-                && quiet == "--quiet"
-                && exact == "--exact" =>
-            {
-                (
-                    package.as_str(),
-                    Some(features.as_str()),
-                    Some(target.as_str()),
-                    Some(filter.as_str()),
-                    true,
-                )
-            }
-            [
-                cargo,
-                test,
-                package_flag,
-                package,
-                features_flag,
-                features,
-                target_flag,
-                target,
-                filter,
-                quiet,
-            ] if cargo == "cargo"
-                && test == "test"
-                && package_flag == "-p"
-                && features_flag == "--features"
-                && target_flag == "--test"
-                && quiet == "--quiet" =>
-            {
-                (
-                    package.as_str(),
-                    Some(features.as_str()),
-                    Some(target.as_str()),
-                    Some(filter.as_str()),
-                    false,
-                )
-            }
+        let (package, target, filter, exact) = match parts {
             [
                 cargo,
                 test,
@@ -153,7 +97,6 @@ impl<'a> CargoTestSelector<'a> {
             {
                 (
                     package.as_str(),
-                    None,
                     Some(target.as_str()),
                     Some(filter.as_str()),
                     true,
@@ -176,7 +119,6 @@ impl<'a> CargoTestSelector<'a> {
             {
                 (
                     package.as_str(),
-                    None,
                     Some(target.as_str()),
                     Some(filter.as_str()),
                     false,
@@ -189,7 +131,7 @@ impl<'a> CargoTestSelector<'a> {
                     && quiet == "--quiet"
                     && exact == "--exact" =>
             {
-                (package.as_str(), None, None, Some(filter.as_str()), true)
+                (package.as_str(), None, Some(filter.as_str()), true)
             }
             [cargo, test, package_flag, package, filter, quiet]
                 if cargo == "cargo"
@@ -197,32 +139,7 @@ impl<'a> CargoTestSelector<'a> {
                     && package_flag == "-p"
                     && quiet == "--quiet" =>
             {
-                (package.as_str(), None, None, Some(filter.as_str()), false)
-            }
-            [
-                cargo,
-                test,
-                package_flag,
-                package,
-                features_flag,
-                features,
-                target_flag,
-                target,
-                quiet,
-            ] if cargo == "cargo"
-                && test == "test"
-                && package_flag == "-p"
-                && features_flag == "--features"
-                && target_flag == "--test"
-                && quiet == "--quiet" =>
-            {
-                (
-                    package.as_str(),
-                    Some(features.as_str()),
-                    Some(target.as_str()),
-                    None,
-                    false,
-                )
+                (package.as_str(), None, Some(filter.as_str()), false)
             }
             [
                 cargo,
@@ -238,7 +155,7 @@ impl<'a> CargoTestSelector<'a> {
                 && target_flag == "--test"
                 && quiet == "--quiet" =>
             {
-                (package.as_str(), None, Some(target.as_str()), None, false)
+                (package.as_str(), Some(target.as_str()), None, false)
             }
             [cargo, test, package_flag, package, quiet]
                 if cargo == "cargo"
@@ -246,15 +163,12 @@ impl<'a> CargoTestSelector<'a> {
                     && package_flag == "-p"
                     && quiet == "--quiet" =>
             {
-                (package.as_str(), None, None, None, false)
+                (package.as_str(), None, None, false)
             }
             _ => return Err("must use the allowlisted cargo test selector shape"),
         };
         if !is_allowed_test_package(package) {
             return Err("uses a package outside the blocker-test allowlist");
-        }
-        if features.is_some_and(|value| value != "ops-contracts") {
-            return Err("uses features outside the selector allowlist");
         }
         if filter.is_some_and(|value| !is_test_name(value))
             || target.is_some_and(|value| !is_test_name(value))
@@ -263,7 +177,6 @@ impl<'a> CargoTestSelector<'a> {
         }
         Ok(Self {
             package,
-            features,
             target,
             lib: false,
             filter,
@@ -277,35 +190,29 @@ impl<'a> CargoTestSelector<'a> {
 
     pub(crate) fn display(self) -> String {
         let exact = if self.exact { " --exact" } else { "" };
-        let features = self
-            .features
-            .map_or(String::new(), |value| format!(" --features {value}"));
         let filter = self
             .filter
             .map_or(String::new(), |value| format!(" {value}"));
         if self.lib {
             return format!(
-                "cargo test -p {}{} --lib --quiet --{}{} --list",
-                self.package, features, filter, exact
+                "cargo test -p {} --lib --quiet --{}{} --list",
+                self.package, filter, exact
             );
         }
         match self.target {
             Some(target) => format!(
-                "cargo test -p {}{} --test {} --quiet --{}{} --list",
-                self.package, features, target, filter, exact
+                "cargo test -p {} --test {} --quiet --{}{} --list",
+                self.package, target, filter, exact
             ),
             None => format!(
-                "cargo test -p {}{} --quiet --{}{} --list",
-                self.package, features, filter, exact
+                "cargo test -p {} --quiet --{}{} --list",
+                self.package, filter, exact
             ),
         }
     }
 
     pub(crate) fn args(self) -> Vec<&'a str> {
         let mut args = vec!["test", "-p", self.package];
-        if let Some(features) = self.features {
-            args.extend(["--features", features]);
-        }
         if let Some(target) = self.target {
             args.extend(["--test", target]);
         } else if self.lib {
@@ -324,9 +231,6 @@ impl<'a> CargoTestSelector<'a> {
 
     pub(crate) fn run_args(self) -> Vec<&'a str> {
         let mut args = vec!["test", "-p", self.package];
-        if let Some(features) = self.features {
-            args.extend(["--features", features]);
-        }
         if let Some(target) = self.target {
             args.extend(["--test", target]);
         } else if self.lib {

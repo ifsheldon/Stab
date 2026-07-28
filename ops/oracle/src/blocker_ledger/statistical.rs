@@ -2,10 +2,9 @@ use std::collections::BTreeSet;
 
 use statrs::distribution::{Binomial, DiscreteCDF as _};
 
-use super::{
-    BlockerCase, ComparatorKind, StatisticalPlan, validate_display_text,
-    validate_gate_statistical_plan,
-};
+use crate::statistical_contract::rejection_boundaries;
+
+use super::{BlockerCase, ComparatorKind, StatisticalPlan, validate_display_text};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct BlockerStatisticalPlanSummary {
@@ -136,7 +135,6 @@ pub(super) fn validate_statistical_plan(
             if evaluate_false_positive_budget {
                 validate_statistical_false_positive_budget(case, plan, violations);
             }
-            validate_gate_statistical_plan(case, plan, violations);
         }
         (ComparatorKind::Statistical, None) => violations.push(format!(
             "case {:?} statistical comparator lacks a reproducible plan",
@@ -205,11 +203,7 @@ pub(super) fn binomial_rejection_probability(
         return 1.0;
     };
 
-    let (lower_max, upper_min) = stab_core::__gate_contract_statistical_rejection_boundaries(
-        shots,
-        probability,
-        allowed_delta,
-    );
+    let (lower_max, upper_min) = rejection_boundaries(shots, probability, allowed_delta);
     lower_max
         .map(|boundary| distribution.cdf(boundary))
         .unwrap_or(0.0)

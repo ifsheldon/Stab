@@ -218,9 +218,9 @@ There is no `scalar` feature. Scalar behavior is defined by the absence of `port
 
 The product feature is removed rather than renamed.
 
-Gate statistical plans, rejection boundaries, and qualification family lists move into `ops/oracle` or a shared ops-owned descriptor module. Their values remain checked against public model descriptors and executable product behavior, but product crates do not export hidden qualification APIs.
+The authoritative gate statistical plans, rejection boundaries, and qualification family lists live in `ops/oracle`. Core semantic tests may retain test-only statistical fixtures, but no product build or rustdoc surface exposes them.
 
-DEM analyzer phase observations used only by benchmarks move behind an ops-owned benchmark adapter. If a phase value is a useful product diagnostic, it receives a documented analysis API; otherwise the benchmark measures through an internal ops harness without adding a public product item.
+DEM analyzer phase observations used only by benchmarks are not promoted into a product diagnostic API. The ops-owned benchmark adapter validates compact repeat blocks and recurrence detector shifts from the public `DetectorErrorModel` output, so benchmark evidence follows observable work without retaining counters in the timed algorithm.
 
 The following names disappear from product rustdoc and qualification inventory:
 
@@ -231,6 +231,10 @@ The following names disappear from product rustdoc and qualification inventory:
 - `__circuit_to_detector_error_model_with_diagnostics`
 - `ErrorAnalyzerDiagnostics` when it remains benchmark-only
 
+### Sequence Amendment
+
+This removal was completed before moving the full gate registry instead of after engine extraction. The implementation exposed a concrete dependency: `GateInfo` carried qualification-only semantic-family data, so preserving the original order would have copied an operations concern into `stab-model` or required a temporary duplicate registry. Removing the feature first keeps one gate table and does not alter any supported product behavior.
+
 ## Extraction Commits
 
 The physical work is split into focused commits:
@@ -238,13 +242,14 @@ The physical work is split into focused commits:
 1. Add this frozen map and architecture checks for the future packages.
 2. Replace all internal foreign-inherent call sites with owner free functions.
 3. Extract Stable scalar `stab-algebra`.
-4. Extract Stable `stab-model` and facade error/path adapters.
-5. Extract Stable `stab-analysis`.
-6. Extract Nightly `stab-engine`.
-7. Extract dependency-free `stab-kernels-simd`, add feature forwarding, and register the distinct backend.
-8. Remove `ops-contracts`, curate facade tiers, and migrate operational descriptors.
-9. Add external-consumer fixtures, dependency rejection fixtures, API-tier checks, and generated inventory ownership.
-10. Run moved-path benchmarks, audit, review, and A6 evidence closure.
+4. Extract the Stable `stab-model` value and error boundary.
+5. Remove `ops-contracts` and migrate operational descriptors before moving the gate registry.
+6. Complete Stable `stab-model` and facade error/path adapters.
+7. Extract Stable `stab-analysis`.
+8. Extract Nightly `stab-engine`.
+9. Extract dependency-free `stab-kernels-simd`, add feature forwarding, and register the distinct backend.
+10. Add external-consumer fixtures, dependency rejection fixtures, API-tier checks, and generated inventory ownership.
+11. Run moved-path benchmarks, audit, review, and A6 evidence closure.
 
 Each commit must compile the workspace state it creates. Temporary duplicate implementations are not an accepted way to keep an intermediate commit green.
 

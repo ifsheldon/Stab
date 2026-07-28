@@ -6,9 +6,7 @@
 use super::*;
 use crate::SampleFormat;
 
-#[cfg(feature = "ops-contracts")]
 use crate::analysis::{gate_has_tableau, gate_tableau};
-#[cfg(feature = "ops-contracts")]
 use std::fmt::Write as _;
 
 fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
@@ -23,7 +21,6 @@ fn count_determined(input: &str, unknown_input: bool) -> u64 {
     count_determined_measurements(&circuit, unknown_input).expect("count determined measurements")
 }
 
-#[cfg(feature = "ops-contracts")]
 #[test]
 fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
     let mut circuit_text = String::new();
