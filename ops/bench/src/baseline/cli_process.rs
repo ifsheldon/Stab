@@ -79,6 +79,12 @@ pub(super) fn run_stab_cli_process_row(
         ensure_witness(row, expected, actual)?;
 
         let memory_args = in_process_args(root, row);
+        #[cfg(feature = "count-allocations")]
+        {
+            let memory_preflight = run_in_process(row, memory_args.clone(), &stdin)?;
+            ensure_witness(row, expected, memory_preflight)?;
+            black_box(memory_preflight);
+        }
         Ok(vec![measure_stab_iterations_with_memory_operation(
             measurement_name,
             CLI_PROCESS_LAUNCHES_PER_MEASUREMENT,
