@@ -16,7 +16,7 @@ use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
     DetectorErrorModel, MAX_DEM_REPEAT_NESTING,
 };
-use crate::{CircuitError, CircuitResult, ResourceLimitError, ResourceOperation};
+use crate::{CircuitError, CircuitResult};
 
 const MAX_DEM_COORDINATE_SCALAR_WORK: u64 = 8_000_000;
 
@@ -558,10 +558,8 @@ pub(crate) enum DemRepeatSelection {
     Expand {
         /// Maximum total expanded iterations across all `Expand` selections in this traversal.
         max_total_iterations: u64,
-        /// Operation name included in a resource-limit error.
+        /// Consumer-readable operation context used by the default validation error.
         context: &'static str,
-        /// Structured operation identity when the expansion limit is caller-selectable.
-        resource_operation: Option<ResourceOperation>,
     },
     /// Visit selected iteration indexes in the supplied order.
     ///
@@ -606,6 +604,18 @@ pub(crate) trait FoldedDemVisitor {
         _state: &DemTraversalState,
     ) -> CircuitResult<ControlFlow<()>> {
         Ok(ControlFlow::Continue(()))
+    }
+
+    /// Constructs the consumer-owned failure for cumulative repeat expansion.
+    fn repeat_expansion_limit_error(
+        &mut self,
+        context: &'static str,
+        actual: u64,
+        limit: u64,
+    ) -> CircuitError {
+        CircuitError::invalid_detector_error_model(format!(
+            "DEM {context} traversal currently supports at most {limit} expanded repeat iterations, got at least {actual}"
+        ))
     }
 }
 
@@ -666,20 +676,18 @@ where
         DemRepeatSelection::Expand {
             max_total_iterations,
             context,
-            resource_operation,
         } => {
             expansion.used_iterations = expansion
                 .used_iterations
                 .checked_add(repeat_count)
                 .ok_or_else(|| {
-                    expansion_error(context, resource_operation, max_total_iterations, u64::MAX)
+                    visitor.repeat_expansion_limit_error(context, u64::MAX, max_total_iterations)
                 })?;
             if expansion.used_iterations > max_total_iterations {
-                return Err(expansion_error(
+                return Err(visitor.repeat_expansion_limit_error(
                     context,
-                    resource_operation,
-                    max_total_iterations,
                     expansion.used_iterations,
+                    max_total_iterations,
                 ));
             }
             for iteration in 0..repeat_count {
@@ -715,23 +723,6 @@ where
             Ok(ControlFlow::Continue(()))
         }
     }
-}
-
-fn expansion_error(
-    context: &'static str,
-    resource_operation: Option<ResourceOperation>,
-    limit: u64,
-    actual: u64,
-) -> CircuitError {
-    if let Some(operation) = resource_operation {
-        return ResourceLimitError::dem_traversal_repeat_iterations(
-            operation, context, actual, limit,
-        )
-        .into();
-    }
-    CircuitError::invalid_detector_error_model(format!(
-        "DEM {context} traversal currently supports at most {limit} expanded repeat iterations, got at least {actual}"
-    ))
 }
 
 fn summarize(items: &[FoldedDemItem<'_>]) -> DemBlockSummary {

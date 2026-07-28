@@ -68,6 +68,8 @@ Folded DEM traversal remains model-owned because it describes compact model stru
 
 Cross-crate consumers use a documented `stab_model::advanced` boundary containing borrowed folded blocks, traversal state, checked summaries, and visitor contracts. The boundary remains typed and read-only; it does not expose model storage fields.
 
+Repeat selections carry only model facts and traversal ceilings. When cumulative expansion exceeds a ceiling, the visitor constructs its owner-domain failure; model traversal does not name logical-search, SAT, execution, or facade resource operations.
+
 ### Compatibility Methods
 
 The following pre-0.2 inherent methods cannot survive on reexported foreign types:

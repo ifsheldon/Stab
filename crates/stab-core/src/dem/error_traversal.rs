@@ -154,8 +154,22 @@ where
         Ok(DemRepeatSelection::Expand {
             max_total_iterations: self.limits.max_repeat_iterations(),
             context: self.context,
-            resource_operation: Some(crate::ResourceOperation::LogicalErrorSearch),
         })
+    }
+
+    fn repeat_expansion_limit_error(
+        &mut self,
+        context: &'static str,
+        actual: u64,
+        limit: u64,
+    ) -> CircuitError {
+        ResourceLimitError::dem_traversal_repeat_iterations(
+            crate::ResourceOperation::LogicalErrorSearch,
+            context,
+            actual,
+            limit,
+        )
+        .into()
     }
 }
 

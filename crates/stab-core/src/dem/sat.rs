@@ -592,8 +592,22 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
         Ok(DemRepeatSelection::Expand {
             max_total_iterations: self.limits.max_repeat_iterations(),
             context: "SAT problem generation",
-            resource_operation: Some(crate::ResourceOperation::SatMaterialization),
         })
+    }
+
+    fn repeat_expansion_limit_error(
+        &mut self,
+        _context: &'static str,
+        actual: u64,
+        limit: u64,
+    ) -> CircuitError {
+        ResourceLimitError::dem_traversal_repeat_iterations(
+            crate::ResourceOperation::SatMaterialization,
+            "SAT problem generation",
+            actual,
+            limit,
+        )
+        .into()
     }
 }
 
