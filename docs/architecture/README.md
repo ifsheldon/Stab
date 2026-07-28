@@ -4,6 +4,8 @@ This directory defines Stab's active product architecture.
 
 The detailed migration sequence, tests, benchmarks, and release criteria live in [the agent-native modular QEC plan](../plans/agent-native-modular-qec-architecture-plan.md).
 
+The exact A6 source, API, feature, test, and benchmark relocation contract is frozen in [the A6 physical component extraction map](a6-component-extraction-map.md).
+
 The starting package graph and public inventory are frozen in [the pre-0.2 baseline](pre-0.2-api-baseline.md).
 
 Intentional public Rust API changes are tracked in [the Stab 0.2 API migration inventory](0.2-api-migration-inventory.md).

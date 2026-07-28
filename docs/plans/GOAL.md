@@ -16,6 +16,7 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 
 - Active milestone: [agent-native-modular-qec-architecture-plan.md](agent-native-modular-qec-architecture-plan.md), A6
 - Product graph: [../architecture/README.md](../architecture/README.md)
+- Exact extraction map: [../architecture/a6-component-extraction-map.md](../architecture/a6-component-extraction-map.md)
 - Component contracts: [../architecture/component-contracts.md](../architecture/component-contracts.md)
 - API migration inventory: [../architecture/0.2-api-migration-inventory.md](../architecture/0.2-api-migration-inventory.md)
 - Progress record: [agent-native-modular-qec-progress-report.md](agent-native-modular-qec-progress-report.md)
