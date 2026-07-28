@@ -99,10 +99,11 @@ impl CapabilitySet {
     }
 
     /// Selectable backend identifiers registered by current compilers.
-    ///
-    /// This is empty until Stab exposes a real backend-selection boundary.
     pub fn selectable_backend_ids(self) -> impl ExactSizeIterator<Item = &'static str> {
-        std::iter::empty()
+        crate::sampling::REGISTERED_BACKENDS
+            .iter()
+            .copied()
+            .map(crate::SamplingBackend::as_str)
     }
 
     pub const fn default_parse_limits(self, _dialect: ModelDialect) -> ParseLimits {

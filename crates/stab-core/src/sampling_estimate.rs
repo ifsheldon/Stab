@@ -1,7 +1,6 @@
 use arrayvec::ArrayVec;
 
-use super::CircuitItem;
-use crate::{Circuit, Estimate, RecordFormat, RepeatNestingLimit, ResourceEstimate};
+use crate::{Circuit, CircuitItem, Estimate, RecordFormat, RepeatNestingLimit, ResourceEstimate};
 
 const INLINE_TRAVERSAL_FRAMES: usize = RepeatNestingLimit::HARD_MAX + 1;
 

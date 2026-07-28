@@ -7,12 +7,11 @@ use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, Stabi
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompilationCapability,
     CompilationOperation, CompilationRequestFingerprint, GateCategory, MeasureRecordOffset,
-    ModelDialect, Pauli, PauliBasis, SampleFormat,
-    result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
+    ModelDialect, Pauli, PauliBasis,
 };
 
+mod api;
 mod direct_z_measurement;
-mod estimate;
 mod execute;
 mod measurement_flip;
 mod noise;
@@ -23,8 +22,15 @@ mod small_frame;
 mod stabilizer_frame;
 mod stream;
 
-pub use estimate::estimate_sampling_request;
+pub use api::{
+    BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
+    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
+    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+};
 pub(crate) use reference::ReferenceSampleScratch;
+
+pub(crate) const REGISTERED_BACKENDS: &[SamplingBackend] = &[SamplingBackend::Scalar];
 
 pub(crate) const COMPILATION_CAPABILITY: CompilationCapability = CompilationCapability::new(
     CompilationOperation::Sampling,
@@ -32,205 +38,62 @@ pub(crate) const COMPILATION_CAPABILITY: CompilationCapability = CompilationCapa
     CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
     CompilationRequestFingerprint::SCHEMA_VERSION,
     false,
-    false,
+    true,
 );
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CompiledSampler {
-    qubit_count: usize,
-    measurement_count: usize,
-    sweep_bit_count: usize,
-    operations: Vec<SampleOperation>,
+    plan: SamplingPlan,
+}
+
+impl PartialEq for CompiledSampler {
+    fn eq(&self, other: &Self) -> bool {
+        self.plan.inner.qubit_count == other.plan.inner.qubit_count
+            && self.plan.inner.measurement_count == other.plan.inner.measurement_count
+            && self.plan.inner.sweep_bit_count == other.plan.inner.sweep_bit_count
+            && self.plan.inner.operations == other.plan.inner.operations
+    }
 }
 
 impl CompiledSampler {
     pub fn compile(circuit: &Circuit) -> CircuitResult<Self> {
-        let mut operations = Vec::new();
-        let counts = compile_circuit(circuit, &mut operations, SweepCompilation::Reject)?;
-        Ok(Self {
-            qubit_count: circuit.count_qubits(),
-            measurement_count: counts.measurements,
-            sweep_bit_count: counts.sweep_bits,
-            operations,
-        })
+        let plan = SamplingCompiler::new()
+            .compile(circuit)
+            .map_err(legacy_compile_error)?;
+        api::validate_legacy_adapter_plan(&plan).map_err(legacy_execution_error)?;
+        Ok(Self { plan })
     }
 
     pub(crate) fn compile_allowing_sweep(circuit: &Circuit) -> CircuitResult<Self> {
-        let mut operations = Vec::new();
-        let counts = compile_circuit(circuit, &mut operations, SweepCompilation::Allow)?;
-        Ok(Self {
-            qubit_count: circuit.count_qubits(),
-            measurement_count: counts.measurements,
-            sweep_bit_count: counts.sweep_bits,
-            operations,
-        })
+        let plan = SamplingCompiler::new()
+            .compile_allowing_sweep(circuit)
+            .map_err(legacy_compile_error)?;
+        api::validate_legacy_adapter_plan(&plan).map_err(legacy_execution_error)?;
+        Ok(Self { plan })
     }
 
-    pub fn sample_zero_one(&self, shots: usize) -> Vec<Vec<bool>> {
-        self.sample_zero_one_with_seed(shots, None)
+    pub const fn plan(&self) -> &SamplingPlan {
+        &self.plan
     }
 
-    pub fn sample_zero_one_with_seed(&self, shots: usize, seed: Option<u64>) -> Vec<Vec<bool>> {
-        self.sample_zero_one_with_seed_and_reference_mode(shots, seed, false)
-    }
-
-    pub fn sample_zero_one_with_seed_and_reference_mode(
-        &self,
-        shots: usize,
-        seed: Option<u64>,
-        skip_reference_sample: bool,
-    ) -> Vec<Vec<bool>> {
-        let mut samples = Vec::with_capacity(shots);
-        let result = self.for_each_sample_with_seed_and_reference_mode(
-            shots,
-            seed,
-            skip_reference_sample,
-            |sample| {
-                samples.push(sample.to_vec());
-                Ok::<(), std::convert::Infallible>(())
-            },
-        );
-        match result {
-            Ok(()) => {}
-            Err(error) => match error {},
-        }
-        samples
-    }
-
-    pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {
-        self.sample_bytes(shots, SampleFormat::ZeroOne)
-    }
-
-    pub fn sample_bytes(&self, shots: usize, format: SampleFormat) -> Vec<u8> {
-        self.sample_bytes_with_seed(shots, format, None)
-    }
-
-    pub fn sample_bytes_with_seed(
-        &self,
-        shots: usize,
-        format: SampleFormat,
-        seed: Option<u64>,
-    ) -> Vec<u8> {
-        self.sample_bytes_with_seed_and_reference_mode(shots, format, seed, false)
-    }
-
-    pub fn sample_bytes_with_seed_and_reference_mode(
-        &self,
-        shots: usize,
-        format: SampleFormat,
-        seed: Option<u64>,
-        skip_reference_sample: bool,
-    ) -> Vec<u8> {
-        let mut rng = sampler_rng(seed);
-        if !skip_reference_sample
-            && format == SampleFormat::ZeroOne
-            && let Some(bytes) = direct_z_measurement::sample_zero_one_bytes(
-                &self.operations,
-                self.measurement_count,
-                shots,
-                &mut rng,
-            )
-        {
-            return bytes;
-        }
-        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
-        if let Some(bytes) = small_frame::sample_bytes(
-            self.qubit_count,
-            self.measurement_count,
-            &self.operations,
-            shots,
-            format,
-            reference_sample.as_deref(),
-            &mut rng,
-        ) {
-            return bytes;
-        }
-        let mut writer = MeasureRecordWriter::with_capacity(
-            format,
-            estimated_sample_bytes_capacity(format, shots, self.measurement_count),
-        );
-        let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut record = Vec::with_capacity(self.measurement_count);
-        let mut output = Vec::with_capacity(self.measurement_count);
-        for _ in 0..shots {
-            self.sample_shot_with_reference_into(
-                &mut rng,
-                reference_sample.as_deref(),
-                &mut frame,
-                &mut record,
-                &mut output,
-            );
-            writer.write_bits(&output);
-            writer.write_end();
-        }
-        writer.into_bytes()
-    }
-
-    pub fn sample_ptb64_bytes_with_seed(
-        &self,
-        shots: usize,
-        seed: Option<u64>,
-    ) -> CircuitResult<Vec<u8>> {
-        self.sample_ptb64_bytes_with_seed_and_reference_mode(shots, seed, false)
-    }
-
-    pub fn sample_ptb64_bytes_with_seed_and_reference_mode(
-        &self,
-        shots: usize,
-        seed: Option<u64>,
-        skip_reference_sample: bool,
-    ) -> CircuitResult<Vec<u8>> {
-        if !shots.is_multiple_of(64) {
-            return Err(CircuitError::invalid_sampler_compilation(
-                "shots must be a multiple of 64 to use ptb64 format",
-            ));
-        }
-        let mut rng = sampler_rng(seed);
-        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
-        let samples = (0..shots)
-            .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
-            .collect::<Vec<_>>();
-        write_ptb64_records_checked(&samples)
+    pub fn into_plan(self) -> SamplingPlan {
+        self.plan
     }
 
     pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {
         let mut rng = SmallRng::seed_from_u64(0);
         let mut frame = if unknown_input {
-            StabilizerFrame::new_unknown(self.qubit_count)
+            StabilizerFrame::new_unknown(self.plan.inner.qubit_count)
         } else {
-            StabilizerFrame::new(self.qubit_count)
+            StabilizerFrame::new(self.plan.inner.qubit_count)
         };
         let mut record = Vec::new();
-        count_determined_operations(&self.operations, &mut frame, &mut record, &mut rng)
-    }
-
-    fn sample_shot_with_reference<R>(&self, rng: &mut R, reference: Option<&[bool]>) -> Vec<bool>
-    where
-        R: Rng,
-    {
-        let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut record = Vec::with_capacity(self.measurement_count);
-        let mut output = Vec::with_capacity(self.measurement_count);
-        self.sample_shot_with_reference_into(rng, reference, &mut frame, &mut record, &mut output);
-        output
-    }
-
-    fn sample_shot_with_reference_into<R>(
-        &self,
-        rng: &mut R,
-        reference: Option<&[bool]>,
-        frame: &mut StabilizerFrame,
-        record: &mut Vec<bool>,
-        output: &mut Vec<bool>,
-    ) where
-        R: Rng,
-    {
-        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, &[], frame, record, output);
-        if let Some(reference) = reference {
-            for (bit, reference_bit) in output.iter_mut().zip(reference) {
-                *bit ^= *reference_bit;
-            }
-        }
+        count_determined_operations(
+            &self.plan.inner.operations,
+            &mut frame,
+            &mut record,
+            &mut rng,
+        )
     }
 
     pub fn reference_sample(&self) -> Vec<bool> {
@@ -239,7 +102,7 @@ impl CompiledSampler {
     }
 
     pub(crate) fn sweep_bit_count(&self) -> usize {
-        self.sweep_bit_count
+        self.plan.inner.sweep_bit_count
     }
 
     #[cfg(test)]
@@ -248,16 +111,16 @@ impl CompiledSampler {
         sweep_record: &[bool],
         output: &mut Vec<bool>,
     ) -> CircuitResult<()> {
-        if sweep_record.len() != self.sweep_bit_count {
+        if sweep_record.len() != self.plan.inner.sweep_bit_count {
             return Err(CircuitError::invalid_result_format(format!(
                 "sweep record expected {} bits, got {}",
-                self.sweep_bit_count,
+                self.plan.inner.sweep_bit_count,
                 sweep_record.len()
             )));
         }
         let mut rng = SmallRng::seed_from_u64(0);
-        let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut record = Vec::with_capacity(self.measurement_count);
+        let mut frame = StabilizerFrame::new(self.plan.inner.qubit_count);
+        let mut record = Vec::with_capacity(self.plan.inner.measurement_count);
         self.sample_shot_in_mode_into(
             &mut rng,
             ExecutionMode::ReferenceSample,
@@ -278,9 +141,9 @@ impl CompiledSampler {
     where
         R: Rng,
     {
-        let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut record = Vec::with_capacity(self.measurement_count);
-        let mut output = Vec::with_capacity(self.measurement_count);
+        let mut frame = StabilizerFrame::new(self.plan.inner.qubit_count);
+        let mut record = Vec::with_capacity(self.plan.inner.measurement_count);
+        let mut output = Vec::with_capacity(self.plan.inner.measurement_count);
         self.sample_shot_in_mode_into(
             rng,
             mode,
@@ -313,7 +176,13 @@ impl CompiledSampler {
             output,
             correlated_error_occurred: &mut correlated_error_occurred,
         };
-        execute_operations(&self.operations, &mut buffers, rng, mode, sweep_record);
+        execute_operations(
+            &self.plan.inner.operations,
+            &mut buffers,
+            rng,
+            mode,
+            sweep_record,
+        );
     }
 }
 
@@ -345,19 +214,34 @@ fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
 }
 
-fn estimated_sample_bytes_capacity(
-    format: SampleFormat,
-    shots: usize,
-    bits_per_shot: usize,
-) -> usize {
-    let bytes_per_shot = match format {
-        SampleFormat::ZeroOne => bits_per_shot.checked_add(1),
-        SampleFormat::B8 => Some(bits_per_shot.div_ceil(8)),
-        SampleFormat::R8 | SampleFormat::Hits | SampleFormat::Dets => None,
-    };
-    bytes_per_shot
-        .and_then(|bytes_per_shot| shots.checked_mul(bytes_per_shot))
-        .unwrap_or(0)
+fn legacy_compile_error(error: SamplingCompileError) -> CircuitError {
+    error.into_circuit_error()
+}
+
+pub(crate) fn legacy_random_policy(seed: Option<u64>) -> RandomPolicy {
+    seed.map_or(RandomPolicy::Entropy, |seed| {
+        RandomPolicy::Seeded(Seed::new(seed))
+    })
+}
+
+pub(crate) fn legacy_reference_mode(skip_reference_sample: bool) -> ReferenceSampleMode {
+    if skip_reference_sample {
+        ReferenceSampleMode::SkipReferenceSample
+    } else {
+        ReferenceSampleMode::UseReferenceSample
+    }
+}
+
+pub(crate) fn legacy_shot_count(shots: usize) -> CircuitResult<ShotCount> {
+    u64::try_from(shots).map(ShotCount::new).map_err(|_| {
+        CircuitError::invalid_sampler_compilation(
+            "shot count cannot fit in the sampling session counter",
+        )
+    })
+}
+
+pub(crate) fn legacy_execution_error(error: SamplingExecutionError) -> CircuitError {
+    error.into_circuit_error()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

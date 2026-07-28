@@ -1,65 +1,18 @@
 use rand::{Rng, RngExt as _};
 
-use crate::{MeasureRecordOffset, PauliBasis, SampleFormat, result_formats::MeasureRecordWriter};
+use crate::{MeasureRecordOffset, PauliBasis};
 
+use super::execute::record_lookback;
 use super::measurement_flip;
 use super::operation::{
     SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
 };
-use super::stabilizer_frame::reset_correction;
-use super::{estimated_sample_bytes_capacity, execute::record_lookback};
+use super::stabilizer_frame::{FrameStorageError, reset_correction};
 
-pub(super) fn sample_bytes<R>(
-    qubit_count: usize,
-    measurement_count: usize,
-    operations: &[SampleOperation],
-    shots: usize,
-    format: SampleFormat,
-    reference: Option<&[bool]>,
-    rng: &mut R,
-) -> Option<Vec<u8>>
-where
-    R: Rng,
-{
-    if qubit_count > SmallStabilizerFrame::MAX_QUBITS
-        || !matches!(format, SampleFormat::ZeroOne | SampleFormat::B8)
-        || !supports_operations(operations)
-    {
-        return None;
-    }
+const SMALL_FRAME_MAX_QUBITS: usize = u64::BITS as usize;
+const SMALL_FRAME_MAX_SYMPLECTIC_WIDTH: usize = SMALL_FRAME_MAX_QUBITS * 2;
 
-    let mut writer = MeasureRecordWriter::with_capacity(
-        format,
-        estimated_sample_bytes_capacity(format, shots, measurement_count),
-    );
-    let mut frame = SmallStabilizerFrame::new(qubit_count);
-    let mut record = Vec::with_capacity(measurement_count);
-    let mut output = Vec::with_capacity(measurement_count);
-    for _ in 0..shots {
-        frame.reset_to_z_basis();
-        record.clear();
-        output.clear();
-        let mut correlated_error_occurred = false;
-        execute_operations(
-            operations,
-            &mut frame,
-            &mut record,
-            &mut output,
-            &mut correlated_error_occurred,
-            rng,
-        );
-        if let Some(reference) = reference {
-            for (bit, reference_bit) in output.iter_mut().zip(reference) {
-                *bit ^= *reference_bit;
-            }
-        }
-        writer.write_bits(&output);
-        writer.write_end();
-    }
-    Some(writer.into_bytes())
-}
-
-fn supports_operations(operations: &[SampleOperation]) -> bool {
+pub(super) fn supports_operations(operations: &[SampleOperation]) -> bool {
     operations.iter().all(|operation| match operation {
         SampleOperation::ApplyHadamard { .. }
         | SampleOperation::ApplyControlledX { .. }
@@ -75,6 +28,33 @@ fn supports_operations(operations: &[SampleOperation]) -> bool {
         SampleOperation::Repeat { body, .. } => supports_operations(body),
         SampleOperation::ApplyTableau { .. } | SampleOperation::SweepPauli { .. } => false,
     })
+}
+
+pub(super) fn sample_shot_into(
+    operations: &[SampleOperation],
+    frame: &mut SmallStabilizerFrame,
+    record: &mut Vec<bool>,
+    output: &mut Vec<bool>,
+    reference: Option<&[bool]>,
+    rng: &mut impl Rng,
+) {
+    frame.reset_to_z_basis();
+    record.clear();
+    output.clear();
+    let mut correlated_error_occurred = false;
+    execute_operations(
+        operations,
+        frame,
+        record,
+        output,
+        &mut correlated_error_occurred,
+        rng,
+    );
+    if let Some(reference) = reference {
+        for (bit, reference_bit) in output.iter_mut().zip(reference) {
+            *bit ^= *reference_bit;
+        }
+    }
 }
 
 fn execute_operations<R>(
@@ -216,33 +196,35 @@ fn measurement_record_bit(record: &[bool], offset: MeasureRecordOffset) -> bool 
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct SmallStabilizerFrame {
+pub(super) struct SmallStabilizerFrame {
     qubit_count: usize,
     row_count: usize,
     xs_by_qubit: Vec<u64>,
     zs_by_qubit: Vec<u64>,
     xs_by_row: Vec<u64>,
     zs_by_row: Vec<u64>,
+    span_basis: [Option<SpanRow>; SMALL_FRAME_MAX_SYMPLECTIC_WIDTH],
     rows_valid: bool,
     signs: u64,
 }
 
 impl SmallStabilizerFrame {
-    const MAX_QUBITS: usize = u64::BITS as usize;
+    pub(super) const MAX_QUBITS: usize = SMALL_FRAME_MAX_QUBITS;
 
-    fn new(qubit_count: usize) -> Self {
+    pub(super) fn try_new(qubit_count: usize) -> Result<Self, FrameStorageError> {
         let mut frame = Self {
             qubit_count,
             row_count: qubit_count,
-            xs_by_qubit: vec![0; qubit_count],
-            zs_by_qubit: vec![0; qubit_count],
-            xs_by_row: vec![0; Self::MAX_QUBITS],
-            zs_by_row: vec![0; Self::MAX_QUBITS],
+            xs_by_qubit: try_zeroed_words(qubit_count, "small-frame X columns")?,
+            zs_by_qubit: try_zeroed_words(qubit_count, "small-frame Z columns")?,
+            xs_by_row: try_zeroed_words(Self::MAX_QUBITS, "small-frame X rows")?,
+            zs_by_row: try_zeroed_words(Self::MAX_QUBITS, "small-frame Z rows")?,
+            span_basis: [None; SMALL_FRAME_MAX_SYMPLECTIC_WIDTH],
             rows_valid: false,
             signs: 0,
         };
         frame.reset_to_z_basis();
-        frame
+        Ok(frame)
     }
 
     fn reset_to_z_basis(&mut self) {
@@ -481,35 +463,36 @@ impl SmallStabilizerFrame {
         Some(product_negative ^ observable.negative)
     }
 
-    fn solve_span(&self, observable: &SmallObservable) -> Option<u64> {
+    fn solve_span(&mut self, observable: &SmallObservable) -> Option<u64> {
         let width = self.qubit_count.checked_mul(2)?;
-        let mut basis = vec![None; width];
-        for row in 0..self.row_count {
-            let mut span_row = SpanRow::from_frame_row(self, row);
-            reduce_span_row(&mut span_row, &basis);
-            if let Some(pivot) = span_row.first_one()
-                && let Some(slot) = basis.get_mut(pivot)
-            {
-                *slot = Some(span_row);
+        self.span_basis.fill(None);
+        let result = (|| {
+            for row in 0..self.row_count {
+                let mut span_row = SpanRow::from_frame_row(self, row);
+                let basis = self.span_basis.get(..width)?;
+                reduce_span_row(&mut span_row, basis);
+                if let Some(pivot) = span_row.first_one()
+                    && let Some(slot) = self.span_basis.get_mut(pivot)
+                {
+                    *slot = Some(span_row);
+                }
             }
-        }
 
-        let mut target = SpanRow {
-            bits: observable.symplectic_bits(self.qubit_count),
-            coefficients: 0,
-        };
-        for column in 0..width {
-            if !target.bit(column) {
-                continue;
+            let mut target = SpanRow {
+                bits: observable.symplectic_bits(self.qubit_count),
+                coefficients: 0,
+            };
+            for column in 0..width {
+                if !target.bit(column) {
+                    continue;
+                }
+                let pivot = self.span_basis.get(column).and_then(Option::as_ref)?;
+                target.xor_assign(pivot);
             }
-            let pivot = basis.get(column).and_then(Option::as_ref)?;
-            target.xor_assign(pivot);
-        }
-        if target.bits == 0 {
-            Some(target.coefficients)
-        } else {
-            None
-        }
+            (target.bits == 0).then_some(target.coefficients)
+        })();
+        self.span_basis.fill(None);
+        result
     }
 
     fn multiply_row_assign(&mut self, row: usize, rhs_x: u64, rhs_z: u64, rhs_negative: bool) {
@@ -627,6 +610,18 @@ impl SmallStabilizerFrame {
     fn row_negative(&self, row: usize) -> bool {
         self.signs & row_bit(row) != 0
     }
+}
+
+fn try_zeroed_words(
+    word_count: usize,
+    component: &'static str,
+) -> Result<Vec<u64>, FrameStorageError> {
+    let mut words = Vec::new();
+    words
+        .try_reserve_exact(word_count)
+        .map_err(|_| FrameStorageError::new(component, word_count))?;
+    words.resize(word_count, 0);
+    Ok(words)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -4,6 +4,7 @@
 )]
 
 use super::*;
+use crate::SampleFormat;
 
 #[cfg(feature = "ops-contracts")]
 use std::fmt::Write as _;
@@ -38,9 +39,9 @@ fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
     let circuit = Circuit::from_stim_str(&circuit_text).expect("parse gate corpus");
     let sampler = CompiledSampler::compile(&circuit).expect("compile gate corpus");
     let mut rng = SmallRng::seed_from_u64(29);
-    let mut frame = StabilizerFrame::new(sampler.qubit_count);
-    let mut record = Vec::with_capacity(sampler.measurement_count);
-    let mut output = Vec::with_capacity(sampler.measurement_count);
+    let mut frame = StabilizerFrame::new(sampler.plan.inner.qubit_count);
+    let mut record = Vec::with_capacity(sampler.plan.inner.measurement_count);
+    let mut output = Vec::with_capacity(sampler.plan.inner.measurement_count);
     sampler.sample_shot_in_mode_into(
         &mut rng,
         ExecutionMode::Sample,

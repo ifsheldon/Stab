@@ -29,8 +29,8 @@ impl CompiledSampler {
     pub(crate) fn reusable_reference_sample_scratch(&self) -> ReferenceSampleScratch {
         ReferenceSampleScratch {
             rng: SmallRng::seed_from_u64(0),
-            frame: StabilizerFrame::new(self.qubit_count),
-            output: Vec::with_capacity(self.measurement_count),
+            frame: StabilizerFrame::new(self.plan.inner.qubit_count),
+            output: Vec::with_capacity(self.plan.inner.measurement_count),
         }
     }
 
@@ -40,10 +40,10 @@ impl CompiledSampler {
         scratch: &mut ReferenceSampleScratch,
         record: &mut Vec<bool>,
     ) -> CircuitResult<()> {
-        if sweep_record.len() != self.sweep_bit_count {
+        if sweep_record.len() != self.plan.inner.sweep_bit_count {
             return Err(CircuitError::invalid_result_format(format!(
                 "sweep record expected {} bits, got {}",
-                self.sweep_bit_count,
+                self.plan.inner.sweep_bit_count,
                 sweep_record.len()
             )));
         }

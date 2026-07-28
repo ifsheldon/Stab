@@ -37,6 +37,8 @@ mod resources;
 pub mod result_formats;
 pub mod result_streaming;
 mod sampling;
+mod sampling_estimate;
+mod sampling_output_compat;
 mod source_text;
 mod sparse_rev_frame_tracker;
 pub mod stabilizers;
@@ -113,8 +115,11 @@ pub use diagnostics::{
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
 pub use execution::{
-    CompiledSampler, ReferenceSampleTree, count_determined_measurements,
-    sample_if_circuit_has_stabilizer_flows,
+    BackendPreference, CompiledSampler, PlanFingerprint, RandomPolicy, ReferenceSampleMode,
+    ReferenceSampleTree, RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,
+    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
+    SinkFailurePhase, count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
 pub use fingerprint::{ModelDialect, ModelFingerprint};
 #[cfg(feature = "ops-contracts")]
@@ -149,7 +154,7 @@ pub use result_formats::{
     MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
     PackedShotBatchView, RecordEncoding, RecordFormat, SampleFormat, SampledErrorWidth,
 };
-pub use sampling::estimate_sampling_request;
+pub use sampling_estimate::estimate_sampling_request;
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
     PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,

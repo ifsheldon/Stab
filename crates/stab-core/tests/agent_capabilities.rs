@@ -59,7 +59,10 @@ fn capability_set_is_generated_from_current_product_descriptors() {
             codec.format() == RecordFormat::Dets
         );
     }
-    assert_eq!(capabilities.selectable_backend_ids().len(), 0);
+    assert_eq!(
+        capabilities.selectable_backend_ids().collect::<Vec<_>>(),
+        vec!["scalar"]
+    );
 
     let mut operations = capabilities.compilation_operations().collect::<Vec<_>>();
     assert_eq!(operations.len(), 1);
@@ -75,7 +78,7 @@ fn capability_set_is_generated_from_current_product_descriptors() {
         CompilationRequestFingerprint::SCHEMA_VERSION
     );
     assert!(!sampling.has_configurable_limits());
-    assert!(!sampling.supports_backend_selection());
+    assert!(sampling.supports_backend_selection());
     assert_eq!(
         capabilities.default_parse_limits(ModelDialect::StimCircuit),
         ParseLimits::default()

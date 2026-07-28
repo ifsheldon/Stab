@@ -29,7 +29,8 @@ impl CompilationOperation {
 ///
 /// Schema one binds the model fingerprint, compiler schema, operation, normalized compile
 /// options, and effective configurable limits. The current public sampling compiler rejects sweep
-/// controls, exposes no configurable compile limit, and has no backend-selection input.
+/// controls and exposes no configurable compile limit. Backend preference and selected backend are
+/// deliberately excluded because this identity describes the lowering request before selection.
 ///
 /// This identity does not include shots, random seed, output encoding, or a selected execution
 /// backend. It is not a compiled-plan identity.
