@@ -267,7 +267,7 @@ fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
         return has_plain_qubit_groups(instruction, 1);
     }
     instruction.gate().is_two_qubit_gate()
-        && instruction.gate().has_tableau()
+        && crate::analysis::gate_has_tableau(instruction.gate())
         && has_plain_qubit_groups(instruction, 2)
 }
 
@@ -558,7 +558,7 @@ mod tests {
         for (index, gate_name) in FIXED_TWO_QUBIT_TABLEAU_GATES.iter().enumerate() {
             let gate = Gate::from_name(gate_name).unwrap();
             assert!(gate.is_two_qubit_gate(), "{gate_name}");
-            assert!(gate.has_tableau(), "{gate_name}");
+            assert!(crate::analysis::gate_has_tableau(gate), "{gate_name}");
             let left = index % 4;
             let right = (index + 1) % 4;
             text.push_str("    ");

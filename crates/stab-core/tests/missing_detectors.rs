@@ -1,6 +1,8 @@
 use stab_core::{
     Circuit, Gate, MissingDetectorOptions, PauliBasis, PauliSign, PauliString, RepeatBlock,
-    RepeatCount, SingleQubitClifford, missing_detectors,
+    RepeatCount, SingleQubitClifford,
+    analysis::{gate_has_tableau, gate_tableau},
+    missing_detectors,
 };
 
 fn missing_with_options(
@@ -148,7 +150,7 @@ fn pf5_missing_detectors_clifford_covers_all_single_qubit_cliffords()
     let input_bases = [PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
     for clifford in SingleQubitClifford::all() {
         let gate = Gate::from_name(clifford.canonical_name())?;
-        let tableau = gate.tableau()?;
+        let tableau = gate_tableau(gate)?;
         for input_basis in input_bases {
             let input = PauliString::from_bases(PauliSign::Plus, [input_basis])?;
             let output = tableau.apply(&input)?;
@@ -206,8 +208,8 @@ fn pf5_missing_detectors_clifford_tracks_two_qubit_and_swap_gates()
 fn pf5_missing_detectors_clifford_covers_all_fixed_two_qubit_tableau_gates()
 -> Result<(), Box<dyn std::error::Error>> {
     let input_bases = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
-    for gate in Gate::all().filter(|gate| gate.has_tableau() && gate.is_two_qubit_gate()) {
-        let tableau = gate.tableau()?;
+    for gate in Gate::all().filter(|gate| gate_has_tableau(*gate) && gate.is_two_qubit_gate()) {
+        let tableau = gate_tableau(gate)?;
         for left_basis in input_bases {
             for right_basis in input_bases {
                 if left_basis == PauliBasis::I && right_basis == PauliBasis::I {

@@ -118,7 +118,7 @@ fn append_decomposed_instruction(
             result.append_instruction(instruction.clone());
             return Ok(());
         }
-        _ if !instruction.gate().has_h_s_cx_m_r_decomposition() => {
+        _ if !crate::analysis::gate_has_h_s_cx_m_r_decomposition(instruction.gate()) => {
             result.append_instruction(instruction.clone());
             return Ok(());
         }

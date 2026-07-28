@@ -7,6 +7,8 @@ use super::*;
 use crate::SampleFormat;
 
 #[cfg(feature = "ops-contracts")]
+use crate::analysis::{gate_has_tableau, gate_tableau};
+#[cfg(feature = "ops-contracts")]
 use std::fmt::Write as _;
 
 fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
@@ -25,9 +27,9 @@ fn count_determined(input: &str, unknown_input: bool) -> u64 {
 #[test]
 fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
     let mut circuit_text = String::new();
-    for gate in crate::Gate::all().filter(|gate| gate.has_tableau()) {
+    for gate in crate::Gate::all().filter(|gate| gate_has_tableau(*gate)) {
         let inverse = gate.inverse().expect("tableau gate inverse");
-        let arity = gate.tableau().expect("gate tableau").len();
+        let arity = gate_tableau(gate).expect("gate tableau").len();
         let targets = [(1, "0"), (2, "0 1")]
             .into_iter()
             .find_map(|(candidate, targets)| (candidate == arity).then_some(targets))

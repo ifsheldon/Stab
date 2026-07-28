@@ -3,6 +3,11 @@ use std::hint::black_box;
 use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
     DetectorErrorModel, Flow, Gate, GateArgumentRule, GateUnitaryMatrix, PauliString, Tableau,
+    analysis::{
+        gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
+        gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
+        gate_unitary_matrix,
+    },
 };
 
 use crate::error::BenchError;
@@ -253,22 +258,22 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
     let tableau_gates = gates
         .iter()
         .copied()
-        .filter(|gate| gate.has_tableau())
+        .filter(|gate| gate_has_tableau(*gate))
         .collect::<Vec<_>>();
     let flow_gates = gates
         .iter()
         .copied()
-        .filter(|gate| gate.has_flows())
+        .filter(|gate| gate_has_flows(*gate))
         .collect::<Vec<_>>();
     let unitary_gates = gates
         .iter()
         .copied()
-        .filter(|gate| gate.has_unitary_matrix())
+        .filter(|gate| gate_has_unitary_matrix(*gate))
         .collect::<Vec<_>>();
     let decomposition_gates = gates
         .iter()
         .copied()
-        .filter(|gate| gate.has_h_s_cx_m_r_decomposition())
+        .filter(|gate| gate_has_h_s_cx_m_r_decomposition(*gate))
         .collect::<Vec<_>>();
 
     Ok(vec![
@@ -323,9 +328,8 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             || {
                 let mut checksum = 0_u64;
                 for gate in &tableau_gates {
-                    let tableau = gate
-                        .tableau()
-                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    let tableau =
+                        gate_tableau(*gate).map_err(|error| stab_runner_error(&row.id, error))?;
                     checksum ^= tableau_checksum(&tableau, &row.id)?;
                     black_box(tableau);
                 }
@@ -339,9 +343,8 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             || {
                 let mut checksum = 0_u64;
                 for gate in &flow_gates {
-                    let flows = gate
-                        .flows()
-                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    let flows =
+                        gate_flows(*gate).map_err(|error| stab_runner_error(&row.id, error))?;
                     checksum ^= flows.len() as u64;
                     for flow in &flows {
                         checksum ^= flow_checksum(flow).rotate_left(3);
@@ -358,8 +361,7 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             || {
                 let mut checksum = 0_u64;
                 for gate in &unitary_gates {
-                    let matrix = gate
-                        .unitary_matrix()
+                    let matrix = gate_unitary_matrix(*gate)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
                     checksum ^= unitary_matrix_checksum(matrix);
                     black_box(matrix);
@@ -374,8 +376,7 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             || {
                 let mut checksum = 0_u64;
                 for gate in &decomposition_gates {
-                    let decomposition = gate
-                        .h_s_cx_m_r_decomposition()
+                    let decomposition = gate_h_s_cx_m_r_decomposition(*gate)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
                     checksum ^= decomposition_checksum(decomposition.as_stim_str());
                     black_box(decomposition);
@@ -390,11 +391,9 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             || {
                 let mut checksum = 0_u64;
                 for gate in &decomposition_gates {
-                    let decomposition = gate
-                        .h_s_cx_m_r_decomposition()
+                    let decomposition = gate_h_s_cx_m_r_decomposition(*gate)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
-                    let circuit = decomposition
-                        .to_circuit()
+                    let circuit = gate_decomposition_to_circuit(decomposition)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
                     checksum ^= circuit.to_stim_string().len() as u64;
                     black_box(circuit);
@@ -555,34 +554,34 @@ fn gate_alias_count() -> usize {
 }
 
 fn gate_tableau_count() -> usize {
-    Gate::all().filter(|gate| gate.has_tableau()).count()
+    Gate::all().filter(|gate| gate_has_tableau(*gate)).count()
 }
 
 fn gate_flow_count() -> usize {
     Gate::all()
-        .filter_map(|gate| gate.flows().ok())
+        .filter_map(|gate| gate_flows(gate).ok())
         .map(|flows| flows.len())
         .sum()
 }
 
 fn gate_unitary_entry_count() -> usize {
     Gate::all()
-        .filter_map(|gate| gate.unitary_matrix().ok())
+        .filter_map(|gate| gate_unitary_matrix(gate).ok())
         .map(GateUnitaryMatrix::entry_count)
         .sum()
 }
 
 fn gate_decomposition_byte_count() -> usize {
     Gate::all()
-        .filter_map(|gate| gate.h_s_cx_m_r_decomposition().ok())
+        .filter_map(|gate| gate_h_s_cx_m_r_decomposition(gate).ok())
         .map(|decomposition| decomposition.as_stim_str().len())
         .sum()
 }
 
 fn gate_decomposition_instruction_count() -> usize {
     Gate::all()
-        .filter_map(|gate| gate.h_s_cx_m_r_decomposition().ok())
-        .filter_map(|decomposition| decomposition.to_circuit().ok())
+        .filter_map(|gate| gate_h_s_cx_m_r_decomposition(gate).ok())
+        .filter_map(|decomposition| gate_decomposition_to_circuit(decomposition).ok())
         .map(|circuit| circuit.items().len())
         .sum()
 }

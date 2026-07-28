@@ -14,7 +14,8 @@ use super::super::{
 use crate::{
     Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,
     DetectionConversionOptions, ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString,
-    Probability, circuit_flow_generators, circuit_to_detector_error_model, sample_detection_events,
+    Probability, analysis::gate_tableau, circuit_flow_generators, circuit_to_detector_error_model,
+    sample_detection_events,
 };
 
 mod statistical;
@@ -117,7 +118,7 @@ fn gate_surface_contract_fixed_tableau() {
     for gate in gates {
         assert_gate_matches_declared_tableau(gate);
         let inverse = gate.inverse().expect("fixed-tableau inverse");
-        let targets = match gate.tableau().expect("fixed tableau").len() {
+        let targets = match gate_tableau(gate).expect("fixed tableau").len() {
             1 => "0",
             2 => "0 1",
             arity => panic!("{} has unexpected arity {arity}", gate.canonical_name()),
@@ -152,7 +153,7 @@ fn gate_surface_contract_fixed_tableau_general_circuit() {
     for gate in gates_in_families(&[GateSemanticFamily::FixedTableau]) {
         assert_gate_matches_declared_tableau(gate);
         let inverse = gate.inverse().expect("fixed-tableau inverse");
-        let targets = match gate.tableau().expect("fixed tableau").len() {
+        let targets = match gate_tableau(gate).expect("fixed tableau").len() {
             1 => "0",
             2 => "0 1",
             arity => panic!("{} has unexpected arity {arity}", gate.canonical_name()),
@@ -169,7 +170,7 @@ fn gate_surface_contract_fixed_tableau_general_circuit() {
 }
 
 fn assert_gate_matches_declared_tableau(gate: Gate) {
-    let tableau = gate.tableau().expect("fixed tableau");
+    let tableau = gate_tableau(gate).expect("fixed tableau");
     let targets = match tableau.len() {
         1 => "0",
         2 => "0 1",

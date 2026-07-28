@@ -212,7 +212,7 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
     assert!(gate_has_tableau(h));
 
     let cx = Gate::from_name("CX").expect("CX");
-    let cx_tableau = cx.tableau().expect("CX tableau");
+    let cx_tableau = gate_tableau(cx).expect("CX tableau");
     assert_eq!(cx_tableau.x_output(0).expect("CX X0").to_string(), "+XX");
     assert_eq!(cx_tableau.z_output(0).expect("CX Z0").to_string(), "+Z_");
     assert_eq!(cx_tableau.x_output(1).expect("CX X1").to_string(), "+_X");
@@ -221,7 +221,7 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
     let expected_tableau_names = expected_tableau_supported_gate_names();
     assert_eq!(expected_tableau_names.len(), 46);
     let actual_tableau_names = Gate::all()
-        .filter(|gate| gate.has_tableau())
+        .filter(|gate| gate_has_tableau(*gate))
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_tableau_names, expected_tableau_names);
@@ -229,22 +229,21 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
     for gate_name in expected_tableau_names {
         let gate = Gate::from_name(gate_name).expect("gate");
         let inverse = gate.inverse().expect("unitary inverse");
-        let gate_inverse_tableau = gate
-            .tableau()
+        let gate_inverse_tableau = gate_tableau(gate)
             .expect("gate tableau")
             .inverse()
             .expect("inverse tableau");
         assert_eq!(
             gate_inverse_tableau,
-            inverse.tableau().expect("inverse gate tableau"),
+            gate_tableau(inverse).expect("inverse gate tableau"),
             "{gate_name} inverse tableau should match inverse gate metadata"
         );
     }
 
     for gate in Gate::all() {
         assert_eq!(
-            gate.has_tableau(),
-            gate.tableau().is_ok(),
+            gate_has_tableau(gate),
+            gate_tableau(gate).is_ok(),
             "{} has_tableau should match tableau materialization",
             gate.canonical_name()
         );
@@ -252,8 +251,8 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
 
     for unsupported in ["M", "R", "DETECTOR", "SPP"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate.has_tableau(), "{unsupported}");
-        let error = gate.tableau().expect_err("reject missing tableau data");
+        assert!(!gate_has_tableau(gate), "{unsupported}");
+        let error = gate_tableau(gate).expect_err("reject missing tableau data");
         assert!(
             error.to_string().contains("does not have tableau data"),
             "{error}"
@@ -273,7 +272,7 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let iswap = Gate::from_name("ISWAP").expect("ISWAP");
     assert_eq!(
-        flow_texts(iswap.flows().expect("ISWAP flows")),
+        flow_texts(gate_flows(iswap).expect("ISWAP flows")),
         ["X_ -> ZY", "Z_ -> _Z", "_X -> YZ", "_Z -> Z_"]
             .map(String::from)
             .to_vec()
@@ -281,7 +280,7 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let sqrt_xx = Gate::from_name("SQRT_XX").expect("SQRT_XX");
     assert_eq!(
-        flow_texts(sqrt_xx.flows().expect("SQRT_XX flows")),
+        flow_texts(gate_flows(sqrt_xx).expect("SQRT_XX flows")),
         ["X_ -> X_", "Z_ -> -YX", "_X -> _X", "_Z -> -XY"]
             .map(String::from)
             .to_vec()
@@ -289,13 +288,13 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let measurement = Gate::from_name("M").expect("M");
     assert_eq!(
-        flow_texts(measurement.flows().expect("M flows")),
+        flow_texts(gate_flows(measurement).expect("M flows")),
         ["Z -> rec[-1]", "Z -> Z"].map(String::from).to_vec()
     );
 
     let pair_measurement = Gate::from_name("MXX").expect("MXX");
     assert_eq!(
-        flow_texts(pair_measurement.flows().expect("MXX flows")),
+        flow_texts(gate_flows(pair_measurement).expect("MXX flows")),
         ["X_ -> X_", "_X -> _X", "ZZ -> ZZ", "XX -> rec[-1]"]
             .map(String::from)
             .to_vec()
@@ -303,7 +302,7 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let pauli_product_measurement = Gate::from_name("MPP").expect("MPP");
     assert_eq!(
-        flow_texts(pauli_product_measurement.flows().expect("MPP flows")),
+        flow_texts(gate_flows(pauli_product_measurement).expect("MPP flows")),
         [
             "XYZ__ -> rec[-2]",
             "___XX -> rec[-1]",
@@ -322,7 +321,7 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let pauli_product = Gate::from_name("SPP").expect("SPP");
     assert_eq!(
-        flow_texts(pauli_product.flows().expect("SPP flows")),
+        flow_texts(gate_flows(pauli_product).expect("SPP flows")),
         [
             "X__ -> X__",
             "Z__ -> -YYZ",
@@ -337,17 +336,17 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     let expected_flow_names = expected_flow_supported_gate_names();
     let actual_flow_names = Gate::all()
-        .filter(|gate| gate.has_flows())
+        .filter(|gate| gate_has_flows(*gate))
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_flow_names, expected_flow_names);
 
     for gate_name in expected_tableau_supported_gate_names() {
         let gate = Gate::from_name(gate_name).expect("gate");
-        let flows = gate.flows().expect("gate flows");
+        let flows = gate_flows(gate).expect("gate flows");
         assert_eq!(
             flows.len(),
-            gate.tableau().expect("gate tableau").len() * 2,
+            gate_tableau(gate).expect("gate tableau").len() * 2,
             "{gate_name} should produce X and Z flow generators for each target"
         );
         let circuit = single_instruction_circuit(gate, gate_name);
@@ -361,7 +360,7 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     for (gate_name, circuit) in measurement_rich_flow_metadata_circuits() {
         let gate = Gate::from_name(gate_name).expect("gate");
-        let flows = gate.flows().expect("gate flows");
+        let flows = gate_flows(gate).expect("gate flows");
         assert!(
             check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows)
                 .into_iter()
@@ -372,8 +371,8 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
 
     for unsupported in ["MPAD", "DETECTOR", "X_ERROR", "PAULI_CHANNEL_1"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate.has_flows(), "{unsupported}");
-        let error = gate.flows().expect_err("reject unsupported flow data");
+        assert!(!gate_has_flows(gate), "{unsupported}");
+        let error = gate_flows(gate).expect_err("reject unsupported flow data");
         assert!(error.to_string().contains("flow metadata"), "{error}");
     }
 }
@@ -394,7 +393,7 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
     );
 
     let iswap = Gate::from_name("ISWAP").expect("ISWAP");
-    let iswap_matrix = iswap.unitary_matrix().expect("ISWAP unitary");
+    let iswap_matrix = gate_unitary_matrix(iswap).expect("ISWAP unitary");
     assert_matrix_close(
         &iswap_matrix.to_vecs(),
         &[
@@ -406,7 +405,7 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
     );
 
     let sqrt_xx = Gate::from_name("SQRT_XX").expect("SQRT_XX");
-    let sqrt_xx_matrix = sqrt_xx.unitary_matrix().expect("SQRT_XX unitary");
+    let sqrt_xx_matrix = gate_unitary_matrix(sqrt_xx).expect("SQRT_XX unitary");
     assert_matrix_close(
         &sqrt_xx_matrix.to_vecs(),
         &[
@@ -419,14 +418,14 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
 
     let expected_unitary_names = expected_tableau_supported_gate_names();
     let actual_unitary_names = Gate::all()
-        .filter(|gate| gate.has_unitary_matrix())
+        .filter(|gate| gate_has_unitary_matrix(*gate))
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_unitary_names, expected_unitary_names);
 
     for &gate_name in &expected_unitary_names {
         let gate = Gate::from_name(gate_name).expect("gate");
-        let matrix = gate.unitary_matrix().expect("gate unitary");
+        let matrix = gate_unitary_matrix(gate).expect("gate unitary");
         let matrix_rows = matrix.to_vecs();
         let dimension = matrix.dimension();
         assert!(
@@ -449,12 +448,14 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
         );
         assert_eq!(
             unitary_to_tableau(&matrix_rows, true).expect("unitary tableau"),
-            gate.tableau().expect("gate tableau"),
+            gate_tableau(gate).expect("gate tableau"),
             "{gate_name} unitary matrix should convert to the gate tableau"
         );
 
         let inverse = gate.inverse().expect("unitary inverse");
-        let inverse_matrix = inverse.unitary_matrix().expect("inverse unitary").to_vecs();
+        let inverse_matrix = gate_unitary_matrix(inverse)
+            .expect("inverse unitary")
+            .to_vecs();
         let expected_inverse = conjugate_transpose(&matrix_rows);
         assert_matrix_close_matrix(
             &inverse_matrix,
@@ -466,8 +467,8 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
 
     for gate in Gate::all() {
         assert_eq!(
-            gate.has_unitary_matrix(),
-            gate.unitary_matrix().is_ok(),
+            gate_has_unitary_matrix(gate),
+            gate_unitary_matrix(gate).is_ok(),
             "{} has_unitary_matrix should match unitary matrix materialization",
             gate.canonical_name()
         );
@@ -475,10 +476,8 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
 
     for unsupported in ["MXX", "MPP", "SPP", "SPP_DAG", "M", "DETECTOR", "X_ERROR"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate.has_unitary_matrix(), "{unsupported}");
-        let error = gate
-            .unitary_matrix()
-            .expect_err("reject unsupported unitary matrix data");
+        assert!(!gate_has_unitary_matrix(gate), "{unsupported}");
+        let error = gate_unitary_matrix(gate).expect_err("reject unsupported unitary matrix data");
         assert!(error.to_string().contains("unitary matrix data"), "{error}");
     }
 }
@@ -503,7 +502,7 @@ fn gate_decomposition_metadata_matches_owned_gate_data() {
 
     let cx = Gate::from_name("CX").expect("CX");
     assert_eq!(
-        cx.h_s_cx_m_r_decomposition()
+        gate_h_s_cx_m_r_decomposition(cx)
             .expect("CX decomposition")
             .as_stim_str(),
         "\nCNOT 0 1\n"
@@ -511,18 +510,18 @@ fn gate_decomposition_metadata_matches_owned_gate_data() {
 
     let mxx = Gate::from_name("MXX").expect("MXX");
     assert_eq!(
-        mxx.h_s_cx_m_r_decomposition()
-            .expect("MXX decomposition")
-            .to_circuit()
-            .expect("parse MXX decomposition")
-            .to_stim_string(),
+        gate_decomposition_to_circuit(
+            gate_h_s_cx_m_r_decomposition(mxx).expect("MXX decomposition")
+        )
+        .expect("parse MXX decomposition")
+        .to_stim_string(),
         concat!("CX 0 1\n", "H 0\n", "M 0\n", "H 0\n", "CX 0 1\n")
     );
 
     let expected_decomposition_names = expected_decomposition_supported_gate_names();
     assert_eq!(expected_decomposition_names.len(), 61);
     let actual_decomposition_names = Gate::all()
-        .filter(|gate| gate.has_h_s_cx_m_r_decomposition())
+        .filter(|gate| gate_has_h_s_cx_m_r_decomposition(*gate))
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_decomposition_names, expected_decomposition_names);
@@ -534,20 +533,20 @@ fn gate_decomposition_metadata_matches_owned_gate_data() {
     );
     for gate_name in expected_decomposition_names {
         let gate = Gate::from_name(gate_name).expect("gate");
-        let decomposition = gate.h_s_cx_m_r_decomposition().expect("gate decomposition");
+        let decomposition = gate_h_s_cx_m_r_decomposition(gate).expect("gate decomposition");
         assert_eq!(
             decomposition.as_stim_str(),
             *upstream_texts.get(gate_name).expect("upstream text"),
             "{gate_name} decomposition text should match pinned Stim v1.16.0"
         );
-        let circuit = decomposition.to_circuit().expect("parse decomposition");
+        let circuit = gate_decomposition_to_circuit(decomposition).expect("parse decomposition");
         assert_h_s_cx_m_r_base(&circuit, gate_name);
     }
 
     for gate in Gate::all() {
         assert_eq!(
-            gate.has_h_s_cx_m_r_decomposition(),
-            gate.h_s_cx_m_r_decomposition().is_ok(),
+            gate_has_h_s_cx_m_r_decomposition(gate),
+            gate_h_s_cx_m_r_decomposition(gate).is_ok(),
             "{} has_h_s_cx_m_r_decomposition should match materialization",
             gate.canonical_name()
         );
@@ -561,10 +560,9 @@ fn gate_decomposition_metadata_matches_owned_gate_data() {
         "HERALDED_ERASE",
     ] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate.has_h_s_cx_m_r_decomposition(), "{unsupported}");
-        let error = gate
-            .h_s_cx_m_r_decomposition()
-            .expect_err("reject missing decomposition data");
+        assert!(!gate_has_h_s_cx_m_r_decomposition(gate), "{unsupported}");
+        let error =
+            gate_h_s_cx_m_r_decomposition(gate).expect_err("reject missing decomposition data");
         assert!(error.to_string().contains("decomposition data"), "{error}");
     }
 }
@@ -578,25 +576,24 @@ fn gate_decomposition_metadata_matches_tableau_where_defined() {
             continue;
         }
         let gate = Gate::from_name(gate_name).expect("gate");
-        let decomposition = gate
-            .h_s_cx_m_r_decomposition()
-            .expect("unitary gate should have decomposition")
-            .to_circuit()
-            .expect("parse decomposition");
+        let decomposition = gate_decomposition_to_circuit(
+            gate_h_s_cx_m_r_decomposition(gate).expect("unitary gate should have decomposition"),
+        )
+        .expect("parse decomposition");
         assert_eq!(
             decomposition
                 .to_tableau(false, false, false)
                 .expect("decomposition tableau"),
-            gate.tableau().expect("gate tableau"),
+            gate_tableau(gate).expect("gate tableau"),
             "{gate_name} decomposition should match gate tableau"
         );
     }
 
     for gate_name in ["M", "MR", "MXX", "MPP", "SPP", "SPP_DAG"] {
         let gate = Gate::from_name(gate_name).expect("non-tableau decomposition gate");
-        assert!(gate.has_h_s_cx_m_r_decomposition(), "{gate_name}");
+        assert!(gate_has_h_s_cx_m_r_decomposition(gate), "{gate_name}");
         assert!(
-            gate.tableau().is_err(),
+            gate_tableau(gate).is_err(),
             "{gate_name} decomposition metadata should not imply tableau metadata"
         );
     }
@@ -658,16 +655,16 @@ fn gate_metadata_api_contract_table_matches_rust_accessors() {
         let gate_name = gate.canonical_name();
         let row = support_table.get(gate_name).expect("contract row");
         assert!(row.validation, "{gate_name} validation column");
-        assert_eq!(row.tableau, gate.has_tableau(), "{gate_name} tableau");
+        assert_eq!(row.tableau, gate_has_tableau(gate), "{gate_name} tableau");
         assert_eq!(
             row.unitary,
-            gate.has_unitary_matrix(),
+            gate_has_unitary_matrix(gate),
             "{gate_name} unitary"
         );
-        assert_eq!(row.flow, gate.has_flows(), "{gate_name} flow");
+        assert_eq!(row.flow, gate_has_flows(gate), "{gate_name} flow");
         assert_eq!(
             row.decomposition,
-            gate.has_h_s_cx_m_r_decomposition(),
+            gate_has_h_s_cx_m_r_decomposition(gate),
             "{gate_name} decomposition"
         );
     }
@@ -916,7 +913,7 @@ fn assert_complex_close(actual: Complex32, expected: Complex32, tolerance: f32, 
 
 fn single_instruction_circuit(gate: Gate, gate_name: &str) -> Circuit {
     let targets = ["", "0", "0 1"]
-        .get(gate.tableau().expect("gate tableau").len())
+        .get(gate_tableau(gate).expect("gate tableau").len())
         .copied()
         .expect("supported flow target count");
     Circuit::from_stim_str(&format!("{gate_name} {targets}\n")).expect("gate circuit")

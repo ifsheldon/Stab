@@ -6,8 +6,9 @@
 
 use stab_core::{
     Circuit, CircuitError, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    DetectionEventRecord, ErrorAnalyzerOptions, Gate, circuit_to_detector_error_model,
-    sample_detection_events,
+    DetectionEventRecord, ErrorAnalyzerOptions, Gate,
+    analysis::{gate_has_tableau, gate_tableau},
+    circuit_to_detector_error_model, sample_detection_events,
 };
 
 #[test]
@@ -640,14 +641,14 @@ fn assert_binomial_5_sigma(label: &str, count: usize, trials: usize, probability
 
 fn fixed_tableau_gate_cases() -> Vec<GateExecutionCase> {
     Gate::all()
-        .filter(|gate| gate.has_tableau())
+        .filter(|gate| gate_has_tableau(*gate))
         .map(|gate| {
             let gate_name = gate.canonical_name();
             let inverse_name = gate
                 .inverse()
                 .expect("fixed-tableau gate has inverse")
                 .canonical_name();
-            let arity = gate.tableau().expect("fixed-tableau gate").len();
+            let arity = gate_tableau(gate).expect("fixed-tableau gate").len();
             let targets = match arity {
                 1 => "0",
                 2 => "0 1",

@@ -12,7 +12,7 @@ use rand::rngs::SmallRng;
 use stab_core::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
-    single_qubit_clifford_for_gate, unitary_to_tableau,
+    analysis::gate_unitary_matrix, single_qubit_clifford_for_gate, unitary_to_tableau,
 };
 
 #[test]
@@ -482,11 +482,11 @@ fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
     let tableaus = gates
         .iter()
         .map(|gate| {
-            let matrix = Gate::from_name(gate.canonical_name())
-                .expect("single-qubit gate")
-                .unitary_matrix()
-                .expect("single-qubit Clifford matrix")
-                .to_vecs();
+            let matrix = gate_unitary_matrix(
+                Gate::from_name(gate.canonical_name()).expect("single-qubit gate"),
+            )
+            .expect("single-qubit Clifford matrix")
+            .to_vecs();
             unitary_to_tableau(&matrix, true).expect("single-qubit Clifford Tableau")
         })
         .collect::<Vec<_>>();

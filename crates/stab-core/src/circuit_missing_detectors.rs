@@ -69,7 +69,7 @@ impl MissingDetectorFinder {
     }
 
     fn process_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        if instruction.gate().has_tableau() {
+        if crate::analysis::gate_has_tableau(instruction.gate()) {
             return self.process_unitary_tableau(instruction);
         }
         match instruction.gate().canonical_name() {

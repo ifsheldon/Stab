@@ -7,7 +7,9 @@
 use std::collections::BTreeSet;
 
 use num_complex::Complex32;
-use stab_core::{Gate, GateUnitaryMatrix, Tableau, unitary_to_tableau};
+use stab_core::{
+    Gate, GateUnitaryMatrix, Tableau, analysis::gate_unitary_matrix, unitary_to_tableau,
+};
 
 #[test]
 fn unitary_to_tableau_matches_known_gate_data_like_stim() {
@@ -107,7 +109,7 @@ fn gate_unitary_matrix_metadata_matches_known_gate_data_like_stim() {
     for case in cases {
         let gate = Gate::from_name(case.name).expect("known gate");
         assert_eq!(
-            gate.unitary_matrix().expect("known gate unitary"),
+            gate_unitary_matrix(gate).expect("known gate unitary"),
             case.expected_gate_unitary_matrix(),
             "{}",
             case.name

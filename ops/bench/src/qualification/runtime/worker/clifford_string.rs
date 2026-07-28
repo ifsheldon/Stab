@@ -5,7 +5,8 @@ use std::sync::atomic::{Ordering, compiler_fence};
 
 use sha2::{Digest as _, Sha256};
 use stab_core::{
-    CliffordString, Gate, SingleQubitClifford, StabilizerResource, Tableau, unitary_to_tableau,
+    CliffordString, Gate, SingleQubitClifford, StabilizerResource, Tableau,
+    analysis::gate_unitary_matrix, unitary_to_tableau,
 };
 
 use super::WorkerError;
@@ -547,9 +548,7 @@ fn scalar_multiplication_table() -> Result<[[u8; 24]; 24], WorkerError> {
     let tableaus = STIM_GATE_ORDER
         .iter()
         .map(|gate| {
-            let matrix = Gate::from_name(gate.canonical_name())?
-                .unitary_matrix()?
-                .to_vecs();
+            let matrix = gate_unitary_matrix(Gate::from_name(gate.canonical_name())?)?.to_vecs();
             unitary_to_tableau(&matrix, true).map_err(WorkerError::from)
         })
         .collect::<Result<Vec<Tableau>, WorkerError>>()?;

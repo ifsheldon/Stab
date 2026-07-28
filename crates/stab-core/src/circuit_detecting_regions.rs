@@ -333,7 +333,9 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
     if is_feedback_capable_controlled_pauli(instruction.gate().canonical_name()) {
         return validate_controlled_pauli_targets(instruction);
     }
-    if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() {
+    if instruction.gate().is_two_qubit_gate()
+        && crate::analysis::gate_has_tableau(instruction.gate())
+    {
         return validate_plain_qubit_pair_targets(instruction);
     }
     if instruction.gate().category() == crate::GateCategory::Noise

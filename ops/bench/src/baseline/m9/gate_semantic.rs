@@ -2,8 +2,9 @@ use std::hint::black_box;
 
 use stab_core::{
     Circuit, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    ErrorAnalyzerOptions, Gate, Probability, circuit_flow_generators,
-    circuit_to_detector_error_model, sample_detection_events,
+    ErrorAnalyzerOptions, Gate, Probability,
+    analysis::{gate_has_tableau, gate_tableau},
+    circuit_flow_generators, circuit_to_detector_error_model, sample_detection_events,
 };
 
 use crate::error::BenchError;
@@ -253,7 +254,7 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
 }
 
 pub(super) fn measurement_work(name: &str) -> Option<(f64, &'static str)> {
-    let fixed = Gate::all().filter(|gate| gate.has_tableau()).count();
+    let fixed = Gate::all().filter(|gate| gate_has_tableau(*gate)).count();
     let execution = fixed
         + SPP_EXECUTION_CASES.len()
         + EXTENDED_EXECUTION_CASES.len()
@@ -294,7 +295,7 @@ fn parse_cases<const N: usize>(
 
 fn fixed_tableau_gate_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, BenchError> {
     Gate::all()
-        .filter(|gate| gate.has_tableau())
+        .filter(|gate| gate_has_tableau(*gate))
         .map(|gate| fixed_tableau_gate_execution_circuit(row_id, gate))
         .collect()
 }
@@ -308,8 +309,7 @@ fn fixed_tableau_gate_execution_circuit(row_id: &str, gate: Gate) -> Result<Circ
             message: format!("{gate_name} has tableau metadata but no inverse"),
         })?
         .canonical_name();
-    let arity = gate
-        .tableau()
+    let arity = gate_tableau(gate)
         .map_err(|error| stab_runner_error(row_id, error))?
         .len();
     let targets = match arity {
