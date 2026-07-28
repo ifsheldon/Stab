@@ -591,6 +591,9 @@ pub(super) fn classify_public_api_source(
     if value == "crates/stab-core/src/execution/sampled_flow.rs" {
         return Some(FeatureId::FlowUtils);
     }
+    if value == "crates/stab-core/src/circuit_file.rs" {
+        return Some(FeatureId::StimFormat);
+    }
     if matches!(
         value.as_str(),
         "crates/stab-core/src/analysis/circuit_adapters.rs"

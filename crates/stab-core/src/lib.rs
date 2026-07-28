@@ -6,6 +6,7 @@ mod capabilities;
 mod circuit;
 mod circuit_detecting_regions;
 mod circuit_feedback;
+mod circuit_file;
 mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
@@ -62,6 +63,7 @@ pub use circuit_detecting_regions::{
     DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
+pub use circuit_file::{read_stim_circuit_file, write_stim_circuit_file};
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,

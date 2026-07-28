@@ -7,7 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use stab_core::{Circuit, CircuitInstruction, Gate, QubitId, Target};
+use stab_core::{Circuit, CircuitInstruction, Gate, QubitId, Target, write_stim_circuit_file};
 
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -99,14 +99,10 @@ fn streaming_file_writer_allocations_do_not_scale_with_target_count() {
     let large_path = temp_output("large");
 
     let small_allocations = allocation_counter::measure(|| {
-        small
-            .write_stim_file(&small_path)
-            .expect("write small circuit");
+        write_stim_circuit_file(&small, &small_path).expect("write small circuit");
     });
     let large_allocations = allocation_counter::measure(|| {
-        large
-            .write_stim_file(&large_path)
-            .expect("write large circuit");
+        write_stim_circuit_file(&large, &large_path).expect("write large circuit");
     });
 
     assert_eq!(

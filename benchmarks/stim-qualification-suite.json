@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "3f40774245267a3f7305fe0ff668dd458b7a7df069b40da500bd00f28906c55f",
-  "semantic_digest": "824df0bdd1bfc776f82ab8bbd05752169cee26f268e317152ac2cdb0f0bacc49",
+  "correctness_digest": "5418ffc2bd640f55ce067ee6cd55c154a5b36c865ae929f07ac2f3f2ab2dca5b",
+  "semantic_digest": "93297f108744402faadfab291fb8be5104dda3dc5dda8132c033a3b9d2d26e00",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -1693,7 +1693,7 @@
     {
       "id": "PERFC-62e1399a85e9a96e",
       "source_line": 78,
-      "anchor_digest": "6235172d00917d1729b29285997f13adec685382ca6d81985dc5da3d85007d6c",
+      "anchor_digest": "352db2e4598c40574b383ec43320e1d4869aa9c5f95e2bf9b061c1f7a21f1a14",
       "section": "4. Core Circuit Features",
       "feature": "Programmatic mutation",
       "raw_status": "Done for current Rust API surface",
@@ -11996,17 +11996,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-c89c14828a31d235",
-      "path": "stab_core::Circuit::from_stim_file",
-      "kind": "method",
-      "performance_feature": "PERF-CIRCUIT-MODEL",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-1133545df33447da",
       "path": "stab_core::Circuit::from_stim_str",
       "kind": "method",
@@ -12272,12 +12261,12 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-5cd229fbbc01fb41",
-      "path": "stab_core::Circuit::write_stim_file",
+      "id": "cq-api-item-94f634294653b26d",
+      "path": "stab_core::Circuit::write_stim_io",
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
+      "correctness_case_id": "cq-evidence-api-9567f1cbe5745ecf",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -48242,6 +48231,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-3120e884c50fe6b0",
+      "path": "stab_core::read_stim_circuit_file",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-1df7a15517f15c39",
       "path": "stab_core::result_formats::BitPlane64Batch",
       "kind": "struct",
@@ -57527,6 +57527,17 @@
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-e57d2891623aa6c1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-232dc5453fefed00",
+      "path": "stab_core::write_stim_circuit_file",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

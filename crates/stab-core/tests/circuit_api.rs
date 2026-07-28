@@ -19,7 +19,7 @@ use stab_core::{
     execution::{
         circuit_reference_sample, circuit_reference_sample_tree, count_determined_measurements,
     },
-    measurement_record_count,
+    measurement_record_count, read_stim_circuit_file, write_stim_circuit_file,
 };
 
 const OVERSIZED_CIRCUIT_FILE_BYTES: u64 = 64 * 1024 * 1024 + 1;
@@ -489,7 +489,7 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
     )
     .expect("write input circuit");
 
-    let circuit = Circuit::from_stim_file(&input_path).expect("read circuit");
+    let circuit = read_stim_circuit_file(&input_path).expect("read circuit");
     assert_eq!(
         circuit.to_stim_string(),
         concat!(
@@ -513,9 +513,7 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
     );
 
     let output_path = dir.join("output.stim");
-    circuit
-        .write_stim_file(&output_path)
-        .expect("write canonical circuit");
+    write_stim_circuit_file(&circuit, &output_path).expect("write canonical circuit");
     assert_eq!(
         fs::read_to_string(&output_path).expect("read output circuit"),
         circuit.to_stim_string()
@@ -523,7 +521,7 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
 
     let opaque_path = dir.join("opaque.stim");
     fs::write(&opaque_path, b"H[\xff] 0 # \xfe\n").expect("write opaque circuit");
-    let opaque = Circuit::from_stim_file(&opaque_path).expect("read opaque circuit bytes");
+    let opaque = read_stim_circuit_file(&opaque_path).expect("read opaque circuit bytes");
     assert_eq!(opaque.to_stim_bytes(), b"H[\xff] 0\n");
 
     fs::remove_dir_all(dir).expect("cleanup temp test dir");
@@ -534,7 +532,7 @@ fn pf1_circuit_file_helpers_report_read_and_write_errors() {
     let dir = temp_test_dir("io-errors");
     let missing_path = dir.join("missing.stim");
 
-    let read_error = Circuit::from_stim_file(&missing_path).expect_err("reject missing file");
+    let read_error = read_stim_circuit_file(&missing_path).expect_err("reject missing file");
     assert!(matches!(
         read_error,
         CircuitError::CircuitIo {
@@ -552,7 +550,7 @@ fn pf1_circuit_file_helpers_report_read_and_write_errors() {
 
     let invalid_path = dir.join("invalid.stim");
     fs::write(&invalid_path, "UNKNOWN 0\n").expect("write invalid circuit");
-    let parse_error = Circuit::from_stim_file(&invalid_path).expect_err("reject invalid circuit");
+    let parse_error = read_stim_circuit_file(&invalid_path).expect_err("reject invalid circuit");
     assert_eq!(
         parse_error.parse_error().map(stab_core::ParseError::code),
         Some(ParseErrorCode::UnknownInstruction),
@@ -565,7 +563,7 @@ fn pf1_circuit_file_helpers_report_read_and_write_errors() {
         .set_len(OVERSIZED_CIRCUIT_FILE_BYTES)
         .expect("resize oversized circuit");
     let oversized_error =
-        Circuit::from_stim_file(&oversized_path).expect_err("reject oversized circuit");
+        read_stim_circuit_file(&oversized_path).expect_err("reject oversized circuit");
     assert!(matches!(
         oversized_error,
         CircuitError::InvalidDomainValue {
@@ -575,9 +573,9 @@ fn pf1_circuit_file_helpers_report_read_and_write_errors() {
     ));
 
     let circuit = Circuit::from_stim_str("H 0\n").expect("parse circuit");
-    let write_error = circuit
-        .write_stim_file(dir.join("missing-parent").join("out.stim"))
-        .expect_err("reject missing output parent");
+    let write_error =
+        write_stim_circuit_file(&circuit, dir.join("missing-parent").join("out.stim"))
+            .expect_err("reject missing output parent");
     assert!(matches!(
         write_error,
         CircuitError::CircuitIo {

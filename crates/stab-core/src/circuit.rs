@@ -224,7 +224,10 @@ impl Circuit {
         }
     }
 
-    pub(crate) fn write_stim_io(&self, out: &mut impl Write) -> io::Result<()> {
+    /// Writes canonical Stim bytes to an existing output stream.
+    ///
+    /// This operation does not open, create, or truncate filesystem paths.
+    pub fn write_stim_io(&self, out: &mut impl Write) -> io::Result<()> {
         self.write_stim_io_indented(out, 0)
     }
 

@@ -1297,11 +1297,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::from_stim_file"
+          "owner_path": "stab_core::read_stim_circuit_file"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::Circuit::write_stim_file"
+          "owner_path": "stab_core::write_stim_circuit_file"
         }
       ],
       "oracle_fixture_owners": [
