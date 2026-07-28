@@ -1969,14 +1969,15 @@
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "The first-invalid pair-target case rejects while constructing a single-target instruction; target grouping and segmentation materialize output only for the fixed small instruction corpus, without an asymptotic allocation claim."
+        "detail": "The first-invalid pair-target case rejects while constructing a single-target instruction; typed observable access accepts the largest representable f64 below 2^64 and rejects 2^64; target grouping and segmentation materialize output only for the fixed small instruction corpus, without an asymptotic allocation claim."
       },
       "negative_axes": [
-        "invalid-pair-target-count"
+        "invalid-pair-target-count",
+        "observable-id-two-to-the-sixty-four"
       ],
       "static_property_plan": {
-        "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
-        "case_count": 26,
+        "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor including the f64/u64 observable boundary, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
+        "case_count": 28,
         "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
       },
       "upstream_owners": [
@@ -5898,13 +5899,41 @@
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Direct detector-frame compilation dry-runs the complete retained conversion and executable-circuit representation, strips nonsemantic tags, accepts the exact compiled-byte boundary, and rejects the first byte over before materialization."
+          "detail": "Direct detector-frame compilation charges conversion terms and executable targets, strips nonsemantic tags, accepts the exact combined compiled-byte boundary, and rejects the first byte over."
         },
         "negative_axes": [
           "executable-targets-unaccounted",
-          "repeat-storage-unaccounted",
           "metadata-retention",
           "compiled-byte-off-by-one"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-direct-frame-pre-materialization-admission-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::direct_frame_compilation_admits_repeats_and_filtered_targets_before_materialization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Direct detector-frame compilation dry-runs compact repeated conversion terms and mixed sweep-filtered executable targets, accepts each exact aggregate byte boundary, and rejects the first excess with only fixed error-path allocation before retaining either plan buffer."
+        },
+        "negative_axes": [
+          "repeat-conversion-materialized-before-admission",
+          "filtered-executable-materialized-before-admission",
+          "aggregate-byte-off-by-one"
         ],
         "standalone": true
       },

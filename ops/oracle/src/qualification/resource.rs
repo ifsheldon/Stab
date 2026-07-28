@@ -100,6 +100,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a5-detection-sampling-allocation-contract",
     "a5-detection-combined-session-storage-contract",
     "a5-direct-frame-compiled-storage-contract",
+    "a5-direct-frame-pre-materialization-admission-contract",
     "a5-dem-sampling-allocation-contract",
 ];
 

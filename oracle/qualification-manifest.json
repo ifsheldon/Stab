@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "6c6290729001447868115594b14fef7a9a8238378421f12c115def43d81c5247",
+  "semantic_digest": "858cc523daed7ad6eb99468168713e19146b1201b86c40a08aa27db18ffc400e",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -161851,6 +161851,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-53556e0ab5a71482",
+      "feature_id": "CQ-RESOURCE",
+      "behavioral_surface": "resource-boundary",
+      "provenance": "qualification-plan",
+      "source_id": "a5-direct-frame-pre-materialization-admission-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--lib",
+          "detection::api::tests::direct_frame_compilation_admits_repeats_and_filtered_targets_before_materialization",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Direct detector-frame compilation dry-runs compact repeated conversion terms and mixed sweep-filtered executable targets, accepts each exact aggregate byte boundary, and rejects the first excess with only fixed error-path allocation before retaining either plan buffer."
+      },
+      "negative_axes": [
+        "repeat-conversion-materialized-before-admission",
+        "filtered-executable-materialized-before-admission",
+        "aggregate-byte-off-by-one"
+      ],
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-5483528f23df5e07",
       "feature_id": "CQ-RESULT-FORMATS",
       "behavioral_surface": "file-format",
@@ -163384,7 +163434,7 @@
           "seeds": [],
           "case_count": 2,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -163650,7 +163700,7 @@
           "seeds": [],
           "case_count": 10,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -164024,7 +164074,7 @@
           "seeds": [],
           "case_count": 4,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -164603,12 +164653,12 @@
         "source": "qualification-case",
         "id": "cq2-circuit-api-instruction-value",
         "plan": {
-          "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
+          "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor including the f64/u64 observable boundary, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
           "maximum_generated_bytes": 0,
           "seeds": [],
-          "case_count": 26,
+          "case_count": 28,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -164631,10 +164681,11 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "The first-invalid pair-target case rejects while constructing a single-target instruction; target grouping and segmentation materialize output only for the fixed small instruction corpus, without an asymptotic allocation claim."
+        "detail": "The first-invalid pair-target case rejects while constructing a single-target instruction; typed observable access accepts the largest representable f64 below 2^64 and rejects 2^64; target grouping and segmentation materialize output only for the fixed small instruction corpus, without an asymptotic allocation claim."
       },
       "negative_axes": [
-        "invalid-pair-target-count"
+        "invalid-pair-target-count",
+        "observable-id-two-to-the-sixty-four"
       ],
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -164781,11 +164832,10 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Direct detector-frame compilation dry-runs the complete retained conversion and executable-circuit representation, strips nonsemantic tags, accepts the exact compiled-byte boundary, and rejects the first byte over before materialization."
+        "detail": "Direct detector-frame compilation charges conversion terms and executable targets, strips nonsemantic tags, accepts the exact combined compiled-byte boundary, and rejects the first byte over."
       },
       "negative_axes": [
         "executable-targets-unaccounted",
-        "repeat-storage-unaccounted",
         "metadata-retention",
         "compiled-byte-off-by-one"
       ],
@@ -168704,7 +168754,7 @@
           "seeds": [],
           "case_count": 21,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -169243,7 +169293,7 @@
           "seeds": [],
           "case_count": 6,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -169405,7 +169455,7 @@
           "seeds": [],
           "case_count": 12,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -175069,7 +175119,7 @@
           "seeds": [],
           "case_count": 15,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "a376ea1688c254849c85c4a94a40f2ec0fb58c3b2cc5f6adc1f03217b526846b",
+          "corpus_sha256": "99da1ed15802aea24efed86544c08e03a29c2c269d3ce4a961a368df597b3ec0",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
