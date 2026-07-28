@@ -14,7 +14,8 @@ use crate::root::RepoRoot;
 use super::{
     batch_sinks::{ByteDigestWriter, DemDigestSink, OutputWitness, u64_sequence_digest},
     cli_process::run_stab_cli_process_row,
-    measure_stab_iterations, stab_runner_error,
+    measure_stab_iterations, measure_stab_iterations_with_postprocess_and_memory_operation,
+    stab_runner_error,
 };
 
 const SAMPLE_DEM_NOISY_FIXTURE: &str =
@@ -251,13 +252,27 @@ fn measure_sample_dem_ptb64_routing(
         OsString::from("--out_format=ptb64"),
     ];
     let expected = sample_dem_ptb64_witness();
-    let preflight = run_sample_dem_cli(row, args.clone(), expected)?;
-    black_box(preflight);
-    measure_stab_iterations(measurement_name, M11_CONTRACT_ITERATIONS, || {
-        let actual = run_sample_dem_cli(row, args.clone(), expected)?;
-        black_box(actual);
-        Ok(())
-    })
+    let preflight = run_sample_dem_cli(args.clone());
+    ensure_sample_dem_cli_output(row, expected, &preflight)?;
+    black_box(preflight.2);
+    let mut timing_state = ();
+    measure_stab_iterations_with_postprocess_and_memory_operation(
+        measurement_name,
+        M11_CONTRACT_ITERATIONS,
+        &mut timing_state,
+        |_| Ok(run_sample_dem_cli(args.clone())),
+        |_, actual| {
+            ensure_sample_dem_cli_output(row, expected, &actual)?;
+            black_box(actual.2);
+            Ok(())
+        },
+        || {
+            let actual = run_sample_dem_cli(args.clone());
+            ensure_sample_dem_cli_output(row, expected, &actual)?;
+            black_box(actual.2);
+            Ok(())
+        },
+    )
 }
 
 #[cfg(not(test))]
@@ -270,11 +285,9 @@ const fn sample_dem_ptb64_witness() -> OutputWitness {
     OutputWitness::new(8, 0x095a_8dff_6d98_bcea)
 }
 
-fn run_sample_dem_cli(
-    row: &BenchmarkRow,
-    args: [OsString; 6],
-    expected: OutputWitness,
-) -> Result<OutputWitness, BenchError> {
+type SampleDemCliOutput = (i32, Vec<u8>, OutputWitness);
+
+fn run_sample_dem_cli(args: [OsString; 6]) -> SampleDemCliOutput {
     let mut stdout = ByteDigestWriter::default();
     let mut stderr = Vec::new();
     let status = stab_cli::run_from(
@@ -283,45 +296,71 @@ fn run_sample_dem_cli(
         &mut stdout,
         &mut stderr,
     );
-    if status != 0 {
+    (status, stderr, stdout.witness())
+}
+
+fn ensure_sample_dem_cli_output(
+    row: &BenchmarkRow,
+    expected: OutputWitness,
+    actual: &SampleDemCliOutput,
+) -> Result<(), BenchError> {
+    if actual.0 != 0 {
         return Err(BenchError::StabRunner {
             row_id: row.id.clone(),
             message: format!(
-                "stab-cli sample_dem failed with status {status}: {}",
-                String::from_utf8_lossy(&stderr)
+                "stab-cli sample_dem failed with status {}: {}",
+                actual.0,
+                String::from_utf8_lossy(&actual.1)
             ),
         });
     }
-    let actual = stdout.witness();
-    if actual != expected {
+    if actual.2 != expected {
         return Err(stab_runner_error(
             &row.id,
-            format!("sample_dem PTB64 output changed: expected {expected:?}, got {actual:?}"),
+            format!(
+                "sample_dem PTB64 output changed: expected {expected:?}, got {:?}",
+                actual.2
+            ),
         ));
     }
-    Ok(actual)
+    Ok(())
 }
 
 fn measure_dem_plan_compile(
     row: &BenchmarkRow,
     model: &DetectorErrorModel,
 ) -> Result<Measurement, BenchError> {
-    measure_stab_iterations(
+    let mut timing_state = ();
+    measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_dem_plan_compile_and_release_surface_like",
         M11_CONTRACT_ITERATIONS,
+        &mut timing_state,
+        |_| compile_dem_plan_dimensions(row, model),
+        |_, actual| ensure_dem_plan_witness(row, actual),
         || {
-            let plan = DemSamplingCompiler::new()
-                .compile(black_box(model))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            ensure_dem_plan_witness(row, &plan)?;
-            black_box((
-                plan.detector_width(),
-                plan.observable_width(),
-                plan.sampled_error_width(),
-            ));
+            let actual = compile_dem_plan_dimensions(row, model)?;
+            ensure_dem_plan_witness(row, actual)?;
             Ok(())
         },
     )
+}
+
+fn compile_dem_plan_dimensions(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<(usize, usize, usize), BenchError> {
+    let actual = {
+        let plan = DemSamplingCompiler::new()
+            .compile(black_box(model))
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(&plan);
+        (
+            plan.detector_width().get(),
+            plan.observable_width().get(),
+            plan.sampled_error_width().get(),
+        )
+    };
+    Ok(actual)
 }
 
 fn measure_dem_session_detector_only(
@@ -348,27 +387,53 @@ fn measure_dem_session_detector_only(
         preflight_summary.committed_shots().get(),
         preflight_sink.witness(),
     )?;
-    let mut session = plan
+    let session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut sink = DemDigestSink::default();
-    let mut witnesses = Vec::with_capacity(M11_CONTRACT_ITERATIONS);
-    let measurement = measure_stab_iterations(
+    let sink = DemDigestSink::default();
+    let mut memory_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut memory_sink = DemDigestSink::default();
+    let mut timing_state = (session, sink, Vec::with_capacity(M11_CONTRACT_ITERATIONS));
+    let measurement = measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_dem_session_detector_only",
         M11_CONTRACT_ITERATIONS,
-        || {
-            sink.reset();
-            let summary = session
-                .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let actual = sink.witness();
+        &mut timing_state,
+        |state| {
+            state
+                .0
+                .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut state.1)
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |state, summary| {
+            let actual = state.1.witness();
             ensure_dem_shot_count(
                 row,
                 "DEM detector-only session",
                 summary.committed_shots().get(),
                 actual.2,
             )?;
-            witnesses.push([actual.0, actual.1, actual.2]);
+            state.2.push([actual.0, actual.1, actual.2]);
+            state.1.reset();
+            black_box(actual);
+            Ok(())
+        },
+        || {
+            let summary = memory_session
+                .run(
+                    ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64),
+                    &mut memory_sink,
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let actual = memory_sink.witness();
+            ensure_dem_phase_witness(
+                row,
+                "DEM detector-only memory operation",
+                DEM_DETECTOR_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
             black_box(actual);
             Ok(())
         },
@@ -378,7 +443,7 @@ fn measure_dem_session_detector_only(
         "DEM detector-only session",
         DEM_DETECTOR_SEQUENCE_DOMAIN,
         DEM_DETECTOR_SEQUENCE_DIGEST,
-        &witnesses,
+        &timing_state.2,
     )?;
     Ok(measurement)
 }
@@ -407,27 +472,53 @@ fn measure_dem_session_with_sampled_errors(
         preflight_summary.committed_shots().get(),
         preflight_sink.witness(),
     )?;
-    let mut session = plan
+    let session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut sink = DemDigestSink::default();
-    let mut witnesses = Vec::with_capacity(M11_CONTRACT_ITERATIONS);
-    let measurement = measure_stab_iterations(
+    let sink = DemDigestSink::default();
+    let mut memory_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut memory_sink = DemDigestSink::default();
+    let mut timing_state = (session, sink, Vec::with_capacity(M11_CONTRACT_ITERATIONS));
+    let measurement = measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_dem_session_with_sampled_errors",
         M11_CONTRACT_ITERATIONS,
-        || {
-            sink.reset();
-            let summary = session
-                .run_with_sampled_errors(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let actual = sink.witness();
+        &mut timing_state,
+        |state| {
+            state
+                .0
+                .run_with_sampled_errors(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut state.1)
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |state, summary| {
+            let actual = state.1.witness();
             ensure_dem_shot_count(
                 row,
                 "DEM sampled-error session",
                 summary.committed_shots().get(),
                 actual.2,
             )?;
-            witnesses.push([actual.0, actual.1, actual.2]);
+            state.2.push([actual.0, actual.1, actual.2]);
+            state.1.reset();
+            black_box(actual);
+            Ok(())
+        },
+        || {
+            let summary = memory_session
+                .run_with_sampled_errors(
+                    ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64),
+                    &mut memory_sink,
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let actual = memory_sink.witness();
+            ensure_dem_phase_witness(
+                row,
+                "DEM sampled-error memory operation",
+                DEM_SAMPLED_ERROR_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
             black_box(actual);
             Ok(())
         },
@@ -437,7 +528,7 @@ fn measure_dem_session_with_sampled_errors(
         "DEM sampled-error session",
         DEM_SAMPLED_ERROR_SEQUENCE_DOMAIN,
         DEM_SAMPLED_ERROR_SEQUENCE_DIGEST,
-        &witnesses,
+        &timing_state.2,
     )?;
     Ok(measurement)
 }
@@ -470,26 +561,54 @@ fn measure_dem_session_replay(
         preflight_summary.committed_shots().get(),
         preflight_sink.witness(),
     )?;
-    let mut session = plan
+    let session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut sink = DemDigestSink::default();
-    measure_stab_iterations("stab_dem_session_replay", M11_CONTRACT_ITERATIONS, || {
-        sink.reset();
-        let summary = session
-            .replay(&replay_records, &mut sink)
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        let actual = sink.witness();
-        ensure_dem_phase_witness(
-            row,
-            "DEM replay session",
-            DEM_REPLAY_WITNESS,
-            summary.committed_shots().get(),
-            actual,
-        )?;
-        black_box(actual);
-        Ok(())
-    })
+    let sink = DemDigestSink::default();
+    let mut memory_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut memory_sink = DemDigestSink::default();
+    let mut timing_state = (session, sink);
+    measure_stab_iterations_with_postprocess_and_memory_operation(
+        "stab_dem_session_replay",
+        M11_CONTRACT_ITERATIONS,
+        &mut timing_state,
+        |state| {
+            state
+                .0
+                .replay(&replay_records, &mut state.1)
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |state, summary| {
+            let actual = state.1.witness();
+            ensure_dem_phase_witness(
+                row,
+                "DEM replay session",
+                DEM_REPLAY_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            state.1.reset();
+            black_box(actual);
+            Ok(())
+        },
+        || {
+            let summary = memory_session
+                .replay(&replay_records, &mut memory_sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let actual = memory_sink.witness();
+            ensure_dem_phase_witness(
+                row,
+                "DEM replay memory operation",
+                DEM_REPLAY_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            black_box(actual);
+            Ok(())
+        },
+    )
 }
 
 fn ensure_dem_phase_witness(
@@ -512,13 +631,8 @@ fn ensure_dem_phase_witness(
 
 fn ensure_dem_plan_witness(
     row: &BenchmarkRow,
-    plan: &stab_core::execution::DemSamplingPlan,
+    actual: (usize, usize, usize),
 ) -> Result<(), BenchError> {
-    let actual = (
-        plan.detector_width().get(),
-        plan.observable_width().get(),
-        plan.sampled_error_width().get(),
-    );
     let expected = (DENSE_DETECTOR_COUNT, 1, DENSE_DETECTOR_COUNT);
     if actual == expected {
         return Ok(());

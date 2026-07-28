@@ -722,6 +722,7 @@ Compatibility scope is explicit. Finite-shot sampling materializers and visitors
 - Independent untimed output witnesses for both pinned Stim and Stab on every affected process-symmetric CLI row.
 - Source-owned exact plan dimensions or a frozen plan fingerprint for every report-only compile-and-release phase.
 - Source-owned shot-count plus a frozen per-result witness or ordered sequence digest for every output-producing report-only A5 phase.
+- Sample each phase finish clock immediately after raw product work and before plan checks, witness extraction, shot-count validation, sequence collection, or digest validation; use independent state for the optional memory operation.
 
 ### Done Criteria
 

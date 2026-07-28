@@ -169,6 +169,9 @@ pub(crate) enum BenchError {
     #[error("measurement_runs must be at least 1")]
     InvalidMeasurementRuns,
 
+    #[error("benchmark monotonic clock moved backwards")]
+    NonMonotonicClock,
+
     #[error("benchmark output path {path} is invalid: {reason}")]
     InvalidBenchmarkOutputDir { path: PathBuf, reason: String },
 

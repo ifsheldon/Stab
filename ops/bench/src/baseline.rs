@@ -44,6 +44,7 @@ mod tests;
 use measurement::{
     measure_stab, measure_stab_batched, measure_stab_iterations,
     measure_stab_iterations_with_memory_operation,
+    measure_stab_iterations_with_postprocess_and_memory_operation,
 };
 pub(crate) use rates::measurement_rate_work;
 

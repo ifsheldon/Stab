@@ -22,7 +22,8 @@ use crate::root::RepoRoot;
 use super::{
     batch_sinks::{ByteDigestWriter, DetectionDigestSink, OutputWitness, u64_sequence_digest},
     cli_process::run_stab_cli_process_row,
-    measure_stab_iterations, stab_runner_error,
+    measure_stab_iterations, measure_stab_iterations_with_postprocess_and_memory_operation,
+    stab_runner_error,
 };
 
 mod detecting_region_rows;
@@ -772,20 +773,32 @@ fn measure_detect_cli(
         OsString::from("--out_format"),
         OsString::from(output_format),
     ];
-    let preflight = run_detect_cli(row, args.clone(), expected)?;
-    black_box(preflight);
-    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
-        let actual = run_detect_cli(row, args.clone(), expected)?;
-        black_box(actual);
-        Ok(())
-    })
+    let preflight = run_detect_cli(args.clone());
+    ensure_detect_cli_output(row, expected, &preflight)?;
+    black_box(preflight.2);
+    let mut timing_state = ();
+    measure_stab_iterations_with_postprocess_and_memory_operation(
+        measurement_name,
+        super::STAB_COMPARE_ITERATIONS,
+        &mut timing_state,
+        |_| Ok(run_detect_cli(args.clone())),
+        |_, actual| {
+            ensure_detect_cli_output(row, expected, &actual)?;
+            black_box(actual.2);
+            Ok(())
+        },
+        || {
+            let actual = run_detect_cli(args.clone());
+            ensure_detect_cli_output(row, expected, &actual)?;
+            black_box(actual.2);
+            Ok(())
+        },
+    )
 }
 
-fn run_detect_cli(
-    row: &BenchmarkRow,
-    args: [OsString; 7],
-    expected: OutputWitness,
-) -> Result<OutputWitness, BenchError> {
+type DetectCliOutput = (i32, Vec<u8>, OutputWitness);
+
+fn run_detect_cli(args: [OsString; 7]) -> DetectCliOutput {
     let mut stdout = ByteDigestWriter::default();
     let mut stderr = Vec::new();
     let status = stab_cli::run_from(
@@ -794,45 +807,71 @@ fn run_detect_cli(
         &mut stdout,
         &mut stderr,
     );
-    if status != 0 {
+    (status, stderr, stdout.witness())
+}
+
+fn ensure_detect_cli_output(
+    row: &BenchmarkRow,
+    expected: OutputWitness,
+    actual: &DetectCliOutput,
+) -> Result<(), BenchError> {
+    if actual.0 != 0 {
         return Err(BenchError::StabRunner {
             row_id: row.id.clone(),
             message: format!(
-                "stab-cli detect failed with status {status}: {}",
-                String::from_utf8_lossy(&stderr)
+                "stab-cli detect failed with status {}: {}",
+                actual.0,
+                String::from_utf8_lossy(&actual.1)
             ),
         });
     }
-    let actual = stdout.witness();
-    if actual != expected {
+    if actual.2 != expected {
         return Err(stab_runner_error(
             &row.id,
-            format!("detect PTB64 output changed: expected {expected:?}, got {actual:?}"),
+            format!(
+                "detect PTB64 output changed: expected {expected:?}, got {:?}",
+                actual.2
+            ),
         ));
     }
-    Ok(actual)
+    Ok(())
 }
 
 fn measure_detection_plan_compile(
     row: &BenchmarkRow,
     circuit: &Circuit,
 ) -> Result<Measurement, BenchError> {
-    measure_stab_iterations(
+    let mut timing_state = ();
+    measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_detection_plan_compile_and_release_basic",
         super::STAB_COMPARE_ITERATIONS,
+        &mut timing_state,
+        |_| compile_detection_plan_dimensions(row, circuit),
+        |_, actual| ensure_detection_plan_witness(row, actual),
         || {
-            let plan = DetectionSamplingCompiler::new()
-                .compile(black_box(circuit))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            ensure_detection_plan_witness(row, &plan)?;
-            black_box((
-                plan.measurement_width(),
-                plan.detector_width(),
-                plan.observable_width(),
-            ));
+            let actual = compile_detection_plan_dimensions(row, circuit)?;
+            ensure_detection_plan_witness(row, actual)?;
             Ok(())
         },
     )
+}
+
+fn compile_detection_plan_dimensions(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+) -> Result<(usize, usize, usize), BenchError> {
+    let actual = {
+        let plan = DetectionSamplingCompiler::new()
+            .compile(black_box(circuit))
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(&plan);
+        (
+            plan.measurement_width().get(),
+            plan.detector_width().get(),
+            plan.observable_width().get(),
+        )
+    };
+    Ok(actual)
 }
 
 fn measure_detection_session(
@@ -856,20 +895,31 @@ fn measure_detection_session(
         preflight_summary.committed_shots().get(),
         preflight_sink.witness(),
     )?;
-    let mut session = plan
+    let session = plan
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut sink = DetectionDigestSink::default();
-    let mut witnesses = Vec::with_capacity(super::STAB_COMPARE_ITERATIONS);
-    let measurement = measure_stab_iterations(
+    let sink = DetectionDigestSink::default();
+    let mut memory_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut memory_sink = DetectionDigestSink::default();
+    let mut timing_state = (
+        session,
+        sink,
+        Vec::with_capacity(super::STAB_COMPARE_ITERATIONS),
+    );
+    let measurement = measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_detection_session_sample_to_detection",
         super::STAB_COMPARE_ITERATIONS,
-        || {
-            sink.reset();
-            let summary = session
-                .run(ShotCount::new(DETECT_SHOTS as u64), &mut sink)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let actual = sink.witness();
+        &mut timing_state,
+        |state| {
+            state
+                .0
+                .run(ShotCount::new(DETECT_SHOTS as u64), &mut state.1)
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |state, summary| {
+            let actual = state.1.witness();
             if summary.committed_shots().get() != DETECT_SHOTS as u64
                 || actual.1 != DETECT_SHOTS as u64
             {
@@ -882,12 +932,28 @@ fn measure_detection_session(
                     ),
                 ));
             }
-            witnesses.push([actual.0, actual.1]);
+            state.2.push([actual.0, actual.1]);
+            state.1.reset();
+            black_box(actual);
+            Ok(())
+        },
+        || {
+            let summary = memory_session
+                .run(ShotCount::new(DETECT_SHOTS as u64), &mut memory_sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let actual = memory_sink.witness();
+            ensure_detection_phase_witness(
+                row,
+                "detection session memory operation",
+                DETECTION_PHASE_FIRST_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
             black_box(actual);
             Ok(())
         },
     )?;
-    ensure_detection_sequence_witness(row, &witnesses)?;
+    ensure_detection_sequence_witness(row, &timing_state.2)?;
     Ok(measurement)
 }
 
@@ -895,34 +961,44 @@ fn measure_m2d_plan_compile(
     row: &BenchmarkRow,
     circuit: &Circuit,
 ) -> Result<Measurement, BenchError> {
-    measure_stab_iterations(
+    let mut timing_state = ();
+    measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_m2d_plan_compile_and_release_basic",
         super::STAB_COMPARE_ITERATIONS,
+        &mut timing_state,
+        |_| compile_m2d_plan_dimensions(row, circuit),
+        |_, actual| ensure_m2d_plan_witness(row, actual),
         || {
-            let plan = MeasurementToDetectionCompiler::new()
-                .compile(black_box(circuit))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            ensure_m2d_plan_witness(row, &plan)?;
-            black_box((
-                plan.measurement_width(),
-                plan.sweep_width(),
-                plan.detector_width(),
-                plan.observable_width(),
-            ));
+            let actual = compile_m2d_plan_dimensions(row, circuit)?;
+            ensure_m2d_plan_witness(row, actual)?;
             Ok(())
         },
     )
 }
 
+fn compile_m2d_plan_dimensions(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+) -> Result<(usize, usize, usize, usize), BenchError> {
+    let actual = {
+        let plan = MeasurementToDetectionCompiler::new()
+            .compile(black_box(circuit))
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(&plan);
+        (
+            plan.measurement_width().get(),
+            plan.sweep_width().get(),
+            plan.detector_width().get(),
+            plan.observable_width().get(),
+        )
+    };
+    Ok(actual)
+}
+
 fn ensure_detection_plan_witness(
     row: &BenchmarkRow,
-    plan: &stab_core::execution::DetectionSamplingPlan,
+    actual: (usize, usize, usize),
 ) -> Result<(), BenchError> {
-    let actual = (
-        plan.measurement_width().get(),
-        plan.detector_width().get(),
-        plan.observable_width().get(),
-    );
     if actual == (1, 1, 0) {
         return Ok(());
     }
@@ -934,14 +1010,8 @@ fn ensure_detection_plan_witness(
 
 fn ensure_m2d_plan_witness(
     row: &BenchmarkRow,
-    plan: &stab_core::execution::MeasurementToDetectionPlan,
+    actual: (usize, usize, usize, usize),
 ) -> Result<(), BenchError> {
-    let actual = (
-        plan.measurement_width().get(),
-        plan.sweep_width().get(),
-        plan.detector_width().get(),
-        plan.observable_width().get(),
-    );
     if actual == (1, 0, 1, 0) {
         return Ok(());
     }
@@ -1009,22 +1079,50 @@ fn measure_m2d_session_batch(
         preflight_summary.committed_shots().get(),
         preflight_sink.witness(),
     )?;
-    let mut session = plan
+    let session = plan
         .session()
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut sink = DetectionDigestSink::default();
-    measure_stab_iterations(
+    let sink = DetectionDigestSink::default();
+    let mut memory_session = plan
+        .session()
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut memory_sink = DetectionDigestSink::default();
+    let mut timing_state = (session, sink);
+    measure_stab_iterations_with_postprocess_and_memory_operation(
         "stab_m2d_session_convert_batch",
         super::STAB_COMPARE_ITERATIONS,
-        || {
-            sink.reset();
-            let summary = session
-                .run(MeasurementBatchView::new(batch.view()), None, &mut sink)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let actual = sink.witness();
+        &mut timing_state,
+        |state| {
+            state
+                .0
+                .run(MeasurementBatchView::new(batch.view()), None, &mut state.1)
+                .map_err(|error| stab_runner_error(&row.id, error))
+        },
+        |state, summary| {
+            let actual = state.1.witness();
             ensure_detection_phase_witness(
                 row,
                 "m2d session",
+                M2D_PHASE_WITNESS,
+                summary.committed_shots().get(),
+                actual,
+            )?;
+            state.1.reset();
+            black_box(actual);
+            Ok(())
+        },
+        || {
+            let summary = memory_session
+                .run(
+                    MeasurementBatchView::new(batch.view()),
+                    None,
+                    &mut memory_sink,
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let actual = memory_sink.witness();
+            ensure_detection_phase_witness(
+                row,
+                "m2d session memory operation",
                 M2D_PHASE_WITNESS,
                 summary.committed_shots().get(),
                 actual,

@@ -54,6 +54,7 @@ Stop and repair the owning source when code, tests, generated inventories, bench
 - Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, and statistical Stim contracts do not change.
 - New phase identities remain report-only and unseeded unless an exact prior identity exists; comparable process rows keep the `1.25x` Stim parity gate.
 - Every process-symmetric A5 row validates independent pinned-Stim and Stab output witnesses outside timing. Every report-only compile phase validates exact source-owned plan dimensions or a frozen plan fingerprint, and every output-producing phase validates shot counts plus a frozen result or ordered sequence digest.
+- Report-only phase timers stop immediately after raw product work; post-clock validation and ordered-witness collection are untimed, and allocation observation uses independent sessions and sinks.
 
 ## Done Criteria
 

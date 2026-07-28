@@ -1,9 +1,13 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(test)]
+use std::sync::{Mutex, MutexGuard};
 
 use crate::error::BenchError;
 use crate::report::AllocationMeasurement;
 
 static ALLOCATION_TRACKING_ENABLED: AtomicBool = AtomicBool::new(false);
+#[cfg(test)]
+static ALLOCATION_TRACKING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug)]
 pub(crate) struct AllocationTrackingGuard {
@@ -52,6 +56,14 @@ pub(crate) fn measure_tracked_memory(
     })
 }
 
+#[cfg(test)]
+pub(crate) fn allocation_tracking_test_lock() -> MutexGuard<'static, ()> {
+    match ALLOCATION_TRACKING_TEST_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 fn current_resident_bytes() -> Option<u64> {
     memory_stats::memory_stats().map(|stats| u64::try_from(stats.physical_mem).unwrap_or(u64::MAX))
 }
@@ -84,11 +96,12 @@ fn measure_allocations_enabled(
 
 #[cfg(test)]
 mod tests {
-    use super::AllocationTrackingGuard;
+    use super::{AllocationTrackingGuard, allocation_tracking_test_lock};
     use crate::error::BenchError;
 
     #[test]
     fn allocation_tracking_guard_requires_count_allocations_feature() {
+        let _test_lock = allocation_tracking_test_lock();
         let result = AllocationTrackingGuard::set(true);
         if cfg!(feature = "count-allocations") {
             assert!(result.is_ok());

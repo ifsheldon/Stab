@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    allocations::AllocationTrackingGuard,
+    allocations::{AllocationTrackingGuard, allocation_tracking_test_lock},
     baseline::{
         batch_sinks::OutputWitness, cli_process, m9, m11,
         measure_stab_iterations_with_memory_operation,
@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[test]
 fn process_timing_and_product_memory_operations_are_separate() {
+    let _test_lock = allocation_tracking_test_lock();
     let _guard = AllocationTrackingGuard::set(cfg!(feature = "count-allocations"))
         .expect("select available allocation mode");
     let timed_calls = AtomicUsize::new(0);
@@ -39,6 +40,48 @@ fn process_timing_and_product_memory_operations_are_separate() {
         measurement.allocation.is_some(),
         cfg!(feature = "count-allocations")
     );
+}
+
+#[cfg(feature = "count-allocations")]
+#[test]
+fn a5_phase_rows_separate_timed_witnesses_from_memory_observation() {
+    let _test_lock = allocation_tracking_test_lock();
+    let _guard = AllocationTrackingGuard::set(true).expect("enable allocation tracking");
+    let root = RepoRoot::resolve(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repository root"),
+    )
+    .expect("resolve repository root");
+    let manifest = BenchmarkManifest::read(&root).expect("read benchmark manifest");
+
+    for row_id in [
+        "m9-detection-batch-phases",
+        "m9-m2d-batch-phases",
+        "m11-dem-batch-phases",
+    ] {
+        let row = manifest
+            .rows
+            .iter()
+            .find(|row| row.id == row_id)
+            .expect("A5 phase row");
+        let measurements = if row_id.starts_with("m11-") {
+            m11::run_dem_sampling_compare_row(&root, "release", row)
+        } else {
+            m9::run_detection_compare_row(&root, "release", row)
+        }
+        .expect("run allocation-enabled A5 phase row")
+        .expect("A5 phase row has a Stab runner");
+
+        assert!(!measurements.is_empty(), "{row_id}");
+        assert!(
+            measurements
+                .iter()
+                .all(|measurement| measurement.allocation.is_some()),
+            "{row_id} must use an independent tracked-memory operation"
+        );
+    }
 }
 
 #[test]
