@@ -108,7 +108,9 @@ pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext, ParseError,
     ParseErrorCode, ParseErrorContext,
 };
-pub use error::{CircuitError, CircuitResult, ModelError, ModelResult};
+pub use error::{
+    CircuitError, CircuitResult, ModelError, ModelResult, ValidationError, ValidationErrorCode,
+};
 pub use error_matcher::explain_errors_from_circuit;
 pub use execution::{
     BackendPreference, CompiledSampler, PlanFingerprint, RandomPolicy, ReferenceSampleMode,

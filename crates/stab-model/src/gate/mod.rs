@@ -10,7 +10,7 @@ pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 pub use unitary::GateUnitaryRows;
 pub(crate) use unitary::gate_unitary_rows;
 
-use crate::{ModelError, ModelResult, Probability, Target};
+use crate::{ModelResult, Probability, Target, ValidationError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GateCategory {
@@ -44,7 +44,7 @@ impl Gate {
 
     #[inline]
     pub fn from_name(name: &str) -> ModelResult<Self> {
-        Self::lookup_name(name).ok_or_else(|| ModelError::UnknownGate(name.to_string()))
+        Self::lookup_name(name).ok_or_else(|| ValidationError::UnknownGate(name.to_string()).into())
     }
 
     #[inline]
@@ -208,7 +208,7 @@ impl ArgRule {
     fn validate(self, gate: &'static str, args: &[f64]) -> ModelResult<()> {
         match self {
             Self::Exact(expected) if args.len() != expected => {
-                Err(ModelError::InvalidArgumentCount {
+                Err(ValidationError::InvalidArgumentCount {
                     gate,
                     expected: match expected {
                         0 => "0",
@@ -217,7 +217,8 @@ impl ArgRule {
                         _ => "fixed",
                     },
                     actual: args.len(),
-                })
+                }
+                .into())
             }
             Self::Exact(_) => Ok(()),
             Self::Any => {
@@ -228,51 +229,58 @@ impl ArgRule {
             }
             Self::ZeroOrOneProbability => {
                 if args.len() > 1 {
-                    return Err(ModelError::InvalidArgumentCount {
+                    return Err(ValidationError::InvalidArgumentCount {
                         gate,
                         expected: "0 or 1",
                         actual: args.len(),
-                    });
+                    }
+                    .into());
                 }
                 if let Some(arg) = args.first().copied() {
-                    Probability::try_new(arg).map_err(|_| ModelError::InvalidArgument {
-                        gate,
-                        argument: arg.to_string(),
+                    Probability::try_new(arg).map_err(|_| {
+                        crate::ModelError::from(ValidationError::InvalidArgument {
+                            gate,
+                            argument: arg.to_string(),
+                        })
                     })?;
                 }
                 Ok(())
             }
             Self::ProbabilityList(expected) => {
                 if args.len() != expected {
-                    return Err(ModelError::InvalidArgumentCount {
+                    return Err(ValidationError::InvalidArgumentCount {
                         gate,
                         expected: "probability list",
                         actual: args.len(),
-                    });
+                    }
+                    .into());
                 }
                 validate_probability_list(gate, args)
             }
             Self::AnyProbabilityList => validate_probability_list(gate, args),
             Self::UnsignedInteger => {
                 if args.len() != 1 {
-                    return Err(ModelError::InvalidArgumentCount {
+                    return Err(ValidationError::InvalidArgumentCount {
                         gate,
                         expected: "1",
                         actual: args.len(),
-                    });
+                    }
+                    .into());
                 }
                 let Some(arg) = args.first().copied() else {
-                    return Err(ModelError::InvalidArgumentCount {
+                    return Err(ValidationError::InvalidArgumentCount {
                         gate,
                         expected: "1",
                         actual: args.len(),
-                    });
+                    }
+                    .into());
                 };
                 if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 {
-                    return Err(ModelError::InvalidArgument {
+                    return Err(ValidationError::InvalidArgument {
                         gate,
                         argument: arg.to_string(),
-                    });
+                    }
+                    .into());
                 }
                 Ok(())
             }
@@ -283,17 +291,20 @@ impl ArgRule {
 fn validate_probability_list(gate: &'static str, args: &[f64]) -> ModelResult<()> {
     let mut total = 0.0;
     for arg in args {
-        Probability::try_new(*arg).map_err(|_| ModelError::InvalidArgument {
-            gate,
-            argument: arg.to_string(),
+        Probability::try_new(*arg).map_err(|_| {
+            crate::ModelError::from(ValidationError::InvalidArgument {
+                gate,
+                argument: arg.to_string(),
+            })
         })?;
         total += *arg;
     }
     if total > 1.0000001 {
-        return Err(ModelError::InvalidArgument {
+        return Err(ValidationError::InvalidArgument {
             gate,
             argument: format!("sum {total}"),
-        });
+        }
+        .into());
     }
     Ok(())
 }
@@ -321,10 +332,11 @@ impl TargetRule {
                 if targets.is_empty() {
                     Ok(())
                 } else {
-                    Err(ModelError::InvalidTargetCount {
+                    Err(ValidationError::InvalidTargetCount {
                         gate,
                         count: targets.len(),
-                    })
+                    }
+                    .into())
                 }
             }
             Self::AnySingleQubit => validate_targets(gate, targets, is_plain_qubit_target),
@@ -400,20 +412,22 @@ fn validate_pair_targets(
     predicate: impl Fn(&Target) -> bool,
 ) -> ModelResult<()> {
     if !targets.len().is_multiple_of(2) {
-        return Err(ModelError::InvalidTargetCount {
+        return Err(ValidationError::InvalidTargetCount {
             gate,
             count: targets.len(),
-        });
+        }
+        .into());
     }
     validate_targets(gate, targets, predicate)?;
     for pair in targets.chunks_exact(2) {
         if let [left, right] = pair
             && left == right
         {
-            return Err(ModelError::InvalidTarget {
+            return Err(ValidationError::InvalidTarget {
                 gate,
                 target: left.to_string(),
-            });
+            }
+            .into());
         }
     }
     Ok(())
@@ -426,10 +440,11 @@ fn validate_targets(
 ) -> ModelResult<()> {
     for target in targets {
         if !predicate(target) {
-            return Err(ModelError::InvalidTarget {
+            return Err(ValidationError::InvalidTarget {
                 gate,
                 target: target.to_string(),
-            });
+            }
+            .into());
         }
     }
     Ok(())
@@ -440,10 +455,11 @@ fn validate_combiners(gate: &'static str, targets: &[Target]) -> ModelResult<()>
     for target in targets {
         if target.is_combiner() {
             if previous_was_combiner {
-                return Err(ModelError::InvalidTarget {
+                return Err(ValidationError::InvalidTarget {
                     gate,
                     target: target.to_string(),
-                });
+                }
+                .into());
             }
             previous_was_combiner = true;
         } else {
@@ -451,10 +467,11 @@ fn validate_combiners(gate: &'static str, targets: &[Target]) -> ModelResult<()>
         }
     }
     if previous_was_combiner && !targets.is_empty() {
-        return Err(ModelError::InvalidTarget {
+        return Err(ValidationError::InvalidTarget {
             gate,
             target: "*".to_string(),
-        });
+        }
+        .into());
     }
     Ok(())
 }
@@ -463,10 +480,11 @@ fn validate_finite_arg(gate: &'static str, arg: f64) -> ModelResult<()> {
     if arg.is_finite() {
         Ok(())
     } else {
-        Err(ModelError::InvalidArgument {
+        Err(ValidationError::InvalidArgument {
             gate,
             argument: arg.to_string(),
-        })
+        }
+        .into())
     }
 }
 

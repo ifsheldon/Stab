@@ -9,6 +9,7 @@ mod parse_limits;
 mod resource_limit;
 mod resources;
 mod target;
+mod validation;
 
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
@@ -28,6 +29,7 @@ pub use resource_limit::{
 };
 pub use resources::{Estimate, EstimateClass, ResourceEstimate};
 pub use target::{Pauli, Target};
+pub use validation::{ValidationError, ValidationErrorCode};
 
 /// Low-level model operations for parsers and admitted algorithms.
 pub mod advanced {

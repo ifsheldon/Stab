@@ -1,6 +1,9 @@
 use std::str::FromStr;
 
-use stab_model::{MeasureRecordOffset, ModelError, Probability, QubitId, RepeatCount, Target};
+use stab_model::{
+    DiagnosticSeverity, MeasureRecordOffset, ModelError, Probability, QubitId, RepeatCount, Target,
+    ValidationError, ValidationErrorCode,
+};
 
 #[test]
 fn typed_model_values_preserve_stim_boundaries() {
@@ -10,23 +13,68 @@ fn typed_model_values_preserve_stim_boundaries() {
     );
     assert_eq!(
         QubitId::new(1 << 24),
-        Err(ModelError::InvalidDomainValue {
-            kind: "qubit id",
-            value: (1 << 24).to_string(),
-        })
+        Err(ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "qubit id",
+                value: (1 << 24).to_string(),
+            }
+        ))
     );
 
     assert_eq!(
         RepeatCount::try_new(0),
-        Err(ModelError::InvalidDomainValue {
-            kind: "repeat count",
-            value: "0".to_owned(),
-        })
+        Err(ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "repeat count",
+                value: "0".to_owned(),
+            }
+        ))
     );
     assert!(Probability::try_new(f64::NAN).is_err());
     assert!(Probability::try_new(-0.0).is_ok());
     assert!(Probability::try_new(1.0).is_ok());
     assert!(Probability::try_new(f64::INFINITY).is_err());
+}
+
+#[test]
+#[allow(
+    clippy::expect_used,
+    reason = "the test must inspect the typed error returned by exact rejected model fixtures"
+)]
+fn model_errors_expose_validation_from_real_model_failures() {
+    let domain_error = QubitId::new(1 << 24).expect_err("reject oversized Stim qubit id");
+    assert!(matches!(
+        domain_error.validation_error(),
+        Some(ValidationError::InvalidDomainValue {
+            kind: "qubit id",
+            ..
+        })
+    ));
+    let domain_validation = domain_error
+        .validation_error()
+        .expect("oversized id is a validation failure");
+    assert_eq!(
+        domain_validation.code(),
+        ValidationErrorCode::InvalidDomainValue
+    );
+    assert_eq!(domain_validation.severity(), DiagnosticSeverity::Error);
+    assert!(domain_error.parse_error().is_none());
+    assert!(domain_error.resource_limit_error().is_none());
+
+    let gate_error = stab_model::Gate::from_name("missing")
+        .expect_err("reject a name outside the closed Stim gate table");
+    assert!(matches!(
+        gate_error.validation_error(),
+        Some(ValidationError::UnknownGate(name)) if name == "missing"
+    ));
+    assert_eq!(
+        gate_error
+            .validation_error()
+            .expect("unknown gate is a validation failure")
+            .code()
+            .as_str(),
+        "unknown-gate"
+    );
 }
 
 #[test]
@@ -45,10 +93,12 @@ fn target_parser_preserves_stim_negative_zero() {
     assert_eq!(offset.stim_text().to_string(), "-0");
     assert_eq!(
         MeasureRecordOffset::try_new(0),
-        Err(ModelError::InvalidDomainValue {
-            kind: "measurement record offset",
-            value: "0".to_owned(),
-        })
+        Err(ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "measurement record offset",
+                value: "0".to_owned(),
+            }
+        ))
     );
 }
 

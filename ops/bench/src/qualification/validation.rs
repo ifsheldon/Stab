@@ -26,7 +26,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "4f216cc289df2ba78abe523721f7309fbc060e9e6f759772af9f55d1d1bfe6fe";
+const CORRECTNESS_DIGEST: &str = "aaccf0f43cf8d9ce835a6fb3eba467e0e890120b5b4514f26b28b8a6ccd74d86";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;

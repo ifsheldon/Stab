@@ -451,6 +451,8 @@ pub(super) fn classify_public_api_source(
         "observableid",
         "qubitid",
         "repeatcount",
+        "validationerror",
+        "validationerrorcode",
     ]
     .iter()
     .any(|marker| api_path_mentions_item(&api_lower, marker))
@@ -493,7 +495,9 @@ pub(super) fn classify_public_api_source(
     }
     if matches!(
         value.as_str(),
-        "crates/stab-model/src/lib.rs" | "crates/stab-model/src/error.rs"
+        "crates/stab-model/src/lib.rs"
+            | "crates/stab-model/src/error.rs"
+            | "crates/stab-model/src/validation.rs"
     ) {
         return Some(FeatureId::CircuitApi);
     }

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     CircuitDetectorId, CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount,
+    ValidationError,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
@@ -214,20 +215,20 @@ impl Circuit {
         let mut scan = DetectorCoordinateScan::new(detectors);
         scan.visit_circuit(self, &mut Vec::new())?;
         if let Some(missing) = scan.next_unresolved_detector() {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "Detector index {} is too big. The circuit has {} detectors",
-                missing.get(),
-                self.count_detectors()?
-            )));
+            return Err(ValidationError::DetectorIndexOutOfRange {
+                index: missing.get(),
+                detector_count: self.count_detectors()?,
+            }
+            .into());
         }
         Ok(scan.out)
     }
 
     pub fn coordinates_of_detector(&self, detector: CircuitDetectorId) -> CircuitResult<Vec<f64>> {
         let mut coordinates = self.detector_coordinates_for([detector])?;
-        coordinates.remove(&detector).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("detector coordinate lookup failed")
-        })
+        coordinates
+            .remove(&detector)
+            .ok_or_else(|| ValidationError::DetectorCoordinateLookupFailed.into())
     }
 
     fn append_item(&mut self, item: CircuitItem) {
@@ -312,7 +313,7 @@ fn flat_sum_operations(
 }
 
 fn circuit_count_overflow() -> CircuitError {
-    CircuitError::invalid_result_format("circuit count overflowed")
+    ValidationError::CircuitCountOverflow.into()
 }
 
 fn repetition_count_overflow() -> CircuitError {
@@ -334,7 +335,7 @@ fn pop_index_error(index: impl ToString) -> CircuitError {
 }
 
 fn detector_count_overflow() -> CircuitError {
-    CircuitError::invalid_detector_error_model("detector count overflowed")
+    ValidationError::DetectorCountOverflow.into()
 }
 
 fn instruction_target_group_count(instruction: &CircuitInstruction) -> usize {
@@ -586,14 +587,12 @@ fn add_coordinate_shift_mul(
         shift.resize(delta.len(), 0.0);
     }
     for (index, value) in delta.iter().enumerate() {
-        let coordinate = shift.get_mut(index).ok_or_else(|| {
-            CircuitError::invalid_result_format("coordinate shift dimension missing")
-        })?;
+        let coordinate = shift
+            .get_mut(index)
+            .ok_or_else(|| CircuitError::from(ValidationError::CoordinateShiftDimensionMissing))?;
         *coordinate += value * multiplier;
         if !coordinate.is_finite() {
-            return Err(CircuitError::invalid_result_format(
-                "coordinate shift overflowed",
-            ));
+            return Err(ValidationError::CoordinateShiftOverflow.into());
         }
     }
     Ok(())
@@ -605,9 +604,7 @@ fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitRe
         if let Some(offset) = shift.get(index) {
             *coordinate += *offset;
             if !coordinate.is_finite() {
-                return Err(CircuitError::invalid_result_format(
-                    "coordinate shift overflowed",
-                ));
+                return Err(ValidationError::CoordinateShiftOverflow.into());
             }
         }
     }
@@ -620,14 +617,12 @@ fn shifted_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<
         shifted.resize(shift.len(), 0.0);
     }
     for (index, value) in shift.iter().enumerate() {
-        let coordinate = shifted.get_mut(index).ok_or_else(|| {
-            CircuitError::invalid_result_format("coordinate shift dimension missing")
-        })?;
+        let coordinate = shifted
+            .get_mut(index)
+            .ok_or_else(|| CircuitError::from(ValidationError::CoordinateShiftDimensionMissing))?;
         *coordinate += *value;
         if !coordinate.is_finite() {
-            return Err(CircuitError::invalid_result_format(
-                "coordinate shift overflowed",
-            ));
+            return Err(ValidationError::CoordinateShiftOverflow.into());
         }
     }
     Ok(shifted)

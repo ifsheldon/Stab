@@ -1,5 +1,5 @@
 use crate::{FormatError, ParseError, ResourceLimitError};
-pub use stab_model::{ModelError, ModelResult};
+pub use stab_model::{ModelError, ModelResult, ValidationError, ValidationErrorCode};
 use thiserror::Error;
 
 pub type CircuitResult<T> = Result<T, CircuitError>;
@@ -76,11 +76,19 @@ impl From<stab_model::ModelError> for CircuitError {
             stab_model::ModelError::ResourceLimit(error) => {
                 Self::ResourceLimit(ResourceLimitError::from(error))
             }
-            stab_model::ModelError::UnknownGate(gate) => Self::UnknownGate(gate),
-            stab_model::ModelError::InvalidDomainValue { kind, value } => {
+            stab_model::ModelError::Validation(error) => Self::from(error),
+        }
+    }
+}
+
+impl From<stab_model::ValidationError> for CircuitError {
+    fn from(error: stab_model::ValidationError) -> Self {
+        match error {
+            stab_model::ValidationError::UnknownGate(gate) => Self::UnknownGate(gate),
+            stab_model::ValidationError::InvalidDomainValue { kind, value } => {
                 Self::InvalidDomainValue { kind, value }
             }
-            stab_model::ModelError::InvalidArgumentCount {
+            stab_model::ValidationError::InvalidArgumentCount {
                 gate,
                 expected,
                 actual,
@@ -89,14 +97,24 @@ impl From<stab_model::ModelError> for CircuitError {
                 expected,
                 actual,
             },
-            stab_model::ModelError::InvalidArgument { gate, argument } => {
+            stab_model::ValidationError::InvalidArgument { gate, argument } => {
                 Self::InvalidArgument { gate, argument }
             }
-            stab_model::ModelError::InvalidTarget { gate, target } => {
+            stab_model::ValidationError::InvalidTarget { gate, target } => {
                 Self::InvalidTarget { gate, target }
             }
-            stab_model::ModelError::InvalidTargetCount { gate, count } => {
+            stab_model::ValidationError::InvalidTargetCount { gate, count } => {
                 Self::InvalidTargetCount { gate, count }
+            }
+            stab_model::ValidationError::CircuitCountOverflow
+            | stab_model::ValidationError::CoordinateShiftDimensionMissing
+            | stab_model::ValidationError::CoordinateShiftOverflow => {
+                Self::invalid_result_format(error.to_string())
+            }
+            stab_model::ValidationError::DetectorCountOverflow
+            | stab_model::ValidationError::DetectorIndexOutOfRange { .. }
+            | stab_model::ValidationError::DetectorCoordinateLookupFailed => {
+                Self::invalid_detector_error_model(error.to_string())
             }
         }
     }

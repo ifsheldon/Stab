@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "832693ba6d578043863edbdf091dafa41ca34b9bd35fcc3273d5aa93b6e63f17",
+  "performance_inventory_sha256": "2a93cf312f51b814658f47e07fe0f89dbee94b9dd40f26816d827220e8db2d19",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {

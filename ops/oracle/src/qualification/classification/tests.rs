@@ -220,6 +220,14 @@ fn classifications_distinguish_selected_execution_domains() {
     assert_eq!(
         classify_public_api_source(
             "stab_model",
+            Path::new("crates/stab-model/src/validation.rs"),
+            "stab_model::ValidationError",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
             Path::new("crates/stab-model/src/lib.rs"),
             "stab_model::advanced::circuit_source_line_limit_error",
         ),

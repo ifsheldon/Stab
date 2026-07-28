@@ -5,7 +5,7 @@
 
 use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, ModelError, QubitId,
-    Target,
+    Target, ValidationError,
     advanced::{
         gate_decomposition, gate_flow_descriptors, gate_unitary_rows, validate_gate,
         validate_gate_targets,
@@ -51,7 +51,9 @@ fn canonical_gate_registry_owns_aliases_and_metadata() {
     );
     assert_eq!(
         Gate::from_name("missing"),
-        Err(ModelError::UnknownGate("missing".to_string()))
+        Err(ModelError::Validation(ValidationError::UnknownGate(
+            "missing".to_string()
+        )))
     );
 }
 
@@ -63,27 +65,36 @@ fn gate_validation_reports_model_owned_errors() {
     validate_gate(h, &[], std::slice::from_ref(&q0)).expect("valid H");
     assert!(matches!(
         validate_gate(h, &[0.5], std::slice::from_ref(&q0)),
-        Err(ModelError::InvalidArgumentCount { gate: "H", .. })
+        Err(ModelError::Validation(
+            ValidationError::InvalidArgumentCount { gate: "H", .. }
+        ))
     ));
 
     let cx = Gate::from_name("CX").expect("CX");
     validate_gate_targets(cx, &[q0.clone(), q1]).expect("valid CX");
     assert!(matches!(
         validate_gate_targets(cx, std::slice::from_ref(&q0)),
-        Err(ModelError::InvalidTargetCount {
-            gate: "CX",
-            count: 1
-        })
+        Err(ModelError::Validation(
+            ValidationError::InvalidTargetCount {
+                gate: "CX",
+                count: 1
+            }
+        ))
     ));
     assert!(matches!(
         validate_gate_targets(cx, &[q0.clone(), q0]),
-        Err(ModelError::InvalidTarget { gate: "CX", .. })
+        Err(ModelError::Validation(ValidationError::InvalidTarget {
+            gate: "CX",
+            ..
+        }))
     ));
 
     let channel = Gate::from_name("PAULI_CHANNEL_1").expect("channel");
     assert!(matches!(
         validate_gate(channel, &[0.6, 0.6, 0.0], &[]),
-        Err(ModelError::InvalidArgument { .. })
+        Err(ModelError::Validation(
+            ValidationError::InvalidArgument { .. }
+        ))
     ));
 }
 

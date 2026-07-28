@@ -18741,6 +18741,62 @@
         "standalone": true
       },
       {
+        "id": "a6-model-validation-error-contract",
+        "feature_id": "CQ-CIRCUIT-API",
+        "comparator": "error-class",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-model",
+            "--test",
+            "value_boundaries",
+            "model_errors_expose_validation_from_real_model_failures",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Typed value and closed gate-name rejection construct bounded diagnostics without model-sized allocation."
+        },
+        "negative_axes": [
+          "domain-value",
+          "unknown-gate",
+          "error-family"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ValidationError"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ValidationErrorCode"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ValidationErrorCode::as_str"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ValidationError::code"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ValidationError::severity"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ModelError::validation_error"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a6-model-gate-validation-contract",
       "feature_id": "CQ-GATE-CONTRACT",
       "comparator": "error-class",

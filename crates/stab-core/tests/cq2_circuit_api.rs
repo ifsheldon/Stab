@@ -10,7 +10,7 @@ use std::io::ErrorKind;
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
     ObservableId, ParseLimits, QubitId, RepeatBlock, RepeatCount, SourceLineLimit, Target,
-    analysis::circuit_without_tags,
+    ValidationError, analysis::circuit_without_tags,
 };
 
 #[test]
@@ -218,10 +218,12 @@ fn cq2_circuit_api_typed_ids_enforce_value_boundaries() {
     assert!(zero < largest);
     assert_eq!(
         QubitId::new(1 << 24),
-        Err(stab_core::ModelError::InvalidDomainValue {
-            kind: "qubit id",
-            value: (1 << 24).to_string(),
-        })
+        Err(stab_core::ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "qubit id",
+                value: (1 << 24).to_string(),
+            }
+        ))
     );
 
     let observable_zero = ObservableId::new(0);
@@ -245,10 +247,12 @@ fn cq2_circuit_api_typed_ids_enforce_value_boundaries() {
 
     assert_eq!(
         RepeatCount::try_new(0),
-        Err(stab_core::ModelError::InvalidDomainValue {
-            kind: "repeat count",
-            value: "0".to_string(),
-        })
+        Err(stab_core::ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "repeat count",
+                value: "0".to_string(),
+            }
+        ))
     );
     let one_repeat = RepeatCount::try_new(1).expect("smallest repeat count");
     let repeat_count = RepeatCount::try_new(u64::MAX).expect("largest repeat count");
