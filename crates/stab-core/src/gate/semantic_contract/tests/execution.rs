@@ -966,7 +966,7 @@ fn assert_family_names(families: &[GateSemanticFamily], expected: &[&str]) {
 
 fn gates_in_families(families: &[GateSemanticFamily]) -> Vec<Gate> {
     Gate::all()
-        .filter(|gate| families.contains(&gate.info.semantic_family))
+        .filter(|gate| families.contains(&super::super::gate_semantic_family(*gate)))
         .collect()
 }
 

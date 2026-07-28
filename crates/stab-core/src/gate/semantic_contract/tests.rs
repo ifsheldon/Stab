@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
     GateSemanticFamily, GateShapeExclusion, GateSurface, GateSurfaceBehavior, GateTargetPattern,
+    gate_semantic_family,
 };
 use crate::{Circuit, CompiledSampler, Gate, MeasureRecordOffset, Pauli, QubitId, Target};
 
@@ -439,7 +440,7 @@ fn gate_surface_contract_family_assignments_are_canonical_metadata() {
 
     for (name, family) in expected {
         assert_eq!(
-            Gate::from_name(name).expect(name).info.semantic_family,
+            gate_semantic_family(Gate::from_name(name).expect(name)),
             family,
             "{name} semantic family"
         );
@@ -447,7 +448,7 @@ fn gate_surface_contract_family_assignments_are_canonical_metadata() {
 
     assert_eq!(
         Gate::all()
-            .map(|gate| gate.info.semantic_family)
+            .map(gate_semantic_family)
             .collect::<BTreeSet<_>>(),
         GateSemanticFamily::ALL.into_iter().collect::<BTreeSet<_>>()
     );

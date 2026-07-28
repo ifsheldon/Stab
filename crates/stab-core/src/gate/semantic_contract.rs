@@ -1,4 +1,4 @@
-use super::{ArgRule, GateCategory, GateInfo, TargetRule};
+use super::{Gate, GateCategory};
 
 macro_rules! define_gate_contract_enum {
     (
@@ -90,114 +90,45 @@ pub(crate) use statistical_plan::{
     gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
 };
 
-pub(super) const fn gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    gate_with_inverse(name, name, category, arg_rule, target_rule)
-}
-
-pub(super) const fn gate_with_inverse(
-    name: &'static str,
-    inverse_name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    semantic_gate_with_inverse(
-        name,
-        inverse_name,
-        category,
-        arg_rule,
-        target_rule,
-        default_semantic_family(category),
-    )
-}
-
-pub(super) const fn semantic_gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-    semantic_family: GateSemanticFamily,
-) -> GateInfo {
-    semantic_gate_with_inverse(name, name, category, arg_rule, target_rule, semantic_family)
-}
-
-pub(super) const fn semantic_gate_with_inverse(
-    name: &'static str,
-    inverse_name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-    semantic_family: GateSemanticFamily,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name,
-        category,
-        arg_rule,
-        target_rule,
-        semantic_family,
-        can_fuse: true,
-    }
-}
-
-pub(super) const fn not_fusable_gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    semantic_not_fusable_gate(
-        name,
-        category,
-        arg_rule,
-        target_rule,
-        default_semantic_family(category),
-    )
-}
-
-pub(super) const fn semantic_not_fusable_gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-    semantic_family: GateSemanticFamily,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name: name,
-        category,
-        arg_rule,
-        target_rule,
-        semantic_family,
-        can_fuse: false,
-    }
-}
-
 #[allow(
     clippy::panic,
-    reason = "ambiguous categories must choose an explicit semantic family in the canonical gate table"
+    reason = "the exhaustive canonical gate contract test proves every ambiguous gate is classified"
 )]
-const fn default_semantic_family(category: GateCategory) -> GateSemanticFamily {
-    match category {
-        GateCategory::Annotation => GateSemanticFamily::Annotation,
-        GateCategory::ControlFlow => GateSemanticFamily::ControlFlow,
-        GateCategory::Controlled
-        | GateCategory::HadamardLike
-        | GateCategory::Pauli
-        | GateCategory::Period3
-        | GateCategory::Period4
-        | GateCategory::ParityPhasing
-        | GateCategory::Swap => GateSemanticFamily::FixedTableau,
-        GateCategory::HeraldedNoise => GateSemanticFamily::HeraldedNoise,
-        GateCategory::PairMeasurement => GateSemanticFamily::PairMeasurement,
-        GateCategory::Collapsing | GateCategory::Noise | GateCategory::PauliProduct => {
-            panic!("ambiguous gate category requires an explicit semantic family")
-        }
+fn gate_semantic_family(gate: Gate) -> GateSemanticFamily {
+    match gate.canonical_name() {
+        "MPAD" => GateSemanticFamily::MeasurementPad,
+        "MX" | "MY" | "M" => GateSemanticFamily::Measurement,
+        "MRX" | "MRY" | "MR" => GateSemanticFamily::MeasureReset,
+        "RX" | "RY" | "R" => GateSemanticFamily::Reset,
+        "XCZ" | "YCZ" => GateSemanticFamily::ReverseClassicalControl,
+        "CX" | "CY" => GateSemanticFamily::ForwardClassicalControl,
+        "CZ" => GateSemanticFamily::SymmetricClassicalControl,
+        "DEPOLARIZE1" | "DEPOLARIZE2" => GateSemanticFamily::Depolarization,
+        "X_ERROR" | "Y_ERROR" | "Z_ERROR" => GateSemanticFamily::PauliNoise,
+        "I_ERROR" | "II_ERROR" => GateSemanticFamily::IdentityNoise,
+        "PAULI_CHANNEL_1" | "PAULI_CHANNEL_2" => GateSemanticFamily::PauliChannel,
+        "E" | "ELSE_CORRELATED_ERROR" => GateSemanticFamily::CorrelatedError,
+        "MPP" => GateSemanticFamily::PauliProductMeasurement,
+        "SPP" | "SPP_DAG" => GateSemanticFamily::PauliProductPhase,
+        _ => match gate.category() {
+            GateCategory::Annotation => GateSemanticFamily::Annotation,
+            GateCategory::ControlFlow => GateSemanticFamily::ControlFlow,
+            GateCategory::Controlled
+            | GateCategory::HadamardLike
+            | GateCategory::Pauli
+            | GateCategory::Period3
+            | GateCategory::Period4
+            | GateCategory::ParityPhasing
+            | GateCategory::Swap => GateSemanticFamily::FixedTableau,
+            GateCategory::HeraldedNoise => GateSemanticFamily::HeraldedNoise,
+            GateCategory::PairMeasurement => GateSemanticFamily::PairMeasurement,
+            GateCategory::Collapsing | GateCategory::Noise | GateCategory::PauliProduct => {
+                panic!(
+                    "ambiguous gate {} requires an explicit semantic family",
+                    gate.canonical_name()
+                )
+            }
+        },
     }
 }
 

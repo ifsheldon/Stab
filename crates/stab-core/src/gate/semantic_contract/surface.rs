@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use super::super::{Gate, TargetRule};
-use super::{GateSemanticFamily, GateSurface};
+use super::super::{Gate, GateTargetRule};
+use super::{GateSemanticFamily, GateSurface, gate_semantic_family};
 use crate::{Pauli, PauliBasis, PauliPhase, QubitId, Target};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -79,7 +79,7 @@ impl GateSurfaceContract {
     }
 
     pub(crate) fn target_patterns(self) -> &'static [GateTargetPattern] {
-        target_patterns(self.gate.info.target_rule)
+        target_patterns(self.gate.target_rule())
     }
 
     pub(crate) fn decision(
@@ -90,19 +90,15 @@ impl GateSurfaceContract {
         if !self.target_patterns().contains(&pattern) {
             return None;
         }
-        decision_for(self.gate.info.semantic_family, surface, pattern)
+        decision_for(gate_semantic_family(self.gate), surface, pattern)
     }
 
     pub(crate) fn classify_target_groups(
         self,
         targets: &[Target],
     ) -> Option<Vec<GateTargetPattern>> {
-        self.gate
-            .info
-            .target_rule
-            .validate(self.gate.info.name, targets)
-            .ok()?;
-        classify_target_groups(self.gate.info.target_rule, targets)
+        self.gate.validate_targets(targets).ok()?;
+        classify_target_groups(self.gate.target_rule(), targets)
     }
 }
 
@@ -167,20 +163,20 @@ const CLASSICAL_CONTROL_PAIRS: &[GateTargetPattern] = &[
     GateTargetPattern::SweepSweep,
 ];
 
-const fn target_patterns(rule: TargetRule) -> &'static [GateTargetPattern] {
+const fn target_patterns(rule: GateTargetRule) -> &'static [GateTargetPattern] {
     match rule {
-        TargetRule::None => NO_TARGETS,
-        TargetRule::AnySingleQubit => PLAIN_QUBIT,
-        TargetRule::MeasurementQubits => MEASUREMENT_QUBIT,
-        TargetRule::MeasurementPads => MEASUREMENT_PAD,
-        TargetRule::PlainPairs => PLAIN_QUBIT_PAIR,
-        TargetRule::ClassicalControlPairs => CLASSICAL_CONTROL_PAIRS,
-        TargetRule::MeasurementPairs => MEASUREMENT_QUBIT_PAIR,
-        TargetRule::RecOnly => DETECTOR_DECLARATION,
-        TargetRule::RecOrPauli => OBSERVABLE_DECLARATION,
-        TargetRule::QubitCoords => QUBIT_COORDINATES,
-        TargetRule::PauliProducts => PAULI_PRODUCTS,
-        TargetRule::PauliList => PAULI_LIST,
+        GateTargetRule::None => NO_TARGETS,
+        GateTargetRule::AnySingleQubit => PLAIN_QUBIT,
+        GateTargetRule::MeasurementQubits => MEASUREMENT_QUBIT,
+        GateTargetRule::MeasurementPads => MEASUREMENT_PAD,
+        GateTargetRule::PlainPairs => PLAIN_QUBIT_PAIR,
+        GateTargetRule::ClassicalControlPairs => CLASSICAL_CONTROL_PAIRS,
+        GateTargetRule::MeasurementPairs => MEASUREMENT_QUBIT_PAIR,
+        GateTargetRule::RecOnly => DETECTOR_DECLARATION,
+        GateTargetRule::RecOrPauli => OBSERVABLE_DECLARATION,
+        GateTargetRule::QubitCoords => QUBIT_COORDINATES,
+        GateTargetRule::PauliProducts => PAULI_PRODUCTS,
+        GateTargetRule::PauliList => PAULI_LIST,
     }
 }
 
@@ -450,30 +446,33 @@ const fn sweep_control_decision(surface: GateSurface) -> GateSurfaceDecision {
     }
 }
 
-fn classify_target_groups(rule: TargetRule, targets: &[Target]) -> Option<Vec<GateTargetPattern>> {
+fn classify_target_groups(
+    rule: GateTargetRule,
+    targets: &[Target],
+) -> Option<Vec<GateTargetPattern>> {
     if targets.is_empty() {
         return Some(vec![match rule {
-            TargetRule::None => GateTargetPattern::NoTargets,
-            TargetRule::AnySingleQubit
-            | TargetRule::MeasurementQubits
-            | TargetRule::MeasurementPads
-            | TargetRule::PlainPairs
-            | TargetRule::ClassicalControlPairs
-            | TargetRule::MeasurementPairs
-            | TargetRule::RecOnly
-            | TargetRule::RecOrPauli
-            | TargetRule::QubitCoords
-            | TargetRule::PauliProducts
-            | TargetRule::PauliList => GateTargetPattern::EmptyTargetList,
+            GateTargetRule::None => GateTargetPattern::NoTargets,
+            GateTargetRule::AnySingleQubit
+            | GateTargetRule::MeasurementQubits
+            | GateTargetRule::MeasurementPads
+            | GateTargetRule::PlainPairs
+            | GateTargetRule::ClassicalControlPairs
+            | GateTargetRule::MeasurementPairs
+            | GateTargetRule::RecOnly
+            | GateTargetRule::RecOrPauli
+            | GateTargetRule::QubitCoords
+            | GateTargetRule::PauliProducts
+            | GateTargetRule::PauliList => GateTargetPattern::EmptyTargetList,
         }]);
     }
     Some(match rule {
-        TargetRule::None => return None,
-        TargetRule::AnySingleQubit => vec![GateTargetPattern::PlainQubit],
-        TargetRule::MeasurementQubits => vec![GateTargetPattern::MeasurementQubit],
-        TargetRule::MeasurementPads => vec![GateTargetPattern::MeasurementPad],
-        TargetRule::PlainPairs => vec![GateTargetPattern::PlainQubitPair],
-        TargetRule::ClassicalControlPairs => {
+        GateTargetRule::None => return None,
+        GateTargetRule::AnySingleQubit => vec![GateTargetPattern::PlainQubit],
+        GateTargetRule::MeasurementQubits => vec![GateTargetPattern::MeasurementQubit],
+        GateTargetRule::MeasurementPads => vec![GateTargetPattern::MeasurementPad],
+        GateTargetRule::PlainPairs => vec![GateTargetPattern::PlainQubitPair],
+        GateTargetRule::ClassicalControlPairs => {
             let mut patterns = Vec::new();
             for pair in targets.chunks_exact(2) {
                 if let [left, right] = pair {
@@ -482,12 +481,12 @@ fn classify_target_groups(rule: TargetRule, targets: &[Target]) -> Option<Vec<Ga
             }
             patterns
         }
-        TargetRule::MeasurementPairs => vec![GateTargetPattern::MeasurementQubitPair],
-        TargetRule::RecOnly => vec![GateTargetPattern::DetectorDeclaration],
-        TargetRule::RecOrPauli => vec![GateTargetPattern::ObservableDeclaration],
-        TargetRule::QubitCoords => vec![GateTargetPattern::QubitCoordinates],
-        TargetRule::PauliProducts => classify_pauli_products(targets)?,
-        TargetRule::PauliList => vec![GateTargetPattern::PauliList],
+        GateTargetRule::MeasurementPairs => vec![GateTargetPattern::MeasurementQubitPair],
+        GateTargetRule::RecOnly => vec![GateTargetPattern::DetectorDeclaration],
+        GateTargetRule::RecOrPauli => vec![GateTargetPattern::ObservableDeclaration],
+        GateTargetRule::QubitCoords => vec![GateTargetPattern::QubitCoordinates],
+        GateTargetRule::PauliProducts => classify_pauli_products(targets)?,
+        GateTargetRule::PauliList => vec![GateTargetPattern::PauliList],
     })
 }
 
