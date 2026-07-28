@@ -7,7 +7,8 @@ Current as of 2026-07-27.
 - A0 architecture contract and baseline: complete.
 - A1 logical ownership and dependency enforcement: complete.
 - A2 diagnostics, resources, fingerprints, and capabilities: complete at clean source revision `7b6c592b08f6a24d31a0673588dce7525b1c02c9`.
-- A3 stable packed records and codecs: in progress; `stab-bits` is committed, and the physical `stab-records` extraction has passed direct Stable tests, the 62-case live Stim differential, architecture enforcement, and dirty-worktree diagnostic benchmarks while clean post-commit evidence and closure audits remain pending.
+- A3 stable packed records and codecs: complete; product timing and allocation evidence binds clean revision `cb0f2ddbb19a99e16f27471b91966312a4404f79`, and the final oracle ownership repair is commit `07df4b33`.
+- A4 sampling compiler, plan, session, and sink: next.
 - Formal correctness and performance evidence for the current post-A1 inventories: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
@@ -317,4 +318,54 @@ The initial dirty timing diagnostic is `target/benchmarks/a3-records-dirty-compa
 
 The A3 audit found two under-specified resource phrases. Returning a generic visitor error is now the defined cancellation signal and preserves the first error without delivering another record. Dense and packed HITS/DETS readers now consume strict lexer events directly, so their allocation is independent of duplicate-token count; a 16,384-duplicate regression proves this for both representations. Raw sparse and typed-token visitors still retain one encoded record because duplicate order is their semantic result. In-memory codec sinks may retain caller-requested encoded output bytes, while all additional scratch remains width- and batch-bounded. `MeasureRecordWriter::begin_dets_result_type` gives component code a typed namespace selector; the raw byte selector remains an explicitly documented compatibility adapter.
 
-The final pre-commit milestone audit and full-code review found no P0/P1 compatibility, resource-safety, benchmark-semantics, or crate-boundary defect. Their only code-quality finding was that three touched qualification modules sat just above the 1,200-line project threshold. Simulator classification, stable case-ID generation, and evidence-only export policy now have separate owned modules; the three parent files are 1,082, 1,197, and 1,197 lines. The extraction is committed at `46abdac2`, and the record benchmark contracts are committed at `b8dff63c`. Clean post-commit timing and allocation evidence remains the only A3 closure blocker.
+The final pre-commit milestone audit and full-code review found no P0/P1 compatibility, resource-safety, benchmark-semantics, or crate-boundary defect. Their only code-quality finding was that three touched qualification modules sat just above the 1,200-line project threshold. Simulator classification, stable case-ID generation, and evidence-only export policy now have separate owned modules; the three parent files are 1,082, 1,197, and 1,197 lines. The extraction is committed at `46abdac2`, the record benchmark contracts are committed at `b8dff63c`, and the synchronized pre-evidence documentation checkpoint is committed at `cb0f2ddb`.
+
+## A3 Clean Closure Evidence
+
+The accepted A3 component and compatibility compare reports below bind clean product revision `cb0f2ddbb19a99e16f27471b91966312a4404f79` with `local_modifications=false`. The later oracle repair changes fixture dispatch only, not product or benchmark code. The two baseline artifacts bind pinned Stim v1.16.0 rather than a Stab revision. The final row is the separately identified clean pre-extraction comparison at revision `a848775937abe65f1d6270a9738600cccb9788fc`.
+
+| Evidence | Artifact | SHA-256 |
+| --- | --- | --- |
+| Direct component baseline | `target/benchmarks/a3-records-clean-baseline-cb0f2ddb/baseline.json` | `fc41686bf931b0181118f52731be3333a58f94991b791d2aed6713d88ef36691` |
+| Direct component timing | `target/benchmarks/a3-records-clean-compare-cb0f2ddb/compare.json` | `78849d336e8f7e65570fff4a376810987f6a1133d73b1bcf2953ccd7abd8b55f` |
+| Direct component allocation | `target/benchmarks/a3-records-clean-allocations-cb0f2ddb/compare.json` | `1157ba5a9a92000cfa330255f216b11fe578b7b6bb41ecd09cb8b411db011118` |
+| Compatibility baseline | `target/benchmarks/a3-records-compat-baseline-cb0f2ddb/baseline.json` | `cbe09e3e5176893b4fe243b138c46daf171f87646c88279bfea19c1796223732` |
+| Source-current compatibility timing | `target/benchmarks/a3-records-compat-compare-cb0f2ddb/compare.json` | `3698a24228c9829ba61dc5deacc7c47152a7a3a1002df5ba6439091460f38737` |
+| Clean pre-extraction comparison | `target/benchmarks/a3-records-pre-extraction-compat-compare-a8487759-retry3/compare.json` | `649b1c344aa546c6d2cad32146d2ab262c5e6425a79f5ee1c217438a6ecd7906` |
+
+The direct component report uses one warmup and three recorded runs. Its source-owned report-only measurements are:
+
+| Measurement | Median observation |
+| --- | --- |
+| Typed B8 shot-major writer | 468.3 million bits per second |
+| Direct PTB64 bit-plane writer | 23.09 billion bits per second |
+| Shot-major to bit-plane transpose | 30.10 billion bits per second |
+| Bit-plane to shot-major transpose | 27.30 billion bits per second |
+| Typed detector and observable DETS parser | 12.67 million records per second |
+
+No Stim ratio is claimed for these component-only workloads. Allocation instrumentation records one measured allocation for every workload: 80,000 bytes for each writer and shot-major-to-plane conversion, 80,384 bytes for plane-to-shot conversion, and 16 bytes for the packed 4,096-record DETS benchmark. The dedicated dense and packed resource tests separately prove that accepted parsing allocation does not grow with record count or duplicate-token count.
+
+The source-current compatibility report also uses one warmup and three recorded runs. All eight Stim-comparable rows pass the unchanged `1.25x` gate:
+
+| Row | Stab over Stim |
+| --- | ---: |
+| `m7-convert-01-to-b8` | `0.273x` |
+| `m7-convert-b8-to-01` | `0.300x` |
+| `m7-convert-dets-to-b8` | `0.175x` |
+| `m7-convert-ptb64-to-01` | `0.269x` |
+| `m8-measure-reader-01` | `0.331x` |
+| `m8-measure-reader-b8` | `0.959x` |
+| `m8-measure-reader-hits` | `0.569x` |
+| `m8-measure-reader-dets` | `0.752x` |
+
+`m7-convert-01-to-ptb64` and `m8-measure-reader-ptb64-contract` remain contract-only because pinned Stim v1.16.0 has no faithful comparator for those exact operations. They are measured but correctly report `not-proven`.
+
+The clean pre-extraction report binds revision `a848775937abe65f1d6270a9738600cccb9788fc` with `local_modifications=false` and reuses the identical compatibility baseline and workload identifiers. Of 18 matched Stab measurements, 14 are faster after extraction and four are slower. The largest observed improvement is 29.6%, and the largest observed slowdown is 10.5%; the latter is below the source-owned 15% self-regression boundary. This separately scheduled three-run comparison is diagnostic rather than an alternating paired self-regression experiment, so the report supports the absence of a material extraction regression but does not establish a formal regression baseline.
+
+The first interrupted pre-extraction path produced no report. The `retry1` path was rejected before measurement because its detached worktree had not materialized the pinned Stim submodule. The `retry2` invocation measured the rows but rejected an absolute publication path. None is reused as evidence; `retry3` is the sole accepted pre-extraction report.
+
+The final closure run of `just oracle::run --implemented-only` caught one integration omission that narrower checks had missed: six result-format coverage rows still dispatched `cargo test` to the now-empty `stab-core` `result_formats` filter. Commit `07df4b33` retargets all six rows to the canonical `stab-records` package and adds a focused manifest-ownership regression. The complete implemented-only oracle then passed. This was repaired as an implementation defect rather than logged as a specification gap.
+
+The final independent milestone audit and full-code-review found no P0, P1, or P2 A3 issue. They identified two P3 documentation precision problems, now corrected: baseline files bind pinned Stim rather than a Stab commit, and the packed DETS allocation artifact must not be cited as the sole proof of the broader dense-allocation invariant.
+
+A3 is complete. Stable users can consume `stab-bits` and `stab-records` without `stab-core` or Nightly, exact Stim result bytes remain unchanged, and the facade retains compatibility adapters without owning a second implementation. Formal post-refactor correctness and performance qualification remains a later program-level task rather than an A3 claim.
