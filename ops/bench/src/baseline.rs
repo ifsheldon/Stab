@@ -20,6 +20,8 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
+mod batch_sinks;
+mod cli_process;
 mod convert;
 mod m10;
 mod m11;
@@ -28,6 +30,7 @@ mod m6;
 mod m7;
 mod m8;
 mod m9;
+mod measurement;
 mod pf1;
 mod pf2;
 mod pf4;
@@ -38,6 +41,10 @@ mod records;
 #[cfg(test)]
 mod tests;
 
+use measurement::{
+    measure_stab, measure_stab_batched, measure_stab_iterations,
+    measure_stab_iterations_with_memory_operation,
+};
 pub(crate) use rates::measurement_rate_work;
 
 #[cfg(not(test))]
@@ -497,13 +504,15 @@ pub(crate) fn run_stab_compare_row_with_root(
                 Ok(Some(measurements))
             } else if let Some(measurements) = m8::run_sample_compare_row(root, profile, row)? {
                 Ok(Some(measurements))
-            } else if let Some(measurements) = m9::run_detection_compare_row(root, row)? {
+            } else if let Some(measurements) = m9::run_detection_compare_row(root, profile, row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = pf6::run_compare_row(row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m10::run_dem_compare_row(row)? {
                 Ok(Some(measurements))
-            } else if let Some(measurements) = m11::run_dem_sampling_compare_row(row)? {
+            } else if let Some(measurements) =
+                m11::run_dem_sampling_compare_row(root, profile, row)?
+            {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m7::run_generator_compare_row(row)? {
                 Ok(Some(measurements))
@@ -723,89 +732,6 @@ fn stab_runner_error(row_id: &str, error: impl ToString) -> BenchError {
         row_id: row_id.to_string(),
         message: error.to_string(),
     }
-}
-
-fn measure_stab(
-    name: &str,
-    mut operation: impl FnMut() -> Result<(), BenchError>,
-) -> Result<Measurement, BenchError> {
-    measure_stab_iterations(name, STAB_COMPARE_ITERATIONS, &mut operation)
-}
-
-fn measure_stab_iterations(
-    name: &str,
-    iterations: usize,
-    mut operation: impl FnMut() -> Result<(), BenchError>,
-) -> Result<Measurement, BenchError> {
-    let mut timings = Vec::with_capacity(iterations);
-    for _ in 0..iterations {
-        let start = Instant::now();
-        operation()?;
-        timings.push(start.elapsed());
-    }
-    let variance_seconds = duration_variance_seconds(&timings);
-    timings.sort();
-    let seconds = timings
-        .get(timings.len() / 2)
-        .map(Duration::as_secs_f64)
-        .unwrap_or_default();
-    let tracked_memory = measure_tracked_memory(&mut operation)?;
-    Ok(Measurement {
-        name: name.to_string(),
-        seconds,
-        variance_seconds,
-        allocation: tracked_memory.allocation,
-        resident_bytes: tracked_memory.resident_bytes_max,
-        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
-        observations: Vec::new(),
-        iterations: Some(iterations),
-    })
-}
-
-fn measure_stab_batched(
-    name: &str,
-    repetitions: usize,
-    mut operation: impl FnMut() -> Result<(), BenchError>,
-) -> Result<Measurement, BenchError> {
-    measure_stab_batched_iterations(name, STAB_COMPARE_ITERATIONS, repetitions, &mut operation)
-}
-
-fn measure_stab_batched_iterations(
-    name: &str,
-    iterations: usize,
-    repetitions: usize,
-    mut operation: impl FnMut() -> Result<(), BenchError>,
-) -> Result<Measurement, BenchError> {
-    let mut timings = Vec::with_capacity(iterations);
-    for _ in 0..iterations {
-        let start = Instant::now();
-        for _ in 0..repetitions {
-            operation()?;
-        }
-        timings.push(start.elapsed().div_f64(repetitions as f64));
-    }
-    let variance_seconds = duration_variance_seconds(&timings);
-    timings.sort();
-    let seconds = timings
-        .get(timings.len() / 2)
-        .map(Duration::as_secs_f64)
-        .unwrap_or_default();
-    let tracked_memory = measure_tracked_memory(|| {
-        for _ in 0..repetitions {
-            operation()?;
-        }
-        Ok(())
-    })?;
-    Ok(Measurement {
-        name: name.to_string(),
-        seconds,
-        variance_seconds,
-        allocation: tracked_memory.allocation,
-        resident_bytes: tracked_memory.resident_bytes_max,
-        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
-        observations: Vec::new(),
-        iterations: Some(iterations),
-    })
 }
 
 pub(crate) fn summarize_measurements(measurements: &[Measurement]) -> String {

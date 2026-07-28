@@ -1,19 +1,17 @@
 use std::ffi::OsString;
 use std::hint::black_box;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use stab_core::{
-    Circuit, CircuitError, CodeDistance, CompiledSampler, DetectionConversionOptions,
-    DetectionObservableOutputMode, Flow, Probability, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SampleFormat, check_if_circuit_has_unsigned_stabilizer_flows,
+    Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, SampleFormat,
+    Seed, ShotCount, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
-    convert_measurements_to_detection_events, generate_repetition_code_circuit,
+    execution::{DetectionSamplingCompiler, MeasurementToDetectionCompiler},
     measurement_record_count,
+    result_formats::read_records,
     result_formats::write_ptb64_records_checked,
-    result_formats::{read_records, write_records},
-    sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
+    try_for_each_sampled_detection_event,
 };
 
 use crate::error::BenchError;
@@ -21,7 +19,11 @@ use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 use crate::root::RepoRoot;
 
-use super::{measure_stab_iterations, stab_runner_error};
+use super::{
+    batch_sinks::{ByteDigestWriter, DetectionDigestSink, OutputWitness},
+    cli_process::run_stab_cli_process_row,
+    measure_stab_iterations, stab_runner_error,
+};
 
 mod detecting_region_rows;
 mod gate_semantic;
@@ -38,22 +40,23 @@ const M2D_SWEEP_B8_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../benchmarks/fixtures/m9_m2d_sweep_b8_measurements.b8");
 const M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_ran_without_feedback_measurements.01");
-const PRIMARY_DISTANCE: u32 = 3;
-const PRIMARY_ROUNDS: u64 = 3;
 #[cfg(not(test))]
 const DETECT_SHOTS: usize = 1024;
 #[cfg(test)]
 const DETECT_SHOTS: usize = 4;
-#[cfg(not(test))]
-const PRIMARY_SHOTS: usize = 64;
-#[cfg(test)]
-const PRIMARY_SHOTS: usize = 2;
+const DETECT_CLI_SHOTS: usize = 1024;
+const PRIMARY_CLI_SHOTS: usize = 64;
 #[cfg(not(test))]
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
 const FLOW_CHECK_CASES: usize = 4;
 const FLOW_CHECK_FLOWS: usize = 27;
+const M2D_PHASE_BATCH_SHOTS: usize = 64;
+#[cfg(not(test))]
+const DETECT_PTB64_SHOTS: usize = 1024;
+#[cfg(test)]
+const DETECT_PTB64_SHOTS: usize = 64;
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -77,19 +80,13 @@ type FlowCheckCase = (Circuit, Vec<Flow>, Vec<bool>);
 
 pub(super) fn run_detection_compare_row(
     root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
+    if let Some(measurement_name) = process_cli_measurement_name(&row.id) {
+        return run_process_cli_row(root, profile, row, measurement_name).map(Some);
+    }
     match row.id.as_str() {
-        "m9-detect-text-cli" => {
-            run_detect_fixture_row(row, "stab_detect_1024_dets", SampleFormat::Dets).map(Some)
-        }
-        "m9-detect-bitpacked-cli" => {
-            run_detect_fixture_row(row, "stab_detect_1024_b8", SampleFormat::B8).map(Some)
-        }
-        "m9-m2d-text-cli" => {
-            run_m2d_fixture_row(row, "stab_m2d_dets", SampleFormat::Dets).map(Some)
-        }
-        "m9-m2d-bitpacked-contract" => run_m2d_bitpacked_row(row).map(Some),
         "m9-m2d-sweep-01-cli" => run_m2d_cli_row(
             row,
             "stab_m2d_sweep_01_dets",
@@ -125,6 +122,8 @@ pub(super) fn run_detection_compare_row(
         "m9-detecting-regions-basic-batch" => detecting_region_rows::run_basic_batch(row).map(Some),
         "m9-missing-detectors-basic-batch" => missing_detector_rows::run_basic_batch(row).map(Some),
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
+        "m9-detection-batch-phases" => run_detection_phase_row(row).map(Some),
+        "m9-m2d-batch-phases" => run_m2d_phase_row(row).map(Some),
         "pf5-detecting-regions-repeat" => detecting_region_rows::run_repeat_row(row).map(Some),
         "pf5-detecting-regions-targets" => detecting_region_rows::run_targets_row(row).map(Some),
         "pf5-detecting-regions-clifford" => detecting_region_rows::run_clifford_row(row).map(Some),
@@ -140,8 +139,6 @@ pub(super) fn run_detection_compare_row(
             missing_detector_rows::run_generated_code_batch(row).map(Some)
         }
         "pf5-has-all-flows-batch" => run_has_all_flows_batch(row).map(Some),
-        "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
-        "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
             row,
             "stab_pf3_m2d_sweep_b8",
@@ -170,6 +167,18 @@ pub(super) fn run_detection_compare_row(
         )
         .map(Some),
         _ => Ok(None),
+    }
+}
+
+pub(super) fn process_cli_measurement_name(row_id: &str) -> Option<&'static str> {
+    match row_id {
+        "m9-detect-text-cli" => Some("stab_detect_1024_dets"),
+        "m9-detect-bitpacked-cli" => Some("stab_detect_1024_b8"),
+        "m9-detect-primary-matrix-contract" => Some("stab_detect_primary_repetition_d3_r3_b8"),
+        "m9-m2d-text-cli" => Some("stab_m2d_dets"),
+        "m9-m2d-bitpacked-contract" => Some("stab_m2d_b8"),
+        "m9-m2d-primary-matrix-contract" => Some("stab_m2d_primary_repetition_d3_r3_b8"),
+        _ => None,
     }
 }
 
@@ -203,7 +212,22 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("m9-detect-text-cli", "stab_detect_1024_dets")
         | ("m9-detect-bitpacked-cli", "stab_detect_1024_b8") => {
+            Some((DETECT_CLI_SHOTS as f64, "shots/s"))
+        }
+        ("m9-detection-batch-phases", "stab_detection_plan_compile_and_release_basic") => {
+            Some((1.0, "plans/s"))
+        }
+        ("m9-detection-batch-phases", "stab_detection_session_sample_to_detection") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
+        }
+        ("m9-detection-batch-phases", "stab_detect_ptb64_routing") => {
+            Some((DETECT_PTB64_SHOTS as f64, "shots/s"))
+        }
+        ("m9-m2d-batch-phases", "stab_m2d_plan_compile_and_release_basic") => {
+            Some((1.0, "plans/s"))
+        }
+        ("m9-m2d-batch-phases", "stab_m2d_session_convert_batch") => {
+            Some((M2D_PHASE_BATCH_SHOTS as f64, "shots/s"))
         }
         ("pf3-detect-sweep-sampling", "stab_detect_sweep_default_false") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
@@ -211,11 +235,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf3-detect-sweep-sampling", "stab_detect_frame_sweep_default_false") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
         }
-        ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_dets")
-        | ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_b8")
-        | ("m9-m2d-primary-matrix-contract", "stab_m2d_primary_repetition_d3_r3_dets")
+        ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_b8")
         | ("m9-m2d-primary-matrix-contract", "stab_m2d_primary_repetition_d3_r3_b8") => {
-            Some((PRIMARY_SHOTS as f64, "shots/s"))
+            Some((PRIMARY_CLI_SHOTS as f64, "shots/s"))
         }
         _ => gate_semantic::measurement_work(name)
             .or_else(|| detecting_region_rows::measurement_work(row_id, name))
@@ -226,13 +248,19 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "m9-detect-text-cli" | "m9-detect-bitpacked-cli" => Some(
-            "report-only: Stab measures in-process detector sampling plus result writing for the public detect contract",
+            "report-only: Stab and pinned Stim execute the same seeded detect command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
         ),
         "m9-m2d-text-cli" => Some(
-            "report-only: Stab measures in-process measurement-to-detection conversion plus result writing",
+            "report-only: Stab and pinned Stim execute the same m2d command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
         ),
         "m9-m2d-bitpacked-contract" => Some(
-            "cli-baseline: Stab measures in-process measurement-to-detection conversion with b8 output against pinned Stim m2d on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on the same fixture with an untimed frozen Stab output witness",
+        ),
+        "m9-detection-batch-phases" => Some(
+            "report-only: source-owned Stab diagnostics separately measure detection plan compile-and-release, bounded session execution, and PTB64 CLI routing without claiming a Stim ratio",
+        ),
+        "m9-m2d-batch-phases" => Some(
+            "report-only: source-owned Stab diagnostics separately measure measurement-to-detection plan compile-and-release and bounded session conversion without claiming a Stim ratio",
         ),
         "m9-m2d-sweep-01-cli" => Some(
             "report-only: Stab measures in-process public m2d --sweep text conversion against a pinned-Stim-compatible command shape",
@@ -256,10 +284,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
         ),
         "m9-detect-primary-matrix-contract" => Some(
-            "cli-baseline: Stab detects the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim detect on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same seeded b8 detect command as bounded subprocesses on the source-owned generated repetition-code d3/r3 fixture",
         ),
         "m9-m2d-primary-matrix-contract" => Some(
-            "cli-baseline: Stab converts source-owned generated repetition-code d3/r3 measurement records to b8 detection events against pinned Stim m2d on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same b8 m2d command as bounded subprocesses on source-owned generated repetition-code d3/r3 measurement records",
         ),
         "pf3-m2d-sweep-b8" => Some(
             "report-only: Stab measures the public m2d --sweep packed b8 path using the source-owned M9 sweep fixture; threshold ownership awaits repeated probe evidence",
@@ -484,37 +512,65 @@ fn run_m2d_cli_row(
     if let Some(path) = side_output.as_ref() {
         create_parent_dir(row, path)?;
     }
+    let expected = run_m2d_cli_once(row, &args, input, side_output.as_deref())?;
     Ok(vec![measure_stab_iterations(
         measurement_name,
         super::STAB_COMPARE_ITERATIONS,
         || {
-            let mut stdout = CountingWriter::default();
-            let mut stderr = Vec::new();
-            let status = stab_cli::run_from(args.clone(), input, &mut stdout, &mut stderr);
-            if status != 0 {
-                return Err(BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: format!(
-                        "stab-cli m2d failed with status {status}: {}",
-                        String::from_utf8_lossy(&stderr)
-                    ),
-                });
+            let actual = run_m2d_cli_once(row, &args, input, side_output.as_deref())?;
+            if actual != expected {
+                return Err(stab_runner_error(
+                    &row.id,
+                    format!("m2d diagnostic output changed: expected {expected:?}, got {actual:?}"),
+                ));
             }
-            if let Some(path) = side_output.as_ref() {
-                let side_bytes = std::fs::read(path).map_err(|source| BenchError::StabRunner {
+            black_box(actual);
+            Ok(())
+        },
+    )?])
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct M2dCliWitness {
+    stdout: OutputWitness,
+    side_output: Option<OutputWitness>,
+}
+
+fn run_m2d_cli_once(
+    row: &BenchmarkRow,
+    args: &[OsString],
+    input: &[u8],
+    side_output: Option<&Path>,
+) -> Result<M2dCliWitness, BenchError> {
+    let mut stdout = ByteDigestWriter::default();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(args.iter().cloned(), input, &mut stdout, &mut stderr);
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli m2d failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    let side_output = side_output
+        .map(|path| {
+            std::fs::read(path)
+                .map(|bytes| OutputWitness::from_bytes(&bytes))
+                .map_err(|source| BenchError::StabRunner {
                     row_id: row.id.clone(),
                     message: format!(
                         "failed to read m2d side output {}: {source}",
                         path.display()
                     ),
-                })?;
-                black_box((stdout.len(), side_bytes.len()));
-            } else {
-                black_box(stdout.len());
-            }
-            Ok(())
-        },
-    )?])
+                })
+        })
+        .transpose()?;
+    Ok(M2dCliWitness {
+        stdout: stdout.witness(),
+        side_output,
+    })
 }
 
 fn run_m2d_sweep_ptb64_cli_row(
@@ -556,31 +612,6 @@ fn sweep_ptb64_records(row: &BenchmarkRow, sweep: bool) -> Result<Vec<u8>, Bench
         })
         .collect::<Vec<_>>();
     write_ptb64_records_checked(&records).map_err(|error| stab_runner_error(&row.id, error))
-}
-
-#[derive(Default)]
-struct CountingWriter {
-    bytes: usize,
-}
-
-impl CountingWriter {
-    fn len(&self) -> usize {
-        self.bytes
-    }
-}
-
-impl Write for CountingWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.bytes = self
-            .bytes
-            .checked_add(buf.len())
-            .ok_or_else(|| io::Error::other("m2d benchmark output byte count overflowed"))?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 fn m2d_sweep_args(root: &RepoRoot, obs_out: bool) -> Vec<OsString> {
@@ -650,207 +681,238 @@ fn m2d_ran_without_feedback_args(root: &RepoRoot) -> Vec<OsString> {
     ]
 }
 
-fn run_detect_fixture_row(
+fn run_process_cli_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
     measurement_name: &'static str,
-    format: SampleFormat,
 ) -> Result<Vec<Measurement>, BenchError> {
+    let expected = frozen_process_cli_witness(&row.id).ok_or_else(|| {
+        stab_runner_error(
+            &row.id,
+            "process-equivalent M9 CLI row has no frozen output witness",
+        )
+    })?;
+    run_stab_cli_process_row(root, profile, row, measurement_name, expected)
+}
+
+fn run_detection_phase_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = parse_circuit(&row.id, DETECT_BASIC_FIXTURE)?;
-    Ok(vec![measure_stab_iterations(
-        measurement_name,
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let output = sample_detection_events(&circuit, DETECT_SHOTS, Some(5))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes = write_detection_records(&output, detect_observable_mode(format), format)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bytes.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_m2d_fixture_row(
-    row: &BenchmarkRow,
-    measurement_name: &'static str,
-    format: SampleFormat,
-) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, M2D_BASIC_CIRCUIT)?;
-    let measurements = m2d_measurements(&row.id, &circuit, SampleFormat::ZeroOne)?;
-    Ok(vec![measure_stab_iterations(
-        measurement_name,
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let output = convert_measurements_to_detection_events(
-                &circuit,
-                &measurements,
-                DetectionConversionOptions {
-                    skip_reference_sample: false,
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes = write_detection_records(
-                &output,
-                DetectionObservableOutputMode::DetectorsOnly,
-                format,
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bytes.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_m2d_bitpacked_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, M2D_BASIC_CIRCUIT)?;
-    let measurements = m2d_measurements(&row.id, &circuit, SampleFormat::ZeroOne)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_m2d_b8",
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let output = convert_measurements_to_detection_events(
-                &circuit,
-                &measurements,
-                DetectionConversionOptions {
-                    skip_reference_sample: false,
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes = write_detection_records(
-                &output,
-                DetectionObservableOutputMode::DetectorsOnly,
-                SampleFormat::B8,
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bytes.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_primary_detect_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = primary_repetition_circuit(&row.id)?;
     Ok(vec![
-        measure_primary_detect(
+        measure_detection_plan_compile(row, &circuit)?,
+        measure_detection_session(row, &circuit)?,
+        measure_detect_cli(
             row,
-            &circuit,
-            "stab_detect_primary_repetition_d3_r3_dets",
-            SampleFormat::Dets,
-        )?,
-        measure_primary_detect(
-            row,
-            &circuit,
-            "stab_detect_primary_repetition_d3_r3_b8",
-            SampleFormat::B8,
+            "stab_detect_ptb64_routing",
+            "ptb64",
+            DETECT_PTB64_SHOTS,
+            detect_ptb64_witness(),
         )?,
     ])
 }
 
-fn run_primary_m2d_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = primary_repetition_circuit(&row.id)?;
-    let sampler =
-        CompiledSampler::compile(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
-    let measurements = sampler.sample_zero_one_with_seed(PRIMARY_SHOTS, Some(5));
+#[cfg(not(test))]
+const fn detect_ptb64_witness() -> OutputWitness {
+    OutputWitness::new(128, 0x8421_ae12_6c7c_ed25)
+}
+
+#[cfg(test)]
+const fn detect_ptb64_witness() -> OutputWitness {
+    OutputWitness::new(8, 0xa8c7_f832_281a_39c5)
+}
+
+fn run_m2d_phase_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, M2D_BASIC_CIRCUIT)?;
     Ok(vec![
-        measure_primary_m2d(
-            row,
-            &circuit,
-            &measurements,
-            "stab_m2d_primary_repetition_d3_r3_dets",
-            SampleFormat::Dets,
-        )?,
-        measure_primary_m2d(
-            row,
-            &circuit,
-            &measurements,
-            "stab_m2d_primary_repetition_d3_r3_b8",
-            SampleFormat::B8,
-        )?,
+        measure_m2d_plan_compile(row, &circuit)?,
+        measure_m2d_session_batch(row, &circuit)?,
     ])
 }
 
-fn measure_primary_detect(
+fn frozen_process_cli_witness(row_id: &str) -> Option<OutputWitness> {
+    match row_id {
+        "m9-detect-text-cli" => Some(OutputWitness::new(5_120, 0xfaf5_740c_b1b3_c325)),
+        "m9-detect-bitpacked-cli" => Some(OutputWitness::new(1_024, 0x51d8_8627_df28_7325)),
+        "m9-detect-primary-matrix-contract" => Some(OutputWitness::new(64, 0x266f_92fc_8d95_4165)),
+        "m9-m2d-text-cli" => Some(OutputWitness::new(13, 0x82da_2292_951b_1973)),
+        "m9-m2d-bitpacked-contract" => Some(OutputWitness::new(2, 0x0832_8707_b4eb_6e3a)),
+        "m9-m2d-primary-matrix-contract" => Some(OutputWitness::new(64, 0xb9b2_3f3a_46fd_0825)),
+        _ => None,
+    }
+}
+
+fn measure_detect_cli(
     row: &BenchmarkRow,
-    circuit: &Circuit,
     measurement_name: &'static str,
-    format: SampleFormat,
+    output_format: &'static str,
+    shots: usize,
+    expected: OutputWitness,
 ) -> Result<Measurement, BenchError> {
+    let args = [
+        OsString::from("stab"),
+        OsString::from("detect"),
+        OsString::from("--shots"),
+        OsString::from(shots.to_string()),
+        OsString::from("--seed=5"),
+        OsString::from("--out_format"),
+        OsString::from(output_format),
+    ];
+    let preflight = run_detect_cli(row, args.clone(), expected)?;
+    black_box(preflight);
     measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
-        let output = sample_detection_events(circuit, PRIMARY_SHOTS, Some(5))
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        let bytes = write_detection_records(&output, detect_observable_mode(format), format)
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(bytes.len());
+        let actual = run_detect_cli(row, args.clone(), expected)?;
+        black_box(actual);
         Ok(())
     })
 }
 
-fn measure_primary_m2d(
+fn run_detect_cli(
     row: &BenchmarkRow,
-    circuit: &Circuit,
-    measurements: &[Vec<bool>],
-    measurement_name: &'static str,
-    format: SampleFormat,
-) -> Result<Measurement, BenchError> {
-    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
-        let output = convert_measurements_to_detection_events(
-            circuit,
-            measurements,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-        let bytes = write_detection_records(
-            &output,
-            DetectionObservableOutputMode::DetectorsOnly,
-            format,
-        )
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(bytes.len());
-        Ok(())
-    })
+    args: [OsString; 7],
+    expected: OutputWitness,
+) -> Result<OutputWitness, BenchError> {
+    let mut stdout = ByteDigestWriter::default();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(
+        args,
+        DETECT_BASIC_FIXTURE.as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli detect failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    let actual = stdout.witness();
+    if actual != expected {
+        return Err(stab_runner_error(
+            &row.id,
+            format!("detect PTB64 output changed: expected {expected:?}, got {actual:?}"),
+        ));
+    }
+    Ok(actual)
 }
 
-fn m2d_measurements(
-    row_id: &str,
+fn measure_detection_plan_compile(
+    row: &BenchmarkRow,
     circuit: &Circuit,
-    format: SampleFormat,
-) -> Result<Vec<Vec<bool>>, BenchError> {
+) -> Result<Measurement, BenchError> {
+    measure_stab_iterations(
+        "stab_detection_plan_compile_and_release_basic",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let plan = DetectionSamplingCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((
+                plan.measurement_width(),
+                plan.detector_width(),
+                plan.observable_width(),
+            ));
+            Ok(())
+        },
+    )
+}
+
+fn measure_detection_session(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+) -> Result<Measurement, BenchError> {
+    let plan = DetectionSamplingCompiler::new()
+        .compile(circuit)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DetectionDigestSink::default();
+    measure_stab_iterations(
+        "stab_detection_session_sample_to_detection",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            sink.reset();
+            let summary = session
+                .run(ShotCount::new(DETECT_SHOTS as u64), &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary.committed_shots(), sink.witness()));
+            Ok(())
+        },
+    )
+}
+
+fn measure_m2d_plan_compile(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+) -> Result<Measurement, BenchError> {
+    measure_stab_iterations(
+        "stab_m2d_plan_compile_and_release_basic",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let plan = MeasurementToDetectionCompiler::new()
+                .compile(black_box(circuit))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((
+                plan.measurement_width(),
+                plan.sweep_width(),
+                plan.detector_width(),
+                plan.observable_width(),
+            ));
+            Ok(())
+        },
+    )
+}
+
+fn measure_m2d_session_batch(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+) -> Result<Measurement, BenchError> {
+    let source_records = m2d_measurements(&row.id, circuit)?;
+    if source_records.is_empty() {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: "m2d phase benchmark fixture contains no records".to_owned(),
+        });
+    }
+    let records = source_records
+        .iter()
+        .cycle()
+        .take(M2D_PHASE_BATCH_SHOTS)
+        .cloned()
+        .collect::<Vec<_>>();
+    let width =
+        measurement_record_count(circuit).map_err(|error| stab_runner_error(&row.id, error))?;
+    let batch = PackedShotBatch::from_records(&records, width)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(circuit)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut session = plan
+        .session()
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DetectionDigestSink::default();
+    measure_stab_iterations(
+        "stab_m2d_session_convert_batch",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            sink.reset();
+            let summary = session
+                .write_batch(MeasurementBatchView::new(batch.view()), None, &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary.committed_shots(), sink.witness()));
+            Ok(())
+        },
+    )
+}
+
+fn m2d_measurements(row_id: &str, circuit: &Circuit) -> Result<Vec<Vec<bool>>, BenchError> {
     let width =
         measurement_record_count(circuit).map_err(|error| stab_runner_error(row_id, error))?;
-    if format == SampleFormat::ZeroOne {
-        return read_records(M2D_BASIC_MEASUREMENTS, SampleFormat::ZeroOne, width)
-            .map_err(|error| stab_runner_error(row_id, error));
-    }
-    let zero_one_records = read_records(M2D_BASIC_MEASUREMENTS, SampleFormat::ZeroOne, width)
-        .map_err(|error| stab_runner_error(row_id, error))?;
-    let encoded = write_records(&zero_one_records, format);
-    read_records(&encoded, format, width).map_err(|error| stab_runner_error(row_id, error))
-}
-
-fn detect_observable_mode(format: SampleFormat) -> DetectionObservableOutputMode {
-    if format == SampleFormat::Dets {
-        DetectionObservableOutputMode::Prepend
-    } else {
-        DetectionObservableOutputMode::DetectorsOnly
-    }
-}
-
-fn primary_repetition_circuit(row_id: &str) -> Result<Circuit, BenchError> {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(PRIMARY_ROUNDS).map_err(|error| stab_runner_error(row_id, error))?,
-        CodeDistance::try_new(PRIMARY_DISTANCE)
-            .map_err(|error| stab_runner_error(row_id, error))?,
-        RepetitionCodeTask::Memory,
-    )
-    .map_err(|error| stab_runner_error(row_id, error))?
-    .with_before_measure_flip_probability(
-        Probability::try_new(0.001).map_err(|error| stab_runner_error(row_id, error))?,
-    );
-    let generated = generate_repetition_code_circuit(&params)
-        .map_err(|error| stab_runner_error(row_id, error))?;
-    Ok(generated.circuit().clone())
+    read_records(M2D_BASIC_MEASUREMENTS, SampleFormat::ZeroOne, width)
+        .map_err(|error| stab_runner_error(row_id, error))
 }
 
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {

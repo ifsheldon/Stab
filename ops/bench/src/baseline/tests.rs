@@ -12,6 +12,7 @@ use crate::report::{BaselineReport, Measurement};
 use crate::root::RepoRoot;
 use std::path::Path;
 
+mod a5;
 mod pf3;
 mod pf5;
 mod pfm_b1;
@@ -710,59 +711,36 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn m9_benchmark_rows_have_stab_compare_runners() {
-    for (id, runner, expected_measurements) in [
+    let root = RepoRoot::resolve(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repository root"),
+    )
+    .expect("resolve repository root");
+    let manifest = BenchmarkManifest::read(&root).expect("read benchmark manifest");
+    for (id, expected_measurements) in [
         (
             "m9-convert-measurements-dets",
-            Runner::StimCli,
             &["stab_convert_measurements_to_dets"][..],
         ),
-        (
-            "m9-detect-text-cli",
-            Runner::StimCli,
-            &["stab_detect_1024_dets"][..],
-        ),
-        (
-            "m9-detect-bitpacked-cli",
-            Runner::StimCli,
-            &["stab_detect_1024_b8"][..],
-        ),
+        ("m9-detect-text-cli", &["stab_detect_1024_dets"][..]),
+        ("m9-detect-bitpacked-cli", &["stab_detect_1024_b8"][..]),
         (
             "m9-detect-primary-matrix-contract",
-            Runner::StimCli,
-            &[
-                "stab_detect_primary_repetition_d3_r3_dets",
-                "stab_detect_primary_repetition_d3_r3_b8",
-            ][..],
+            &["stab_detect_primary_repetition_d3_r3_b8"][..],
         ),
-        ("m9-m2d-text-cli", Runner::StimCli, &["stab_m2d_dets"][..]),
-        (
-            "m9-m2d-bitpacked-contract",
-            Runner::StimCli,
-            &["stab_m2d_b8"][..],
-        ),
-        (
-            "m9-m2d-sweep-01-cli",
-            Runner::StimCli,
-            &["stab_m2d_sweep_01_dets"][..],
-        ),
-        (
-            "m9-m2d-sweep-b8-cli",
-            Runner::StimCli,
-            &["stab_m2d_sweep_b8"][..],
-        ),
-        (
-            "m9-m2d-sweep-obs-out-cli",
-            Runner::StimCli,
-            &["stab_m2d_sweep_obs_out"][..],
-        ),
+        ("m9-m2d-text-cli", &["stab_m2d_dets"][..]),
+        ("m9-m2d-bitpacked-contract", &["stab_m2d_b8"][..]),
+        ("m9-m2d-sweep-01-cli", &["stab_m2d_sweep_01_dets"][..]),
+        ("m9-m2d-sweep-b8-cli", &["stab_m2d_sweep_b8"][..]),
+        ("m9-m2d-sweep-obs-out-cli", &["stab_m2d_sweep_obs_out"][..]),
         (
             "m9-m2d-ran-without-feedback-cli",
-            Runner::StimCli,
             &["stab_m2d_ran_without_feedback"][..],
         ),
         (
             "m9-detecting-regions-basic-batch",
-            Runner::ContractOnly,
             &[
                 "stab_detecting_regions_basic_cases",
                 "stab_detecting_regions_basic_regions",
@@ -770,7 +748,6 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m9-missing-detectors-basic-batch",
-            Runner::ContractOnly,
             &[
                 "stab_missing_detectors_basic_cases",
                 "stab_missing_detectors_basic_suggestions",
@@ -778,34 +755,34 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m9-feedback-inline-mpp-batch",
-            Runner::ContractOnly,
             &["stab_feedback_inline_mpp_transforms"][..],
         ),
         (
             "m9-m2d-primary-matrix-contract",
-            Runner::StimCli,
+            &["stab_m2d_primary_repetition_d3_r3_b8"][..],
+        ),
+        (
+            "m9-detection-batch-phases",
             &[
-                "stab_m2d_primary_repetition_d3_r3_dets",
-                "stab_m2d_primary_repetition_d3_r3_b8",
+                "stab_detection_plan_compile_and_release_basic",
+                "stab_detection_session_sample_to_detection",
+                "stab_detect_ptb64_routing",
+            ][..],
+        ),
+        (
+            "m9-m2d-batch-phases",
+            &[
+                "stab_m2d_plan_compile_and_release_basic",
+                "stab_m2d_session_convert_batch",
             ][..],
         ),
     ] {
-        let row = BenchmarkRow {
-            id: id.to_string(),
-            milestone: Milestone::M9,
-            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
-            runner,
-            upstream_source: "src/stim/cmd/command_detect.test.cc".to_string(),
-            stim_perf_filter: String::new(),
-            argv: "detect|--shots|1024".to_string(),
-            stdin_path: String::new(),
-            phase: "throughput".to_string(),
-            measurement: "detector-conversion".to_string(),
-            description: "test row".to_string(),
-            comparability: crate::comparability::ComparabilityClass::Unspecified,
-        };
-
-        let measurements = run_stab_compare_row(&row)
+        let row = manifest
+            .rows
+            .iter()
+            .find(|row| row.id == id)
+            .expect("manifest row");
+        let measurements = run_stab_compare_row(row)
             .expect("run compare row")
             .expect("Stab runner");
         let names = measurements

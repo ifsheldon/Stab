@@ -1,30 +1,32 @@
+use std::ffi::OsString;
 use std::hint::black_box;
 
 use stab_core::{
-    CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel, SampleFormat,
-    write_detection_records,
+    CompiledDemSampler, DetectorErrorModel, RandomPolicy, Seed, ShotCount,
+    execution::DemSamplingCompiler,
 };
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
+use crate::root::RepoRoot;
 
-use super::{measure_stab_iterations, stab_runner_error};
+use super::{
+    batch_sinks::{ByteDigestWriter, DemDigestSink, OutputWitness},
+    cli_process::run_stab_cli_process_row,
+    measure_stab_iterations, stab_runner_error,
+};
 
 const SAMPLE_DEM_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_noisy.dem");
-const SPARSE_CONTRACT_FIXTURE: &str =
-    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_sparse_contract.dem");
-const DENSE_CONTRACT_FIXTURE: &str =
-    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_dense_contract.dem");
-const REPEATED_CONTRACT_FIXTURE: &str =
-    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_repeated_contract.dem");
-const HIGH_DETECTOR_CONTRACT_FIXTURE: &str =
-    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_high_detector_contract.dem");
 #[cfg(not(test))]
 const M11_SAMPLE_DEM_SHOTS: usize = 1024;
 #[cfg(test)]
 const M11_SAMPLE_DEM_SHOTS: usize = 4;
+#[cfg(not(test))]
+const M11_PTB64_SHOTS: usize = 1024;
+#[cfg(test)]
+const M11_PTB64_SHOTS: usize = 64;
 #[cfg(not(test))]
 const M11_CONTRACT_SHOTS: usize = 64;
 #[cfg(test)]
@@ -40,40 +42,28 @@ const DENSE_DETECTOR_COUNT: usize = 16;
 const HIGH_DETECTOR_COUNT: usize = 4096;
 
 pub(super) fn run_dem_sampling_compare_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
+    if let Some(measurement_name) = process_cli_measurement_name(&row.id) {
+        return run_process_cli_row(root, profile, row, measurement_name).map(Some);
+    }
     match row.id.as_str() {
         "m11-dem-sampler" => run_compiled_dem_sampler_row(row).map(Some),
-        "m11-sample-dem-cli" => run_sample_dem_cli_row(row).map(Some),
-        "m11-sample-dem-sparse-contract" => run_contract_row(
-            row,
-            "stab_sample_dem_sparse_b8",
-            SPARSE_CONTRACT_FIXTURE,
-            SampleFormat::B8,
-        )
-        .map(Some),
-        "m11-sample-dem-dense-contract" => run_contract_row(
-            row,
-            "stab_sample_dem_dense_b8",
-            DENSE_CONTRACT_FIXTURE,
-            SampleFormat::B8,
-        )
-        .map(Some),
-        "m11-sample-dem-repeated-contract" => run_contract_row(
-            row,
-            "stab_sample_dem_repeated_b8",
-            REPEATED_CONTRACT_FIXTURE,
-            SampleFormat::B8,
-        )
-        .map(Some),
-        "m11-sample-dem-high-detector-contract" => run_contract_row(
-            row,
-            "stab_sample_dem_high_detector_b8",
-            HIGH_DETECTOR_CONTRACT_FIXTURE,
-            SampleFormat::B8,
-        )
-        .map(Some),
+        "m11-dem-batch-phases" => run_dem_phase_row(row).map(Some),
         _ => Ok(None),
+    }
+}
+
+pub(super) fn process_cli_measurement_name(row_id: &str) -> Option<&'static str> {
+    match row_id {
+        "m11-sample-dem-cli" => Some("stab_sample_dem_cli_1024_zero_one"),
+        "m11-sample-dem-sparse-contract" => Some("stab_sample_dem_sparse_b8"),
+        "m11-sample-dem-dense-contract" => Some("stab_sample_dem_dense_b8"),
+        "m11-sample-dem-repeated-contract" => Some("stab_sample_dem_repeated_b8"),
+        "m11-sample-dem-high-detector-contract" => Some("stab_sample_dem_high_detector_b8"),
+        _ => None,
     }
 }
 
@@ -84,6 +74,21 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("m11-sample-dem-cli", "stab_sample_dem_cli_1024_zero_one") => {
             Some((M11_SAMPLE_DEM_SHOTS as f64, "shots/s"))
+        }
+        ("m11-dem-batch-phases", "stab_dem_plan_compile_and_release_surface_like") => {
+            Some((1.0, "plans/s"))
+        }
+        ("m11-dem-batch-phases", "stab_dem_session_detector_only") => {
+            Some((M11_SAMPLE_DEM_SHOTS as f64, "shots/s"))
+        }
+        ("m11-dem-batch-phases", "stab_dem_session_with_sampled_errors") => {
+            Some((M11_SAMPLE_DEM_SHOTS as f64, "shots/s"))
+        }
+        ("m11-dem-batch-phases", "stab_dem_session_replay") => {
+            Some((M11_SAMPLE_DEM_SHOTS as f64, "shots/s"))
+        }
+        ("m11-dem-batch-phases", "stab_sample_dem_cli_ptb64_routing") => {
+            Some((M11_PTB64_SHOTS as f64, "shots/s"))
         }
         ("m11-sample-dem-sparse-contract", "stab_sample_dem_sparse_b8")
         | ("m11-sample-dem-dense-contract", "stab_sample_dem_dense_b8")
@@ -104,19 +109,22 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures a precompiled surface-like DEM sampler; upstream Stim perf uses a generated d11/r100 surface-code DEM with 1024 stripes",
         ),
         "m11-sample-dem-cli" => Some(
-            "report-only: Stab measures in-process sample_dem parse, compile, sample, and 01 output writing; pinned Stim baseline includes CLI process costs",
+            "report-only: Stab and pinned Stim execute the same seeded sample_dem command as bounded subprocesses with identical input, launch count, discarded timed stdout, and an untimed frozen Stab output witness",
         ),
         "m11-sample-dem-sparse-contract" => Some(
-            "cli-baseline: Stab measures sparse detector ids with detector-only b8 output against pinned Stim sample_dem on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for sparse detector-id b8 output on the same fixture",
         ),
         "m11-sample-dem-dense-contract" => Some(
-            "cli-baseline: Stab measures dense detector targets with detector-only b8 output against pinned Stim sample_dem on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for dense detector-target b8 output on the same fixture",
         ),
         "m11-sample-dem-repeated-contract" => Some(
-            "cli-baseline: Stab measures repeat and detector-shift DEM sampling with detector-only b8 output against pinned Stim sample_dem on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for repeated detector-shift b8 output on the same fixture",
         ),
         "m11-sample-dem-high-detector-contract" => Some(
-            "cli-baseline: Stab measures high detector index output width with detector-only b8 output against pinned Stim sample_dem on the same fixture",
+            "cli-baseline: Stab and pinned Stim execute the same bounded sample_dem subprocess workload for high detector index b8 output on the same fixture",
+        ),
+        "m11-dem-batch-phases" => Some(
+            "report-only: source-owned Stab diagnostics separately measure DEM plan compile-and-release, detector-only execution, sampled-error execution, replay, and PTB64 CLI routing without claiming a Stim ratio",
         ),
         _ => None,
     }
@@ -139,55 +147,214 @@ fn run_compiled_dem_sampler_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, 
     )?])
 }
 
-fn run_sample_dem_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    Ok(vec![measure_stab_iterations(
-        "stab_sample_dem_cli_1024_zero_one",
-        M11_CONTRACT_ITERATIONS,
-        || {
-            let model = parse_dem(&row.id, SAMPLE_DEM_NOISY_FIXTURE)?;
-            let sampler = CompiledDemSampler::compile(&model)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let output = sampler
-                .sample_detection_events_with_seed(M11_SAMPLE_DEM_SHOTS, Some(5))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes = write_detection_records(
-                &output,
-                DetectionObservableOutputMode::DetectorsOnly,
-                SampleFormat::ZeroOne,
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bytes.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_contract_row(
+fn run_process_cli_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
     measurement_name: &'static str,
-    fixture: &str,
-    format: SampleFormat,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let model = parse_dem(&row.id, fixture)?;
-    let sampler =
-        CompiledDemSampler::compile(&model).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        measurement_name,
+    let expected = frozen_process_cli_witness(&row.id).ok_or_else(|| {
+        stab_runner_error(
+            &row.id,
+            "process-equivalent M11 CLI row has no frozen output witness",
+        )
+    })?;
+    run_stab_cli_process_row(root, profile, row, measurement_name, expected)
+}
+
+fn run_dem_phase_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let surface_like = surface_like_dem_fixture();
+    let model = parse_dem(&row.id, &surface_like)?;
+    Ok(vec![
+        measure_dem_plan_compile(row, &model)?,
+        measure_dem_session_detector_only(row, &model)?,
+        measure_dem_session_with_sampled_errors(row, &model)?,
+        measure_dem_session_replay(row, &model)?,
+        measure_sample_dem_ptb64_routing(
+            row,
+            "stab_sample_dem_cli_ptb64_routing",
+            M11_PTB64_SHOTS,
+        )?,
+    ])
+}
+
+fn frozen_process_cli_witness(row_id: &str) -> Option<OutputWitness> {
+    match row_id {
+        "m11-sample-dem-cli" => Some(OutputWitness::new(2_048, 0x6812_4a44_9ddc_4ddd)),
+        "m11-sample-dem-sparse-contract" => Some(OutputWitness::new(16_448, 0xd0a3_49ec_b8be_ae8a)),
+        "m11-sample-dem-dense-contract" => Some(OutputWitness::new(1_024, 0x51d8_8627_df28_7325)),
+        "m11-sample-dem-repeated-contract" => {
+            Some(OutputWitness::new(1_088, 0xa90f_4905_1fc5_9427))
+        }
+        "m11-sample-dem-high-detector-contract" => {
+            Some(OutputWitness::new(32_768, 0x8f69_55bf_94ec_2325))
+        }
+        _ => None,
+    }
+}
+
+fn measure_sample_dem_ptb64_routing(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+    shots: usize,
+) -> Result<Measurement, BenchError> {
+    let args = [
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--shots"),
+        OsString::from(shots.to_string()),
+        OsString::from("--seed=5"),
+        OsString::from("--out_format=ptb64"),
+    ];
+    let expected = sample_dem_ptb64_witness();
+    let preflight = run_sample_dem_cli(row, args.clone(), expected)?;
+    black_box(preflight);
+    measure_stab_iterations(measurement_name, M11_CONTRACT_ITERATIONS, || {
+        let actual = run_sample_dem_cli(row, args.clone(), expected)?;
+        black_box(actual);
+        Ok(())
+    })
+}
+
+#[cfg(not(test))]
+const fn sample_dem_ptb64_witness() -> OutputWitness {
+    OutputWitness::new(128, 0xa1c2_c833_a4ca_07f2)
+}
+
+#[cfg(test)]
+const fn sample_dem_ptb64_witness() -> OutputWitness {
+    OutputWitness::new(8, 0x095a_8dff_6d98_bcea)
+}
+
+fn run_sample_dem_cli(
+    row: &BenchmarkRow,
+    args: [OsString; 6],
+    expected: OutputWitness,
+) -> Result<OutputWitness, BenchError> {
+    let mut stdout = ByteDigestWriter::default();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(
+        args,
+        SAMPLE_DEM_NOISY_FIXTURE.as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli sample_dem failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    let actual = stdout.witness();
+    if actual != expected {
+        return Err(stab_runner_error(
+            &row.id,
+            format!("sample_dem PTB64 output changed: expected {expected:?}, got {actual:?}"),
+        ));
+    }
+    Ok(actual)
+}
+
+fn measure_dem_plan_compile(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<Measurement, BenchError> {
+    measure_stab_iterations(
+        "stab_dem_plan_compile_and_release_surface_like",
         M11_CONTRACT_ITERATIONS,
         || {
-            let output = sampler
-                .sample_detection_events_with_seed(M11_CONTRACT_SHOTS, Some(5))
+            let plan = DemSamplingCompiler::new()
+                .compile(black_box(model))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes = write_detection_records(
-                &output,
-                DetectionObservableOutputMode::DetectorsOnly,
-                format,
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bytes.len());
+            black_box((
+                plan.detector_width(),
+                plan.observable_width(),
+                plan.sampled_error_width(),
+            ));
             Ok(())
         },
-    )?])
+    )
+}
+
+fn measure_dem_session_detector_only(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<Measurement, BenchError> {
+    let plan = DemSamplingCompiler::new()
+        .compile(model)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    measure_stab_iterations(
+        "stab_dem_session_detector_only",
+        M11_CONTRACT_ITERATIONS,
+        || {
+            sink.reset();
+            let summary = session
+                .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary.committed_shots(), sink.witness()));
+            Ok(())
+        },
+    )
+}
+
+fn measure_dem_session_with_sampled_errors(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<Measurement, BenchError> {
+    let plan = DemSamplingCompiler::new()
+        .compile(model)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    measure_stab_iterations(
+        "stab_dem_session_with_sampled_errors",
+        M11_CONTRACT_ITERATIONS,
+        || {
+            sink.reset();
+            let summary = session
+                .run_with_sampled_errors(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary.committed_shots(), sink.witness()));
+            Ok(())
+        },
+    )
+}
+
+fn measure_dem_session_replay(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<Measurement, BenchError> {
+    let plan = DemSamplingCompiler::new()
+        .compile(model)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let replay_records = (0..M11_SAMPLE_DEM_SHOTS)
+        .map(|shot| {
+            (0..plan.error_count())
+                .map(|error| (shot + error * 3) % 17 == 0)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    measure_stab_iterations("stab_dem_session_replay", M11_CONTRACT_ITERATIONS, || {
+        sink.reset();
+        let summary = session
+            .replay(&replay_records, &mut sink)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box((summary.committed_shots(), sink.witness()));
+        Ok(())
+    })
 }
 
 fn parse_dem(row_id: &str, fixture: &str) -> Result<DetectorErrorModel, BenchError> {
@@ -216,60 +383,63 @@ mod tests {
         reason = "benchmark runner tests use direct assertions for compact diagnostics"
     )]
 
-    use crate::manifest::{BenchmarkRow, Milestone, Runner};
+    use std::path::Path;
 
     use super::{compare_note, measurement_work, run_dem_sampling_compare_row};
+    use crate::{manifest::BenchmarkManifest, root::RepoRoot};
 
     #[test]
     fn m11_benchmark_rows_have_stab_compare_runners() {
-        for (id, runner, expected_measurements) in [
+        let root = RepoRoot::resolve(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .and_then(Path::parent)
+                .expect("repository root"),
+        )
+        .expect("resolve repository root");
+        let manifest = BenchmarkManifest::read(&root).expect("read benchmark manifest");
+        for (id, expected_measurements) in [
             (
                 "m11-dem-sampler",
-                Runner::StimPerf,
                 &["stab_dem_sampler_sample_surface_like_1024"][..],
             ),
             (
                 "m11-sample-dem-cli",
-                Runner::StimCli,
                 &["stab_sample_dem_cli_1024_zero_one"][..],
             ),
             (
                 "m11-sample-dem-sparse-contract",
-                Runner::StimCli,
                 &["stab_sample_dem_sparse_b8"][..],
             ),
             (
                 "m11-sample-dem-dense-contract",
-                Runner::StimCli,
                 &["stab_sample_dem_dense_b8"][..],
             ),
             (
                 "m11-sample-dem-repeated-contract",
-                Runner::StimCli,
                 &["stab_sample_dem_repeated_b8"][..],
             ),
             (
                 "m11-sample-dem-high-detector-contract",
-                Runner::StimCli,
                 &["stab_sample_dem_high_detector_b8"][..],
             ),
+            (
+                "m11-dem-batch-phases",
+                &[
+                    "stab_dem_plan_compile_and_release_surface_like",
+                    "stab_dem_session_detector_only",
+                    "stab_dem_session_with_sampled_errors",
+                    "stab_dem_session_replay",
+                    "stab_sample_dem_cli_ptb64_routing",
+                ][..],
+            ),
         ] {
-            let row = BenchmarkRow {
-                id: id.to_string(),
-                milestone: Milestone::M11,
-                threshold_class: crate::manifest::ThresholdClass::ReportOnly,
-                runner,
-                upstream_source: "src/stim/cmd/command_sample_dem.test.cc".to_string(),
-                stim_perf_filter: String::new(),
-                argv: "sample_dem|--shots|1024".to_string(),
-                stdin_path: "oracle/fixtures/inputs/sample_dem_noisy.dem".to_string(),
-                phase: "throughput".to_string(),
-                measurement: "sample-dem".to_string(),
-                description: "test row".to_string(),
-                comparability: crate::comparability::ComparabilityClass::Unspecified,
-            };
-
-            let measurements = run_dem_sampling_compare_row(&row)
+            let row = manifest
+                .rows
+                .iter()
+                .find(|row| row.id == id)
+                .expect("manifest row");
+            let measurements = run_dem_sampling_compare_row(&root, "release", row)
                 .expect("run compare row")
                 .expect("Stab runner");
             let names = measurements
