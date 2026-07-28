@@ -145,6 +145,14 @@ fn m8_benchmark_rows_have_stab_compare_runners() {
             .collect::<Vec<_>>();
 
         assert_eq!(names.as_slice(), expected_measurements);
+        if id.starts_with("m8-sample-primary-") || id == "m8-sample-high-repeat-contract" {
+            assert!(
+                measurements
+                    .iter()
+                    .all(|measurement| measurement.iterations == Some(1)),
+                "{id} must contribute one process launch to each outer recorded run"
+            );
+        }
         assert!(
             compare_note(id).is_some(),
             "{id} should explain benchmark comparability"

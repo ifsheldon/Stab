@@ -73,6 +73,7 @@ const REFERENCE_SAMPLE_INNER_REPS: usize = 4;
 const SIMULATOR_COMPARE_ITERATIONS: usize = 3;
 #[cfg(test)]
 const SIMULATOR_COMPARE_ITERATIONS: usize = 1;
+const SAMPLE_CLI_PROCESS_LAUNCHES_PER_MEASUREMENT: usize = 1;
 #[cfg(not(test))]
 const MILLION_SHOT_COMPARE_ITERATIONS: usize = 8;
 #[cfg(test)]
@@ -567,7 +568,12 @@ fn run_sample_throughput_row(
             let output = sink
                 .into_bytes()
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((summary, output.len()));
+            black_box((
+                summary,
+                output.len(),
+                output.first().copied(),
+                output.last().copied(),
+            ));
             Ok(())
         },
     )?])
@@ -615,7 +621,7 @@ fn run_primary_generated_sample_row(
     #[cfg(test)]
     Ok(vec![measure_stab_iterations(
         measurement_name,
-        SIMULATOR_COMPARE_ITERATIONS,
+        SAMPLE_CLI_PROCESS_LAUNCHES_PER_MEASUREMENT,
         || run_sample_cli(row, fixture, PRIMARY_MATRIX_SHOTS, "b8", expected),
     )?])
 }
@@ -642,7 +648,7 @@ fn run_high_repeat_contract_row(
     #[cfg(test)]
     Ok(vec![measure_stab_iterations(
         "stab_sample_high_repeat_contract",
-        SIMULATOR_COMPARE_ITERATIONS,
+        SAMPLE_CLI_PROCESS_LAUNCHES_PER_MEASUREMENT,
         || run_sample_cli(row, HIGH_REPEAT_CONTRACT_FIXTURE, 1, "b8", expected),
     )?])
 }
@@ -689,7 +695,7 @@ fn run_sample_cli_process_row(
 
     Ok(vec![measure_stab_iterations(
         measurement_name,
-        SIMULATOR_COMPARE_ITERATIONS,
+        SAMPLE_CLI_PROCESS_LAUNCHES_PER_MEASUREMENT,
         || {
             let output = run_process(&program, &args, &stdin, &root.path, false)?;
             check_success(&program, &output)?;
