@@ -40,6 +40,7 @@ pub(super) fn classify_manifest_row(row: &BenchmarkRow) -> Result<&'static str, 
         "PERF-DEM-SAMPLING"
     } else if id.starts_with("m9-detect-")
         || id.starts_with("m9-m2d-")
+        || matches!(id, "m9-detection-batch-phases" | "m9-m2d-batch-phases")
         || id.starts_with("pf3-m2d-")
         || id == "pf3-detect-sweep-sampling"
         || id.starts_with("pf7-cli-m2d-")

@@ -26,11 +26,11 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "091a03280f829e783d1c5acd7b1dbd5fb8bd37ccdea85bfcc0ddec9a9e8b863b";
+const CORRECTNESS_DIGEST: &str = "cd3fc7a16bc5464b96c3d7148c3aa1c9105875e925753853f2ac2e84910ff4e4";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
-const EXPECTED_MANIFEST_ROWS: usize = 164;
+const EXPECTED_MANIFEST_ROWS: usize = 167;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
 const EXPECTED_WAIVERS: usize = 3;
@@ -1136,8 +1136,8 @@ fn validate_rows(
         ("PERF-GENERATION", 23),
         ("PERF-CONVERT-CLI", 11),
         ("PERF-SAMPLING", 10),
-        ("PERF-DETECTION", 15),
-        ("PERF-DEM-SAMPLING", 7),
+        ("PERF-DETECTION", 17),
+        ("PERF-DEM-SAMPLING", 8),
         ("PERF-ERROR-ANALYSIS", 11),
         ("PERF-SEARCH-AND-MATCHING", 21),
         ("PERF-FLOWS-AND-DETECTOR-UTILITIES", 22),
@@ -1150,25 +1150,25 @@ fn validate_rows(
         ));
     }
     validate_decision_count(suite, RowDecision::Retained, 9, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 139, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 13, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 14, issues);
-    validate_classification_count(suite, RowClassification::Diagnostic, 137, issues);
+    validate_classification_count(suite, RowClassification::Diagnostic, 140, issues);
     validate_classification_count(suite, RowClassification::Proxy, 11, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
-    validate_classification_count(suite, RowClassification::MissingScale, 126, issues);
+    validate_classification_count(suite, RowClassification::MissingScale, 129, issues);
     validate_classification_count(
         suite,
         RowClassification::MissingCorrectnessPreflight,
-        161,
+        164,
         issues,
     );
-    validate_classification_count(suite, RowClassification::MissingOutputDigest, 161, issues);
-    validate_classification_count(suite, RowClassification::MissingComparator, 76, issues);
-    validate_classification_count(suite, RowClassification::AdapterCandidate, 76, issues);
+    validate_classification_count(suite, RowClassification::MissingOutputDigest, 164, issues);
+    validate_classification_count(suite, RowClassification::MissingComparator, 79, issues);
+    validate_classification_count(suite, RowClassification::AdapterCandidate, 79, issues);
     validate_classification_count(
         suite,
         RowClassification::InProcessProcessMismatch,

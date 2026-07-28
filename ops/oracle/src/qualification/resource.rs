@@ -90,6 +90,15 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a4-sampling-session-allocation-contract",
     "a4-cli-sampling-codec-allocation-contract",
     "a4-cli-sampling-projection-allocation-contract",
+    "a5-dem-session-work-admission-contract",
+    "a5-dem-session-active-byte-admission-contract",
+    "a5-dem-compatibility-sink-byte-contract",
+    "a5-cli-replay-output-activation-contract",
+    "a5-delayed-output-identity-contract",
+    "a5-measurement-detection-allocation-contract",
+    "a5-detection-sampling-allocation-contract",
+    "a5-detection-combined-session-storage-contract",
+    "a5-dem-sampling-allocation-contract",
 ];
 
 struct PlannedResourceCaseSpec {

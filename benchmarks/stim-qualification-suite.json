@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "091a03280f829e783d1c5acd7b1dbd5fb8bd37ccdea85bfcc0ddec9a9e8b863b",
-  "semantic_digest": "4aa88447f230845873bcc44657f037e48f2f2147c0260412d055efc2c221bc95",
+  "correctness_digest": "cd3fc7a16bc5464b96c3d7148c3aa1c9105875e925753853f2ac2e84910ff4e4",
+  "semantic_digest": "29ad73efed98d4af5db0738ec1250a4dd5af7dfe238777f4e672806499c0b45f",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -12177,6 +12177,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-a27840085d49206e",
+      "path": "stab_core::CompiledDemSampler::plan",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-c82cbb884681ad5e",
       "path": "stab_core::CompiledDemSampler::sample_detection_events",
       "kind": "method",
@@ -12249,6 +12260,28 @@
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-3e9fb044964aad41",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-28af7a61b055a786",
+      "path": "stab_core::CompiledDemSampler::session",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-fdd8fc61f93ca74c",
+      "path": "stab_core::CompiledDemSampler::session_with_limits",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-1ae419bb91a1edbf",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -38898,6 +38931,2845 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-c851537e66f45165",
+      "path": "stab_core::execution::DemReplayBatchStatus",
+      "kind": "enum",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-50638ac4f2a6389a",
+      "path": "stab_core::execution::DemReplayBatchStatus as Clone for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-305c85da8f4fb059",
+      "path": "stab_core::execution::DemReplayBatchStatus as Copy for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d4a8757386bb2d4a",
+      "path": "stab_core::execution::DemReplayBatchStatus as Debug for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a1ec3af472697da8",
+      "path": "stab_core::execution::DemReplayBatchStatus as Eq for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-02fe0f01682f968e",
+      "path": "stab_core::execution::DemReplayBatchStatus as Hash for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8a46954bc1191aaf",
+      "path": "stab_core::execution::DemReplayBatchStatus as PartialEq for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-dfe2a9346256e2b7",
+      "path": "stab_core::execution::DemReplayBatchStatus as StructuralPartialEq for@69037db2e2e7",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-0b8ddc47c963cc71",
+      "path": "stab_core::execution::DemReplayBatchStatus::Accepted",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-fda527fec4a44ad8",
+      "path": "stab_core::execution::DemReplayBatchStatus::Cancelled",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c67cccc9b1bd5186",
+      "path": "stab_core::execution::DemReplayBatchStatus::is_accepted",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c7668db537348d3d",
+      "path": "stab_core::execution::DemReplayBatchStatus::is_cancelled",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ef52bd1961993635",
+      "path": "stab_core::execution::DemReplaySession",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-9535ba08fdb50c74",
+      "path": "stab_core::execution::DemReplaySession as Debug for@52dd8c1ec317",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a5d572e57fd29a1b",
+      "path": "stab_core::execution::DemReplaySession as Drop for@52dd8c1ec317",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aafa46f91d546bfa",
+      "path": "stab_core::execution::DemReplaySession::finish",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-bb61d3b9c11bfd2f",
+      "path": "stab_core::execution::DemReplaySession::write_batch",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d440ab8788eaaea5",
+      "path": "stab_core::execution::DemSamplingCancellation",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-acdd741310ecbf51",
+      "path": "stab_core::execution::DemSamplingCancellation as Clone for@4fa26f23287e",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-67ee6c48a4c16e34",
+      "path": "stab_core::execution::DemSamplingCancellation as Debug for@4fa26f23287e",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e0336a99793d2ba9",
+      "path": "stab_core::execution::DemSamplingCancellation as Default for@4fa26f23287e",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8667271b9611a808",
+      "path": "stab_core::execution::DemSamplingCancellation::cancel",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c695167e0db408af",
+      "path": "stab_core::execution::DemSamplingCancellation::is_cancelled",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9d1ad9f33478ffba",
+      "path": "stab_core::execution::DemSamplingCancellation::reset",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f6dc3c82d96b5aaf",
+      "path": "stab_core::execution::DemSamplingCompiler",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8817122cf68b779f",
+      "path": "stab_core::execution::DemSamplingCompiler as Clone for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4d048ccb470f9124",
+      "path": "stab_core::execution::DemSamplingCompiler as Copy for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-7ddb22671402a01c",
+      "path": "stab_core::execution::DemSamplingCompiler as Debug for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-18f5fdac69253616",
+      "path": "stab_core::execution::DemSamplingCompiler as Default for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4efb473ae0a4cc0f",
+      "path": "stab_core::execution::DemSamplingCompiler as Eq for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-13d5ff99fec18684",
+      "path": "stab_core::execution::DemSamplingCompiler as PartialEq for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3b6a6841fe102f80",
+      "path": "stab_core::execution::DemSamplingCompiler as StructuralPartialEq for@07c5a30073ef",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-59e69d6ac4523451",
+      "path": "stab_core::execution::DemSamplingCompiler::compile",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a1c5bd41f8fe06a8",
+      "path": "stab_core::execution::DemSamplingCompiler::new",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-86b30de3d25682eb",
+      "path": "stab_core::execution::DemSamplingExecutionError",
+      "kind": "enum",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-85fcc169cc7b6cc5",
+      "path": "stab_core::execution::DemSamplingExecutionError as Debug for@c5294a5fc673",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-13cb8002220cbdc2",
+      "path": "stab_core::execution::DemSamplingExecutionError as Display for@c5294a5fc673",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ebeb3b57aa5aa241",
+      "path": "stab_core::execution::DemSamplingExecutionError as Error for@c5294a5fc673",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-034b094a7e998c2a",
+      "path": "stab_core::execution::DemSamplingExecutionError as From@b2741872b012 for@c5294a5fc673",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-41b1a02e58085246",
+      "path": "stab_core::execution::DemSamplingExecutionError::InternalInvariant",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-193a378555cce7b3",
+      "path": "stab_core::execution::DemSamplingExecutionError::InternalInvariant::message",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-66070cccbd6374a4",
+      "path": "stab_core::execution::DemSamplingExecutionError::InvalidRequest",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e92e7fe4a0f3d5cd",
+      "path": "stab_core::execution::DemSamplingExecutionError::InvalidRequest::0",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e3bc2aa1ad5af1d0",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionPoisoned",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a12206f4bad7251d",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionStorageAllocation",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3d02b8e53295fcd7",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionStorageAllocation::message",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-84b145ece74895f1",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionStorageLimit",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bba871ede6225022",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionStorageLimit::estimated_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-187f8807cce998c6",
+      "path": "stab_core::execution::DemSamplingExecutionError::SessionStorageLimit::limit_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b9971ad77cff6eda",
+      "path": "stab_core::execution::DemSamplingExecutionError::ShotCounterOverflow",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-00d3446e70f60f86",
+      "path": "stab_core::execution::DemSamplingExecutionError::into_circuit_error",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1e297988eb1fa252",
+      "path": "stab_core::execution::DemSamplingPlan",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4aefaabfc2ace3eb",
+      "path": "stab_core::execution::DemSamplingPlan as Clone for@6c6c589911df",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8c78963900b3b06c",
+      "path": "stab_core::execution::DemSamplingPlan as Debug for@6c6c589911df",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1b6352d9dc6f1436",
+      "path": "stab_core::execution::DemSamplingPlan as PartialEq for@6c6c589911df",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bef8f88c621ad8a9",
+      "path": "stab_core::execution::DemSamplingPlan as StructuralPartialEq for@6c6c589911df",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-da483cf05bbc9d92",
+      "path": "stab_core::execution::DemSamplingPlan::detector_count",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4a48c1f6aa7c06d9",
+      "path": "stab_core::execution::DemSamplingPlan::detector_width",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-abe3102bb5a8c726",
+      "path": "stab_core::execution::DemSamplingPlan::error_count",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a3c529b813941cb8",
+      "path": "stab_core::execution::DemSamplingPlan::observable_count",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9421b74b1ebe4699",
+      "path": "stab_core::execution::DemSamplingPlan::observable_width",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-6d4153d1ee6970c6",
+      "path": "stab_core::execution::DemSamplingPlan::sampled_error_width",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-39cb9a7b55e77e20",
+      "path": "stab_core::execution::DemSamplingPlan::session",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9e8786eaee171b27",
+      "path": "stab_core::execution::DemSamplingPlan::session_with_limits",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-1ae419bb91a1edbf",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-442bb524f928c000",
+      "path": "stab_core::execution::DemSamplingPlan::validate_replay",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-17a84526808a4bcc",
+      "path": "stab_core::execution::DemSamplingPlan::validate_replay_with_limits",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-1ae419bb91a1edbf",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2cf7448cf5797eb0",
+      "path": "stab_core::execution::DemSamplingRunError",
+      "kind": "enum",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ba1605c0e74a1d4b",
+      "path": "stab_core::execution::DemSamplingRunError as Debug for@a8d49c4ee365",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3e65c85ef32ce113",
+      "path": "stab_core::execution::DemSamplingRunError as Display for@a8d49c4ee365",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-999fe829d7bf5e87",
+      "path": "stab_core::execution::DemSamplingRunError as Error for@a8d49c4ee365",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4861554114c35322",
+      "path": "stab_core::execution::DemSamplingRunError::Engine",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5bbb52f860de20fd",
+      "path": "stab_core::execution::DemSamplingRunError::Engine::progress",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ed3ee61e95f583fa",
+      "path": "stab_core::execution::DemSamplingRunError::Engine::source",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3110b207c60cc9d8",
+      "path": "stab_core::execution::DemSamplingRunError::Sink",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b1b1be51f7c946f7",
+      "path": "stab_core::execution::DemSamplingRunError::Sink::phase",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c9bf1267c09ceacc",
+      "path": "stab_core::execution::DemSamplingRunError::Sink::progress",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-620bee71c53749e9",
+      "path": "stab_core::execution::DemSamplingRunError::Sink::source",
+      "kind": "field",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1b0003e48e39fdb6",
+      "path": "stab_core::execution::DemSamplingRunError::progress",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5777963474139474",
+      "path": "stab_core::execution::DemSamplingRunProgress",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8cf3d0dff5c56eaf",
+      "path": "stab_core::execution::DemSamplingRunProgress as Clone for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-31ae162a5f1f5073",
+      "path": "stab_core::execution::DemSamplingRunProgress as Copy for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2cf61999fb03023a",
+      "path": "stab_core::execution::DemSamplingRunProgress as Debug for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-112c933a7a6bffed",
+      "path": "stab_core::execution::DemSamplingRunProgress as Default for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-709708d45b3f924f",
+      "path": "stab_core::execution::DemSamplingRunProgress as Eq for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6dd90e85b92ed4a2",
+      "path": "stab_core::execution::DemSamplingRunProgress as PartialEq for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-424b9b37c41a6f0b",
+      "path": "stab_core::execution::DemSamplingRunProgress as StructuralPartialEq for@3d56865dd89b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d914867cfa241acd",
+      "path": "stab_core::execution::DemSamplingRunProgress::attempted_batch_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-0b66ad309dbb0dc3",
+      "path": "stab_core::execution::DemSamplingRunProgress::committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-03a29aa5f1994fe8",
+      "path": "stab_core::execution::DemSamplingRunStatus",
+      "kind": "enum",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e642cd95ee780a26",
+      "path": "stab_core::execution::DemSamplingRunStatus as Clone for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b26488da4b610bd4",
+      "path": "stab_core::execution::DemSamplingRunStatus as Copy for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aa3592c8b5778c7f",
+      "path": "stab_core::execution::DemSamplingRunStatus as Debug for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c3b66aed7231d159",
+      "path": "stab_core::execution::DemSamplingRunStatus as Eq for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f8159bf67c65f7a3",
+      "path": "stab_core::execution::DemSamplingRunStatus as Hash for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-871d3791e964763d",
+      "path": "stab_core::execution::DemSamplingRunStatus as PartialEq for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-102a3fa7c2a1e6c6",
+      "path": "stab_core::execution::DemSamplingRunStatus as StructuralPartialEq for@038b95649edc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e73cdacc9bec26a5",
+      "path": "stab_core::execution::DemSamplingRunStatus::Cancelled",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a543bb5848e9595e",
+      "path": "stab_core::execution::DemSamplingRunStatus::Completed",
+      "kind": "variant",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-660dae794911f2f1",
+      "path": "stab_core::execution::DemSamplingRunStatus::is_cancelled",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-66ec74f5872eb967",
+      "path": "stab_core::execution::DemSamplingRunStatus::is_completed",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-62e5216729bce4e1",
+      "path": "stab_core::execution::DemSamplingRunSummary",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-af6175a28c4236d6",
+      "path": "stab_core::execution::DemSamplingRunSummary as Clone for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1c126a109f3b2b87",
+      "path": "stab_core::execution::DemSamplingRunSummary as Copy for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-33bc6f66ebc43437",
+      "path": "stab_core::execution::DemSamplingRunSummary as Debug for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-04ac0145b3665bc9",
+      "path": "stab_core::execution::DemSamplingRunSummary as Eq for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2942b189ee1cb7a0",
+      "path": "stab_core::execution::DemSamplingRunSummary as PartialEq for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-0315fa024b0f8c22",
+      "path": "stab_core::execution::DemSamplingRunSummary as StructuralPartialEq for@7c08ced74e40",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f30cb83c573ad46b",
+      "path": "stab_core::execution::DemSamplingRunSummary::committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5f5c20f61733591a",
+      "path": "stab_core::execution::DemSamplingRunSummary::requested_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2a2e1f8097337a3e",
+      "path": "stab_core::execution::DemSamplingRunSummary::status",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-99062000e4bfb14b",
+      "path": "stab_core::execution::DemSamplingRunSummary::total_committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2110e870f675fe95",
+      "path": "stab_core::execution::DemSamplingSession",
+      "kind": "struct",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c18282d2886abc60",
+      "path": "stab_core::execution::DemSamplingSession as Debug for@2d5ff638abdc",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-2468dafcf87c9294",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8b9cd5d312561306",
+      "path": "stab_core::execution::DemSamplingSession::cancellation",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5967d34be9a740bc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-24a3b4311964790b",
+      "path": "stab_core::execution::DemSamplingSession::is_poisoned",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-f94574dfe36d05a9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-98b496d3df58455a",
+      "path": "stab_core::execution::DemSamplingSession::replay",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-b155af3b724983f4",
+      "path": "stab_core::execution::DemSamplingSession::run",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-03f7cdecc6abcd6f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1b75e578de0deb12",
+      "path": "stab_core::execution::DemSamplingSession::run_with_sampled_errors",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-03f7cdecc6abcd6f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1f8d53bde71bbf80",
+      "path": "stab_core::execution::DemSamplingSession::start_replay",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5c2282d45bd1e2fd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-79ebe63d4958f977",
+      "path": "stab_core::execution::DemSamplingSession::total_committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-72ef2576fbd22658",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-0fdc5a08d27e1edb",
+      "path": "stab_core::execution::DetectionCompileError",
+      "kind": "enum",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-035a95e7b685e163",
+      "path": "stab_core::execution::DetectionCompileError as Clone for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8833ecdf15296819",
+      "path": "stab_core::execution::DetectionCompileError as Debug for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-90012939c7523d3e",
+      "path": "stab_core::execution::DetectionCompileError as Display for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2a71c36094efa9eb",
+      "path": "stab_core::execution::DetectionCompileError as Eq for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b80d701b38832932",
+      "path": "stab_core::execution::DetectionCompileError as Error for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bbb17f1687121da6",
+      "path": "stab_core::execution::DetectionCompileError as From@b2741872b012 for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ada8b412a76c32b4",
+      "path": "stab_core::execution::DetectionCompileError as PartialEq for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b4c38f302850e275",
+      "path": "stab_core::execution::DetectionCompileError as StructuralPartialEq for@98d229f610e9",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2455a4bda33544c7",
+      "path": "stab_core::execution::DetectionCompileError::InvalidCircuit",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e7785941924687b3",
+      "path": "stab_core::execution::DetectionCompileError::InvalidCircuit::0",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-7d717b97bb56b93e",
+      "path": "stab_core::execution::DetectionCompileError::into_circuit_error",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-fc74697bc5baedab",
+      "path": "stab_core::execution::DetectionExecutionError",
+      "kind": "enum",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aba0fb3eac704ad8",
+      "path": "stab_core::execution::DetectionExecutionError as Clone for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f7e1378f1c4daa21",
+      "path": "stab_core::execution::DetectionExecutionError as Debug for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2efc28f117d52233",
+      "path": "stab_core::execution::DetectionExecutionError as Display for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-047373387d9c57dc",
+      "path": "stab_core::execution::DetectionExecutionError as Eq for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-0d8a47063753cc5b",
+      "path": "stab_core::execution::DetectionExecutionError as Error for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-7511936c198201be",
+      "path": "stab_core::execution::DetectionExecutionError as From@b2741872b012 for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2a48cbbc47a4c07d",
+      "path": "stab_core::execution::DetectionExecutionError as PartialEq for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-200a7ace4386f67f",
+      "path": "stab_core::execution::DetectionExecutionError as StructuralPartialEq for@f6b4dcfdf72b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b7240251d2245eaa",
+      "path": "stab_core::execution::DetectionExecutionError::CancelledComposition",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f232d5a6db33d77b",
+      "path": "stab_core::execution::DetectionExecutionError::Conversion",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b1e06d14607ab1ff",
+      "path": "stab_core::execution::DetectionExecutionError::Conversion::0",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d3dba0df6eaf47ab",
+      "path": "stab_core::execution::DetectionExecutionError::InternalInvariant",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-84cc9eeeb792711d",
+      "path": "stab_core::execution::DetectionExecutionError::InternalInvariant::message",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-64a572c2638c4457",
+      "path": "stab_core::execution::DetectionExecutionError::Sampling",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-81e5282624c913c6",
+      "path": "stab_core::execution::DetectionExecutionError::Sampling::0",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e65b1987f0048c35",
+      "path": "stab_core::execution::DetectionExecutionError::SessionPoisoned",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f9973ed3b627c22c",
+      "path": "stab_core::execution::DetectionExecutionError::SessionStorageAllocation",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f093ba5f69344a69",
+      "path": "stab_core::execution::DetectionExecutionError::SessionStorageAllocation::message",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-56bd2b9bf996d416",
+      "path": "stab_core::execution::DetectionExecutionError::SessionStorageLimit",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e4068b8c2134a21d",
+      "path": "stab_core::execution::DetectionExecutionError::SessionStorageLimit::estimated_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c15d5c96d621b1dc",
+      "path": "stab_core::execution::DetectionExecutionError::SessionStorageLimit::limit_bytes",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4ebde4eb1af4a444",
+      "path": "stab_core::execution::DetectionExecutionError::ShotCounterOverflow",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8c52c5d1602dded9",
+      "path": "stab_core::execution::DetectionExecutionError::into_circuit_error",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-08f29f66e9368906",
+      "path": "stab_core::execution::DetectionRunError",
+      "kind": "enum",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-44a6045d8207a4c9",
+      "path": "stab_core::execution::DetectionRunError as Debug for@d1d96b030edf",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-958c59a49d387337",
+      "path": "stab_core::execution::DetectionRunError as Display for@d1d96b030edf",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-63c22af553e75955",
+      "path": "stab_core::execution::DetectionRunError as Error for@d1d96b030edf",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-fd45fe1108a42a71",
+      "path": "stab_core::execution::DetectionRunError::Engine",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-dc421c3e27485ac6",
+      "path": "stab_core::execution::DetectionRunError::Engine::progress",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-7ed448e8bd8d75b5",
+      "path": "stab_core::execution::DetectionRunError::Engine::source",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-879ea6b3c9166dc6",
+      "path": "stab_core::execution::DetectionRunError::Sink",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8c623cd953ad22cb",
+      "path": "stab_core::execution::DetectionRunError::Sink::phase",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6768abf8582e38b9",
+      "path": "stab_core::execution::DetectionRunError::Sink::progress",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-370d6b6ff94dd314",
+      "path": "stab_core::execution::DetectionRunError::Sink::source",
+      "kind": "field",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f78b159602e77c4d",
+      "path": "stab_core::execution::DetectionRunError::progress",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-31a3f18c406d0e1c",
+      "path": "stab_core::execution::DetectionRunProgress",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5b6350578055b24c",
+      "path": "stab_core::execution::DetectionRunProgress as Clone for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b56dd85dbc9a9164",
+      "path": "stab_core::execution::DetectionRunProgress as Copy for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6d961d246edaf11f",
+      "path": "stab_core::execution::DetectionRunProgress as Debug for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aa034b6c56a7cf92",
+      "path": "stab_core::execution::DetectionRunProgress as Default for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a82393a43a276033",
+      "path": "stab_core::execution::DetectionRunProgress as Eq for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6eef6ca5e3a4a2f4",
+      "path": "stab_core::execution::DetectionRunProgress as PartialEq for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ad00569390330eed",
+      "path": "stab_core::execution::DetectionRunProgress as StructuralPartialEq for@1f431e298dcb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ece6b9c9e0a7115b",
+      "path": "stab_core::execution::DetectionRunProgress::attempted_batch_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d4e7df1031ea117c",
+      "path": "stab_core::execution::DetectionRunProgress::committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-3c07c9f261f85a58",
+      "path": "stab_core::execution::DetectionRunStatus",
+      "kind": "enum",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6819a388b13a3044",
+      "path": "stab_core::execution::DetectionRunStatus as Clone for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8eaaf92a988d49e5",
+      "path": "stab_core::execution::DetectionRunStatus as Copy for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a3dd7fb939f9502a",
+      "path": "stab_core::execution::DetectionRunStatus as Debug for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c60ee472d96e8188",
+      "path": "stab_core::execution::DetectionRunStatus as Eq for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c21083de41149359",
+      "path": "stab_core::execution::DetectionRunStatus as Hash for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e50232eee66dfa84",
+      "path": "stab_core::execution::DetectionRunStatus as PartialEq for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4968fa95074874c9",
+      "path": "stab_core::execution::DetectionRunStatus as StructuralPartialEq for@84feecb30f1a",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8ed93606dac633a1",
+      "path": "stab_core::execution::DetectionRunStatus::Cancelled",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-67efe069852f66af",
+      "path": "stab_core::execution::DetectionRunStatus::Completed",
+      "kind": "variant",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-906b996c4555eaba",
+      "path": "stab_core::execution::DetectionRunSummary",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-eb7eb3b4ca113863",
+      "path": "stab_core::execution::DetectionRunSummary as Clone for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d3d10fcdd74bdcab",
+      "path": "stab_core::execution::DetectionRunSummary as Copy for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-619859191c627c38",
+      "path": "stab_core::execution::DetectionRunSummary as Debug for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-da54f6f5b0418cea",
+      "path": "stab_core::execution::DetectionRunSummary as Eq for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d6a1c347df2acfe1",
+      "path": "stab_core::execution::DetectionRunSummary as PartialEq for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c95c345e2704426b",
+      "path": "stab_core::execution::DetectionRunSummary as StructuralPartialEq for@3e844029d2d3",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-da5cb754cf9b71f0",
+      "path": "stab_core::execution::DetectionRunSummary::committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-452bef1f3906ce10",
+      "path": "stab_core::execution::DetectionRunSummary::requested_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-27fc1fe415bdfbdf",
+      "path": "stab_core::execution::DetectionRunSummary::status",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e5964bd67f5bb3c1",
+      "path": "stab_core::execution::DetectionRunSummary::total_committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-db0a7126a870c562",
+      "path": "stab_core::execution::DetectionSamplingCompiler",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-336a424238e6bd26",
+      "path": "stab_core::execution::DetectionSamplingCompiler as Clone for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-487b505effeae355",
+      "path": "stab_core::execution::DetectionSamplingCompiler as Copy for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3fd4bc6c3637deb2",
+      "path": "stab_core::execution::DetectionSamplingCompiler as Debug for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-62d4a71e5c13a044",
+      "path": "stab_core::execution::DetectionSamplingCompiler as Default for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-09f1bdad477b8049",
+      "path": "stab_core::execution::DetectionSamplingCompiler as Eq for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f21a635a769108c4",
+      "path": "stab_core::execution::DetectionSamplingCompiler as PartialEq for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6d297f7eb15e546d",
+      "path": "stab_core::execution::DetectionSamplingCompiler as StructuralPartialEq for@7a17674d41ab",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-805786b7f0b5903a",
+      "path": "stab_core::execution::DetectionSamplingCompiler::compile",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5701da3cd45d60c4",
+      "path": "stab_core::execution::DetectionSamplingCompiler::limits",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-11bef6f02fe6e961",
+      "path": "stab_core::execution::DetectionSamplingCompiler::new",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4a79f8ea05d70cfc",
+      "path": "stab_core::execution::DetectionSamplingPlan",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-563f77bb99917f24",
+      "path": "stab_core::execution::DetectionSamplingPlan as Clone for@5e9394f85989",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1aabe7b04ea44dcb",
+      "path": "stab_core::execution::DetectionSamplingPlan as Debug for@5e9394f85989",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-af12416fa119e62d",
+      "path": "stab_core::execution::DetectionSamplingPlan::detector_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9d0579a261d06fd6",
+      "path": "stab_core::execution::DetectionSamplingPlan::measurement_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-8157aa3c87ba5839",
+      "path": "stab_core::execution::DetectionSamplingPlan::observable_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e533698a2b898b1c",
+      "path": "stab_core::execution::DetectionSamplingPlan::session",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ccfca2f73ca9ab6b",
+      "path": "stab_core::execution::DetectionSamplingSession",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-018e644eb86a1c6e",
+      "path": "stab_core::execution::DetectionSamplingSession as Debug for@e5882321a180",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f0c51716557d6e71",
+      "path": "stab_core::execution::DetectionSamplingSession::cancellation",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c9169948819b1a04",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f007f14d2effb1fa",
+      "path": "stab_core::execution::DetectionSamplingSession::is_poisoned",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6d894aa572644723",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5b57189af7ab733b",
+      "path": "stab_core::execution::DetectionSamplingSession::run",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18787778710c986b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-642e1079e9500488",
+      "path": "stab_core::execution::DetectionSamplingSession::total_committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-83b62ab37799656e",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-fd5bf9d53e4de034",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8449e4fc52c40e65",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as Clone for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5b3bde094026f41f",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as Copy for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-19b2706341c8dd50",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as Debug for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3019587551180422",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as Default for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-06990614df827828",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as Eq for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1bc9b906b190c58b",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as PartialEq for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-fc8f2a1c56c8ad43",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler as StructuralPartialEq for@afa02ce87a53",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a9bbd12ed6004b4d",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler::compile",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-0809038e35c245cb",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler::limits",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-338bdd244c936717",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f2be41b2a2d39d37",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler::new",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-74881e4ab4463e57",
+      "path": "stab_core::execution::MeasurementToDetectionCompiler::reference_sample_mode",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-34403d4b3c4a3d59",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-b373d43c5eb43041",
+      "path": "stab_core::execution::MeasurementToDetectionPlan",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c5515fe15b8f508b",
+      "path": "stab_core::execution::MeasurementToDetectionPlan as Clone for@b2f9868e2ffe",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-deefa401a9ff1b20",
+      "path": "stab_core::execution::MeasurementToDetectionPlan as Debug for@b2f9868e2ffe",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f2433e85083b626f",
+      "path": "stab_core::execution::MeasurementToDetectionPlan::detector_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-212880b48648a82b",
+      "path": "stab_core::execution::MeasurementToDetectionPlan::measurement_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-11b3bc7a4f9fa7e8",
+      "path": "stab_core::execution::MeasurementToDetectionPlan::observable_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-06ddd362e642816b",
+      "path": "stab_core::execution::MeasurementToDetectionPlan::session",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2a78c536b97786ee",
+      "path": "stab_core::execution::MeasurementToDetectionPlan::sweep_width",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-985b24e6f770d1a2",
+      "path": "stab_core::execution::MeasurementToDetectionSession",
+      "kind": "struct",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-029be6ead6bf7906",
+      "path": "stab_core::execution::MeasurementToDetectionSession as Debug for@bc23fe42dc7b",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-cda035f4eff52365",
+      "path": "stab_core::execution::MeasurementToDetectionSession::cancellation",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-bf27b585bdca54c7",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-61f61afff4130013",
+      "path": "stab_core::execution::MeasurementToDetectionSession::finish",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-45762cc3588b2b64",
+      "path": "stab_core::execution::MeasurementToDetectionSession::is_poisoned",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-0d8c2945e7e8076f",
+      "path": "stab_core::execution::MeasurementToDetectionSession::run",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2fdd6c3340e0e430",
+      "path": "stab_core::execution::MeasurementToDetectionSession::total_committed_shots",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-6518d9b8216cc58f",
+      "path": "stab_core::execution::MeasurementToDetectionSession::write_batch",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-6a130d6fe25e1635",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-00b33b2c2e00d3a9",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter",
+      "kind": "struct",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f958929a23703169",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as Debug for@d913cd1f8cb0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-dda528d8cc2a6cd0",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter as MeasurementSink for@d913cd1f8cb0",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-588f8ffd8e25c1e8",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter::finish",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-186a8eaa30a241bd",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter::new",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2c94e47650ddcbf9",
+      "path": "stab_core::execution::MeasurementToDetectionSinkAdapter::write_batch_with_sweep",
+      "kind": "method",
+      "performance_feature": "PERF-RESULT-IO",
+      "supporting_performance_features": [
+        "PERF-CONVERT-CLI"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-03bfee7a015f86c8",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-c48702131fe1d3fa",
       "path": "stab_core::execution::PlanFingerprint",
       "kind": "struct",
@@ -58668,6 +61540,67 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-M11-DEM-BATCH-PHASES",
+      "manifest_row": "m11-dem-batch-phases",
+      "row_origin": "inherited",
+      "performance_feature": "PERF-DEM-SAMPLING",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "future-candidate",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [],
+      "correctness_binding": "unresolved",
+      "planned_correctness_case_id": "CQPLANNED-PERFQ-M11-DEM-BATCH-PHASES",
+      "workload_family": {
+        "fixture": {
+          "kind": "inline",
+          "id": "m11-dem-batch-phases"
+        },
+        "source": "src/stim/simulators/dem_sampler.perf.cc",
+        "deterministic_seed": "source-owned-inline:m11-dem-batch-phases",
+        "scales": [
+          {
+            "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "A5 Stab-only DEM plan detector sampled-error replay and PTB64 routing phase diagnostics",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "shots",
+      "output_contract": {
+        "expected_shape": "dem-batch-phases output count, width, and semantic digest from the declared correctness preflight",
+        "digest_state": "planned",
+        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "inherited"
+        ],
+        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Legacy workload m11-dem-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
+      "owner": "stab-core/dem-sampler",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-M11-DEM-SAMPLER",
       "manifest_row": "m11-dem-sampler",
       "row_origin": "inherited",
@@ -64791,6 +67724,67 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-M9-DETECTION-BATCH-PHASES",
+      "manifest_row": "m9-detection-batch-phases",
+      "row_origin": "inherited",
+      "performance_feature": "PERF-DETECTION",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "future-candidate",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [],
+      "correctness_binding": "unresolved",
+      "planned_correctness_case_id": "CQPLANNED-PERFQ-M9-DETECTION-BATCH-PHASES",
+      "workload_family": {
+        "fixture": {
+          "kind": "inline",
+          "id": "m9-detection-batch-phases"
+        },
+        "source": "src/stim/simulators/frame_simulator.perf.cc",
+        "deterministic_seed": "source-owned-inline:m9-detection-batch-phases",
+        "scales": [
+          {
+            "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "A5 Stab-only detection plan session and PTB64 routing phase diagnostics",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "detector-events",
+      "output_contract": {
+        "expected_shape": "detection-batch-phases output count, width, and semantic digest from the declared correctness preflight",
+        "digest_state": "planned",
+        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "inherited"
+        ],
+        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Legacy workload m9-detection-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
+      "owner": "stab-core/detection",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-M9-FEEDBACK-INLINE-MPP-BATCH",
       "manifest_row": "m9-feedback-inline-mpp-batch",
       "row_origin": "inherited",
@@ -64849,6 +67843,67 @@
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-feedback-inline-mpp-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
       "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-M9-M2D-BATCH-PHASES",
+      "manifest_row": "m9-m2d-batch-phases",
+      "row_origin": "inherited",
+      "performance_feature": "PERF-DETECTION",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "future-candidate",
+      "phase": "convert",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [],
+      "correctness_binding": "unresolved",
+      "planned_correctness_case_id": "CQPLANNED-PERFQ-M9-M2D-BATCH-PHASES",
+      "workload_family": {
+        "fixture": {
+          "kind": "inline",
+          "id": "m9-m2d-batch-phases"
+        },
+        "source": "src/stim/simulators/measurements_to_detection_events.test.cc",
+        "deterministic_seed": "source-owned-inline:m9-m2d-batch-phases",
+        "scales": [
+          {
+            "id": "inherited",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "A5 Stab-only measurement-to-detection plan and bounded batch session diagnostics",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "detector-events",
+      "output_contract": {
+        "expected_shape": "m2d-batch-phases output count, width, and semantic digest from the declared correctness preflight",
+        "digest_state": "planned",
+        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "inherited"
+        ],
+        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Legacy workload m9-m2d-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
+      "owner": "stab-core/detection",
       "status": "planned"
     },
     {
@@ -69651,6 +72706,29 @@
       "waiver_refs": []
     },
     {
+      "id": "m11-dem-batch-phases",
+      "primary_group_id": "PERFQ-M11-DEM-BATCH-PHASES",
+      "supporting_performance_features": [],
+      "decision": "reworked",
+      "classifications": [
+        "diagnostic",
+        "missing-scale",
+        "missing-correctness-preflight",
+        "missing-output-digest",
+        "missing-comparator",
+        "adapter-candidate"
+      ],
+      "stim_mapping": {
+        "kind": "planned-adapter",
+        "symbol": "stim_adapter::m11_dem_batch_phases",
+        "source": "src/stim/simulators/dem_sampler.perf.cc"
+      },
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [],
+      "waiver_refs": []
+    },
+    {
       "id": "m11-dem-sampler",
       "primary_group_id": "PERFQ-M11-DEM-SAMPLER",
       "supporting_performance_features": [],
@@ -69689,7 +72767,7 @@
       ],
       "stim_mapping": {
         "kind": "process-cli",
-        "argv": "sample_dem|--shots|1024",
+        "argv": "sample_dem|--shots|1024|--seed|5",
         "stdin_path": "oracle/fixtures/inputs/sample_dem_noisy.dem"
       },
       "threshold_refs": [
@@ -71641,7 +74719,7 @@
       ],
       "stim_mapping": {
         "kind": "process-cli",
-        "argv": "detect|--shots|1024|--out_format=b8",
+        "argv": "detect|--shots|1024|--out_format=b8|--seed|5",
         "stdin_path": "oracle/fixtures/inputs/detect_basic.stim"
       },
       "threshold_refs": [
@@ -71693,7 +74771,7 @@
       ],
       "stim_mapping": {
         "kind": "process-cli",
-        "argv": "detect|--shots|1024|--out_format=dets",
+        "argv": "detect|--shots|1024|--out_format=dets|--seed|5",
         "stdin_path": "oracle/fixtures/inputs/detect_basic.stim"
       },
       "threshold_refs": [
@@ -71727,6 +74805,29 @@
       "waiver_refs": []
     },
     {
+      "id": "m9-detection-batch-phases",
+      "primary_group_id": "PERFQ-M9-DETECTION-BATCH-PHASES",
+      "supporting_performance_features": [],
+      "decision": "reworked",
+      "classifications": [
+        "diagnostic",
+        "missing-scale",
+        "missing-correctness-preflight",
+        "missing-output-digest",
+        "missing-comparator",
+        "adapter-candidate"
+      ],
+      "stim_mapping": {
+        "kind": "planned-adapter",
+        "symbol": "stim_adapter::m9_detection_batch_phases",
+        "source": "src/stim/simulators/frame_simulator.perf.cc"
+      },
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [],
+      "waiver_refs": []
+    },
+    {
       "id": "m9-feedback-inline-mpp-batch",
       "primary_group_id": "PERFQ-M9-FEEDBACK-INLINE-MPP-BATCH",
       "supporting_performance_features": [],
@@ -71744,6 +74845,29 @@
         "kind": "planned-adapter",
         "symbol": "stim_adapter::m9_feedback_inline_mpp_batch",
         "source": "src/stim/util_top/transform_without_feedback.test.cc"
+      },
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [],
+      "waiver_refs": []
+    },
+    {
+      "id": "m9-m2d-batch-phases",
+      "primary_group_id": "PERFQ-M9-M2D-BATCH-PHASES",
+      "supporting_performance_features": [],
+      "decision": "reworked",
+      "classifications": [
+        "diagnostic",
+        "missing-scale",
+        "missing-correctness-preflight",
+        "missing-output-digest",
+        "missing-comparator",
+        "adapter-candidate"
+      ],
+      "stim_mapping": {
+        "kind": "planned-adapter",
+        "symbol": "stim_adapter::m9_m2d_batch_phases",
+        "source": "src/stim/simulators/measurements_to_detection_events.test.cc"
       },
       "threshold_refs": [],
       "threshold_max_relative_ratio": null,
@@ -73624,6 +76748,7 @@
         "DemSampler_surface_code_rotated_memory_z_distance11_100rounds_1024stripes"
       ],
       "manifest_rows": [
+        "m11-dem-batch-phases",
         "m11-dem-sampler"
       ]
     },
@@ -73651,6 +76776,7 @@
       ],
       "manifest_rows": [
         "m8-frame-simulator",
+        "m9-detection-batch-phases",
         "pf3-detect-sweep-sampling"
       ]
     },

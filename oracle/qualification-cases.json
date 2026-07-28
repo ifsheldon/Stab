@@ -4950,6 +4950,1302 @@
         "standalone": true
       },
       {
+        "id": "a5-dem-session-work-admission-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "work_limits_reject_before_rng_or_sink_and_leave_session_reusable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Plan- and compatibility-level limit admission reject sampled and replay work before advancing seeded RNG state or touching the sink, while an admitted retry on the same session produces the exact fresh-session stream."
+        },
+        "negative_axes": [
+          "sampled-work-over-limit",
+          "replay-work-over-limit",
+          "pre-admission-rng-advance",
+          "pre-admission-sink-write"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::session_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::session_with_limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::validate_replay_with_limits"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-session-active-byte-admission-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "session_batch_capacity_obeys_the_caller_active_byte_budget",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The caller's materialized-byte policy bounds the active reusable DEM record, sampled-error, and packed-plane storage: an admitted policy shrinks the internal batch while the first policy below one complete record fails before session allocation."
+        },
+        "negative_axes": [
+          "caller-byte-limit-bypass",
+          "minimum-batch-off-by-one",
+          "active-batch-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-compatibility-sink-byte-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampler_limits",
+            "sampled_error_streaming_charges_both_compatibility_records",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The sampled-error compatibility visitor admits the exact combined byte budget for its reusable detection and sampled-error records plus one complete session batch, and rejects the first byte below that boundary before visiting a record."
+        },
+        "negative_axes": [
+          "sampled-error-record-unaccounted",
+          "compatibility-scratch-off-by-one",
+          "visitor-before-byte-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-cli-detection-format-batch-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m9::batch_formats::detect_routes_4096_shots_through_every_supported_batch_format",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Detect routes 4,096 shots across multiple bounded batches for every supported primary and observable-side format, including exact complete PTB64 groups, without retaining the primary output."
+        },
+        "negative_axes": [
+          "single-batch-only",
+          "format-route-bypass",
+          "observable-side-buffer-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-cli-m2d-format-batch-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m9::batch_formats::m2d_routes_4096_records_through_every_supported_batch_format",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Measurement-to-detection conversion consumes 4,096 records from every supported input format and routes multiple bounded batches through every supported primary and observable-side output format."
+        },
+        "negative_axes": [
+          "packed-input-materialization",
+          "single-batch-only",
+          "output-format-route-bypass"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-cli-dem-format-batch-contract",
+        "feature_id": "CQ-CLI",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m11::sample_dem_routes_4096_shots_through_every_supported_batch_format",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "DEM sampling routes 4,096 shots across multiple bounded batches for every supported detector, observable-side, and sampled-error output format, including complete PTB64 groups."
+        },
+        "negative_axes": [
+          "sampled-error-route-bypass",
+          "single-batch-only",
+          "side-output-buffer-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-cli-replay-output-activation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::m11::malformed_replay_prefix_does_not_create_or_truncate_outputs",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Malformed text, packed, and PTB64 replay prefixes fail before primary, observable, or sampled-error outputs are created or existing output sentinels are truncated."
+        },
+        "negative_axes": [
+          "output-create-before-replay-validation",
+          "output-truncate-before-replay-validation",
+          "packed-replay-lifecycle-bypass"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-delayed-output-identity-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "io_plan::tests::delayed_output_open_rechecks_retained_input_identity",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Delayed output opening compares the opened output identity against input handles retained across parsing and replay validation, rejecting a hardlink substituted after the lexical preflight without truncating the input inode."
+        },
+        "negative_axes": [
+          "time-of-check-path-replacement",
+          "retained-input-identity-loss",
+          "delayed-alias-truncation"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-plan-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::plans_are_shareable_and_streamed_conversion_matches_materialized_output",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "A shareable immutable conversion plan creates isolated mutable state and streams one typed detector and observable batch that exactly matches the compatibility materializer."
+        },
+        "negative_axes": [
+          "plan-mutation",
+          "detector-plane-drift",
+          "observable-plane-drift",
+          "sink-lifecycle-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionCompiler"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionCompiler::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionCompiler::compile"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan::measurement_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan::sweep_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionPlan::session"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::run"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-sweep-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::sweep_batches_and_reference_modes_match_materialized_conversion",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Explicit sweep batches and both reference-sample modes produce the exact materialized conversion result without joining the two semantic input planes."
+        },
+        "negative_axes": [
+          "sweep-plane-loss",
+          "reference-mode-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionCompiler::reference_sample_mode"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-adapter-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The public measurement-sink adapter forwards a bounded measurement and sweep batch into one detector-sink lifecycle and preserves exact detector and observable records."
+        },
+        "negative_axes": [
+          "sweep-plane-loss",
+          "double-finish",
+          "observable-routing-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::write_batch_with_sweep"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::finish"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-prefix-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Record-at-a-time conversion commits a valid prefix, rejects a later malformed-width batch before sink delivery, remains reusable, and finalizes exactly once."
+        },
+        "negative_axes": [
+          "valid-prefix-loss",
+          "preflight-poisoning",
+          "post-error-write",
+          "double-finish"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::write_batch"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::finish"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::is_poisoned"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::total_committed_shots"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-cancellation-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::conversion_cancellation_rejects_a_whole_batch_and_is_resumable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Pre-cancelled conversion accepts no partial batch, touches no sink record, stays unpoisoned, and resumes after explicit reset with exact cumulative progress."
+        },
+        "negative_axes": [
+          "partial-batch-commit",
+          "cancellation-poisoning",
+          "resume-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionSession::cancellation"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-sampling-equivalence-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::automatic_fused_and_direct_sampling_match_legacy_materialization",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Automatic direct-frame and fused sample-convert plan selection preserve declared widths, exact seeded compatibility records, 64-shot batch partitioning, and one sink lifecycle."
+        },
+        "negative_axes": [
+          "plan-variant-drift",
+          "seeded-stream-drift",
+          "batch-boundary-drift",
+          "semantic-width-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingCompiler"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingCompiler::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingCompiler::compile"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingPlan"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingPlan::measurement_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingPlan::session"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingSession"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingSession::run"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-sampling-partition-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::seeded_same_session_partitioning_is_exact_for_both_private_variants",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Two calls on one seeded direct or fused session concatenate to the exact one-call stream and retain exact cumulative committed-shot accounting."
+        },
+        "negative_axes": [
+          "chunk-boundary-rng-drift",
+          "variant-partition-drift",
+          "cumulative-progress-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingSession::total_committed_shots"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-sampling-cancellation-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::cancellation_stops_between_bounded_batches_and_finalizes_sink",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Direct and fused sessions observe cancellation between complete bounded batches, finalize the accepted prefix, preserve exact summaries, and resume after reset."
+        },
+        "negative_axes": [
+          "partial-batch-cancellation",
+          "missing-finalization",
+          "cancellation-poisoning",
+          "resume-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingSession::cancellation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunStatus"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunSummary"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunSummary::status"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunSummary::requested_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunSummary::committed_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunSummary::total_committed_shots"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-sampling-failure-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::sink_failures_preserve_first_error_progress_and_poison_sessions",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Write and finish failures retain the first typed source and exact progress, poison affected sessions, reject later work, and convert engine diagnostics without erasing their class."
+        },
+        "negative_axes": [
+          "sink-error-erasure",
+          "progress-drift",
+          "post-failure-reuse",
+          "diagnostic-class-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionExecutionError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionExecutionError::into_circuit_error"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunError::progress"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunProgress"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunProgress::committed_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionRunProgress::attempted_batch_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingSession::is_poisoned"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-compilation-limit-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::compilation_rejects_limits_before_session_or_sink_work",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Both detection compiler families apply the same explicit conversion limits and return typed compile diagnostics before constructing a session or touching a sink."
+        },
+        "negative_axes": [
+          "conversion-limit-bypass",
+          "sampling-limit-bypass",
+          "late-admission"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::MeasurementToDetectionCompiler::limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionSamplingCompiler::limits"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionCompileError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DetectionCompileError::into_circuit_error"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-measurement-detection-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::warmed_conversion_reuses_width_and_batch_bounded_storage",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "After warmup, repeated 64-record measurement and sweep conversion batches reuse width-dependent session storage with zero measured allocations."
+        },
+        "negative_axes": [
+          "per-record-allocation",
+          "per-batch-allocation",
+          "sweep-scratch-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-sampling-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::warmed_detection_variants_reuse_session_and_batch_storage",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "After warmup, direct-frame and fused detection sessions reuse bounded plan and batch storage across repeated 64-shot calls with zero measured allocations."
+        },
+        "negative_axes": [
+          "direct-session-allocation",
+          "fused-session-allocation",
+          "record-count-growth"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-detection-combined-session-storage-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::api::tests::fused_detection_storage_admission_uses_the_combined_session_estimate",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Fused detection admits the aggregate sampling and conversion session estimate at the exact private limit and rejects the first excess before allocating either mutable sub-session."
+        },
+        "negative_axes": [
+          "individually-admitted-aggregate-overflow",
+          "combined-session-off-by-one"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-compiler-plan-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "public_compiler_and_compatibility_facade_share_one_plan_contract",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The public compiler and compatibility facade produce one equal shareable lowered plan with exact semantic widths, admitted replay work, and an isolated seeded session."
+        },
+        "negative_axes": [
+          "facade-plan-drift",
+          "semantic-width-drift",
+          "compiler-session-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCompiler"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCompiler::new"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCompiler::compile"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::sampled_error_width"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::detector_count"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::observable_count"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::error_count"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::session"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingPlan::validate_replay"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::plan"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledDemSampler::session"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunSummary"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunSummary::status"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunSummary::requested_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunSummary::committed_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunSummary::total_committed_shots"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-sampling-equivalence-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "streamed_sessions_match_materialized_sampling_across_dem_families",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Detector-only and sampled-error session algorithms exactly match materialized seeded output across deterministic, noisy, repeated, correlated, observable-only, and nested DEM families."
+        },
+        "negative_axes": [
+          "detector-only-drift",
+          "sampled-error-drift",
+          "repeat-lowering-drift",
+          "correlated-error-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::run"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::run_with_sampled_errors"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-sampling-partition-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "seeded_sessions_partition_exactly_for_both_sampling_algorithms",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Partitioned detector-only and sampled-error runs concatenate to the exact whole seeded stream and retain exact cumulative committed-shot accounting."
+        },
+        "negative_axes": [
+          "chunk-boundary-rng-drift",
+          "algorithm-partition-drift",
+          "cumulative-progress-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::total_committed_shots"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-replay-lifecycle-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Incremental replay accepts bounded caller-owned batches, emits exact materialized detector and observable records plus sampled-error planes, finalizes once, and does not advance session RNG state."
+        },
+        "negative_axes": [
+          "replay-rng-advance",
+          "batch-order-drift",
+          "sampled-error-plane-loss",
+          "double-finish"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::replay"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::start_replay"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplaySession"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplaySession::write_batch"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplaySession::finish"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplayBatchStatus::is_accepted"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-replay-abandonment-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "replay_batch_validation_is_retryable_but_abandoned_output_poisons",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Replay width rejection reports the exact already-committed prefix and attempted batch, remains retryable before delivery, and dropping an incomplete replay after committed output poisons the parent session because the sink lifecycle cannot be trusted."
+        },
+        "negative_axes": [
+          "preflight-poisoning",
+          "committed-prefix-progress-loss",
+          "abandoned-output-reuse",
+          "missing-finish"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-cancellation-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "cancellation_commits_only_complete_batches_and_session_resumes",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Sampling cancellation stops between complete batches and resumes the exact seeded stream; replay cancellation before delivery or after the final accepted write finalizes once, reports an exact cancelled summary, and leaves the parent session reusable."
+        },
+        "negative_axes": [
+          "partial-batch-cancellation",
+          "cancellation-poisoning",
+          "replay-write-after-cancel",
+          "replay-finish-cancellation-misclassification",
+          "resume-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCancellation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCancellation::cancel"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCancellation::reset"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingCancellation::is_cancelled"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::cancellation"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunStatus"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunStatus::is_completed"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunStatus::is_cancelled"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplayBatchStatus"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemReplayBatchStatus::is_cancelled"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-sampling-failure-contract",
+        "feature_id": "CQ-DEM-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "sink_failures_preserve_progress_and_poison_sessions",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Write and finish failures retain the typed source and exact progress, poison the session, reject later work before sink access, and convert engine diagnostics without erasing their class."
+        },
+        "negative_axes": [
+          "sink-error-erasure",
+          "progress-drift",
+          "post-failure-reuse",
+          "diagnostic-class-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingExecutionError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingExecutionError::into_circuit_error"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunError"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunError::progress"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunProgress"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunProgress::committed_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingRunProgress::attempted_batch_shots"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::DemSamplingSession::is_poisoned"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a5-dem-sampling-allocation-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "dem_sampling_plan_session",
+            "post_warmup_session_execution_allocations_are_record_count_independent",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "After warmup, detector-only sampling, sampled-error sampling, and replay process 1,024 or 64 records with zero measured allocations and bounded retained session storage."
+        },
+        "negative_axes": [
+          "detector-only-allocation",
+          "sampled-error-allocation",
+          "replay-allocation",
+          "record-count-growth"
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-parse-policy-default-contract",
         "feature_id": "CQ-RESOURCE",
         "comparator": "exact-value",
