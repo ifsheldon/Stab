@@ -223,6 +223,7 @@ pub(crate) fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), 
 
 pub(crate) fn run_stab_compare_row_with_root(
     root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
@@ -494,7 +495,7 @@ pub(crate) fn run_stab_compare_row_with_root(
                 Ok(Some(measurements))
             } else if let Some(measurements) = records::run_record_compare_row(row)? {
                 Ok(Some(measurements))
-            } else if let Some(measurements) = m8::run_sample_compare_row(row)? {
+            } else if let Some(measurements) = m8::run_sample_compare_row(root, profile, row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m9::run_detection_compare_row(root, row)? {
                 Ok(Some(measurements))

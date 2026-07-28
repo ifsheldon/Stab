@@ -1,17 +1,27 @@
+#[cfg(not(test))]
+use std::ffi::OsString;
 use std::hint::black_box;
+#[cfg(test)]
+use std::io::{self, Write};
+#[cfg(not(test))]
+use std::path::{Component, Path, PathBuf};
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
-    Circuit, CompiledSampler, Probability, ReferenceSampleTree, SampleFormat,
-    biased_randomize_bits,
+    BackendPreference, BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink,
+    MeasurementSink, Probability, RandomPolicy, RecordFormat, ReferenceSampleTree, SampleFormat,
+    SamplingCompiler, Seed, ShotCount, biased_randomize_bits,
     result_formats::{write_ptb64_records_checked, write_records},
     result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
 };
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
+#[cfg(not(test))]
+use crate::process::{check_success, run_checked_status, run_process};
 use crate::report::Measurement;
+use crate::root::RepoRoot;
 
 use super::{
     TINY_DIRECT_COMPARE_REPETITIONS, measure_stab, measure_stab_batched, measure_stab_iterations,
@@ -75,6 +85,8 @@ enum MeasureReaderMode {
 }
 
 pub(super) fn run_sample_compare_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
@@ -167,20 +179,28 @@ pub(super) fn run_sample_compare_row(
         )
         .map(Some),
         "m8-probability-util" => run_probability_util_row(row).map(Some),
-        "m8-sample-primary-repetition-contract" => run_primary_repetition_row(row).map(Some),
+        "m8-sample-primary-repetition-contract" => {
+            run_primary_repetition_row(root, profile, row).map(Some)
+        }
         "m8-sample-primary-rotated-surface-contract" => run_primary_surface_row(
+            root,
+            profile,
             row,
             "stab_sample_primary_rotated_surface_d3_r3",
             PRIMARY_ROTATED_SURFACE_FIXTURE,
         )
         .map(Some),
         "m8-sample-primary-unrotated-surface-contract" => run_primary_surface_row(
+            root,
+            profile,
             row,
             "stab_sample_primary_unrotated_surface_d3_r3",
             PRIMARY_UNROTATED_SURFACE_FIXTURE,
         )
         .map(Some),
-        "m8-sample-high-repeat-contract" => run_high_repeat_contract_row(row).map(Some),
+        "m8-sample-high-repeat-contract" => {
+            run_high_repeat_contract_row(root, profile, row).map(Some)
+        }
         _ => Ok(None),
     }
 }
@@ -224,10 +244,20 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m8-reference-sample-tree", "stab_reference_sample_tree_nested_circuit") => {
             Some((422.0, "measurements/s"))
         }
-        ("m8-sample-analysis-1shot", "stab_sample_compile_noisy_1q") => {
-            Some((1.0, "compilations/s"))
+        (
+            "m8-sample-analysis-1shot",
+            "stab_sample_compile_plan_auto_noisy_1q" | "stab_sample_compile_plan_scalar_noisy_1q",
+        ) => Some((1.0, "compilations/s")),
+        ("m8-sample-analysis-1shot", "stab_sample_construct_session_noisy_1q") => {
+            Some((1.0, "sessions/s"))
         }
-        ("m8-sample-analysis-1shot", "stab_sample_1shot_zero_one") => Some((1.0, "shots/s")),
+        (
+            "m8-sample-analysis-1shot",
+            "stab_sample_execute_witness_sink_64_continuous_session"
+            | "stab_sample_consume_typed_batch_64"
+            | "stab_sample_encode_b8_64"
+            | "stab_sample_repeated_session_16x4_continuous_session",
+        ) => Some((64.0, "shots/s")),
         ("m8-sample-throughput-1024", "stab_sample_1024_zero_one") => Some((1024.0, "shots/s")),
         ("m8-sample-throughput-1000000", "stab_sample_1000000_zero_one") => {
             Some((1_000_000.0, "shots/s"))
@@ -283,7 +313,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "partial-match: Stab measures the basic reference-sample-tree helper; optimized loop-folded construction remains a logged M8 spec gap",
         ),
         "m8-sample-analysis-1shot" => Some(
-            "report-only: Stab splits core sampler compilation and one-shot sampling; pinned Stim baseline is end-to-end CLI sample",
+            "report-only: Stab phase-separates plan compilation, scalar selection, session construction, steady-state raw execution, consumption of a prebuilt typed batch, encoding of a prebuilt typed batch, and repeated-session execution; only raw and repeated measurements advance preconstructed sessions, while pinned Stim baseline is end-to-end CLI sample",
         ),
         "m8-sample-throughput-1024" | "m8-sample-throughput-1000000" => Some(
             "report-only: Stab measures in-process core sampler throughput with default 01 output; pinned Stim baseline includes CLI process, parse, and output costs",
@@ -292,16 +322,16 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "direct-match: Stab measures the biased random bit utility against the pinned Stim probability_util perf filters",
         ),
         "m8-sample-primary-repetition-contract" => Some(
-            "cli-baseline: Stab samples the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
+            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 repetition-code d3/r3 b8 witness",
         ),
         "m8-sample-primary-rotated-surface-contract" => Some(
-            "cli-baseline: Stab samples the source-owned generated rotated-surface d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
+            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 rotated-surface d3/r3 b8 witness",
         ),
         "m8-sample-primary-unrotated-surface-contract" => Some(
-            "cli-baseline: Stab samples the source-owned generated unrotated-surface d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
+            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 unrotated-surface d3/r3 b8 witness",
         ),
         "m8-sample-high-repeat-contract" => Some(
-            "cli-baseline: Stab samples the source-owned repeat-heavy fixture with b8 output against pinned Stim sample on the same fixture; optimized loop folding remains a logged M8 spec gap",
+            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 repeat-heavy b8 witness, while optimized loop folding remains a logged M8 spec gap",
         ),
         _ => None,
     }
@@ -380,32 +410,91 @@ fn run_probability_util_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
 
 fn run_sample_analysis_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = sample_circuit(&row.id, SAMPLE_NOISY_FIXTURE)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
+    let plan = compile_plan(&row.id, &circuit)?;
+    let mut raw_session = sampling_session(&row.id, &plan, 5)?;
+    let mut raw_sink = BoundaryWitnessSink::default();
+    let mut delivery_sink = DigestMeasurementSink::default();
+    let mut repeated_session = sampling_session(&row.id, &plan, 5)?;
+    let mut repeated_sink = BoundaryWitnessSink::default();
+    let encoding_batch = sample_encoding_batch(&row.id, plan.measurement_width().get())?;
     Ok(vec![
-        measure_stab("stab_sample_compile_noisy_1q", || {
-            let compiled = CompiledSampler::compile(&circuit)
+        measure_stab("stab_sample_compile_plan_auto_noisy_1q", || {
+            let compiled = SamplingCompiler::new()
+                .compile(&circuit)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(compiled);
             Ok(())
         })?,
-        measure_stab("stab_sample_1shot_zero_one", || {
-            let output = sampler.sample_bytes_with_seed(1, SampleFormat::ZeroOne, Some(5));
-            black_box(output.len());
+        measure_stab("stab_sample_compile_plan_scalar_noisy_1q", || {
+            let compiled = SamplingCompiler::new()
+                .backend(BackendPreference::Scalar)
+                .compile(&circuit)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(compiled);
             Ok(())
         })?,
+        measure_stab("stab_sample_construct_session_noisy_1q", || {
+            let session = plan
+                .session(RandomPolicy::Seeded(Seed::new(5)))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(session);
+            Ok(())
+        })?,
+        measure_stab(
+            "stab_sample_execute_witness_sink_64_continuous_session",
+            || {
+                let summary = raw_session
+                    .run(ShotCount::new(64), &mut raw_sink)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box((summary, raw_sink.digest));
+                Ok(())
+            },
+        )?,
+        measure_stab("stab_sample_consume_typed_batch_64", || {
+            delivery_sink
+                .write_batch(MeasurementBatchView::from_bit_planes(encoding_batch.view()))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(delivery_sink.digest);
+            Ok(())
+        })?,
+        measure_stab("stab_sample_encode_b8_64", || {
+            let mut sink =
+                MeasurementCodecSink::try_new(RecordFormat::B8, plan.measurement_width())
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+            sink.write_batch(MeasurementBatchView::from_bit_planes(encoding_batch.view()))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let bytes = sink
+                .into_bytes()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(bytes.len());
+            Ok(())
+        })?,
+        measure_stab(
+            "stab_sample_repeated_session_16x4_continuous_session",
+            || {
+                for _ in 0..16 {
+                    let summary = repeated_session
+                        .run(ShotCount::new(4), &mut repeated_sink)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box((summary, repeated_sink.digest));
+                }
+                Ok(())
+            },
+        )?,
     ])
 }
 
 fn run_frame_simulator_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let fixture = frame_simulator_fixture();
     let circuit = sample_circuit(&row.id, &fixture)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
+    let plan = compile_plan(&row.id, &circuit)?;
     Ok(vec![
         measure_stab_iterations(
             "stab_frame_compile_depolarize1",
             SIMULATOR_COMPARE_ITERATIONS,
             || {
-                let compiled = CompiledSampler::compile(&circuit)
+                let compiled = SamplingCompiler::new()
+                    .compile(&circuit)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(compiled);
                 Ok(())
@@ -415,12 +504,8 @@ fn run_frame_simulator_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Bench
             "stab_frame_sample_depolarize1_b8",
             SIMULATOR_COMPARE_ITERATIONS,
             || {
-                let output = sampler.sample_bytes_with_seed(
-                    FRAME_SIMULATOR_SHOTS,
-                    SampleFormat::B8,
-                    Some(5),
-                );
-                black_box(output.len());
+                let output = sample_plan_b8(&row.id, &plan, FRAME_SIMULATOR_SHOTS, 5)?;
+                black_box(output);
                 Ok(())
             },
         )?,
@@ -430,13 +515,13 @@ fn run_frame_simulator_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Bench
 fn run_tableau_simulator_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let fixture = tableau_simulator_fixture();
     let circuit = sample_circuit(&row.id, &fixture)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
+    let plan = compile_plan(&row.id, &circuit)?;
     Ok(vec![measure_stab_iterations(
         "stab_tableau_sample_cx_1shot",
         SIMULATOR_COMPARE_ITERATIONS,
         || {
-            let output = sampler.sample_bytes_with_seed(1, SampleFormat::B8, Some(5));
-            black_box(output.len());
+            let output = sample_plan_b8(&row.id, &plan, 1, 5)?;
+            black_box(output);
             Ok(())
         },
     )?])
@@ -465,20 +550,37 @@ fn run_sample_throughput_row(
     iterations: usize,
 ) -> Result<Vec<Measurement>, BenchError> {
     let circuit = sample_circuit(&row.id, fixture)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
+    let plan = compile_plan(&row.id, &circuit)?;
     Ok(vec![measure_stab_iterations(
         measurement_name,
         iterations,
         || {
-            let output = sampler.sample_bytes_with_seed(shots, SampleFormat::ZeroOne, Some(5));
-            black_box(output.len());
+            let mut session = sampling_session(&row.id, &plan, 5)?;
+            let mut sink =
+                MeasurementCodecSink::try_new(RecordFormat::ZeroOne, plan.measurement_width())
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+            sink.reserve_records(shots)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let summary = session
+                .run(shot_count(&row.id, shots)?, &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let output = sink
+                .into_bytes()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary, output.len()));
             Ok(())
         },
     )?])
 }
 
-fn run_primary_repetition_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+fn run_primary_repetition_row(
+    root: &RepoRoot,
+    profile: &str,
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
     run_primary_generated_sample_row(
+        root,
+        profile,
         row,
         "stab_sample_primary_repetition_d3_r3",
         PRIMARY_REPETITION_FIXTURE,
@@ -486,52 +588,446 @@ fn run_primary_repetition_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
 }
 
 fn run_primary_surface_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
     measurement_name: &'static str,
     fixture: &str,
 ) -> Result<Vec<Measurement>, BenchError> {
-    run_primary_generated_sample_row(row, measurement_name, fixture)
+    run_primary_generated_sample_row(root, profile, row, measurement_name, fixture)
 }
 
 fn run_primary_generated_sample_row(
+    root: &RepoRoot,
+    profile: &str,
     row: &BenchmarkRow,
     measurement_name: &'static str,
     fixture: &str,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = sample_circuit(&row.id, fixture)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
+    #[cfg(not(test))]
+    {
+        run_sample_cli_process_row(root, profile, row, measurement_name, fixture)
+    }
+    #[cfg(test)]
+    let _ = (root, profile);
+    #[cfg(test)]
+    let expected = sample_cli_witness(row, fixture, PRIMARY_MATRIX_SHOTS, "b8")?;
+    #[cfg(test)]
+    Ok(vec![measure_stab_iterations(
+        measurement_name,
+        SIMULATOR_COMPARE_ITERATIONS,
+        || run_sample_cli(row, fixture, PRIMARY_MATRIX_SHOTS, "b8", expected),
+    )?])
+}
+
+fn run_high_repeat_contract_row(
+    root: &RepoRoot,
+    profile: &str,
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    #[cfg(not(test))]
+    {
+        run_sample_cli_process_row(
+            root,
+            profile,
+            row,
+            "stab_sample_high_repeat_contract",
+            HIGH_REPEAT_CONTRACT_FIXTURE,
+        )
+    }
+    #[cfg(test)]
+    let _ = (root, profile);
+    #[cfg(test)]
+    let expected = sample_cli_witness(row, HIGH_REPEAT_CONTRACT_FIXTURE, 1, "b8")?;
+    #[cfg(test)]
+    Ok(vec![measure_stab_iterations(
+        "stab_sample_high_repeat_contract",
+        SIMULATOR_COMPARE_ITERATIONS,
+        || run_sample_cli(row, HIGH_REPEAT_CONTRACT_FIXTURE, 1, "b8", expected),
+    )?])
+}
+
+#[cfg(not(test))]
+fn run_sample_cli_process_row(
+    root: &RepoRoot,
+    profile: &str,
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+    fixture: &str,
+) -> Result<Vec<Measurement>, BenchError> {
+    let stdin = row.stdin(root)?;
+    if stdin != fixture.as_bytes() {
+        return Err(stab_runner_error(
+            &row.id,
+            "manifest input no longer matches the source-owned sampling fixture",
+        ));
+    }
+    let args = row
+        .argv_tokens()
+        .into_iter()
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let program = build_stab_cli_binary(root, profile, &row.id)?;
+    let expected = frozen_pre_a4_cli_witness(&row.id).ok_or_else(|| {
+        stab_runner_error(
+            &row.id,
+            "process-equivalent sampling row has no frozen pre-A4 output witness",
+        )
+    })?;
+
+    let preflight = run_process(&program, &args, &stdin, &root.path, true)?;
+    check_success(&program, &preflight)?;
+    let actual = OutputWitness::from_bytes(&preflight.stdout);
+    if actual != expected {
+        return Err(stab_runner_error(
+            &row.id,
+            format!(
+                "sample process preflight changed from the clean pre-A4 witness: expected {expected:?}, got {actual:?}"
+            ),
+        ));
+    }
+
     Ok(vec![measure_stab_iterations(
         measurement_name,
         SIMULATOR_COMPARE_ITERATIONS,
         || {
-            let output =
-                sampler.sample_bytes_with_seed(PRIMARY_MATRIX_SHOTS, SampleFormat::B8, Some(5));
-            black_box(output.len());
+            let output = run_process(&program, &args, &stdin, &root.path, false)?;
+            check_success(&program, &output)?;
+            black_box((output.status, output.parent_observed_peak_rss_bytes));
             Ok(())
         },
     )?])
 }
 
-fn run_high_repeat_contract_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = sample_circuit(&row.id, HIGH_REPEAT_CONTRACT_FIXTURE)?;
-    let sampler = compile_sampler(&row.id, &circuit)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_sample_high_repeat_contract",
-        SIMULATOR_COMPARE_ITERATIONS,
-        || {
-            let output = sampler.sample_bytes_with_seed(1, SampleFormat::B8, Some(5));
-            black_box(output.len());
-            Ok(())
-        },
-    )?])
+#[cfg(not(test))]
+fn build_stab_cli_binary(
+    root: &RepoRoot,
+    profile: &str,
+    row_id: &str,
+) -> Result<PathBuf, BenchError> {
+    let profile_path = Path::new(profile);
+    if profile.is_empty()
+        || profile_path.components().count() != 1
+        || !matches!(profile_path.components().next(), Some(Component::Normal(_)))
+    {
+        return Err(stab_runner_error(
+            row_id,
+            format!("unsafe Cargo profile name {profile:?}"),
+        ));
+    }
+    run_checked_status(
+        "cargo",
+        [
+            "build",
+            "--quiet",
+            "--profile",
+            profile,
+            "--package",
+            "stab-cli",
+            "--bin",
+            "stab",
+        ],
+        &root.path,
+    )?;
+    let profile_dir = if profile == "dev" { "debug" } else { profile };
+    let binary = root
+        .path
+        .join("target")
+        .join(profile_dir)
+        .join(format!("stab{}", std::env::consts::EXE_SUFFIX));
+    if !binary.is_file() {
+        return Err(stab_runner_error(
+            row_id,
+            format!(
+                "Cargo completed without producing the expected Stab CLI binary {}",
+                binary.display()
+            ),
+        ));
+    }
+    Ok(binary)
+}
+
+fn frozen_pre_a4_cli_witness(row_id: &str) -> Option<OutputWitness> {
+    match row_id {
+        "m8-sample-primary-repetition-contract" => Some(OutputWitness {
+            bytes: 128,
+            digest: 0xc6a0_1d09_04c3_59a5,
+        }),
+        "m8-sample-primary-rotated-surface-contract" => Some(OutputWitness {
+            bytes: 320,
+            digest: 0x0c81_72cc_5f87_aa84,
+        }),
+        "m8-sample-primary-unrotated-surface-contract" => Some(OutputWitness {
+            bytes: 448,
+            digest: 0x5298_992f_11e2_32d7,
+        }),
+        "m8-sample-high-repeat-contract" => Some(OutputWitness {
+            bytes: 64,
+            digest: 0x5e27_5dae_3600_d85b,
+        }),
+        _ => None,
+    }
 }
 
 fn sample_circuit(row_id: &str, fixture: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(fixture).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn compile_sampler(row_id: &str, circuit: &Circuit) -> Result<CompiledSampler, BenchError> {
-    CompiledSampler::compile(circuit).map_err(|error| stab_runner_error(row_id, error))
+fn compile_plan(row_id: &str, circuit: &Circuit) -> Result<stab_core::SamplingPlan, BenchError> {
+    SamplingCompiler::new()
+        .compile(circuit)
+        .map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn sampling_session(
+    row_id: &str,
+    plan: &stab_core::SamplingPlan,
+    seed: u64,
+) -> Result<stab_core::SamplingSession, BenchError> {
+    plan.session(RandomPolicy::Seeded(Seed::new(seed)))
+        .map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn shot_count(row_id: &str, shots: usize) -> Result<ShotCount, BenchError> {
+    ShotCount::try_from(shots).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn sample_encoding_batch(
+    row_id: &str,
+    bits_per_shot: usize,
+) -> Result<BitPlane64Batch, BenchError> {
+    let mut batch = BitPlane64Batch::zeros(64, bits_per_shot)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    for bit_index in 0..bits_per_shot {
+        let word = (0..64).fold(0_u64, |word, shot_index| {
+            if (shot_index + bit_index * 3).is_multiple_of(5) {
+                word | (1_u64 << shot_index)
+            } else {
+                word
+            }
+        });
+        batch
+            .copy_plane_from_word(bit_index, word)
+            .map_err(|error| stab_runner_error(row_id, error))?;
+    }
+    Ok(batch)
+}
+
+fn sample_plan_b8(
+    row_id: &str,
+    plan: &stab_core::SamplingPlan,
+    shots: usize,
+    seed: u64,
+) -> Result<usize, BenchError> {
+    let mut session = sampling_session(row_id, plan, seed)?;
+    let mut sink = MeasurementCodecSink::try_new(RecordFormat::B8, plan.measurement_width())
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    session
+        .run(shot_count(row_id, shots)?, &mut sink)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    sink.into_bytes()
+        .map(|bytes| bytes.len())
+        .map_err(|error| stab_runner_error(row_id, error))
+}
+
+#[cfg(test)]
+fn run_sample_cli(
+    row: &BenchmarkRow,
+    fixture: &str,
+    shots: usize,
+    output_format: &str,
+    expected: OutputWitness,
+) -> Result<(), BenchError> {
+    let shots = shots.to_string();
+    let args = [
+        "stab",
+        "sample",
+        "--shots",
+        shots.as_str(),
+        "--out_format",
+        output_format,
+        "--seed",
+        "5",
+    ];
+    let mut output = WitnessWriter::default();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(args, fixture.as_bytes(), &mut output, &mut stderr);
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli sample failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    let actual = output.witness();
+    if actual != expected {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli sample output witness changed: expected {expected:?}, got {actual:?}"
+            ),
+        });
+    }
+    black_box(actual);
+    Ok(())
+}
+
+#[cfg(test)]
+fn sample_cli_witness(
+    row: &BenchmarkRow,
+    fixture: &str,
+    shots: usize,
+    output_format: &str,
+) -> Result<OutputWitness, BenchError> {
+    let shots = shots.to_string();
+    let args = [
+        "stab",
+        "sample",
+        "--shots",
+        shots.as_str(),
+        "--out_format",
+        output_format,
+        "--seed",
+        "5",
+    ];
+    let mut output = WitnessWriter::default();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(args, fixture.as_bytes(), &mut output, &mut stderr);
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli sample witness failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    Ok(output.witness())
+}
+
+#[derive(Default)]
+struct BoundaryWitnessSink {
+    digest: u64,
+}
+
+impl MeasurementSink for BoundaryWitnessSink {
+    type Error = &'static str;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        self.digest = self
+            .digest
+            .rotate_left(7)
+            .wrapping_add(batch.shot_count() as u64)
+            .wrapping_add((batch.width().get() as u64).rotate_left(17));
+        if batch.shot_count() != 0 && batch.width().get() != 0 {
+            let first = batch
+                .get(0, 0)
+                .ok_or("sampling benchmark could not read its first witness bit")?;
+            let last = batch
+                .get(batch.shot_count() - 1, batch.width().get() - 1)
+                .ok_or("sampling benchmark could not read its last witness bit")?;
+            self.digest ^= u64::from(first) | (u64::from(last) << 1);
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct DigestMeasurementSink {
+    digest: u64,
+}
+
+impl MeasurementSink for DigestMeasurementSink {
+    type Error = &'static str;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        for shot in 0..batch.shot_count() {
+            for bit in 0..batch.width().get() {
+                let value = batch
+                    .get(shot, bit)
+                    .ok_or("sampling benchmark received an invalid typed batch view")?;
+                self.digest = self.digest.rotate_left(1) ^ u64::from(value);
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct OutputWitness {
+    bytes: usize,
+    digest: u64,
+}
+
+impl OutputWitness {
+    #[cfg(not(test))]
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut digest = 0xcbf2_9ce4_8422_2325_u64;
+        for byte in bytes {
+            digest ^= u64::from(*byte);
+            digest = digest.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self {
+            bytes: bytes.len(),
+            digest,
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct WitnessWriter {
+    bytes: usize,
+    digest: u64,
+}
+
+#[cfg(test)]
+impl Default for WitnessWriter {
+    fn default() -> Self {
+        Self {
+            bytes: 0,
+            digest: 0xcbf2_9ce4_8422_2325,
+        }
+    }
+}
+
+#[cfg(test)]
+impl WitnessWriter {
+    const fn witness(&self) -> OutputWitness {
+        OutputWitness {
+            bytes: self.bytes,
+            digest: self.digest,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Write for WitnessWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("sample benchmark output byte count overflowed"))?;
+        for byte in bytes {
+            self.digest ^= u64::from(*byte);
+            self.digest = self.digest.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn measure_reader_record(denominator: usize) -> Vec<bool> {
@@ -555,6 +1051,7 @@ fn frame_simulator_fixture() -> String {
 
 fn tableau_simulator_fixture() -> String {
     let mut text = String::new();
+    text.push_str("SWAP 0 1\n");
     for index in 0..TABLEAU_SIMULATOR_QUBITS {
         text.push_str("H ");
         text.push_str(&index.to_string());
@@ -584,143 +1081,4 @@ fn reference_sample_tree_fixture() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::manifest::{BenchmarkRow, Milestone, Runner};
-
-    use super::{compare_note, measurement_work, run_sample_compare_row};
-
-    #[test]
-    fn m8_benchmark_rows_have_stab_compare_runners() {
-        for (id, expected_measurements) in [
-            (
-                "m8-measure-reader-01",
-                &["stab_read_01_dense_per10", "stab_read_01_sparse_per10"][..],
-            ),
-            (
-                "m8-measure-reader-b8",
-                &["stab_read_b8_dense_per10", "stab_read_b8_sparse_per10"][..],
-            ),
-            (
-                "m8-measure-reader-r8",
-                &[
-                    "stab_read_r8_dense_per10",
-                    "stab_read_r8_dense_per100",
-                    "stab_read_r8_sparse_per10",
-                    "stab_read_r8_sparse_per100",
-                ][..],
-            ),
-            (
-                "m8-measure-reader-hits",
-                &[
-                    "stab_read_hits_dense_per10",
-                    "stab_read_hits_dense_per100",
-                    "stab_read_hits_sparse_per10",
-                    "stab_read_hits_sparse_per100",
-                ][..],
-            ),
-            (
-                "m8-measure-reader-dets",
-                &[
-                    "stab_read_dets_dense_per10",
-                    "stab_read_dets_dense_per100",
-                    "stab_read_dets_sparse_per10",
-                    "stab_read_dets_sparse_per100",
-                ][..],
-            ),
-            (
-                "m8-measure-reader-ptb64-contract",
-                &["stab_measure_reader_ptb64_64x10k_contract"][..],
-            ),
-            (
-                "m8-frame-simulator",
-                &[
-                    "stab_frame_compile_depolarize1",
-                    "stab_frame_sample_depolarize1_b8",
-                ][..],
-            ),
-            (
-                "m8-tableau-simulator",
-                &["stab_tableau_sample_cx_1shot"][..],
-            ),
-            (
-                "m8-reference-sample-tree",
-                &["stab_reference_sample_tree_nested_circuit"][..],
-            ),
-            (
-                "m8-sample-analysis-1shot",
-                &["stab_sample_compile_noisy_1q", "stab_sample_1shot_zero_one"][..],
-            ),
-            (
-                "m8-sample-throughput-1024",
-                &["stab_sample_1024_zero_one"][..],
-            ),
-            (
-                "m8-sample-throughput-1000000",
-                &["stab_sample_1000000_zero_one"][..],
-            ),
-            (
-                "m8-probability-util",
-                &[
-                    "stab_biased_random_1024_0point1percent",
-                    "stab_biased_random_1024_0point01percent",
-                    "stab_biased_random_1024_1percent",
-                    "stab_biased_random_1024_40percent",
-                    "stab_biased_random_1024_50percent",
-                    "stab_biased_random_1024_90percent",
-                    "stab_biased_random_1024_99percent",
-                ][..],
-            ),
-            (
-                "m8-sample-primary-repetition-contract",
-                &["stab_sample_primary_repetition_d3_r3"][..],
-            ),
-            (
-                "m8-sample-primary-rotated-surface-contract",
-                &["stab_sample_primary_rotated_surface_d3_r3"][..],
-            ),
-            (
-                "m8-sample-primary-unrotated-surface-contract",
-                &["stab_sample_primary_unrotated_surface_d3_r3"][..],
-            ),
-            (
-                "m8-sample-high-repeat-contract",
-                &["stab_sample_high_repeat_contract"][..],
-            ),
-        ] {
-            let row = BenchmarkRow {
-                id: id.to_string(),
-                milestone: Milestone::M8,
-                threshold_class: crate::manifest::ThresholdClass::ReportOnly,
-                runner: Runner::StimCli,
-                upstream_source: "src/stim/cmd/command_sample.test.cc".to_string(),
-                stim_perf_filter: String::new(),
-                argv: "sample|--shots|1".to_string(),
-                stdin_path: "oracle/fixtures/inputs/sample_noisy.stim".to_string(),
-                phase: "throughput".to_string(),
-                measurement: "sample".to_string(),
-                description: "test row".to_string(),
-                comparability: crate::comparability::ComparabilityClass::Unspecified,
-            };
-
-            let measurements = run_sample_compare_row(&row)
-                .expect("run compare row")
-                .expect("Stab runner");
-            let names = measurements
-                .iter()
-                .map(|measurement| measurement.name.as_str())
-                .collect::<Vec<_>>();
-
-            assert_eq!(names.as_slice(), expected_measurements);
-            assert!(
-                compare_note(id).is_some(),
-                "{id} should explain benchmark comparability"
-            );
-            for name in names {
-                assert!(
-                    measurement_work(id, name).is_some(),
-                    "{id}/{name} should report normalized work"
-                );
-            }
-        }
-    }
-}
+mod tests;

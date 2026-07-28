@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 68);
+        assert_eq!(thresholds.rows.len(), 66);
         for id in [
             "m6-stabilizers-to-tableau",
             "m6-tableau",
@@ -521,6 +521,8 @@ mod tests {
             "m7-cli-dispatch",
             "m8-frame-simulator",
             "m8-sample-analysis-1shot",
+            "m8-sample-throughput-1024",
+            "m8-sample-throughput-1000000",
         ] {
             assert!(
                 thresholds.rows.iter().all(|row| row.id != id),

@@ -204,8 +204,6 @@
     { "id": "m8-sample-primary-repetition-contract", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-primary-rotated-surface-contract", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-primary-unrotated-surface-contract", "max_relative_ratio": 1.25 },
-    { "id": "m8-sample-throughput-1000000", "max_relative_ratio": 1.25 },
-    { "id": "m8-sample-throughput-1024", "max_relative_ratio": 1.25 },
     { "id": "m8-tableau-simulator", "max_relative_ratio": 1.25 },
     { "id": "m9-convert-measurements-dets", "max_relative_ratio": 1.25 },
     { "id": "m9-detect-bitpacked-cli", "max_relative_ratio": 1.25 },

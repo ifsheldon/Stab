@@ -9,6 +9,8 @@ pub(crate) enum WorkerError {
     #[error(transparent)]
     Circuit(#[from] stab_core::CircuitError),
     #[error(transparent)]
+    SamplingCompile(#[from] stab_core::SamplingCompileError),
+    #[error(transparent)]
     Bits(#[from] stab_core::BitError),
     #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
     MeasurementMismatch {

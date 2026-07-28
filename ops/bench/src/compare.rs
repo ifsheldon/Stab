@@ -103,7 +103,7 @@ pub(crate) fn run_compare(
         baseline_path.display()
     );
     if options.warmup {
-        run_warmup_rows_with_root(root, &rows)?;
+        run_warmup_rows_with_root(root, &rows, &options.profile)?;
     }
     let mut pending = Vec::new();
     let mut missing_baselines = Vec::new();
@@ -127,7 +127,8 @@ pub(crate) fn run_compare(
         };
         let stim_measurements = baseline_measurements(&baseline_report, row);
         let note = compare_note(&row.id).map(str::to_string);
-        match run_recorded_stab_compare_row(root, row, options.measurement_runs)? {
+        match run_recorded_stab_compare_row(root, row, &options.profile, options.measurement_runs)?
+        {
             Some(measurements) => {
                 let printed_note = note
                     .as_deref()
@@ -384,13 +385,17 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
     Ok(profiler_note_findings)
 }
 
-fn run_warmup_rows_with_root(root: &RepoRoot, rows: &[&BenchmarkRow]) -> Result<(), BenchError> {
+fn run_warmup_rows_with_root(
+    root: &RepoRoot,
+    rows: &[&BenchmarkRow],
+    profile: &str,
+) -> Result<(), BenchError> {
     println!(
         "[{PREFIX}] warming {} Stab compare row(s) before recording measurements",
         rows.len()
     );
     for row in rows {
-        drop(run_stab_compare_row_with_root(root, row)?);
+        drop(run_stab_compare_row_with_root(root, profile, row)?);
     }
     Ok(())
 }
@@ -398,14 +403,15 @@ fn run_warmup_rows_with_root(root: &RepoRoot, rows: &[&BenchmarkRow]) -> Result<
 fn run_recorded_stab_compare_row(
     root: &RepoRoot,
     row: &BenchmarkRow,
+    profile: &str,
     measurement_runs: usize,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     if measurement_runs == 1 {
-        return run_stab_compare_row_with_root(root, row);
+        return run_stab_compare_row_with_root(root, profile, row);
     }
     let mut runs = Vec::with_capacity(measurement_runs);
     for _ in 0..measurement_runs {
-        let Some(measurements) = run_stab_compare_row_with_root(root, row)? else {
+        let Some(measurements) = run_stab_compare_row_with_root(root, profile, row)? else {
             return Ok(None);
         };
         runs.push(measurements);
@@ -421,7 +427,7 @@ fn run_warmup_rows(rows: &[&BenchmarkRow]) -> Result<(), BenchError> {
             .and_then(Path::parent)
             .expect("repository root"),
     )?;
-    run_warmup_rows_with_root(&root, rows)
+    run_warmup_rows_with_root(&root, rows, "release")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -2,8 +2,8 @@ use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
 use stab_core::{
-    Circuit, CompilationRequestFingerprint, CompiledSampler, Estimate, ModelFingerprint,
-    RecordFormat, ResourceEstimate, estimate_sampling_request,
+    Circuit, CompilationRequestFingerprint, Estimate, ModelFingerprint, PlanFingerprint,
+    RecordFormat, ResourceEstimate, SamplingCompiler, estimate_sampling_request,
 };
 
 use super::{
@@ -47,7 +47,7 @@ pub(super) enum AgentDiagnosticOutput {
     ModelFingerprint(ModelFingerprint),
     CompilationRequestFingerprint(CompilationRequestFingerprint),
     SamplingRequestEstimate(ResourceEstimate),
-    CompiledSampler(CompiledSampler),
+    SamplingPlanFingerprint(PlanFingerprint),
     CompileRelease { completed_iterations: u64 },
 }
 
@@ -80,7 +80,7 @@ impl AgentDiagnosticFixture {
         if self.kind == AgentDiagnosticKind::SamplerCompile {
             for _ in 0..iterations {
                 compiler_fence(Ordering::SeqCst);
-                let compiled = CompiledSampler::compile(black_box(&self.circuit))?;
+                let compiled = SamplingCompiler::new().compile(black_box(&self.circuit))?;
                 drop(black_box(compiled));
             }
             return Ok(AgentDiagnosticOutput::CompileRelease {
@@ -111,11 +111,14 @@ impl AgentDiagnosticFixture {
             else {
                 return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
             };
-            let AgentDiagnosticOutput::CompiledSampler(expected) = &self.expected else {
+            let AgentDiagnosticOutput::SamplingPlanFingerprint(expected) = &self.expected else {
                 return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
             };
             if completed_iterations != iterations
-                || CompiledSampler::compile(&self.circuit)? != *expected
+                || SamplingCompiler::new()
+                    .compile(&self.circuit)?
+                    .fingerprint()
+                    != *expected
             {
                 return Err(WorkerError::AgentDiagnosticWitness(self.kind_name()));
             }
@@ -164,9 +167,9 @@ fn execute_once(
                 ESTIMATE_OUTPUT_FORMAT,
             ))
         }
-        AgentDiagnosticKind::SamplerCompile => {
-            AgentDiagnosticOutput::CompiledSampler(CompiledSampler::compile(circuit)?)
-        }
+        AgentDiagnosticKind::SamplerCompile => AgentDiagnosticOutput::SamplingPlanFingerprint(
+            SamplingCompiler::new().compile(circuit)?.fingerprint(),
+        ),
     })
 }
 
@@ -195,12 +198,13 @@ fn encode_output(output: &AgentDiagnosticOutput, circuit: &Circuit, material: &m
                 encode_estimate(value, material);
             }
         }
-        AgentDiagnosticOutput::CompiledSampler(_)
+        AgentDiagnosticOutput::SamplingPlanFingerprint(_)
         | AgentDiagnosticOutput::CompileRelease {
             completed_iterations: _,
         } => {
-            // Exact typed equality above validates the complete private plan shape. The stable
-            // request identity binds the semantic model without making Debug output a contract.
+            // Plan identity is validated against an independently prepared Stab plan above.
+            // Cross-implementation semantics stay backend-neutral so the pinned Stim worker can
+            // prove it compiled the same request without pretending to share Stab's private IR.
             let request = CompilationRequestFingerprint::for_sampling(circuit);
             material.extend_from_slice(&request.digest());
         }

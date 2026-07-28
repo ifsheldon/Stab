@@ -26,7 +26,7 @@ fn run_stab_compare_row(
             .and_then(Path::parent)
             .expect("repository root"),
     )?;
-    run_stab_compare_row_with_root(&root, row)
+    run_stab_compare_row_with_root(&root, "release", row)
 }
 
 #[test]
