@@ -1,5 +1,11 @@
 use crate::target::TargetVec;
-use crate::{CircuitResult, Gate, Target};
+use crate::{
+    CircuitResult, Gate, Target,
+    gate::{
+        plain_cx_gate, plain_detector_gate, plain_h_gate, plain_m_gate, plain_s_gate,
+        plain_tick_gate,
+    },
+};
 
 use super::CircuitInstruction;
 
@@ -8,26 +14,26 @@ pub(super) fn parse_common_plain_instruction(
 ) -> Option<CircuitResult<CircuitInstruction>> {
     if line == "TICK" {
         return Some(Ok(CircuitInstruction::from_validated_parts(
-            Gate::plain_tick(),
+            plain_tick_gate(),
             Vec::new(),
             TargetVec::new(),
             None,
         )));
     }
     if let Some(rest) = line.strip_prefix("H ") {
-        return parse_common_single_qubit_instruction(Gate::plain_h(), rest);
+        return parse_common_single_qubit_instruction(plain_h_gate(), rest);
     }
     if let Some(rest) = line.strip_prefix("S ") {
-        return parse_common_single_qubit_instruction(Gate::plain_s(), rest);
+        return parse_common_single_qubit_instruction(plain_s_gate(), rest);
     }
     if let Some(rest) = line.strip_prefix("M ").or_else(|| line.strip_prefix("MZ ")) {
-        return parse_common_single_qubit_instruction(Gate::plain_m(), rest);
+        return parse_common_single_qubit_instruction(plain_m_gate(), rest);
     }
     if let Some(rest) = line
         .strip_prefix("CX ")
         .or_else(|| line.strip_prefix("CNOT "))
     {
-        return parse_common_pair_instruction(Gate::plain_cx(), rest);
+        return parse_common_pair_instruction(plain_cx_gate(), rest);
     }
     if let Some(rest) = line.strip_prefix("DETECTOR ") {
         return parse_common_detector_instruction(rest);
@@ -99,7 +105,7 @@ fn parse_common_detector_instruction(rest: &str) -> Option<CircuitResult<Circuit
     let mut targets = TargetVec::new();
     targets.push(target);
     Some(Ok(CircuitInstruction::from_validated_parts(
-        Gate::plain_detector(),
+        plain_detector_gate(),
         Vec::new(),
         targets,
         None,

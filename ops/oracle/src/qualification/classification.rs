@@ -2,6 +2,7 @@ use std::path::Path;
 
 use super::model::{DeferredProduct, FeatureId, UpstreamDisposition};
 
+mod gate_api;
 mod simulator;
 mod stabilizer;
 
@@ -455,6 +456,9 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::GateContract);
     }
+    if gate_api::classifies(&api_lower) {
+        return Some(FeatureId::GateContract);
+    }
 
     if matches!(
         value.as_str(),
@@ -530,6 +534,7 @@ pub(super) fn classify_public_api_source(
         return Some(FeatureId::Detection);
     }
     if value.starts_with("crates/stab-core/src/gate")
+        || value.starts_with("crates/stab-model/src/gate")
         || matches!(
             value.as_str(),
             "crates/stab-core/src/target.rs" | "crates/stab-model/src/target.rs"

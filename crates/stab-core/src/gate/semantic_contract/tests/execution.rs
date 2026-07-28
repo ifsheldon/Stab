@@ -8,8 +8,8 @@
 use std::collections::BTreeSet;
 
 use super::super::{
-    GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateTargetPattern,
-    gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
+    GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateSurfaceContractExt,
+    GateTargetPattern, gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
 };
 use crate::{
     Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,

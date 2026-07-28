@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::super::{Gate, GateTargetRule};
+use super::super::{Gate, GateTargetRule, validate_gate_targets};
 use super::{GateSemanticFamily, GateSurface, gate_semantic_family};
 use crate::{Pauli, PauliBasis, PauliPhase, QubitId, Target};
 
@@ -97,13 +97,17 @@ impl GateSurfaceContract {
         self,
         targets: &[Target],
     ) -> Option<Vec<GateTargetPattern>> {
-        self.gate.validate_targets(targets).ok()?;
+        validate_gate_targets(self.gate, targets).ok()?;
         classify_target_groups(self.gate.target_rule(), targets)
     }
 }
 
-impl Gate {
-    pub(crate) fn surface_contract(self) -> GateSurfaceContract {
+pub(crate) trait GateSurfaceContractExt {
+    fn surface_contract(self) -> GateSurfaceContract;
+}
+
+impl GateSurfaceContractExt for Gate {
+    fn surface_contract(self) -> GateSurfaceContract {
         GateSurfaceContract { gate: self }
     }
 }

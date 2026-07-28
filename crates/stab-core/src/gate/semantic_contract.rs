@@ -77,7 +77,8 @@ mod surface;
 
 #[cfg(test)]
 pub(crate) use surface::{
-    GateShapeExclusion, GateSurfaceBehavior, GateSurfaceContract, GateTargetPattern,
+    GateShapeExclusion, GateSurfaceBehavior, GateSurfaceContract, GateSurfaceContractExt,
+    GateTargetPattern,
 };
 
 #[cfg(test)]

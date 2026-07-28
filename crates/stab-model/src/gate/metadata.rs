@@ -46,6 +46,7 @@ pub enum GateTargetGroupKind {
 
 impl Gate {
     /// Returns all accepted names for this gate, in Stim v1.16.0 alias order.
+    #[inline]
     pub fn aliases(self) -> &'static [&'static str] {
         match self.info.name {
             "DETECTOR" => &["DETECTOR"],
@@ -133,19 +134,23 @@ impl Gate {
         }
     }
 
+    #[inline]
     pub fn argument_rule(self) -> GateArgumentRule {
         self.info.arg_rule.into()
     }
 
+    #[inline]
     pub fn target_rule(self) -> GateTargetRule {
         self.info.target_rule.into()
     }
 
+    #[inline]
     pub fn target_group_kind(self) -> GateTargetGroupKind {
         self.info.target_rule.target_group_kind()
     }
 
     /// Returns true when Stim has a unitary/tableau inverse for this gate.
+    #[inline]
     pub fn is_unitary(self) -> bool {
         matches!(
             self.info.category,
@@ -160,6 +165,7 @@ impl Gate {
     }
 
     /// Returns true for reset or measure-reset gates.
+    #[inline]
     pub fn is_reset(self) -> bool {
         matches!(self.info.name, "RX" | "RY" | "R" | "MRX" | "MRY" | "MR")
     }
@@ -167,6 +173,7 @@ impl Gate {
     /// Returns Stim v1.16.0's `GateData.is_noisy_gate` flag.
     ///
     /// This intentionally excludes `MPAD`, which can take a probability argument but is not flagged as noisy by Stim.
+    #[inline]
     pub fn is_noisy(self) -> bool {
         matches!(
             self.info.category,
@@ -177,6 +184,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn produces_measurements(self) -> bool {
         matches!(
             self.info.name,
@@ -196,6 +204,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn is_single_qubit_gate(self) -> bool {
         matches!(
             self.info.target_rule,
@@ -203,6 +212,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn is_two_qubit_gate(self) -> bool {
         matches!(
             self.info.target_rule,
@@ -212,6 +222,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn takes_measurement_record_targets(self) -> bool {
         matches!(
             self.info.target_rule,
@@ -219,6 +230,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn takes_pauli_targets(self) -> bool {
         matches!(
             self.info.target_rule,
@@ -226,6 +238,7 @@ impl Gate {
         )
     }
 
+    #[inline]
     pub fn is_symmetric_gate(self) -> bool {
         if matches!(
             self.info.target_rule,
@@ -258,6 +271,7 @@ impl Gate {
     }
 
     /// Returns the true unitary inverse, or `None` for non-unitary gates.
+    #[inline]
     pub fn inverse(self) -> Option<Self> {
         self.is_unitary()
             .then(|| Self::from_name(self.info.inverse_name).ok())
@@ -265,10 +279,12 @@ impl Gate {
     }
 
     /// Returns Stim's best candidate inverse, including non-unitary generalized inverses.
-    pub fn generalized_inverse(self) -> crate::CircuitResult<Self> {
+    #[inline]
+    pub fn generalized_inverse(self) -> crate::ModelResult<Self> {
         self.best_candidate_inverse()
     }
 
+    #[inline]
     pub fn can_fuse(self) -> bool {
         self.info.can_fuse
     }

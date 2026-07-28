@@ -1,4 +1,5 @@
 use crate::diagnostics::bounded_parse_diagnostic_text;
+use crate::gate::{gate_from_name, lookup_simple_plain_gate, validate_gate};
 use crate::model_parse::{line_error, validation_error};
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
@@ -289,7 +290,7 @@ fn parse_instruction_fully_generic_from_parts(
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
 ) -> CircuitResult<CircuitInstruction> {
-    let gate = Gate::lookup_name(name.text()).ok_or_else(|| {
+    let gate = gate_from_name(name.text()).ok_or_else(|| {
         let name_excerpt = bounded_parse_diagnostic_text(name.text());
         line_error(
             ModelDialect::StimCircuit,
@@ -307,19 +308,19 @@ fn parse_instruction_fully_generic_from_parts(
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
     let targets = parse_targets(line_number, name.text(), rest, end_error_span)?;
-    gate.validate(&args.values, &targets.values)
-        .map_err(|error| {
-            let (code, span) = validation_span(&error, &args, &targets);
-            validation_error(
-                ModelDialect::StimCircuit,
-                line_number,
-                name.text(),
-                code,
-                span,
-                error,
-                true,
-            )
-        })?;
+    validate_gate(gate, &args.values, &targets.values).map_err(|error| {
+        let error = CircuitError::from(error);
+        let (code, span) = validation_span(&error, &args, &targets);
+        validation_error(
+            ModelDialect::StimCircuit,
+            line_number,
+            name.text(),
+            code,
+            span,
+            error,
+            true,
+        )
+    })?;
     Ok(CircuitInstruction::from_validated_parts(
         gate,
         args.values,
@@ -547,7 +548,7 @@ fn parse_optional_args<'a>(
     if let Some(token) = first_non_finite {
         let token_excerpt = bounded_parse_diagnostic_text(token.text());
         let legacy_detail = Gate::from_name(instruction)
-            .and_then(|gate| gate.validate(&values, &TargetVec::new()))
+            .and_then(|gate| validate_gate(gate, &values, &TargetVec::new()))
             .err()
             .map_or_else(
                 || format!("invalid argument {token_excerpt}"),
@@ -833,7 +834,7 @@ fn parse_simple_plain_instruction(
     name: &str,
     rest: &str,
 ) -> Option<CircuitResult<CircuitInstruction>> {
-    let gate = Gate::from_simple_plain_name(name)?;
+    let gate = lookup_simple_plain_gate(name)?;
     if rest.starts_with('[') || rest.starts_with('(') {
         return None;
     }

@@ -1,5 +1,5 @@
-#[derive(Clone, Copy)]
-pub(crate) enum GateUnitaryRows {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GateUnitaryRows {
     One([[(f32, f32); 2]; 2]),
     Two([[(f32, f32); 4]; 4]),
 }

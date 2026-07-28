@@ -117,9 +117,6 @@ pub use execution::{
     SinkFailurePhase, count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
 pub use fingerprint::{ModelDialect, ModelFingerprint};
-pub use gate::{
-    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
-};
 pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
     RepeatCount,
@@ -143,6 +140,9 @@ pub use result_formats::{
     PackedShotBatchView, RecordEncoding, RecordFormat, SampleFormat, SampledErrorWidth,
 };
 pub use sampling_estimate::estimate_sampling_request;
+pub use stab_model::{
+    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
+};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
     PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,

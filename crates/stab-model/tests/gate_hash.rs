@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use stab_core::Gate;
+use stab_model::Gate;
 
 const STIM_V116_GATE_HASHES: [(&str, usize); 82] = [
     ("NOT_A_GATE", 143),

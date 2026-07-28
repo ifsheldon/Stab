@@ -1,10 +1,14 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
 mod error;
+mod gate;
 mod ids;
 mod target;
 
 pub use error::{ModelError, ModelResult};
+pub use gate::{
+    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
+};
 pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText, ObservableId,
     Probability, QubitId, RepeatCount,
@@ -15,7 +19,8 @@ pub use target::{Pauli, Target};
 pub mod advanced {
     use std::fmt::Display;
 
-    use super::{MeasureRecordOffset, ModelResult, Probability, Target};
+    use super::{Gate, GateDecomposition, MeasureRecordOffset, ModelResult, Probability, Target};
+    pub use crate::gate::GateUnitaryRows;
     use smallvec::SmallVec;
 
     /// Inline target storage used by the exact Stim parsers.
@@ -52,5 +57,83 @@ pub mod advanced {
     /// Parses the fast path for a whitespace-separated plain-qubit target list.
     pub fn parse_plain_qubit_target_text(text: &str) -> ModelResult<Option<TargetVec>> {
         crate::target::parse_plain_qubit_target_text(text)
+    }
+
+    /// Looks up any canonical or aliased Stim v1.16.0 gate name.
+    #[inline]
+    pub fn lookup_gate(name: &str) -> Option<Gate> {
+        Gate::lookup_name(name)
+    }
+
+    /// Looks up the parser's small common-gate fast path.
+    #[inline]
+    pub fn lookup_simple_plain_gate(name: &str) -> Option<Gate> {
+        Gate::from_simple_plain_name(name)
+    }
+
+    /// Validates arguments and targets against a gate's closed syntax descriptor.
+    #[inline]
+    pub fn validate_gate(gate: Gate, args: &[f64], targets: &[Target]) -> ModelResult<()> {
+        gate.validate(args, targets)
+    }
+
+    /// Validates only targets against a gate's closed syntax descriptor.
+    #[inline]
+    pub fn validate_gate_targets(gate: Gate, targets: &[Target]) -> ModelResult<()> {
+        gate.validate_targets(targets)
+    }
+
+    /// Returns the common parser fast-path `H` gate.
+    #[inline]
+    pub fn plain_h_gate() -> Gate {
+        Gate::plain_h()
+    }
+
+    /// Returns the common parser fast-path `M` gate.
+    #[inline]
+    pub fn plain_m_gate() -> Gate {
+        Gate::plain_m()
+    }
+
+    /// Returns the common parser fast-path `CX` gate.
+    #[inline]
+    pub fn plain_cx_gate() -> Gate {
+        Gate::plain_cx()
+    }
+
+    /// Returns the common parser fast-path `S` gate.
+    #[inline]
+    pub fn plain_s_gate() -> Gate {
+        Gate::plain_s()
+    }
+
+    /// Returns the common parser fast-path `DETECTOR` gate.
+    #[inline]
+    pub fn plain_detector_gate() -> Gate {
+        Gate::plain_detector()
+    }
+
+    /// Returns the common parser fast-path `TICK` gate.
+    #[inline]
+    pub fn plain_tick_gate() -> Gate {
+        Gate::plain_tick()
+    }
+
+    /// Returns the raw pinned flow descriptors for a gate.
+    #[inline]
+    pub fn gate_flow_descriptors(gate: Gate) -> Option<&'static [&'static str]> {
+        crate::gate::gate_flow_descriptors(gate.canonical_name())
+    }
+
+    /// Returns the raw pinned scalar unitary rows for a gate.
+    #[inline]
+    pub fn gate_unitary_rows(gate: Gate) -> Option<GateUnitaryRows> {
+        crate::gate::gate_unitary_rows(gate.canonical_name())
+    }
+
+    /// Returns the raw pinned H/S/CX/M/R decomposition descriptor for a gate.
+    #[inline]
+    pub fn gate_decomposition(gate: Gate) -> Option<GateDecomposition> {
+        crate::gate::gate_decomposition_text(gate.canonical_name()).map(GateDecomposition::new)
     }
 }

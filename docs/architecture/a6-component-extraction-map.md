@@ -130,6 +130,8 @@ The following do not move into model:
 - graphlike search, SAT generation, error matching, or circuit-to-DEM analysis;
 - reference sampling or determined-measurement counting.
 
+The gate slice is physically complete. The canonical registry and raw descriptors live under `crates/stab-model/src/gate/`; `stab-core/src/gate.rs` contains only facade reexports, parser-facing delegation, and the test-only semantic surface contract. Semantic families remain a core qualification classification instead of a field on `GateInfo`, because they describe selected execution evidence rather than closed Stim syntax. `Gate::from_name`, validation, and generalized-inverse construction now return `ModelError`; facade call sites preserve their established `CircuitError` behavior through the existing lossless conversion.
+
 ### `stab-analysis`
 
 | Current source | Destination | Public ownership and rationale |

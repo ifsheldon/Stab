@@ -12541,20 +12541,20 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::all"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::all"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::canonical_name"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::canonical_name"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::aliases"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::aliases"
         }
       ],
       "oracle_fixture_owners": [
@@ -12598,8 +12598,16 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::from_name"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::from_name"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::lookup_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::lookup_simple_plain_gate"
         }
       ]
     },
@@ -12614,7 +12622,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
           "gate_hash",
           "gate_name_hash_matches_exact_stim_v116_gate_table",
@@ -12673,8 +12681,16 @@
           "owner_path": "stab_core::analysis::gate_has_unitary_matrix"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_unitary"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_unitary"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::GateUnitaryRows"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::gate_unitary_rows"
         },
         {
           "crate_name": "stab_core",
@@ -12751,12 +12767,16 @@
           "owner_path": "stab_core::analysis::gate_has_h_s_cx_m_r_decomposition"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateDecomposition"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateDecomposition"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateDecomposition::as_stim_str"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateDecomposition::as_stim_str"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::gate_decomposition"
         },
         {
           "crate_name": "stab_core",
@@ -19316,84 +19336,116 @@
       ],
       "public_api_owners": [
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::argument_rule"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::argument_rule"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::best_candidate_inverse"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::best_candidate_inverse"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::can_fuse"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::can_fuse"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::category"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::category"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::generalized_inverse"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::generalized_inverse"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::inverse"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::inverse"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_noisy"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_noisy"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_reset"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_reset"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_single_qubit_gate"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_single_qubit_gate"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_symmetric_gate"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_symmetric_gate"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::is_two_qubit_gate"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::is_two_qubit_gate"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::produces_measurements"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::produces_measurements"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::takes_measurement_record_targets"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::takes_measurement_record_targets"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::takes_pauli_targets"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::takes_pauli_targets"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::target_group_kind"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::target_group_kind"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::Gate::target_rule"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::Gate::target_rule"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateArgumentRule"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateArgumentRule"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateCategory"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateCategory"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateTargetGroupKind"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateTargetGroupKind"
         },
         {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::GateTargetRule"
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::GateTargetRule"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::validate_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::validate_gate_targets"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_h_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_m_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_cx_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_s_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_detector_gate"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::plain_tick_gate"
         }
       ],
       "oracle_fixture_owners": [
@@ -19476,6 +19528,10 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::gate_has_flows"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::advanced::gate_flow_descriptors"
         }
       ]
     },

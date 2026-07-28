@@ -7,8 +7,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    GateSemanticFamily, GateShapeExclusion, GateSurface, GateSurfaceBehavior, GateTargetPattern,
-    gate_semantic_family,
+    GateSemanticFamily, GateShapeExclusion, GateSurface, GateSurfaceBehavior,
+    GateSurfaceContractExt, GateTargetPattern, gate_semantic_family,
 };
 use crate::{Circuit, CompiledSampler, Gate, MeasureRecordOffset, Pauli, QubitId, Target};
 
@@ -81,7 +81,7 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
         let contract = gate.surface_contract();
         for &pattern in contract.target_patterns() {
             let targets = representative_targets(pattern);
-            gate.validate(&args, &targets).unwrap_or_else(|error| {
+            super::super::validate_gate(gate, &args, &targets).unwrap_or_else(|error| {
                 panic!(
                     "{} pattern {pattern:?} must satisfy its canonical parser rule: {error}",
                     gate.canonical_name()
@@ -529,13 +529,13 @@ fn assert_unsupported(
 }
 
 fn representative_args(gate: Gate) -> Vec<f64> {
-    match gate.arg_rule() {
-        super::super::ArgRule::Exact(count) => vec![0.0; count],
-        super::super::ArgRule::Any => Vec::new(),
-        super::super::ArgRule::ZeroOrOneProbability => vec![0.125],
-        super::super::ArgRule::ProbabilityList(count) => vec![0.0; count],
-        super::super::ArgRule::AnyProbabilityList => Vec::new(),
-        super::super::ArgRule::UnsignedInteger => vec![0.0],
+    match gate.argument_rule() {
+        crate::GateArgumentRule::Exact(count) => vec![0.0; count],
+        crate::GateArgumentRule::Any => Vec::new(),
+        crate::GateArgumentRule::OptionalProbability => vec![0.125],
+        crate::GateArgumentRule::ProbabilityList(count) => vec![0.0; count],
+        crate::GateArgumentRule::AnyProbabilityList => Vec::new(),
+        crate::GateArgumentRule::UnsignedInteger => vec![0.0],
     }
 }
 

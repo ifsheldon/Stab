@@ -67,7 +67,7 @@ pub fn gate_has_tableau(gate: Gate) -> bool {
 /// detector-conversion, or analyzer execution support.
 pub fn gate_flows(gate: Gate) -> CircuitResult<Vec<Flow>> {
     let gate_name = gate.canonical_name();
-    if let Some(descriptors) = crate::gate::gate_flow_descriptors(gate_name) {
+    if let Some(descriptors) = crate::gate::gate_flow_descriptors(gate) {
         return descriptors
             .iter()
             .map(|descriptor| {
@@ -108,7 +108,7 @@ pub fn gate_flows(gate: Gate) -> CircuitResult<Vec<Flow>> {
 
 /// Returns true when [`gate_flows`] can produce gate-table flow metadata.
 pub fn gate_has_flows(gate: Gate) -> bool {
-    gate_has_tableau(gate) || crate::gate::gate_flow_descriptors(gate.canonical_name()).is_some()
+    gate_has_tableau(gate) || crate::gate::gate_flow_descriptors(gate).is_some()
 }
 
 /// Returns Stim v1.16.0's fixed-shape one- or two-qubit unitary matrix metadata.
@@ -116,7 +116,7 @@ pub fn gate_has_flows(gate: Gate) -> bool {
 /// Variable-target unitary gate families, such as `SPP` and `SPP_DAG`, do not have fixed matrix
 /// metadata in Stim's gate table and are rejected here.
 pub fn gate_unitary_matrix(gate: Gate) -> CircuitResult<GateUnitaryMatrix> {
-    crate::gate::gate_unitary_rows(gate.canonical_name())
+    crate::gate::gate_unitary_rows(gate)
         .map(|rows| match rows {
             GateUnitaryRows::One(rows) => GateUnitaryMatrix::One(complex_matrix(rows)),
             GateUnitaryRows::Two(rows) => GateUnitaryMatrix::Two(complex_matrix(rows)),
@@ -131,7 +131,7 @@ pub fn gate_unitary_matrix(gate: Gate) -> CircuitResult<GateUnitaryMatrix> {
 
 /// Returns true when [`gate_unitary_matrix`] can produce fixed-shape unitary metadata.
 pub fn gate_has_unitary_matrix(gate: Gate) -> bool {
-    crate::gate::gate_unitary_rows(gate.canonical_name()).is_some()
+    crate::gate::gate_unitary_rows(gate).is_some()
 }
 
 /// Returns Stim v1.16.0's H/S/CX/M/R decomposition metadata for `gate`.
@@ -139,19 +139,17 @@ pub fn gate_has_unitary_matrix(gate: Gate) -> bool {
 /// This exposes the static gate-table metadata only. Full circuit decomposition is owned by the
 /// circuit transform APIs and is not implied by this accessor.
 pub fn gate_h_s_cx_m_r_decomposition(gate: Gate) -> CircuitResult<GateDecomposition> {
-    crate::gate::gate_decomposition_text(gate.canonical_name())
-        .map(GateDecomposition::new)
-        .ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(format!(
-                "gate {} does not have H/S/CX/M/R decomposition data",
-                gate.canonical_name()
-            ))
-        })
+    crate::gate::gate_decomposition(gate).ok_or_else(|| {
+        CircuitError::invalid_tableau_conversion(format!(
+            "gate {} does not have H/S/CX/M/R decomposition data",
+            gate.canonical_name()
+        ))
+    })
 }
 
 /// Returns true when [`gate_h_s_cx_m_r_decomposition`] can produce gate-table metadata.
 pub fn gate_has_h_s_cx_m_r_decomposition(gate: Gate) -> bool {
-    crate::gate::gate_decomposition_text(gate.canonical_name()).is_some()
+    crate::gate::gate_decomposition(gate).is_some()
 }
 
 /// Parses gate decomposition metadata into a validated circuit.

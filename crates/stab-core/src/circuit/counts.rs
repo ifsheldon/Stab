@@ -1,5 +1,5 @@
 use super::{Circuit, CircuitInstruction, CircuitItem};
-use crate::Target;
+use crate::{GateTargetRule, Target};
 
 impl Circuit {
     pub fn count_qubits(&self) -> usize {
@@ -62,7 +62,7 @@ impl CircuitInstruction {
     }
 
     fn count_simulated_qubits(&self) -> usize {
-        if self.gate.targets_are_measurement_pads() {
+        if self.gate.target_rule() == GateTargetRule::MeasurementPads {
             0
         } else {
             self.count_qubits()

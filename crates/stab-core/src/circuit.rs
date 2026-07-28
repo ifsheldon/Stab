@@ -2,13 +2,13 @@ use std::fmt::{Display, Formatter};
 use std::io::{self, Write};
 use std::ops::RangeBounds;
 
-use crate::gate::{ArgRule, GateTargetGroupKind};
+use crate::gate::{GateTargetGroupKind, validate_gate};
 use crate::model_bytes::PreparedModelText;
 use crate::model_tag::ModelTag;
 use crate::target::TargetVec;
 use crate::{
-    CircuitError, CircuitResult, Gate, ModelDialect, ModelFingerprint, ObservableId, ParseLimits,
-    Probability, RepeatCount, Target,
+    CircuitError, CircuitResult, Gate, GateArgumentRule, ModelDialect, ModelFingerprint,
+    ObservableId, ParseLimits, Probability, RepeatCount, Target,
 };
 
 mod api;
@@ -357,7 +357,7 @@ impl CircuitInstruction {
         tag: Option<String>,
     ) -> CircuitResult<Self> {
         let targets = TargetVec::from_vec(targets);
-        gate.validate(&args, &targets)?;
+        validate_gate(gate, &args, &targets)?;
         Ok(Self::from_validated_parts(gate, args, targets, tag))
     }
 
@@ -368,7 +368,7 @@ impl CircuitInstruction {
         tag: Option<&[u8]>,
     ) -> CircuitResult<Self> {
         let targets = TargetVec::from_vec(targets);
-        gate.validate(&args, &targets)?;
+        validate_gate(gate, &args, &targets)?;
         Ok(Self {
             gate,
             args,
@@ -402,8 +402,8 @@ impl CircuitInstruction {
     /// Returns this instruction's optional probability argument when the gate has one.
     pub fn probability_argument(&self) -> CircuitResult<Option<Probability>> {
         if !matches!(
-            self.gate.arg_rule(),
-            ArgRule::ZeroOrOneProbability | ArgRule::ProbabilityList(1)
+            self.gate.argument_rule(),
+            GateArgumentRule::OptionalProbability | GateArgumentRule::ProbabilityList(1)
         ) {
             return Ok(None);
         }
@@ -417,8 +417,8 @@ impl CircuitInstruction {
     /// Returns this instruction's disjoint probability-list arguments when the gate has them.
     pub fn probability_arguments(&self) -> CircuitResult<Option<Vec<Probability>>> {
         if !matches!(
-            self.gate.arg_rule(),
-            ArgRule::ProbabilityList(_) | ArgRule::AnyProbabilityList
+            self.gate.argument_rule(),
+            GateArgumentRule::ProbabilityList(_) | GateArgumentRule::AnyProbabilityList
         ) {
             return Ok(None);
         }
@@ -432,7 +432,7 @@ impl CircuitInstruction {
 
     /// Returns this instruction's observable id argument when the gate has one.
     pub fn observable_id_argument(&self) -> CircuitResult<Option<ObservableId>> {
-        if self.gate.arg_rule() != ArgRule::UnsignedInteger {
+        if self.gate.argument_rule() != GateArgumentRule::UnsignedInteger {
             return Ok(None);
         }
         self.args
@@ -444,7 +444,7 @@ impl CircuitInstruction {
 
     /// Returns coordinate-like arguments for gates whose argument list is arbitrary floats.
     pub fn coordinate_arguments(&self) -> Option<&[f64]> {
-        (self.gate.arg_rule() == ArgRule::Any).then_some(&self.args)
+        (self.gate.argument_rule() == GateArgumentRule::Any).then_some(&self.args)
     }
 
     pub fn targets(&self) -> &[Target] {
