@@ -1,4 +1,5 @@
 use crate::ByteSpan;
+use stab_model::advanced::byte_span_from_valid_range;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SourceSlice<'a> {
@@ -24,11 +25,11 @@ impl<'a> SourceSlice<'a> {
     }
 
     pub(crate) fn span(self) -> ByteSpan {
-        ByteSpan::from_valid_range(self.byte_start, self.text.len())
+        byte_span_from_valid_range(self.byte_start, self.text.len())
     }
 
     pub(crate) fn end_span(self) -> ByteSpan {
-        ByteSpan::from_valid_range(self.byte_start + self.text.len(), 0)
+        byte_span_from_valid_range(self.byte_start + self.text.len(), 0)
     }
 
     pub(crate) fn subspan(self, relative_start: usize, byte_length: usize) -> Option<ByteSpan> {
@@ -185,7 +186,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: ByteSpan::from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
                     });
                 }
                 b'{' if !in_tag && !in_arguments => {
@@ -198,7 +199,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: ByteSpan::from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
                     });
                 }
                 b'}' if !in_tag && !in_arguments && !has_non_space => {
@@ -211,7 +212,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: ByteSpan::from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
                     });
                 }
                 byte if !matches!(byte, b' ' | b'\t' | b'\r') => {

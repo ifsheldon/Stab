@@ -1,10 +1,18 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
+mod diagnostics;
+mod dialect;
 mod error;
 mod gate;
 mod ids;
+mod parse_limits;
+mod resources;
 mod target;
 
+pub use diagnostics::{
+    ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
+};
+pub use dialect::ModelDialect;
 pub use error::{ModelError, ModelResult};
 pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
@@ -13,13 +21,19 @@ pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText, ObservableId,
     Probability, QubitId, RepeatCount,
 };
+pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
+pub use resources::{Estimate, EstimateClass, ResourceEstimate};
 pub use target::{Pauli, Target};
 
 /// Low-level model operations for parsers and admitted algorithms.
 pub mod advanced {
     use std::fmt::Display;
 
-    use super::{Gate, GateDecomposition, MeasureRecordOffset, ModelResult, Probability, Target};
+    use super::{
+        ByteSpan, Estimate, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
+        ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, ResourceEstimate,
+        Target,
+    };
     pub use crate::gate::GateUnitaryRows;
     use smallvec::SmallVec;
 
@@ -28,6 +42,57 @@ pub mod advanced {
 
     /// Stim's exclusive upper bound for encoded target values.
     pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
+
+    /// Constructs a span after the caller has proved that the range does not overflow.
+    pub const fn byte_span_from_valid_range(byte_start: usize, byte_length: usize) -> ByteSpan {
+        ByteSpan::from_valid_range(byte_start, byte_length)
+    }
+
+    /// Bounds attacker-controlled text using the model diagnostic contract.
+    pub fn bounded_parse_diagnostic_text(value: &str) -> String {
+        crate::diagnostics::bounded_parse_diagnostic_text(value)
+    }
+
+    /// Constructs a model parse diagnostic with separate machine and compatibility messages.
+    pub fn parse_error_with_human_message(
+        code: ParseErrorCode,
+        message: impl Into<String>,
+        human_message: impl Into<String>,
+        span: ByteSpan,
+        context: ParseErrorContext,
+    ) -> ParseError {
+        ParseError::with_human_message(code, message, human_message, span, context)
+    }
+
+    /// Constructs the UTF-8 diagnostic recorded by the byte-oriented admission scanner.
+    pub fn invalid_utf8_parse_error(
+        dialect: ModelDialect,
+        byte_start: usize,
+        byte_length: usize,
+        error_length: Option<usize>,
+    ) -> ParseError {
+        ParseError::invalid_utf8_at(dialect, byte_start, byte_length, error_length)
+    }
+
+    /// Returns the schema-one fingerprint discriminator for a model dialect.
+    pub const fn model_dialect_fingerprint_discriminator(dialect: ModelDialect) -> u8 {
+        dialect.fingerprint_discriminator()
+    }
+
+    /// Assembles the resource vocabulary emitted by the current sampling facade.
+    pub const fn resource_estimate_for_sampling_request(
+        input_items: Estimate<usize>,
+        expanded_operations: Estimate<usize>,
+        folded_traversal: Estimate<usize>,
+        output_bytes: Estimate<usize>,
+    ) -> ResourceEstimate {
+        ResourceEstimate::for_sampling_request(
+            input_items,
+            expanded_operations,
+            folded_traversal,
+            output_bytes,
+        )
+    }
 
     /// Constructs a probability after the caller has proved its domain.
     pub fn probability_from_valid(value: f64) -> Probability {

@@ -1,6 +1,9 @@
 use arrayvec::ArrayVec;
 
-use crate::{Circuit, CircuitItem, Estimate, RecordFormat, RepeatNestingLimit, ResourceEstimate};
+use crate::{
+    Circuit, CircuitItem, EncodedSizeEstimate, Estimate, RecordFormat, RepeatNestingLimit,
+    ResourceEstimate,
+};
 
 const INLINE_TRAVERSAL_FRAMES: usize = RepeatNestingLimit::HARD_MAX + 1;
 
@@ -22,17 +25,22 @@ pub fn estimate_sampling_request(
         .ok()
         .and_then(|measurements| usize::try_from(measurements).ok())
         .map_or(Estimate::Unknown, |measurements| {
-            output_format
-                .estimate_output_bytes(shots, measurements)
-                .into()
+            estimate_from_encoded(output_format.estimate_output_bytes(shots, measurements))
         });
 
-    ResourceEstimate::for_sampling_request(
+    stab_model::advanced::resource_estimate_for_sampling_request(
         input_items.map_or(Estimate::Unknown, Estimate::Exact),
         expanded_operations.map_or(Estimate::Unknown, Estimate::Exact),
         input_items.map_or(Estimate::Unknown, Estimate::Exact),
         output_bytes,
     )
+}
+
+fn estimate_from_encoded<T>(estimate: EncodedSizeEstimate<T>) -> Estimate<T> {
+    match estimate {
+        EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
+        EncodedSizeEstimate::Unknown => Estimate::Unknown,
+    }
 }
 
 fn operation_counts(circuit: &Circuit) -> (Option<usize>, Option<usize>) {

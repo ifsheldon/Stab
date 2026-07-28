@@ -30,7 +30,6 @@ mod mbqc_decomposition;
 mod model_bytes;
 mod model_parse;
 mod model_tag;
-mod parse_limits;
 mod probability_util;
 mod resources;
 pub mod result_formats;
@@ -118,7 +117,7 @@ pub use execution::{
     SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
     SinkFailurePhase, count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
-pub use fingerprint::{ModelDialect, ModelFingerprint};
+pub use fingerprint::ModelFingerprint;
 pub use ids::{
     CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
     RepeatCount,
@@ -128,7 +127,6 @@ pub use matched_error::{
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
-pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
 pub use probability_util::biased_randomize_bits;
 pub use resources::{
     Estimate, EstimateClass, ResourceEstimate, ResourceKind, ResourceLimitError, ResourceOperation,
@@ -144,6 +142,7 @@ pub use result_formats::{
 pub use sampling_estimate::estimate_sampling_request;
 pub use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
+    ModelDialect, ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit,
 };
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,

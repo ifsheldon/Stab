@@ -3433,6 +3433,10 @@
             "owner_path": "stab_core::DiagnosticSeverity::as_str"
           },
           {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::byte_span_from_valid_range"
+          },
+          {
             "crate_name": "stab_core",
             "owner_path": "stab_core::FormatErrorCode"
           },
@@ -3738,6 +3742,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::ModelDialect::as_str"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::model_dialect_fingerprint_discriminator"
           }
         ],
         "standalone": true
@@ -4189,6 +4197,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::estimate_sampling_request"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::resource_estimate_for_sampling_request"
           }
         ],
         "standalone": true
@@ -6902,6 +6914,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::CircuitError::parse_error"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::parse_error_with_human_message"
           }
         ],
         "standalone": true
@@ -6982,6 +6998,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::ParseError::decode_utf8"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::invalid_utf8_parse_error"
           }
         ],
         "standalone": true
@@ -7274,6 +7294,12 @@
           "attacker-sized-error-payload",
           "utf8-boundary-split",
           "exact-span-truncation"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::advanced::bounded_parse_diagnostic_text"
+          }
         ],
         "standalone": true
       },

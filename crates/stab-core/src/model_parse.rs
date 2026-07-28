@@ -1,4 +1,5 @@
-use crate::{ByteSpan, CircuitError, ModelDialect, ParseError, ParseErrorCode, ParseErrorContext};
+use crate::{ByteSpan, CircuitError, ModelDialect, ParseErrorCode, ParseErrorContext};
+use stab_model::advanced::{byte_span_from_valid_range, parse_error_with_human_message};
 
 pub(crate) fn line_error(
     dialect: ModelDialect,
@@ -10,7 +11,7 @@ pub(crate) fn line_error(
     context: ParseErrorContext,
 ) -> CircuitError {
     debug_assert_eq!(context.dialect(), dialect);
-    ParseError::with_human_message(
+    parse_error_with_human_message(
         code,
         message,
         format!(
@@ -30,7 +31,7 @@ pub(crate) fn plain_error(
     span: ByteSpan,
     context: ParseErrorContext,
 ) -> CircuitError {
-    ParseError::with_human_message(code, message, human_message, span, context).into()
+    parse_error_with_human_message(code, message, human_message, span, context).into()
 }
 
 pub(crate) fn validation_error(
@@ -99,7 +100,7 @@ pub(crate) fn validation_error(
             instruction: instruction.to_string(),
         },
     };
-    ParseError::with_human_message(code, message, human_message, span, context).into()
+    parse_error_with_human_message(code, message, human_message, span, context).into()
 }
 
 pub(crate) fn unexpected_repeat_terminator(dialect: ModelDialect, span: ByteSpan) -> CircuitError {
@@ -117,7 +118,7 @@ pub(crate) fn unterminated_repeat_block(dialect: ModelDialect, input_len: usize)
         ParseErrorCode::UnterminatedRepeatBlock,
         "unterminated repeat block",
         "unterminated repeat block",
-        ByteSpan::from_valid_range(input_len, 0),
+        byte_span_from_valid_range(input_len, 0),
         ParseErrorContext::Model { dialect },
     )
 }

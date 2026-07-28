@@ -57,7 +57,9 @@ impl CompilationRequestFingerprint {
         hasher.update([operation.discriminator()]);
         hasher.update(Self::SAMPLING_COMPILER_SCHEMA_VERSION.to_be_bytes());
         hasher.update(model.schema_version().to_be_bytes());
-        hasher.update([model.dialect().fingerprint_discriminator()]);
+        hasher.update([
+            stab_model::advanced::model_dialect_fingerprint_discriminator(model.dialect()),
+        ]);
         hasher.update(model.digest());
 
         // Sweep rejection is fixed compiler behavior in schema one, not a caller option.

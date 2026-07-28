@@ -1,11 +1,16 @@
 use thiserror::Error;
 
+use crate::ParseError;
+
 /// Result type for stable model construction and validation.
 pub type ModelResult<T> = Result<T, ModelError>;
 
 /// A typed failure while constructing or validating a Stim model value.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum ModelError {
+    #[error(transparent)]
+    Parse(#[from] ParseError),
+
     #[error("unknown gate {0}")]
     UnknownGate(String),
 

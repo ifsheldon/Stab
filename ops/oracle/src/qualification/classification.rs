@@ -3,8 +3,11 @@ use std::path::Path;
 use super::model::{DeferredProduct, FeatureId, UpstreamDisposition};
 
 mod gate_api;
+mod public_api_helpers;
 mod simulator;
 mod stabilizer;
+
+use public_api_helpers::{api_path_mentions_item, is_resource_policy_api};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct UpstreamClassification {
@@ -272,15 +275,6 @@ pub(super) fn classify_upstream_path(path: &Path) -> UpstreamClassification {
     classify_upstream_case(path, "")
 }
 
-fn api_path_mentions_item(api_path: &str, item: &str) -> bool {
-    api_path.split("::").any(|segment| {
-        segment == item
-            || segment
-                .strip_prefix(item)
-                .is_some_and(|suffix| suffix.starts_with(" as "))
-    })
-}
-
 pub(super) fn classify_public_api_source(
     crate_name: &str,
     source_path: &Path,
@@ -291,11 +285,23 @@ pub(super) fn classify_public_api_source(
     }
     let value = source_path.to_string_lossy().replace('\\', "/");
     let api_lower = api_path.to_ascii_lowercase();
+    if api_lower.contains("bounded_parse_diagnostic_text") {
+        return Some(FeatureId::Resource);
+    }
     if is_resource_policy_api(&api_lower) || api_lower.ends_with("::resource_limit_error") {
         return Some(FeatureId::Resource);
     }
-    if api_lower.contains("parseerror") || api_lower.ends_with("::parse_error") {
+    if api_lower.contains("parseerror")
+        || api_lower.contains("parse_error")
+        || api_lower.contains("parse_diagnostic")
+    {
         return Some(FeatureId::StimFormat);
+    }
+    if api_path_mentions_item(&api_lower, "bytespan")
+        || api_lower.contains("byte_span")
+        || api_path_mentions_item(&api_lower, "diagnosticseverity")
+    {
+        return Some(FeatureId::ResultFormats);
     }
     if api_lower.contains("erroranalyzeroptions")
         || api_lower.contains("circuit_to_detector_error_model")
@@ -439,6 +445,7 @@ pub(super) fn classify_public_api_source(
     }
     if [
         "circuitdetectorid",
+        "modeldialect",
         "modelerror",
         "modelresult",
         "observableid",
@@ -564,12 +571,18 @@ pub(super) fn classify_public_api_source(
     }
     if matches!(
         value.as_str(),
-        "crates/stab-core/src/parse_limits.rs" | "crates/stab-core/src/resources.rs"
+        "crates/stab-core/src/parse_limits.rs"
+            | "crates/stab-core/src/resources.rs"
+            | "crates/stab-model/src/parse_limits.rs"
+            | "crates/stab-model/src/resources.rs"
     ) || value == "crates/stab-core/src/sampling_estimate.rs"
     {
         return Some(FeatureId::Resource);
     }
-    if value == "crates/stab-core/src/fingerprint.rs" {
+    if matches!(
+        value.as_str(),
+        "crates/stab-core/src/fingerprint.rs" | "crates/stab-model/src/dialect.rs"
+    ) {
         return Some(FeatureId::CircuitApi);
     }
     if value == "crates/stab-core/src/capabilities.rs" {
@@ -609,25 +622,6 @@ pub(super) fn classify_public_api_source(
         return Some(FeatureId::CircuitApi);
     }
     None
-}
-
-fn is_resource_policy_api(api_lower: &str) -> bool {
-    api_lower.ends_with("_with_limits")
-        || api_lower.ends_with("_and_limits")
-        || api_lower.ends_with("::compile_with_limits")
-        || api_lower.ends_with("::validate_replay_work_units")
-        || api_lower.ends_with("::try_for_each_detection_event_from_error_records")
-        || [
-            "parselimits",
-            "circuitflattenlimits",
-            "demflattenlimits",
-            "detectionconversionlimits",
-            "demsamplerlimits",
-            "logicalerrorsearchlimits",
-            "satmaterializationlimits",
-        ]
-        .iter()
-        .any(|name| api_lower.contains(name))
 }
 
 fn classify_command(value: &str) -> UpstreamClassification {

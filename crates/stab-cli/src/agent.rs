@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use clap::{Args, CommandFactory, Subcommand, ValueEnum};
 use serde::Serialize;
 use stab_core::{
-    CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, Estimate,
-    GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, ModelFingerprint,
-    ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate, SamplingCompiler,
-    estimate_sampling_request, result_formats::validate_ptb64_shot_count,
+    CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, EncodedSizeEstimate,
+    Estimate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule,
+    ModelFingerprint, ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate,
+    SamplingCompiler, estimate_sampling_request, result_formats::validate_ptb64_shot_count,
 };
 
 use crate::{
@@ -183,9 +183,12 @@ where
         None
     };
     if let Some(visible_measurement_count) = visible_measurements {
-        estimates.output_bytes = EstimateReport::from(Estimate::from(
-            output_format.estimate_output_bytes(args.shots, visible_measurement_count),
-        ));
+        let output_bytes =
+            match output_format.estimate_output_bytes(args.shots, visible_measurement_count) {
+                EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
+                EncodedSizeEstimate::Unknown => Estimate::Unknown,
+            };
+        estimates.output_bytes = EstimateReport::from(output_bytes);
     }
 
     let report = SamplePlanReport {

@@ -1,5 +1,6 @@
-use crate::ResourceEstimate;
 use thiserror::Error;
+
+use crate::ResourceEstimate;
 
 /// Maximum number of physical source lines admitted by a parser.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

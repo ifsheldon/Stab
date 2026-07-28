@@ -2,45 +2,12 @@ use arrayvec::ArrayVec;
 use sha2::{Digest as _, Sha256};
 
 use crate::{
-    Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, Pauli, Target,
+    Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, ModelDialect,
+    Pauli, Target,
 };
 
 const MODEL_FINGERPRINT_DOMAIN: &[u8] = b"stab:model-fingerprint\0";
 const INLINE_TRAVERSAL_FRAMES: usize = crate::RepeatNestingLimit::HARD_MAX + 1;
-
-/// Canonical model dialect included in a [`ModelFingerprint`].
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ModelDialect {
-    StimCircuit,
-    DetectorErrorModel,
-}
-
-impl ModelDialect {
-    pub const ALL: [Self; 2] = [Self::StimCircuit, Self::DetectorErrorModel];
-
-    pub fn all() -> impl ExactSizeIterator<Item = Self> {
-        Self::ALL.into_iter()
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::StimCircuit => "stim-circuit",
-            Self::DetectorErrorModel => "detector-error-model",
-        }
-    }
-
-    const fn discriminator(self) -> u8 {
-        match self {
-            Self::StimCircuit => 1,
-            Self::DetectorErrorModel => 2,
-        }
-    }
-
-    pub(crate) const fn fingerprint_discriminator(self) -> u8 {
-        self.discriminator()
-    }
-}
 
 /// Versioned SHA-256 identity of a circuit or detector error model.
 ///
@@ -108,7 +75,7 @@ impl StructuralEncoder {
         let mut hasher = Sha256::new();
         hasher.update(MODEL_FINGERPRINT_DOMAIN);
         hasher.update(ModelFingerprint::SCHEMA_VERSION.to_be_bytes());
-        hasher.update([dialect.discriminator()]);
+        hasher.update([stab_model::advanced::model_dialect_fingerprint_discriminator(dialect)]);
         Self { dialect, hasher }
     }
 

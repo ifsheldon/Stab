@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 
 use crate::{CircuitError, ModelDialect, ParseError, ParseLimits};
+use stab_model::advanced::invalid_utf8_parse_error;
 
 pub(crate) struct PreparedModelText<'a> {
     text: Cow<'a, str>,
@@ -61,7 +62,7 @@ impl<'a> PreparedModelText<'a> {
                 byte_end,
             );
             if !is_opaque_metadata && invalid_utf8.is_none() {
-                invalid_utf8 = Some(ParseError::invalid_utf8_at(
+                invalid_utf8 = Some(invalid_utf8_parse_error(
                     dialect,
                     byte_start,
                     byte_length,

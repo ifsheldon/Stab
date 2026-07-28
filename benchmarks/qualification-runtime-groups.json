@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "02e5a637b8b76713739542259388b0076c732168dc9899d89bcd1780b4c2d247",
+  "performance_inventory_sha256": "b5dec487219e3fdab51847c28fb391ce1a2968afb357fa7c9778ba7ff5fd7567",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -316,7 +316,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bd20a013e903a05f"
       ],
-      "owner": "stab-core/gates",
+      "owner": "stab-model/gates",
       "profiler_note": null
     },
     {

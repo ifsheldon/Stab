@@ -163,6 +163,70 @@ fn classifications_distinguish_selected_execution_domains() {
     );
     assert_eq!(
         classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/diagnostics.rs"),
+            "stab_model::ByteSpan",
+        ),
+        Some(FeatureId::ResultFormats)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/lib.rs"),
+            "stab_model::advanced::byte_span_from_valid_range",
+        ),
+        Some(FeatureId::ResultFormats)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/diagnostics.rs"),
+            "stab_model::ParseError",
+        ),
+        Some(FeatureId::StimFormat)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/lib.rs"),
+            "stab_model::advanced::bounded_parse_diagnostic_text",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/parse_limits.rs"),
+            "stab_model::ParseLimits",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/resources.rs"),
+            "stab_model::Estimate",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/lib.rs"),
+            "stab_model::advanced::resource_estimate_for_sampling_request",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_model",
+            Path::new("crates/stab-model/src/dialect.rs"),
+            "stab_model::ModelDialect",
+        ),
+        Some(FeatureId::CircuitApi)
+    );
+    assert_eq!(
+        classify_public_api_source(
             "stab_core",
             Path::new("crates/stab-core/src/detection/output.rs"),
             "stab_core::write_detection_records",
