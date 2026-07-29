@@ -68,7 +68,7 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A6 product graph after complete model and analysis extraction plus circuit-sampling extraction is:
+The current A6 product graph after complete model and analysis extraction plus circuit-sampling and detection-execution extraction is:
 
 ```text
 stab-cli -> stab-core
@@ -80,7 +80,7 @@ stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
 
-`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, and `stab-engine` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. `stab-analysis` owns every implemented pure analysis slice: gate-to-algebra semantic projections, recursive circuit and DEM tag stripping, full-circuit tableau conversion, simplification, decomposition, bounded circuit and DEM flattening, DEM probability rounding, SAT/WCNF materialization, graphlike and hypergraph logical-error search, error matching and provenance values, noise removal, repetition/surface/color circuit generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM lowering, loop folding, and XYZ error-probability decomposition. `stab-engine` owns backend-neutral compilation-request fingerprints, execution-side biased randomization, and the complete circuit-sampling compiler, immutable plan, mutable session, direct-Z, small-frame, general-frame, deterministic reference-sample, cancellation, progress, poisoning, and typed measurement-sink paths. The engine exposes one canonical crate-root sampling API; `stab-core` reexports that API and retains `CompiledSampler`, callback streaming, materialized records, and byte encoding as compatibility adapters. Measurement-to-detection conversion, circuit detection sampling, DEM sampling, reference-sample trees, and sampled-flow execution remain physically in `stab-core`; detection extraction is the active next engine work. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, and `stab-engine` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. `stab-analysis` owns every implemented pure analysis slice: gate-to-algebra semantic projections, recursive circuit and DEM tag stripping, full-circuit tableau conversion, simplification, decomposition, bounded circuit and DEM flattening, DEM probability rounding, SAT/WCNF materialization, graphlike and hypergraph logical-error search, error matching and provenance values, noise removal, repetition/surface/color circuit generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM lowering, loop folding, and XYZ error-probability decomposition. `stab-engine` owns backend-neutral compilation-request fingerprints, execution-side biased randomization, circuit-sampling plans and sessions, measurement-to-detection plans and sessions, and direct or fused circuit detection sampling. Its typed measurement and detection sinks preserve cancellation, progress, poisoning, reusable-buffer, reference-sample, and sweep-state contracts without importing codecs, paths, CLI, or ops. `stab-core` reexports or wraps these canonical APIs and retains `CompiledSampler`, `CompiledDetectionConverter`, callback streaming, materialized compatibility values, byte encoding, and detection output routing. DEM sampling, reference-sample trees, and sampled-flow execution remain physically in `stab-core`; DEM sampling is the active next engine extraction. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -112,7 +112,7 @@ The record-boundary and Nightly-isolation milestones remove these allowances; th
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and circuit-sampling `stab-engine` packages build on that compiler. Completed portable-backend integration retains the pinned Nightly target.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and sampling-and-detection `stab-engine` packages build on that compiler. Completed portable-backend integration retains the pinned Nightly target.
 
 `stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
 
