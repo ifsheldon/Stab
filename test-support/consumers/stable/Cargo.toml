@@ -1,0 +1,17 @@
+[package]
+name = "stab-stable-consumer"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+stab-algebra = { path = "../../../crates/stab-algebra", version = "=0.1.1", default-features = false }
+stab-analysis = { path = "../../../crates/stab-analysis", version = "=0.1.1" }
+stab-bits = { path = "../../../crates/stab-bits", version = "=0.1.1", default-features = false }
+stab-engine = { path = "../../../crates/stab-engine", version = "=0.1.1" }
+stab-model = { path = "../../../crates/stab-model", version = "=0.1.1" }
+stab-records = { path = "../../../crates/stab-records", version = "=0.1.1" }

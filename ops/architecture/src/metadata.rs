@@ -58,6 +58,13 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         packages.push(PackageSpec {
             name: package.name.to_string(),
             relative_path,
+            default_features: package
+                .features
+                .get("default")
+                .into_iter()
+                .flatten()
+                .map(ToString::to_string)
+                .collect(),
         });
     }
     packages.sort();
@@ -174,6 +181,7 @@ mod tests {
         let package = PackageSpec {
             name: "stab-core".to_owned(),
             relative_path: std::path::PathBuf::from("crates/stab-core"),
+            default_features: Vec::new(),
         };
         assert_eq!(package.relative_path, Path::new("crates/stab-core"));
     }

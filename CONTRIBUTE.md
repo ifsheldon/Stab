@@ -1,13 +1,16 @@
 # Contributing to Stab
 
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, and scalar-default `stab-algebra` packages form a Stable Rust 1.97.1 component stack. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
+The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and current scalar `stab-engine` packages form a Stable Rust 1.97.1 component stack. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
 
 Check the Stable component directly with:
 
 ```sh
-cargo +1.97.1 test -p stab-bits -p stab-records -p stab-algebra
+cargo +1.97.1 test -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine
+just architecture::consumer-check
 ```
+
+The consumer check compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed feature-unification fixtures. It also verifies that scalar fixtures do not resolve `stab-kernels-simd` and that each portable fixture resolves exactly one kernel package.
 
 The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.
 Clone with tags and initialize `vendor/stim` with its tags because pinned Stim validation requires both commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` and exact tag `v1.16.0`.

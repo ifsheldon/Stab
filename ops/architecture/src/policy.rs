@@ -15,6 +15,14 @@ const KNOWN_PRODUCT_PACKAGES: &[&str] = &[
     "stab-model",
     "stab-records",
 ];
+const STABLE_COMPONENT_PACKAGES: &[&str] = &[
+    "stab-algebra",
+    "stab-analysis",
+    "stab-bits",
+    "stab-engine",
+    "stab-model",
+    "stab-records",
+];
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum DependencyKind {
@@ -39,6 +47,7 @@ impl DependencyKind {
 pub struct PackageSpec {
     pub name: String,
     pub relative_path: PathBuf,
+    pub default_features: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -98,6 +107,20 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
         }
         if class == PackageClass::Product {
             validate_product_identity(package, &mut violations);
+            if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str())
+                && package
+                    .default_features
+                    .iter()
+                    .any(|feature| feature.contains("portable-simd"))
+            {
+                violations.push(Violation::new(
+                    "stable-default-reaches-nightly",
+                    format!(
+                        "Stable component {} enables portable SIMD through default features {:?}",
+                        package.name, package.default_features
+                    ),
+                ));
+            }
         }
     }
 
@@ -283,6 +306,7 @@ mod tests {
         PackageSpec {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
+            default_features: Vec::new(),
         }
     }
 
@@ -294,6 +318,7 @@ mod tests {
                 PackageSpec {
                     name: "stab-compat-corpus".to_owned(),
                     relative_path: PathBuf::from("test-support/compat-corpus"),
+                    default_features: Vec::new(),
                 },
             ],
             edges: vec![WorkspaceEdge {
@@ -363,6 +388,26 @@ mod tests {
                 .expect("unknown product package should fail")
                 .code,
             "unknown-product-package"
+        );
+    }
+
+    #[test]
+    fn stable_component_defaults_cannot_reach_portable_simd() {
+        let mut bits = package("stab-bits", "crates");
+        bits.default_features = vec!["portable-simd".to_owned()];
+        let report = validate_graph(&WorkspaceGraph {
+            packages: vec![bits],
+            edges: Vec::new(),
+        });
+
+        assert_eq!(report.violations.len(), 1);
+        assert_eq!(
+            report
+                .violations
+                .first()
+                .expect("portable default should produce one violation")
+                .code,
+            "stable-default-reaches-nightly"
         );
     }
 }

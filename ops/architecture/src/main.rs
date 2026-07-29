@@ -21,6 +21,8 @@ struct Cli {
 enum Command {
     /// Validate the current workspace against the target product architecture.
     Check,
+    /// Compile external Stable, Nightly, and mixed feature consumers.
+    ConsumerCheck,
 }
 
 fn main() -> ExitCode {
@@ -34,6 +36,16 @@ fn main() -> ExitCode {
                 } else {
                     ExitCode::from(1)
                 }
+            }
+            Err(error) => {
+                eprintln!("[{PREFIX}] ERROR: {error}");
+                ExitCode::from(2)
+            }
+        },
+        Command::ConsumerCheck => match stab_architecture::check_external_consumers(&cli.root) {
+            Ok(summary) => {
+                summary.print();
+                ExitCode::SUCCESS
             }
             Err(error) => {
                 eprintln!("[{PREFIX}] ERROR: {error}");

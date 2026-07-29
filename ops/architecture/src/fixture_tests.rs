@@ -18,6 +18,8 @@ struct GraphFixture {
 struct FixturePackage {
     name: String,
     path: PathBuf,
+    #[serde(default)]
+    default_features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,6 +64,7 @@ fn assert_fixture(source: &str) {
             .map(|package| PackageSpec {
                 name: package.name,
                 relative_path: package.path,
+                default_features: package.default_features,
             })
             .collect(),
         edges: fixture
@@ -137,6 +140,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         .map(|name| PackageSpec {
             name: (*name).to_string(),
             relative_path: PathBuf::from("crates").join(name),
+            default_features: Vec::new(),
         })
         .collect::<Vec<_>>();
     for from in PRODUCT_PACKAGES {

@@ -1,0 +1,13 @@
+[package]
+name = "stab-mixed-consumer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+stab-algebra = { path = "../../../crates/stab-algebra", version = "=0.1.1", default-features = false }
+stab-bits = { path = "../../../crates/stab-bits", version = "=0.1.1", default-features = false }
+stab-core = { path = "../../../crates/stab-core", version = "=0.1.1", default-features = false, features = ["portable-simd"] }

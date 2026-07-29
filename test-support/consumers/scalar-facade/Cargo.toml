@@ -1,0 +1,11 @@
+[package]
+name = "stab-scalar-facade-consumer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+stab-core = { path = "../../../crates/stab-core", version = "=0.1.1", default-features = false }

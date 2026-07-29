@@ -31,8 +31,13 @@ jobs:
       - name: Show toolchain
         run: rustup show active-toolchain
 
+      - name: Install Stable component toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+
       - name: Architecture
-        run: just architecture::check
+        run: |
+          just architecture::check
+          just architecture::consumer-check
 
       - name: Format
         run: cargo fmt --all --check

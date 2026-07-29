@@ -9,7 +9,9 @@ homepage.workspace = true
 publish = false
 
 [features]
+default = ["portable-simd"]
 count-allocations = ["dep:allocation-counter"]
+portable-simd = ["stab-cli/portable-simd", "stab-core/portable-simd"]
 
 [lints]
 workspace = true
@@ -27,8 +29,8 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-analysis = { workspace = true }
-stab-cli = { path = "../../crates/stab-cli" }
-stab-core = { path = "../../crates/stab-core" }
+stab-cli = { path = "../../crates/stab-cli", default-features = false }
+stab-core = { path = "../../crates/stab-core", default-features = false }
 stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }

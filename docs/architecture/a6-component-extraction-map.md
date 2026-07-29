@@ -311,6 +311,8 @@ Add external-consumer fixtures for:
 - root, `advanced`, and `experimental` rustdoc tiers;
 - absence of qualification-only product exports.
 
+`just architecture::consumer-check` owns the four external-consumer builds and their resolved-feature assertions. The fixtures are standalone workspaces under `test-support/consumers/`, so successful workspace-internal compilation cannot substitute for the downstream Stable, scalar-facade, portable-facade, and mixed-consumer contracts.
+
 ## Benchmark Ownership
 
 The extraction does not invent new aggregate benchmark rows.

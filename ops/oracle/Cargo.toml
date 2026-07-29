@@ -11,6 +11,10 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+default = ["portable-simd"]
+portable-simd = ["stab-core/portable-simd"]
+
 [dependencies]
 clap = { workspace = true }
 csv = { workspace = true }
@@ -20,7 +24,7 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-compat-corpus = { path = "../../test-support/compat-corpus" }
-stab-core = { path = "../../crates/stab-core" }
+stab-core = { path = "../../crates/stab-core", default-features = false }
 statrs = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

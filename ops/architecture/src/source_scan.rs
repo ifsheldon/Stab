@@ -206,6 +206,7 @@ mod tests {
         let package = PackageSpec {
             name: SIMD_PACKAGE.to_owned(),
             relative_path: PathBuf::from("crates/stab-kernels-simd"),
+            default_features: Vec::new(),
         };
         let packages = [package.clone()];
         let source = Path::new("crates/stab-kernels-simd/src/lib.rs");
@@ -221,6 +222,7 @@ mod tests {
         let core = PackageSpec {
             name: "stab-core".to_owned(),
             relative_path: PathBuf::from("crates/stab-core"),
+            default_features: Vec::new(),
         };
         assert_eq!(
             classify_simd_site(Path::new("crates/stab-core/src/bits/simd.rs"), Some(&core)),
