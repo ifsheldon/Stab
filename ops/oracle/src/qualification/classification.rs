@@ -9,7 +9,8 @@ mod simulator;
 mod stabilizer;
 
 use public_api_helpers::{
-    api_path_mentions_item, classify_extracted_analysis_api, is_resource_policy_api,
+    api_path_mentions_item, classify_extracted_analysis_api, is_analyzer_api,
+    is_resource_policy_api,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -309,11 +310,7 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::ResultFormats);
     }
-    if api_lower.contains("erroranalyzeroptions")
-        || api_lower.contains("circuit_to_detector_error_model")
-        || api_lower.ends_with("::detector_error_model")
-        || api_lower.contains("explain_errors")
-    {
+    if is_analyzer_api(&api_lower) {
         return Some(FeatureId::Analyzer);
     }
     if api_lower.ends_with("::reference_sample")

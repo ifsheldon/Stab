@@ -2196,6 +2196,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "signal-hook",
+ "stab-analysis",
  "stab-cli",
  "stab-core",
  "stab-model",

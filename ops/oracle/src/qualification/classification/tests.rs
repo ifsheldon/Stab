@@ -38,9 +38,9 @@ fn classifications_distinguish_selected_execution_domains() {
 
     assert_eq!(
         classify_public_api_source(
-            "stab_core",
-            Path::new("crates/stab-core/src/dem/analyze.rs"),
-            "stab_core::ErrorAnalyzerOptions",
+            "stab_analysis",
+            Path::new("crates/stab-analysis/src/circuit_to_dem/options.rs"),
+            "stab_analysis::ErrorAnalyzerOptions",
         ),
         Some(FeatureId::Analyzer)
     );

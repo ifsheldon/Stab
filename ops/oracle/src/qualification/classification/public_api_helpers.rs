@@ -13,6 +13,9 @@ pub(super) fn classify_extracted_analysis_api(
     if source_path.starts_with("crates/stab-analysis/src/circuit_generation") {
         return Some(FeatureId::Generation);
     }
+    if source_path.starts_with("crates/stab-analysis/src/circuit_to_dem") {
+        return Some(FeatureId::Analyzer);
+    }
     if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
         || source_path.starts_with("crates/stab-analysis/src/circuit_feedback")
         || source_path.starts_with("crates/stab-analysis/src/circuit_detecting_regions")
@@ -99,6 +102,17 @@ pub(super) fn api_path_mentions_item(api_path: &str, item: &str) -> bool {
                 .strip_prefix(item)
                 .is_some_and(|suffix| suffix.starts_with(" as "))
     })
+}
+
+pub(super) fn is_analyzer_api(api_lower: &str) -> bool {
+    api_lower.contains("erroranalyzeroptions")
+        || api_path_mentions_item(api_lower, "disjointpauliprobabilities")
+        || api_path_mentions_item(api_lower, "independentpauliprobabilities")
+        || api_lower.contains("circuit_to_detector_error_model")
+        || api_lower.ends_with("::independent_to_disjoint_xyz_errors")
+        || api_lower.ends_with("::try_disjoint_to_independent_xyz_errors")
+        || api_lower.ends_with("::detector_error_model")
+        || api_lower.contains("explain_errors")
 }
 
 pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {

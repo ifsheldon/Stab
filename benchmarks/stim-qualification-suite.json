@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "265ec8d9eb6682b3aadd1b2d0bb4233cd52c42bf535170243aabc1cb1d13413c",
-  "semantic_digest": "d07a2d0e9e4b138c02ec609892707e9ab5bb70d23bb7e38852f7564a88350c7b",
+  "correctness_digest": "999411729ac3297c0247d44c8d64babc12dcbc55208be8e94fb25e37058ce28f",
+  "semantic_digest": "a8ac03892be5def364c6309200fe0763e6d2b6b564a9333fef1dec33a3dcf28e",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -8779,6 +8779,248 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-61d7bb6c0cf69957",
+      "path": "stab_analysis::DisjointPauliProbabilities",
+      "kind": "struct",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3c3c5256f9eae3b7",
+      "path": "stab_analysis::DisjointPauliProbabilities as Clone for@303c88095ac2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ae35f8073c8aaab1",
+      "path": "stab_analysis::DisjointPauliProbabilities as Copy for@303c88095ac2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-059822a8d8a29910",
+      "path": "stab_analysis::DisjointPauliProbabilities as Debug for@303c88095ac2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-38c304408449377e",
+      "path": "stab_analysis::DisjointPauliProbabilities as PartialEq for@303c88095ac2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-92463d3467b6dbec",
+      "path": "stab_analysis::DisjointPauliProbabilities as StructuralPartialEq for@303c88095ac2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1a90c5b5cf2c9b3d",
+      "path": "stab_analysis::DisjointPauliProbabilities::x",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-7e362f30231f6c58",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-68a9b8257e7824cb",
+      "path": "stab_analysis::DisjointPauliProbabilities::y",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-643174e8f50e7fd9",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-910087f23e7f5951",
+      "path": "stab_analysis::DisjointPauliProbabilities::z",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1767a8125ec7c128",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a732aef20239b8a7",
+      "path": "stab_analysis::ErrorAnalyzerOptions",
+      "kind": "struct",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-50aaf9d97c080955",
+      "path": "stab_analysis::ErrorAnalyzerOptions as Clone for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aa80d1a1c53cadeb",
+      "path": "stab_analysis::ErrorAnalyzerOptions as Copy for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-30bb9ba4ddcddada",
+      "path": "stab_analysis::ErrorAnalyzerOptions as Debug for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d05b2c3405f3aff0",
+      "path": "stab_analysis::ErrorAnalyzerOptions as Default for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-0e07f7d282ba6d77",
+      "path": "stab_analysis::ErrorAnalyzerOptions as PartialEq for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-634d1be698582385",
+      "path": "stab_analysis::ErrorAnalyzerOptions as StructuralPartialEq for@593f12a7db72",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e1c1a2c8d49cb68b",
+      "path": "stab_analysis::ErrorAnalyzerOptions::allow_gauge_detectors",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e835f214f8fd2c6d",
+      "path": "stab_analysis::ErrorAnalyzerOptions::approximate_disjoint_errors_threshold",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1d638445562124e1",
+      "path": "stab_analysis::ErrorAnalyzerOptions::block_decomposition_from_introducing_remnant_edges",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bf0d468b205a2713",
+      "path": "stab_analysis::ErrorAnalyzerOptions::decompose_errors",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-58b7de46415bb32c",
+      "path": "stab_analysis::ErrorAnalyzerOptions::fold_loops",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-9911a4ceb6d68e72",
+      "path": "stab_analysis::ErrorAnalyzerOptions::ignore_decomposition_failures",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-342fd4a5d900648f",
       "path": "stab_analysis::GateUnitaryMatrix",
       "kind": "enum",
@@ -9072,6 +9314,105 @@
       "performance_feature": "PERF-GENERATION",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a1f51ba50f8a2841",
+      "path": "stab_analysis::IndependentPauliProbabilities",
+      "kind": "struct",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8fa19d29615b147a",
+      "path": "stab_analysis::IndependentPauliProbabilities as Clone for@ffa4354a8ccd",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8f840a9aaec63c95",
+      "path": "stab_analysis::IndependentPauliProbabilities as Copy for@ffa4354a8ccd",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-fe91cbc4e14f5454",
+      "path": "stab_analysis::IndependentPauliProbabilities as Debug for@ffa4354a8ccd",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-43a94493c9b5843c",
+      "path": "stab_analysis::IndependentPauliProbabilities as PartialEq for@ffa4354a8ccd",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6ca0c0f0799ba409",
+      "path": "stab_analysis::IndependentPauliProbabilities as StructuralPartialEq for@ffa4354a8ccd",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aca570d39356016c",
+      "path": "stab_analysis::IndependentPauliProbabilities::x",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-471517d935a8438a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a6d2952a306ed333",
+      "path": "stab_analysis::IndependentPauliProbabilities::y",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-c89e5086dba48fcd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-cbc64e2965919568",
+      "path": "stab_analysis::IndependentPauliProbabilities::z",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-969d7d75c7168fdf",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -11862,6 +12203,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-9c52bf72ffbf1610",
+      "path": "stab_analysis::circuit_to_detector_error_model",
+      "kind": "function",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-76393aede5c55f24",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-a6861c4a4f9660c2",
       "path": "stab_analysis::circuit_to_tableau",
       "kind": "function",
@@ -12495,6 +12847,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-89acebcc256860af",
+      "path": "stab_analysis::independent_to_disjoint_xyz_errors",
+      "kind": "function",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-9903098c329a322f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-0e3237ff4dc1782f",
       "path": "stab_analysis::mbqc_decomposition",
       "kind": "function",
@@ -12549,6 +12912,17 @@
       "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-b39136b2f3ddc791",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d8bc2e2be1ee3e93",
+      "path": "stab_analysis::try_disjoint_to_independent_xyz_errors",
+      "kind": "function",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-5d1390ea03e84a06",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -26037,7 +26411,7 @@
       "kind": "struct",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26048,7 +26422,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26059,7 +26433,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26070,7 +26444,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26081,7 +26455,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26092,7 +26466,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f330c2c66b1e5f6c",
+      "correctness_case_id": "cq-evidence-api-a2840d28a2213dbc",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26103,7 +26477,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2a87c0c86a8b5d43",
+      "correctness_case_id": "cq-evidence-api-7e362f30231f6c58",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -26114,7 +26488,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-e6994b9afa55daac",
+      "correctness_case_id": "cq-evidence-api-643174e8f50e7fd9",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -26125,7 +26499,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-278191fb37db44df",
+      "correctness_case_id": "cq-evidence-api-1767a8125ec7c128",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -26305,7 +26679,7 @@
       "kind": "struct",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26316,7 +26690,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26327,7 +26701,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26338,7 +26712,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26349,7 +26723,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26360,7 +26734,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26371,7 +26745,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26382,7 +26756,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26393,7 +26767,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26404,7 +26778,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26415,7 +26789,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26426,7 +26800,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -26437,7 +26811,7 @@
       "kind": "field",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-64aa793f35918e4b",
+      "correctness_case_id": "cq-evidence-api-671a020f654f68a6",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30279,7 +30653,7 @@
       "kind": "struct",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30290,7 +30664,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30301,7 +30675,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30312,7 +30686,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30323,7 +30697,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30334,7 +30708,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-733cc714ec9c6367",
+      "correctness_case_id": "cq-evidence-api-c1facaeee30d31b4",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -30345,7 +30719,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-3ad3cbdbcb73b044",
+      "correctness_case_id": "cq-evidence-api-471517d935a8438a",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -30356,7 +30730,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-d100a78a7843bf72",
+      "correctness_case_id": "cq-evidence-api-c89e5086dba48fcd",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -30367,7 +30741,7 @@
       "kind": "method",
       "performance_feature": "PERF-ERROR-ANALYSIS",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-3c9f8aef00cdf664",
+      "correctness_case_id": "cq-evidence-api-969d7d75c7168fdf",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

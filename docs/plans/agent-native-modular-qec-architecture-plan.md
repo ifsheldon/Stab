@@ -468,8 +468,8 @@ Each included row requires byte-exact preservation of opaque tag payloads on sur
 | Feedback inlining | Surviving operations retain their tags, and an introduced correction record inherits the tag of the consumed feedback operation. | `cargo test -p stab-core --test opaque_tag_transform_regressions feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operations -- --exact` |
 | DEM probability rounding | Instruction and repeat-block tags remain byte-identical through numeric rounding. | `cargo test -p stab-core --test opaque_tag_transform_regressions rounded_dem_preserves_opaque_instruction_and_repeat_tags -- --exact` |
 | DEM flattening | Every materialized instruction retains the byte-identical source instruction tag after detector-offset rewriting. | `cargo test -p stab-core --test opaque_tag_transform_regressions flattened_dem_preserves_opaque_tags_on_materialized_instructions -- --exact` |
-| Circuit-to-DEM analysis without loop folding | Distinct opaque error tags remain distinct and are not merged merely because their detector effects match. | `cargo test -p stab-core --test dem_analyzer_tags dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
-| Circuit-to-DEM analysis with loop folding | Distinct opaque error tags remain distinct in folded and tail output. | `cargo test -p stab-core --test dem_analyzer_tags folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
+| Circuit-to-DEM analysis without loop folding | Distinct opaque error tags remain distinct and are not merged merely because their detector effects match. | `cargo test -p stab-analysis --test dem_analyzer_tags dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
+| Circuit-to-DEM analysis with loop folding | Distinct opaque error tags remain distinct in folded and tail output. | `cargo test -p stab-analysis --test dem_analyzer_tags folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
 
 Comments are excluded because circuit and DEM comments are non-semantic and intentionally discarded during parsing.
 

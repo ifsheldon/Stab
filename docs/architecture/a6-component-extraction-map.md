@@ -148,7 +148,7 @@ The complete model slice is physically extracted. `stab-model` owns `Circuit`, `
 | `circuit_inverse*` | `circuit/inverse/*` | Own unitary, QEC, and flow-aware inversion. |
 | `circuit_missing_detectors*` | `circuit/missing_detectors/*` | Own missing-detector analysis. |
 | `circuit_simplify.rs`, `circuit_tableau.rs`, `circuit_transforms.rs` | `circuit/*` | Own simplification, tableau lowering, decomposition, noise removal, and bounded flattening. |
-| `dem/analyze*` | `dem/analyze/*` | Own circuit-to-DEM analysis, options, diagnostics, decomposition, and folded lowering. |
+| `dem/analyze*` | `circuit_to_dem.rs`, `circuit_to_dem/*` | Own circuit-to-DEM analysis, options, diagnostics, error-probability decomposition, and folded lowering. |
 | `dem/arena_index.rs`, `dem/error_traversal.rs` | `dem/*` | Own analysis indexing and bounded error-mechanism traversal. |
 | `dem/flatten.rs` | `dem/flatten.rs` | Own materialized DEM flattening and `DemFlattenLimits`. |
 | `dem/graphlike*`, `dem/hyper*`, `dem/sat*`, `dem/search_budget.rs` | `dem/*` | Own graph and hypergraph search, SAT materialization, and their operation-specific policies. |
@@ -156,7 +156,7 @@ The complete model slice is physically extracted. `stab-model` owns `Circuit`, `
 | `mbqc_decomposition.rs` | `mbqc.rs` | Own MBQC decomposition. |
 | `sparse_rev_frame_tracker*` | `sparse_reverse_tracker/*` | Own pure reverse tracking shared by flow and DEM analysis. |
 
-Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, circuit-flatten resource admission, repetition/surface/color generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, and missing-detector analysis are physically extracted. `stab-core` wrappers retain the old aggregate error, generated-value, flow, inversion-option, resource, detecting-region, and missing-detector signatures, while the canonical Stable implementation and owning exact-output tests live in `stab-analysis`; cross-component DEM-equivalence and facade tests remain in core until analyzer extraction. DEM analysis, DEM transforms, search, SAT, and error matching remain active.
+Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, circuit-flatten resource admission, repetition/surface/color generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM analysis, folded analyzer lowering, and XYZ error-probability decomposition are physically extracted. `stab-core` wrappers retain the old aggregate error, generated-value, flow, inversion-option, resource, detecting-region, missing-detector, and analyzer signatures, while the canonical Stable implementation and owning exact-output tests live in `stab-analysis`; generated-QEC semantic equivalence, CLI, and focused facade tests remain in core. DEM transforms, graph and hypergraph search, SAT, and error matching remain active.
 
 The crate depends only on exact-version `stab-model` and `stab-algebra` edges.
 

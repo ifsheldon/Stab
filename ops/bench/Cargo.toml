@@ -26,6 +26,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
+stab-analysis = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-core = { path = "../../crates/stab-core" }
 stab-model = { workspace = true }

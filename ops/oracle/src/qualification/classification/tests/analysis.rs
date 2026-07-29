@@ -85,6 +85,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_to_dem.rs",
+            "stab_analysis::circuit_to_detector_error_model",
+            FeatureId::Analyzer,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit_to_dem/error_decomp.rs",
+            "stab_analysis::IndependentPauliProbabilities",
+            FeatureId::Analyzer,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,
@@ -130,6 +142,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
             "crates/stab-core/src/lib.rs",
             "stab_core::GeneratedCircuit::layout_text",
             FeatureId::Generation,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/lib.rs",
+            "stab_core::DisjointPauliProbabilities",
+            FeatureId::Analyzer,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/dem/analyze.rs",
+            "stab_core::try_disjoint_to_independent_xyz_errors",
+            FeatureId::Analyzer,
         ),
         (
             "stab_core",
