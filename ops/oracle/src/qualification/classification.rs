@@ -288,14 +288,14 @@ pub(super) fn classify_public_api_source(
     }
     let value = source_path.to_string_lossy().replace('\\', "/");
     let api_lower = api_path.to_ascii_lowercase();
-    if let Some(feature_id) = classify_extracted_analysis_api(&value, &api_lower) {
-        return Some(feature_id);
-    }
     if api_lower.contains("bounded_parse_diagnostic_text") {
         return Some(FeatureId::Resource);
     }
     if is_resource_policy_api(&api_lower) || api_lower.ends_with("::resource_limit_error") {
         return Some(FeatureId::Resource);
+    }
+    if let Some(feature_id) = classify_extracted_analysis_api(&value, &api_lower) {
+        return Some(feature_id);
     }
     if api_lower.contains("parseerror")
         || api_lower.contains("parse_error")

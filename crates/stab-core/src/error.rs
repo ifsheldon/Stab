@@ -133,6 +133,16 @@ impl From<stab_analysis::AnalysisError> for CircuitError {
             stab_analysis::AnalysisError::InvalidCircuitSimplification { message } => {
                 Self::InvalidCircuitSimplification { message }
             }
+            stab_analysis::AnalysisError::InvalidDomainValue { kind, value } => {
+                Self::InvalidDomainValue { kind, value }
+            }
+            stab_analysis::AnalysisError::InvalidResultFormat { message } => {
+                Self::invalid_result_format(message)
+            }
+            stab_analysis::AnalysisError::InvalidDetectorErrorModel { message } => {
+                Self::invalid_detector_error_model(message)
+            }
+            stab_analysis::AnalysisError::ResourceLimit(error) => Self::ResourceLimit(error.into()),
         }
     }
 }

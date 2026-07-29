@@ -2163,6 +2163,7 @@ dependencies = [
 name = "stab-analysis"
 version = "0.1.1"
 dependencies = [
+ "allocation-counter",
  "num-complex",
  "stab-algebra",
  "stab-model",

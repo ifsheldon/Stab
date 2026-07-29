@@ -2417,6 +2417,8 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_flattened_operations"}
       ],
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::flattened_circuit"},
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::flattened_circuit_operations"},
         {"crate_name": "stab_core", "owner_path": "stab_core::analysis::flattened_circuit"},
         {"crate_name": "stab_core", "owner_path": "stab_core::analysis::flattened_circuit_operations"}
       ],
@@ -2439,6 +2441,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_noise_removes_id_errors"}
       ],
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::circuit_without_noise"},
         {"crate_name": "stab_core", "owner_path": "stab_core::analysis::circuit_without_noise"}
       ]
     },
@@ -7856,7 +7859,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_flatten_limits",
             "policy_preserves_defaults_and_rejects_before_output_allocation",
@@ -7875,24 +7878,72 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_OPERATIONS"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_OPERATIONS"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_operations"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::max_expanded_operations"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_operations"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::with_max_expanded_operations"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::flattened_circuit_with_limits"
           },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::analysis::flattened_circuit_with_limits"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::AnalysisError::resource_limit_error"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError::code"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError::operation"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError::resource"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError::actual"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceLimitError::limit"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceOperation"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceOperation::as_str"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceKind"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceKind::as_str"
           }
         ],
         "standalone": true
@@ -7908,7 +7959,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_flatten_limits",
             "retained_payload_dimensions_have_exact_boundaries",
@@ -7928,40 +7979,40 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_TARGETS"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_TARGETS"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_ARGUMENTS"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::DEFAULT_MAX_EXPANDED_ARGUMENTS"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_targets"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::max_expanded_targets"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::max_expanded_arguments"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::max_expanded_arguments"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::max_materialized_bytes"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::max_materialized_bytes"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_targets"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::with_max_expanded_targets"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::with_max_expanded_arguments"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::with_max_expanded_arguments"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CircuitFlattenLimits::with_max_materialized_bytes"
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::CircuitFlattenLimits::with_max_materialized_bytes"
           }
         ],
         "standalone": true
@@ -7977,7 +8028,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_flatten_limits",
             "retained_payload_count_overflow_fails_before_materialization",
@@ -8007,7 +8058,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_flatten_limits",
             "programmatic_repeat_depth_is_admitted_before_recursive_flattening",
@@ -8026,6 +8077,10 @@
         ],
         "public_api_owners": [
           {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::flattened_circuit_operations_with_limits"
+          },
+          {
             "crate_name": "stab_core",
             "owner_path": "stab_core::analysis::flattened_circuit_operations_with_limits"
           }
@@ -8043,7 +8098,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_flatten_limits",
             "caller_raised_limit_cannot_exceed_platform_materialization_capacity",
@@ -8059,6 +8114,36 @@
           "raised-policy-capacity-panic",
           "platform-limit-bypass",
           "allocation-before-admission"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-analysis-resource-facade-conversion",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "analysis_owner_facade",
+            "analysis_resource_error_conversion_preserves_the_facade_contract",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The facade converts an analysis-owned flatten rejection without losing the established operation, resource dimension, actual value, limit, or human diagnostic."
+        },
+        "negative_axes": [
+          "analysis-resource-class-loss",
+          "facade-operation-drift",
+          "facade-display-drift"
         ],
         "standalone": true
       },

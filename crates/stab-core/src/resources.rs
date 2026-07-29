@@ -151,18 +151,13 @@ pub(crate) enum LogicalErrorSearchResource {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
+    Analysis(stab_analysis::ResourceLimitError),
     CircuitSourceLines,
     CircuitRepeatNesting {
         source_line: usize,
     },
     DetectorErrorModelSourceLines,
     DetectorErrorModelRepeatNesting,
-    CircuitFlattenRepeatNesting,
-    CircuitFlattenExpandedOperations,
-    CircuitFlattenTargetOccurrences,
-    CircuitFlattenArgumentValues,
-    CircuitFlattenMaterializedBytes,
-    CircuitFlattenMaterializedUnits,
     DetectionRecordBits {
         subject: DetectionRecordLimitSubject,
     },
@@ -209,6 +204,15 @@ pub struct ResourceLimitError {
 }
 
 impl ResourceLimitError {
+    pub(crate) const fn from_analysis(error: stab_analysis::ResourceLimitError) -> Self {
+        Self {
+            cause: ResourceLimitCause::Analysis(error),
+            actual: error.actual(),
+            limit: error.limit(),
+            span: None,
+        }
+    }
+
     pub(crate) fn from_model_parse(error: stab_model::ResourceLimitError) -> Self {
         let cause = match error.context() {
             stab_model::ResourceLimitContext::CircuitSourceLines => {
@@ -229,60 +233,6 @@ impl ResourceLimitError {
             actual: error.actual(),
             limit: error.limit(),
             span: Some(error.span()),
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_expanded_operations(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenExpandedOperations,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_repeat_nesting(actual: usize, limit: usize) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenRepeatNesting,
-            actual: actual as u64,
-            limit: limit as u64,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_materialized_units(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenMaterializedUnits,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_target_occurrences(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenTargetOccurrences,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_argument_values(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenArgumentValues,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_materialized_bytes(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenMaterializedBytes,
-            actual,
-            limit,
-            span: None,
         }
     }
 
@@ -512,19 +462,16 @@ impl ResourceLimitError {
 
     pub const fn operation(&self) -> ResourceOperation {
         match self.cause {
+            ResourceLimitCause::Analysis(error) => match error.operation() {
+                stab_analysis::ResourceOperation::CircuitFlatten => {
+                    ResourceOperation::CircuitFlatten
+                }
+            },
             ResourceLimitCause::CircuitSourceLines
             | ResourceLimitCause::CircuitRepeatNesting { .. } => ResourceOperation::CircuitParse,
             ResourceLimitCause::DetectorErrorModelSourceLines
             | ResourceLimitCause::DetectorErrorModelRepeatNesting => {
                 ResourceOperation::DetectorErrorModelParse
-            }
-            ResourceLimitCause::CircuitFlattenRepeatNesting
-            | ResourceLimitCause::CircuitFlattenExpandedOperations
-            | ResourceLimitCause::CircuitFlattenTargetOccurrences
-            | ResourceLimitCause::CircuitFlattenArgumentValues
-            | ResourceLimitCause::CircuitFlattenMaterializedBytes
-            | ResourceLimitCause::CircuitFlattenMaterializedUnits => {
-                ResourceOperation::CircuitFlatten
             }
             ResourceLimitCause::DetectionRecordBits { .. }
             | ResourceLimitCause::DetectionMaterializedBits { .. }
@@ -557,27 +504,30 @@ impl ResourceLimitError {
 
     pub const fn resource(&self) -> ResourceKind {
         match self.cause {
+            ResourceLimitCause::Analysis(error) => match error.resource() {
+                stab_analysis::ResourceKind::RepeatNesting => ResourceKind::RepeatNesting,
+                stab_analysis::ResourceKind::ExpandedOperations => ResourceKind::ExpandedOperations,
+                stab_analysis::ResourceKind::MaterializedUnits => ResourceKind::MaterializedUnits,
+                stab_analysis::ResourceKind::MaterializedBytes => ResourceKind::MaterializedBytes,
+                stab_analysis::ResourceKind::TargetOccurrences => ResourceKind::TargetOccurrences,
+                stab_analysis::ResourceKind::ArgumentValues => ResourceKind::ArgumentValues,
+            },
             ResourceLimitCause::CircuitSourceLines
             | ResourceLimitCause::DetectorErrorModelSourceLines => ResourceKind::SourceLines,
             ResourceLimitCause::CircuitRepeatNesting { .. }
             | ResourceLimitCause::DetectorErrorModelRepeatNesting
-            | ResourceLimitCause::CircuitFlattenRepeatNesting
             | ResourceLimitCause::DetectionRepeatNesting => ResourceKind::RepeatNesting,
-            ResourceLimitCause::CircuitFlattenExpandedOperations
-            | ResourceLimitCause::DetectionExpandedInstructions
+            ResourceLimitCause::DetectionExpandedInstructions
             | ResourceLimitCause::DetectorErrorModelFlattenExpandedInstructions => {
                 ResourceKind::ExpandedOperations
             }
-            ResourceLimitCause::CircuitFlattenTargetOccurrences
-            | ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences => {
+            ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences => {
                 ResourceKind::TargetOccurrences
             }
-            ResourceLimitCause::CircuitFlattenArgumentValues
-            | ResourceLimitCause::DetectorErrorModelFlattenArgumentValues => {
+            ResourceLimitCause::DetectorErrorModelFlattenArgumentValues => {
                 ResourceKind::ArgumentValues
             }
-            ResourceLimitCause::CircuitFlattenMaterializedBytes
-            | ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes => {
+            ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes => {
                 ResourceKind::MaterializedBytes
             }
             ResourceLimitCause::DetectionRecordBits { .. } => ResourceKind::RecordBits,
@@ -594,8 +544,7 @@ impl ResourceLimitError {
                 ResourceKind::SampledErrorApplications
             }
             ResourceLimitCause::DetectorErrorModelReplayWorkUnits => ResourceKind::ReplayWorkUnits,
-            ResourceLimitCause::CircuitFlattenMaterializedUnits
-            | ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits
+            ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits
             | ResourceLimitCause::DetectorErrorModelMaterializedUnits => {
                 ResourceKind::MaterializedUnits
             }
@@ -666,9 +615,16 @@ impl From<stab_model::ResourceLimitError> for ResourceLimitError {
     }
 }
 
+impl From<stab_analysis::ResourceLimitError> for ResourceLimitError {
+    fn from(error: stab_analysis::ResourceLimitError) -> Self {
+        Self::from_analysis(error)
+    }
+}
+
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.cause {
+            ResourceLimitCause::Analysis(error) => Display::fmt(&error, formatter),
             ResourceLimitCause::CircuitSourceLines => write!(
                 formatter,
                 "failed to parse line {}: circuit input has more than {} lines",
@@ -688,36 +644,6 @@ impl Display for ResourceLimitError {
                 formatter,
                 "invalid detector error model: DEM repeat nesting exceeds current limit {}",
                 self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenRepeatNesting => write!(
-                formatter,
-                "invalid flattened circuit repeat nesting value {} exceeds fixed safety limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenExpandedOperations => write!(
-                formatter,
-                "invalid flattened circuit operation count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenTargetOccurrences => write!(
-                formatter,
-                "invalid flattened circuit target count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenArgumentValues => write!(
-                formatter,
-                "invalid flattened circuit argument count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenMaterializedBytes => write!(
-                formatter,
-                "invalid flattened circuit would require at least {} materialized bytes; current limit is {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenMaterializedUnits => write!(
-                formatter,
-                "invalid flattened circuit instruction vector would require {} materialized units; platform limit is {}",
-                self.actual, self.limit
             ),
             ResourceLimitCause::DetectionRecordBits { subject } => match subject {
                 DetectionRecordLimitSubject::DetectionRecord => write!(

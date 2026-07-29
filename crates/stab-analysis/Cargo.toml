@@ -16,3 +16,6 @@ num-complex = { workspace = true }
 stab-algebra = { workspace = true }
 stab-model = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+allocation-counter = { workspace = true }

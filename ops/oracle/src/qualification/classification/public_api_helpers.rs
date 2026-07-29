@@ -6,7 +6,11 @@ pub(super) fn classify_extracted_analysis_api(
 ) -> Option<FeatureId> {
     if api_lower.ends_with("::decomposed_circuit")
         || api_lower.ends_with("::simplified_circuit")
-        || source_path == "crates/stab-analysis/src/circuit_simplify.rs"
+        || matches!(
+            source_path,
+            "crates/stab-analysis/src/circuit_simplify.rs"
+                | "crates/stab-analysis/src/circuit_transforms.rs"
+        )
     {
         return Some(FeatureId::CircuitApi);
     }
@@ -44,6 +48,9 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
             "detectionconversionlimits",
             "demsamplerlimits",
             "logicalerrorsearchlimits",
+            "resourcekind",
+            "resourcelimiterror",
+            "resourceoperation",
             "satmaterializationlimits",
         ]
         .iter()

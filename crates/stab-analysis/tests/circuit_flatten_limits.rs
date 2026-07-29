@@ -5,13 +5,11 @@
 
 use std::hint::black_box;
 
-use stab_core::{
-    Circuit, CircuitFlattenLimits, CircuitItem, RepeatBlock, RepeatCount, RepeatNestingLimit,
-    ResourceKind, ResourceOperation, Target,
-    analysis::{
-        flattened_circuit, flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
-    },
+use stab_analysis::{
+    CircuitFlattenLimits, ResourceKind, ResourceOperation, flattened_circuit,
+    flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
+use stab_model::{Circuit, CircuitItem, RepeatBlock, RepeatCount, RepeatNestingLimit, Target};
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
@@ -92,8 +90,11 @@ fn policy_preserves_defaults_and_rejects_before_output_allocation() {
     let resource = rejected
         .resource_limit_error()
         .expect("flattening rejection should expose typed resource context");
+    assert_eq!(resource.code(), "resource-limit-exceeded");
     assert_eq!(resource.operation(), ResourceOperation::CircuitFlatten);
+    assert_eq!(resource.operation().as_str(), "circuit-flatten");
     assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
+    assert_eq!(resource.resource().as_str(), "expanded-operations");
     assert_eq!(resource.actual(), 4);
     assert_eq!(resource.limit(), 3);
 

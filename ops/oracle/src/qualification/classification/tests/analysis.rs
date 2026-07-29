@@ -25,6 +25,24 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_transforms.rs",
+            "stab_analysis::flattened_circuit",
+            FeatureId::CircuitApi,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit_transforms.rs",
+            "stab_analysis::flattened_circuit_with_limits",
+            FeatureId::Resource,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/resources.rs",
+            "stab_analysis::ResourceKind",
+            FeatureId::Resource,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/gate.rs",
             "stab_analysis::single_qubit_clifford_for_gate",
             FeatureId::Algebra,
