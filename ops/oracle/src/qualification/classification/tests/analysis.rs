@@ -73,6 +73,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_detecting_regions.rs",
+            "stab_analysis::DetectingRegionOptions",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit_missing_detectors.rs",
+            "stab_analysis::missing_detectors",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,

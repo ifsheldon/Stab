@@ -15,8 +15,10 @@ pub(super) fn classify_extracted_analysis_api(
     }
     if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
         || source_path.starts_with("crates/stab-analysis/src/circuit_feedback")
+        || source_path.starts_with("crates/stab-analysis/src/circuit_detecting_regions")
         || source_path.starts_with("crates/stab-analysis/src/sparse_rev_frame_tracker")
         || source_path.starts_with("crates/stab-analysis/src/circuit_inverse")
+        || source_path.starts_with("crates/stab-analysis/src/circuit_missing_detectors")
     {
         return Some(FeatureId::FlowUtils);
     }
@@ -62,7 +64,12 @@ fn is_flow_api(api_lower: &str) -> bool {
     [
         "unsignedstabilizerflowcheck",
         "unsignedstabilizerflowfailure",
+        "detectingregionmap",
+        "detectingregionoptions",
+        "detectingregiontargetmap",
+        "detectingregiontargetoptions",
         "inverseqecoptions",
+        "missingdetectoroptions",
         "timereversedforflowsoptions",
     ]
     .iter()

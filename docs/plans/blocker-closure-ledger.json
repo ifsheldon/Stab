@@ -3757,7 +3757,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_repeat_",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_repeat_",
             "upstream_source": "src/stim/util_top/circuit_to_detecting_regions.test.cc"
           }
         },
@@ -3767,7 +3767,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_target_api",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target_api",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3777,7 +3777,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_target_shape",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target_shape",
             "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
           }
         },
@@ -3787,7 +3787,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_target",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3797,7 +3797,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_clifford",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_clifford",
             "upstream_source": "doc/python_api_reference_vDev.md"
           }
         },
@@ -3807,7 +3807,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_gauge",
+            "argv": "cargo-test|-p|stab-analysis|detecting_regions_gauge",
             "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
           }
         },
@@ -3817,7 +3817,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_repetition_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_repetition_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3827,7 +3827,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_rotated_surface_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_rotated_surface_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3837,7 +3837,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_unrotated_surface_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_unrotated_surface_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3847,7 +3847,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_surface_code_memory_x_basis_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_surface_code_memory_x_basis_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         }
@@ -3888,7 +3888,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx",
               "--quiet",
               "--exact"
@@ -3901,7 +3901,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions.test.cc"
             }
           },
@@ -3929,7 +3929,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "circuit_detecting_regions::tests::detecting_regions_anticommutation_rejects_implicit_start_state",
               "--quiet",
               "--exact"
@@ -3942,7 +3942,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::detecting_regions_anticommutation_rejects_implicit_start_state|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_anticommutation_rejects_implicit_start_state|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions_test.py"
             }
           },
