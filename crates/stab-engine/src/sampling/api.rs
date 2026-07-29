@@ -213,7 +213,7 @@ impl SamplingCompiler {
         self.compile_with_sweep_policy(circuit, SweepCompilation::Reject)
     }
 
-    pub(super) fn compile_allowing_sweep(
+    pub(crate) fn compile_allowing_sweep(
         self,
         circuit: &Circuit,
     ) -> Result<SamplingPlan, SamplingCompileError> {

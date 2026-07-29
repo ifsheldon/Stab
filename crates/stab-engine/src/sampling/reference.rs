@@ -5,8 +5,7 @@ use super::stabilizer_frame::StabilizerFrame;
 use super::{ExecutionMode, SamplingExecutionError, SamplingPlan};
 
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct ReferenceSampleScratch {
+pub(crate) struct ReferenceSampleScratch {
     pub(super) rng: SmallRng,
     pub(super) frame: StabilizerFrame,
     pub(super) output: Vec<bool>,

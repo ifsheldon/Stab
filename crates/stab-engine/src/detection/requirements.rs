@@ -1,6 +1,8 @@
-use crate::{
-    Circuit, CircuitError, CircuitItem, CircuitResult, RepeatNestingLimit, ResourceLimitError,
-    Target,
+use stab_model::{Circuit, CircuitItem, RepeatNestingLimit, Target};
+
+use super::error::{
+    DetectionError as CircuitError, DetectionResourceLimitError as ResourceLimitError,
+    DetectionResult as CircuitResult,
 };
 
 pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> CircuitResult<bool> {

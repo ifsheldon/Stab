@@ -1,9 +1,21 @@
 //! Backend-neutral engine foundations for Stab.
 
+mod detection;
 pub mod fingerprint;
 pub mod probability;
 mod sampling;
 
+pub use detection::{
+    CompiledDetectionConverter, DetectionCompileError, DetectionConversionLimits,
+    DetectionConversionOptions, DetectionError, DetectionEventRecord, DetectionExecutionError,
+    DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
+    DetectionRunError, DetectionRunProgress, DetectionRunStatus, DetectionRunSummary,
+    DetectionSamplingCompiler, DetectionSamplingPlan, DetectionSamplingSession,
+    MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
+    MeasurementToDetectionSinkAdapter, detection_record_width, detection_record_width_with_limits,
+    measurement_record_count, measurement_record_count_with_limits,
+    validate_detection_sampling_circuit, validate_detection_sampling_circuit_with_limits,
+};
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;
 pub use sampling::{
@@ -14,6 +26,3 @@ pub use sampling::{
     SinkFailurePhase, count_determined_measurements,
 };
 pub use sampling::{COMPILATION_DESCRIPTOR, REGISTERED_BACKENDS};
-
-#[doc(hidden)]
-pub use sampling::{ReferenceSampleScratch, normalize_pauli_product_terms_for_core_detection};

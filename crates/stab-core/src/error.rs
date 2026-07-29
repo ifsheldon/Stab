@@ -178,6 +178,24 @@ impl From<stab_engine::SamplingExecutionError> for CircuitError {
     }
 }
 
+impl From<stab_engine::DetectionError> for CircuitError {
+    fn from(error: stab_engine::DetectionError) -> Self {
+        match error {
+            stab_engine::DetectionError::Model(error) => error.into(),
+            stab_engine::DetectionError::Analysis(error) => error.into(),
+            stab_engine::DetectionError::InvalidSamplerCompilation { message } => {
+                Self::invalid_sampler_compilation(message)
+            }
+            stab_engine::DetectionError::InvalidResultFormat { message } => {
+                Self::invalid_result_format(message)
+            }
+            stab_engine::DetectionError::ResourceLimit(error) => {
+                Self::ResourceLimit(ResourceLimitError::from(error))
+            }
+        }
+    }
+}
+
 impl CircuitError {
     pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
         Self::InvalidDomainValue {

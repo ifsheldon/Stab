@@ -4,8 +4,6 @@ use crate::{Circuit, CircuitError, CircuitResult};
 
 mod stream;
 
-#[doc(hidden)]
-pub(crate) use engine_sampling::ReferenceSampleScratch;
 pub use engine_sampling::{
     BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
     SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
@@ -36,7 +34,7 @@ impl CompiledSampler {
 
     pub(crate) fn compile_allowing_sweep(circuit: &Circuit) -> CircuitResult<Self> {
         let plan = SamplingCompiler::new()
-            .compile_allowing_sweep_for_core_detection(circuit)
+            .compile_allowing_sweep_for_core(circuit)
             .map_err(CircuitError::from)?;
         plan.validate_legacy_adapter_storage_for_core()
             .map_err(CircuitError::from)?;
@@ -59,10 +57,6 @@ impl CompiledSampler {
         self.plan.reference_sample()
     }
 
-    pub(crate) fn sweep_bit_count(&self) -> usize {
-        self.plan.sweep_bit_count_for_core_detection()
-    }
-
     #[cfg(test)]
     pub(crate) fn reference_sample_with_sweep_into(
         &self,
@@ -70,39 +64,18 @@ impl CompiledSampler {
         output: &mut Vec<bool>,
     ) -> CircuitResult<()> {
         self.plan
-            .reference_measurement_record_with_sweep_into_for_core_detection(sweep_record, output)
+            .reference_measurement_record_with_sweep_into_for_core(sweep_record, output)
             .map_err(CircuitError::from)
     }
 
+    #[cfg(test)]
     pub(crate) fn reference_measurement_record_with_sweep_into(
         &self,
         sweep_record: &[bool],
         record: &mut Vec<bool>,
     ) -> CircuitResult<()> {
         self.plan
-            .reference_measurement_record_with_sweep_into_for_core_detection(sweep_record, record)
-            .map_err(CircuitError::from)
-    }
-
-    pub(crate) fn try_reusable_reference_sample_scratch(
-        &self,
-    ) -> Result<ReferenceSampleScratch, SamplingExecutionError> {
-        self.plan
-            .try_reusable_reference_sample_scratch_for_core_detection()
-    }
-
-    pub(crate) fn reference_measurement_record_with_sweep_and_scratch_into(
-        &self,
-        sweep_record: &[bool],
-        scratch: &mut ReferenceSampleScratch,
-        record: &mut Vec<bool>,
-    ) -> CircuitResult<()> {
-        self.plan
-            .reference_measurement_record_with_sweep_and_scratch_into_for_core_detection(
-                sweep_record,
-                scratch,
-                record,
-            )
+            .reference_measurement_record_with_sweep_into_for_core(sweep_record, record)
             .map_err(CircuitError::from)
     }
 }
@@ -136,18 +109,6 @@ pub(crate) fn legacy_shot_count(shots: usize) -> CircuitResult<ShotCount> {
 
 pub(crate) fn legacy_execution_error(error: SamplingExecutionError) -> CircuitError {
     CircuitError::from(error)
-}
-
-pub(crate) mod pauli_product {
-    use crate::{CircuitError, CircuitResult, PauliBasis};
-
-    pub(crate) fn normalize_terms(
-        raw_terms: Vec<(usize, PauliBasis, bool)>,
-        base_inverted: bool,
-    ) -> CircuitResult<(Vec<(usize, PauliBasis)>, bool)> {
-        stab_engine::normalize_pauli_product_terms_for_core_detection(raw_terms, base_inverted)
-            .map_err(CircuitError::from)
-    }
 }
 
 #[cfg(test)]

@@ -436,6 +436,45 @@ impl From<stab_analysis::ResourceLimitError> for ResourceLimitError {
     }
 }
 
+impl From<stab_engine::DetectionResourceLimitError> for ResourceLimitError {
+    fn from(error: stab_engine::DetectionResourceLimitError) -> Self {
+        use stab_engine::{DetectionRecordLimitSubject as RecordSubject, DetectionResourceKind};
+
+        match error.kind() {
+            DetectionResourceKind::RecordBits(subject) => {
+                let subject = match subject {
+                    RecordSubject::DetectionRecord => DetectionRecordLimitSubject::DetectionRecord,
+                    RecordSubject::MeasurementRecord => {
+                        DetectionRecordLimitSubject::MeasurementRecord
+                    }
+                    RecordSubject::SweepRecord => DetectionRecordLimitSubject::SweepRecord,
+                    RecordSubject::ObservableCount => DetectionRecordLimitSubject::ObservableCount,
+                };
+                Self::detection_record_bits(subject, error.actual(), error.limit())
+            }
+            DetectionResourceKind::RepeatNesting => Self::detection_repeat_nesting(
+                usize::try_from(error.actual()).unwrap_or(usize::MAX),
+                usize::try_from(error.limit()).unwrap_or(usize::MAX),
+            ),
+            DetectionResourceKind::RepeatCount => {
+                Self::detection_repeat_count(error.actual(), error.limit())
+            }
+            DetectionResourceKind::ExpandedInstructions => {
+                Self::detection_expanded_instructions(error.actual(), error.limit())
+            }
+            DetectionResourceKind::RepeatIterations => {
+                Self::detection_repeat_iterations(error.actual(), error.limit())
+            }
+            DetectionResourceKind::CompiledTerms => {
+                Self::detection_compiled_terms(error.actual(), error.limit())
+            }
+            DetectionResourceKind::CompiledBytes => {
+                Self::detection_compiled_bytes(error.actual(), error.limit())
+            }
+        }
+    }
+}
+
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.cause {

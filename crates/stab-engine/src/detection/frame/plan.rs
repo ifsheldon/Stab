@@ -1,17 +1,19 @@
 use std::borrow::Cow;
 
 use rand::Rng;
+use stab_model::advanced::CircuitBuilder as CircuitAssembler;
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock, Target};
 
 use super::ScalarDetectionFrame;
 use super::helpers::{
     is_frame_bit_target, is_frame_qubit_or_bit_target, unsupported_frame_instruction,
     zero_probability_noise,
 };
-use crate::detection::{ConversionPlan, DetectionConversionLimits};
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, RepeatBlock,
-    ResourceLimitError, Target, circuit::CircuitAssembler,
+use crate::detection::error::{
+    DetectionError as CircuitError, DetectionResourceLimitError as ResourceLimitError,
+    DetectionResult as CircuitResult,
 };
+use crate::detection::{ConversionPlan, DetectionConversionLimits};
 
 struct AdmittedFrameConversion {
     plan: ConversionPlan,
@@ -230,7 +232,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
         "CZ" => validate_frame_cz_targets(instruction),
         "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
-        _ if crate::analysis::gate_has_tableau(instruction.gate()) => Ok(()),
+        _ if stab_analysis::gate_has_tableau(instruction.gate()) => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
         name => Err(CircuitError::invalid_sampler_compilation(format!(
             "M9 detector frame subset does not support {name}"
@@ -241,7 +243,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
 pub(super) fn decomposed_frame_instruction(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<Circuit> {
-    crate::analysis::decomposed_single_instruction(instruction).map_err(|error| {
+    stab_analysis::advanced::decomposed_single_instruction(instruction).map_err(|error| {
         CircuitError::invalid_sampler_compilation(format!(
             "{} cannot be executed by frame detection via decomposition: {error}",
             instruction.gate().canonical_name()
@@ -457,7 +459,13 @@ fn try_clone_execution_instruction(
             ))
         })?;
     targets.extend(instruction.targets().iter().cloned());
-    crate::circuit::circuit_instruction_with_tag_bytes(instruction.gate(), args, targets, None)
+    stab_model::advanced::circuit_instruction_with_tag_bytes(
+        instruction.gate(),
+        args,
+        targets,
+        None,
+    )
+    .map_err(Into::into)
 }
 
 fn frame_execution_instruction<'a>(
@@ -499,7 +507,7 @@ fn frame_execution_instruction<'a>(
         })?;
     args.extend_from_slice(instruction.args());
     Ok(Some(Cow::Owned(
-        crate::circuit::circuit_instruction_with_tag_bytes(
+        stab_model::advanced::circuit_instruction_with_tag_bytes(
             instruction.gate(),
             args,
             targets,

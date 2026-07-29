@@ -14,7 +14,6 @@ pub use crate::circuit_inverse::{
     circuit_inverse_qec_with_options, circuit_inverse_unitary, circuit_time_reversed_for_flows,
     circuit_time_reversed_for_flows_with_options,
 };
-pub(crate) use crate::circuit_simplify::decomposed_single_instruction;
 pub use crate::circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use crate::circuit_tableau::circuit_to_tableau;
 pub use crate::circuit_transforms::{

@@ -28,8 +28,7 @@ pub use api::{
     SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
 };
-#[doc(hidden)]
-pub use reference::ReferenceSampleScratch;
+pub(crate) use reference::ReferenceSampleScratch;
 
 /// Sampling backends registered by this build.
 pub const REGISTERED_BACKENDS: &[SamplingBackend] = &[SamplingBackend::Scalar];
@@ -82,12 +81,9 @@ pub const COMPILATION_DESCRIPTOR: SamplingCompilationDescriptor = SamplingCompil
 };
 
 impl SamplingCompiler {
-    /// Temporary bridge for core detection during the facade migration.
-    ///
-    /// Normal public sampling rejects sweep controls. Detection conversion still needs a
-    /// sweep-aware reference compiler until that subsystem also moves into `stab-engine`.
+    /// Compatibility bridge for facade-owned reference-sampling adapters.
     #[doc(hidden)]
-    pub fn compile_allowing_sweep_for_core_detection(
+    pub fn compile_allowing_sweep_for_core(
         self,
         circuit: &Circuit,
     ) -> Result<SamplingPlan, SamplingCompileError> {
@@ -112,38 +108,9 @@ impl SamplingPlan {
         self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample, &[])
     }
 
-    /// Temporary bridge for core detection during the facade migration.
+    /// Compatibility bridge for facade-owned reference-sampling adapters.
     #[doc(hidden)]
-    pub fn sweep_bit_count_for_core_detection(&self) -> usize {
-        self.inner.sweep_bit_count
-    }
-
-    /// Temporary bridge for core detection during the facade migration.
-    #[doc(hidden)]
-    pub fn validate_legacy_adapter_storage_for_core(&self) -> Result<(), SamplingExecutionError> {
-        api::validate_legacy_adapter_plan(self)
-    }
-
-    /// Temporary bridge for core detection during the facade migration.
-    #[doc(hidden)]
-    pub fn estimated_session_storage_bytes_for_core_detection(
-        &self,
-        reference_mode: ReferenceSampleMode,
-    ) -> u128 {
-        self.estimated_session_storage_bytes(reference_mode)
-    }
-
-    /// Temporary bridge for core detection during the facade migration.
-    #[doc(hidden)]
-    pub fn try_reusable_reference_sample_scratch_for_core_detection(
-        &self,
-    ) -> Result<ReferenceSampleScratch, SamplingExecutionError> {
-        self.try_reusable_reference_sample_scratch()
-    }
-
-    /// Temporary bridge for core detection during the facade migration.
-    #[doc(hidden)]
-    pub fn reference_measurement_record_with_sweep_into_for_core_detection(
+    pub fn reference_measurement_record_with_sweep_into_for_core(
         &self,
         sweep_record: &[bool],
         output: &mut Vec<bool>,
@@ -151,15 +118,14 @@ impl SamplingPlan {
         self.reference_measurement_record_with_sweep_into(sweep_record, output)
     }
 
+    pub(crate) fn sweep_bit_count(&self) -> usize {
+        self.inner.sweep_bit_count
+    }
+
     /// Temporary bridge for core detection during the facade migration.
     #[doc(hidden)]
-    pub fn reference_measurement_record_with_sweep_and_scratch_into_for_core_detection(
-        &self,
-        sweep_record: &[bool],
-        scratch: &mut ReferenceSampleScratch,
-        record: &mut Vec<bool>,
-    ) -> Result<(), SamplingExecutionError> {
-        self.reference_measurement_record_with_sweep_and_scratch_into(sweep_record, scratch, record)
+    pub fn validate_legacy_adapter_storage_for_core(&self) -> Result<(), SamplingExecutionError> {
+        api::validate_legacy_adapter_plan(self)
     }
 
     fn sample_shot_in_mode<R>(
@@ -221,17 +187,8 @@ pub fn count_determined_measurements(
     unknown_input: bool,
 ) -> Result<u64, SamplingCompileError> {
     Ok(SamplingCompiler::new()
-        .compile_allowing_sweep_for_core_detection(circuit)?
+        .compile_allowing_sweep(circuit)?
         .count_determined_measurements(unknown_input))
-}
-
-/// Temporary bridge for core detection during the facade migration.
-#[doc(hidden)]
-pub fn normalize_pauli_product_terms_for_core_detection(
-    raw_terms: Vec<(usize, PauliBasis, bool)>,
-    base_inverted: bool,
-) -> Result<(Vec<(usize, PauliBasis)>, bool), SamplingCompileError> {
-    pauli_product::normalize_terms(raw_terms, base_inverted)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

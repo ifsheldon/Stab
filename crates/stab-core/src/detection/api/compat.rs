@@ -30,7 +30,7 @@ pub(in crate::detection) fn sample_materialized(
         DetectionBufferLimitSubject::DetectionRecords,
         shots,
         output_width,
-        limits.max_materialized_bits,
+        limits.max_materialized_bits(),
     )?;
     let mut sink = MaterializingSink::new(shots)?;
     let mut session = plan
@@ -69,17 +69,6 @@ where
         .run(shot_count(shots).map_err(E::from)?, &mut sink)
         .map(|_| ())
         .map_err(map_callback_run_error)
-}
-
-pub(in crate::detection) fn validate(
-    circuit: &Circuit,
-    limits: DetectionConversionLimits,
-) -> CircuitResult<()> {
-    DetectionSamplingCompiler::new()
-        .limits(limits)
-        .compile(circuit)
-        .map(|_| ())
-        .map_err(|error| error.into_circuit_error())
 }
 
 struct MaterializingSink {

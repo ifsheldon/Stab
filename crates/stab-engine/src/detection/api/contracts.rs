@@ -2,29 +2,15 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::{CircuitError, SamplingExecutionError, ShotCount, SinkFailurePhase};
+use crate::{SamplingExecutionError, ShotCount, SinkFailurePhase};
+
+use super::super::error::DetectionError;
 
 /// Failure to compile a measurement-conversion or detection-sampling plan.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum DetectionCompileError {
     #[error(transparent)]
-    InvalidCircuit(#[from] CircuitError),
-}
-
-impl DetectionCompileError {
-    pub fn into_circuit_error(self) -> CircuitError {
-        match self {
-            Self::InvalidCircuit(error) => error,
-        }
-    }
-
-    pub(super) fn from_engine(error: stab_engine::DetectionCompileError) -> Self {
-        match error {
-            stab_engine::DetectionCompileError::InvalidCircuit(error) => {
-                Self::InvalidCircuit(error.into())
-            }
-        }
-    }
+    InvalidCircuit(#[from] DetectionError),
 }
 
 /// Engine-side failure from a detection conversion or sampling session.
@@ -51,7 +37,7 @@ pub enum DetectionExecutionError {
     SessionStorageAllocation { message: String },
 
     #[error("detection conversion failed: {0}")]
-    Conversion(#[source] CircuitError),
+    Conversion(#[source] DetectionError),
 
     #[error("measurement sampling failed: {0}")]
     Sampling(#[source] SamplingExecutionError),
@@ -63,46 +49,8 @@ pub enum DetectionExecutionError {
     InternalInvariant { message: String },
 }
 
-impl DetectionExecutionError {
-    pub fn into_circuit_error(self) -> CircuitError {
-        match self {
-            Self::Conversion(error) => error,
-            Self::Sampling(error) => CircuitError::from(error),
-            other => CircuitError::invalid_sampler_compilation(other.to_string()),
-        }
-    }
-
-    pub(super) fn from_engine(error: stab_engine::DetectionExecutionError) -> Self {
-        match error {
-            stab_engine::DetectionExecutionError::SessionPoisoned => Self::SessionPoisoned,
-            stab_engine::DetectionExecutionError::DeliveryFinished => Self::DeliveryFinished,
-            stab_engine::DetectionExecutionError::ShotCounterOverflow => Self::ShotCounterOverflow,
-            stab_engine::DetectionExecutionError::SessionStorageLimit {
-                estimated_bytes,
-                limit_bytes,
-            } => Self::SessionStorageLimit {
-                estimated_bytes,
-                limit_bytes,
-            },
-            stab_engine::DetectionExecutionError::SessionStorageAllocation { message } => {
-                Self::SessionStorageAllocation { message }
-            }
-            stab_engine::DetectionExecutionError::Conversion(error) => {
-                Self::Conversion(error.into())
-            }
-            stab_engine::DetectionExecutionError::Sampling(error) => Self::Sampling(error),
-            stab_engine::DetectionExecutionError::CancelledComposition => {
-                Self::CancelledComposition
-            }
-            stab_engine::DetectionExecutionError::InternalInvariant { message } => {
-                Self::InternalInvariant { message }
-            }
-        }
-    }
-}
-
-impl From<CircuitError> for DetectionExecutionError {
-    fn from(error: CircuitError) -> Self {
+impl From<DetectionError> for DetectionExecutionError {
+    fn from(error: DetectionError) -> Self {
         Self::Conversion(error)
     }
 }

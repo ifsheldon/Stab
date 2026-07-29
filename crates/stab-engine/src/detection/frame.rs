@@ -1,10 +1,9 @@
 use rand::{Rng, RngExt as _};
+use stab_algebra::{PauliBasis, PauliSign};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, Target};
 
+use super::error::{DetectionError as CircuitError, DetectionResult as CircuitResult};
 use super::{try_false_vec, try_vec_with_capacity};
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, Pauli, PauliBasis,
-    PauliSign, Target,
-};
 
 mod helpers;
 mod plan;
@@ -156,7 +155,7 @@ impl ScalarDetectionFrame {
             "SPP" | "SPP_DAG" => {
                 self.execute_decomposed_instruction(instruction, max_repeat_unroll, rng)
             }
-            _ if crate::analysis::gate_has_tableau(instruction.gate()) => {
+            _ if stab_analysis::gate_has_tableau(instruction.gate()) => {
                 self.apply_tableau_instruction(instruction)
             }
             _ if zero_probability_noise(instruction)? => Ok(()),
@@ -442,7 +441,7 @@ impl ScalarDetectionFrame {
 
     fn apply_tableau_targets(&mut self, gate: Gate, targets: &[Target]) -> CircuitResult<()> {
         let gate_name = gate.canonical_name();
-        let tableau = crate::analysis::gate_tableau(gate)?;
+        let tableau = stab_analysis::gate_tableau(gate)?;
         let qubits = targets
             .iter()
             .map(|target| {

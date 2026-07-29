@@ -1,9 +1,10 @@
 use rand::{Rng, RngExt as _};
-
-use crate::{
-    CircuitError, CircuitInstruction, CircuitResult, GateCategory, MeasureRecordOffset, Pauli,
-    PauliBasis, Probability, Target,
+use stab_algebra::PauliBasis;
+use stab_model::{
+    CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, Target,
 };
+
+use super::super::error::{DetectionError as CircuitError, DetectionResult as CircuitResult};
 
 pub(super) fn frame_bit(bits: &[bool], qubit: usize) -> CircuitResult<bool> {
     bits.get(qubit)

@@ -10,11 +10,12 @@ use std::convert::Infallible;
 
 use stab_records::MeasurementSink;
 
-use super::*;
-use crate::{
-    ResourceKind, Seed, convert_measurements_to_detection_events,
-    convert_measurements_to_detection_events_with_sweep, sample_detection_events,
+use super::super::test_support::{
+    convert_measurements_to_detection_events, convert_measurements_to_detection_events_with_sweep,
+    sample_detection_events,
 };
+use super::*;
+use crate::{DetectionError, DetectionResourceKind, Seed};
 
 #[derive(Default)]
 struct CollectSink {
@@ -604,7 +605,6 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
     ));
     assert!(
         DetectionExecutionError::SessionPoisoned
-            .into_circuit_error()
             .to_string()
             .contains("session is poisoned")
     );
@@ -700,12 +700,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
         &conversion_error,
         DetectionCompileError::InvalidCircuit(_)
     ));
-    assert!(
-        conversion_error
-            .into_circuit_error()
-            .to_string()
-            .contains("record width")
-    );
+    assert!(conversion_error.to_string().contains("record width"));
     let sampling_error = DetectionSamplingCompiler::new()
         .limits(limits)
         .compile(&circuit)
@@ -714,12 +709,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
         &sampling_error,
         DetectionCompileError::InvalidCircuit(_)
     ));
-    assert!(
-        sampling_error
-            .into_circuit_error()
-            .to_string()
-            .contains("record width")
-    );
+    assert!(sampling_error.to_string().contains("record width"));
 }
 
 #[test]
@@ -752,12 +742,12 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
     let error = DetectionSamplingCompiler::new()
         .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
         .compile_direct_for_test(&tagged)
-        .expect_err("reject the first byte above the direct-plan boundary")
-        .into_circuit_error();
-    let resource = error
-        .resource_limit_error()
-        .expect("direct-plan byte rejection remains typed");
-    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+        .expect_err("reject the first byte above the direct-plan boundary");
+    let DetectionCompileError::InvalidCircuit(DetectionError::ResourceLimit(resource)) = error
+    else {
+        panic!("direct-plan byte rejection must remain typed");
+    };
+    assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
     assert_eq!(resource.actual(), exact_bytes);
     assert_eq!(resource.limit(), exact_bytes - 1);
 }
