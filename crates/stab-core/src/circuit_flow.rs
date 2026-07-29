@@ -7,8 +7,6 @@ pub use stab_analysis::{
     circuit_has_unsigned_stabilizer_flow,
 };
 
-pub(crate) use stab_analysis::advanced::flow_record_index;
-
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     stab_analysis::circuit_flow_generators(circuit).map_err(Into::into)
 }

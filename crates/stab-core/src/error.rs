@@ -213,6 +213,20 @@ impl From<stab_engine::DemError> for CircuitError {
     }
 }
 
+impl From<stab_engine::SampledFlowError> for CircuitError {
+    fn from(error: stab_engine::SampledFlowError) -> Self {
+        match error {
+            stab_engine::SampledFlowError::Model(error) => error.into(),
+            stab_engine::SampledFlowError::Analysis(error) => error.into(),
+            stab_engine::SampledFlowError::SamplingCompile(error) => error.into(),
+            stab_engine::SampledFlowError::SamplingExecution(error) => error.into(),
+            stab_engine::SampledFlowError::InvalidFlow { message } => {
+                Self::invalid_detector_error_model(message)
+            }
+        }
+    }
+}
+
 impl From<stab_engine::ReferenceSampleTreeError> for CircuitError {
     fn from(error: stab_engine::ReferenceSampleTreeError) -> Self {
         match error {

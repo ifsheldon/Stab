@@ -5,6 +5,7 @@ mod detection;
 pub mod fingerprint;
 pub mod probability;
 mod reference_sample_tree;
+mod sampled_flow;
 mod sampling;
 
 pub use dem_sampling::{
@@ -27,6 +28,7 @@ pub use detection::{
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
+pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows};
 pub use sampling::{
     BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
     SamplingBackend, SamplingCancellation, SamplingCompilationDescriptor, SamplingCompileError,

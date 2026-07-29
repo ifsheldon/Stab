@@ -328,10 +328,8 @@ fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics(
 }
 
 #[test]
-fn sample_if_circuit_has_stabilizer_flows_checks_signed_unitary_flows() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/has_flow.test.cc
-    // sample_if_circuit_has_stabilizer_flows_signed_checked.
-    let circuit = circuit(
+fn sampled_flow_facade_preserves_engine_output_and_error_mapping() {
+    let unitary_circuit = circuit(
         "
         R 2 3
         X 1 3
@@ -340,171 +338,32 @@ fn sample_if_circuit_has_stabilizer_flows_checks_signed_unitary_flows() {
     let flows = [
         flow("Z0 -> Z0"),
         flow("Z1 -> -Z1"),
-        flow("1 -> Z2"),
-        flow("1 -> -Z3"),
         flow("Z0 -> -Z0"),
         flow("Z1 -> Z1"),
-        flow("1 -> -Z2"),
-        flow("1 -> Z3"),
     ];
-
+    let expected = stab_engine::sample_if_circuit_has_stabilizer_flows(
+        &unitary_circuit,
+        &flows,
+        stab_engine::ShotCount::new(256),
+        stab_engine::RandomPolicy::Seeded(stab_engine::Seed::new(5)),
+    )
+    .expect("canonical sampled flow");
     assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(&circuit, &flows, 256, Some(5))
-            .expect("sample signed flows"),
-        vec![true, true, true, true, false, false, false, false]
+        sample_if_circuit_has_stabilizer_flows(&unitary_circuit, &flows, 256, Some(5))
+            .expect("root sampled-flow facade"),
+        expected
     );
-}
-
-#[test]
-fn sample_if_circuit_has_stabilizer_flows_checks_signed_measurement_records() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/has_flow.test.cc
-    // sample_if_circuit_has_stabilizer_flows_measurements_signed_checked.
-    let circuit = circuit(
-        "
-        X 1
-        M 0 1 2
-        X 2
-        ",
-    );
-    let flows = [
-        flow("Z0 -> Z0"),
-        flow("Z1 -> -Z1"),
-        flow("Z2 -> -Z2"),
-        flow("Z0 -> rec[-3]"),
-        flow("-Z1 -> rec[-2]"),
-        flow("Z2 -> rec[-1]"),
-        flow("1 -> Z0 xor rec[-3]"),
-        flow("1 -> Z1 xor rec[-2]"),
-        flow("1 -> -Z2 xor rec[-1]"),
-        flow("Z0 -> -Z0"),
-        flow("Z1 -> Z1"),
-        flow("Z2 -> Z2"),
-        flow("-Z0 -> rec[-3]"),
-        flow("Z1 -> rec[-2]"),
-        flow("-Z2 -> rec[-1]"),
-        flow("1 -> -Z0 xor rec[-3]"),
-        flow("1 -> -Z1 xor rec[-2]"),
-        flow("1 -> Z2 xor rec[-1]"),
-    ];
-
     assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(&circuit, &flows, 256, Some(7))
-            .expect("sample signed measurement flows"),
-        vec![
-            true, true, true, true, true, true, true, true, true, false, false, false, false,
-            false, false, false, false, false
-        ]
-    );
-}
-
-#[test]
-fn sample_if_circuit_has_stabilizer_flows_checks_signed_observables() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/has_flow.test.cc
-    // sample_if_circuit_has_stabilizer_flows_signed_obs and observable target variants.
-    let observable_record_circuit = circuit(
-        "
-        X 1
-        M 0 1 2
-        X 2
-        OBSERVABLE_INCLUDE(0) rec[-3]
-        OBSERVABLE_INCLUDE(1) rec[-2]
-        OBSERVABLE_INCLUDE(2) rec[-1]
-        ",
-    );
-    let observable_record_flows = [
-        flow("Z0 -> obs[0]"),
-        flow("-Z1 -> obs[1]"),
-        flow("Z2 -> obs[2]"),
-        flow("1 -> Z0 xor obs[0]"),
-        flow("1 -> Z1 xor obs[1]"),
-        flow("1 -> -Z2 xor obs[2]"),
-        flow("-Z0 -> obs[0]"),
-        flow("Z1 -> obs[1]"),
-        flow("-Z2 -> obs[2]"),
-    ];
-    assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(
-            &observable_record_circuit,
-            &observable_record_flows,
+        stab_core::execution::sample_if_circuit_has_stabilizer_flows(
+            &unitary_circuit,
+            &flows,
             256,
-            Some(11),
+            Some(5),
         )
-        .expect("sample signed observable record flows"),
-        vec![true, true, true, true, true, true, false, false, false]
+        .expect("execution sampled-flow facade"),
+        expected
     );
 
-    let observable_pauli_circuit = circuit(
-        "
-        OBSERVABLE_INCLUDE(3) X0
-        OBSERVABLE_INCLUDE(2) Y0
-        OBSERVABLE_INCLUDE(4) Z1
-        ",
-    );
-    let observable_pauli_flows = [
-        flow("X0 -> obs[3]"),
-        flow("Y0 -> obs[2]"),
-        flow("Z1 -> obs[4]"),
-        flow("-X0 -> obs[3]"),
-        flow("X0 -> obs[2]"),
-        flow("Y0 -> obs[3]"),
-        flow("-Z1 -> obs[4]"),
-    ];
-    assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(
-            &observable_pauli_circuit,
-            &observable_pauli_flows,
-            256,
-            Some(13),
-        )
-        .expect("sample signed observable Pauli flows"),
-        vec![true, true, true, false, false, false, false]
-    );
-
-    let inverted_observable_pauli_circuit = circuit(
-        "
-        OBSERVABLE_INCLUDE(3) X0
-        OBSERVABLE_INCLUDE(2) !X0
-        ",
-    );
-    let inverted_observable_pauli_flows = [
-        flow("X0 -> obs[3]"),
-        flow("-X0 -> obs[2]"),
-        flow("-X0 -> obs[3]"),
-        flow("X0 -> obs[2]"),
-    ];
-    assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(
-            &inverted_observable_pauli_circuit,
-            &inverted_observable_pauli_flows,
-            256,
-            Some(17),
-        )
-        .expect("sample signed inverted observable Pauli flows"),
-        vec![true, true, false, false]
-    );
-}
-
-#[test]
-fn sample_if_circuit_has_stabilizer_flows_checks_inverted_record_observables() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/has_flow.test.cc
-    // sample_if_circuit_has_stabilizer_flows_inverted_obs_rec.
-    let circuit = circuit(
-        "
-        M !0
-        OBSERVABLE_INCLUDE(3) rec[-1]
-        ",
-    );
-    let flows = [flow("-Z0 -> obs[3]"), flow("Z0 -> obs[3]")];
-
-    assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(&circuit, &flows, 256, Some(23))
-            .expect("sample signed inverted record-backed observable flows"),
-        vec![true, false]
-    );
-}
-
-#[test]
-fn sample_if_circuit_has_stabilizer_flows_rejects_malformed_measurement_refs() {
     let error = sample_if_circuit_has_stabilizer_flows(
         &circuit("M 0\n"),
         &[flow("Z -> rec[-2]")],
@@ -512,7 +371,10 @@ fn sample_if_circuit_has_stabilizer_flows_rejects_malformed_measurement_refs() {
         Some(19),
     )
     .expect_err("reject out-of-range sampled flow record");
-
+    assert!(matches!(
+        error,
+        CircuitError::InvalidDetectorErrorModel { .. }
+    ));
     assert!(
         error.to_string().contains("outside sampled flow circuit"),
         "{error}"
