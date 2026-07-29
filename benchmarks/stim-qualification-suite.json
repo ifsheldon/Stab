@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "4810270ad3cb1183d13c293ef74f3ec4938ead76a8130d85dcf72409f2ac0d68",
-  "semantic_digest": "d02432bd650dc5e564681420b7fec399999f9e78a0ab09b5a3de891669bbc151",
+  "correctness_digest": "737cecc89e7a7622dff9df0b9ca2e208d55b844aa62b7adf727c9988895b6459",
+  "semantic_digest": "40d26d39f270ed43316324d8f246ac76fd1adb4098333b657fa8dfe19663bcef",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -11516,6 +11516,17 @@
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d44b2d5a74038633",
+      "path": "stab_analysis::circuit_with_inlined_feedback",
+      "kind": "function",
+      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-be3a2d090f70f7d4",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

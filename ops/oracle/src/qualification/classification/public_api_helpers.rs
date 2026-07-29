@@ -14,6 +14,7 @@ pub(super) fn classify_extracted_analysis_api(
         return Some(FeatureId::Generation);
     }
     if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
+        || source_path.starts_with("crates/stab-analysis/src/circuit_feedback")
         || source_path.starts_with("crates/stab-analysis/src/sparse_rev_frame_tracker")
         || source_path.starts_with("crates/stab-analysis/src/circuit_inverse")
     {

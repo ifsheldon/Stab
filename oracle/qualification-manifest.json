@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "4810270ad3cb1183d13c293ef74f3ec4938ead76a8130d85dcf72409f2ac0d68",
+  "semantic_digest": "737cecc89e7a7622dff9df0b9ca2e208d55b844aa62b7adf727c9988895b6459",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -65539,6 +65539,19 @@
       ]
     },
     {
+      "id": "cq-api-item-d44b2d5a74038633",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_with_inlined_feedback",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_feedback.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-api-be3a2d090f70f7d4",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
       "id": "cq-api-item-3f06f7c03f66ce25",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_analysis",
@@ -104120,7 +104133,7 @@
       "path": "stab_core::analysis::circuit_with_inlined_feedback",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_feedback.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-6d4eea7b264ac7e9",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106610,7 +106623,7 @@
       "path": "stab_core::circuit_with_inlined_feedback",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_feedback.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-6d4eea7b264ac7e9",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -153901,6 +153914,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-be3a2d090f70f7d4",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_with_inlined_feedback",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_be3a2d090f70f7d4",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-c22ab75a751e80df",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "rust-api",
@@ -180638,7 +180695,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "circuit_with_inlined_feedback",
             "--quiet"
           ]

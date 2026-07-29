@@ -67,6 +67,12 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_feedback.rs",
+            "stab_analysis::circuit_with_inlined_feedback",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,
