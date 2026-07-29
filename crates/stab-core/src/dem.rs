@@ -1,7 +1,5 @@
 mod analyze;
 mod flatten;
-#[cfg(test)]
-mod generated_qec_tests;
 mod sat;
 
 pub use analyze::{
@@ -22,12 +20,7 @@ pub use stab_model::{
 
 use crate::CircuitResult;
 #[cfg(test)]
-use crate::{CircuitError, Probability};
-
-#[cfg(test)]
-pub(crate) fn dem_instruction_detector_shift(instruction: &DemInstruction) -> CircuitResult<u64> {
-    stab_model::advanced::dem_instruction_detector_shift(instruction).map_err(Into::into)
-}
+use crate::Probability;
 
 pub fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,

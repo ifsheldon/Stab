@@ -30,10 +30,20 @@ fn typed_model_values_preserve_stim_boundaries() {
             }
         ))
     );
-    assert!(Probability::try_new(f64::NAN).is_err());
-    assert!(Probability::try_new(-0.0).is_ok());
-    assert!(Probability::try_new(1.0).is_ok());
-    assert!(Probability::try_new(f64::INFINITY).is_err());
+}
+
+#[test]
+fn probability_typed_boundary_matches_stim_argument_validation() {
+    assert_eq!(Probability::try_new(0.0).map(Probability::get), Ok(0.0));
+    assert_eq!(Probability::try_new(-0.0).map(Probability::get), Ok(-0.0));
+    assert_eq!(Probability::try_new(1.0).map(Probability::get), Ok(1.0));
+
+    for rejected in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(
+            Probability::try_new(rejected).is_err(),
+            "expected {rejected:?} to be rejected"
+        );
+    }
 }
 
 #[test]

@@ -6,10 +6,14 @@
 
 use std::collections::BTreeSet;
 
-use super::*;
-use crate::{
-    Circuit, CodeDistance, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, generate_repetition_code_circuit, generate_surface_code_circuit,
+use stab_analysis::{
+    CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
+    generate_repetition_code_circuit, generate_surface_code_circuit,
+};
+use stab_model::{
+    Circuit, DemInstruction, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    Probability,
 };
 
 const GENERATED_DEM_TOLERANCE: f64 = 1e-12;
@@ -137,11 +141,11 @@ fn assert_circuit_dem_semantics_match_pinned_stim(circuit: &Circuit, pinned_stim
 }
 
 trait SemanticDemExt {
-    fn semantic_dem(&self) -> CircuitResult<SemanticDem>;
+    fn semantic_dem(&self) -> SemanticResult<SemanticDem>;
 }
 
 impl SemanticDemExt for DetectorErrorModel {
-    fn semantic_dem(&self) -> CircuitResult<SemanticDem> {
+    fn semantic_dem(&self) -> SemanticResult<SemanticDem> {
         let mut out = SemanticDem::default();
         let mut state = DemTraversalState::default();
         collect_semantic_dem(self, &mut state, &mut out)?;
@@ -184,7 +188,7 @@ fn collect_semantic_dem(
     dem: &DetectorErrorModel,
     state: &mut DemTraversalState,
     out: &mut SemanticDem,
-) -> CircuitResult<()> {
+) -> SemanticResult<()> {
     for item in dem.items() {
         match item {
             DemItem::Instruction(instruction) => {
@@ -204,14 +208,13 @@ fn collect_semantic_instruction(
     instruction: &DemInstruction,
     state: &mut DemTraversalState,
     out: &mut SemanticDem,
-) -> CircuitResult<()> {
+) -> SemanticResult<()> {
     match instruction.kind() {
         DemInstructionKind::Error => {
-            let probability = instruction.args().first().copied().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
-                    "error instruction must have one probability argument",
-                )
-            })?;
+            let probability =
+                instruction.args().first().copied().ok_or_else(|| {
+                    "error instruction must have one probability argument".to_owned()
+                })?;
             let targets = semantic_error_targets(instruction.targets(), state.detector_offset)?;
             out.errors.push(SemanticError {
                 probability,
@@ -220,28 +223,22 @@ fn collect_semantic_instruction(
         }
         DemInstructionKind::Detector => {
             let [DemTarget::RelativeDetector(detector)] = instruction.targets() else {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "detector instruction must have one detector target",
-                ));
+                return Err("detector instruction must have one detector target".to_owned());
             };
             out.detectors.push(SemanticDetector {
                 detector: state
                     .detector_offset
                     .checked_add(detector.get())
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "semantic detector id overflowed",
-                        )
-                    })?,
+                    .ok_or_else(|| "semantic detector id overflowed".to_owned())?,
                 coordinates: shifted_coordinates(instruction.args(), &state.coordinate_shift),
             });
         }
         DemInstructionKind::LogicalObservable => {
             for target in instruction.targets() {
                 let DemTarget::LogicalObservable(observable) = target else {
-                    return Err(CircuitError::invalid_detector_error_model(
-                        "logical_observable instruction must have observable targets",
-                    ));
+                    return Err(
+                        "logical_observable instruction must have observable targets".to_owned(),
+                    );
                 };
                 out.logical_observables.push(observable.get());
             }
@@ -250,10 +247,11 @@ fn collect_semantic_instruction(
             apply_coordinate_shift(&mut state.coordinate_shift, instruction.args());
             state.detector_offset = state
                 .detector_offset
-                .checked_add(crate::dem::dem_instruction_detector_shift(instruction)?)
-                .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("detector shift overflowed")
-                })?;
+                .checked_add(
+                    stab_model::advanced::dem_instruction_detector_shift(instruction)
+                        .map_err(|error| error.to_string())?,
+                )
+                .ok_or_else(|| "detector shift overflowed".to_owned())?;
         }
     }
     Ok(())
@@ -262,15 +260,15 @@ fn collect_semantic_instruction(
 fn semantic_error_targets(
     targets: &[DemTarget],
     detector_offset: u64,
-) -> CircuitResult<Vec<SemanticTarget>> {
+) -> SemanticResult<Vec<SemanticTarget>> {
     let mut detectors = BTreeSet::new();
     let mut logical_observables = BTreeSet::new();
     for target in targets {
         match *target {
             DemTarget::RelativeDetector(detector) => {
-                let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("semantic detector id overflowed")
-                })?;
+                let detector_id = detector_offset
+                    .checked_add(detector.get())
+                    .ok_or_else(|| "semantic detector id overflowed".to_owned())?;
                 toggle(&mut detectors, detector_id);
             }
             DemTarget::LogicalObservable(observable) => {
@@ -278,9 +276,7 @@ fn semantic_error_targets(
             }
             DemTarget::Separator => {}
             DemTarget::Numeric(_) => {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "numeric targets are not error targets",
-                ));
+                return Err("numeric targets are not error targets".to_owned());
             }
         }
     }
@@ -294,6 +290,8 @@ fn semantic_error_targets(
     );
     Ok(out)
 }
+
+type SemanticResult<T> = Result<T, String>;
 
 fn toggle(set: &mut BTreeSet<u64>, value: u64) {
     if !set.insert(value) {

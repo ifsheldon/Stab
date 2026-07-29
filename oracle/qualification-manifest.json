@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "dd25ee270aa3865929d6b0c418dcf66f90e7f70dc541b60ef7153cfbfc72f04c",
+  "semantic_digest": "b7d3853f25ec509eb83999ae16befa9b50d381c8881243d0be714a9624f5bb1f",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -117381,7 +117381,7 @@
       "path": "stab_core::find_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 53,
+      "source_line": 51,
       "owner_case_id": "cq-evidence-api-32578357b1eddffd",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -117394,7 +117394,7 @@
       "path": "stab_core::find_undetectable_logical_error_with_limits",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 68,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-e6b906b0657cf170",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -117590,7 +117590,7 @@
       "path": "stab_core::shortest_graphlike_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 32,
+      "source_line": 30,
       "owner_case_id": "cq-evidence-api-2e502a23c3336410",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -117603,7 +117603,7 @@
       "path": "stab_core::shortest_graphlike_undetectable_logical_error_with_limits",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 40,
+      "source_line": 38,
       "owner_case_id": "cq-evidence-qualification-e6b906b0657cf170",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -173750,8 +173750,8 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "detection",
+            "stab-engine",
+            "detection::tests::detection_conversion_",
             "--quiet"
           ]
         }
@@ -173854,7 +173854,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "detection_sampling_uses_all_false_default_sweep_bits",
             "--quiet"
           ]
@@ -174345,7 +174345,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "error_decomp",
             "--quiet"
           ]
@@ -177642,8 +177642,8 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "sampling",
+            "stab-engine",
+            "sampling::tests::",
             "--quiet"
           ]
         }
@@ -177771,7 +177771,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "detection_sampling",
             "--quiet"
           ]
@@ -178177,6 +178177,7 @@
       "comparator": "property",
       "execution": {
         "tiers": [
+          "pr",
           "full",
           "soak"
         ],
@@ -178188,29 +178189,41 @@
       },
       "statistical_plan": null,
       "property_plan": {
-        "state": "planned",
-        "source": "qualification-case",
-        "id": "cq-evidence-oracle-722f66adf75815e2",
-        "plan": null
+        "state": "existing",
+        "source": "oracle-fixture",
+        "id": "coverage-util-bot-probability-util",
+        "plan": {
+          "generator_domain": "closed-unit probability boundary corpus",
+          "maximum_generated_bytes": 0,
+          "seeds": [],
+          "case_count": 1,
+          "corpus_path": "crates/stab-model/tests/value_boundaries.rs",
+          "corpus_sha256": "25f698d62758f00db31df59ac8db13e7615451e7f6ec28c4a3876db051e8b835",
+          "persistence_policy": "existing-focused-regression",
+          "execution_mode": "cargo-subprocess"
+        }
       },
       "primary_selector": {
-        "state": "planned",
-        "kind": "oracle-fixture",
+        "state": "existing",
+        "kind": "cargo-test",
         "value": [
-          "coverage-util-bot-probability-util"
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "value_boundaries",
+          "probability_typed_boundary_matches_stim_argument_validation",
+          "--quiet",
+          "--exact"
         ]
       },
       "supporting_selectors": [
         {
           "state": "existing",
-          "kind": "cargo-test",
+          "kind": "oracle-fixture",
           "value": [
-            "cargo",
-            "test",
-            "-p",
-            "stab-core",
-            "probability",
-            "--quiet"
+            "coverage-util-bot-probability-util"
           ]
         }
       ],
@@ -178222,7 +178235,7 @@
       "performance_groups": [
         "PERF-SAMPLING"
       ],
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "id": "cq-evidence-oracle-72d3e5a77597ef65",
@@ -180165,8 +180178,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "circuit_to_dem",
+            "stab-analysis",
+            "--test",
+            "dem_analyzer_heralded",
+            "dem_analyzer_heralded_",
             "--quiet"
           ]
         }
@@ -181077,7 +181092,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "dem_analyzer",
             "--quiet"
           ]
@@ -182681,8 +182696,8 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "detection",
+            "stab-engine",
+            "detection::tests::detection_sampling_",
             "--quiet"
           ]
         }
@@ -183540,8 +183555,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
+            "--test",
             "generated_qec_dem",
+            "generated_qec_dem_",
             "--quiet"
           ]
         }
@@ -184224,8 +184241,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
+            "--test",
             "generated_qec_dem",
+            "generated_qec_dem_",
             "--quiet"
           ]
         }
@@ -186179,8 +186198,8 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "count_determined",
+            "stab-engine",
+            "count_determined_measurements_matches",
             "--quiet"
           ]
         }

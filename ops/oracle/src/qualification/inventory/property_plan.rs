@@ -52,6 +52,10 @@ pub(super) fn oracle_reference(
             "crates/stab-bits/tests/bits.rs",
             "twiddle helper boundary and upstream example corpus",
         ),
+        "coverage-util-bot-probability-util" => (
+            "crates/stab-model/tests/value_boundaries.rs",
+            "closed-unit probability boundary corpus",
+        ),
         "coverage-stabilizers-pauli-string-ref" => (
             "crates/stab-core/tests/stabilizers.rs",
             "Pauli reference weight and active-term corpus",
