@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "072d7286f76dea289407ecab0fbf7b9e0ae76ff2afa7607a06632a7aa6310539",
+  "performance_inventory_sha256": "a152314a9eaa5362f285bbfbd4340fb9f48d1e980a34bfd27a730f40b5b1e58b",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -358,7 +358,7 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -410,7 +410,7 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -462,7 +462,7 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -514,7 +514,7 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -567,7 +567,7 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -618,7 +618,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bea77c19e9ae0b24"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/sparse-xor",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -669,7 +669,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bea77c19e9ae0b24"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/sparse-xor",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -721,7 +721,7 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-matrix",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -773,7 +773,7 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-matrix",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -825,7 +825,7 @@
         "cq-evidence-qualification-3bab0f51237445f6",
         "cq-evidence-qualification-489e6445120743c2"
       ],
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -878,7 +878,7 @@
         "cq-evidence-qualification-489e6445120743c2",
         "cq-evidence-qualification-5331280b58fd49c7"
       ],
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -931,7 +931,7 @@
         "cq-evidence-qualification-489e6445120743c2",
         "cq-evidence-qualification-5331280b58fd49c7"
       ],
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
         {
@@ -984,7 +984,7 @@
         "cq-evidence-qualification-510e746ec36e7d1c",
         "cq-evidence-qualification-ae9390dd6a207cb6"
       ],
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
         "sha256": "4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04"
@@ -1040,7 +1040,7 @@
         "cq-evidence-qualification-510e746ec36e7d1c",
         "cq-evidence-qualification-ae9390dd6a207cb6"
       ],
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
         "sha256": "4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04"

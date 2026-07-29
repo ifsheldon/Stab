@@ -734,16 +734,19 @@ fn work_unit(feature: &str) -> &'static str {
 
 fn owner(feature: &str) -> &'static str {
     match feature {
-        "PERF-RESULT-IO" => "stab-core/result-formats",
-        "PERF-BIT-KERNELS" => "stab-core/bits",
-        "PERF-GENERATION" => "stab-core/generation",
+        "PERF-RESULT-IO" => "stab-records",
+        "PERF-BIT-KERNELS" => "stab-bits",
+        "PERF-GENERATION" => "stab-analysis/generation",
         "PERF-CONVERT-CLI" | "PERF-CLI-STARTUP-AND-ERRORS" => "stab-cli",
-        "PERF-SAMPLING" => "stab-core/sampling",
-        "PERF-DETECTION" => "stab-core/detection",
-        "PERF-DEM-SAMPLING" => "stab-core/dem-sampler",
-        "PERF-ERROR-ANALYSIS" => "stab-core/analyzer",
-        "PERF-SEARCH-AND-MATCHING" => "stab-core/search",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES" => "stab-core/flow-utils",
+        "PERF-SAMPLING" => "stab-engine/sampling",
+        "PERF-DETECTION" => "stab-engine/detection",
+        "PERF-DEM-SAMPLING" => "stab-engine/dem-sampling",
+        "PERF-ERROR-ANALYSIS" => "stab-analysis/error-analysis",
+        "PERF-SEARCH-AND-MATCHING" => "stab-analysis/search",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES" => "stab-analysis/flow-utils",
+        "PERF-STABILIZER-ALGEBRA" => "stab-algebra",
+        "PERF-CIRCUIT-MODEL" => "stab-model",
+        "PERF-GATE-CONTRACT" => "stab-model/gates",
         "PERF-RESOURCE-BOUNDARIES" => "ops/bench",
         _ => "stab-core",
     }
@@ -852,6 +855,16 @@ mod tests {
                 .expect("owned row"),
             "PERF-FLOWS-AND-DETECTOR-UTILITIES"
         );
+    }
+
+    #[test]
+    fn performance_domains_follow_physical_component_owners() {
+        assert_eq!(owner("PERF-BIT-KERNELS"), "stab-bits");
+        assert_eq!(owner("PERF-RESULT-IO"), "stab-records");
+        assert_eq!(owner("PERF-STABILIZER-ALGEBRA"), "stab-algebra");
+        assert_eq!(owner("PERF-CIRCUIT-MODEL"), "stab-model");
+        assert_eq!(owner("PERF-SAMPLING"), "stab-engine/sampling");
+        assert_eq!(owner("PERF-ERROR-ANALYSIS"), "stab-analysis/error-analysis");
     }
 
     #[test]

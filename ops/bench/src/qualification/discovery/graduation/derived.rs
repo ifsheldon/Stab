@@ -133,7 +133,7 @@ pub(super) fn apply_sparse_xor(
         "One capacity-primed sparse fixture remains live during timing and setup and peak process RSS are report-only observations at every scale. Stab's timed callbacks allocate nothing at all scales and the accepted maximum; PQ6 owns cross-scale RSS and Stim allocation acceptance.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/bits".to_string();
+    group.owner = "stab-bits/sparse-xor".to_string();
     group.reason = if item_workload {
         "Implemented paired pinned-Stim and Rust seven-item sparse toggles with exact CQ2, complete-callback, canonical-state, allocation, scale, timing, and bounded-worker contracts."
     } else {

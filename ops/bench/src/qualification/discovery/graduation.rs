@@ -316,7 +316,7 @@ fn apply_clifford_string(
     } else {
         TimingBatchPolicy::IndependentThroughput
     };
-    group.owner = "stab-core/stabilizers".to_string();
+    group.owner = "stab-algebra/clifford-string".to_string();
     group.reason = if non_identity {
         "Implemented paired pinned-Stim and Rust public in-place Clifford-string multiplication over the complete deterministic 24-by-23 non-identity composition cycle with exact CQ2, immutable-right, output, zero-allocation, hostile-input, scale, timing, and receipt contracts."
     } else {
@@ -417,7 +417,7 @@ fn apply_pauli_string_iter(
         "Each Stab callback performs exactly five allocation calls requesting 120 bytes at all three range scales, including the accepted maximum. Stim allocation counts remain unclaimed; setup and peak RSS remain report-only until PQ6."
     });
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/stabilizers".to_string();
+    group.owner = "stab-algebra/pauli-string".to_string();
     group.reason = if singleton {
         "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Y/Z singleton traversal with exact CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts."
     } else {
@@ -538,7 +538,7 @@ fn apply_pauli_string_multiply(
         "Two equal-width Pauli strings remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for each direct public in-place multiplication at every scale and the accepted maximum; setup and peak RSS remain report-only until PQ6.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/stabilizers".to_string();
+    group.owner = "stab-algebra/pauli-string".to_string();
     group.reason = "Implemented paired pinned-Stim and Rust direct in-place Pauli multiplication with exact API ownership, CQ2, deterministic non-identity operands, phase and state digests, zero-allocation, scale, timing, and bounded-worker contracts."
         .to_string();
     group.status = QualificationStatus::Implemented;
@@ -628,7 +628,7 @@ fn apply_bit_matrix_transpose(
         "One mutable matrix remains live during timing. Stab allocation instrumentation proves zero calls and zero bytes for public in-place transpose at every scale and the accepted maximum; setup and peak RSS are report-only until PQ6."
     });
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/bits".to_string();
+    group.owner = "stab-bits/bit-matrix".to_string();
     group.reason = if allocating {
         "Implemented paired pinned-Stim and Rust public allocating square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, one-allocation, scale, timing, and bounded-worker contracts."
     } else {
@@ -711,7 +711,7 @@ fn apply_simd_bits_xor(root: &RepoRoot, group: &mut QualificationGroup) -> Resul
         "Two aligned bit vectors remain live during timing and setup and peak process RSS are report-only observations at every scale. Timed mutation reuses preallocated storage; PQ6 owns explicit cross-scale RSS and allocation slack.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/bits".to_string();
+    group.owner = "stab-bits/bit-vector".to_string();
     group.reason = "Implemented paired pinned-Stim and Rust complete-vector XOR work with exact CQ2, deterministic paired input, semantic output, scale, timing, and bounded-worker contracts. The legacy row's not-zero and unmatched logical operations remain separate."
         .to_string();
     group.status = QualificationStatus::Implemented;
@@ -745,7 +745,7 @@ fn apply_simd_word_popcount(
         "The aligned bit vector is prepared before timing and setup and peak process RSS are report-only observations at every scale. This slice makes no linear-growth acceptance claim; PQ6 owns explicit cross-scale RSS and allocation slack.",
     );
     group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/bits".to_string();
+    group.owner = "stab-bits/bit-vector".to_string();
     group.reason = "Implemented paired pinned-Stim and Rust toggle-plus-popcount work with exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts."
         .to_string();
     group.status = QualificationStatus::Implemented;

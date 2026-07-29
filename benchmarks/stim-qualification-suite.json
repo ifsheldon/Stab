@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "b7d3853f25ec509eb83999ae16befa9b50d381c8881243d0be714a9624f5bb1f",
-  "semantic_digest": "072d7286f76dea289407ecab0fbf7b9e0ae76ff2afa7607a06632a7aa6310539",
+  "semantic_digest": "a152314a9eaa5362f285bbfbd4340fb9f48d1e980a34bfd27a730f40b5b1e58b",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -85005,7 +85005,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-analyze-errors-decompose-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -85068,7 +85068,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-analyze-errors-fold-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -85131,7 +85131,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-analyze-errors-high-repeat-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -85558,7 +85558,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-error-analyzer remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -85619,7 +85619,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-error-decomp remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -85680,7 +85680,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m10-graphlike-search remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -85741,7 +85741,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-dem-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -85802,7 +85802,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-dem-sampler remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -85865,7 +85865,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-sample-dem-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -85928,7 +85928,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-sample-dem-dense-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -85991,7 +85991,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-sample-dem-high-detector-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -86054,7 +86054,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-sample-dem-repeated-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -86117,7 +86117,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m11-sample-dem-sparse-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -86562,7 +86562,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust public allocating square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, one-allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-matrix",
       "status": "implemented"
     },
     {
@@ -86668,7 +86668,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust public in-place square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, zero-allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-matrix",
       "status": "implemented"
     },
     {
@@ -86729,7 +86729,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m5-simd-bit-table remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits",
       "status": "planned"
     },
     {
@@ -86832,7 +86832,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust complete-vector XOR work with exact CQ2, deterministic paired input, semantic output, scale, timing, and bounded-worker contracts. The legacy row's not-zero and unmatched logical operations remain separate.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "status": "implemented"
     },
     {
@@ -86935,7 +86935,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the zero pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "status": "implemented"
     },
     {
@@ -87038,7 +87038,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the early pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "status": "implemented"
     },
     {
@@ -87141,7 +87141,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the late pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "status": "implemented"
     },
     {
@@ -87245,7 +87245,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust toggle-plus-popcount work with exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/bit-vector",
       "status": "implemented"
     },
     {
@@ -87347,7 +87347,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust 1,000-row sparse symmetric differences with exact CQ2, actual-operation, canonical-state, allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/sparse-xor",
       "status": "implemented"
     },
     {
@@ -87449,7 +87449,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust seven-item sparse toggles with exact CQ2, complete-callback, canonical-state, allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits/sparse-xor",
       "status": "implemented"
     },
     {
@@ -87554,7 +87554,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented the exact pinned identity-by-identity CliffordString benchmark as an independent public in-place workload with exact CQ2, immutable-right, result-witness, zero-allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/clifford-string",
       "status": "implemented"
     },
     {
@@ -87662,7 +87662,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust public in-place Clifford-string multiplication over the complete deterministic 24-by-23 non-identity composition cycle with exact CQ2, immutable-right, output, zero-allocation, hostile-input, scale, timing, and receipt contracts.",
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/clifford-string",
       "status": "implemented"
     },
     {
@@ -87773,7 +87773,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Z weight-range traversal with exact API ownership, CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "status": "implemented"
     },
     {
@@ -87877,7 +87877,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Y/Z singleton traversal with exact CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "status": "implemented"
     },
     {
@@ -87983,7 +87983,7 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust direct in-place Pauli multiplication with exact API ownership, CQ2, deterministic non-identity operands, phase and state digests, zero-allocation, scale, timing, and bounded-worker contracts.",
-      "owner": "stab-core/stabilizers",
+      "owner": "stab-algebra/pauli-string",
       "status": "implemented"
     },
     {
@@ -88044,7 +88044,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m6-stabilizers-to-tableau remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-algebra",
       "status": "planned"
     },
     {
@@ -88105,7 +88105,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m6-tableau remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-algebra",
       "status": "planned"
     },
     {
@@ -88166,7 +88166,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m6-tableau-iter remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-algebra",
       "status": "planned"
     },
     {
@@ -88914,7 +88914,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-color-d5-r5 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -88975,7 +88975,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d17-r17 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89036,7 +89036,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d17-r170 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89097,7 +89097,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d3-r3 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89158,7 +89158,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d3-r30 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89219,7 +89219,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d5-r5 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89280,7 +89280,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d5-r50 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89341,7 +89341,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d9-r9 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89402,7 +89402,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-repetition-d9-r90 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89463,7 +89463,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d17-r17 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89524,7 +89524,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d17-r170 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89585,7 +89585,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d3-r3 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89646,7 +89646,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d3-r30 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89707,7 +89707,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d5-r5 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89768,7 +89768,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d5-r50 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89829,7 +89829,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d9-r9 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89890,7 +89890,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-rotated-surface-d9-r90 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -89951,7 +89951,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d3-r3 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90012,7 +90012,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d3-r30 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90073,7 +90073,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d5-r5 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90134,7 +90134,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d5-r50 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90195,7 +90195,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d9-r9 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90256,7 +90256,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m7-gen-unrotated-surface-d9-r90 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/generation",
+      "owner": "stab-analysis/generation",
       "status": "planned"
     },
     {
@@ -90378,7 +90378,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-frame-simulator remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -90439,7 +90439,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-01 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90500,7 +90500,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-b8 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90561,7 +90561,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-dets remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90622,7 +90622,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-hits remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90683,7 +90683,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-ptb64-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90744,7 +90744,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-measure-reader-r8 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90805,7 +90805,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-probability-util remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/bits",
+      "owner": "stab-bits",
       "status": "planned"
     },
     {
@@ -90866,7 +90866,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-record-batch-transpose-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90927,7 +90927,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-record-dets-layout-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -90988,7 +90988,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-record-writer-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/result-formats",
+      "owner": "stab-records",
       "status": "planned"
     },
     {
@@ -91049,7 +91049,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-reference-sample-tree remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91112,7 +91112,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-analysis-1shot remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91175,7 +91175,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-high-repeat-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91238,7 +91238,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-primary-repetition-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91301,7 +91301,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-primary-rotated-surface-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91364,7 +91364,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-primary-unrotated-surface-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91427,7 +91427,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-throughput-1000000 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91490,7 +91490,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-sample-throughput-1024 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91551,7 +91551,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m8-tableau-simulator remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/sampling",
+      "owner": "stab-engine/sampling",
       "status": "planned"
     },
     {
@@ -91677,7 +91677,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-detect-bitpacked-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -91740,7 +91740,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-detect-primary-matrix-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -91803,7 +91803,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-detect-text-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -91864,7 +91864,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-detecting-regions-basic-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -91925,7 +91925,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-detection-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -91986,7 +91986,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-feedback-inline-mpp-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -92047,7 +92047,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-batch-phases remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92110,7 +92110,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-bitpacked-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92173,7 +92173,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-primary-matrix-contract remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92236,7 +92236,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-ran-without-feedback-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92299,7 +92299,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-sweep-01-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92362,7 +92362,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-sweep-b8-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92425,7 +92425,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-sweep-obs-out-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92488,7 +92488,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-m2d-text-cli remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -92549,7 +92549,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload m9-missing-detectors-basic-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -92610,7 +92610,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf1-circuit-coordinate-query remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -92793,7 +92793,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf1-gate-metadata-lookup remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model/gates",
       "status": "planned"
     },
     {
@@ -92854,7 +92854,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-circuit-decompose-mpp-spp remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -92915,7 +92915,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-circuit-flatten-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -92976,7 +92976,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-circuit-without-noise remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -93037,7 +93037,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-feedback-inline-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model",
       "status": "planned"
     },
     {
@@ -93098,7 +93098,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-time-reverse-flow remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -93159,7 +93159,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf2-time-reverse-flow-measurement remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -93220,7 +93220,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf3-analyze-errors-sweep remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -93281,7 +93281,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf3-detect-sweep-sampling remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -93342,7 +93342,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf3-gate-semantic-wide remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core",
+      "owner": "stab-model/gates",
       "status": "planned"
     },
     {
@@ -93403,7 +93403,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf3-m2d-sweep-b8 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -93464,7 +93464,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf3-m2d-sweep-ptb64-input remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -93647,7 +93647,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-folded-graphlike-traversal remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -93769,7 +93769,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-hypergraph-logical-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -93830,7 +93830,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-hypergraph-no-target-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -93952,7 +93952,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-sampler-folded-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/dem-sampler",
+      "owner": "stab-engine/dem-sampling",
       "status": "planned"
     },
     {
@@ -94013,7 +94013,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-sat-flat-repeat-fold remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94074,7 +94074,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-search-annotation-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94135,7 +94135,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-search-mixed-zero-probability-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94196,7 +94196,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-search-nested-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94257,7 +94257,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-dem-search-zero-shift-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94318,7 +94318,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-error-matcher-filter-annotation-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94379,7 +94379,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-error-matcher-filter-flat-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94440,7 +94440,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-error-matcher-filter-logical-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94501,7 +94501,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf4-error-matcher-filter-nested-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -94562,7 +94562,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-detecting-regions-clifford remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94623,7 +94623,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-detecting-regions-generated-repetition remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94684,7 +94684,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-detecting-regions-generated-surface remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94745,7 +94745,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-detecting-regions-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94806,7 +94806,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-detecting-regions-targets remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94867,7 +94867,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-flow-generators-measurement-python remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94928,7 +94928,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-flow-generators-measurement-rich remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -94989,7 +94989,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-flow-solve-measurement-python remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95050,7 +95050,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-flow-solve-measurement-rich remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95111,7 +95111,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-has-all-flows-batch remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95172,7 +95172,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-missing-detectors-generated-code remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95233,7 +95233,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-missing-detectors-mpad remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95294,7 +95294,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf5-missing-detectors-mpp remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95355,7 +95355,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf6-error-decomp-loop-folded remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -95416,7 +95416,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf6-sparse-rev-frame-loop remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -95477,7 +95477,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf7-cli-analyze-errors-decompose remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -95538,7 +95538,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf7-cli-analyze-errors-generated remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -95660,7 +95660,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf7-cli-m2d-feedback-inline remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -95721,7 +95721,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pf7-cli-m2d-sweep-b8 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/detection",
+      "owner": "stab-engine/detection",
       "status": "planned"
     },
     {
@@ -95782,7 +95782,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b1-time-reverse-generated-surface remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95843,7 +95843,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b1-time-reverse-large-unitary-repeat remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95904,7 +95904,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b1-time-reverse-mpad-matrix remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -95965,7 +95965,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b1-time-reverse-sparse-high-qubit remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -96087,7 +96087,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b4-flow-solve-matrix-sizes remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/flow-utils",
+      "owner": "stab-analysis/flow-utils",
       "status": "planned"
     },
     {
@@ -96148,7 +96148,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-analyzer-cycle-folding remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -96209,7 +96209,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-analyzer-generated-qec remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/analyzer",
+      "owner": "stab-analysis/error-analysis",
       "status": "planned"
     },
     {
@@ -96270,7 +96270,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-graphlike-generated-d11-r1000 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96331,7 +96331,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-graphlike-generated-d25 remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96392,7 +96392,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-graphlike-search-direct-dem remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96453,7 +96453,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-hypergraph-search-direct-dem remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96514,7 +96514,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-hypergraph-search-generated-qec remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96575,7 +96575,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-wcnf-direct-dem remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     },
     {
@@ -96636,7 +96636,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Legacy workload pfm-b5-wcnf-generated-qec remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-      "owner": "stab-core/search",
+      "owner": "stab-analysis/search",
       "status": "planned"
     }
   ],
