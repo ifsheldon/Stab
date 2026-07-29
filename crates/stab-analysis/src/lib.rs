@@ -5,6 +5,7 @@
 //! contracts.
 
 pub mod circuit;
+mod circuit_detecting_regions;
 mod circuit_feedback;
 mod circuit_flow;
 mod circuit_generation;
@@ -19,6 +20,11 @@ mod resources;
 mod sparse_rev_frame_tracker;
 
 pub use circuit::circuit_without_tags;
+pub use circuit_detecting_regions::{
+    DetectingRegionMap, DetectingRegionOptions, DetectingRegionTargetMap,
+    DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
+    circuit_detecting_regions, circuit_detecting_regions_for_targets,
+};
 pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,

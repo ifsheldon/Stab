@@ -213,7 +213,7 @@ fn detecting_regions_target_shape_supports_spp_unitary_products() {
              OBSERVABLE_INCLUDE(0) Z0\n"
         ))
         .unwrap();
-        let decomposed = crate::analysis::decomposed_circuit(&circuit).unwrap();
+        let decomposed = crate::decomposed_circuit(&circuit).unwrap();
         let observable = DemTarget::logical_observable(0).unwrap();
         let options = DetectingRegionTargetOptions {
             targets: vec![observable],
