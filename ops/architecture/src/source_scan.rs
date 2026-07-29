@@ -336,27 +336,44 @@ fn parse_facade_surface(
     let mut surface = FacadeSurface::default();
     for item in syntax.items {
         match item {
-            Item::Mod(item) if is_public(&item.vis) => {
-                match module_has_path_override(&item.attrs) {
-                    Ok(false) => {
-                        surface.modules.insert(item.ident.to_string());
+            Item::Mod(item) => {
+                let pathless = match module_has_path_override(&item.attrs) {
+                    Ok(false) => true,
+                    Ok(true) => {
+                        violations.push(Violation::new(
+                            "facade-module-path-override",
+                            format!(
+                                "{} declares module `{}` through a path override; facade tier modules must use canonical pathless declarations",
+                                path.display(),
+                                item.ident
+                            ),
+                        ));
+                        false
                     }
-                    Ok(true) => violations.push(Violation::new(
-                        "facade-module-path-override",
-                        format!(
-                            "{} declares public module `{}` through a path override; facade tier modules must use canonical pathless declarations",
-                            path.display(),
-                            item.ident
-                        ),
-                    )),
-                    Err(error) => violations.push(Violation::new(
-                        "facade-module-attribute-parse",
-                        format!(
-                            "failed to validate attributes on public module `{}` in {}: {error}",
-                            item.ident,
-                            path.display()
-                        ),
-                    )),
+                    Err(error) => {
+                        violations.push(Violation::new(
+                            "facade-module-attribute-parse",
+                            format!(
+                                "failed to validate attributes on module `{}` in {}: {error}",
+                                item.ident,
+                                path.display()
+                            ),
+                        ));
+                        false
+                    }
+                };
+                if is_public(&item.vis) && pathless {
+                    if matches!(tier, FacadeTier::Root) && item.content.is_some() {
+                        violations.push(Violation::new(
+                            "facade-root-inline-module",
+                            format!(
+                                "{} defines public root module `{}` inline; root facade tiers must be canonical out-of-line modules",
+                                path.display(),
+                                item.ident
+                            ),
+                        ));
+                    }
+                    surface.modules.insert(item.ident.to_string());
                 }
             }
             Item::Use(item) if is_public(&item.vis) => {
@@ -393,12 +410,10 @@ fn parse_facade_surface(
                 report_direct_item(path, tier, "union", &item.ident, violations);
             }
             Item::Macro(item) => {
-                let macro_name = item
-                    .mac
-                    .path
-                    .segments
-                    .last()
-                    .map_or_else(|| "<anonymous>".to_owned(), |segment| segment.ident.to_string());
+                let macro_name = item.mac.path.segments.last().map_or_else(
+                    || "<anonymous>".to_owned(),
+                    |segment| segment.ident.to_string(),
+                );
                 violations.push(Violation::new(
                     tier.direct_item_code(),
                     format!(
@@ -746,9 +761,44 @@ mod tests {
     }
 
     #[test]
+    fn facade_tiers_reject_inline_root_modules_and_private_path_overrides() {
+        let violations = facade_tier_violations(
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced {}\npub mod analysis;\npub mod execution;\npub mod experimental { pub struct UnreviewedExtension; }\n#[path = \"../../outside.rs\"] mod hidden;\n#[cfg_attr(all(), cfg_attr(any(), path = \"../../alternate.rs\"))] mod nested_hidden;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            codes
+                .iter()
+                .filter(|code| **code == "facade-root-inline-module")
+                .count(),
+            2
+        );
+        assert_eq!(
+            codes
+                .iter()
+                .filter(|code| **code == "facade-module-path-override")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn facade_tier_parser_ignores_comments_strings_and_restricted_modules() {
         let modules = public_module_names(
-            "pub mod advanced;\n// pub mod bits;\nconst TEXT: &str = \"pub mod stabilizers;\";\npub(crate) mod result_formats;\npub mod experimental {}\n",
+            "pub mod advanced;\n// pub mod bits;\nconst TEXT: &str = \"pub mod stabilizers;\";\npub(crate) mod result_formats;\npub mod experimental;\n",
         );
         assert_eq!(
             modules,
