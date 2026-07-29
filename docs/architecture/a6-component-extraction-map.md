@@ -181,6 +181,8 @@ Execution code does not import `SampleFormat`, text codecs, filesystem paths, CL
 
 `detection/output.rs` does not move as written because it imports `SampleFormat` and byte writers. Its semantic detector and observable routing moves behind typed sinks, while byte-format compatibility wrappers remain in `stab-core`.
 
+The first engine foundation slice is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, and `biased_randomize_bits`; `stab-core` retains thin compatibility reexports, direct benchmark callers use the canonical package, and qualification records the facade paths as aliases. Sampling compilers, plans, sessions, detection conversion, DEM sampling, capabilities, and their owner-domain errors remain the active extraction work.
+
 ### `stab-kernels-simd`
 
 | Current source | Destination | Public ownership and rationale |
