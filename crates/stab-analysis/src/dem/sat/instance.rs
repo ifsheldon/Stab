@@ -1,6 +1,6 @@
 use super::SatMaterializationLimits;
 use crate::resources::SatMaterializationResource;
-use crate::{CircuitError, CircuitResult, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum SatProblemMode {
@@ -62,12 +62,12 @@ impl BoolRef {
         }
     }
 
-    fn to_wdimacs_literal(self) -> CircuitResult<Option<String>> {
+    fn to_wdimacs_literal(self) -> AnalysisResult<Option<String>> {
         let Some(index) = self.variable_index() else {
             return Ok(None);
         };
         let one_based = index.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT variable index overflowed")
+            AnalysisError::invalid_detector_error_model("SAT variable index overflowed")
         })?;
         if self.negated {
             Ok(Some(format!("-{one_based}")))
@@ -115,7 +115,7 @@ pub(super) struct SatShape {
 }
 
 impl SatShape {
-    pub(super) fn validate(self, limits: SatMaterializationLimits) -> CircuitResult<Self> {
+    pub(super) fn validate(self, limits: SatMaterializationLimits) -> AnalysisResult<Self> {
         validate_limit(
             SatMaterializationResource::ErrorMechanisms,
             self.error_mechanisms,
@@ -158,11 +158,11 @@ impl MaxSatInstance {
     pub(super) fn with_shape(
         shape: SatShape,
         limits: SatMaterializationLimits,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let shape = shape.validate(limits)?;
         let mut clauses = Vec::new();
         clauses.try_reserve_exact(shape.clauses).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "SAT problem generation cannot reserve {} clauses",
                 shape.clauses
             ))
@@ -174,10 +174,10 @@ impl MaxSatInstance {
         })
     }
 
-    pub(super) fn new_bool(&mut self) -> CircuitResult<BoolRef> {
+    pub(super) fn new_bool(&mut self) -> AnalysisResult<BoolRef> {
         let variable = self.num_variables;
         let next = self.num_variables.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT variable count overflowed")
+            AnalysisError::invalid_detector_error_model("SAT variable count overflowed")
         })?;
         validate_limit(
             SatMaterializationResource::Variables,
@@ -188,17 +188,17 @@ impl MaxSatInstance {
         Ok(BoolRef::variable(variable))
     }
 
-    pub(super) fn add_clause(&mut self, clause: Clause) -> CircuitResult<()> {
+    pub(super) fn add_clause(&mut self, clause: Clause) -> AnalysisResult<()> {
         if let ClauseWeight::Soft(weight) = clause.weight {
             if !weight.is_finite() || weight <= 0.0 {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "SAT soft clause weight must be finite and positive",
                 ));
             }
             self.max_weight = self.max_weight.max(weight);
         }
         let clause_count = self.clauses.len().checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT clause count overflowed")
+            AnalysisError::invalid_detector_error_model("SAT clause count overflowed")
         })?;
         validate_limit(
             SatMaterializationResource::Clauses,
@@ -209,7 +209,7 @@ impl MaxSatInstance {
             .clause_literals
             .checked_add(clause.vars.len())
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("SAT clause literal count overflowed")
+                AnalysisError::invalid_detector_error_model("SAT clause literal count overflowed")
             })?;
         validate_limit(
             SatMaterializationResource::ClauseLiterals,
@@ -221,7 +221,7 @@ impl MaxSatInstance {
         Ok(())
     }
 
-    pub(super) fn xor(&mut self, left: BoolRef, right: BoolRef) -> CircuitResult<BoolRef> {
+    pub(super) fn xor(&mut self, left: BoolRef, right: BoolRef) -> AnalysisResult<BoolRef> {
         match (left.constant_value(), right.constant_value()) {
             (Some(false), _) => return Ok(right),
             (Some(true), _) => return Ok(right.not()),
@@ -238,12 +238,12 @@ impl MaxSatInstance {
         Ok(output)
     }
 
-    pub(super) fn validate_shape(&self, shape: SatShape) -> CircuitResult<()> {
+    pub(super) fn validate_shape(&self, shape: SatShape) -> AnalysisResult<()> {
         if self.num_variables != shape.variables
             || self.clauses.len() != shape.clauses
             || self.clause_literals != shape.clause_literals
         {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "SAT preflight shape changed during encoding: expected {} variables, {} clauses, and {} literals; got {}, {}, and {}",
                 shape.variables,
                 shape.clauses,
@@ -256,7 +256,7 @@ impl MaxSatInstance {
         Ok(())
     }
 
-    pub(super) fn to_wdimacs(&self, mode: SatProblemMode) -> CircuitResult<String> {
+    pub(super) fn to_wdimacs(&self, mode: SatProblemMode) -> AnalysisResult<String> {
         let clause_count = self.clauses.len();
         let top = self.top_weight(mode, clause_count)?;
         let output_bound = self.exact_output_bytes(mode, top)?;
@@ -267,7 +267,7 @@ impl MaxSatInstance {
         )?;
         let mut out = String::new();
         out.try_reserve(output_bound).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "SAT problem generation cannot reserve {output_bound} WDIMACS output bytes"
             ))
         })?;
@@ -296,7 +296,7 @@ impl MaxSatInstance {
         Ok(out)
     }
 
-    fn exact_output_bytes(&self, mode: SatProblemMode, top: usize) -> CircuitResult<usize> {
+    fn exact_output_bytes(&self, mode: SatProblemMode, top: usize) -> AnalysisResult<usize> {
         let mut bytes = "p wcnf ".len();
         bytes = checked_output_add(bytes, decimal_digits(self.num_variables))?;
         bytes = checked_output_add(bytes, 1)?;
@@ -316,7 +316,7 @@ impl MaxSatInstance {
                     continue;
                 };
                 let one_based = index.checked_add(1).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "SAT variable index overflowed while sizing output",
                     )
                 })?;
@@ -329,7 +329,7 @@ impl MaxSatInstance {
         Ok(bytes)
     }
 
-    fn top_weight(&self, mode: SatProblemMode, clause_count: usize) -> CircuitResult<usize> {
+    fn top_weight(&self, mode: SatProblemMode, clause_count: usize) -> AnalysisResult<usize> {
         top_weight_for_clause_count(mode, clause_count)
     }
 
@@ -338,18 +338,18 @@ impl MaxSatInstance {
         mode: SatProblemMode,
         top: usize,
         weight: &ClauseWeight,
-    ) -> CircuitResult<usize> {
+    ) -> AnalysisResult<usize> {
         match weight {
             ClauseWeight::Hard => Ok(top),
             ClauseWeight::Soft(_) if matches!(mode, SatProblemMode::Unweighted) => Ok(1),
             ClauseWeight::Soft(weight) => {
                 let SatProblemMode::Weighted { quantization } = mode else {
-                    return Err(CircuitError::invalid_detector_error_model(
+                    return Err(AnalysisError::invalid_detector_error_model(
                         "unweighted SAT problem received weighted clause",
                     ));
                 };
                 if self.max_weight <= 0.0 {
-                    return Err(CircuitError::invalid_detector_error_model(
+                    return Err(AnalysisError::invalid_detector_error_model(
                         "weighted SAT problem has no positive soft-clause weight",
                     ));
                 }
@@ -359,14 +359,14 @@ impl MaxSatInstance {
     }
 }
 
-fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> CircuitResult<usize> {
+fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> AnalysisResult<usize> {
     match mode {
         SatProblemMode::Unweighted => clause_count.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("unweighted SAT top weight overflowed")
+            AnalysisError::invalid_detector_error_model("unweighted SAT top weight overflowed")
         }),
         SatProblemMode::Weighted { quantization } => {
             let quantization = usize::try_from(quantization).map_err(|_| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "weighted SAT quantization does not fit usize",
                 )
             })?;
@@ -374,15 +374,17 @@ fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> Cir
                 .checked_mul(clause_count)
                 .and_then(|value| value.checked_add(1))
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("weighted SAT top weight overflowed")
+                    AnalysisError::invalid_detector_error_model(
+                        "weighted SAT top weight overflowed",
+                    )
                 })
         }
     }
 }
 
-fn checked_output_add(left: usize, right: usize) -> CircuitResult<usize> {
+fn checked_output_add(left: usize, right: usize) -> AnalysisResult<usize> {
     left.checked_add(right).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model("SAT exact output byte count overflowed")
+        AnalysisError::invalid_detector_error_model("SAT exact output byte count overflowed")
     })
 }
 
@@ -392,36 +394,36 @@ fn decimal_digits(value: usize) -> usize {
         .map_or(1, |digits| digits as usize + 1)
 }
 
-fn rounded_nonnegative_usize(value: f64) -> CircuitResult<usize> {
+fn rounded_nonnegative_usize(value: f64) -> AnalysisResult<usize> {
     if !value.is_finite() || value < 0.0 {
-        return Err(CircuitError::invalid_detector_error_model(
+        return Err(AnalysisError::invalid_detector_error_model(
             "SAT quantized weight is not a finite nonnegative value",
         ));
     }
     let rounded = value.round();
     if rounded > usize::MAX as f64 {
-        return Err(CircuitError::invalid_detector_error_model(
+        return Err(AnalysisError::invalid_detector_error_model(
             "SAT quantized weight exceeds usize",
         ));
     }
     format!("{rounded:.0}")
         .parse::<usize>()
-        .map_err(|_| CircuitError::invalid_detector_error_model("SAT quantized weight overflowed"))
+        .map_err(|_| AnalysisError::invalid_detector_error_model("SAT quantized weight overflowed"))
 }
 
 pub(super) fn validate_limit(
     resource: SatMaterializationResource,
     actual: usize,
     limit: usize,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if actual > limit {
         let actual = u64::try_from(actual).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "SAT resource amount does not fit resource diagnostics",
             )
         })?;
         let limit = u64::try_from(limit).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "SAT resource limit does not fit resource diagnostics",
             )
         })?;

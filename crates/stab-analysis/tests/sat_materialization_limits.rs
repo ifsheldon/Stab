@@ -4,17 +4,18 @@
     reason = "SAT materialization policy tests use direct fixture assertions"
 )]
 
-use stab_core::{
-    CircuitResult, DetectorErrorModel, ResourceKind, ResourceOperation, SatMaterializationLimits,
+use stab_analysis::{
+    AnalysisResult, ResourceKind, ResourceOperation, SatMaterializationLimits,
     likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
     shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
 };
+use stab_model::DetectorErrorModel;
 
 fn dem(text: &str) -> DetectorErrorModel {
     DetectorErrorModel::from_dem_str(text).expect("parse DEM")
 }
 
-fn assert_rejected(result: CircuitResult<String>, expected: &str) {
+fn assert_rejected(result: AnalysisResult<String>, expected: &str) {
     let error = result.expect_err("SAT materialization limit should reject the model");
     assert!(
         error.to_string().contains(expected),
@@ -29,7 +30,7 @@ macro_rules! limits {
 }
 
 #[test]
-fn default_policy_keeps_frozen_literals_and_existing_entry_points() -> CircuitResult<()> {
+fn default_policy_keeps_frozen_literals_and_existing_entry_points() -> AnalysisResult<()> {
     let model = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
     let limits = limits!();
 
@@ -68,7 +69,7 @@ fn default_policy_keeps_frozen_literals_and_existing_entry_points() -> CircuitRe
 }
 
 #[test]
-fn traversal_limits_accept_exact_maxima_and_reject_first_excesses() -> CircuitResult<()> {
+fn traversal_limits_accept_exact_maxima_and_reject_first_excesses() -> AnalysisResult<()> {
     let accepted = dem("repeat 3 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n");
     shortest_error_sat_problem_with_limits(
         &accepted,
@@ -111,7 +112,7 @@ fn traversal_limits_accept_exact_maxima_and_reject_first_excesses() -> CircuitRe
 }
 
 #[test]
-fn flattened_error_and_target_limits_are_admitted_before_collection() -> CircuitResult<()> {
+fn flattened_error_and_target_limits_are_admitted_before_collection() -> AnalysisResult<()> {
     let two_errors = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
     shortest_error_sat_problem_with_limits(&two_errors, limits!().with_max_error_mechanisms(2))?;
     assert_rejected(
@@ -142,7 +143,7 @@ fn flattened_error_and_target_limits_are_admitted_before_collection() -> Circuit
 }
 
 #[test]
-fn cnf_shape_limits_accept_exact_maxima_and_reject_first_excess() -> CircuitResult<()> {
+fn cnf_shape_limits_accept_exact_maxima_and_reject_first_excess() -> AnalysisResult<()> {
     let model = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
 
     shortest_error_sat_problem_with_limits(&model, limits!().with_max_variables(3))?;
@@ -166,7 +167,7 @@ fn cnf_shape_limits_accept_exact_maxima_and_reject_first_excess() -> CircuitResu
 }
 
 #[test]
-fn every_early_unsat_path_obeys_the_output_byte_limit() -> CircuitResult<()> {
+fn every_early_unsat_path_obeys_the_output_byte_limit() -> AnalysisResult<()> {
     const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
 
     let no_model_content = dem("");

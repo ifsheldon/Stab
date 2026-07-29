@@ -1,7 +1,12 @@
 mod flatten;
+mod sat;
 mod transforms;
 
 pub use flatten::DemFlattenLimits;
+pub use sat::{
+    SatMaterializationLimits, likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
+    shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
+};
 pub use transforms::{
     detector_error_model_without_tags, flattened_detector_error_model,
     flattened_detector_error_model_with_limits, rounded_detector_error_model,

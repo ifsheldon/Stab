@@ -121,18 +121,6 @@ pub(crate) enum DetectionBufferLimitSubject {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum SatMaterializationResource {
-    RepeatCount,
-    ExpandedInstructions,
-    ErrorMechanisms,
-    TargetOccurrences,
-    Variables,
-    Clauses,
-    ClauseLiterals,
-    OutputBytes,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum LogicalErrorSearchResource {
     RepeatCount,
     ExpandedErrorMechanisms,
@@ -174,9 +162,6 @@ enum ResourceLimitCause {
     DetectorErrorModelReplayWorkUnits,
     DetectorErrorModelMaterializedUnits,
     DetectorErrorModelMaterializedBytes,
-    SatMaterialization {
-        resource: SatMaterializationResource,
-    },
     LogicalErrorSearch {
         context: &'static str,
         resource: LogicalErrorSearchResource,
@@ -345,19 +330,6 @@ impl ResourceLimitError {
         }
     }
 
-    pub(crate) const fn sat_materialization(
-        resource: SatMaterializationResource,
-        actual: u64,
-        limit: u64,
-    ) -> Self {
-        Self {
-            cause: ResourceLimitCause::SatMaterialization { resource },
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
     pub(crate) const fn logical_error_search(
         context: &'static str,
         resource: LogicalErrorSearchResource,
@@ -399,6 +371,9 @@ impl ResourceLimitError {
                 stab_analysis::ResourceOperation::DetectorErrorModelFlatten => {
                     ResourceOperation::DetectorErrorModelFlatten
                 }
+                stab_analysis::ResourceOperation::SatMaterialization => {
+                    ResourceOperation::SatMaterialization
+                }
             },
             ResourceLimitCause::CircuitSourceLines
             | ResourceLimitCause::CircuitRepeatNesting { .. } => ResourceOperation::CircuitParse,
@@ -420,7 +395,6 @@ impl ResourceLimitError {
             | ResourceLimitCause::DetectorErrorModelMaterializedBytes => {
                 ResourceOperation::DetectorErrorModelSampling
             }
-            ResourceLimitCause::SatMaterialization { .. } => ResourceOperation::SatMaterialization,
             ResourceLimitCause::LogicalErrorSearch { .. } => ResourceOperation::LogicalErrorSearch,
             ResourceLimitCause::DemTraversalRepeatIterations { operation, .. } => operation,
         }
@@ -437,6 +411,11 @@ impl ResourceLimitError {
                 stab_analysis::ResourceKind::MaterializedBytes => ResourceKind::MaterializedBytes,
                 stab_analysis::ResourceKind::TargetOccurrences => ResourceKind::TargetOccurrences,
                 stab_analysis::ResourceKind::ArgumentValues => ResourceKind::ArgumentValues,
+                stab_analysis::ResourceKind::ErrorMechanisms => ResourceKind::ErrorMechanisms,
+                stab_analysis::ResourceKind::Variables => ResourceKind::Variables,
+                stab_analysis::ResourceKind::Clauses => ResourceKind::Clauses,
+                stab_analysis::ResourceKind::ClauseLiterals => ResourceKind::ClauseLiterals,
+                stab_analysis::ResourceKind::OutputBytes => ResourceKind::OutputBytes,
             },
             ResourceLimitCause::CircuitSourceLines
             | ResourceLimitCause::DetectorErrorModelSourceLines => ResourceKind::SourceLines,
@@ -460,18 +439,6 @@ impl ResourceLimitError {
             ResourceLimitCause::DetectorErrorModelMaterializedBytes => {
                 ResourceKind::MaterializedBytes
             }
-            ResourceLimitCause::SatMaterialization { resource } => match resource {
-                SatMaterializationResource::RepeatCount => ResourceKind::RepeatCount,
-                SatMaterializationResource::ExpandedInstructions => {
-                    ResourceKind::ExpandedOperations
-                }
-                SatMaterializationResource::ErrorMechanisms => ResourceKind::ErrorMechanisms,
-                SatMaterializationResource::TargetOccurrences => ResourceKind::TargetOccurrences,
-                SatMaterializationResource::Variables => ResourceKind::Variables,
-                SatMaterializationResource::Clauses => ResourceKind::Clauses,
-                SatMaterializationResource::ClauseLiterals => ResourceKind::ClauseLiterals,
-                SatMaterializationResource::OutputBytes => ResourceKind::OutputBytes,
-            },
             ResourceLimitCause::LogicalErrorSearch { resource, .. } => match resource {
                 LogicalErrorSearchResource::RepeatCount => ResourceKind::RepeatCount,
                 LogicalErrorSearchResource::ExpandedErrorMechanisms => {
@@ -639,48 +606,6 @@ impl Display for ResourceLimitError {
                 "cannot compile circuit sampler: DEM sampler would require at least {} materialized bytes; current limit is {}",
                 self.actual, self.limit
             ),
-            ResourceLimitCause::SatMaterialization { resource } => match resource {
-                SatMaterializationResource::RepeatCount => write!(
-                    formatter,
-                    "invalid detector error model: DEM SAT problem generation currently supports repeat counts up to {}, got {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::ExpandedInstructions => write!(
-                    formatter,
-                    "invalid detector error model: DEM SAT problem generation currently supports at most {} expanded instructions, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::ErrorMechanisms => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} error mechanisms, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::TargetOccurrences => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} target occurrences, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::Variables => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} variables, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::Clauses => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} clauses, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::ClauseLiterals => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} clause literals, got at least {}",
-                    self.limit, self.actual
-                ),
-                SatMaterializationResource::OutputBytes => write!(
-                    formatter,
-                    "invalid detector error model: SAT problem generation currently supports at most {} WDIMACS output bytes, got at least {}",
-                    self.limit, self.actual
-                ),
-            },
             ResourceLimitCause::LogicalErrorSearch { context, resource } => match resource {
                 LogicalErrorSearchResource::RepeatCount => write!(
                     formatter,

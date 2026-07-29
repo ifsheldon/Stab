@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 pub enum ResourceOperation {
     CircuitFlatten,
     DetectorErrorModelFlatten,
+    SatMaterialization,
 }
 
 impl ResourceOperation {
@@ -12,6 +13,7 @@ impl ResourceOperation {
         match self {
             Self::CircuitFlatten => "circuit-flatten",
             Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
+            Self::SatMaterialization => "sat-materialization",
         }
     }
 }
@@ -27,6 +29,11 @@ pub enum ResourceKind {
     MaterializedBytes,
     TargetOccurrences,
     ArgumentValues,
+    ErrorMechanisms,
+    Variables,
+    Clauses,
+    ClauseLiterals,
+    OutputBytes,
 }
 
 impl ResourceKind {
@@ -40,8 +47,25 @@ impl ResourceKind {
             Self::MaterializedBytes => "materialized-bytes",
             Self::TargetOccurrences => "target-occurrences",
             Self::ArgumentValues => "argument-values",
+            Self::ErrorMechanisms => "error-mechanisms",
+            Self::Variables => "variables",
+            Self::Clauses => "clauses",
+            Self::ClauseLiterals => "clause-literals",
+            Self::OutputBytes => "output-bytes",
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum SatMaterializationResource {
+    RepeatCount,
+    ExpandedInstructions,
+    ErrorMechanisms,
+    TargetOccurrences,
+    Variables,
+    Clauses,
+    ClauseLiterals,
+    OutputBytes,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -59,6 +83,12 @@ enum ResourceLimitCause {
     DemFlattenArgumentValues,
     DemFlattenMaterializedBytes,
     DemFlattenMaterializedUnits,
+    SatMaterialization {
+        resource: SatMaterializationResource,
+    },
+    SatTraversalRepeatIterations {
+        context: &'static str,
+    },
 }
 
 /// Typed resource-admission failure produced by pure analysis operations.
@@ -174,6 +204,30 @@ impl ResourceLimitError {
         }
     }
 
+    pub(crate) const fn sat_materialization(
+        resource: SatMaterializationResource,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::SatMaterialization { resource },
+            actual,
+            limit,
+        }
+    }
+
+    pub(crate) const fn sat_traversal_repeat_iterations(
+        context: &'static str,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::SatTraversalRepeatIterations { context },
+            actual,
+            limit,
+        }
+    }
+
     pub const fn code(self) -> &'static str {
         "resource-limit-exceeded"
     }
@@ -197,6 +251,10 @@ impl ResourceLimitError {
             | ResourceLimitCause::DemFlattenMaterializedUnits => {
                 ResourceOperation::DetectorErrorModelFlatten
             }
+            ResourceLimitCause::SatMaterialization { .. }
+            | ResourceLimitCause::SatTraversalRepeatIterations { .. } => {
+                ResourceOperation::SatMaterialization
+            }
         }
     }
 
@@ -217,6 +275,21 @@ impl ResourceLimitError {
             ResourceLimitCause::DemFlattenArgumentValues => ResourceKind::ArgumentValues,
             ResourceLimitCause::DemFlattenMaterializedBytes => ResourceKind::MaterializedBytes,
             ResourceLimitCause::DemFlattenMaterializedUnits => ResourceKind::MaterializedUnits,
+            ResourceLimitCause::SatMaterialization { resource } => match resource {
+                SatMaterializationResource::RepeatCount => ResourceKind::RepeatCount,
+                SatMaterializationResource::ExpandedInstructions => {
+                    ResourceKind::ExpandedOperations
+                }
+                SatMaterializationResource::ErrorMechanisms => ResourceKind::ErrorMechanisms,
+                SatMaterializationResource::TargetOccurrences => ResourceKind::TargetOccurrences,
+                SatMaterializationResource::Variables => ResourceKind::Variables,
+                SatMaterializationResource::Clauses => ResourceKind::Clauses,
+                SatMaterializationResource::ClauseLiterals => ResourceKind::ClauseLiterals,
+                SatMaterializationResource::OutputBytes => ResourceKind::OutputBytes,
+            },
+            ResourceLimitCause::SatTraversalRepeatIterations { .. } => {
+                ResourceKind::RepeatIterations
+            }
         }
     }
 
@@ -296,6 +369,53 @@ impl Display for ResourceLimitError {
                 formatter,
                 "invalid detector error model: DEM flattened instruction vector would require {} materialized units; platform limit is {}",
                 self.actual, self.limit
+            ),
+            ResourceLimitCause::SatMaterialization { resource } => match resource {
+                SatMaterializationResource::RepeatCount => write!(
+                    formatter,
+                    "invalid detector error model: DEM SAT problem generation currently supports repeat counts up to {}, got {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::ExpandedInstructions => write!(
+                    formatter,
+                    "invalid detector error model: DEM SAT problem generation currently supports at most {} expanded instructions, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::ErrorMechanisms => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} error mechanisms, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::TargetOccurrences => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} target occurrences, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::Variables => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} variables, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::Clauses => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} clauses, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::ClauseLiterals => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} clause literals, got at least {}",
+                    self.limit, self.actual
+                ),
+                SatMaterializationResource::OutputBytes => write!(
+                    formatter,
+                    "invalid detector error model: SAT problem generation currently supports at most {} WDIMACS output bytes, got at least {}",
+                    self.limit, self.actual
+                ),
+            },
+            ResourceLimitCause::SatTraversalRepeatIterations { context } => write!(
+                formatter,
+                "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
+                self.limit, self.actual
             ),
         }
     }

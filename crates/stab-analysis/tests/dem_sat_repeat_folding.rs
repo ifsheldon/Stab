@@ -3,16 +3,15 @@
     reason = "integration tests use direct assertions for compact diagnostics"
 )]
 
-use stab_core::{
-    CircuitResult, DetectorErrorModel, likeliest_error_sat_problem, shortest_error_sat_problem,
-};
+use stab_analysis::{AnalysisResult, likeliest_error_sat_problem, shortest_error_sat_problem};
+use stab_model::DetectorErrorModel;
 
-fn dem(input: &str) -> CircuitResult<DetectorErrorModel> {
+fn dem(input: &str) -> AnalysisResult<DetectorErrorModel> {
     DetectorErrorModel::from_dem_str(input).map_err(Into::into)
 }
 
 #[test]
-fn sat_problem_shortest_folds_large_flat_zero_shift_repeats() -> CircuitResult<()> {
+fn sat_problem_shortest_folds_large_flat_zero_shift_repeats() -> AnalysisResult<()> {
     let model = dem("\
 repeat 100001 {
     error(0.1) D0 L0
@@ -25,7 +24,7 @@ repeat 100001 {
 }
 
 #[test]
-fn sat_problem_shortest_folds_large_flat_zero_shift_zero_probability_repeats() -> CircuitResult<()>
+fn sat_problem_shortest_folds_large_flat_zero_shift_zero_probability_repeats() -> AnalysisResult<()>
 {
     let model = dem("\
 repeat 100001 {
@@ -39,7 +38,7 @@ repeat 100001 {
 }
 
 #[test]
-fn sat_problem_shortest_folds_large_nested_zero_shift_repeats() -> CircuitResult<()> {
+fn sat_problem_shortest_folds_large_nested_zero_shift_repeats() -> AnalysisResult<()> {
     let model = dem("\
 repeat 100001 {
     detector(1, 2) D0
@@ -105,7 +104,7 @@ repeat 100001 {
 
 #[test]
 fn sat_problem_shortest_compresses_large_flat_zero_shift_high_observable_repeat()
--> CircuitResult<()> {
+-> AnalysisResult<()> {
     let model = dem("\
 repeat 100001 {
     error(0) L1000001
@@ -119,7 +118,7 @@ repeat 100001 {
 }
 
 #[test]
-fn sat_problem_likeliest_folds_large_flat_zero_shift_repeats_by_map_cost() -> CircuitResult<()> {
+fn sat_problem_likeliest_folds_large_flat_zero_shift_repeats_by_map_cost() -> AnalysisResult<()> {
     let model = dem("\
 repeat 100001 {
     error(0.000001) D0 L0
@@ -214,7 +213,7 @@ repeat 100001 {
 }
 
 #[test]
-fn sat_problem_likeliest_folds_large_nested_zero_shift_repeats_by_map_cost() -> CircuitResult<()> {
+fn sat_problem_likeliest_folds_large_nested_zero_shift_repeats_by_map_cost() -> AnalysisResult<()> {
     let model = dem("\
 repeat 100001 {
     detector(1, 2) D0
