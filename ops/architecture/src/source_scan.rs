@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
@@ -26,6 +27,8 @@ pub(super) fn scan_workspace_sources(
     }
     rust_sources.sort();
     rust_sources.dedup();
+
+    validate_facade_tiers(root, &mut violations)?;
 
     for source_path in &rust_sources {
         let source = std::fs::read_to_string(root.join(source_path)).map_err(|source| {
@@ -57,6 +60,97 @@ pub(super) fn scan_workspace_sources(
         rust_source_count: rust_sources.len(),
         violations,
         migration_allowances: Vec::new(),
+    })
+}
+
+fn validate_facade_tiers(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
+    let facade_root = Path::new("crates/stab-core/src/lib.rs");
+    let facade_advanced = Path::new("crates/stab-core/src/advanced.rs");
+    let root_source = read_source(root, facade_root)?;
+    let advanced_source = read_source(root, facade_advanced)?;
+    violations.extend(facade_tier_violations(
+        facade_root,
+        &root_source,
+        facade_advanced,
+        &advanced_source,
+    ));
+    Ok(())
+}
+
+fn facade_tier_violations(
+    facade_root: &Path,
+    root_source: &str,
+    facade_advanced: &Path,
+    advanced_source: &str,
+) -> Vec<Violation> {
+    let mut violations = Vec::new();
+    let root_modules = public_module_names(root_source);
+    for required in ["advanced", "experimental"] {
+        if !root_modules.contains(required) {
+            violations.push(Violation::new(
+                "facade-tier-missing",
+                format!(
+                    "{} must publicly declare module `{required}`",
+                    facade_root.display()
+                ),
+            ));
+        }
+    }
+
+    for forbidden in ["bits", "result_formats", "result_streaming", "stabilizers"] {
+        if root_modules.contains(forbidden) {
+            violations.push(Violation::new(
+                "facade-owner-module-public",
+                format!(
+                    "{} must not publicly expose implementation-owner module `{forbidden}`",
+                    facade_root.display()
+                ),
+            ));
+        }
+    }
+
+    let advanced_modules = public_module_names(advanced_source);
+    for required in [
+        "storage",
+        "algebra",
+        "records",
+        "backend",
+        "traversal",
+        "compat",
+    ] {
+        if !advanced_modules.contains(required) {
+            violations.push(Violation::new(
+                "facade-advanced-module-missing",
+                format!(
+                    "{} must publicly declare module `{required}`",
+                    facade_advanced.display()
+                ),
+            ));
+        }
+    }
+
+    violations
+}
+
+fn public_module_names(source: &str) -> BTreeSet<&str> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let declaration = line.trim().strip_prefix("pub mod ")?;
+            let name_len = declaration
+                .bytes()
+                .take_while(u8::is_ascii_alphanumeric)
+                .count();
+            let (name, suffix) = declaration.split_at(name_len);
+            (!name.is_empty() && suffix.trim_start().starts_with([';', '{'])).then_some(name)
+        })
+        .collect()
+}
+
+fn read_source(root: &Path, relative_path: &Path) -> Result<String, CheckError> {
+    std::fs::read_to_string(root.join(relative_path)).map_err(|source| CheckError::ReadSource {
+        path: relative_path.to_path_buf(),
+        source,
     })
 }
 
@@ -207,6 +301,9 @@ mod tests {
             name: SIMD_PACKAGE.to_owned(),
             relative_path: PathBuf::from("crates/stab-kernels-simd"),
             default_features: Vec::new(),
+            version: cargo_metadata::semver::Version::new(0, 2, 0),
+            publish: None,
+            binary_targets: Vec::new(),
         };
         let packages = [package.clone()];
         let source = Path::new("crates/stab-kernels-simd/src/lib.rs");
@@ -223,6 +320,9 @@ mod tests {
             name: "stab-core".to_owned(),
             relative_path: PathBuf::from("crates/stab-core"),
             default_features: Vec::new(),
+            version: cargo_metadata::semver::Version::new(0, 2, 0),
+            publish: None,
+            binary_targets: Vec::new(),
         };
         assert_eq!(
             classify_simd_site(Path::new("crates/stab-core/src/bits/simd.rs"), Some(&core)),
@@ -235,5 +335,39 @@ mod tests {
             ),
             SimdSite::Forbidden
         );
+    }
+
+    #[test]
+    fn facade_tier_contract_reports_missing_and_owner_shaped_surfaces() {
+        let violations = facade_tier_violations(
+            Path::new("lib.rs"),
+            "pub mod advanced;\npub mod bits;\n",
+            Path::new("advanced.rs"),
+            "pub mod storage {}\npub mod records {}\n",
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            codes,
+            vec![
+                "facade-tier-missing",
+                "facade-owner-module-public",
+                "facade-advanced-module-missing",
+                "facade-advanced-module-missing",
+                "facade-advanced-module-missing",
+                "facade-advanced-module-missing",
+            ]
+        );
+    }
+
+    #[test]
+    fn facade_tier_parser_ignores_comments_strings_and_restricted_modules() {
+        let modules = public_module_names(
+            "pub mod advanced;\n// pub mod bits;\nconst TEXT: &str = \"pub mod stabilizers;\";\npub(crate) mod result_formats;\npub mod experimental {}\n",
+        );
+        assert_eq!(modules, BTreeSet::from(["advanced", "experimental"]));
     }
 }

@@ -20,7 +20,9 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 pub use consumer::{ConsumerCheckError, ConsumerCheckSummary, check_external_consumers};
-pub use policy::{DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph};
+pub use policy::{
+    DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
+};
 
 const PREFIX: &str = "stab-architecture";
 

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use cargo_metadata::semver::Version;
 use serde::Deserialize;
 
 use crate::policy::validate_graph;
@@ -62,6 +63,17 @@ fn assert_fixture(source: &str) {
             .packages
             .into_iter()
             .map(|package| PackageSpec {
+                version: Version::new(0, 2, 0),
+                publish: if package.path.starts_with("crates") {
+                    None
+                } else {
+                    Some(Vec::new())
+                },
+                binary_targets: if package.name == "stab-cli" {
+                    vec!["stab".to_owned()]
+                } else {
+                    Vec::new()
+                },
                 name: package.name,
                 relative_path: package.path,
                 default_features: package.default_features,
@@ -77,6 +89,7 @@ fn assert_fixture(source: &str) {
                 optional: edge.optional,
             })
             .collect(),
+        declared_path_dependencies: Vec::new(),
     };
     let report = validate_graph(&graph);
     let actual = report
@@ -141,6 +154,13 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
             name: (*name).to_string(),
             relative_path: PathBuf::from("crates").join(name),
             default_features: Vec::new(),
+            version: Version::new(0, 2, 0),
+            publish: None,
+            binary_targets: if *name == "stab-cli" {
+                vec!["stab".to_owned()]
+            } else {
+                Vec::new()
+            },
         })
         .collect::<Vec<_>>();
     for from in PRODUCT_PACKAGES {
@@ -154,6 +174,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                         kind: kind.into(),
                         optional: to == "stab-kernels-simd",
                     }],
+                    declared_path_dependencies: Vec::new(),
                 };
                 let report = validate_graph(&graph);
                 let is_permitted = PERMITTED_EDGES.contains(&(from, to));

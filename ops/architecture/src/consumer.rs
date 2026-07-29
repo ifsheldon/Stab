@@ -166,6 +166,14 @@ pub enum ConsumerCheckError {
 
     #[error("workspace metadata does not contain package {0}")]
     MissingWorkspacePackage(&'static str),
+
+    #[error(
+        "external consumer {fixture} has publishable workspace packages {packages:?}; every test-support package must set publish = false"
+    )]
+    PublishableFixturePackages {
+        fixture: &'static str,
+        packages: Vec<String>,
+    },
 }
 
 pub fn check_external_consumers(root: &Path) -> Result<ConsumerCheckSummary, ConsumerCheckError> {
@@ -284,6 +292,7 @@ fn validate_fixture_metadata(
             fixture: fixture.id,
             source,
         })?;
+    require_unpublished_fixture_packages(&metadata, fixture.id)?;
     let features = resolved_features(&metadata, fixture.id)?;
     let kernel_count = features.count("stab-kernels-simd");
     let expected_kernel_count = usize::from(fixture.portable);
@@ -303,6 +312,28 @@ fn validate_fixture_metadata(
         return Err(ConsumerCheckError::UnexpectedPackage {
             fixture: fixture.id,
             package: "stab-core",
+        });
+    }
+    Ok(())
+}
+
+fn require_unpublished_fixture_packages(
+    metadata: &Metadata,
+    fixture: &'static str,
+) -> Result<(), ConsumerCheckError> {
+    let workspace_members = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
+    let mut publishable_packages = metadata
+        .packages
+        .iter()
+        .filter(|package| workspace_members.contains(&package.id))
+        .filter(|package| !matches!(&package.publish, Some(registries) if registries.is_empty()))
+        .map(|package| package.name.to_string())
+        .collect::<Vec<_>>();
+    publishable_packages.sort();
+    if !publishable_packages.is_empty() {
+        return Err(ConsumerCheckError::PublishableFixturePackages {
+            fixture,
+            packages: publishable_packages,
         });
     }
     Ok(())
@@ -374,4 +405,34 @@ fn require_portable_feature(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publishable_external_fixture_packages_are_rejected_from_metadata() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/publication-contract-workspace");
+        let metadata = MetadataCommand::new()
+            .current_dir(&root)
+            .manifest_path(root.join("Cargo.toml"))
+            .other_options(vec!["--locked".to_owned()])
+            .exec()
+            .expect("load publication-contract fixture");
+
+        let error = require_unpublished_fixture_packages(&metadata, "publishable-fixture")
+            .expect_err("publishable fixture packages should fail");
+        match error {
+            ConsumerCheckError::PublishableFixturePackages { fixture, packages } => {
+                assert_eq!(fixture, "publishable-fixture");
+                assert_eq!(
+                    packages,
+                    ["fixture-ops", "fixture-support", "stab-cli", "stab-core"]
+                );
+            }
+            other => panic!("unexpected fixture-publication error: {other}"),
+        }
+    }
 }

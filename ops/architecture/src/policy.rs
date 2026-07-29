@@ -1,8 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::{Component, PathBuf};
 
+use cargo_metadata::semver::{Op, Version, VersionReq};
+
 use crate::{MigrationAllowance, Violation};
 
+const RELEASE_MAJOR: u64 = 0;
+const RELEASE_MINOR: u64 = 2;
+const RELEASE_PATCH: u64 = 0;
 const KNOWN_PRODUCT_PACKAGES: &[&str] = &[
     "stab-algebra",
     "stab-analysis",
@@ -48,6 +53,9 @@ pub struct PackageSpec {
     pub name: String,
     pub relative_path: PathBuf,
     pub default_features: Vec<String>,
+    pub version: Version,
+    pub publish: Option<Vec<String>>,
+    pub binary_targets: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -59,9 +67,18 @@ pub struct WorkspaceEdge {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeclaredPathDependency {
+    pub from: String,
+    pub to: String,
+    pub kind: DependencyKind,
+    pub version_req: VersionReq,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkspaceGraph {
     pub packages: Vec<PackageSpec>,
     pub edges: Vec<WorkspaceEdge>,
+    pub declared_path_dependencies: Vec<DeclaredPathDependency>,
 }
 
 #[derive(Debug)]
@@ -105,22 +122,90 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             ));
             continue;
         }
-        if class == PackageClass::Product {
-            validate_product_identity(package, &mut violations);
-            if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str())
-                && package
-                    .default_features
-                    .iter()
-                    .any(|feature| feature.contains("portable-simd"))
-            {
+
+        match class {
+            PackageClass::Product => {
+                validate_product_identity(package, &mut violations);
+                validate_product_publication(package, &mut violations);
+                if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str())
+                    && package
+                        .default_features
+                        .iter()
+                        .any(|feature| feature.contains("portable-simd"))
+                {
+                    violations.push(Violation::new(
+                        "stable-default-reaches-nightly",
+                        format!(
+                            "Stable component {} enables portable SIMD through default features {:?}",
+                            package.name, package.default_features
+                        ),
+                    ));
+                }
+            }
+            PackageClass::Ops if package_is_publishable(package) => {
                 violations.push(Violation::new(
-                    "stable-default-reaches-nightly",
+                    "operational-package-publishable",
                     format!(
-                        "Stable component {} enables portable SIMD through default features {:?}",
-                        package.name, package.default_features
+                        "operational package {} at {} must set publish = false",
+                        package.name,
+                        package.relative_path.display()
                     ),
                 ));
             }
+            PackageClass::TestSupport if package_is_publishable(package) => {
+                violations.push(Violation::new(
+                    "test-support-package-publishable",
+                    format!(
+                        "test-support package {} at {} must set publish = false",
+                        package.name,
+                        package.relative_path.display()
+                    ),
+                ));
+            }
+            PackageClass::Ops | PackageClass::TestSupport | PackageClass::Unclassified => {}
+        }
+    }
+
+    for dependency in &graph.declared_path_dependencies {
+        let Some(from) = packages.get(dependency.from.as_str()) else {
+            violations.push(Violation::new(
+                "unknown-path-dependency-source",
+                format!(
+                    "{} path dependency names missing source package {}",
+                    dependency.kind.as_str(),
+                    dependency.from
+                ),
+            ));
+            continue;
+        };
+        let Some(to) = packages.get(dependency.to.as_str()) else {
+            violations.push(Violation::new(
+                "unknown-path-dependency-target",
+                format!(
+                    "{} path dependency from {} names missing target package {}",
+                    dependency.kind.as_str(),
+                    dependency.from,
+                    dependency.to
+                ),
+            ));
+            continue;
+        };
+        if classify_path(&from.relative_path) == PackageClass::Product
+            && classify_path(&to.relative_path) == PackageClass::Product
+            && package_is_publishable(from)
+            && package_is_publishable(to)
+            && !is_exact_release_requirement(&dependency.version_req)
+        {
+            violations.push(Violation::new(
+                "publishable-product-path-version",
+                format!(
+                    "publishable product {} has a {} path dependency on {} requiring {}; every publishable product path dependency must require exactly =0.2.0",
+                    dependency.from,
+                    dependency.kind.as_str(),
+                    dependency.to,
+                    dependency.version_req
+                ),
+            ));
         }
     }
 
@@ -277,6 +362,51 @@ fn validate_product_identity(package: &PackageSpec, violations: &mut Vec<Violati
     }
 }
 
+fn validate_product_publication(package: &PackageSpec, violations: &mut Vec<Violation>) {
+    if package_is_publishable(package) && package.version != release_version() {
+        violations.push(Violation::new(
+            "publishable-product-version",
+            format!(
+                "publishable product package {} must have version {}, found {}",
+                package.name,
+                release_version(),
+                package.version
+            ),
+        ));
+    }
+    if package.name == "stab-cli"
+        && !matches!(package.binary_targets.as_slice(), [target] if target == "stab")
+    {
+        violations.push(Violation::new(
+            "cli-binary-targets",
+            format!(
+                "stab-cli must expose exactly one binary target named stab, found {:?}",
+                package.binary_targets
+            ),
+        ));
+    }
+}
+
+fn package_is_publishable(package: &PackageSpec) -> bool {
+    !matches!(&package.publish, Some(registries) if registries.is_empty())
+}
+
+fn release_version() -> Version {
+    Version::new(RELEASE_MAJOR, RELEASE_MINOR, RELEASE_PATCH)
+}
+
+fn is_exact_release_requirement(requirement: &VersionReq) -> bool {
+    matches!(
+        requirement.comparators.as_slice(),
+        [comparator]
+            if comparator.op == Op::Exact
+                && comparator.major == RELEASE_MAJOR
+                && comparator.minor == Some(RELEASE_MINOR)
+                && comparator.patch == Some(RELEASE_PATCH)
+                && comparator.pre.is_empty()
+    )
+}
+
 fn is_permitted_product_edge(from: &str, to: &str) -> bool {
     match from {
         "stab-kernels-simd" => false,
@@ -307,6 +437,25 @@ mod tests {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
             default_features: Vec::new(),
+            version: Version::new(0, 2, 0),
+            publish: if prefix == "crates" {
+                None
+            } else {
+                Some(Vec::new())
+            },
+            binary_targets: if name == "stab-cli" {
+                vec!["stab".to_owned()]
+            } else {
+                Vec::new()
+            },
+        }
+    }
+
+    fn graph(packages: Vec<PackageSpec>) -> WorkspaceGraph {
+        WorkspaceGraph {
+            packages,
+            edges: Vec::new(),
+            declared_path_dependencies: Vec::new(),
         }
     }
 
@@ -319,6 +468,9 @@ mod tests {
                     name: "stab-compat-corpus".to_owned(),
                     relative_path: PathBuf::from("test-support/compat-corpus"),
                     default_features: Vec::new(),
+                    version: Version::new(0, 2, 0),
+                    publish: Some(Vec::new()),
+                    binary_targets: Vec::new(),
                 },
             ],
             edges: vec![WorkspaceEdge {
@@ -327,6 +479,7 @@ mod tests {
                 kind: DependencyKind::Development,
                 optional: false,
             }],
+            declared_path_dependencies: Vec::new(),
         };
         let report = validate_graph(&graph);
         assert!(report.violations.is_empty());
@@ -363,6 +516,7 @@ mod tests {
                 kind: DependencyKind::Development,
                 optional: false,
             }],
+            declared_path_dependencies: Vec::new(),
         };
         assert_eq!(
             validate_graph(&upward_graph)
@@ -379,6 +533,7 @@ mod tests {
         let graph = WorkspaceGraph {
             packages: vec![package("stab-plugin", "crates")],
             edges: Vec::new(),
+            declared_path_dependencies: Vec::new(),
         };
         let report = validate_graph(&graph);
         assert_eq!(
@@ -395,10 +550,7 @@ mod tests {
     fn stable_component_defaults_cannot_reach_portable_simd() {
         let mut bits = package("stab-bits", "crates");
         bits.default_features = vec!["portable-simd".to_owned()];
-        let report = validate_graph(&WorkspaceGraph {
-            packages: vec![bits],
-            edges: Vec::new(),
-        });
+        let report = validate_graph(&graph(vec![bits]));
 
         assert_eq!(report.violations.len(), 1);
         assert_eq!(
@@ -409,5 +561,132 @@ mod tests {
                 .code,
             "stable-default-reaches-nightly"
         );
+    }
+
+    #[test]
+    fn publishable_product_packages_require_release_version() {
+        let mut core = package("stab-core", "crates");
+        core.version = Version::new(0, 2, 1);
+        let report = validate_graph(&graph(vec![core.clone()]));
+        assert_eq!(report.violations.len(), 1);
+        let violation = report
+            .violations
+            .first()
+            .expect("wrong release version should fail");
+        assert_eq!(violation.code, "publishable-product-version");
+        assert!(violation.message.contains("stab-core"));
+        assert!(violation.message.contains("0.2.1"));
+        assert!(violation.message.contains("0.2.0"));
+
+        core.publish = Some(Vec::new());
+        assert!(
+            validate_graph(&graph(vec![core])).violations.is_empty(),
+            "unpublished product packages are outside the publication-version contract"
+        );
+    }
+
+    #[test]
+    fn publishable_product_path_dependencies_require_exact_release_version() {
+        let packages = vec![
+            package("stab-records", "crates"),
+            package("stab-bits", "crates"),
+        ];
+        for kind in [
+            DependencyKind::Normal,
+            DependencyKind::Development,
+            DependencyKind::Build,
+        ] {
+            let exact = WorkspaceGraph {
+                packages: packages.clone(),
+                edges: Vec::new(),
+                declared_path_dependencies: vec![DeclaredPathDependency {
+                    from: "stab-records".to_owned(),
+                    to: "stab-bits".to_owned(),
+                    kind,
+                    version_req: VersionReq::parse("=0.2.0")
+                        .expect("exact release requirement should parse"),
+                }],
+            };
+            assert!(
+                validate_graph(&exact).violations.is_empty(),
+                "{kind:?} exact path requirement should pass"
+            );
+
+            for requirement in ["0.2.0", "=0.2", ">=0.2.0", "=0.2.0-alpha.1"] {
+                let mut inexact = exact.clone();
+                inexact
+                    .declared_path_dependencies
+                    .first_mut()
+                    .expect("fixture should contain its path dependency")
+                    .version_req =
+                    VersionReq::parse(requirement).expect("fixture requirement should parse");
+                let report = validate_graph(&inexact);
+                let violation = report
+                    .violations
+                    .iter()
+                    .find(|violation| violation.code == "publishable-product-path-version")
+                    .expect("inexact product path requirement should fail");
+                assert!(violation.message.contains("stab-records"));
+                assert!(violation.message.contains("stab-bits"));
+                assert!(violation.message.contains("=0.2.0"));
+            }
+        }
+    }
+
+    #[test]
+    fn operational_and_test_support_packages_must_be_unpublished() {
+        for (name, prefix, expected_code) in [
+            (
+                "stab-architecture",
+                "ops",
+                "operational-package-publishable",
+            ),
+            (
+                "stab-compat-corpus",
+                "test-support",
+                "test-support-package-publishable",
+            ),
+        ] {
+            let mut support = package(name, prefix);
+            support.publish = None;
+            let report = validate_graph(&graph(vec![support]));
+            let violation = report
+                .violations
+                .first()
+                .expect("publishable support package should fail");
+            assert_eq!(violation.code, expected_code);
+            assert!(violation.message.contains(name));
+            assert!(violation.message.contains("publish = false"));
+        }
+    }
+
+    #[test]
+    fn cli_exposes_exactly_one_stab_binary() {
+        let valid = package("stab-cli", "crates");
+        assert!(
+            validate_graph(&graph(vec![valid.clone()]))
+                .violations
+                .is_empty()
+        );
+
+        for targets in [
+            Vec::new(),
+            vec!["stab-cli".to_owned()],
+            vec!["stab".to_owned(), "stab-helper".to_owned()],
+        ] {
+            let mut cli = valid.clone();
+            cli.binary_targets = targets;
+            let report = validate_graph(&graph(vec![cli]));
+            let violation = report
+                .violations
+                .iter()
+                .find(|violation| violation.code == "cli-binary-targets")
+                .expect("invalid CLI binary targets should fail");
+            assert!(
+                violation
+                    .message
+                    .contains("exactly one binary target named stab")
+            );
+        }
     }
 }

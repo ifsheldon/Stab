@@ -1,9 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use cargo_metadata::{DependencyKind as CargoDependencyKind, MetadataCommand, PackageId};
+use cargo_metadata::{
+    DependencyKind as CargoDependencyKind, MetadataCommand, PackageId, TargetKind,
+};
 
-use crate::{CheckError, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph};
+use crate::{
+    CheckError, DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
+};
 
 pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckError> {
     let metadata = MetadataCommand::new()
@@ -25,6 +29,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         .cloned()
         .collect::<BTreeSet<_>>();
     let mut package_names = BTreeMap::<PackageId, String>::new();
+    let mut package_roots = BTreeMap::<std::path::PathBuf, String>::new();
     let mut packages = Vec::with_capacity(workspace_ids.len());
 
     for package in metadata
@@ -55,6 +60,15 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
             })?
             .to_path_buf();
         package_names.insert(package.id.clone(), package.name.to_string());
+        package_roots.insert(package_root, package.name.to_string());
+        let mut binary_targets = package
+            .targets
+            .iter()
+            .filter(|target| target.kind.contains(&TargetKind::Bin))
+            .map(|target| target.name.clone())
+            .collect::<Vec<_>>();
+        binary_targets.sort();
+        binary_targets.dedup();
         packages.push(PackageSpec {
             name: package.name.to_string(),
             relative_path,
@@ -65,9 +79,57 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
                 .flatten()
                 .map(ToString::to_string)
                 .collect(),
+            version: package.version.clone(),
+            publish: package.publish.clone(),
+            binary_targets,
         });
     }
-    packages.sort();
+    packages.sort_by(|left, right| {
+        (&left.name, &left.relative_path).cmp(&(&right.name, &right.relative_path))
+    });
+
+    let mut declared_path_dependencies = Vec::new();
+    for package in metadata
+        .packages
+        .iter()
+        .filter(|package| workspace_ids.contains(&package.id))
+    {
+        let from = package_name(&package_names, &package.id)?;
+        for dependency in &package.dependencies {
+            let Some(path) = dependency.path.as_ref() else {
+                continue;
+            };
+            let dependency_root = std::fs::canonicalize(path.as_std_path()).map_err(|source| {
+                CheckError::ResolveRoot {
+                    path: path.clone().into_std_path_buf(),
+                    source,
+                }
+            })?;
+            let Some(to) = package_roots.get(&dependency_root) else {
+                continue;
+            };
+            declared_path_dependencies.push(DeclaredPathDependency {
+                from: from.clone(),
+                to: to.clone(),
+                kind: DependencyKind::from_cargo(dependency.kind),
+                version_req: dependency.req.clone(),
+            });
+        }
+    }
+    declared_path_dependencies.sort_by(|left, right| {
+        (
+            &left.from,
+            &left.to,
+            left.kind,
+            left.version_req.to_string(),
+        )
+            .cmp(&(
+                &right.from,
+                &right.to,
+                right.kind,
+                right.version_req.to_string(),
+            ))
+    });
 
     let resolve = metadata
         .resolve
@@ -109,6 +171,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
     Ok(WorkspaceGraph {
         packages,
         edges: edges.into_iter().collect(),
+        declared_path_dependencies,
     })
 }
 
@@ -182,6 +245,9 @@ mod tests {
             name: "stab-core".to_owned(),
             relative_path: std::path::PathBuf::from("crates/stab-core"),
             default_features: Vec::new(),
+            version: cargo_metadata::semver::Version::new(0, 2, 0),
+            publish: None,
+            binary_targets: Vec::new(),
         };
         assert_eq!(package.relative_path, Path::new("crates/stab-core"));
     }
@@ -197,10 +263,56 @@ mod tests {
                 && edge.to == "stab-engine"
                 && edge.kind == DependencyKind::Normal
         }));
+        assert!(graph.declared_path_dependencies.iter().any(|dependency| {
+            dependency.from == "stab-model"
+                && dependency.to == "stab-engine"
+                && dependency.kind == DependencyKind::Normal
+                && dependency.version_req == cargo_metadata::semver::VersionReq::STAR
+        }));
         let report = crate::policy::validate_graph(&graph);
         assert!(report.violations.iter().any(|violation| {
             violation.code == "forbidden-product-edge"
                 && violation.message.contains("stab-model -> stab-engine")
         }));
+    }
+
+    #[test]
+    fn metadata_drives_publication_contract_violations() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/publication-contract-workspace");
+        let graph = load_workspace_graph(&root).expect("load publication-contract fixture");
+
+        let cli = graph
+            .packages
+            .iter()
+            .find(|package| package.name == "stab-cli")
+            .expect("fixture should contain stab-cli");
+        assert_eq!(cli.version, cargo_metadata::semver::Version::new(0, 2, 1));
+        assert_eq!(cli.publish, None);
+        assert_eq!(cli.binary_targets, ["stab", "stab-helper"]);
+        assert!(graph.declared_path_dependencies.iter().any(|dependency| {
+            dependency.from == "stab-cli"
+                && dependency.to == "stab-core"
+                && dependency.version_req
+                    == cargo_metadata::semver::VersionReq::parse("0.2.0")
+                        .expect("fixture requirement should parse")
+        }));
+
+        let report = crate::policy::validate_graph(&graph);
+        let actual_codes = report
+            .violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actual_codes,
+            [
+                "cli-binary-targets",
+                "operational-package-publishable",
+                "publishable-product-path-version",
+                "publishable-product-version",
+                "test-support-package-publishable",
+            ]
+        );
     }
 }
