@@ -98,10 +98,8 @@ fn convert_with_sweep(
 
 #[test]
 fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
-    let circuit = Circuit::from_stim_str(
-        "H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
-    )
-    .expect("parse sweep conversion circuit");
+    let circuit_text = "H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let circuit = Circuit::from_stim_str(circuit_text).expect("parse sweep conversion circuit");
     let converter = CompiledDetectionConverter::compile(
         &circuit,
         DetectionConversionOptions {
@@ -111,6 +109,19 @@ fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
     .expect("compile sweep conversion circuit");
     let measurement = [false];
     let sweep = [true];
+    assert_eq!(converter.sweep_bit_count(), 1);
+    let mut reusable_reference = converter.reusable_reference_sample();
+    let mut reusable_record = converter.reusable_detection_record();
+    converter
+        .convert_record_with_sweep_into(
+            &measurement,
+            &sweep,
+            &mut reusable_reference,
+            &mut reusable_record,
+        )
+        .expect("convert one sweep-conditioned record into reusable storage");
+    let expected = convert_with_sweep(circuit_text, &[&measurement], &[&sweep], false);
+    assert_eq!(reusable_record, expected.records[0]);
 
     let reference_sampling = SamplingCompiler::new()
         .compile_allowing_sweep(&circuit)
@@ -202,6 +213,23 @@ fn compiled_detection_converter_streams_like_materialized_conversion() {
         },
     )
     .expect("compile converter");
+    assert_eq!(converter.measurement_count(), 2);
+    assert_eq!(converter.sweep_bit_count(), 0);
+    assert_eq!(converter.detector_count(), 2);
+    assert_eq!(converter.observable_count(), 3);
+    assert_eq!(converter.reusable_reference_sample(), vec![false; 2]);
+    assert_eq!(
+        converter.reusable_detection_record(),
+        DetectionEventRecord {
+            detectors: vec![false; 2],
+            observables: vec![false; 3],
+        }
+    );
+    let direct = measurements
+        .iter()
+        .map(|record| converter.convert_record(record))
+        .collect::<Result<Vec<_>, _>>()
+        .expect("convert records directly");
     let mut streamed = Vec::new();
     converter
         .try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
@@ -210,6 +238,7 @@ fn compiled_detection_converter_streams_like_materialized_conversion() {
         })
         .expect("stream conversion");
 
+    assert_eq!(direct, materialized.records);
     assert_eq!(streamed, materialized.records);
 }
 
