@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use proptest::prelude::*;
 use stab_bits as bits;
-use stab_bits::{BitBlock, BitMatrix, BitSlice, BitVec, SparseXorVec};
+use stab_bits::{BitBlock, BitError, BitMatrix, BitSlice, BitVec, SparseXorVec};
 
 #[test]
 fn bits_bit_ref_and_tail_boundaries_follow_stim() {
@@ -159,6 +159,26 @@ fn bits_bitvec_multi_block_boundaries_match_reference() {
             xor_expected_with_mask(&left_bools, &right_bools, &mask_bools)
         );
     }
+}
+
+#[test]
+fn bits_xor_rejects_unequal_width_without_mutation() {
+    let mut left = BitVec::from_words_truncated(257, vec![0x55aa_1234_9876_cdef; 5]);
+    let before = left.clone();
+    let right = BitVec::from_words_truncated(256, vec![0xf0f0_0f0f_dead_beef; 4]);
+
+    let error = left
+        .xor_assign(&right.as_bitslice())
+        .expect_err("unequal widths must be rejected before scalar or SIMD mutation");
+
+    assert_eq!(
+        error,
+        BitError::LengthMismatch {
+            left: 257,
+            right: 256
+        }
+    );
+    assert_eq!(left, before);
 }
 
 #[cfg(feature = "portable-simd")]
