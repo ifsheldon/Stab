@@ -1,6 +1,6 @@
 # PERFQ-M6-CLIFFORD-STRING Profiler Note
 
-Owner: `stab-core` Clifford-string storage and right multiplication.
+Owner: `stab-algebra` Clifford-string storage and right multiplication.
 
 Status: the first clean focused adapter probes proved equivalent semantic work but exposed a material performance failure in both qualification groups. The identity probe reported a diagnostic ratio of `21.933884`, and the non-identity probe reported `238.618379`, against the `1.25x` threshold. These probes use intentionally tiny calibrated work and are diagnostic infrastructure evidence rather than promotable full or soak measurements, but the non-identity scaling measurements below confirmed that the implementation architecture was unsuitable. The threshold, frozen vectors, comparator, work definitions, scales, and correctness prerequisites remain unchanged and unwaived.
 

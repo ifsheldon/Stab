@@ -987,7 +987,7 @@
       "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04"
+        "sha256": "5b65020b0e0b8ba2adbf196c0921a621fdd871c06d67c5d19981345905207021"
       },
       "comparator_sources": [
         {
@@ -1043,7 +1043,7 @@
       "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
-        "sha256": "4b484afed5b1a20d4e1f9c71eccb592f0e2b8a55dc71cb9b818c0b08b2c52e04"
+        "sha256": "5b65020b0e0b8ba2adbf196c0921a621fdd871c06d67c5d19981345905207021"
       },
       "comparator_sources": [
         {
