@@ -1,10 +1,17 @@
 //! Backend-neutral engine foundations for Stab.
 
+mod dem_sampling;
 mod detection;
 pub mod fingerprint;
 pub mod probability;
 mod sampling;
 
+pub use dem_sampling::{
+    DemError, DemReplayBatchStatus, DemReplaySession, DemResourceKind, DemResourceLimitError,
+    DemSamplerLimits, DemSamplingCancellation, DemSamplingCompiler, DemSamplingExecutionError,
+    DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus,
+    DemSamplingRunSummary, DemSamplingSession,
+};
 pub use detection::{
     CompiledDetectionConverter, DetectionCompileError, DetectionConversionLimits,
     DetectionConversionOptions, DetectionError, DetectionEventRecord, DetectionExecutionError,

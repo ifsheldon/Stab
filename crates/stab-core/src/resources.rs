@@ -475,6 +475,23 @@ impl From<stab_engine::DetectionResourceLimitError> for ResourceLimitError {
     }
 }
 
+impl From<stab_engine::DemResourceLimitError> for ResourceLimitError {
+    fn from(error: stab_engine::DemResourceLimitError) -> Self {
+        use stab_engine::DemResourceKind;
+
+        let actual = usize::try_from(error.actual()).unwrap_or(usize::MAX);
+        let limit = usize::try_from(error.limit()).unwrap_or(usize::MAX);
+        match error.kind() {
+            DemResourceKind::SampledErrorApplications => {
+                Self::dem_sampled_error_applications(actual, limit)
+            }
+            DemResourceKind::ReplayWorkUnits => Self::dem_replay_work_units(actual, limit),
+            DemResourceKind::MaterializedUnits => Self::dem_materialized_units(actual, limit),
+            DemResourceKind::MaterializedBytes => Self::dem_materialized_bytes(actual, limit),
+        }
+    }
+}
+
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.cause {

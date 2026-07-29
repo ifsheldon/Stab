@@ -3,7 +3,6 @@ mod flatten;
 #[cfg(test)]
 mod generated_qec_tests;
 mod sat;
-mod traversal;
 
 pub use analyze::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
@@ -21,13 +20,11 @@ pub use stab_model::{
     DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
 };
 
-pub(crate) use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
-pub(crate) use traversal::{FoldedDemBlock, FoldedDemItem, FoldedDemTraversal};
-
 use crate::CircuitResult;
 #[cfg(test)]
 use crate::{CircuitError, Probability};
 
+#[cfg(test)]
 pub(crate) fn dem_instruction_detector_shift(instruction: &DemInstruction) -> CircuitResult<u64> {
     stab_model::advanced::dem_instruction_detector_shift(instruction).map_err(Into::into)
 }

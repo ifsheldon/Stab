@@ -21,12 +21,6 @@ pub(super) fn try_vec_with_capacity<T>(len: usize, context: &'static str) -> Cir
     Ok(values)
 }
 
-pub(super) fn try_false_vec(len: usize, context: &'static str) -> CircuitResult<Vec<bool>> {
-    let mut values = try_vec_with_capacity(len, context)?;
-    values.resize(len, false);
-    Ok(values)
-}
-
 pub(super) fn try_clone_bool_slice(
     values: &[bool],
     context: &'static str,
