@@ -95,7 +95,7 @@ impl CapabilitySet {
     }
 
     pub fn compilation_operations(self) -> impl ExactSizeIterator<Item = CompilationCapability> {
-        let descriptor = stab_engine::sampling::COMPILATION_DESCRIPTOR;
+        let descriptor = stab_engine::COMPILATION_DESCRIPTOR;
         [CompilationCapability::new(
             descriptor.operation(),
             descriptor.input_dialect(),
@@ -109,7 +109,7 @@ impl CapabilitySet {
 
     /// Selectable backend identifiers registered by current compilers.
     pub fn selectable_backend_ids(self) -> impl ExactSizeIterator<Item = &'static str> {
-        stab_engine::sampling::REGISTERED_BACKENDS
+        stab_engine::REGISTERED_BACKENDS
             .iter()
             .copied()
             .map(crate::SamplingBackend::as_str)

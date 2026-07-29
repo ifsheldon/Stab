@@ -1,4 +1,4 @@
-use stab_engine::sampling as engine_sampling;
+use stab_engine as engine_sampling;
 
 use crate::{Circuit, CircuitError, CircuitResult};
 
@@ -145,11 +145,8 @@ pub(crate) mod pauli_product {
         raw_terms: Vec<(usize, PauliBasis, bool)>,
         base_inverted: bool,
     ) -> CircuitResult<(Vec<(usize, PauliBasis)>, bool)> {
-        stab_engine::sampling::normalize_pauli_product_terms_for_core_detection(
-            raw_terms,
-            base_inverted,
-        )
-        .map_err(CircuitError::from)
+        stab_engine::normalize_pauli_product_terms_for_core_detection(raw_terms, base_inverted)
+            .map_err(CircuitError::from)
     }
 }
 

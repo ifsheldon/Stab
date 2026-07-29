@@ -121,6 +121,7 @@ fn compiler_selects_only_registered_backends_and_fingerprints_the_plan() {
 
     assert_eq!(first.backend(), SamplingBackend::Scalar);
     assert_eq!(second.backend(), SamplingBackend::Scalar);
+    assert_eq!(stab_engine::REGISTERED_BACKENDS, &[SamplingBackend::Scalar]);
     assert_eq!(BackendPreference::Auto.as_str(), "auto");
     assert_eq!(BackendPreference::Scalar.as_str(), "scalar");
     assert_eq!(BackendPreference::PortableSimd.as_str(), "portable-simd");
