@@ -170,13 +170,6 @@ enum ResourceLimitCause {
     DetectionRepeatIterations,
     DetectionCompiledTerms,
     DetectionCompiledBytes,
-    DetectorErrorModelFlattenRepeatCount,
-    DetectorErrorModelFlattenExpandedInstructions,
-    DetectorErrorModelFlattenRepeatIterations,
-    DetectorErrorModelFlattenTargetOccurrences,
-    DetectorErrorModelFlattenArgumentValues,
-    DetectorErrorModelFlattenMaterializedUnits,
-    DetectorErrorModelFlattenMaterializedBytes,
     DetectorErrorModelSampledErrorApplications,
     DetectorErrorModelReplayWorkUnits,
     DetectorErrorModelMaterializedUnits,
@@ -316,69 +309,6 @@ impl ResourceLimitError {
         }
     }
 
-    pub(crate) const fn dem_flatten_repeat_count(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenRepeatCount,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_expanded_instructions(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenExpandedInstructions,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_repeat_iterations(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenRepeatIterations,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_target_occurrences(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_argument_values(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenArgumentValues,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_materialized_bytes(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_materialized_units(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits,
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
     pub(crate) const fn dem_sampled_error_applications(actual: usize, limit: usize) -> Self {
         Self {
             cause: ResourceLimitCause::DetectorErrorModelSampledErrorApplications,
@@ -466,6 +396,9 @@ impl ResourceLimitError {
                 stab_analysis::ResourceOperation::CircuitFlatten => {
                     ResourceOperation::CircuitFlatten
                 }
+                stab_analysis::ResourceOperation::DetectorErrorModelFlatten => {
+                    ResourceOperation::DetectorErrorModelFlatten
+                }
             },
             ResourceLimitCause::CircuitSourceLines
             | ResourceLimitCause::CircuitRepeatNesting { .. } => ResourceOperation::CircuitParse,
@@ -481,15 +414,6 @@ impl ResourceLimitError {
             | ResourceLimitCause::DetectionRepeatIterations
             | ResourceLimitCause::DetectionCompiledTerms
             | ResourceLimitCause::DetectionCompiledBytes => ResourceOperation::DetectionConversion,
-            ResourceLimitCause::DetectorErrorModelFlattenRepeatCount
-            | ResourceLimitCause::DetectorErrorModelFlattenExpandedInstructions
-            | ResourceLimitCause::DetectorErrorModelFlattenRepeatIterations
-            | ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences
-            | ResourceLimitCause::DetectorErrorModelFlattenArgumentValues
-            | ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits
-            | ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes => {
-                ResourceOperation::DetectorErrorModelFlatten
-            }
             ResourceLimitCause::DetectorErrorModelSampledErrorApplications
             | ResourceLimitCause::DetectorErrorModelReplayWorkUnits
             | ResourceLimitCause::DetectorErrorModelMaterializedUnits
@@ -507,6 +431,8 @@ impl ResourceLimitError {
             ResourceLimitCause::Analysis(error) => match error.resource() {
                 stab_analysis::ResourceKind::RepeatNesting => ResourceKind::RepeatNesting,
                 stab_analysis::ResourceKind::ExpandedOperations => ResourceKind::ExpandedOperations,
+                stab_analysis::ResourceKind::RepeatCount => ResourceKind::RepeatCount,
+                stab_analysis::ResourceKind::RepeatIterations => ResourceKind::RepeatIterations,
                 stab_analysis::ResourceKind::MaterializedUnits => ResourceKind::MaterializedUnits,
                 stab_analysis::ResourceKind::MaterializedBytes => ResourceKind::MaterializedBytes,
                 stab_analysis::ResourceKind::TargetOccurrences => ResourceKind::TargetOccurrences,
@@ -517,35 +443,18 @@ impl ResourceLimitError {
             ResourceLimitCause::CircuitRepeatNesting { .. }
             | ResourceLimitCause::DetectorErrorModelRepeatNesting
             | ResourceLimitCause::DetectionRepeatNesting => ResourceKind::RepeatNesting,
-            ResourceLimitCause::DetectionExpandedInstructions
-            | ResourceLimitCause::DetectorErrorModelFlattenExpandedInstructions => {
-                ResourceKind::ExpandedOperations
-            }
-            ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences => {
-                ResourceKind::TargetOccurrences
-            }
-            ResourceLimitCause::DetectorErrorModelFlattenArgumentValues => {
-                ResourceKind::ArgumentValues
-            }
-            ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes => {
-                ResourceKind::MaterializedBytes
-            }
+            ResourceLimitCause::DetectionExpandedInstructions => ResourceKind::ExpandedOperations,
             ResourceLimitCause::DetectionRecordBits { .. } => ResourceKind::RecordBits,
             ResourceLimitCause::DetectionMaterializedBits { .. } => ResourceKind::MaterializedBits,
-            ResourceLimitCause::DetectionRepeatCount
-            | ResourceLimitCause::DetectorErrorModelFlattenRepeatCount => ResourceKind::RepeatCount,
-            ResourceLimitCause::DetectionRepeatIterations
-            | ResourceLimitCause::DetectorErrorModelFlattenRepeatIterations => {
-                ResourceKind::RepeatIterations
-            }
+            ResourceLimitCause::DetectionRepeatCount => ResourceKind::RepeatCount,
+            ResourceLimitCause::DetectionRepeatIterations => ResourceKind::RepeatIterations,
             ResourceLimitCause::DetectionCompiledTerms => ResourceKind::CompiledTerms,
             ResourceLimitCause::DetectionCompiledBytes => ResourceKind::MaterializedBytes,
             ResourceLimitCause::DetectorErrorModelSampledErrorApplications => {
                 ResourceKind::SampledErrorApplications
             }
             ResourceLimitCause::DetectorErrorModelReplayWorkUnits => ResourceKind::ReplayWorkUnits,
-            ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits
-            | ResourceLimitCause::DetectorErrorModelMaterializedUnits => {
+            ResourceLimitCause::DetectorErrorModelMaterializedUnits => {
                 ResourceKind::MaterializedUnits
             }
             ResourceLimitCause::DetectorErrorModelMaterializedBytes => {
@@ -708,41 +617,6 @@ impl Display for ResourceLimitError {
             ResourceLimitCause::DetectionCompiledBytes => write!(
                 formatter,
                 "cannot compile circuit sampler: detection conversion would require at least {} compiled bytes; current limit is {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenRepeatCount => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports repeat counts up to {}, got {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenExpandedInstructions => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} expanded instructions, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenRepeatIterations => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} expanded repeat iterations, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenTargetOccurrences => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} target occurrences, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenArgumentValues => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} argument values, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenMaterializedBytes => write!(
-                formatter,
-                "invalid detector error model: DEM flattened would require at least {} materialized bytes; current limit is {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::DetectorErrorModelFlattenMaterializedUnits => write!(
-                formatter,
-                "invalid detector error model: DEM flattened instruction vector would require {} materialized units; platform limit is {}",
                 self.actual, self.limit
             ),
             ResourceLimitCause::DetectorErrorModelSampledErrorApplications => write!(

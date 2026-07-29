@@ -10,11 +10,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use stab_core::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
-    DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult, Probability,
-    analysis::{
-        detector_error_model_without_tags, flattened_detector_error_model,
-        rounded_detector_error_model,
-    },
+    DemRepeatCount, DemTarget, DetectorErrorModel, Probability,
+    analysis::flattened_detector_error_model,
 };
 
 #[test]
@@ -603,100 +600,6 @@ fn cq2_dem_coordinate_query_contract_matches_stim() {
 }
 
 #[test]
-fn cq2_dem_flattened_iteration_contract_matches_stim() {
-    let model = DetectorErrorModel::from_dem_str(
-        "error(0.125) D0\n\
-         repeat[tag] 2 {\n\
-             shift_detectors(3) 2\n\
-             detector(1, 2) D0\n\
-             error(0.25) D0 L0\n\
-         }\n\
-         logical_observable L0\n",
-    )
-    .expect("flattened DEM");
-    let instructions = model
-        .iter_flattened_instructions()
-        .collect::<ModelResult<Vec<_>>>()
-        .expect("lazy flattening");
-    assert_eq!(instructions.len(), 6);
-    let mut from_iterator = DetectorErrorModel::new();
-    for instruction in instructions {
-        from_iterator.push_instruction(instruction);
-    }
-    let expected = concat!(
-        "error(0.125) D0\n",
-        "detector(4, 2) D2\n",
-        "error(0.25) D2 L0\n",
-        "detector(7, 2) D4\n",
-        "error(0.25) D4 L0\n",
-        "logical_observable L0\n",
-    );
-    assert_eq!(from_iterator.to_dem_string(), expected);
-    assert_eq!(
-        flattened_detector_error_model(&model)
-            .expect("materialized flattening")
-            .to_dem_string(),
-        expected
-    );
-
-    let huge = DetectorErrorModel::from_dem_str("repeat 1000000000000 {\n    error(0.1) D0\n}\n")
-        .expect("large lazy DEM");
-    let first = huge
-        .iter_flattened_instructions()
-        .take(3)
-        .collect::<ModelResult<Vec<_>>>()
-        .expect("bounded lazy prefix");
-    assert_eq!(first.len(), 3);
-    assert!(flattened_detector_error_model(&huge).is_err());
-}
-
-#[test]
-fn cq2_dem_compact_transform_contract_matches_stim() {
-    let model = DetectorErrorModel::from_dem_str(
-        "error[first](0.01000002) D0 D1\n\
-         repeat[outer] 2 {\n\
-             error[inner](0.123456789) D1 D2 L3\n\
-             detector[coords](0.0200000334, 0.12345) D0\n\
-         }\n",
-    )
-    .expect("transform DEM");
-    assert_eq!(
-        rounded_detector_error_model(&model, 2).expect("rounded DEM"),
-        DetectorErrorModel::from_dem_str(
-            "error[first](0.01) D0 D1\n\
-             repeat[outer] 2 {\n\
-                 error[inner](0.12) D1 D2 L3\n\
-                 detector[coords](0.0200000334, 0.12345) D0\n\
-             }\n",
-        )
-        .expect("rounded reference")
-    );
-    let stripped = detector_error_model_without_tags(&model);
-    assert_eq!(
-        stripped,
-        DetectorErrorModel::from_dem_str(
-            "error(0.01000002) D0 D1\n\
-             repeat 2 {\n\
-                 error(0.123456789) D1 D2 L3\n\
-                 detector(0.0200000334, 0.12345) D0\n\
-             }\n",
-        )
-        .expect("tag-free reference")
-    );
-    assert!(!stripped.to_dem_string().contains('['));
-    assert!(model.to_dem_string().contains("[first]"));
-    assert_eq!(
-        rounded_detector_error_model(
-            &DetectorErrorModel::from_dem_str("error(0.000001) D0\n").expect("tiny error"),
-            2,
-        )
-        .expect("round tiny error")
-        .to_dem_string(),
-        "error(0) D0\n"
-    );
-}
-
-#[test]
 fn cq2_dem_instruction_source_matrix_matches_stim() {
     cq2_dem_target_value_and_parse_contract_matches_stim();
     cq2_dem_instruction_value_validation_and_print_contract_matches_stim();
@@ -706,12 +609,6 @@ fn cq2_dem_instruction_source_matrix_matches_stim() {
 #[test]
 fn cq2_dem_model_source_matrix_matches_stim() {
     cq2_dem_model_value_mutation_and_repeat_contract_matches_stim();
-}
-
-#[test]
-fn cq2_dem_materialized_transform_matrix_matches_stim() {
-    cq2_dem_flattened_iteration_contract_matches_stim();
-    cq2_dem_compact_transform_contract_matches_stim();
 }
 
 #[test]

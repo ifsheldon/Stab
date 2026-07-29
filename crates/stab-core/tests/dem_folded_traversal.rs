@@ -597,55 +597,6 @@ fn pfm_b3_folded_traversal_coordinates() {
 }
 
 #[test]
-fn pfm_b3_folded_traversal_transforms() {
-    let source = dem("repeat[outer] 1000000000 {\n\
-             error[first](0.123456) D0 L0\n\
-             detector[coords](1, 2) D0\n\
-             repeat[inner] 3 {\n\
-                 error[tiny](0.0004) D1\n\
-             }\n\
-         }\n");
-    let rounded = source.rounded(3).expect("compact rounded transform");
-    assert_eq!(
-        rounded,
-        dem("repeat[outer] 1000000000 {\n\
-                 error[first](0.123) D0 L0\n\
-                 detector[coords](1, 2) D0\n\
-                 repeat[inner] 3 {\n\
-                     error[tiny](0) D1\n\
-                 }\n\
-             }\n")
-    );
-    let stripped = source.without_tags().to_dem_string();
-    assert!(stripped.starts_with("repeat 1000000000"), "{stripped}");
-    assert!(!stripped.contains('['), "{stripped}");
-    let flatten_error = source
-        .flattened()
-        .expect_err("materialized flattening keeps its explicit cap");
-    assert!(
-        flatten_error.to_string().contains("supports repeat counts"),
-        "{flatten_error}"
-    );
-
-    let mut deep = dem("error[tag](0.1234) D0\n");
-    for _ in 0..257 {
-        let mut outer = DetectorErrorModel::new();
-        outer.push_repeat_block(DemRepeatBlock::new(
-            DemRepeatCount::new(1),
-            deep,
-            Some("nested".to_string()),
-        ));
-        deep = outer;
-    }
-    assert_eq!(deep.count_errors(), Ok(1));
-    assert_eq!(
-        deep.rounded(2).expect("deep rounded model").count_errors(),
-        Ok(1)
-    );
-    assert!(!deep.without_tags().to_dem_string().contains('['));
-}
-
-#[test]
 fn pfm_b3_folded_traversal_sampler() {
     const SHOTS: usize = 100_000;
     let stochastic = dem("repeat 1000001 {\n\

@@ -15,6 +15,7 @@ mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_to_dem;
 mod circuit_transforms;
+mod dem;
 mod error;
 pub mod gate;
 mod mbqc_decomposition;
@@ -56,6 +57,10 @@ pub use circuit_to_dem::{
 pub use circuit_transforms::{
     CircuitFlattenLimits, circuit_without_noise, flattened_circuit, flattened_circuit_operations,
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
+};
+pub use dem::{
+    DemFlattenLimits, detector_error_model_without_tags, flattened_detector_error_model,
+    flattened_detector_error_model_with_limits, rounded_detector_error_model,
 };
 pub use error::{AnalysisError, AnalysisResult};
 pub use gate::{

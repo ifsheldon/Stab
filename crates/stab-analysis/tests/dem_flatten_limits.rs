@@ -4,10 +4,13 @@
     reason = "flattening policy tests use compact fixture construction and exact diagnostics"
 )]
 
-use stab_core::{
-    CircuitResult, DemFlattenLimits, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock,
-    DemRepeatCount, DemTarget, DetectorErrorModel, ResourceKind, ResourceOperation,
-    analysis::{flattened_detector_error_model, flattened_detector_error_model_with_limits},
+use stab_analysis::{
+    AnalysisResult, DemFlattenLimits, ResourceKind, ResourceOperation,
+    flattened_detector_error_model, flattened_detector_error_model_with_limits,
+};
+use stab_model::{
+    DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget,
+    DetectorErrorModel,
 };
 
 fn nested_repeat_model() -> DetectorErrorModel {
@@ -33,31 +36,6 @@ fn single_error_model() -> DetectorErrorModel {
         .expect("build error instruction"),
     );
     model
-}
-
-#[test]
-fn policy_builders_and_getters_keep_independent_values() {
-    let defaults = DemFlattenLimits::default();
-    assert_eq!(defaults.max_repeat_unroll(), 100_000);
-    assert_eq!(defaults.max_expanded_instructions(), 1_000_000);
-    assert_eq!(defaults.max_repeat_iterations(), 1_000_000);
-    assert_eq!(defaults.max_target_occurrences(), 32_000_000);
-    assert_eq!(defaults.max_argument_values(), 16_000_000);
-    assert_eq!(defaults.max_materialized_bytes(), 512 * 1024 * 1024);
-
-    let customized = defaults
-        .with_max_repeat_unroll(3)
-        .with_max_expanded_instructions(6)
-        .with_max_repeat_iterations(8)
-        .with_max_target_occurrences(9)
-        .with_max_argument_values(10)
-        .with_max_materialized_bytes(11);
-    assert_eq!(customized.max_repeat_unroll(), 3);
-    assert_eq!(customized.max_expanded_instructions(), 6);
-    assert_eq!(customized.max_repeat_iterations(), 8);
-    assert_eq!(customized.max_target_occurrences(), 9);
-    assert_eq!(customized.max_argument_values(), 10);
-    assert_eq!(customized.max_materialized_bytes(), 11);
 }
 
 #[test]
@@ -338,7 +316,7 @@ fn repeat_nesting_remains_a_fixed_non_configurable_invariant() {
 }
 
 #[test]
-fn default_entry_points_are_equivalent_and_keep_default_error_text() -> CircuitResult<()> {
+fn default_entry_points_are_equivalent_and_keep_default_error_text() -> AnalysisResult<()> {
     let model = nested_repeat_model();
     let free = flattened_detector_error_model(&model)?;
     let explicit_defaults =

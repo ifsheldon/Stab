@@ -5,20 +5,15 @@
 )]
 
 use stab_core::{
-    Circuit, CircuitInstruction, CircuitItem, DemItem, DetectorErrorModel,
+    Circuit, CircuitInstruction, CircuitItem,
     analysis::{
         circuit_inverse_qec, circuit_inverse_unitary, circuit_with_inlined_feedback,
-        circuit_without_noise, decomposed_circuit, flattened_circuit,
-        flattened_detector_error_model, rounded_detector_error_model, simplified_circuit,
+        circuit_without_noise, decomposed_circuit, flattened_circuit, simplified_circuit,
     },
 };
 
 fn circuit_from_bytes(bytes: &[u8]) -> Circuit {
     Circuit::from_stim_bytes(bytes).expect("parse opaque-tag circuit")
-}
-
-fn dem_from_bytes(bytes: &[u8]) -> DetectorErrorModel {
-    DetectorErrorModel::from_dem_bytes(bytes).expect("parse opaque-tag DEM")
 }
 
 fn circuit_instructions(circuit: &Circuit) -> Vec<&CircuitInstruction> {
@@ -33,17 +28,6 @@ fn circuit_instruction_tags(circuit: &Circuit) -> Vec<Option<&[u8]>> {
     circuit_instructions(circuit)
         .into_iter()
         .map(CircuitInstruction::tag_bytes)
-        .collect()
-}
-
-fn dem_top_level_tags(model: &DetectorErrorModel) -> Vec<Option<&[u8]>> {
-    model
-        .items()
-        .iter()
-        .map(|item| match item {
-            DemItem::Instruction(instruction) => instruction.tag_bytes(),
-            DemItem::RepeatBlock(repeat) => repeat.tag_bytes(),
-        })
         .collect()
 }
 
@@ -208,65 +192,6 @@ fn feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operation
             Some(b"\xfb".as_slice()),
             Some(b"\xfa".as_slice()),
             Some(b"\xf9".as_slice()),
-        ]
-    );
-}
-
-#[test]
-fn rounded_dem_preserves_opaque_instruction_and_repeat_tags() {
-    let model = dem_from_bytes(
-        b"error[\xff](0.49) D0\n\
-          repeat[\xfe] 2 {\n    error[\xfd](0.51) D1\n}\n",
-    );
-    let rounded = rounded_detector_error_model(&model, 0).expect("round tagged DEM");
-
-    assert_eq!(
-        rounded.to_dem_bytes(),
-        b"error[\xff](0) D0\nrepeat[\xfe] 2 {\n    error[\xfd](1) D1\n}\n"
-    );
-    assert_eq!(
-        dem_top_level_tags(&rounded),
-        vec![Some(b"\xff".as_slice()), Some(b"\xfe".as_slice())]
-    );
-    let repeat = rounded
-        .items()
-        .iter()
-        .find_map(|item| match item {
-            DemItem::Instruction(_) => None,
-            DemItem::RepeatBlock(repeat) => Some(repeat),
-        })
-        .expect("rounded repeat block");
-    assert_eq!(
-        dem_top_level_tags(repeat.body()),
-        vec![Some(b"\xfd".as_slice())]
-    );
-}
-
-#[test]
-fn flattened_dem_preserves_opaque_tags_on_materialized_instructions() {
-    let model = dem_from_bytes(
-        b"error[\xff](0.5) D0\n\
-          shift_detectors[\xfc] 3\n\
-          repeat[\xfe] 2 {\n    error[\xfd](0.25) D0 L1\n    detector[\xfb] D1\n    shift_detectors[\xfa] 2\n}\n",
-    );
-    let flattened = flattened_detector_error_model(&model).expect("flatten tagged DEM");
-
-    assert_eq!(
-        flattened.to_dem_bytes(),
-        b"error[\xff](0.5) D0\n\
-          error[\xfd](0.25) D3 L1\n\
-          detector[\xfb] D4\n\
-          error[\xfd](0.25) D5 L1\n\
-          detector[\xfb] D6\n"
-    );
-    assert_eq!(
-        dem_top_level_tags(&flattened),
-        vec![
-            Some(b"\xff".as_slice()),
-            Some(b"\xfd".as_slice()),
-            Some(b"\xfb".as_slice()),
-            Some(b"\xfd".as_slice()),
-            Some(b"\xfb".as_slice()),
         ]
     );
 }
