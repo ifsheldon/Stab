@@ -214,7 +214,10 @@ fn validate_worker_evidence(
                 commit,
                 &report.toolchain,
             )
-            .map_err(|_| SimdCompareError::WorkerEvidence)?;
+            .map_err(|source| SimdCompareError::WorkerEvidence {
+                variant: worker.variant,
+                source,
+            })?;
     }
     Ok(())
 }
@@ -453,7 +456,12 @@ fn validate_invocation(
     let worker = match variant {
         StabBuildVariant::Scalar => &report.scalar_worker,
         StabBuildVariant::PortableSimd => &report.portable_worker,
-        StabBuildVariant::LegacyDefault => return Err(SimdCompareError::WorkerEvidence),
+        StabBuildVariant::LegacyDefault => {
+            return Err(SimdCompareError::WorkerEvidence {
+                variant,
+                source: super::super::stab_build::StabBuildError::LegacyBuildVariant,
+            });
+        }
     };
     let expected_work_count = iterations
         .get()

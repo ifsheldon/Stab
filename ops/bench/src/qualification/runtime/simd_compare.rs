@@ -20,7 +20,7 @@ use super::protocol::{
 use super::run::{
     ClaimClass, INVOCATION_TIMEOUT, QualificationTier, RepositoryEvidence, WARMUP_BATCHES,
 };
-use super::stab_build::{StabBuildReceipt, StabBuildVariant};
+use super::stab_build::{StabBuildError, StabBuildReceipt, StabBuildVariant};
 use super::statistics::{
     StatisticsError, bootstrap_interval, median, relative_mad, validate_positive_finite,
 };
@@ -815,8 +815,12 @@ pub(super) enum SimdCompareError {
     InventoryEvidence,
     #[error("SIMD comparison report repository identity is stale")]
     RepositoryEvidence,
-    #[error("SIMD comparison worker build evidence is stale or inconsistent")]
-    WorkerEvidence,
+    #[error("SIMD comparison {variant:?} worker build evidence is stale or inconsistent: {source}")]
+    WorkerEvidence {
+        variant: StabBuildVariant,
+        #[source]
+        source: StabBuildError,
+    },
     #[error("SIMD comparison group or scale evidence differs from its runtime contract")]
     GroupEvidence,
     #[error("SIMD comparison calibration evidence does not replay")]

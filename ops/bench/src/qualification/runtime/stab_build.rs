@@ -339,27 +339,28 @@ impl StabBuildReceipt {
         repository_commit: &str,
         toolchain: &ToolchainEvidence,
     ) -> Result<(), StabBuildError> {
-        let source_matches =
-            digest_materialized_worker_source(&source_root.path)? == self.worker_source_sha256;
-        let manifests_match = digest_file(&source_root.path.join("Cargo.lock"))?
-            == self.cargo_lock_sha256
-            && digest_file(&source_root.path.join("Cargo.toml"))? == self.workspace_manifest_sha256
-            && digest_file(&source_root.path.join("ops/bench/Cargo.toml"))?
-                == self.package_manifest_sha256;
-        if source_matches
-            && manifests_match
-            && self.validates_report_identity(
-                source_sha256,
-                build_fingerprint,
-                binary_sha256,
-                repository_commit,
-                toolchain,
-            )
-        {
-            Ok(())
-        } else {
-            Err(StabBuildError::StaleIdentity)
+        if digest_materialized_worker_source(&source_root.path)? != self.worker_source_sha256 {
+            return Err(StabBuildError::ReplayedSourceIdentity);
         }
+        for (relative_path, expected) in [
+            ("Cargo.lock", &self.cargo_lock_sha256),
+            ("Cargo.toml", &self.workspace_manifest_sha256),
+            ("ops/bench/Cargo.toml", &self.package_manifest_sha256),
+        ] {
+            if digest_file(&source_root.path.join(relative_path))? != *expected {
+                return Err(StabBuildError::ReplayedManifestIdentity(relative_path));
+            }
+        }
+        if !self.validates_report_identity(
+            source_sha256,
+            build_fingerprint,
+            binary_sha256,
+            repository_commit,
+            toolchain,
+        ) {
+            return Err(StabBuildError::StaleIdentity);
+        }
+        Ok(())
     }
 
     fn recomputed_build_fingerprint(&self) -> Result<String, StabBuildError> {
@@ -678,6 +679,10 @@ pub(super) enum StabBuildError {
     InvalidCargoHome(PathBuf),
     #[error("legacy-default is a read-only historical Stab build variant")]
     LegacyBuildVariant,
+    #[error("replayed Stab worker source does not match the sealed build receipt")]
+    ReplayedSourceIdentity,
+    #[error("replayed Stab manifest {0} does not match the sealed build receipt")]
+    ReplayedManifestIdentity(&'static str),
     #[error("sealed Stab worker or build receipt changed identity")]
     StaleIdentity,
     #[error(transparent)]
