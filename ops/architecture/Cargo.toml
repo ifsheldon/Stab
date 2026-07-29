@@ -14,7 +14,7 @@ workspace = true
 [dependencies]
 cargo_metadata = { workspace = true }
 clap = { workspace = true }
-syn = { workspace = true }
+syn = { workspace = true, features = ["visit"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]

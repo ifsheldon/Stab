@@ -1,0 +1,12 @@
+[package]
+name = "fixture-consumer"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+stab-core-copy = { package = "stab-core", path = "../../external/stab-core" }
+
+[lib]
+path = "src/lib.rs"
+

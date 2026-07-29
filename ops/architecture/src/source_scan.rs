@@ -1,13 +1,23 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use syn::{Item, UseTree, Visibility};
+use syn::punctuated::Punctuated;
+use syn::visit::{self, Visit};
+use syn::{Item, Meta, Token, UseTree, Visibility};
 
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
 const FACADE_ROOT_MODULES: [&str; 4] = ["advanced", "analysis", "execution", "experimental"];
+const FACADE_ADVANCED_MODULES: [&str; 6] = [
+    "storage",
+    "algebra",
+    "records",
+    "backend",
+    "traversal",
+    "compat",
+];
 
 pub(super) struct SourceReport {
     pub rust_source_count: usize,
@@ -41,7 +51,20 @@ pub(super) fn scan_workspace_sources(
                 source,
             }
         })?;
-        if !contains_portable_simd_site(&source) {
+        let contains_portable_simd = match contains_portable_simd_site(&source) {
+            Ok(contains_portable_simd) => contains_portable_simd,
+            Err(error) => {
+                violations.push(Violation::new(
+                    "portable-simd-source-parse",
+                    format!(
+                        "failed to parse {} while proving portable-SIMD isolation: {error}",
+                        source_path.display()
+                    ),
+                ));
+                continue;
+            }
+        };
+        if !contains_portable_simd {
             continue;
         }
         let package = package_for_source(source_path, packages);
@@ -70,31 +93,42 @@ pub(super) fn scan_workspace_sources(
 fn validate_facade_tiers(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
     let facade_root = Path::new("crates/stab-core/src/lib.rs");
     let facade_advanced = Path::new("crates/stab-core/src/advanced.rs");
+    let facade_experimental = Path::new("crates/stab-core/src/experimental.rs");
     let root_reexports = Path::new(FACADE_ROOT_REEXPORTS);
     let root_source = read_source(root, facade_root)?;
     let advanced_source = read_source(root, facade_advanced)?;
+    let experimental_source = read_source(root, facade_experimental)?;
     let root_reexport_inventory = read_source(root, root_reexports)?;
     violations.extend(facade_tier_violations(
-        facade_root,
-        &root_source,
-        facade_advanced,
-        &advanced_source,
-        root_reexports,
-        &root_reexport_inventory,
+        FacadeSource::new(facade_root, &root_source),
+        FacadeSource::new(facade_advanced, &advanced_source),
+        FacadeSource::new(facade_experimental, &experimental_source),
+        FacadeSource::new(root_reexports, &root_reexport_inventory),
     ));
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+struct FacadeSource<'a> {
+    path: &'a Path,
+    source: &'a str,
+}
+
+impl<'a> FacadeSource<'a> {
+    fn new(path: &'a Path, source: &'a str) -> Self {
+        Self { path, source }
+    }
+}
+
 fn facade_tier_violations(
-    facade_root: &Path,
-    root_source: &str,
-    facade_advanced: &Path,
-    advanced_source: &str,
-    root_reexports: &Path,
-    root_reexport_inventory: &str,
+    root: FacadeSource<'_>,
+    advanced: FacadeSource<'_>,
+    experimental: FacadeSource<'_>,
+    root_reexports: FacadeSource<'_>,
 ) -> Vec<Violation> {
     let mut violations = Vec::new();
-    let root_surface = parse_facade_surface(facade_root, root_source, &mut violations);
+    let root_surface =
+        parse_facade_surface(root.path, root.source, FacadeTier::Root, &mut violations);
     let expected_root_modules = FACADE_ROOT_MODULES
         .into_iter()
         .map(str::to_owned)
@@ -104,7 +138,7 @@ fn facade_tier_violations(
             "facade-tier-missing",
             format!(
                 "{} must publicly declare module `{missing}`",
-                facade_root.display()
+                root.path.display()
             ),
         ));
     }
@@ -113,20 +147,20 @@ fn facade_tier_violations(
             "facade-root-module-unassigned",
             format!(
                 "{} publicly declares unassigned root module `{unexpected}`",
-                facade_root.display()
+                root.path.display()
             ),
         ));
     }
 
     let expected_root_reexports =
-        parse_root_reexport_inventory(root_reexports, root_reexport_inventory, &mut violations);
+        parse_root_reexport_inventory(root_reexports.path, root_reexports.source, &mut violations);
     for missing in expected_root_reexports.difference(&root_surface.reexports) {
         violations.push(Violation::new(
             "facade-root-reexport-missing",
             format!(
                 "{} assigns `{missing}` to the facade root, but {} does not reexport it",
-                root_reexports.display(),
-                facade_root.display()
+                root_reexports.path.display(),
+                root.path.display()
             ),
         ));
     }
@@ -135,30 +169,28 @@ fn facade_tier_violations(
             "facade-root-reexport-unassigned",
             format!(
                 "{} publicly reexports unassigned root item `{unexpected}`; assign it in {} or move it under `advanced`",
-                facade_root.display(),
-                root_reexports.display()
+                root.path.display(),
+                root_reexports.path.display()
             ),
         ));
     }
 
-    let advanced_surface = parse_facade_surface(facade_advanced, advanced_source, &mut violations);
-    let required_advanced_modules = [
-        "storage",
-        "algebra",
-        "records",
-        "backend",
-        "traversal",
-        "compat",
-    ]
-    .into_iter()
-    .map(str::to_owned)
-    .collect::<BTreeSet<_>>();
+    let advanced_surface = parse_facade_surface(
+        advanced.path,
+        advanced.source,
+        FacadeTier::Advanced,
+        &mut violations,
+    );
+    let required_advanced_modules = FACADE_ADVANCED_MODULES
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
     for required in required_advanced_modules.difference(&advanced_surface.modules) {
         violations.push(Violation::new(
             "facade-advanced-module-missing",
             format!(
                 "{} must publicly declare module `{required}`",
-                facade_advanced.display()
+                advanced.path.display()
             ),
         ));
     }
@@ -170,12 +202,87 @@ fn facade_tier_violations(
             "facade-advanced-module-unassigned",
             format!(
                 "{} publicly declares unassigned advanced module `{unexpected}`",
-                facade_advanced.display()
+                advanced.path.display()
+            ),
+        ));
+    }
+    for reexport in &advanced_surface.reexports {
+        violations.push(Violation::new(
+            "facade-advanced-reexport",
+            format!(
+                "{} publicly reexports top-level item `{reexport}`; advanced items must live under an assigned module",
+                advanced.path.display()
+            ),
+        ));
+    }
+
+    let experimental_surface = parse_facade_surface(
+        experimental.path,
+        experimental.source,
+        FacadeTier::Experimental,
+        &mut violations,
+    );
+    for module in &experimental_surface.modules {
+        violations.push(Violation::new(
+            "facade-experimental-module",
+            format!(
+                "{} publicly declares experimental module `{module}` before A8 defines an allowlist",
+                experimental.path.display()
+            ),
+        ));
+    }
+    for reexport in &experimental_surface.reexports {
+        violations.push(Violation::new(
+            "facade-experimental-reexport",
+            format!(
+                "{} publicly reexports experimental item `{reexport}` before A8 defines an allowlist",
+                experimental.path.display()
             ),
         ));
     }
 
     violations
+}
+
+#[derive(Clone, Copy)]
+enum FacadeTier {
+    Root,
+    Advanced,
+    Experimental,
+}
+
+impl FacadeTier {
+    fn direct_item_code(self) -> &'static str {
+        match self {
+            Self::Root => "facade-root-direct-item",
+            Self::Advanced => "facade-advanced-direct-item",
+            Self::Experimental => "facade-experimental-direct-item",
+        }
+    }
+
+    fn anonymous_reexport_code(self) -> &'static str {
+        match self {
+            Self::Root => "facade-root-anonymous-reexport",
+            Self::Advanced => "facade-advanced-anonymous-reexport",
+            Self::Experimental => "facade-experimental-anonymous-reexport",
+        }
+    }
+
+    fn glob_reexport_code(self) -> &'static str {
+        match self {
+            Self::Root => "facade-root-glob-reexport",
+            Self::Advanced => "facade-advanced-glob-reexport",
+            Self::Experimental => "facade-experimental-glob-reexport",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Root => "facade root",
+            Self::Advanced => "advanced facade",
+            Self::Experimental => "experimental facade",
+        }
+    }
 }
 
 #[derive(Default)]
@@ -187,6 +294,7 @@ struct FacadeSurface {
 fn parse_facade_surface(
     path: &Path,
     source: &str,
+    tier: FacadeTier,
     violations: &mut Vec<Violation>,
 ) -> FacadeSurface {
     let syntax = match syn::parse_file(source) {
@@ -210,44 +318,45 @@ fn parse_facade_surface(
                 surface.modules.insert(item.ident.to_string());
             }
             Item::Use(item) if is_public(&item.vis) => {
-                collect_public_use_names(path, &item.tree, None, &mut surface, violations);
+                collect_public_use_names(path, &item.tree, None, tier, &mut surface, violations);
             }
             Item::Const(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "constant", &item.ident, violations);
+                report_direct_item(path, tier, "constant", &item.ident, violations);
             }
             Item::Enum(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "enum", &item.ident, violations);
+                report_direct_item(path, tier, "enum", &item.ident, violations);
             }
             Item::ExternCrate(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "extern crate", &item.ident, violations);
+                report_direct_item(path, tier, "extern crate", &item.ident, violations);
             }
             Item::Fn(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "function", &item.sig.ident, violations);
+                report_direct_item(path, tier, "function", &item.sig.ident, violations);
             }
             Item::Static(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "static", &item.ident, violations);
+                report_direct_item(path, tier, "static", &item.ident, violations);
             }
             Item::Struct(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "struct", &item.ident, violations);
+                report_direct_item(path, tier, "struct", &item.ident, violations);
             }
             Item::Trait(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "trait", &item.ident, violations);
+                report_direct_item(path, tier, "trait", &item.ident, violations);
             }
             Item::TraitAlias(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "trait alias", &item.ident, violations);
+                report_direct_item(path, tier, "trait alias", &item.ident, violations);
             }
             Item::Type(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "type alias", &item.ident, violations);
+                report_direct_item(path, tier, "type alias", &item.ident, violations);
             }
             Item::Union(item) if is_public(&item.vis) => {
-                report_direct_root_item(path, "union", &item.ident, violations);
+                report_direct_item(path, tier, "union", &item.ident, violations);
             }
             Item::Macro(item) if has_macro_export(&item.attrs) => {
                 violations.push(Violation::new(
-                    "facade-root-direct-item",
+                    tier.direct_item_code(),
                     format!(
-                        "{} defines a root-exported macro; facade root items must be explicit reexports",
-                        path.display()
+                        "{} defines an exported macro directly in the {}; exported items must follow its tier policy",
+                        path.display(),
+                        tier.label()
                     ),
                 ));
             }
@@ -268,17 +377,19 @@ fn has_macro_export(attributes: &[syn::Attribute]) -> bool {
         .any(|attribute| attribute.path().is_ident("macro_export"))
 }
 
-fn report_direct_root_item(
+fn report_direct_item(
     path: &Path,
+    tier: FacadeTier,
     kind: &str,
     name: &syn::Ident,
     violations: &mut Vec<Violation>,
 ) {
     violations.push(Violation::new(
-        "facade-root-direct-item",
+        tier.direct_item_code(),
         format!(
-            "{} defines public {kind} `{name}`; facade root items must be explicit reexports",
-            path.display()
+            "{} defines public {kind} `{name}` directly in the {}; exported items must follow its tier policy",
+            path.display(),
+            tier.label()
         ),
     ));
 }
@@ -287,6 +398,7 @@ fn collect_public_use_names(
     path: &Path,
     tree: &UseTree,
     parent: Option<&syn::Ident>,
+    tier: FacadeTier,
     surface: &mut FacadeSurface,
     violations: &mut Vec<Violation>,
 ) {
@@ -295,6 +407,7 @@ fn collect_public_use_names(
             path,
             &path_tree.tree,
             Some(&path_tree.ident),
+            tier,
             surface,
             violations,
         ),
@@ -309,11 +422,12 @@ fn collect_public_use_names(
         UseTree::Rename(rename) => {
             if rename.rename == "_" {
                 violations.push(Violation::new(
-                    "facade-root-anonymous-reexport",
+                    tier.anonymous_reexport_code(),
                     format!(
-                        "{} contains anonymous public reexport `{}` as `_`",
+                        "{} contains anonymous public reexport `{}` as `_` in the {}",
                         path.display(),
-                        rename.ident
+                        rename.ident,
+                        tier.label()
                     ),
                 ));
             } else {
@@ -322,16 +436,16 @@ fn collect_public_use_names(
         }
         UseTree::Glob(_) => {
             violations.push(Violation::new(
-                "facade-root-glob-reexport",
+                tier.glob_reexport_code(),
                 format!(
-                    "{} contains a public glob reexport; facade tiers require explicit item names",
-                    path.display()
+                    "{} contains a public glob reexport in the {}; facade tiers require explicit item names",
+                    path.display(), tier.label()
                 ),
             ));
         }
         UseTree::Group(group) => {
             for item in &group.items {
-                collect_public_use_names(path, item, parent, surface, violations);
+                collect_public_use_names(path, item, parent, tier, surface, violations);
             }
         }
     }
@@ -376,7 +490,12 @@ fn parse_root_reexport_inventory(
 #[cfg(test)]
 fn public_module_names(source: &str) -> BTreeSet<String> {
     let mut violations = Vec::new();
-    let surface = parse_facade_surface(Path::new("fixture.rs"), source, &mut violations);
+    let surface = parse_facade_surface(
+        Path::new("fixture.rs"),
+        source,
+        FacadeTier::Root,
+        &mut violations,
+    );
     assert!(violations.is_empty(), "{violations:?}");
     surface.modules
 }
@@ -461,43 +580,246 @@ fn package_for_source<'a>(
         .max_by_key(|package| package.relative_path.components().count())
 }
 
-fn contains_portable_simd_site(source: &str) -> bool {
-    let compact = source
-        .chars()
-        .filter(|character| !character.is_ascii_whitespace())
-        .collect::<String>();
-    contains_rooted_simd(&compact, "std")
-        || contains_rooted_simd(&compact, "core")
-        || compact.contains(&["#![feature(", "portable", "_simd", ")]"].concat())
+fn contains_portable_simd_site(source: &str) -> syn::Result<bool> {
+    let syntax = syn::parse_file(source)?;
+    let root_aliases = collect_standard_root_aliases(&syntax);
+    let mut inspector = PortableSimdInspector {
+        root_aliases: &root_aliases,
+        found: false,
+        attribute_error: None,
+    };
+    inspector.visit_file(&syntax);
+    if let Some(error) = inspector.attribute_error {
+        return Err(error);
+    }
+    Ok(inspector.found)
 }
 
-fn contains_rooted_simd(compact: &str, root: &str) -> bool {
-    if compact.contains(&format!("{root}::simd")) {
-        return true;
+fn collect_standard_root_aliases(syntax: &syn::File) -> BTreeSet<String> {
+    let mut aliases = ["core".to_owned(), "std".to_owned()]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    loop {
+        let mut collector = StandardRootAliasCollector {
+            known_aliases: &aliases,
+            discovered_aliases: BTreeSet::new(),
+        };
+        collector.visit_file(syntax);
+        let previous_len = aliases.len();
+        aliases.extend(collector.discovered_aliases);
+        if aliases.len() == previous_len {
+            return aliases;
+        }
+    }
+}
+
+struct StandardRootAliasCollector<'a> {
+    known_aliases: &'a BTreeSet<String>,
+    discovered_aliases: BTreeSet<String>,
+}
+
+impl<'ast> Visit<'ast> for StandardRootAliasCollector<'_> {
+    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+        collect_standard_aliases_from_use_tree(
+            &item.tree,
+            &mut Vec::new(),
+            self.known_aliases,
+            &mut self.discovered_aliases,
+        );
+        visit::visit_item_use(self, item);
     }
 
-    let grouped_prefix = format!("{root}::{{");
-    let mut remainder = compact;
-    while let Some(prefix_index) = remainder.find(&grouped_prefix) {
-        let Some(group) = remainder.get(prefix_index + grouped_prefix.len()..) else {
-            return false;
-        };
-        let group_end = group.find(';').unwrap_or(group.len());
-        let Some(group_contents) = group.get(..group_end) else {
-            return false;
-        };
-        if group_contents
-            .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
-            .any(|identifier| identifier == "simd")
-        {
-            return true;
+    fn visit_item_extern_crate(&mut self, item: &'ast syn::ItemExternCrate) {
+        if matches!(item.ident.to_string().as_str(), "core" | "std") {
+            let alias = item
+                .rename
+                .as_ref()
+                .map_or_else(|| item.ident.to_string(), |(_, rename)| rename.to_string());
+            if alias != "_" {
+                self.discovered_aliases.insert(alias);
+            }
         }
-        let Some(next_remainder) = group.get(group_end..) else {
-            return false;
-        };
-        remainder = next_remainder;
+        visit::visit_item_extern_crate(self, item);
     }
-    false
+}
+
+fn collect_standard_aliases_from_use_tree(
+    tree: &UseTree,
+    prefix: &mut Vec<String>,
+    known_aliases: &BTreeSet<String>,
+    discovered_aliases: &mut BTreeSet<String>,
+) {
+    match tree {
+        UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            collect_standard_aliases_from_use_tree(
+                &path.tree,
+                prefix,
+                known_aliases,
+                discovered_aliases,
+            );
+            prefix.pop();
+        }
+        UseTree::Rename(rename) => {
+            let mut source = prefix.clone();
+            if rename.ident != "self" {
+                source.push(rename.ident.to_string());
+            }
+            if source.len() == 1
+                && source
+                    .first()
+                    .is_some_and(|root| known_aliases.contains(root))
+                && rename.rename != "_"
+            {
+                discovered_aliases.insert(rename.rename.to_string());
+            }
+        }
+        UseTree::Group(group) => {
+            for tree in &group.items {
+                collect_standard_aliases_from_use_tree(
+                    tree,
+                    prefix,
+                    known_aliases,
+                    discovered_aliases,
+                );
+            }
+        }
+        UseTree::Name(_) | UseTree::Glob(_) => {}
+    }
+}
+
+struct PortableSimdInspector<'a> {
+    root_aliases: &'a BTreeSet<String>,
+    found: bool,
+    attribute_error: Option<syn::Error>,
+}
+
+impl<'ast> Visit<'ast> for PortableSimdInspector<'_> {
+    fn visit_attribute(&mut self, attribute: &'ast syn::Attribute) {
+        if self.found || self.attribute_error.is_some() {
+            return;
+        }
+        match meta_enables_portable_simd(&attribute.meta) {
+            Ok(found) => self.found = found,
+            Err(error) => self.attribute_error = Some(error),
+        }
+    }
+
+    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+        if !self.found {
+            self.found =
+                use_tree_contains_portable_simd(&item.tree, &mut Vec::new(), self.root_aliases);
+        }
+        if !self.found {
+            visit::visit_item_use(self, item);
+        }
+    }
+
+    fn visit_path(&mut self, path: &'ast syn::Path) {
+        if !self.found {
+            self.found = path_segments_contain_portable_simd(
+                path.segments
+                    .iter()
+                    .map(|segment| segment.ident.to_string()),
+                self.root_aliases,
+            );
+        }
+        if !self.found {
+            visit::visit_path(self, path);
+        }
+    }
+}
+
+fn meta_enables_portable_simd(meta: &Meta) -> syn::Result<bool> {
+    let Meta::List(list) = meta else {
+        return Ok(false);
+    };
+    if list.path.is_ident("feature") {
+        let features =
+            list.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated)?;
+        return Ok(features
+            .iter()
+            .any(|feature| feature.is_ident("portable_simd")));
+    }
+    if !list.path.is_ident("cfg_attr") {
+        return Ok(false);
+    }
+
+    let nested = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in nested {
+        if meta_enables_portable_simd(&meta)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn use_tree_contains_portable_simd(
+    tree: &UseTree,
+    prefix: &mut Vec<String>,
+    root_aliases: &BTreeSet<String>,
+) -> bool {
+    match tree {
+        UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            let found = path_segments_contain_portable_simd(
+                prefix.iter().map(String::as_str),
+                root_aliases,
+            ) || use_tree_contains_portable_simd(&path.tree, prefix, root_aliases);
+            prefix.pop();
+            found
+        }
+        UseTree::Name(name) => {
+            let include_name = name.ident != "self";
+            if include_name {
+                prefix.push(name.ident.to_string());
+            }
+            let found = path_segments_contain_portable_simd(
+                prefix.iter().map(String::as_str),
+                root_aliases,
+            );
+            if include_name {
+                prefix.pop();
+            }
+            found
+        }
+        UseTree::Rename(rename) => {
+            let include_name = rename.ident != "self";
+            if include_name {
+                prefix.push(rename.ident.to_string());
+            }
+            let found = path_segments_contain_portable_simd(
+                prefix.iter().map(String::as_str),
+                root_aliases,
+            );
+            if include_name {
+                prefix.pop();
+            }
+            found
+        }
+        UseTree::Glob(_) => {
+            path_segments_contain_portable_simd(prefix.iter().map(String::as_str), root_aliases)
+        }
+        UseTree::Group(group) => group
+            .items
+            .iter()
+            .any(|tree| use_tree_contains_portable_simd(tree, prefix, root_aliases)),
+    }
+}
+
+fn path_segments_contain_portable_simd<I, S>(segments: I, root_aliases: &BTreeSet<String>) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut segments = segments.into_iter();
+    let Some(root) = segments.next() else {
+        return false;
+    };
+    let Some(module) = segments.next() else {
+        return false;
+    };
+    root_aliases.contains(root.as_ref()) && module.as_ref() == "simd"
 }
 
 #[cfg(test)]
@@ -512,21 +834,59 @@ mod tests {
         ["use ", root, "::{mem, ", "simd", "::{Simd}};"].concat()
     }
 
+    fn has_portable_simd(source: &str) -> bool {
+        contains_portable_simd_site(source).expect("fixture must parse")
+    }
+
     #[test]
     fn finds_direct_grouped_and_feature_gated_portable_simd() {
-        assert!(contains_portable_simd_site(&direct_import("std")));
-        assert!(contains_portable_simd_site(&grouped_import("std")));
-        assert!(contains_portable_simd_site(&direct_import("core")));
-        assert!(contains_portable_simd_site(&grouped_import("core")));
-        assert!(contains_portable_simd_site(
+        assert!(has_portable_simd(&direct_import("std")));
+        assert!(has_portable_simd(&grouped_import("std")));
+        assert!(has_portable_simd(&direct_import("core")));
+        assert!(has_portable_simd(&grouped_import("core")));
+        assert!(has_portable_simd(
             &["#![feature(", "portable", "_simd", ")]"].concat()
+        ));
+        assert!(has_portable_simd(
+            "#![cfg_attr(all(), cfg_attr(any(), feature(portable_simd)))]"
         ));
     }
 
     #[test]
-    fn does_not_confuse_simd_like_identifiers_with_std_simd() {
-        let unrelated = ["use crate::simd; fn f() { let std_simd = 1; }"].concat();
-        assert!(!contains_portable_simd_site(&unrelated));
+    fn finds_root_aliases_grouped_aliases_and_extern_crate_aliases() {
+        assert!(has_portable_simd(
+            "use std as platform;\nuse platform::simd::Simd;"
+        ));
+        assert!(has_portable_simd(
+            "use std::{self as platform, mem};\ntype Lanes = platform::simd::Simd<u64, 4>;"
+        ));
+        assert!(has_portable_simd(
+            "use core as platform;\nuse platform as foundation;\nuse foundation::simd::*;"
+        ));
+        assert!(has_portable_simd(
+            "extern crate core as platform;\ntype Mask = platform::simd::Mask<i64, 4>;"
+        ));
+    }
+
+    #[test]
+    fn ignores_simd_like_identifiers_comments_strings_and_unrelated_aliases() {
+        let unrelated = r#"
+            use crate::std as platform;
+            use crate::simd;
+            const TEXT: &str = "std::simd and #![feature(portable_simd)]";
+            // use core::simd::Simd;
+            fn f() {
+                let std_simd = 1;
+                let _ = platform::simd::Local;
+            }
+        "#;
+        assert!(!has_portable_simd(unrelated));
+        assert!(!has_portable_simd("use std as platform;"));
+    }
+
+    #[test]
+    fn malformed_rust_fails_closed() {
+        assert!(contains_portable_simd_site("fn broken( {").is_err());
     }
 
     #[test]
@@ -574,12 +934,16 @@ mod tests {
     #[test]
     fn facade_tier_contract_reports_missing_and_owner_shaped_surfaces() {
         let violations = facade_tier_violations(
-            Path::new("lib.rs"),
-            "pub mod advanced;\npub mod analysis;\npub mod bits;\npub mod execution;\npub mod experimental;\n",
-            Path::new("advanced.rs"),
-            "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            Path::new("root-reexports.txt"),
-            "",
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod bits;\npub mod execution;\npub mod experimental;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
 
         let [violation] = violations.as_slice() else {
@@ -606,12 +970,16 @@ mod tests {
     #[test]
     fn facade_tier_contract_parses_grouped_multiline_and_aliased_reexports() {
         let violations = facade_tier_violations(
-            Path::new("lib.rs"),
-            "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\npub use stab_bits::{\n    BitVec,\n    BitMatrix as Matrix,\n};\n",
-            Path::new("advanced.rs"),
-            "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            Path::new("root-reexports.txt"),
-            "Circuit\n",
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\npub use stab_bits::{\n    BitVec,\n    BitMatrix as Matrix,\n};\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
         );
         let unexpected = violations
             .iter()
@@ -635,12 +1003,16 @@ mod tests {
     #[test]
     fn facade_tier_contract_rejects_globs_and_missing_assignments() {
         let violations = facade_tier_violations(
-            Path::new("lib.rs"),
-            "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::*;\n",
-            Path::new("advanced.rs"),
-            "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            Path::new("root-reexports.txt"),
-            "Circuit\n",
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::*;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
         );
         let codes = violations
             .iter()
@@ -656,12 +1028,19 @@ mod tests {
     #[test]
     fn facade_tier_inventory_rejects_invalid_and_duplicate_entries() {
         let violations = facade_tier_violations(
-            Path::new("lib.rs"),
-            "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\n",
-            Path::new("advanced.rs"),
-            "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            Path::new("root-reexports.txt"),
-            "Circuit\nCircuit\nnot-valid\n",
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(
+                Path::new("root-reexports.txt"),
+                "Circuit\nCircuit\nnot-valid\n",
+            ),
         );
         let codes = violations
             .iter()
@@ -673,6 +1052,61 @@ mod tests {
             BTreeSet::from([
                 "facade-root-inventory-duplicate",
                 "facade-root-inventory-invalid"
+            ])
+        );
+    }
+
+    #[test]
+    fn facade_tier_contract_accepts_current_advanced_and_experimental_shape() {
+        let violations = facade_tier_violations(
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                include_str!("../../../crates/stab-core/src/advanced.rs"),
+            ),
+            FacadeSource::new(
+                Path::new("experimental.rs"),
+                include_str!("../../../crates/stab-core/src/experimental.rs"),
+            ),
+            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+        );
+
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn facade_tier_contract_rejects_advanced_and_experimental_exports() {
+        let violations = facade_tier_violations(
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\npub use crate::Circuit;\npub struct Escape;\n",
+            ),
+            FacadeSource::new(
+                Path::new("experimental.rs"),
+                "pub mod decoder {}\npub use crate::Circuit;\npub fn escape() {}\n",
+            ),
+            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            codes,
+            BTreeSet::from([
+                "facade-advanced-direct-item",
+                "facade-advanced-reexport",
+                "facade-experimental-direct-item",
+                "facade-experimental-module",
+                "facade-experimental-reexport",
             ])
         );
     }

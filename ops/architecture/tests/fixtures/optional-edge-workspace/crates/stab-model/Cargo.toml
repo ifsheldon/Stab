@@ -2,6 +2,7 @@
 name = "stab-model"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 publish = false
 
 [features]

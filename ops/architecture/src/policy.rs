@@ -8,6 +8,9 @@ use crate::{MigrationAllowance, Violation};
 const RELEASE_MAJOR: u64 = 0;
 const RELEASE_MINOR: u64 = 2;
 const RELEASE_PATCH: u64 = 0;
+const STABLE_RUST_MAJOR: u64 = 1;
+const STABLE_RUST_MINOR: u64 = 97;
+const STABLE_RUST_PATCH: u64 = 1;
 const KNOWN_PRODUCT_PACKAGES: &[&str] = &[
     "stab-algebra",
     "stab-analysis",
@@ -20,7 +23,18 @@ const KNOWN_PRODUCT_PACKAGES: &[&str] = &[
     "stab-model",
     "stab-records",
 ];
-const STABLE_COMPONENT_PACKAGES: &[&str] = &[
+const GUARDED_PRODUCT_DEPENDENCY_PACKAGES: &[&str] = &[
+    "stab-algebra",
+    "stab-analysis",
+    "stab-bits",
+    "stab-cli",
+    "stab-core",
+    "stab-engine",
+    "stab-kernels-simd",
+    "stab-model",
+    "stab-records",
+];
+pub(crate) const STABLE_COMPONENT_PACKAGES: &[&str] = &[
     "stab-algebra",
     "stab-analysis",
     "stab-bits",
@@ -74,11 +88,24 @@ pub struct DeclaredPathDependency {
     pub version_req: VersionReq,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct ResolvedDependencyIdentity {
+    pub from_package: String,
+    pub from_package_id: String,
+    pub dependency_name: String,
+    pub to_package: String,
+    pub to_package_id: String,
+    pub to_workspace_package: Option<String>,
+    pub kind: DependencyKind,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkspaceGraph {
     pub packages: Vec<PackageSpec>,
     pub edges: Vec<WorkspaceEdge>,
     pub declared_path_dependencies: Vec<DeclaredPathDependency>,
+    pub(crate) package_rust_versions: BTreeMap<String, Option<Version>>,
+    pub(crate) resolved_dependencies: Vec<ResolvedDependencyIdentity>,
 }
 
 #[derive(Debug)]
@@ -127,19 +154,25 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             PackageClass::Product => {
                 validate_product_identity(package, &mut violations);
                 validate_product_publication(package, &mut violations);
-                if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str())
-                    && package
+                if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str()) {
+                    validate_stable_rust_version(
+                        package,
+                        graph.package_rust_versions.get(&package.name),
+                        &mut violations,
+                    );
+                    if package
                         .default_features
                         .iter()
                         .any(|feature| feature.contains("portable-simd"))
-                {
-                    violations.push(Violation::new(
-                        "stable-default-reaches-nightly",
-                        format!(
-                            "Stable component {} enables portable SIMD through default features {:?}",
-                            package.name, package.default_features
-                        ),
-                    ));
+                    {
+                        violations.push(Violation::new(
+                            "stable-default-reaches-nightly",
+                            format!(
+                                "Stable component {} enables portable SIMD through default features {:?}",
+                                package.name, package.default_features
+                            ),
+                        ));
+                    }
                 }
             }
             PackageClass::Ops if package_is_publishable(package) => {
@@ -163,6 +196,25 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                 ));
             }
             PackageClass::Ops | PackageClass::TestSupport | PackageClass::Unclassified => {}
+        }
+    }
+
+    for dependency in &graph.resolved_dependencies {
+        if GUARDED_PRODUCT_DEPENDENCY_PACKAGES.contains(&dependency.to_package.as_str())
+            && !resolves_to_local_product_package(dependency, &packages)
+        {
+            violations.push(Violation::new(
+                "external-product-dependency",
+                format!(
+                    "{} package {} ({}) resolves dependency {} to external product package {} ({}); it must resolve to the corresponding local workspace package",
+                    dependency.kind.as_str(),
+                    dependency.from_package,
+                    dependency.from_package_id,
+                    dependency.dependency_name,
+                    dependency.to_package,
+                    dependency.to_package_id,
+                ),
+            ));
         }
     }
 
@@ -325,6 +377,20 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
     }
 }
 
+fn resolves_to_local_product_package(
+    dependency: &ResolvedDependencyIdentity,
+    packages: &BTreeMap<&str, &PackageSpec>,
+) -> bool {
+    if dependency.to_workspace_package.as_deref() != Some(dependency.to_package.as_str()) {
+        return false;
+    }
+    packages
+        .get(dependency.to_package.as_str())
+        .is_some_and(|package| {
+            package.relative_path == PathBuf::from("crates").join(&dependency.to_package)
+        })
+}
+
 fn classify_path(path: &std::path::Path) -> PackageClass {
     match path.components().next() {
         Some(Component::Normal(component)) if component == "crates" => PackageClass::Product,
@@ -387,12 +453,37 @@ fn validate_product_publication(package: &PackageSpec, violations: &mut Vec<Viol
     }
 }
 
+fn validate_stable_rust_version(
+    package: &PackageSpec,
+    actual: Option<&Option<Version>>,
+    violations: &mut Vec<Violation>,
+) {
+    let expected = stable_rust_version();
+    if actual.and_then(Option::as_ref) == Some(&expected) {
+        return;
+    }
+    let actual = actual
+        .and_then(Option::as_ref)
+        .map_or_else(|| "not declared".to_owned(), ToString::to_string);
+    violations.push(Violation::new(
+        "stable-component-rust-version",
+        format!(
+            "Stable component {} must declare rust-version = {}, found {}",
+            package.name, expected, actual
+        ),
+    ));
+}
+
 fn package_is_publishable(package: &PackageSpec) -> bool {
     !matches!(&package.publish, Some(registries) if registries.is_empty())
 }
 
 fn release_version() -> Version {
     Version::new(RELEASE_MAJOR, RELEASE_MINOR, RELEASE_PATCH)
+}
+
+pub(crate) fn stable_rust_version() -> Version {
+    Version::new(STABLE_RUST_MAJOR, STABLE_RUST_MINOR, STABLE_RUST_PATCH)
 }
 
 fn is_exact_release_requirement(requirement: &VersionReq) -> bool {
@@ -452,35 +543,45 @@ mod tests {
     }
 
     fn graph(packages: Vec<PackageSpec>) -> WorkspaceGraph {
+        let package_rust_versions = packages
+            .iter()
+            .map(|package| {
+                (
+                    package.name.clone(),
+                    STABLE_COMPONENT_PACKAGES
+                        .contains(&package.name.as_str())
+                        .then(stable_rust_version),
+                )
+            })
+            .collect();
         WorkspaceGraph {
             packages,
             edges: Vec::new(),
             declared_path_dependencies: Vec::new(),
+            package_rust_versions,
+            resolved_dependencies: Vec::new(),
         }
     }
 
     #[test]
     fn test_support_edges_are_development_only_and_downward() {
-        let graph = WorkspaceGraph {
-            packages: vec![
-                package("stab-core", "crates"),
-                PackageSpec {
-                    name: "stab-compat-corpus".to_owned(),
-                    relative_path: PathBuf::from("test-support/compat-corpus"),
-                    default_features: Vec::new(),
-                    version: Version::new(0, 2, 0),
-                    publish: Some(Vec::new()),
-                    binary_targets: Vec::new(),
-                },
-            ],
-            edges: vec![WorkspaceEdge {
-                from: "stab-core".to_owned(),
-                to: "stab-compat-corpus".to_owned(),
-                kind: DependencyKind::Development,
-                optional: false,
-            }],
-            declared_path_dependencies: Vec::new(),
-        };
+        let mut graph = graph(vec![
+            package("stab-core", "crates"),
+            PackageSpec {
+                name: "stab-compat-corpus".to_owned(),
+                relative_path: PathBuf::from("test-support/compat-corpus"),
+                default_features: Vec::new(),
+                version: Version::new(0, 2, 0),
+                publish: Some(Vec::new()),
+                binary_targets: Vec::new(),
+            },
+        ]);
+        graph.edges = vec![WorkspaceEdge {
+            from: "stab-core".to_owned(),
+            to: "stab-compat-corpus".to_owned(),
+            kind: DependencyKind::Development,
+            optional: false,
+        }];
         let report = validate_graph(&graph);
         assert!(report.violations.is_empty());
         assert!(report.migration_allowances.is_empty());
@@ -509,14 +610,13 @@ mod tests {
         assert!(report.migration_allowances.is_empty());
 
         let upward_graph = WorkspaceGraph {
-            packages: graph.packages,
             edges: vec![WorkspaceEdge {
                 from: "stab-compat-corpus".to_owned(),
                 to: "stab-core".to_owned(),
                 kind: DependencyKind::Development,
                 optional: false,
             }],
-            declared_path_dependencies: Vec::new(),
+            ..graph
         };
         assert_eq!(
             validate_graph(&upward_graph)
@@ -530,11 +630,7 @@ mod tests {
 
     #[test]
     fn new_product_packages_require_an_explicit_role() {
-        let graph = WorkspaceGraph {
-            packages: vec![package("stab-plugin", "crates")],
-            edges: Vec::new(),
-            declared_path_dependencies: Vec::new(),
-        };
+        let graph = graph(vec![package("stab-plugin", "crates")]);
         let report = validate_graph(&graph);
         assert_eq!(
             report
@@ -561,6 +657,81 @@ mod tests {
                 .code,
             "stable-default-reaches-nightly"
         );
+    }
+
+    #[test]
+    fn stable_components_require_the_exact_rust_version() {
+        for name in STABLE_COMPONENT_PACKAGES {
+            let valid = graph(vec![package(name, "crates")]);
+            assert!(
+                validate_graph(&valid).violations.is_empty(),
+                "{name} should accept the exact Stable MSRV"
+            );
+
+            for actual in [None, Some(Version::new(1, 97, 0))] {
+                let mut invalid = valid.clone();
+                invalid
+                    .package_rust_versions
+                    .insert((*name).to_owned(), actual);
+                let report = validate_graph(&invalid);
+                let violation = report
+                    .violations
+                    .iter()
+                    .find(|violation| violation.code == "stable-component-rust-version")
+                    .expect("missing or mismatched Stable MSRV should fail");
+                assert!(violation.message.contains(name));
+                assert!(violation.message.contains("1.97.1"));
+            }
+        }
+    }
+
+    #[test]
+    fn external_product_dependencies_are_rejected_for_every_source_kind() {
+        let packages = vec![
+            package("stab-core", "crates"),
+            package("fixture-consumer", "ops"),
+        ];
+        for to_package_id in [
+            "path+file:///tmp/external/stab-core#9.9.9",
+            "git+https://example.invalid/stab-core#01234567",
+            "registry+https://example.invalid/index#stab-core@9.9.9",
+        ] {
+            let mut invalid = graph(packages.clone());
+            invalid
+                .resolved_dependencies
+                .push(ResolvedDependencyIdentity {
+                    from_package: "fixture-consumer".to_owned(),
+                    from_package_id: "path+file:///workspace/ops/fixture-consumer#0.2.0".to_owned(),
+                    dependency_name: "stab_core_copy".to_owned(),
+                    to_package: "stab-core".to_owned(),
+                    to_package_id: to_package_id.to_owned(),
+                    to_workspace_package: None,
+                    kind: DependencyKind::Normal,
+                });
+            let report = validate_graph(&invalid);
+            let violation = report
+                .violations
+                .iter()
+                .find(|violation| violation.code == "external-product-dependency")
+                .expect("external product package copy should fail");
+            assert!(violation.message.contains("fixture-consumer"));
+            assert!(violation.message.contains("stab-core"));
+            assert!(violation.message.contains(to_package_id));
+        }
+
+        let mut valid = graph(packages);
+        valid
+            .resolved_dependencies
+            .push(ResolvedDependencyIdentity {
+                from_package: "fixture-consumer".to_owned(),
+                from_package_id: "path+file:///workspace/ops/fixture-consumer#0.2.0".to_owned(),
+                dependency_name: "stab_core".to_owned(),
+                to_package: "stab-core".to_owned(),
+                to_package_id: "path+file:///workspace/crates/stab-core#0.2.0".to_owned(),
+                to_workspace_package: Some("stab-core".to_owned()),
+                kind: DependencyKind::Normal,
+            });
+        assert!(validate_graph(&valid).violations.is_empty());
     }
 
     #[test]
@@ -596,17 +767,14 @@ mod tests {
             DependencyKind::Development,
             DependencyKind::Build,
         ] {
-            let exact = WorkspaceGraph {
-                packages: packages.clone(),
-                edges: Vec::new(),
-                declared_path_dependencies: vec![DeclaredPathDependency {
-                    from: "stab-records".to_owned(),
-                    to: "stab-bits".to_owned(),
-                    kind,
-                    version_req: VersionReq::parse("=0.2.0")
-                        .expect("exact release requirement should parse"),
-                }],
-            };
+            let mut exact = graph(packages.clone());
+            exact.declared_path_dependencies = vec![DeclaredPathDependency {
+                from: "stab-records".to_owned(),
+                to: "stab-bits".to_owned(),
+                kind,
+                version_req: VersionReq::parse("=0.2.0")
+                    .expect("exact release requirement should parse"),
+            }];
             assert!(
                 validate_graph(&exact).violations.is_empty(),
                 "{kind:?} exact path requirement should pass"

@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "crates/stab-core",
+    "ops/fixture-consumer",
+]
+exclude = ["external/stab-core"]
+resolver = "3"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+

@@ -1,9 +1,9 @@
 [package]
-name = "stab-engine"
-edition.workspace = true
+name = "stab-core"
 version.workspace = true
-rust-version.workspace = true
+edition.workspace = true
 publish = false
 
 [lib]
 path = "src/lib.rs"
+

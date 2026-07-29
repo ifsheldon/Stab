@@ -7,6 +7,7 @@ use cargo_metadata::{
 
 use crate::{
     CheckError, DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
+    policy::ResolvedDependencyIdentity,
 };
 
 pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckError> {
@@ -28,8 +29,13 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    let mut package_names = BTreeMap::<PackageId, String>::new();
+    let package_names = metadata
+        .packages
+        .iter()
+        .map(|package| (package.id.clone(), package.name.to_string()))
+        .collect::<BTreeMap<_, _>>();
     let mut package_roots = BTreeMap::<std::path::PathBuf, String>::new();
+    let mut package_rust_versions = BTreeMap::new();
     let mut packages = Vec::with_capacity(workspace_ids.len());
 
     for package in metadata
@@ -59,8 +65,8 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
                 path: package_root.clone(),
             })?
             .to_path_buf();
-        package_names.insert(package.id.clone(), package.name.to_string());
         package_roots.insert(package_root, package.name.to_string());
+        package_rust_versions.insert(package.name.to_string(), package.rust_version.clone());
         let mut binary_targets = package
             .targets
             .iter()
@@ -135,6 +141,40 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         .resolve
         .as_ref()
         .ok_or(CheckError::MissingResolve)?;
+    let mut resolved_dependencies = BTreeSet::new();
+    for node in &resolve.nodes {
+        let from_package = package_name(&package_names, &node.id)?;
+        for dependency in &node.deps {
+            let to_package = package_name(&package_names, &dependency.pkg)?;
+            let to_workspace_package = workspace_ids
+                .contains(&dependency.pkg)
+                .then(|| to_package.clone());
+            if dependency.dep_kinds.is_empty() {
+                resolved_dependencies.insert(ResolvedDependencyIdentity {
+                    from_package: from_package.clone(),
+                    from_package_id: node.id.repr.clone(),
+                    dependency_name: dependency.name.clone(),
+                    to_package,
+                    to_package_id: dependency.pkg.repr.clone(),
+                    to_workspace_package,
+                    kind: DependencyKind::Normal,
+                });
+                continue;
+            }
+            for dependency_kind in &dependency.dep_kinds {
+                resolved_dependencies.insert(ResolvedDependencyIdentity {
+                    from_package: from_package.clone(),
+                    from_package_id: node.id.repr.clone(),
+                    dependency_name: dependency.name.clone(),
+                    to_package: to_package.clone(),
+                    to_package_id: dependency.pkg.repr.clone(),
+                    to_workspace_package: to_workspace_package.clone(),
+                    kind: DependencyKind::from_cargo(dependency_kind.kind),
+                });
+            }
+        }
+    }
+
     let mut edges = BTreeSet::new();
     for node in resolve
         .nodes
@@ -172,6 +212,8 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         packages,
         edges: edges.into_iter().collect(),
         declared_path_dependencies,
+        package_rust_versions,
+        resolved_dependencies: resolved_dependencies.into_iter().collect(),
     })
 }
 
@@ -269,11 +311,47 @@ mod tests {
                 && dependency.kind == DependencyKind::Normal
                 && dependency.version_req == cargo_metadata::semver::VersionReq::STAR
         }));
+        for package in ["stab-model", "stab-engine"] {
+            assert_eq!(
+                graph.package_rust_versions.get(package),
+                Some(&Some(crate::policy::stable_rust_version())),
+                "{package} should retain its declared Stable MSRV"
+            );
+        }
         let report = crate::policy::validate_graph(&graph);
         assert!(report.violations.iter().any(|violation| {
             violation.code == "forbidden-product-edge"
                 && violation.message.contains("stab-model -> stab-engine")
         }));
+    }
+
+    #[test]
+    fn metadata_rejects_an_external_path_copy_of_a_product_package() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/external-product-copy-workspace");
+        let graph = load_workspace_graph(&root).expect("load external-product-copy fixture");
+
+        let dependency = graph
+            .resolved_dependencies
+            .iter()
+            .find(|dependency| {
+                dependency.from_package == "fixture-consumer"
+                    && dependency.to_package == "stab-core"
+            })
+            .expect("fixture should retain the external stab-core dependency");
+        assert_eq!(dependency.dependency_name, "stab_core_copy");
+        assert_eq!(dependency.to_workspace_package, None);
+        assert!(dependency.to_package_id.contains("external/stab-core"));
+
+        let report = crate::policy::validate_graph(&graph);
+        let violation = report
+            .violations
+            .iter()
+            .find(|violation| violation.code == "external-product-dependency")
+            .expect("external path copy should violate the product identity policy");
+        assert!(violation.message.contains("fixture-consumer"));
+        assert!(violation.message.contains("stab-core"));
+        assert!(violation.message.contains("external/stab-core"));
     }
 
     #[test]

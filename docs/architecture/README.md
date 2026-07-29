@@ -100,9 +100,11 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-`just architecture::check` enforces every workspace edge, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, and rejects Stable defaults that reach portable SIMD.
+`just architecture::check` enforces every workspace edge, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
 
-The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code. It also parses `stab-core` with `syn`, requires the exact public root modules, rejects root glob exports and direct definitions, and compares every named root reexport against `ops/architecture/facade-root-reexports.txt`.
+The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
+
+The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and keeps `experimental` empty until A8 supplies an explicit allowlist. Portable-SIMD inspection follows direct, grouped, and aliased `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 

@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use cargo_metadata::semver::Version;
 use serde::Deserialize;
 
-use crate::policy::validate_graph;
+use crate::policy::{STABLE_COMPONENT_PACKAGES, stable_rust_version, validate_graph};
 use crate::{DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph};
 
 #[derive(Debug, Deserialize)]
@@ -58,27 +59,29 @@ impl From<FixtureDependencyKind> for DependencyKind {
 fn assert_fixture(source: &str) {
     let fixture: GraphFixture =
         serde_json::from_str(source).expect("architecture graph fixture should parse");
+    let packages = fixture
+        .packages
+        .into_iter()
+        .map(|package| PackageSpec {
+            version: Version::new(0, 2, 0),
+            publish: if package.path.starts_with("crates") {
+                None
+            } else {
+                Some(Vec::new())
+            },
+            binary_targets: if package.name == "stab-cli" {
+                vec!["stab".to_owned()]
+            } else {
+                Vec::new()
+            },
+            name: package.name,
+            relative_path: package.path,
+            default_features: package.default_features,
+        })
+        .collect::<Vec<_>>();
     let graph = WorkspaceGraph {
-        packages: fixture
-            .packages
-            .into_iter()
-            .map(|package| PackageSpec {
-                version: Version::new(0, 2, 0),
-                publish: if package.path.starts_with("crates") {
-                    None
-                } else {
-                    Some(Vec::new())
-                },
-                binary_targets: if package.name == "stab-cli" {
-                    vec!["stab".to_owned()]
-                } else {
-                    Vec::new()
-                },
-                name: package.name,
-                relative_path: package.path,
-                default_features: package.default_features,
-            })
-            .collect(),
+        package_rust_versions: expected_rust_versions(&packages),
+        packages,
         edges: fixture
             .edges
             .into_iter()
@@ -90,6 +93,7 @@ fn assert_fixture(source: &str) {
             })
             .collect(),
         declared_path_dependencies: Vec::new(),
+        resolved_dependencies: Vec::new(),
     };
     let report = validate_graph(&graph);
     let actual = report
@@ -98,6 +102,20 @@ fn assert_fixture(source: &str) {
         .map(|violation| violation.code.to_owned())
         .collect::<Vec<_>>();
     assert_eq!(actual, fixture.expected_violation_codes);
+}
+
+fn expected_rust_versions(packages: &[PackageSpec]) -> BTreeMap<String, Option<Version>> {
+    packages
+        .iter()
+        .map(|package| {
+            (
+                package.name.clone(),
+                STABLE_COMPONENT_PACKAGES
+                    .contains(&package.name.as_str())
+                    .then(stable_rust_version),
+            )
+        })
+        .collect()
 }
 
 #[test]
@@ -163,6 +181,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
             },
         })
         .collect::<Vec<_>>();
+    let package_rust_versions = expected_rust_versions(&packages);
     for from in PRODUCT_PACKAGES {
         for to in PRODUCT_PACKAGES {
             for kind in FixtureDependencyKind::ALL {
@@ -175,6 +194,8 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                         optional: to == "stab-kernels-simd",
                     }],
                     declared_path_dependencies: Vec::new(),
+                    package_rust_versions: package_rust_versions.clone(),
+                    resolved_dependencies: Vec::new(),
                 };
                 let report = validate_graph(&graph);
                 let is_permitted = PERMITTED_EDGES.contains(&(from, to));
