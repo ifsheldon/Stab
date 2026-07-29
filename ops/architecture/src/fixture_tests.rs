@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use cargo_metadata::semver::Version;
 use serde::Deserialize;
 
-use crate::policy::{STABLE_COMPONENT_PACKAGES, stable_rust_version, validate_graph};
+use crate::policy::{
+    PRODUCT_PACKAGE_CONTRACTS, is_stable_component, stable_rust_version, validate_graph,
+};
 use crate::{DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph};
 
 #[derive(Debug, Deserialize)]
@@ -62,25 +63,28 @@ fn assert_fixture(source: &str) {
     let packages = fixture
         .packages
         .into_iter()
-        .map(|package| PackageSpec {
-            version: Version::new(0, 2, 0),
-            publish: if package.path.starts_with("crates") {
-                None
-            } else {
-                Some(Vec::new())
-            },
-            binary_targets: if package.name == "stab-cli" {
-                vec!["stab".to_owned()]
-            } else {
-                Vec::new()
-            },
-            name: package.name,
-            relative_path: package.path,
-            default_features: package.default_features,
+        .map(|package| {
+            let rust_version = is_stable_component(&package.name).then(stable_rust_version);
+            PackageSpec {
+                version: Version::new(0, 2, 0),
+                publish: if package.path.starts_with("crates") {
+                    None
+                } else {
+                    Some(Vec::new())
+                },
+                binary_targets: if package.name == "stab-cli" {
+                    vec!["stab".to_owned()]
+                } else {
+                    Vec::new()
+                },
+                name: package.name,
+                relative_path: package.path,
+                default_features: package.default_features,
+                rust_version,
+            }
         })
         .collect::<Vec<_>>();
     let graph = WorkspaceGraph {
-        package_rust_versions: expected_rust_versions(&packages),
         packages,
         edges: fixture
             .edges
@@ -104,20 +108,6 @@ fn assert_fixture(source: &str) {
     assert_eq!(actual, fixture.expected_violation_codes);
 }
 
-fn expected_rust_versions(packages: &[PackageSpec]) -> BTreeMap<String, Option<Version>> {
-    packages
-        .iter()
-        .map(|package| {
-            (
-                package.name.clone(),
-                STABLE_COMPONENT_PACKAGES
-                    .contains(&package.name.as_str())
-                    .then(stable_rust_version),
-            )
-        })
-        .collect()
-}
-
 #[test]
 fn target_graph_fixture_is_permitted() {
     assert_fixture(include_str!("../tests/fixtures/permitted-target.json"));
@@ -130,48 +120,17 @@ fn forbidden_edge_fixture_fails_closed() {
 
 #[test]
 fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
-    const PRODUCT_PACKAGES: [&str; 10] = [
-        "stab-algebra",
-        "stab-analysis",
-        "stab-bits",
-        "stab-cli",
-        "stab-core",
-        "stab-decoder",
-        "stab-engine",
-        "stab-kernels-simd",
-        "stab-model",
-        "stab-records",
-    ];
-    const PERMITTED_EDGES: [(&str, &str); 21] = [
-        ("stab-bits", "stab-kernels-simd"),
-        ("stab-records", "stab-bits"),
-        ("stab-algebra", "stab-bits"),
-        ("stab-algebra", "stab-kernels-simd"),
-        ("stab-model", "stab-algebra"),
-        ("stab-analysis", "stab-model"),
-        ("stab-analysis", "stab-algebra"),
-        ("stab-engine", "stab-model"),
-        ("stab-engine", "stab-records"),
-        ("stab-engine", "stab-algebra"),
-        ("stab-engine", "stab-analysis"),
-        ("stab-decoder", "stab-model"),
-        ("stab-decoder", "stab-records"),
-        ("stab-core", "stab-algebra"),
-        ("stab-core", "stab-analysis"),
-        ("stab-core", "stab-bits"),
-        ("stab-core", "stab-decoder"),
-        ("stab-core", "stab-engine"),
-        ("stab-core", "stab-model"),
-        ("stab-core", "stab-records"),
-        ("stab-cli", "stab-core"),
-    ];
-
-    let packages = PRODUCT_PACKAGES
+    let product_packages = PRODUCT_PACKAGE_CONTRACTS
+        .iter()
+        .map(|contract| contract.name)
+        .collect::<Vec<_>>();
+    let packages = product_packages
         .iter()
         .map(|name| PackageSpec {
-            name: (*name).to_string(),
+            name: (*name).to_owned(),
             relative_path: PathBuf::from("crates").join(name),
             default_features: Vec::new(),
+            rust_version: is_stable_component(name).then(stable_rust_version),
             version: Version::new(0, 2, 0),
             publish: None,
             binary_targets: if *name == "stab-cli" {
@@ -181,26 +140,27 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
             },
         })
         .collect::<Vec<_>>();
-    let package_rust_versions = expected_rust_versions(&packages);
-    for from in PRODUCT_PACKAGES {
-        for to in PRODUCT_PACKAGES {
+    for from in &product_packages {
+        for to in &product_packages {
             for kind in FixtureDependencyKind::ALL {
                 let graph = WorkspaceGraph {
                     packages: packages.clone(),
                     edges: vec![WorkspaceEdge {
-                        from: from.to_string(),
-                        to: to.to_string(),
+                        from: (*from).to_owned(),
+                        to: (*to).to_owned(),
                         kind: kind.into(),
-                        optional: to == "stab-kernels-simd",
+                        optional: *to == "stab-kernels-simd",
                     }],
                     declared_path_dependencies: Vec::new(),
-                    package_rust_versions: package_rust_versions.clone(),
                     resolved_dependencies: Vec::new(),
                 };
                 let report = validate_graph(&graph);
-                let is_permitted = PERMITTED_EDGES.contains(&(from, to));
+                let is_permitted = PRODUCT_PACKAGE_CONTRACTS
+                    .iter()
+                    .find(|contract| contract.name == *from)
+                    .is_some_and(|contract| contract.allowed_dependencies.contains(to));
                 let valid_kernel_edge =
-                    to != "stab-kernels-simd" || matches!(kind, FixtureDependencyKind::Normal);
+                    *to != "stab-kernels-simd" || matches!(kind, FixtureDependencyKind::Normal);
                 assert_eq!(
                     report.violations.is_empty(),
                     is_permitted && valid_kernel_edge,

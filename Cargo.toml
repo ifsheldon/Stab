@@ -40,6 +40,7 @@ ignore = "0.4.26"
 memory-stats = "1.2.0"
 num-complex = "0.4.6"
 proptest = "1.11.0"
+proc-macro2 = "1.0.107"
 rand = "0.10.1"
 rustix = { version = "1.1.4", features = ["fs", "process", "thread"] }
 same-file = "1.0.6"

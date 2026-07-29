@@ -35,7 +35,6 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         .map(|package| (package.id.clone(), package.name.to_string()))
         .collect::<BTreeMap<_, _>>();
     let mut package_roots = BTreeMap::<std::path::PathBuf, String>::new();
-    let mut package_rust_versions = BTreeMap::new();
     let mut packages = Vec::with_capacity(workspace_ids.len());
 
     for package in metadata
@@ -66,7 +65,6 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
             })?
             .to_path_buf();
         package_roots.insert(package_root, package.name.to_string());
-        package_rust_versions.insert(package.name.to_string(), package.rust_version.clone());
         let mut binary_targets = package
             .targets
             .iter()
@@ -85,6 +83,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
                 .flatten()
                 .map(ToString::to_string)
                 .collect(),
+            rust_version: package.rust_version.clone(),
             version: package.version.clone(),
             publish: package.publish.clone(),
             binary_targets,
@@ -212,7 +211,6 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         packages,
         edges: edges.into_iter().collect(),
         declared_path_dependencies,
-        package_rust_versions,
         resolved_dependencies: resolved_dependencies.into_iter().collect(),
     })
 }
@@ -287,6 +285,7 @@ mod tests {
             name: "stab-core".to_owned(),
             relative_path: std::path::PathBuf::from("crates/stab-core"),
             default_features: Vec::new(),
+            rust_version: None,
             version: cargo_metadata::semver::Version::new(0, 2, 0),
             publish: None,
             binary_targets: Vec::new(),
@@ -311,11 +310,16 @@ mod tests {
                 && dependency.kind == DependencyKind::Normal
                 && dependency.version_req == cargo_metadata::semver::VersionReq::STAR
         }));
-        for package in ["stab-model", "stab-engine"] {
+        for package_name in ["stab-model", "stab-engine"] {
+            let package = graph
+                .packages
+                .iter()
+                .find(|package| package.name == package_name)
+                .expect("fixture package should be retained");
             assert_eq!(
-                graph.package_rust_versions.get(package),
-                Some(&Some(crate::policy::stable_rust_version())),
-                "{package} should retain its declared Stable MSRV"
+                package.rust_version,
+                Some(crate::policy::stable_rust_version()),
+                "{package_name} should retain its declared Stable MSRV"
             );
         }
         let report = crate::policy::validate_graph(&graph);
@@ -385,8 +389,8 @@ mod tests {
         assert_eq!(
             actual_codes,
             [
-                "cli-binary-targets",
                 "operational-package-publishable",
+                "product-binary-targets",
                 "publishable-product-path-version",
                 "publishable-product-version",
                 "test-support-package-publishable",

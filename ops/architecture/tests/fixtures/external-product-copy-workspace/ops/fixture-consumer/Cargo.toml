@@ -9,4 +9,3 @@ stab-core-copy = { package = "stab-core", path = "../../external/stab-core" }
 
 [lib]
 path = "src/lib.rs"
-

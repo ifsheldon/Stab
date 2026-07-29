@@ -32,9 +32,11 @@ stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
 stab-cli -> stab-core
 ```
+
+The policy reserves the future `stab-decoder` package name, but A6 does not claim that crate or an edge to it. A7 must add the implementation and update the graph from source-current Cargo metadata.
 
 Algebra moves before the model because its production implementation no longer imports `Gate`. Model syntax can then depend on algebra values without creating a reverse edge.
 
@@ -309,7 +311,8 @@ Add external-consumer fixtures for:
 - Nightly facade with `portable-simd`;
 - CLI, oracle, and benchmark explicit feature intent;
 - feature unification from multiple consumers;
-- forbidden product-to-ops, kernel-to-Stab, mandatory Stable-to-kernel, Stable-to-facade, and direct `std::simd`, `core::simd`, or portable-SIMD feature-gate sites outside the kernel crate;
+- forbidden product-to-ops, kernel-to-Stab, mandatory Stable-to-kernel, Stable-to-facade, and direct, aliased, or macro-contained `std::simd` and `core::simd` sites outside the kernel crate;
+- every unstable Rust feature gate in a Stable component, facade module path overrides, item-generating facade macros, and exported macros anywhere in `stab-core`;
 - root, `advanced`, and `experimental` rustdoc tiers;
 - absence of qualification-only product exports.
 

@@ -2,9 +2,9 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use syn::punctuated::Punctuated;
-use syn::visit::{self, Visit};
 use syn::{Item, Meta, Token, UseTree, Visibility};
 
+use crate::policy::is_stable_component;
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
@@ -18,6 +18,8 @@ const FACADE_ADVANCED_MODULES: [&str; 6] = [
     "traversal",
     "compat",
 ];
+
+mod rust_source;
 
 pub(super) struct SourceReport {
     pub rust_source_count: usize,
@@ -51,34 +53,54 @@ pub(super) fn scan_workspace_sources(
                 source,
             }
         })?;
-        let contains_portable_simd = match contains_portable_simd_site(&source) {
-            Ok(contains_portable_simd) => contains_portable_simd,
+        let facts = match rust_source::inspect(&source) {
+            Ok(facts) => facts,
             Err(error) => {
                 violations.push(Violation::new(
-                    "portable-simd-source-parse",
+                    "architecture-source-parse",
                     format!(
-                        "failed to parse {} while proving portable-SIMD isolation: {error}",
+                        "failed to parse {} while checking source-boundary contracts: {error}",
                         source_path.display()
                     ),
                 ));
                 continue;
             }
         };
-        if !contains_portable_simd {
-            continue;
-        }
         let package = package_for_source(source_path, packages);
-        match classify_simd_site(source_path, package) {
-            SimdSite::Kernel => {}
-            SimdSite::Forbidden => {
-                violations.push(Violation::new(
-                    "portable-simd-outside-kernel",
-                    format!(
-                        "portable-SIMD source in {} must move to {}",
-                        source_path.display(),
-                        SIMD_PACKAGE
-                    ),
-                ));
+        if package.is_some_and(|package| is_stable_component(&package.name))
+            && !facts.feature_gates.is_empty()
+        {
+            violations.push(Violation::new(
+                "stable-component-feature-gate",
+                format!(
+                    "Stable component source {} enables unstable Rust features {:?}",
+                    source_path.display(),
+                    facts.feature_gates
+                ),
+            ));
+        }
+        if package.is_some_and(|package| package.name == "stab-core") && facts.has_macro_export {
+            violations.push(Violation::new(
+                "facade-exported-macro",
+                format!(
+                    "{} exports a macro from stab-core; facade exports must remain inventory-owned Rust items",
+                    source_path.display()
+                ),
+            ));
+        }
+        if facts.contains_portable_simd {
+            match classify_simd_site(source_path, package) {
+                SimdSite::Kernel => {}
+                SimdSite::Forbidden => {
+                    violations.push(Violation::new(
+                        "portable-simd-outside-kernel",
+                        format!(
+                            "portable-SIMD source in {} must move to {}",
+                            source_path.display(),
+                            SIMD_PACKAGE
+                        ),
+                    ));
+                }
             }
         }
     }
@@ -315,7 +337,27 @@ fn parse_facade_surface(
     for item in syntax.items {
         match item {
             Item::Mod(item) if is_public(&item.vis) => {
-                surface.modules.insert(item.ident.to_string());
+                match module_has_path_override(&item.attrs) {
+                    Ok(false) => {
+                        surface.modules.insert(item.ident.to_string());
+                    }
+                    Ok(true) => violations.push(Violation::new(
+                        "facade-module-path-override",
+                        format!(
+                            "{} declares public module `{}` through a path override; facade tier modules must use canonical pathless declarations",
+                            path.display(),
+                            item.ident
+                        ),
+                    )),
+                    Err(error) => violations.push(Violation::new(
+                        "facade-module-attribute-parse",
+                        format!(
+                            "failed to validate attributes on public module `{}` in {}: {error}",
+                            item.ident,
+                            path.display()
+                        ),
+                    )),
+                }
             }
             Item::Use(item) if is_public(&item.vis) => {
                 collect_public_use_names(path, &item.tree, None, tier, &mut surface, violations);
@@ -350,12 +392,19 @@ fn parse_facade_surface(
             Item::Union(item) if is_public(&item.vis) => {
                 report_direct_item(path, tier, "union", &item.ident, violations);
             }
-            Item::Macro(item) if has_macro_export(&item.attrs) => {
+            Item::Macro(item) => {
+                let macro_name = item
+                    .mac
+                    .path
+                    .segments
+                    .last()
+                    .map_or_else(|| "<anonymous>".to_owned(), |segment| segment.ident.to_string());
                 violations.push(Violation::new(
                     tier.direct_item_code(),
                     format!(
-                        "{} defines an exported macro directly in the {}; exported items must follow its tier policy",
+                        "{} invokes or defines item macro `{}` directly in the {}; generated items cannot bypass its tier policy",
                         path.display(),
+                        macro_name,
                         tier.label()
                     ),
                 ));
@@ -367,14 +416,36 @@ fn parse_facade_surface(
     surface
 }
 
-fn is_public(visibility: &Visibility) -> bool {
-    matches!(visibility, Visibility::Public(_))
+fn module_has_path_override(attributes: &[syn::Attribute]) -> syn::Result<bool> {
+    for attribute in attributes {
+        if meta_sets_module_path(&attribute.meta)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
-fn has_macro_export(attributes: &[syn::Attribute]) -> bool {
-    attributes
-        .iter()
-        .any(|attribute| attribute.path().is_ident("macro_export"))
+fn meta_sets_module_path(meta: &Meta) -> syn::Result<bool> {
+    if matches!(meta, Meta::NameValue(value) if value.path.is_ident("path")) {
+        return Ok(true);
+    }
+    let Meta::List(list) = meta else {
+        return Ok(false);
+    };
+    if !list.path.is_ident("cfg_attr") {
+        return Ok(false);
+    }
+    let nested = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    for meta in nested {
+        if meta_sets_module_path(&meta)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn is_public(visibility: &Visibility) -> bool {
+    matches!(visibility, Visibility::Public(_))
 }
 
 fn report_direct_item(
@@ -580,314 +651,9 @@ fn package_for_source<'a>(
         .max_by_key(|package| package.relative_path.components().count())
 }
 
-fn contains_portable_simd_site(source: &str) -> syn::Result<bool> {
-    let syntax = syn::parse_file(source)?;
-    let root_aliases = collect_standard_root_aliases(&syntax);
-    let mut inspector = PortableSimdInspector {
-        root_aliases: &root_aliases,
-        found: false,
-        attribute_error: None,
-    };
-    inspector.visit_file(&syntax);
-    if let Some(error) = inspector.attribute_error {
-        return Err(error);
-    }
-    Ok(inspector.found)
-}
-
-fn collect_standard_root_aliases(syntax: &syn::File) -> BTreeSet<String> {
-    let mut aliases = ["core".to_owned(), "std".to_owned()]
-        .into_iter()
-        .collect::<BTreeSet<_>>();
-    loop {
-        let mut collector = StandardRootAliasCollector {
-            known_aliases: &aliases,
-            discovered_aliases: BTreeSet::new(),
-        };
-        collector.visit_file(syntax);
-        let previous_len = aliases.len();
-        aliases.extend(collector.discovered_aliases);
-        if aliases.len() == previous_len {
-            return aliases;
-        }
-    }
-}
-
-struct StandardRootAliasCollector<'a> {
-    known_aliases: &'a BTreeSet<String>,
-    discovered_aliases: BTreeSet<String>,
-}
-
-impl<'ast> Visit<'ast> for StandardRootAliasCollector<'_> {
-    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
-        collect_standard_aliases_from_use_tree(
-            &item.tree,
-            &mut Vec::new(),
-            self.known_aliases,
-            &mut self.discovered_aliases,
-        );
-        visit::visit_item_use(self, item);
-    }
-
-    fn visit_item_extern_crate(&mut self, item: &'ast syn::ItemExternCrate) {
-        if matches!(item.ident.to_string().as_str(), "core" | "std") {
-            let alias = item
-                .rename
-                .as_ref()
-                .map_or_else(|| item.ident.to_string(), |(_, rename)| rename.to_string());
-            if alias != "_" {
-                self.discovered_aliases.insert(alias);
-            }
-        }
-        visit::visit_item_extern_crate(self, item);
-    }
-}
-
-fn collect_standard_aliases_from_use_tree(
-    tree: &UseTree,
-    prefix: &mut Vec<String>,
-    known_aliases: &BTreeSet<String>,
-    discovered_aliases: &mut BTreeSet<String>,
-) {
-    match tree {
-        UseTree::Path(path) => {
-            prefix.push(path.ident.to_string());
-            collect_standard_aliases_from_use_tree(
-                &path.tree,
-                prefix,
-                known_aliases,
-                discovered_aliases,
-            );
-            prefix.pop();
-        }
-        UseTree::Rename(rename) => {
-            let mut source = prefix.clone();
-            if rename.ident != "self" {
-                source.push(rename.ident.to_string());
-            }
-            if source.len() == 1
-                && source
-                    .first()
-                    .is_some_and(|root| known_aliases.contains(root))
-                && rename.rename != "_"
-            {
-                discovered_aliases.insert(rename.rename.to_string());
-            }
-        }
-        UseTree::Group(group) => {
-            for tree in &group.items {
-                collect_standard_aliases_from_use_tree(
-                    tree,
-                    prefix,
-                    known_aliases,
-                    discovered_aliases,
-                );
-            }
-        }
-        UseTree::Name(_) | UseTree::Glob(_) => {}
-    }
-}
-
-struct PortableSimdInspector<'a> {
-    root_aliases: &'a BTreeSet<String>,
-    found: bool,
-    attribute_error: Option<syn::Error>,
-}
-
-impl<'ast> Visit<'ast> for PortableSimdInspector<'_> {
-    fn visit_attribute(&mut self, attribute: &'ast syn::Attribute) {
-        if self.found || self.attribute_error.is_some() {
-            return;
-        }
-        match meta_enables_portable_simd(&attribute.meta) {
-            Ok(found) => self.found = found,
-            Err(error) => self.attribute_error = Some(error),
-        }
-    }
-
-    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
-        if !self.found {
-            self.found =
-                use_tree_contains_portable_simd(&item.tree, &mut Vec::new(), self.root_aliases);
-        }
-        if !self.found {
-            visit::visit_item_use(self, item);
-        }
-    }
-
-    fn visit_path(&mut self, path: &'ast syn::Path) {
-        if !self.found {
-            self.found = path_segments_contain_portable_simd(
-                path.segments
-                    .iter()
-                    .map(|segment| segment.ident.to_string()),
-                self.root_aliases,
-            );
-        }
-        if !self.found {
-            visit::visit_path(self, path);
-        }
-    }
-}
-
-fn meta_enables_portable_simd(meta: &Meta) -> syn::Result<bool> {
-    let Meta::List(list) = meta else {
-        return Ok(false);
-    };
-    if list.path.is_ident("feature") {
-        let features =
-            list.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated)?;
-        return Ok(features
-            .iter()
-            .any(|feature| feature.is_ident("portable_simd")));
-    }
-    if !list.path.is_ident("cfg_attr") {
-        return Ok(false);
-    }
-
-    let nested = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in nested {
-        if meta_enables_portable_simd(&meta)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn use_tree_contains_portable_simd(
-    tree: &UseTree,
-    prefix: &mut Vec<String>,
-    root_aliases: &BTreeSet<String>,
-) -> bool {
-    match tree {
-        UseTree::Path(path) => {
-            prefix.push(path.ident.to_string());
-            let found = path_segments_contain_portable_simd(
-                prefix.iter().map(String::as_str),
-                root_aliases,
-            ) || use_tree_contains_portable_simd(&path.tree, prefix, root_aliases);
-            prefix.pop();
-            found
-        }
-        UseTree::Name(name) => {
-            let include_name = name.ident != "self";
-            if include_name {
-                prefix.push(name.ident.to_string());
-            }
-            let found = path_segments_contain_portable_simd(
-                prefix.iter().map(String::as_str),
-                root_aliases,
-            );
-            if include_name {
-                prefix.pop();
-            }
-            found
-        }
-        UseTree::Rename(rename) => {
-            let include_name = rename.ident != "self";
-            if include_name {
-                prefix.push(rename.ident.to_string());
-            }
-            let found = path_segments_contain_portable_simd(
-                prefix.iter().map(String::as_str),
-                root_aliases,
-            );
-            if include_name {
-                prefix.pop();
-            }
-            found
-        }
-        UseTree::Glob(_) => {
-            path_segments_contain_portable_simd(prefix.iter().map(String::as_str), root_aliases)
-        }
-        UseTree::Group(group) => group
-            .items
-            .iter()
-            .any(|tree| use_tree_contains_portable_simd(tree, prefix, root_aliases)),
-    }
-}
-
-fn path_segments_contain_portable_simd<I, S>(segments: I, root_aliases: &BTreeSet<String>) -> bool
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    let mut segments = segments.into_iter();
-    let Some(root) = segments.next() else {
-        return false;
-    };
-    let Some(module) = segments.next() else {
-        return false;
-    };
-    root_aliases.contains(root.as_ref()) && module.as_ref() == "simd"
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn direct_import(root: &str) -> String {
-        ["use ", root, "::", "simd", "::Simd;"].concat()
-    }
-
-    fn grouped_import(root: &str) -> String {
-        ["use ", root, "::{mem, ", "simd", "::{Simd}};"].concat()
-    }
-
-    fn has_portable_simd(source: &str) -> bool {
-        contains_portable_simd_site(source).expect("fixture must parse")
-    }
-
-    #[test]
-    fn finds_direct_grouped_and_feature_gated_portable_simd() {
-        assert!(has_portable_simd(&direct_import("std")));
-        assert!(has_portable_simd(&grouped_import("std")));
-        assert!(has_portable_simd(&direct_import("core")));
-        assert!(has_portable_simd(&grouped_import("core")));
-        assert!(has_portable_simd(
-            &["#![feature(", "portable", "_simd", ")]"].concat()
-        ));
-        assert!(has_portable_simd(
-            "#![cfg_attr(all(), cfg_attr(any(), feature(portable_simd)))]"
-        ));
-    }
-
-    #[test]
-    fn finds_root_aliases_grouped_aliases_and_extern_crate_aliases() {
-        assert!(has_portable_simd(
-            "use std as platform;\nuse platform::simd::Simd;"
-        ));
-        assert!(has_portable_simd(
-            "use std::{self as platform, mem};\ntype Lanes = platform::simd::Simd<u64, 4>;"
-        ));
-        assert!(has_portable_simd(
-            "use core as platform;\nuse platform as foundation;\nuse foundation::simd::*;"
-        ));
-        assert!(has_portable_simd(
-            "extern crate core as platform;\ntype Mask = platform::simd::Mask<i64, 4>;"
-        ));
-    }
-
-    #[test]
-    fn ignores_simd_like_identifiers_comments_strings_and_unrelated_aliases() {
-        let unrelated = r#"
-            use crate::std as platform;
-            use crate::simd;
-            const TEXT: &str = "std::simd and #![feature(portable_simd)]";
-            // use core::simd::Simd;
-            fn f() {
-                let std_simd = 1;
-                let _ = platform::simd::Local;
-            }
-        "#;
-        assert!(!has_portable_simd(unrelated));
-        assert!(!has_portable_simd("use std as platform;"));
-    }
-
-    #[test]
-    fn malformed_rust_fails_closed() {
-        assert!(contains_portable_simd_site("fn broken( {").is_err());
-    }
 
     #[test]
     fn kernel_package_owns_direct_simd() {
@@ -895,6 +661,7 @@ mod tests {
             name: SIMD_PACKAGE.to_owned(),
             relative_path: PathBuf::from("crates/stab-kernels-simd"),
             default_features: Vec::new(),
+            rust_version: None,
             version: cargo_metadata::semver::Version::new(0, 2, 0),
             publish: None,
             binary_targets: Vec::new(),
@@ -914,6 +681,7 @@ mod tests {
             name: "stab-core".to_owned(),
             relative_path: PathBuf::from("crates/stab-core"),
             default_features: Vec::new(),
+            rust_version: None,
             version: cargo_metadata::semver::Version::new(0, 2, 0),
             publish: None,
             binary_targets: Vec::new(),
@@ -951,6 +719,30 @@ mod tests {
         };
         assert_eq!(violation.code, "facade-root-module-unassigned");
         assert!(violation.message.contains("`bits`"));
+    }
+
+    #[test]
+    fn facade_tiers_reject_path_overrides_and_item_macros() {
+        let violations = facade_tier_violations(
+            FacadeSource::new(
+                Path::new("lib.rs"),
+                "#[path = \"alternate.rs\"] pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\ninclude!(\"exports.rs\");\n",
+            ),
+            FacadeSource::new(
+                Path::new("advanced.rs"),
+                "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+            ),
+            FacadeSource::new(Path::new("experimental.rs"), ""),
+            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<BTreeSet<_>>();
+
+        assert!(codes.contains("facade-module-path-override"));
+        assert!(codes.contains("facade-root-direct-item"));
+        assert!(codes.contains("facade-tier-missing"));
     }
 
     #[test]

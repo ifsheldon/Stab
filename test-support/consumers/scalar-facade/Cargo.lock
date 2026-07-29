@@ -246,11 +246,6 @@ name = "stab-core"
 version = "0.2.0"
 dependencies = [
  "arrayvec",
- "hex",
- "num-complex",
- "rand",
- "sha2",
- "smallvec",
  "stab-algebra",
  "stab-analysis",
  "stab-bits",

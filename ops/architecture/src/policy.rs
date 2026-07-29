@@ -11,37 +11,80 @@ const RELEASE_PATCH: u64 = 0;
 const STABLE_RUST_MAJOR: u64 = 1;
 const STABLE_RUST_MINOR: u64 = 97;
 const STABLE_RUST_PATCH: u64 = 1;
-const KNOWN_PRODUCT_PACKAGES: &[&str] = &[
-    "stab-algebra",
-    "stab-analysis",
-    "stab-bits",
-    "stab-cli",
-    "stab-core",
-    "stab-decoder",
-    "stab-engine",
-    "stab-kernels-simd",
-    "stab-model",
-    "stab-records",
+pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
+    ProductPackageContract::stable("stab-algebra", &["stab-bits", "stab-kernels-simd"]),
+    ProductPackageContract::stable("stab-analysis", &["stab-algebra", "stab-model"]),
+    ProductPackageContract::stable("stab-bits", &["stab-kernels-simd"]),
+    ProductPackageContract::nightly("stab-cli", &["stab-core"], &["stab"]),
+    ProductPackageContract::nightly(
+        "stab-core",
+        &[
+            "stab-algebra",
+            "stab-analysis",
+            "stab-bits",
+            "stab-decoder",
+            "stab-engine",
+            "stab-model",
+            "stab-records",
+        ],
+        &[],
+    ),
+    ProductPackageContract::stable("stab-decoder", &["stab-model", "stab-records"]),
+    ProductPackageContract::stable(
+        "stab-engine",
+        &[
+            "stab-algebra",
+            "stab-analysis",
+            "stab-model",
+            "stab-records",
+        ],
+    ),
+    ProductPackageContract::nightly("stab-kernels-simd", &[], &[]),
+    ProductPackageContract::stable("stab-model", &["stab-algebra"]),
+    ProductPackageContract::stable("stab-records", &["stab-bits"]),
 ];
-const GUARDED_PRODUCT_DEPENDENCY_PACKAGES: &[&str] = &[
-    "stab-algebra",
-    "stab-analysis",
-    "stab-bits",
-    "stab-cli",
-    "stab-core",
-    "stab-engine",
-    "stab-kernels-simd",
-    "stab-model",
-    "stab-records",
-];
-pub(crate) const STABLE_COMPONENT_PACKAGES: &[&str] = &[
-    "stab-algebra",
-    "stab-analysis",
-    "stab-bits",
-    "stab-engine",
-    "stab-model",
-    "stab-records",
-];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ProductPackageContract {
+    pub(crate) name: &'static str,
+    pub(crate) stable_component: bool,
+    pub(crate) allowed_dependencies: &'static [&'static str],
+    pub(crate) binary_targets: &'static [&'static str],
+}
+
+impl ProductPackageContract {
+    const fn stable(name: &'static str, allowed_dependencies: &'static [&'static str]) -> Self {
+        Self {
+            name,
+            stable_component: true,
+            allowed_dependencies,
+            binary_targets: &[],
+        }
+    }
+
+    const fn nightly(
+        name: &'static str,
+        allowed_dependencies: &'static [&'static str],
+        binary_targets: &'static [&'static str],
+    ) -> Self {
+        Self {
+            name,
+            stable_component: false,
+            allowed_dependencies,
+            binary_targets,
+        }
+    }
+}
+
+pub(crate) fn product_contract(name: &str) -> Option<&'static ProductPackageContract> {
+    PRODUCT_PACKAGE_CONTRACTS
+        .iter()
+        .find(|contract| contract.name == name)
+}
+
+pub(crate) fn is_stable_component(name: &str) -> bool {
+    product_contract(name).is_some_and(|contract| contract.stable_component)
+}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum DependencyKind {
@@ -67,6 +110,7 @@ pub struct PackageSpec {
     pub name: String,
     pub relative_path: PathBuf,
     pub default_features: Vec<String>,
+    pub rust_version: Option<Version>,
     pub version: Version,
     pub publish: Option<Vec<String>>,
     pub binary_targets: Vec<String>,
@@ -104,7 +148,6 @@ pub struct WorkspaceGraph {
     pub packages: Vec<PackageSpec>,
     pub edges: Vec<WorkspaceEdge>,
     pub declared_path_dependencies: Vec<DeclaredPathDependency>,
-    pub(crate) package_rust_versions: BTreeMap<String, Option<Version>>,
     pub(crate) resolved_dependencies: Vec<ResolvedDependencyIdentity>,
 }
 
@@ -154,12 +197,8 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             PackageClass::Product => {
                 validate_product_identity(package, &mut violations);
                 validate_product_publication(package, &mut violations);
-                if STABLE_COMPONENT_PACKAGES.contains(&package.name.as_str()) {
-                    validate_stable_rust_version(
-                        package,
-                        graph.package_rust_versions.get(&package.name),
-                        &mut violations,
-                    );
+                if is_stable_component(&package.name) {
+                    validate_stable_rust_version(package, &mut violations);
                     if package
                         .default_features
                         .iter()
@@ -200,7 +239,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
     }
 
     for dependency in &graph.resolved_dependencies {
-        if GUARDED_PRODUCT_DEPENDENCY_PACKAGES.contains(&dependency.to_package.as_str())
+        if product_contract(&dependency.to_package).is_some()
             && !resolves_to_local_product_package(dependency, &packages)
         {
             violations.push(Violation::new(
@@ -403,7 +442,7 @@ fn classify_path(path: &std::path::Path) -> PackageClass {
 }
 
 fn validate_product_identity(package: &PackageSpec, violations: &mut Vec<Violation>) {
-    if !KNOWN_PRODUCT_PACKAGES.contains(&package.name.as_str()) {
+    if product_contract(&package.name).is_none() {
         violations.push(Violation::new(
             "unknown-product-package",
             format!(
@@ -440,30 +479,28 @@ fn validate_product_publication(package: &PackageSpec, violations: &mut Vec<Viol
             ),
         ));
     }
-    if package.name == "stab-cli"
-        && !matches!(package.binary_targets.as_slice(), [target] if target == "stab")
-    {
+    let Some(contract) = product_contract(&package.name) else {
+        return;
+    };
+    if package.binary_targets != contract.binary_targets {
         violations.push(Violation::new(
-            "cli-binary-targets",
+            "product-binary-targets",
             format!(
-                "stab-cli must expose exactly one binary target named stab, found {:?}",
-                package.binary_targets
+                "{} must expose binary targets {:?}, found {:?}",
+                package.name, contract.binary_targets, package.binary_targets
             ),
         ));
     }
 }
 
-fn validate_stable_rust_version(
-    package: &PackageSpec,
-    actual: Option<&Option<Version>>,
-    violations: &mut Vec<Violation>,
-) {
+fn validate_stable_rust_version(package: &PackageSpec, violations: &mut Vec<Violation>) {
     let expected = stable_rust_version();
-    if actual.and_then(Option::as_ref) == Some(&expected) {
+    if package.rust_version.as_ref() == Some(&expected) {
         return;
     }
-    let actual = actual
-        .and_then(Option::as_ref)
+    let actual = package
+        .rust_version
+        .as_ref()
         .map_or_else(|| "not declared".to_owned(), ToString::to_string);
     violations.push(Violation::new(
         "stable-component-rust-version",
@@ -499,24 +536,7 @@ fn is_exact_release_requirement(requirement: &VersionReq) -> bool {
 }
 
 fn is_permitted_product_edge(from: &str, to: &str) -> bool {
-    match from {
-        "stab-kernels-simd" => false,
-        "stab-bits" => to == "stab-kernels-simd",
-        "stab-records" => to == "stab-bits",
-        "stab-algebra" => matches!(to, "stab-bits" | "stab-kernels-simd"),
-        "stab-model" => to == "stab-algebra",
-        "stab-analysis" => matches!(to, "stab-model" | "stab-algebra"),
-        "stab-engine" => matches!(
-            to,
-            "stab-model" | "stab-records" | "stab-algebra" | "stab-analysis"
-        ),
-        "stab-decoder" => matches!(to, "stab-model" | "stab-records"),
-        "stab-core" => KNOWN_PRODUCT_PACKAGES.iter().copied().any(|package| {
-            package == to && !matches!(package, "stab-core" | "stab-cli" | "stab-kernels-simd")
-        }),
-        "stab-cli" => to == "stab-core",
-        _ => false,
-    }
+    product_contract(from).is_some_and(|contract| contract.allowed_dependencies.contains(&to))
 }
 
 #[cfg(test)]
@@ -528,6 +548,7 @@ mod tests {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
             default_features: Vec::new(),
+            rust_version: is_stable_component(name).then(stable_rust_version),
             version: Version::new(0, 2, 0),
             publish: if prefix == "crates" {
                 None
@@ -543,22 +564,10 @@ mod tests {
     }
 
     fn graph(packages: Vec<PackageSpec>) -> WorkspaceGraph {
-        let package_rust_versions = packages
-            .iter()
-            .map(|package| {
-                (
-                    package.name.clone(),
-                    STABLE_COMPONENT_PACKAGES
-                        .contains(&package.name.as_str())
-                        .then(stable_rust_version),
-                )
-            })
-            .collect();
         WorkspaceGraph {
             packages,
             edges: Vec::new(),
             declared_path_dependencies: Vec::new(),
-            package_rust_versions,
             resolved_dependencies: Vec::new(),
         }
     }
@@ -571,6 +580,7 @@ mod tests {
                 name: "stab-compat-corpus".to_owned(),
                 relative_path: PathBuf::from("test-support/compat-corpus"),
                 default_features: Vec::new(),
+                rust_version: None,
                 version: Version::new(0, 2, 0),
                 publish: Some(Vec::new()),
                 binary_targets: Vec::new(),
@@ -661,25 +671,31 @@ mod tests {
 
     #[test]
     fn stable_components_require_the_exact_rust_version() {
-        for name in STABLE_COMPONENT_PACKAGES {
-            let valid = graph(vec![package(name, "crates")]);
+        for contract in PRODUCT_PACKAGE_CONTRACTS
+            .iter()
+            .filter(|contract| contract.stable_component)
+        {
+            let valid = graph(vec![package(contract.name, "crates")]);
             assert!(
                 validate_graph(&valid).violations.is_empty(),
-                "{name} should accept the exact Stable MSRV"
+                "{} should accept the exact Stable MSRV",
+                contract.name
             );
 
             for actual in [None, Some(Version::new(1, 97, 0))] {
                 let mut invalid = valid.clone();
                 invalid
-                    .package_rust_versions
-                    .insert((*name).to_owned(), actual);
+                    .packages
+                    .first_mut()
+                    .expect("fixture should contain one package")
+                    .rust_version = actual;
                 let report = validate_graph(&invalid);
                 let violation = report
                     .violations
                     .iter()
                     .find(|violation| violation.code == "stable-component-rust-version")
                     .expect("missing or mismatched Stable MSRV should fail");
-                assert!(violation.message.contains(name));
+                assert!(violation.message.contains(contract.name));
                 assert!(violation.message.contains("1.97.1"));
             }
         }
@@ -848,13 +864,9 @@ mod tests {
             let violation = report
                 .violations
                 .iter()
-                .find(|violation| violation.code == "cli-binary-targets")
+                .find(|violation| violation.code == "product-binary-targets")
                 .expect("invalid CLI binary targets should fail");
-            assert!(
-                violation
-                    .message
-                    .contains("exactly one binary target named stab")
-            );
+            assert!(violation.message.contains("[\"stab\"]"));
         }
     }
 }

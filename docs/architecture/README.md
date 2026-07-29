@@ -92,23 +92,24 @@ stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
-stab-decoder -> stab-model + stab-records
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
 stab-cli -> stab-core
 
 ops -> product crates
 product crates -X-> ops
 ```
 
-`just architecture::check` enforces every workspace edge, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
+`stab-decoder` is reserved by the architecture policy but is not part of the completed A6 graph. A7 must add the physical crate and its earned dependency edge before this current-state graph includes it.
+
+`just architecture::check` derives package identity, Stable status, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits test-support dependencies only as development edges, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
 
 The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
 
-The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and keeps `experimental` empty until A8 supplies an explicit allowlist. Portable-SIMD inspection follows direct, grouped, and aliased `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
+The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects module path overrides and item-generating macros in facade tier entry files, rejects exported macros anywhere in `stab-core`, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and keeps `experimental` empty until A8 supplies an explicit allowlist. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check.
+Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check. Every unstable Rust `feature(...)` gate is rejected in Stable components, including target-gated and nested `cfg_attr` forms.
 
 `just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through bits, algebra, and core in each portable graph.
 
