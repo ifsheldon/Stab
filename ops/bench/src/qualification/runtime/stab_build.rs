@@ -87,7 +87,7 @@ pub(super) struct StabWorkerExecutable {
     executable: SealedExecutable,
     identity: WorkerIdentity,
     receipt: StabBuildReceipt,
-    source_root: PathBuf,
+    source_root: RepoRoot,
 }
 
 impl StabWorkerExecutable {
@@ -128,11 +128,14 @@ impl StabWorkerExecutable {
         }
         super::git::materialize_repository_commit(root, repository_commit, &source)?;
         link_cargo_cache(&cargo_home)?;
+        let materialized_root = RepoRoot::resolve(&source)
+            .map_err(|error| StabBuildError::SourceInput(error.to_string()))?;
 
-        let worker_source_sha256 = digest_materialized_worker_source(&source)?;
-        let cargo_lock_sha256 = digest_file(&source.join("Cargo.lock"))?;
-        let workspace_manifest_sha256 = digest_file(&source.join("Cargo.toml"))?;
-        let package_manifest_sha256 = digest_file(&source.join("ops/bench/Cargo.toml"))?;
+        let worker_source_sha256 = digest_worker_source(&materialized_root)?;
+        let cargo_lock_sha256 = digest_repository_file(&materialized_root, "Cargo.lock")?;
+        let workspace_manifest_sha256 = digest_repository_file(&materialized_root, "Cargo.toml")?;
+        let package_manifest_sha256 =
+            digest_repository_file(&materialized_root, "ops/bench/Cargo.toml")?;
         let linker = canonical_linker()?;
         let linker_sha256 = super::adapter::sha256_regular_file(&linker, 512 << 20)?;
         let build_arguments = normalized_build_arguments(variant);
@@ -209,7 +212,7 @@ impl StabWorkerExecutable {
             executable,
             identity,
             receipt,
-            source_root: source,
+            source_root: materialized_root,
         };
         worker.verify(toolchain, repository_commit)?;
         Ok(worker)
@@ -237,8 +240,7 @@ impl StabWorkerExecutable {
         repository_commit: &str,
     ) -> Result<(), StabBuildError> {
         self.executable.verify()?;
-        if digest_materialized_worker_source(&self.source_root)?
-            != self.receipt.worker_source_sha256
+        if digest_worker_source(&self.source_root)? != self.receipt.worker_source_sha256
             || self.receipt.binary_sha256 != self.executable.sha256()
             || !self.receipt.validates_report_identity(
                 self.identity.source_digest.as_str(),
@@ -339,7 +341,7 @@ impl StabBuildReceipt {
         repository_commit: &str,
         toolchain: &ToolchainEvidence,
     ) -> Result<(), StabBuildError> {
-        if digest_materialized_worker_source(&source_root.path)? != self.worker_source_sha256 {
+        if digest_worker_source(source_root)? != self.worker_source_sha256 {
             return Err(StabBuildError::ReplayedSourceIdentity);
         }
         for (relative_path, expected) in [
@@ -347,7 +349,7 @@ impl StabBuildReceipt {
             ("Cargo.toml", &self.workspace_manifest_sha256),
             ("ops/bench/Cargo.toml", &self.package_manifest_sha256),
         ] {
-            if digest_file(&source_root.path.join(relative_path))? != *expected {
+            if digest_repository_file(source_root, relative_path)? != *expected {
                 return Err(StabBuildError::ReplayedManifestIdentity(relative_path));
             }
         }
@@ -591,15 +593,25 @@ fn link_cargo_cache(private_home: &Path) -> Result<(), StabBuildError> {
     Ok(())
 }
 
-fn digest_file(path: &Path) -> Result<String, StabBuildError> {
-    super::adapter::sha256_regular_file(path, MAX_SOURCE_INPUT_BYTES).map_err(StabBuildError::from)
+fn digest_repository_file(root: &RepoRoot, relative_path: &str) -> Result<String, StabBuildError> {
+    let path = root.path.join(relative_path);
+    let bytes = crate::source_file::read_repo_regular_file_bounded(
+        root,
+        &path,
+        usize::try_from(MAX_SOURCE_INPUT_BYTES)
+            .map_err(|_| StabBuildError::SourceInput("source byte limit".to_string()))?,
+    )
+    .map_err(|error| StabBuildError::SourceInput(error.to_string()))?;
+    Ok(hex_digest(&Sha256::digest(bytes)))
 }
 
-fn digest_materialized_worker_source(source: &Path) -> Result<String, StabBuildError> {
+fn digest_worker_source(source: &RepoRoot) -> Result<String, StabBuildError> {
     let mut digest = Sha256::new();
     for (logical_path, repository_path) in WORKER_SOURCES {
-        let bytes = crate::source_file::read_regular_file_bounded(
-            &source.join(repository_path),
+        let path = source.path.join(repository_path);
+        let bytes = crate::source_file::read_repo_regular_file_bounded(
+            source,
+            &path,
             usize::try_from(MAX_SOURCE_INPUT_BYTES)
                 .map_err(|_| StabBuildError::SourceInput("source byte limit".to_string()))?,
         )
@@ -715,9 +727,9 @@ mod tests {
             std::fs::write(&source_path, format!("materialized {path}\n"))
                 .expect("materialized worker source");
         }
+        let root = RepoRoot::resolve(runtime.path()).expect("resolve materialized source");
 
-        let materialized =
-            digest_materialized_worker_source(runtime.path()).expect("materialized digest");
+        let materialized = digest_worker_source(&root).expect("materialized digest");
         let controller = worker::source_digest().expect("controller digest");
         assert_ne!(materialized, controller.as_str());
 
@@ -725,7 +737,7 @@ mod tests {
             .path()
             .join(WORKER_SOURCES.get(1).expect("bits source contract").1);
         std::fs::write(bits_path, b"changed bits source\n").expect("change bits source");
-        let changed = digest_materialized_worker_source(runtime.path()).expect("changed digest");
+        let changed = digest_worker_source(&root).expect("changed digest");
         assert_ne!(materialized, changed);
 
         let not_zero_path = runtime
@@ -733,9 +745,35 @@ mod tests {
             .join(WORKER_SOURCES.get(2).expect("not-zero source contract").1);
         std::fs::write(not_zero_path, b"changed not-zero source\n")
             .expect("change not-zero source");
-        let changed_again =
-            digest_materialized_worker_source(runtime.path()).expect("changed digest");
+        let changed_again = digest_worker_source(&root).expect("changed digest");
         assert_ne!(changed, changed_again);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replay_hashes_sources_and_manifests_through_a_retained_root() {
+        let runtime = tempfile::tempdir().expect("temporary source tree");
+        for (_, path) in WORKER_SOURCES {
+            let source_path = runtime.path().join(path);
+            std::fs::create_dir_all(source_path.parent().expect("worker parent"))
+                .expect("materialized source directories");
+            std::fs::write(&source_path, format!("materialized {path}\n"))
+                .expect("materialized worker source");
+        }
+        std::fs::write(runtime.path().join("Cargo.lock"), b"lock\n").expect("write lock");
+        let root = RepoRoot::resolve(runtime.path()).expect("resolve source root");
+        let descriptor = crate::source_file::open_repo_directory_descriptor(&root, &root.path)
+            .expect("retain source root");
+        let retained = RepoRoot::from_retained_descriptor(descriptor);
+
+        assert_eq!(
+            digest_worker_source(&root).expect("direct source digest"),
+            digest_worker_source(&retained).expect("retained source digest")
+        );
+        assert_eq!(
+            digest_repository_file(&root, "Cargo.lock").expect("direct manifest digest"),
+            digest_repository_file(&retained, "Cargo.lock").expect("retained manifest digest")
+        );
     }
 
     #[test]
@@ -743,8 +781,7 @@ mod tests {
         let root =
             RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
                 .expect("repository root");
-        let materialized =
-            digest_materialized_worker_source(&root.path).expect("materialized digest");
+        let materialized = digest_worker_source(&root).expect("materialized digest");
         let controller = worker::source_digest().expect("controller digest");
         assert_eq!(materialized, controller.as_str());
     }

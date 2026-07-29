@@ -59,6 +59,7 @@ pub(crate) fn validate_repo_regular_file(root: &RepoRoot, path: &Path) -> Result
     }
 }
 
+#[cfg(test)]
 pub(crate) fn read_regular_file_bounded(
     path: &Path,
     max_bytes: usize,
@@ -121,7 +122,7 @@ pub(crate) fn duplicate_repo_root_descriptor(
         .map_err(source_io(path))
 }
 
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 fn read_regular_file_bounded_unix(path: &Path, max_bytes: usize) -> Result<Vec<u8>, BenchError> {
     let file = open_regular_file_unix(path)?;
     read_open_regular_file_bounded(file, path, max_bytes)
