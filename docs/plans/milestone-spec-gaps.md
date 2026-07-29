@@ -1333,3 +1333,12 @@ Current text: M0 requires CI benchmark smoke tests, while M3 owns the benchmark 
 Gap: before M3, benchmark smoke can only prove workspace wiring unless the plan requires an explicit placeholder benchmark target.
 Proposed amendment: clarify whether M0 benchmark smoke is compile-only workspace smoke or require a tiny explicit benchmark target that is intentionally replaced by the M3 benchmark harness.
 Resolution: M0 now defines `just bench::smoke` as a compile and wiring smoke for benchmark operations only. It must not claim benchmark baselines, performance thresholds, or workload parity before M3 creates the real benchmark package, baseline commands, and benchmark matrix. Evidence is `just bench::smoke` and the M3 benchmark-baseline milestone text.
+
+## 2026-07-30 - A6: Stable Scalar Engine Boundary
+
+Status: Resolved
+Revealed by: milestone audit after physical component extraction.
+Current text: the architecture plan and ADR required the complete engine to remain on pinned Nightly, while the implemented `stab-engine` package, Stable consumer fixture, architecture policy, and contributor documentation deliberately support Rust 1.97.1.
+Gap: the written boundary treated mutable execution as inherently Nightly even though the scalar engine has no `stab-kernels-simd` dependency and no direct portable-SIMD code. Enforcing the text would make Stable decoder and orchestration crates import a Nightly engine without gaining a distinct execution plan or measured backend.
+Proposed amendment: keep `stab-engine` Stable while scalar is its only registered backend; reserve Nightly for the facade, CLI, the dependency-free SIMD kernel crate, and consumers that explicitly enable `portable-simd`.
+Resolution: the A6 plan, ADR 0005, extraction map, Stable test matrix, and external-consumer contract now name the scalar engine as part of the Rust 1.97.1 component stack. A future Nightly backend must use an explicit feature or separate implementation crate and prove a distinct executable plan, capability descriptor, fingerprint, semantic equivalence, and phase-specific performance evidence before changing the default engine boundary.

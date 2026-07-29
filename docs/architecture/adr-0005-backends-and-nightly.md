@@ -18,9 +18,11 @@ Any restored direct `std::simd` use belongs only to `stab-kernels-simd` and must
 
 `stab-kernels-simd` has no Stab dependency and accepts raw word slices and fixed word blocks only.
 
-Model, bits, records, scalar algebra, and pure analysis support Rust 1.97.1.
+Model, bits, records, scalar algebra, pure analysis, and the scalar engine support Rust 1.97.1.
 
-The complete engine, facade, and CLI retain the pinned Nightly high-performance build.
+The facade and CLI retain the pinned Nightly workspace build. The engine remains Stable-compatible while its only registered backend is scalar and it has no dependency on the raw SIMD kernel crate.
+
+Making the default engine Nightly-only would prevent Stable decoder and orchestration crates from composing public plans, sessions, and typed sinks without providing a corresponding execution benefit. A future backend that needs Nightly must use an explicit feature or a separate implementation crate and prove a distinct executable plan before changing this boundary.
 
 Scalar behavior is the absence of the additive `portable-simd` feature.
 
@@ -41,5 +43,6 @@ No unimplemented GPU capability is advertised.
 ## Consequences
 
 - Stable consumers can use reusable toolkit components.
+- Stable consumers can compile and execute the scalar plan/session pipeline without importing the facade or CLI.
 - Nightly consumers can opt into measured portable bit and algebra kernels without changing sampling capability claims.
 - A later device backend must prove a real plan and batch contract before becoming public.

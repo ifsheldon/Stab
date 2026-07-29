@@ -56,6 +56,19 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Resource behavior: `ParseLimits` owns caller-selectable source-line admission and a caller-tightenable 256-level parsed-model repeat envelope. Programmatic models may exceed that parser envelope only for APIs with an established deeper contract; those consumers must be iterative or reject before recursive work. `DemFlattenLimits` belongs to the analysis adapter rather than the model.
 - Extension points: immutable typed circuit passes consume and return models.
 
+### Bits
+
+- Purpose: own Stable packed bit storage, checked views, scalar kernels, sparse symmetric-difference storage, and bit-matrix layouts.
+- Inputs and outputs: typed bit vectors, slices, blocks, matrices, sparse index sets, and `BitError`.
+- Invariants: logical widths are explicit, unused tail bits are masked at owned boundaries, checked operations reject width and range mismatches before mutation, and optional acceleration cannot change scalar semantics.
+- Dependencies: standard-library support plus the optional dependency-free raw SIMD kernel crate behind `portable-simd`.
+- Forbidden: model, records, algebra, analysis, engine, facade, CLI, and ops.
+- Resource behavior: owned storage is proportional to declared logical width or matrix shape; in-place kernels allocate nothing after construction; sparse operations retain capacity proportional to their canonical sorted support.
+- Extension points: checked packed storage and allocation-free in-place operations. New raw acceleration remains private to the selected implementation boundary until a measured caller proves it.
+- Conformance tests: scalar references, tails, dirty padding, empty and block boundaries, unequal-width rejection without mutation, sparse invariants, transpose semantics, allocation counts, and default-versus-portable feature runs.
+- Benchmarks: dense XOR, not-zero, popcount, sparse XOR, and transpose workloads with pinned Stim comparators where faithful; scalar-versus-SIMD diagnostics apply only to kernels whose executed path changes.
+- Files changed together: bit source and tests, optional feature maps, raw kernel sources, architecture checks, qualification ownership, runtime contracts, profiler notes, and Stable/Nightly matrix documentation.
+
 ### Records
 
 - Purpose: own typed result layouts, packed batches, strict codecs, sources, and sinks.
@@ -108,6 +121,32 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: CLI, ops, and engine.
 - Resource behavior: `CircuitFlattenLimits`, `DemFlattenLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits` own their independent expansion, retained-state, and output budgets. Other partial analysis algorithms retain documented fixed safety contracts instead of sharing a generic policy.
 - Extension points: typed circuit passes.
+
+### Facade
+
+- Purpose: provide the curated ergonomic `stab-core` API and preserve explicitly documented pre-0.2 compatibility adapters over canonical component owners.
+- Inputs and outputs: common model, algebra, plan, session, batch, diagnostic, capability, resource-policy, filesystem, and materialized compatibility values.
+- Invariants: root exports stay curated, advanced storage and adapters remain visibly advanced, compatibility conversion is lossless, and the facade does not become a second implementation owner.
+- Dependencies: bits, records, algebra, model, analysis, engine, and decoder once available.
+- Forbidden: CLI, ops, test-support runtime dependencies, and direct portable-SIMD imports.
+- Resource behavior: the facade delegates operation admission to owning components; byte-materializing conveniences retain only caller-requested output plus documented compatibility scratch and do not weaken component limits.
+- Extension points: `advanced` exposes proven lower-level component seams and `experimental` contains only externally proven pre-stable contracts. Neither namespace is a dynamic plugin registry.
+- Conformance tests: facade-to-owner identity, error conversion, compatibility adapters, filesystem safety, root/advanced/experimental API tiers, downstream consumers, implemented CLI oracle, and generated ownership.
+- Benchmarks: facade adapters are measured only when they are the public workload under study; canonical component phases remain separately timed and cannot be inferred from a facade aggregate.
+- Files changed together: facade exports and adapters, the API migration inventory, architecture tier policy, external consumers, correctness ownership, affected benchmark callers, README, and migration documentation.
+
+### CLI
+
+- Purpose: adapt typed product APIs to Stim-compatible process behavior and Stab-native agent commands.
+- Inputs and outputs: Clap arguments, retained input and output file roles, stdin/stdout/stderr, exit status, human or JSON diagnostics, and source-owned capability or plan representations.
+- Invariants: implemented Stim flags and file formats preserve their compatibility contracts, path aliases fail before truncation, agent schemas are versioned, and command code does not duplicate model, codec, compiler, backend, or qualification truth.
+- Dependencies: the facade plus command-line and operating-system adapter libraries.
+- Forbidden: private component internals, direct kernel selection, benchmark policy, correctness ledgers, and mutable global extension registries.
+- Resource behavior: command preflight opens and validates all active file roles before output truncation, streaming commands retain bounded per-record or per-batch state, and bounded materialized commands report their explicit input and output caps.
+- Extension points: versioned Stab-native inspection, capability, and planning commands over public descriptors. Product extensions enter through component APIs before becoming CLI switches.
+- Conformance tests: exact and structural pinned-Stim command cases, malformed input, stderr and exit classes, file alias identities, large streaming requests, agent-schema fixtures, and unavailable backend requests.
+- Benchmarks: process-symmetric CLI rows for startup, parsing, conversion, sampling, detection, DEM work, and output routing; in-process rows remain diagnostic unless they faithfully match the public process boundary.
+- Files changed together: command definitions and tests, help and agent schemas, capability descriptors, oracle fixtures, benchmark manifest rows, path-role policy, README, and feature checklist.
 
 ## Current Source Ownership
 

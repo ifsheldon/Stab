@@ -96,8 +96,8 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 | `stab-records` | Stable 1.97.1 | Measurement and detection batches, layouts, codecs, sources, sinks |
 | `stab-algebra` | Stable 1.97.1 by default | Pauli strings, Cliffords, tableaus, flows, scalar algebra |
 | `stab-kernels-simd` | Pinned Nightly | Raw portable-SIMD kernels over word slices and fixed word blocks, with no Stab dependency |
-| `stab-engine` | Pinned Nightly | Sampling, detection conversion, DEM sampling, backend compilation over shared analysis lowering |
-| `stab-analysis` | Stable where independent of execution | Circuit transforms, circuit-to-DEM analysis, search, generation, error matching |
+| `stab-engine` | Stable 1.97.1 | Scalar sampling, detection conversion, DEM sampling, and backend compilation over shared analysis lowering |
+| `stab-analysis` | Stable 1.97.1 | Circuit transforms, circuit-to-DEM analysis, search, generation, error matching |
 | `stab-decoder` | Stable 1.97.1 | Decoder batch interoperability and conformance support |
 | `stab-core` | Pinned Nightly | Curated ergonomic facade and compatibility conveniences |
 | `stab-cli` | Pinned Nightly | Thin command adapter over public facade APIs |
@@ -126,7 +126,7 @@ ops -> product crates
 
 The inverse edge is forbidden.
 
-Simulation-backed helpers that are currently described as analysis move to `stab-engine` so `stab-analysis` can remain independent of the Nightly execution crate.
+Simulation-backed helpers that are currently described as analysis move to `stab-engine` so `stab-analysis` remains pure and independent of mutable execution.
 
 ## Public API Direction
 
@@ -746,8 +746,8 @@ Status: Active.
 - Extract `stab-model`, `stab-algebra`, `stab-engine`, and `stab-analysis`.
 - Extract `stab-kernels-simd` as the only direct portable-SIMD owner.
 - Extract in dependency order: algebra after removing `Gate`, model after removing foreign inherent algorithm methods, analysis after model and algebra, engine after analysis, then SIMD kernels after scalar paths are explicit.
-- Make model, bits, records, scalar algebra, and pure analysis compile on Stable 1.97.1.
-- Keep the full facade, engine, and CLI on pinned Nightly.
+- Make model, bits, records, scalar algebra, pure analysis, and the scalar engine compile on Stable 1.97.1.
+- Keep the full facade and CLI on pinned Nightly. Require Nightly only for `stab-kernels-simd` and consumers that explicitly enable `portable-simd`.
 - Give `stab-kernels-simd` no Stab dependencies and restrict its cross-crate API to raw `[u64]`, `&mut [u64]`, and fixed `[u64; 4]` kernels.
 - Make scalar behavior the absence of the additive `portable-simd` feature; do not create mutually exclusive scalar and SIMD features.
 - Limit the first SIMD surface to four-word XOR and non-identity Clifford right multiplication. Defer scans, masks, transpose, sampling, and additional kernels until an affected workload proves a real benefit.
@@ -763,7 +763,7 @@ Status: Active.
 - Stable and Nightly CI matrices.
 - Default-feature and portable-SIMD feature-unification checks.
 - Stable external-consumer and Nightly facade-consumer fixtures.
-- Architecture rejection of `std::simd`, `core::simd`, or `#![feature(portable_simd)]` outside `stab-kernels-simd`, any Stab dependency from that kernel crate, mandatory Stable-to-kernel edges, Stable default features reaching Nightly, and Stable dev dependencies reaching engine, facade, CLI, or ops.
+- Architecture rejection of `std::simd`, `core::simd`, or `#![feature(portable_simd)]` outside `stab-kernels-simd`, any Stab dependency from that kernel crate, mandatory Stable-to-kernel edges, Stable default features reaching Nightly, and Stable dev dependencies reaching the facade, CLI, or ops.
 - Scalar and SIMD equivalence for every affected public bit and Clifford operation, including tails, all 24-by-24 valid Clifford products, metadata counts, unequal widths, and allocation-free mutation.
 - Architecture dependency checks.
 - Rustdoc public API inventory and tier checks.
@@ -778,7 +778,7 @@ Status: Active.
 
 ### Done Criteria
 
-- Stable component consumers do not compile `std::simd`.
+- Stable component consumers, including scalar engine consumers, do not compile `std::simd`.
 - The Nightly facade can opt into source-current SIMD leaf kernels without advertising a nonexistent sampling backend.
 - Only `stab-kernels-simd` contains `#![feature(portable_simd)]`.
 - Medium and large scalar-versus-SIMD XOR and non-identity Clifford evidence is source-current. SIMD remains opt-in unless affected families demonstrate a material benefit without parity or confidence regression.
@@ -896,7 +896,7 @@ Status: Active.
 ## Standard Verification
 
 ```text
-cargo +1.97.1 check -p stab-bits -p stab-model -p stab-records -p stab-algebra
+cargo +1.97.1 check -p stab-bits -p stab-model -p stab-records -p stab-algebra -p stab-analysis -p stab-engine
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace

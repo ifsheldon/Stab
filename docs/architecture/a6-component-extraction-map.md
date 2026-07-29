@@ -260,7 +260,7 @@ The physical work is split into focused commits:
 5. Remove `ops-contracts` and migrate operational descriptors before moving the gate registry.
 6. Complete Stable `stab-model` and facade error/path adapters.
 7. Extract Stable `stab-analysis`.
-8. Extract Nightly `stab-engine`.
+8. Extract Stable scalar `stab-engine`.
 9. Extract dependency-free `stab-kernels-simd` and add feature forwarding for measured bit and algebra kernels while retaining scalar-only sampling backend registration.
 10. Add external-consumer fixtures, dependency rejection fixtures, API-tier checks, and generated inventory ownership.
 11. Run moved-path benchmarks, audit, review, and A6 evidence closure.
@@ -276,11 +276,11 @@ Each commit must compile the workspace state it creates. Temporary duplicate imp
 The following run on Rust 1.97.1:
 
 ```text
-cargo +1.97.1 check -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis
-cargo +1.97.1 test -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis
+cargo +1.97.1 check -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine
+cargo +1.97.1 test -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine
 ```
 
-External fixture crates prove that Stable consumers do not compile facade, engine, CLI, ops, or Nightly kernel code.
+External fixture crates prove that Stable consumers can compile the scalar engine without compiling the facade, CLI, ops, or Nightly kernel code.
 
 ### Algebra
 
@@ -309,7 +309,7 @@ Add external-consumer fixtures for:
 - Nightly facade with `portable-simd`;
 - CLI, oracle, and benchmark explicit feature intent;
 - feature unification from multiple consumers;
-- forbidden product-to-ops, kernel-to-Stab, mandatory Stable-to-kernel, Stable-to-engine, Stable-to-facade, and direct `std::simd`, `core::simd`, or portable-SIMD feature-gate sites outside the kernel crate;
+- forbidden product-to-ops, kernel-to-Stab, mandatory Stable-to-kernel, Stable-to-facade, and direct `std::simd`, `core::simd`, or portable-SIMD feature-gate sites outside the kernel crate;
 - root, `advanced`, and `experimental` rustdoc tiers;
 - absence of qualification-only product exports.
 
