@@ -17,7 +17,7 @@ impl CompiledSampler {
     where
         F: FnMut(&[bool]) -> Result<(), E>,
     {
-        let zero_progress = SamplingRunProgress::new(0, 0);
+        let zero_progress = SamplingRunProgress::default();
         let mut session = self
             .plan
             .session_with_reference_mode(
@@ -29,13 +29,14 @@ impl CompiledSampler {
                 progress: zero_progress,
             })?;
         let mut record = Vec::new();
+        let measurement_count = self.plan().measurement_width().get();
         record
-            .try_reserve_exact(self.plan.inner.measurement_count)
+            .try_reserve_exact(measurement_count)
             .map_err(|error| RunError::Engine {
                 source: SamplingExecutionError::SessionStorageAllocation {
                     message: format!(
                         "legacy callback record capacity {}: {error}",
-                        self.plan.inner.measurement_count
+                        measurement_count
                     ),
                 },
                 progress: zero_progress,

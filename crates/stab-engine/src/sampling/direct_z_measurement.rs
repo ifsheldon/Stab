@@ -1,6 +1,6 @@
 use rand::{Rng, RngExt as _};
 
-use crate::PauliBasis;
+use stab_algebra::PauliBasis;
 
 use super::operation::SampleOperation;
 

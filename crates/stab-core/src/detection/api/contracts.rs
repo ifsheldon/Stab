@@ -59,7 +59,7 @@ impl DetectionExecutionError {
     pub fn into_circuit_error(self) -> CircuitError {
         match self {
             Self::Conversion(error) => error,
-            Self::Sampling(error) => error.into_circuit_error(),
+            Self::Sampling(error) => CircuitError::from(error),
             other => CircuitError::invalid_sampler_compilation(other.to_string()),
         }
     }

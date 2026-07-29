@@ -1,4 +1,5 @@
-use crate::{MeasureRecordOffset, PauliBasis};
+use stab_algebra::PauliBasis;
+use stab_model::MeasureRecordOffset;
 
 use super::stabilizer_frame::LocalTableauTransform;
 

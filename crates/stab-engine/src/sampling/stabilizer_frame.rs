@@ -1,8 +1,9 @@
 use std::fmt;
 
 use rand::{Rng, RngExt as _};
+use stab_algebra::{PauliBasis, PauliSign, StabilizerError, Tableau};
 
-use crate::{CircuitError, CircuitResult, PauliBasis, PauliSign, StabilizerError, Tableau};
+use super::SamplingCompileError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct LocalTableauTransform {
@@ -11,7 +12,7 @@ pub(super) struct LocalTableauTransform {
 }
 
 impl LocalTableauTransform {
-    pub(super) fn from_tableau(tableau: &Tableau) -> CircuitResult<Self> {
+    pub(super) fn from_tableau(tableau: &Tableau) -> Result<Self, SamplingCompileError> {
         let target_count = tableau.len();
         let output_count = local_basis_count(target_count)?;
         let mut outputs = Vec::with_capacity(output_count);
@@ -23,7 +24,7 @@ impl LocalTableauTransform {
             let mut output_bases = Vec::with_capacity(target_count);
             for target in 0..target_count {
                 let Some(basis) = output.get(target) else {
-                    return Err(CircuitError::invalid_sampler_compilation(
+                    return Err(SamplingCompileError::invalid_circuit(
                         "tableau output length changed while compiling sampler",
                     ));
                 };
@@ -743,11 +744,11 @@ fn reduce_span_row(row: &mut SpanRow, basis: &[Option<usize>], prior_rows: &[Spa
     }
 }
 
-fn local_basis_count(target_count: usize) -> CircuitResult<usize> {
+fn local_basis_count(target_count: usize) -> Result<usize, SamplingCompileError> {
     let mut count = 1usize;
     for _ in 0..target_count {
         count = count.checked_mul(4).ok_or_else(|| {
-            CircuitError::invalid_sampler_compilation(
+            SamplingCompileError::invalid_circuit(
                 "local tableau transform has too many target basis states",
             )
         })?;
@@ -793,6 +794,6 @@ pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
     }
 }
 
-fn map_stabilizer_error(error: StabilizerError) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(error.to_string())
+fn map_stabilizer_error(error: StabilizerError) -> SamplingCompileError {
+    SamplingCompileError::invalid_circuit(error.to_string())
 }

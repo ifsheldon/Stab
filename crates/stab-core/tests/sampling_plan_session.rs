@@ -221,10 +221,16 @@ fn compilation_failures_keep_invalid_circuits_distinct_from_missing_backends() {
         .expect_err("ordinary sampling rejects sweep-controlled execution");
     assert_eq!(invalid.code(), SamplingCompileErrorCode::InvalidCircuit);
     assert_eq!(invalid.code().as_str(), "invalid-circuit");
-    let SamplingCompileError::InvalidCircuit(original_cause) = invalid.clone() else {
-        panic!("invalid circuit must retain its CircuitError cause");
+    let SamplingCompileError::InvalidCircuit { message } = invalid.clone() else {
+        panic!("invalid circuit must retain its engine diagnostic");
     };
-    assert_eq!(invalid.into_circuit_error(), original_cause);
+    assert_eq!(message, "M8 sampler subset does not support CX");
+    assert_eq!(
+        CircuitError::from(invalid),
+        CircuitError::InvalidSamplerCompilation {
+            message: "M8 sampler subset does not support CX".to_owned()
+        }
+    );
 
     let ordinary = Circuit::from_stim_str("M 0\n").expect("parse ordinary circuit");
     let unavailable = SamplingCompiler::new()
@@ -237,8 +243,7 @@ fn compilation_failures_keep_invalid_circuits_distinct_from_missing_backends() {
     );
     assert_eq!(unavailable.code().as_str(), "backend-unavailable");
     assert!(
-        unavailable
-            .into_circuit_error()
+        CircuitError::from(unavailable)
             .to_string()
             .contains("portable-simd")
     );
@@ -724,9 +729,7 @@ fn sink_write_and_finish_errors_poison_with_exact_progress() {
     ));
     assert_eq!(unused.write_calls, 0);
     assert_eq!(
-        SamplingExecutionError::SessionPoisoned
-            .into_circuit_error()
-            .to_string(),
+        CircuitError::from(SamplingExecutionError::SessionPoisoned).to_string(),
         CircuitError::InvalidSamplerCompilation {
             message: "sampling session is poisoned".to_owned()
         }

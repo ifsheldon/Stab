@@ -147,6 +147,37 @@ impl From<stab_analysis::AnalysisError> for CircuitError {
     }
 }
 
+impl From<stab_engine::SamplingCompileError> for CircuitError {
+    fn from(error: stab_engine::SamplingCompileError) -> Self {
+        match error {
+            stab_engine::SamplingCompileError::Model(error) => error.into(),
+            stab_engine::SamplingCompileError::Analysis(error) => error.into(),
+            stab_engine::SamplingCompileError::InvalidCircuit { message } => {
+                Self::invalid_sampler_compilation(message)
+            }
+            stab_engine::SamplingCompileError::BackendUnavailable { requested } => {
+                Self::invalid_sampler_compilation(format!(
+                    "sampling backend {} is unavailable",
+                    requested.as_str()
+                ))
+            }
+        }
+    }
+}
+
+impl From<stab_engine::SamplingExecutionError> for CircuitError {
+    fn from(error: stab_engine::SamplingExecutionError) -> Self {
+        match error {
+            stab_engine::SamplingExecutionError::InvalidSweepRecordWidth { expected, actual } => {
+                Self::invalid_result_format(format!(
+                    "sweep record expected {expected} bits, got {actual}"
+                ))
+            }
+            other => Self::invalid_sampler_compilation(other.to_string()),
+        }
+    }
+}
+
 impl CircuitError {
     pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
         Self::InvalidDomainValue {

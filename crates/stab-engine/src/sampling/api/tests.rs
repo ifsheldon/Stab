@@ -1,4 +1,5 @@
 use super::*;
+use stab_records::{MeasurementCodecSink, RecordFormat};
 
 #[derive(Default)]
 struct RecordSink {
@@ -80,11 +81,8 @@ fn counter_overflow_rejects_before_work_without_poisoning() {
         .session(RandomPolicy::Seeded(Seed::new(1)))
         .expect("construct session");
     session.total_committed_shots = u64::MAX;
-    let mut sink = crate::MeasurementCodecSink::try_new(
-        crate::RecordFormat::ZeroOne,
-        MeasurementWidth::new(1),
-    )
-    .expect("construct sink");
+    let mut sink = MeasurementCodecSink::try_new(RecordFormat::ZeroOne, MeasurementWidth::new(1))
+        .expect("construct sink");
 
     assert!(matches!(
         session.run(ShotCount::new(1), &mut sink),

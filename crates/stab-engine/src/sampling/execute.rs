@@ -3,7 +3,7 @@ use rand::Rng;
 use super::operation::SampleOperation;
 use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame, reset_correction};
 use super::{ExecutionMode, measurement_flip, noise};
-use crate::MeasureRecordOffset;
+use stab_model::MeasureRecordOffset;
 
 pub(super) struct ExecutionBuffers<'a> {
     pub(super) frame: &'a mut StabilizerFrame,

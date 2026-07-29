@@ -7,6 +7,10 @@ use std::sync::{Arc, OnceLock};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
+use stab_model::Circuit;
+use stab_records::{
+    BitPlane64Batch, BitPlane64BatchView, MeasurementBatchView, MeasurementSink, MeasurementWidth,
+};
 use thiserror::Error;
 
 use super::direct_z_measurement::DirectZMeasurementPlan;
@@ -18,10 +22,7 @@ use super::{
     ExecutionMode, SweepCompilation, compile_circuit, direct_z_measurement, sampler_rng,
     small_frame,
 };
-use crate::{
-    BitPlane64Batch, BitPlane64BatchView, Circuit, CircuitError, CompilationRequestFingerprint,
-    MeasurementBatchView, MeasurementSink, MeasurementWidth,
-};
+use crate::CompilationRequestFingerprint;
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
@@ -93,29 +94,31 @@ impl SamplingCompileErrorCode {
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum SamplingCompileError {
     #[error(transparent)]
-    InvalidCircuit(#[from] CircuitError),
+    Model(#[from] stab_model::ModelError),
+
+    #[error(transparent)]
+    Analysis(#[from] stab_analysis::AnalysisError),
+
+    #[error("{message}")]
+    InvalidCircuit { message: String },
 
     #[error("sampling backend {} is not available in this build", requested.as_str())]
     BackendUnavailable { requested: BackendPreference },
 }
 
 impl SamplingCompileError {
-    pub const fn code(&self) -> SamplingCompileErrorCode {
-        match self {
-            Self::InvalidCircuit(_) => SamplingCompileErrorCode::InvalidCircuit,
-            Self::BackendUnavailable { .. } => SamplingCompileErrorCode::BackendUnavailable,
+    pub(crate) fn invalid_circuit(message: impl Into<String>) -> Self {
+        Self::InvalidCircuit {
+            message: message.into(),
         }
     }
 
-    pub fn into_circuit_error(self) -> CircuitError {
+    pub const fn code(&self) -> SamplingCompileErrorCode {
         match self {
-            SamplingCompileError::InvalidCircuit(error) => error,
-            SamplingCompileError::BackendUnavailable { requested } => {
-                CircuitError::invalid_sampler_compilation(format!(
-                    "sampling backend {} is unavailable",
-                    requested.as_str()
-                ))
+            Self::Model(_) | Self::Analysis(_) | Self::InvalidCircuit { .. } => {
+                SamplingCompileErrorCode::InvalidCircuit
             }
+            Self::BackendUnavailable { .. } => SamplingCompileErrorCode::BackendUnavailable,
         }
     }
 }
@@ -363,6 +366,15 @@ pub struct SamplingPlan {
     pub(super) inner: Arc<SamplingPlanInner>,
 }
 
+impl PartialEq for SamplingPlan {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.qubit_count == other.inner.qubit_count
+            && self.inner.measurement_count == other.inner.measurement_count
+            && self.inner.sweep_bit_count == other.inner.sweep_bit_count
+            && self.inner.operations == other.inner.operations
+    }
+}
+
 impl fmt::Debug for SamplingPlan {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -514,14 +526,11 @@ pub enum SamplingExecutionError {
     #[error("sampling session could not allocate bounded storage: {message}")]
     SessionStorageAllocation { message: String },
 
+    #[error("sweep record expected {expected} bits, got {actual}")]
+    InvalidSweepRecordWidth { expected: usize, actual: usize },
+
     #[error("sampling execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
-}
-
-impl SamplingExecutionError {
-    pub fn into_circuit_error(self) -> CircuitError {
-        CircuitError::invalid_sampler_compilation(self.to_string())
-    }
 }
 
 /// Sink operation that failed.

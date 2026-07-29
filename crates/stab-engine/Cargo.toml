@@ -15,7 +15,11 @@ workspace = true
 hex = { workspace = true }
 rand = { workspace = true }
 sha2 = { workspace = true }
+stab-algebra = { workspace = true }
+stab-analysis = { workspace = true }
 stab-model = { workspace = true }
+stab-records = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }

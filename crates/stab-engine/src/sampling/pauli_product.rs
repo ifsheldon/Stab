@@ -1,9 +1,11 @@
-use crate::{CircuitError, CircuitResult, PauliBasis};
+use stab_algebra::PauliBasis;
+
+use super::SamplingCompileError;
 
 pub(crate) fn normalize_terms(
     raw_terms: Vec<(usize, PauliBasis, bool)>,
     base_inverted: bool,
-) -> CircuitResult<(Vec<(usize, PauliBasis)>, bool)> {
+) -> Result<(Vec<(usize, PauliBasis)>, bool), SamplingCompileError> {
     let mut terms = Vec::new();
     let mut inverted = base_inverted;
     let mut phase = 0u8;
@@ -14,7 +16,7 @@ pub(crate) fn normalize_terms(
     match phase {
         0 => Ok((terms, inverted)),
         2 => Ok((terms, !inverted)),
-        _ => Err(CircuitError::invalid_sampler_compilation(
+        _ => Err(SamplingCompileError::invalid_circuit(
             "MPP Pauli product is anti-Hermitian",
         )),
     }

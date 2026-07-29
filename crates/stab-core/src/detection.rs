@@ -149,7 +149,7 @@ impl CompiledDetectionConverter {
         let mut reference_scratch = self
             .reference_sample
             .reusable_scratch()
-            .map_err(|error| E::from(error.into_circuit_error()))?;
+            .map_err(|error| E::from(CircuitError::from(error)))?;
         let sweep_record =
             try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
         for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
@@ -185,7 +185,7 @@ impl CompiledDetectionConverter {
         let mut reference_scratch = self
             .reference_sample
             .reusable_scratch()
-            .map_err(|error| E::from(error.into_circuit_error()))?;
+            .map_err(|error| E::from(CircuitError::from(error)))?;
         let mut shot_index = 0usize;
         loop {
             match (measurement_iter.next(), sweep_iter.next()) {
@@ -260,7 +260,7 @@ impl CompiledDetectionConverter {
         let mut reference_scratch = self
             .reference_sample
             .reusable_scratch()
-            .map_err(crate::SamplingExecutionError::into_circuit_error)?;
+            .map_err(CircuitError::from)?;
         self.convert_record_with_sweep_and_scratch_into(
             measurement_record,
             sweep_record,

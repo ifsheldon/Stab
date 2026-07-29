@@ -40,12 +40,12 @@ use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
-    BitPlane64Batch, Circuit, CircuitItem, CircuitResult, CodeDistance, ColorCodeParams,
-    ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink, Probability,
-    RandomPolicy, ReferenceSampleMode, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    RunError, SampleFormat, SamplingCompiler, SamplingSession, Seed, ShotCount, SurfaceCodeParams,
-    SurfaceCodeTask, generate_color_code_circuit, generate_repetition_code_circuit,
-    generate_surface_code_circuit,
+    BitPlane64Batch, Circuit, CircuitError, CircuitItem, CircuitResult, CodeDistance,
+    ColorCodeParams, ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink,
+    Probability, RandomPolicy, ReferenceSampleMode, RepetitionCodeParams, RepetitionCodeTask,
+    RoundCount, RunError, SampleFormat, SamplingCompiler, SamplingSession, Seed, ShotCount,
+    SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
+    generate_repetition_code_circuit, generate_surface_code_circuit,
     result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
 
@@ -761,7 +761,7 @@ where
     let circuit = Circuit::from_stim_bytes(&input_bytes)?;
     let plan = SamplingCompiler::new()
         .compile(&circuit)
-        .map_err(stab_core::SamplingCompileError::into_circuit_error)?;
+        .map_err(CircuitError::from)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
         legacy_tableau_visible_measurements(&circuit)?
@@ -778,9 +778,8 @@ where
     };
     let mut session = plan
         .session_with_reference_mode(random_policy, reference_mode)
-        .map_err(stab_core::SamplingExecutionError::into_circuit_error)?;
-    let shots = ShotCount::try_from(args.shots)
-        .map_err(stab_core::SamplingExecutionError::into_circuit_error)?;
+        .map_err(CircuitError::from)?;
+    let shots = ShotCount::try_from(args.shots).map_err(CircuitError::from)?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(

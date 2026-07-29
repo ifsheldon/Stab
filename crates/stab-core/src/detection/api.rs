@@ -720,7 +720,9 @@ impl DetectionSamplingSession {
                 sampling,
                 conversion,
             } => construct_fused_state_after_admission(
-                sampling.estimated_session_storage_bytes(ReferenceSampleMode::UseReferenceSample),
+                sampling.estimated_session_storage_bytes_for_core_detection(
+                    ReferenceSampleMode::UseReferenceSample,
+                ),
                 conversion_session_storage_bytes(conversion),
                 || {
                     Ok(DetectionSamplingState::FusedSamplingConversion {
@@ -1100,6 +1102,7 @@ fn detection_rng(policy: RandomPolicy) -> SmallRng {
     match policy {
         RandomPolicy::Entropy => SmallRng::seed_from_u64(rand::random()),
         RandomPolicy::Seeded(seed) => SmallRng::seed_from_u64(seed.get()),
+        _ => SmallRng::seed_from_u64(rand::random()),
     }
 }
 
@@ -1120,6 +1123,9 @@ fn reference_scratch_error(error: crate::SamplingExecutionError) -> DetectionExe
         },
         crate::SamplingExecutionError::SessionStorageAllocation { message } => {
             DetectionExecutionError::SessionStorageAllocation { message }
+        }
+        crate::SamplingExecutionError::InvalidSweepRecordWidth { .. } => {
+            DetectionExecutionError::Conversion(CircuitError::from(error))
         }
         other => DetectionExecutionError::Sampling(other),
     }

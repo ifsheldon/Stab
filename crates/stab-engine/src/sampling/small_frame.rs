@@ -1,6 +1,7 @@
 use rand::{Rng, RngExt as _};
 
-use crate::{MeasureRecordOffset, PauliBasis};
+use stab_algebra::PauliBasis;
+use stab_model::MeasureRecordOffset;
 
 use super::execute::record_lookback;
 use super::measurement_flip;

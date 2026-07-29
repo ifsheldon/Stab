@@ -249,6 +249,7 @@ impl DemSamplingSession {
         let rng = match random_policy {
             RandomPolicy::Entropy => dem_sampler_rng(None),
             RandomPolicy::Seeded(seed) => dem_sampler_rng(Some(seed.get())),
+            _ => dem_sampler_rng(None),
         };
         Ok(Self {
             plan,

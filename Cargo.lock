@@ -2270,7 +2270,11 @@ dependencies = [
  "hex",
  "rand 0.10.1",
  "sha2",
+ "stab-algebra",
+ "stab-analysis",
  "stab-model",
+ "stab-records",
+ "thiserror",
 ]
 
 [[package]]

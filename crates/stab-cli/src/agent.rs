@@ -169,7 +169,7 @@ where
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
         .compile(&circuit)
-        .map_err(|error| CliError::Circuit(error.into_circuit_error()))?;
+        .map_err(|error| CliError::Circuit(stab_core::CircuitError::from(error)))?;
     let request_fingerprint = plan.request_fingerprint();
     let mut estimates = ResourceEstimateReport::from(estimate_sampling_request(
         &circuit,

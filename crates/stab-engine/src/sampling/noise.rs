@@ -1,6 +1,6 @@
 use rand::{Rng, RngExt as _};
 
-use crate::PauliBasis;
+use stab_algebra::PauliBasis;
 
 use super::operation::{SINGLE_QUBIT_PAULI_CHANNEL_BASES, TWO_QUBIT_PAULI_CHANNEL_BASES};
 use super::stabilizer_frame::StabilizerFrame;
