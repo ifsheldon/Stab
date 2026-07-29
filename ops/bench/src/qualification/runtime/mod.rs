@@ -20,6 +20,7 @@ mod report;
 mod rollup;
 mod run;
 mod self_regression;
+mod simd_compare;
 mod stab_build;
 mod statistics;
 mod toolchain;
@@ -36,6 +37,7 @@ pub(crate) use report::ReportArgs;
 pub(crate) use rollup::{RollupArgs, RollupReportArgs};
 pub(crate) use run::RunArgs;
 pub(crate) use self_regression::{BaselineCandidateArgs, SelfRegressionArgs};
+pub(crate) use simd_compare::SimdCompareArgs;
 pub(crate) use worker::WorkerArgs;
 
 pub(super) struct QualificationSession {
@@ -188,6 +190,23 @@ pub(crate) fn run_diagnostic(
     args: DiagnosticArgs,
 ) -> Result<std::path::PathBuf, String> {
     diagnostic::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn run_simd_compare(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: SimdCompareArgs,
+) -> Result<std::path::PathBuf, String> {
+    simd_compare::run_with_repository(
         &session.root,
         &session.source_root,
         &session.repository,

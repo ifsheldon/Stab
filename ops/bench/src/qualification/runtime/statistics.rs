@@ -246,7 +246,7 @@ pub(crate) fn summarize(
     })
 }
 
-fn validate_positive_finite(values: &[f64]) -> Result<(), StatisticsError> {
+pub(super) fn validate_positive_finite(values: &[f64]) -> Result<(), StatisticsError> {
     if values
         .iter()
         .any(|value| !value.is_finite() || *value <= 0.0)
@@ -257,7 +257,7 @@ fn validate_positive_finite(values: &[f64]) -> Result<(), StatisticsError> {
     }
 }
 
-fn median(values: &[f64]) -> Result<f64, StatisticsError> {
+pub(super) fn median(values: &[f64]) -> Result<f64, StatisticsError> {
     if values.is_empty() {
         return Err(StatisticsError::MissingSamples);
     }
@@ -282,7 +282,7 @@ fn median(values: &[f64]) -> Result<f64, StatisticsError> {
     }
 }
 
-fn relative_mad(values: &[f64]) -> Result<f64, StatisticsError> {
+pub(super) fn relative_mad(values: &[f64]) -> Result<f64, StatisticsError> {
     let center = median(values)?;
     if center <= 0.0 {
         return Err(StatisticsError::InvalidSample);
@@ -294,7 +294,7 @@ fn relative_mad(values: &[f64]) -> Result<f64, StatisticsError> {
     Ok(median(&deviations)? / center)
 }
 
-fn bootstrap_interval(values: &[f64]) -> Result<(f64, f64), StatisticsError> {
+pub(super) fn bootstrap_interval(values: &[f64]) -> Result<(f64, f64), StatisticsError> {
     if values.is_empty() {
         return Err(StatisticsError::MissingSamples);
     }

@@ -21,7 +21,8 @@ mod validation;
 
 pub(crate) use runtime::{
     BaselineCandidateArgs, CompletionArgs, CompletionReportArgs, DiagnosticArgs, ParityArgs,
-    ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs, WorkerArgs,
+    ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs,
+    SimdCompareArgs, WorkerArgs,
 };
 pub(crate) use status::StatusArgs;
 
@@ -91,6 +92,24 @@ pub(crate) fn run_diagnostic(root: &RepoRoot, args: DiagnosticArgs) -> Result<()
         .map_err(BenchError::Qualification)?;
         println!(
             "[{PREFIX}] published Stab-only product diagnostic at {}",
+            output.display()
+        );
+        Ok(())
+    })
+}
+
+pub(crate) fn run_simd_compare(root: &RepoRoot, args: SimdCompareArgs) -> Result<(), BenchError> {
+    with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        let output = runtime::run_simd_compare(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)?;
+        println!(
+            "[{PREFIX}] published scalar-versus-portable-SIMD diagnostic at {}",
             output.display()
         );
         Ok(())

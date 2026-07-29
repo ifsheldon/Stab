@@ -15,7 +15,7 @@ use super::worker;
 use super::worker::WorkerIdentity;
 use crate::root::RepoRoot;
 
-const RECEIPT_SCHEMA_VERSION: u32 = 6;
+const RECEIPT_SCHEMA_VERSION: u32 = 7;
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
@@ -94,6 +94,23 @@ impl StabWorkerExecutable {
         repository_commit: &str,
         toolchain: &ToolchainEvidence,
     ) -> Result<Self, StabBuildError> {
+        Self::prepare_with_variant(
+            root,
+            repository_commit,
+            toolchain,
+            StabBuildVariant::PortableSimd,
+        )
+    }
+
+    pub(in crate::qualification::runtime) fn prepare_with_variant(
+        root: &RepoRoot,
+        repository_commit: &str,
+        toolchain: &ToolchainEvidence,
+        variant: StabBuildVariant,
+    ) -> Result<Self, StabBuildError> {
+        if variant == StabBuildVariant::LegacyDefault {
+            return Err(StabBuildError::LegacyBuildVariant);
+        }
         let runtime = tempfile::Builder::new()
             .prefix("stab-pq1-build-")
             .tempdir_in(RUNTIME_PARENT)
@@ -116,10 +133,11 @@ impl StabWorkerExecutable {
         let package_manifest_sha256 = digest_file(&source.join("ops/bench/Cargo.toml"))?;
         let linker = canonical_linker()?;
         let linker_sha256 = super::adapter::sha256_regular_file(&linker, 512 << 20)?;
-        let build_arguments = normalized_build_arguments();
+        let build_arguments = normalized_build_arguments(variant);
         let build_environment = normalized_build_environment(toolchain, &linker, &linker_sha256)?;
         let mut receipt = StabBuildReceipt {
             schema_version: RECEIPT_SCHEMA_VERSION,
+            variant,
             repository_commit: repository_commit.to_string(),
             worker_source_sha256,
             cargo_lock_sha256,
@@ -238,6 +256,8 @@ impl StabWorkerExecutable {
 #[serde(deny_unknown_fields)]
 pub(super) struct StabBuildReceipt {
     schema_version: u32,
+    #[serde(default)]
+    variant: StabBuildVariant,
     repository_commit: String,
     worker_source_sha256: String,
     cargo_lock_sha256: String,
@@ -256,6 +276,10 @@ pub(super) struct StabBuildReceipt {
 }
 
 impl StabBuildReceipt {
+    pub(in crate::qualification::runtime) const fn variant(&self) -> StabBuildVariant {
+        self.variant
+    }
+
     pub(super) fn validates_report_identity(
         &self,
         source_sha256: &str,
@@ -265,6 +289,7 @@ impl StabBuildReceipt {
         toolchain: &ToolchainEvidence,
     ) -> bool {
         self.schema_version == RECEIPT_SCHEMA_VERSION
+            && self.variant != StabBuildVariant::LegacyDefault
             && self.repository_commit == repository_commit
             && self.worker_source_sha256 == source_sha256
             && self.build_fingerprint == build_fingerprint
@@ -286,7 +311,7 @@ impl StabBuildReceipt {
             && canonical_linker().is_ok_and(|linker| linker == Path::new(&self.linker_path))
             && super::adapter::sha256_regular_file(Path::new(&self.linker_path), 512 << 20)
                 .is_ok_and(|digest| digest == self.linker_sha256)
-            && self.build_arguments == normalized_build_arguments()
+            && self.build_arguments == normalized_build_arguments(self.variant)
             && valid_receipt_digest(&self.cargo_lock_sha256)
             && valid_receipt_digest(&self.workspace_manifest_sha256)
             && valid_receipt_digest(&self.package_manifest_sha256)
@@ -306,6 +331,7 @@ impl StabBuildReceipt {
     fn recomputed_build_fingerprint(&self) -> Result<String, StabBuildError> {
         let material = serde_json::to_vec(&serde_json::json!({
             "schema_version": self.schema_version,
+            "variant": self.variant,
             "repository_commit": self.repository_commit,
             "worker_source_sha256": self.worker_source_sha256,
             "cargo_lock_sha256": self.cargo_lock_sha256,
@@ -324,6 +350,15 @@ impl StabBuildReceipt {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(in crate::qualification::runtime) enum StabBuildVariant {
+    #[default]
+    LegacyDefault,
+    Scalar,
+    PortableSimd,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BuildToolIdentity {
@@ -339,8 +374,8 @@ struct BuildEnvironmentEntry {
     value: String,
 }
 
-fn normalized_build_arguments() -> Vec<String> {
-    [
+fn normalized_build_arguments(variant: StabBuildVariant) -> Vec<String> {
+    let mut arguments = [
         "build",
         "--offline",
         "--locked",
@@ -355,7 +390,13 @@ fn normalized_build_arguments() -> Vec<String> {
     ]
     .into_iter()
     .map(str::to_string)
-    .collect()
+    .collect::<Vec<_>>();
+    arguments.push("--no-default-features".to_string());
+    if variant == StabBuildVariant::PortableSimd {
+        arguments.push("--features".to_string());
+        arguments.push("portable-simd".to_string());
+    }
+    arguments
 }
 
 fn normalized_build_environment(
@@ -601,6 +642,8 @@ pub(super) enum StabBuildError {
     MissingCargoHome,
     #[error("Cargo cache home is not an absolute directory: {0}")]
     InvalidCargoHome(PathBuf),
+    #[error("legacy-default is a read-only historical Stab build variant")]
+    LegacyBuildVariant,
     #[error("sealed Stab worker or build receipt changed identity")]
     StaleIdentity,
     #[error(transparent)]
@@ -685,6 +728,7 @@ mod tests {
         let environment = vec![entry("A", "B")];
         let base = StabBuildReceipt {
             schema_version: RECEIPT_SCHEMA_VERSION,
+            variant: StabBuildVariant::PortableSimd,
             repository_commit: "a".repeat(40),
             worker_source_sha256: "b".repeat(64),
             cargo_lock_sha256: "c".repeat(64),
@@ -704,7 +748,7 @@ mod tests {
             linker_sha256: "f".repeat(64),
             target_triple: toolchain.target_triple.clone(),
             cargo_profile: "release".to_string(),
-            build_arguments: normalized_build_arguments(),
+            build_arguments: normalized_build_arguments(StabBuildVariant::PortableSimd),
             build_environment: environment,
             build_fingerprint: String::new(),
             binary_sha256: String::new(),
@@ -734,5 +778,76 @@ mod tests {
                 .recomputed_build_fingerprint()
                 .expect("changed flags")
         );
+    }
+
+    #[test]
+    fn build_variant_is_explicit_and_changes_the_fingerprint() {
+        let scalar = normalized_build_arguments(StabBuildVariant::Scalar);
+        let portable = normalized_build_arguments(StabBuildVariant::PortableSimd);
+        assert!(
+            scalar
+                .iter()
+                .any(|argument| argument == "--no-default-features")
+        );
+        assert!(!scalar.iter().any(|argument| argument == "portable-simd"));
+        assert!(
+            portable
+                .iter()
+                .any(|argument| argument == "--no-default-features")
+        );
+        assert!(portable.iter().any(|argument| argument == "portable-simd"));
+
+        let mut receipt = test_receipt(StabBuildVariant::Scalar);
+        let scalar_fingerprint = receipt
+            .recomputed_build_fingerprint()
+            .expect("scalar fingerprint");
+        receipt.variant = StabBuildVariant::PortableSimd;
+        receipt.build_arguments = portable;
+        let portable_fingerprint = receipt
+            .recomputed_build_fingerprint()
+            .expect("portable fingerprint");
+        assert_ne!(scalar_fingerprint, portable_fingerprint);
+    }
+
+    #[test]
+    fn historical_receipts_without_a_variant_remain_readable() {
+        let mut value =
+            serde_json::to_value(test_receipt(StabBuildVariant::PortableSimd)).expect("receipt");
+        value
+            .as_object_mut()
+            .expect("receipt object")
+            .remove("variant");
+        let receipt: StabBuildReceipt = serde_json::from_value(value).expect("historical receipt");
+        assert_eq!(receipt.variant, StabBuildVariant::LegacyDefault);
+    }
+
+    fn test_receipt(variant: StabBuildVariant) -> StabBuildReceipt {
+        StabBuildReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            variant,
+            repository_commit: "a".repeat(40),
+            worker_source_sha256: "b".repeat(64),
+            cargo_lock_sha256: "c".repeat(64),
+            workspace_manifest_sha256: "d".repeat(64),
+            package_manifest_sha256: "e".repeat(64),
+            cargo: BuildToolIdentity {
+                path: "/toolchain/cargo".to_string(),
+                sha256: "2".repeat(64),
+                version: "cargo 1".to_string(),
+            },
+            rustc: BuildToolIdentity {
+                path: "/toolchain/bin/rustc".to_string(),
+                sha256: "3".repeat(64),
+                version: "rustc 1\nhost: x86_64-unknown-linux-gnu".to_string(),
+            },
+            linker_path: "/usr/bin/cc".to_string(),
+            linker_sha256: "f".repeat(64),
+            target_triple: "x86_64-unknown-linux-gnu".to_string(),
+            cargo_profile: "release".to_string(),
+            build_arguments: normalized_build_arguments(variant),
+            build_environment: vec![entry("A", "B")],
+            build_fingerprint: String::new(),
+            binary_sha256: String::new(),
+        }
     }
 }

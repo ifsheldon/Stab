@@ -265,6 +265,8 @@ The physical work is split into focused commits:
 10. Add external-consumer fixtures, dependency rejection fixtures, API-tier checks, and generated inventory ownership.
 11. Run moved-path benchmarks, audit, review, and A6 evidence closure.
 
+The A6 scalar-versus-portable diagnostic uses `just bench::simd-compare`. It is intentionally narrower than a new qualification group: it reuses the existing M5 dense-XOR and M6 non-identity Clifford runtime contracts at medium and large scales, binds both explicit Cargo feature selections into private build receipts, requires exact semantic output, alternates pair order, and reports portable-over-scalar ratios without making Stim parity, self-regression, release, or backend claims.
+
 Each commit must compile the workspace state it creates. Temporary duplicate implementations are not an accepted way to keep an intermediate commit green.
 
 ## Test Ownership

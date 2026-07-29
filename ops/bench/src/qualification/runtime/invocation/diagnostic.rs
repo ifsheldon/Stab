@@ -13,7 +13,7 @@ use super::super::protocol::{
 };
 use super::{
     InvocationError, InvocationRecord, PROTOCOL_OUTPUT_LIMIT, checked_process, checked_work_count,
-    supports_group, worker_environment,
+    protocol_arguments, supports_group, worker_environment,
 };
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
@@ -49,10 +49,25 @@ impl PreparedDiagnosticWorker {
         repository_commit: &str,
         toolchain: &super::super::toolchain::ToolchainEvidence,
     ) -> Result<Self, InvocationError> {
-        let worker = super::super::stab_build::StabWorkerExecutable::prepare(
+        Self::prepare_variant(
             root,
             repository_commit,
             toolchain,
+            super::super::stab_build::StabBuildVariant::PortableSimd,
+        )
+    }
+
+    pub(in crate::qualification::runtime) fn prepare_variant(
+        root: &RepoRoot,
+        repository_commit: &str,
+        toolchain: &super::super::toolchain::ToolchainEvidence,
+        variant: super::super::stab_build::StabBuildVariant,
+    ) -> Result<Self, InvocationError> {
+        let worker = super::super::stab_build::StabWorkerExecutable::prepare_with_variant(
+            root,
+            repository_commit,
+            toolchain,
+            variant,
         )?;
         let prepared = Self {
             root: root.path.clone(),
@@ -73,6 +88,21 @@ impl PreparedDiagnosticWorker {
         &self,
         request: DiagnosticInvocationRequest<'_>,
     ) -> Result<InvocationRecord, InvocationError> {
+        self.invoke_checked(request, true)
+    }
+
+    pub(in crate::qualification::runtime) fn invoke_variant_comparison(
+        &self,
+        request: DiagnosticInvocationRequest<'_>,
+    ) -> Result<InvocationRecord, InvocationError> {
+        self.invoke_checked(request, false)
+    }
+
+    fn invoke_checked(
+        &self,
+        request: DiagnosticInvocationRequest<'_>,
+        require_product_diagnostic: bool,
+    ) -> Result<InvocationRecord, InvocationError> {
         let cpu = self.cpu.ok_or(InvocationError::MissingCpu)?;
         let DiagnosticInvocationRequest {
             group,
@@ -82,35 +112,29 @@ impl PreparedDiagnosticWorker {
             expected_output_digest,
             timeout,
         } = request;
+        let variant_group = matches!(
+            group.id.to_string().as_str(),
+            super::SIMD_BITS_XOR_GROUP_ID | super::CLIFFORD_NON_IDENTITY_GROUP_ID
+        );
         if !supports_group(group)
-            || group.claim_class != super::super::run::ClaimClass::ProductDiagnostic
+            || (require_product_diagnostic
+                && group.claim_class != super::super::run::ClaimClass::ProductDiagnostic)
+            || (!require_product_diagnostic && !variant_group)
         {
             return Err(InvocationError::UnsupportedGroup(group.id.to_string()));
         }
         let measurement_id = group.single_measurement()?;
         let expected_cpu = u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu))?;
         let expected_work_count = checked_work_count(iterations, scale.work_items)?;
-        let arguments = vec![
-            OsString::from("qualification-worker"),
-            OsString::from("--workload"),
-            OsString::from(group.workload_id.to_string()),
-            OsString::from("--measurement-id"),
-            OsString::from(measurement_id.to_string()),
-            OsString::from("--iterations"),
-            OsString::from(iterations.get().to_string()),
-            OsString::from("--work-items"),
-            OsString::from(scale.work_items.get().to_string()),
-            OsString::from("--evidence-mode"),
-            OsString::from(match evidence_mode {
-                EvidenceMode::Contract => "contract",
-                EvidenceMode::Timing => "timing",
-                EvidenceMode::Memory => "memory",
-            }),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-            OsString::from("--expected-cpu"),
-            OsString::from(expected_cpu.to_string()),
-        ];
+        let mut arguments = protocol_arguments(
+            group,
+            measurement_id,
+            evidence_mode,
+            iterations,
+            scale,
+            Some(expected_cpu),
+        )?;
+        arguments.insert(0, OsString::from("qualification-worker"));
         let process = run_bounded_process(&ProcessRequest {
             program: self.worker.program(),
             args: arguments,

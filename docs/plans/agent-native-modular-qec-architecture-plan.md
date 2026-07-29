@@ -772,6 +772,7 @@ Status: Active.
 ### Benchmarks
 
 - Compare scalar and SIMD builds of the affected dense-XOR and non-identity Clifford workloads using identical inputs and exact output witnesses.
+- Bind `--no-default-features` scalar and `--no-default-features --features portable-simd` builds into distinct schema-version-7 private worker receipts. Use the fixed medium and large scales, three alternating warmup pairs, and at least nine alternating retained pairs. Report portable-over-scalar normalized ratios and a deterministic confidence interval; call the result a material benefit only when the complete interval is below `1.0`.
 - Re-run Stim-relative M5 XOR and M6 non-identity Clifford parity for the selected portable build without changing the `1.25x` gate.
 - Treat not-zero, popcount, sparse XOR, transpose, Pauli, sampling, parser, records, conversion, DEM, and analysis rows as continuity checks only when their executed call path actually changes.
 

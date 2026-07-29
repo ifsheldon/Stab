@@ -241,6 +241,54 @@ pub(super) struct InvocationRequest<'a> {
     pub(super) timeout: Duration,
 }
 
+fn protocol_arguments(
+    group: &super::group::GroupContract,
+    measurement_id: &super::protocol::ProtocolId,
+    evidence_mode: EvidenceMode,
+    iterations: NonZeroU64,
+    scale: &super::group::ScaleContract,
+    expected_cpu: Option<u32>,
+) -> Result<Vec<OsString>, InvocationError> {
+    let mut arguments = vec![
+        OsString::from("--workload"),
+        OsString::from(group.workload_id.to_string()),
+        OsString::from("--measurement-id"),
+        OsString::from(measurement_id.to_string()),
+        OsString::from("--iterations"),
+        OsString::from(iterations.get().to_string()),
+        OsString::from("--work-items"),
+        OsString::from(scale.work_items.get().to_string()),
+        OsString::from("--evidence-mode"),
+        OsString::from(match evidence_mode {
+            EvidenceMode::Contract => "contract",
+            EvidenceMode::Timing => "timing",
+            EvidenceMode::Memory => "memory",
+        }),
+        OsString::from("--start-barrier"),
+        OsString::from("true"),
+    ];
+    if let Some(expected_cpu) = expected_cpu {
+        arguments.push(OsString::from("--expected-cpu"));
+        arguments.push(OsString::from(expected_cpu.to_string()));
+    }
+    if let Some(descriptor) = clifford_string::runtime_descriptor(
+        &group.id.to_string(),
+        &group.workload_id.to_string(),
+        scale.work_items.get(),
+    )? {
+        arguments.push(OsString::from("--input-descriptor-hex"));
+        arguments.push(OsString::from(descriptor));
+    }
+    if matches!(
+        group.id.to_string().as_str(),
+        DEM_PARSE_GROUP_ID | DEM_CANONICAL_PRINT_GROUP_ID
+    ) {
+        arguments.push(OsString::from("--input-family"));
+        arguments.push(OsString::from(scale.family_id.to_string()));
+    }
+    Ok(arguments)
+}
+
 impl PreparedWorkers {
     pub(crate) fn prepare(
         root: &RepoRoot,
@@ -374,43 +422,14 @@ impl PreparedWorkers {
             .map(|cpu| u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu)))
             .transpose()?;
         let expected_work_count = checked_work_count(iterations, scale.work_items)?;
-        let mut arguments = vec![
-            OsString::from("--workload"),
-            OsString::from(group.workload_id.to_string()),
-            OsString::from("--measurement-id"),
-            OsString::from(measurement_id.to_string()),
-            OsString::from("--iterations"),
-            OsString::from(iterations.get().to_string()),
-            OsString::from("--work-items"),
-            OsString::from(scale.work_items.get().to_string()),
-            OsString::from("--evidence-mode"),
-            OsString::from(match evidence_mode {
-                EvidenceMode::Contract => "contract",
-                EvidenceMode::Timing => "timing",
-                EvidenceMode::Memory => "memory",
-            }),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-        ];
-        if let Some(expected_cpu) = expected_cpu {
-            arguments.push(OsString::from("--expected-cpu"));
-            arguments.push(OsString::from(expected_cpu.to_string()));
-        }
-        if let Some(descriptor) = clifford_string::runtime_descriptor(
-            &group.id.to_string(),
-            &group.workload_id.to_string(),
-            scale.work_items.get(),
-        )? {
-            arguments.push(OsString::from("--input-descriptor-hex"));
-            arguments.push(OsString::from(descriptor));
-        }
-        if matches!(
-            group.id.to_string().as_str(),
-            DEM_PARSE_GROUP_ID | DEM_CANONICAL_PRINT_GROUP_ID
-        ) {
-            arguments.push(OsString::from("--input-family"));
-            arguments.push(OsString::from(scale.family_id.to_string()));
-        }
+        let mut arguments = protocol_arguments(
+            group,
+            measurement_id,
+            evidence_mode,
+            iterations,
+            scale,
+            expected_cpu,
+        )?;
         let (program, source_digest, build_fingerprint) = match implementation {
             Implementation::Stim => (
                 self.adapter.path.clone(),

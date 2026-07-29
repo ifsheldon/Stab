@@ -111,6 +111,9 @@ enum Command {
     /// Run one Stab-only product diagnostic without producing parity evidence.
     QualificationDiagnostic(qualification::DiagnosticArgs),
 
+    /// Compare explicit scalar and portable-SIMD Stab builds on affected workloads.
+    QualificationSimdCompare(qualification::SimdCompareArgs),
+
     /// Validate a paired qualification report and regenerate derived artifacts.
     QualificationReport(qualification::ReportArgs),
 
@@ -310,6 +313,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationDiagnostic(args) => {
             qualification::run_diagnostic(&root, args)?;
+        }
+        Command::QualificationSimdCompare(args) => {
+            qualification::run_simd_compare(&root, args)?;
         }
         Command::QualificationReport(args) => {
             qualification::report(&root, args)?;

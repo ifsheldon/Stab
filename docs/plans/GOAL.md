@@ -35,7 +35,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 5. Completed: extract circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM sampling, reference-sample trees, and sampled-flow execution into `stab-engine` without changing facade or CLI behavior.
 6. Completed at `a465009c`: create dependency-free `stab-kernels-simd`, restore four-word XOR and Clifford composition against the current scalar references, and keep engine backend registration scalar-only.
 7. Curate `stab-core` root, `advanced`, and `experimental` APIs, and add exact `=0.2.0` path versions to every publishable edge.
-8. In progress: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, and dependency rejection checks are implemented. Add rustdoc tier checks and source-current scalar-versus-SIMD evidence.
+8. In progress: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, dependency rejection checks, schema-version-7 feature-aware worker receipts, and the fixed scalar-versus-SIMD diagnostic harness are implemented. Add rustdoc tier checks, commit the harness, and produce source-current scalar-versus-SIMD evidence from that clean revision.
 9. Rerun every benchmark family whose call path moved, then run milestone-audit and full-code-review; fix all findings before A6 closure.
 
 ## Nonnegotiable Contracts
