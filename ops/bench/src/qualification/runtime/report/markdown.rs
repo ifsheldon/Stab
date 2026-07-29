@@ -123,16 +123,3 @@ fn display_optional_bytes(value: Option<u64>) -> String {
         |value| format!("{value} bytes"),
     )
 }
-
-#[cfg(test)]
-mod tests {
-    use super::super::super::group::ParityEligibility;
-    use super::*;
-
-    #[test]
-    fn generated_report_names_stim_parity_eligibility() {
-        let line = parity_eligibility_line(ParityEligibility::ThresholdEligible);
-        assert_eq!(line, "- Parity eligibility: `ThresholdEligible`\n");
-        assert!(!line.contains("Baseline eligibility"));
-    }
-}

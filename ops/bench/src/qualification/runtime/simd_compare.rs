@@ -691,8 +691,16 @@ fn render_json(value: &impl Serialize) -> Result<Vec<u8>, SimdCompareError> {
 }
 
 fn render_markdown(report: &SimdCompareReport, report_sha256: &str) -> String {
-    let mut output = format!(
-        "# Scalar Versus Portable SIMD Diagnostic\n\n- Scope: `scalar-vs-portable-simd`\n- Timing boundary: `raw-work-v2`\n- Report SHA-256: `{report_sha256}`\n- Ratio direction: portable SIMD seconds per work item divided by scalar seconds per work item\n- Stim parity: not evaluated\n- Stab self-regression: not evaluated\n- Material benefit: confidence-interval upper bound below `1.0`\n\n## Measurements\n\n| Group | Scale | Pairs | Median portable/scalar | 95% interval | Ratio relative MAD | Material benefit |\n|---|---|---:|---:|---:|---:|---|\n"
+    let mut output = render_diagnostic_header(
+        &report.repository.commit_before,
+        &report.host.profile_id,
+        report.host.verified,
+        report.command.allow_unverified_host,
+        &report.host.violations,
+        report_sha256,
+    );
+    output.push_str(
+        "\n## Measurements\n\n| Group | Scale | Pairs | Median portable/scalar | 95% interval | Ratio relative MAD | Material benefit |\n|---|---|---:|---:|---:|---:|---|\n",
     );
     for group in &report.groups {
         for scale in &group.scales {
@@ -714,6 +722,35 @@ fn render_markdown(report: &SimdCompareReport, report_sha256: &str) -> String {
         }
     }
     output
+}
+
+fn render_diagnostic_header(
+    revision: &str,
+    host_profile: &str,
+    host_verified: bool,
+    allow_unverified_host: bool,
+    violations: &[String],
+    report_sha256: &str,
+) -> String {
+    let host_violations = if violations.is_empty() {
+        "none".to_owned()
+    } else {
+        violations.join("; ")
+    };
+    format!(
+        "# Scalar Versus Portable SIMD Diagnostic\n\n- Scope: `scalar-vs-portable-simd`\n- Source revision: `{revision}`\n- Timing boundary: `raw-work-v2`\n- Report SHA-256: `{report_sha256}`\n- Host profile: `{host_profile}`\n- Host verified: {}\n- Unverified-host diagnostic override: {}\n- Evidence status: {}\n- Host violations: {host_violations}\n- Scalar build variant: `scalar`\n- Portable build variant: `portable-simd`\n- Ratio direction: portable SIMD seconds per work item divided by scalar seconds per work item\n- Stim parity: not evaluated\n- Stab self-regression: not evaluated\n- Material benefit: confidence-interval upper bound below `1.0`\n",
+        if host_verified { "yes" } else { "no" },
+        if allow_unverified_host {
+            "enabled"
+        } else {
+            "disabled"
+        },
+        if host_verified {
+            "host-verified diagnostic"
+        } else {
+            "unpromotable diagnostic only"
+        },
+    )
 }
 
 struct SuiteDeadline {
@@ -812,6 +849,125 @@ pub(super) enum SimdCompareError {
 }
 
 #[cfg(test)]
+fn synthetic_report_shell(groups: Vec<GroupEvidence>, output: &str) -> SimdCompareReport {
+    fn build_receipt(variant: StabBuildVariant) -> StabBuildReceipt {
+        let variant = match variant {
+            StabBuildVariant::Scalar => "scalar",
+            StabBuildVariant::PortableSimd => "portable-simd",
+            StabBuildVariant::LegacyDefault => "legacy-default",
+        };
+        serde_json::from_value(serde_json::json!({
+            "schema_version": 7,
+            "variant": variant,
+            "repository_commit": "0123456789abcdef0123456789abcdef01234567",
+            "worker_source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cargo_lock_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "workspace_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "package_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cargo": {"path": "/cargo", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "version": "cargo"},
+            "rustc": {"path": "/rustc", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "version": "rustc"},
+            "linker_path": "/linker",
+            "linker_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "target_triple": "aarch64-unknown-linux-gnu",
+            "cargo_profile": "release",
+            "build_arguments": [],
+            "build_environment": [],
+            "build_fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }))
+        .expect("synthetic build receipt should deserialize")
+    }
+
+    let worker = |variant, source: char, fingerprint: char| VariantWorkerEvidence {
+        variant,
+        identity: DiagnosticWorkerIdentityEvidence {
+            stab_source_sha256: std::iter::repeat_n(source, 64).collect(),
+            stab_build_fingerprint: std::iter::repeat_n(fingerprint, 64).collect(),
+            stab_binary_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+        },
+        build_receipt: build_receipt(variant),
+    };
+    SimdCompareReport {
+        schema_version: REPORT_SCHEMA_VERSION,
+        scope: ComparisonScope::ScalarVsPortableSimd,
+        timing_boundary: RAW_WORK_TIMING_BOUNDARY,
+        generated_unix_epoch_seconds: 1,
+        performance_inventory_sha256:
+            "1111111111111111111111111111111111111111111111111111111111111111".to_owned(),
+        correctness_inventory_sha256:
+            "2222222222222222222222222222222222222222222222222222222222222222".to_owned(),
+        command: CommandEvidence {
+            output: output.to_owned(),
+            group_ids: GROUP_IDS.map(str::to_owned).to_vec(),
+            scale_ids: SCALE_IDS.map(str::to_owned).to_vec(),
+            tier: QualificationTier::Pr,
+            allow_unverified_host: false,
+            warmup_pairs: WARMUP_BATCHES,
+            retained_pairs: QualificationTier::Pr.sample_count(),
+            invocation_timeout_seconds: INVOCATION_TIMEOUT.as_secs(),
+            suite_timeout_seconds: SUITE_TIMEOUT.as_secs(),
+        },
+        repository: RepositoryEvidence {
+            commit_before: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            commit_after: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            local_modifications_before: false,
+            local_modifications_after: false,
+        },
+        host: HostEvidence {
+            policy_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+            profile_id: "synthetic".to_owned(),
+            operating_system: "linux".to_owned(),
+            architecture: "aarch64".to_owned(),
+            allowed_cpus: vec![0],
+            logical_cpu_count: 1,
+            selected_cpu: 0,
+            cpu_identity: "synthetic".to_owned(),
+            load_one_before: 0.0,
+            load_one_after: 0.0,
+            maximum_load_one: 1.0,
+            available_memory_before_bytes: 1,
+            available_memory_after_bytes: 1,
+            minimum_available_memory_bytes: 1,
+            swap_in_before: 0,
+            swap_in_after: 0,
+            swap_out_before: 0,
+            swap_out_after: 0,
+            frequency_governor_before: None,
+            frequency_governor_after: None,
+            frequency_khz_before: None,
+            frequency_khz_after: None,
+            maximum_temperature_millidegrees_celsius: 85_000,
+            thermal_readings_before: Vec::new(),
+            thermal_readings_after: Vec::new(),
+            thermal_probe_available: false,
+            verified: true,
+            violations: Vec::new(),
+        },
+        toolchain: super::toolchain::ToolchainEvidence {
+            rust_toolchain: "nightly-2026-06-20".to_owned(),
+            cargo_profile: "release".to_owned(),
+            rustup_path: "/rustup".to_owned(),
+            rustup_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+            cargo_path: "/cargo".to_owned(),
+            cargo_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+            cargo_verbose_version: "cargo".to_owned(),
+            rustc_path: "/rustc".to_owned(),
+            rustc_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
+            rustc_verbose_version: "rustc".to_owned(),
+            target_triple: "aarch64-unknown-linux-gnu".to_owned(),
+        },
+        scalar_worker: worker(StabBuildVariant::Scalar, 'b', 'e'),
+        portable_worker: worker(StabBuildVariant::PortableSimd, 'c', 'f'),
+        groups,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -845,6 +1001,30 @@ mod tests {
                 .expect("ambiguous summary")
                 .material_benefit
         );
+    }
+
+    #[test]
+    fn diagnostic_markdown_exposes_unverified_host_provenance() {
+        let rendered = render_diagnostic_header(
+            "0123456789abcdef0123456789abcdef01234567",
+            "aarch64-controlled",
+            false,
+            true,
+            &[
+                "swap counters changed".to_owned(),
+                "temperature exceeded policy".to_owned(),
+            ],
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+
+        assert!(rendered.contains("Source revision: `0123456789abcdef"));
+        assert!(rendered.contains("Host profile: `aarch64-controlled`"));
+        assert!(rendered.contains("Host verified: no"));
+        assert!(rendered.contains("Unverified-host diagnostic override: enabled"));
+        assert!(rendered.contains("Evidence status: unpromotable diagnostic only"));
+        assert!(rendered.contains("swap counters changed; temperature exceeded policy"));
+        assert!(rendered.contains("Scalar build variant: `scalar`"));
+        assert!(rendered.contains("Portable build variant: `portable-simd`"));
     }
 
     fn sample(

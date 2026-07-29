@@ -10,6 +10,8 @@ use super::{
     VariantPairedSample, VariantSummary, WARMUP_BATCHES, exact_pair_output, pair_sample,
     render_json, render_markdown, summarize,
 };
+#[cfg(test)]
+use super::{VariantCalibrationProbe, synthetic_report_shell};
 use crate::config::STIM_COMMIT;
 use crate::qualification::runtime::artifact::{
     DirectQualificationArtifactPath, RepositoryBinding, read_artifact_bounded_with_repository,
@@ -101,12 +103,13 @@ pub(super) fn validate_report(
     report: &SimdCompareReport,
     expected_output: Option<&DirectQualificationArtifactPath>,
 ) -> Result<(), SimdCompareError> {
-    validate_report_shape(report, expected_output)?;
-    if report.performance_inventory_sha256 != performance_inventory_sha256
-        || report.correctness_inventory_sha256 != correctness_inventory_sha256
-    {
-        return Err(SimdCompareError::InventoryEvidence);
-    }
+    validate_report_payload(
+        performance_inventory_sha256,
+        correctness_inventory_sha256,
+        groups,
+        report,
+        expected_output,
+    )?;
     let current = super::super::run::bound_repository_state(root, live_repository)?;
     if current.commit != report.repository.commit_after
         || current.local_modifications != report.repository.local_modifications_after
@@ -116,6 +119,22 @@ pub(super) fn validate_report(
     report.toolchain.validate_current(source_root)?;
     report.host.validate_against_policy(source_root)?;
     validate_worker_evidence(source_root, report)?;
+    Ok(())
+}
+
+fn validate_report_payload(
+    performance_inventory_sha256: &str,
+    correctness_inventory_sha256: &str,
+    groups: &[ResolvedGroupContract],
+    report: &SimdCompareReport,
+    expected_output: Option<&DirectQualificationArtifactPath>,
+) -> Result<(), SimdCompareError> {
+    validate_report_shape(report, expected_output)?;
+    if report.performance_inventory_sha256 != performance_inventory_sha256
+        || report.correctness_inventory_sha256 != correctness_inventory_sha256
+    {
+        return Err(SimdCompareError::InventoryEvidence);
+    }
     if groups.len() != report.groups.len() {
         return Err(SimdCompareError::GroupEvidence);
     }
@@ -424,8 +443,7 @@ fn validate_invocation(
 ) -> Result<(), SimdCompareError> {
     if invocation.implementation != Implementation::Stab
         || invocation.evidence_mode != EvidenceMode::Timing
-        || !invocation.process_wall_seconds.is_finite()
-        || invocation.process_wall_seconds <= 0.0
+        || !raw_durations_are_physically_possible(invocation)
     {
         return Err(SimdCompareError::RawInvocation);
     }
@@ -460,6 +478,18 @@ fn validate_invocation(
     }
     .validate(&invocation.rows)?;
     Ok(())
+}
+
+fn raw_durations_are_physically_possible(
+    invocation: &super::super::invocation::InvocationRecord,
+) -> bool {
+    invocation.process_wall_seconds.is_finite()
+        && invocation.process_wall_seconds > 0.0
+        && invocation.rows.iter().all(|row| {
+            row.elapsed_seconds.is_finite()
+                && row.elapsed_seconds > 0.0
+                && row.elapsed_seconds <= invocation.process_wall_seconds
+        })
 }
 
 fn reconstruct_scale_derivations(scale: &ScaleEvidence) -> Result<(), SimdCompareError> {
@@ -639,11 +669,280 @@ mod tests {
         }
     }
 
+    fn group_values(index: usize) -> (&'static str, &'static str, &'static str) {
+        if index == 0 {
+            (
+                "simd-bits-xor",
+                "xor-complete-vector",
+                "stab-bits/bit-vector",
+            )
+        } else {
+            (
+                "clifford-string-right-multiply-non-identity",
+                "right-multiply-non-identity",
+                "stab-algebra/clifford-string",
+            )
+        }
+    }
+
+    fn invocation_for_group(
+        index: usize,
+        elapsed_seconds: f64,
+        source: char,
+    ) -> super::super::super::invocation::InvocationRecord {
+        let (workload, measurement_id, _) = group_values(index);
+        let mut invocation = invocation(elapsed_seconds, 8, source);
+        let row = invocation
+            .rows
+            .first_mut()
+            .expect("synthetic invocation should contain one row");
+        row.workload_id = ProtocolId::try_new(workload).expect("workload");
+        row.measurement_id = ProtocolId::try_new(measurement_id).expect("measurement");
+        invocation
+    }
+
+    fn pair_for_group(index: usize, pair_index: usize) -> VariantPairExecution {
+        VariantPairExecution {
+            pair_index,
+            order: super::super::VariantPairOrder::for_pair(pair_index),
+            scalar: invocation_for_group(index, 0.45, 'b'),
+            portable: invocation_for_group(index, 0.40, 'c'),
+        }
+    }
+
+    fn complete_scale(index: usize, scale_id: &str, size_class: SizeClass) -> ScaleEvidence {
+        let samples = (0..3)
+            .map(|pair_index| pair_for_group(index, pair_index))
+            .collect::<Vec<_>>();
+        let paired_samples = samples
+            .iter()
+            .map(pair_sample)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("paired samples");
+        let summary = summarize(&paired_samples).expect("summary");
+        let calibration = |variant, source| VariantCalibration {
+            variant,
+            selected_iterations: 1,
+            selected_measured_seconds: 0.5,
+            probes: vec![VariantCalibrationProbe {
+                iterations: 1,
+                invocation: invocation_for_group(index, 0.5, source),
+            }],
+        };
+        ScaleEvidence {
+            scale_id: scale_id.to_owned(),
+            family_id: "default".to_owned(),
+            size_class,
+            work_items: 8,
+            input_bytes: 8,
+            input_digest: digest('a'),
+            scalar_calibration: calibration(StabBuildVariant::Scalar, 'b'),
+            portable_calibration: calibration(StabBuildVariant::PortableSimd, 'c'),
+            common_iterations: 1,
+            semantic_validation: pair_for_group(index, 0),
+            warmups: (0..WARMUP_BATCHES)
+                .map(|pair_index| pair_for_group(index, pair_index))
+                .collect(),
+            samples,
+            paired_samples,
+            summary,
+        }
+    }
+
+    fn complete_contract(index: usize) -> ResolvedGroupContract {
+        let (workload, measurement, owner) = group_values(index);
+        let group_id = *GROUP_IDS.get(index).expect("synthetic group index");
+        ResolvedGroupContract {
+            source_sha256: digest(if index == 0 { '9' } else { '8' }),
+            product_diagnostic_suite_timeout_seconds: NonZeroU64::new(1).expect("timeout"),
+            contract: GroupContract {
+                id: ProtocolId::try_new(group_id).expect("group"),
+                claim_class: ClaimClass::PromotablePerformance,
+                parity_eligibility: ParityEligibility::ThresholdEligible,
+                timing_batch_policy: TimingBatchPolicy::CommonIterations,
+                workload_id: ProtocolId::try_new(workload).expect("workload"),
+                measurement_ids: vec![ProtocolId::try_new(measurement).expect("measurement")],
+                scales: vec![
+                    ScaleContract {
+                        id: ProtocolId::try_new("medium").expect("scale"),
+                        family_id: ProtocolId::try_new("default").expect("family"),
+                        size_class: SizeClass::Medium,
+                        work_items: NonZeroU64::new(8).expect("work"),
+                        input_bytes: 8,
+                        input_digest: InputDigest::try_new(digest('a')).expect("input digest"),
+                    },
+                    ScaleContract {
+                        id: ProtocolId::try_new("large").expect("scale"),
+                        family_id: ProtocolId::try_new("default").expect("family"),
+                        size_class: SizeClass::Large,
+                        work_items: NonZeroU64::new(8).expect("work"),
+                        input_bytes: 8,
+                        input_digest: InputDigest::try_new(digest('a')).expect("input digest"),
+                    },
+                ],
+                correctness_case_ids: Vec::new(),
+                owner: ProtocolId::try_new(owner).expect("owner"),
+                profiler_note: None,
+                comparator_sources: Vec::new(),
+            },
+        }
+    }
+
+    fn complete_group(index: usize) -> GroupEvidence {
+        let (workload, measurement, owner) = group_values(index);
+        let group_id = *GROUP_IDS.get(index).expect("synthetic group index");
+        GroupEvidence {
+            group_id: group_id.to_owned(),
+            group_contract_sha256: digest(if index == 0 { '9' } else { '8' }),
+            workload_id: workload.to_owned(),
+            measurement_id: measurement.to_owned(),
+            owner: owner.to_owned(),
+            scales: vec![
+                complete_scale(index, "medium", SizeClass::Medium),
+                complete_scale(index, "large", SizeClass::Large),
+            ],
+        }
+    }
+
+    fn complete_payload() -> (
+        Vec<ResolvedGroupContract>,
+        SimdCompareReport,
+        DirectQualificationArtifactPath,
+    ) {
+        let output = DirectQualificationArtifactPath::try_new(std::path::Path::new(
+            "target/benchmarks/qualification/synthetic-simd-report",
+        ))
+        .expect("synthetic output path");
+        let groups = vec![complete_contract(0), complete_contract(1)];
+        let report = synthetic_report_shell(
+            vec![complete_group(0), complete_group(1)],
+            &output.as_path().to_string_lossy(),
+        );
+        (groups, report, output)
+    }
+
     #[test]
     fn deterministic_replay_reconstructs_samples_and_summary() {
         let scale = scale_evidence();
         reconstruct_scale_derivations(&scale).expect("first replay");
         reconstruct_scale_derivations(&scale).expect("deterministic second replay");
+    }
+
+    #[test]
+    fn replay_rejects_worker_time_exceeding_parent_wall_time() {
+        let mut impossible = invocation(1.0, 8, 'b');
+        impossible.process_wall_seconds = 0.5;
+        assert!(!raw_durations_are_physically_possible(&impossible));
+
+        impossible.process_wall_seconds = 1.0;
+        assert!(raw_durations_are_physically_possible(&impossible));
+    }
+
+    #[test]
+    fn complete_payload_replay_rejects_trust_boundary_mutations() {
+        const PERFORMANCE: &str =
+            "1111111111111111111111111111111111111111111111111111111111111111";
+        const CORRECTNESS: &str =
+            "2222222222222222222222222222222222222222222222222222222222222222";
+        let (groups, report, output) = complete_payload();
+        validate_report_payload(PERFORMANCE, CORRECTNESS, &groups, &report, Some(&output))
+            .expect("complete synthetic payload should replay");
+
+        let mut stale_inventory = report.clone();
+        stale_inventory.performance_inventory_sha256 = digest('0');
+        assert!(matches!(
+            validate_report_payload(
+                PERFORMANCE,
+                CORRECTNESS,
+                &groups,
+                &stale_inventory,
+                Some(&output)
+            ),
+            Err(SimdCompareError::InventoryEvidence)
+        ));
+
+        let mut unverified = report.clone();
+        unverified.host.verified = false;
+        unverified.host.violations = vec!["host violation".to_owned()];
+        assert!(matches!(
+            validate_report_payload(
+                PERFORMANCE,
+                CORRECTNESS,
+                &groups,
+                &unverified,
+                Some(&output)
+            ),
+            Err(SimdCompareError::InvalidReport)
+        ));
+
+        let mut stale_contract = report.clone();
+        stale_contract
+            .groups
+            .first_mut()
+            .expect("first group")
+            .group_contract_sha256 = digest('0');
+        assert!(matches!(
+            validate_report_payload(
+                PERFORMANCE,
+                CORRECTNESS,
+                &groups,
+                &stale_contract,
+                Some(&output)
+            ),
+            Err(SimdCompareError::GroupEvidence)
+        ));
+
+        let mut impossible_time = report.clone();
+        let invocation = &mut impossible_time
+            .groups
+            .first_mut()
+            .expect("first group")
+            .scales
+            .first_mut()
+            .expect("first scale")
+            .scalar_calibration
+            .probes
+            .first_mut()
+            .expect("calibration probe")
+            .invocation;
+        invocation.process_wall_seconds = 0.25;
+        assert!(matches!(
+            validate_report_payload(
+                PERFORMANCE,
+                CORRECTNESS,
+                &groups,
+                &impossible_time,
+                Some(&output)
+            ),
+            Err(SimdCompareError::RawInvocation)
+        ));
+
+        let mut output_mismatch = report;
+        output_mismatch
+            .groups
+            .first_mut()
+            .expect("first group")
+            .scales
+            .first_mut()
+            .expect("first scale")
+            .samples
+            .first_mut()
+            .expect("first pair")
+            .portable
+            .rows
+            .first_mut()
+            .expect("portable row")
+            .output_digest = SemanticDigest::try_new(digest('0')).expect("output digest");
+        assert!(matches!(
+            validate_report_payload(
+                PERFORMANCE,
+                CORRECTNESS,
+                &groups,
+                &output_mismatch,
+                Some(&output)
+            ),
+            Err(SimdCompareError::Protocol(_))
+        ));
     }
 
     #[test]
