@@ -112,7 +112,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             performance_feature: "PERF-SAMPLING",
             phase: Phase::Compile,
             correctness_cases: &["cq-evidence-qualification-7bcf8fcdbbfa6d68"],
-            owner: "stab-core/sampling-compiler",
+            owner: "stab-engine/sampling-compiler",
             reason: "Measures the complete SamplingCompiler compile-and-release lifecycle over a pre-parsed deterministic circuit. Untimed recompilation compares the exact PlanFingerprint with a typed witness, the legacy CompiledSampler adapter is covered by the same correctness parent, and no sampling method is called.",
         },
     ]

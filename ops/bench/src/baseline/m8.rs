@@ -9,13 +9,15 @@ use std::path::{Component, Path, PathBuf};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
-    BackendPreference, BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink,
-    MeasurementSink, Probability, RandomPolicy, RecordFormat, ReferenceSampleTree, SampleFormat,
-    SamplingCompiler, Seed, ShotCount,
+    BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
+    Probability, RecordFormat, ReferenceSampleTree, SampleFormat,
     result_formats::{write_ptb64_records_checked, write_records},
     result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
 };
-use stab_engine::biased_randomize_bits;
+use stab_engine::{
+    BackendPreference, RandomPolicy, SamplingCompiler, SamplingPlan, SamplingSession, Seed,
+    ShotCount, biased_randomize_bits,
+};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -780,7 +782,7 @@ fn sample_circuit(row_id: &str, fixture: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(fixture).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn compile_plan(row_id: &str, circuit: &Circuit) -> Result<stab_core::SamplingPlan, BenchError> {
+fn compile_plan(row_id: &str, circuit: &Circuit) -> Result<SamplingPlan, BenchError> {
     SamplingCompiler::new()
         .compile(circuit)
         .map_err(|error| stab_runner_error(row_id, error))
@@ -788,9 +790,9 @@ fn compile_plan(row_id: &str, circuit: &Circuit) -> Result<stab_core::SamplingPl
 
 fn sampling_session(
     row_id: &str,
-    plan: &stab_core::SamplingPlan,
+    plan: &SamplingPlan,
     seed: u64,
-) -> Result<stab_core::SamplingSession, BenchError> {
+) -> Result<SamplingSession, BenchError> {
     plan.session(RandomPolicy::Seeded(Seed::new(seed)))
         .map_err(|error| stab_runner_error(row_id, error))
 }
@@ -822,7 +824,7 @@ fn sample_encoding_batch(
 
 fn sample_plan_b8(
     row_id: &str,
-    plan: &stab_core::SamplingPlan,
+    plan: &SamplingPlan,
     shots: usize,
     seed: u64,
 ) -> Result<usize, BenchError> {

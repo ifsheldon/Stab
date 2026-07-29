@@ -61,8 +61,15 @@ pub(super) fn classify_extracted_engine_api(
     source_path: &str,
     api_lower: &str,
 ) -> Option<FeatureId> {
+    if api_path_mentions_item(api_lower, "samplingcompilationdescriptor")
+        || api_lower.ends_with("::compilation_descriptor")
+    {
+        return Some(FeatureId::CircuitApi);
+    }
     if source_path.starts_with("crates/stab-engine/src/fingerprint")
         || source_path.starts_with("crates/stab-engine/src/probability")
+        || source_path.starts_with("crates/stab-engine/src/sampling")
+        || is_extracted_sampling_api(api_lower)
         || api_path_mentions_item(api_lower, "compilationoperation")
         || api_path_mentions_item(api_lower, "compilationrequestfingerprint")
         || api_path_mentions_item(api_lower, "biased_randomize_bits")
@@ -70,6 +77,38 @@ pub(super) fn classify_extracted_engine_api(
         return Some(FeatureId::Sampling);
     }
     None
+}
+
+fn is_extracted_sampling_api(api_lower: &str) -> bool {
+    if !api_lower.starts_with("stab_engine::") && !api_lower.starts_with("stab_core::") {
+        return false;
+    }
+    [
+        "backendpreference",
+        "planfingerprint",
+        "randompolicy",
+        "referencesamplemode",
+        "runerror",
+        "samplingbackend",
+        "samplingcancellation",
+        "samplingcompilationdescriptor",
+        "samplingcompileerror",
+        "samplingcompileerrorcode",
+        "samplingcompiler",
+        "samplingexecutionerror",
+        "samplingplan",
+        "samplingrunprogress",
+        "samplingrunstatus",
+        "samplingrunsummary",
+        "samplingsession",
+        "seed",
+        "shotcount",
+        "sinkfailurephase",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
+        || api_lower.ends_with("::compilation_descriptor")
+        || api_lower.ends_with("::registered_backends")
 }
 
 fn is_generation_api(api_lower: &str) -> bool {

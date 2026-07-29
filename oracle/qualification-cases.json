@@ -4071,6 +4071,38 @@
             "owner_path": "stab_core::CompilationCapability::supports_backend_selection"
           },
           {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::operation"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::input_dialect"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::compiler_schema_version"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::request_fingerprint_schema_version"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::has_configurable_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingCompilationDescriptor::supports_backend_selection"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::COMPILATION_DESCRIPTOR"
+          },
+          {
             "crate_name": "stab_core",
             "owner_path": "stab_core::ModelDialect::all"
           }
@@ -4328,6 +4360,7 @@
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::new" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::backend" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::compile" },
+          { "crate_name": "stab_engine", "owner_path": "stab_engine::REGISTERED_BACKENDS" },
           { "crate_name": "stab_core", "owner_path": "stab_core::CompiledSampler::compile" }
         ],
         "standalone": true
@@ -4415,7 +4448,6 @@
         "public_api_owners": [
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError::code" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileError::into_circuit_error" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileErrorCode" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompileErrorCode::as_str" }
         ],
@@ -4485,6 +4517,7 @@
         ],
         "public_api_owners": [
           { "crate_name": "stab_core", "owner_path": "stab_core::RandomPolicy" },
+          { "crate_name": "stab_engine", "owner_path": "stab_engine::RandomPolicy::seed" },
           { "crate_name": "stab_core", "owner_path": "stab_core::Seed" },
           { "crate_name": "stab_core", "owner_path": "stab_core::Seed::new" },
           { "crate_name": "stab_core", "owner_path": "stab_core::Seed::get" },
@@ -4573,7 +4606,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "sampling::api::tests::direct_small_and_general_variants_match_the_previous_general_frame_stream",
             "--quiet",
@@ -4593,6 +4626,89 @@
         "public_api_owners": [
           { "crate_name": "stab_core", "owner_path": "stab_core::ReferenceSampleMode" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingPlan::session_with_reference_mode" }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-determined-measurement-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "sampling::tests::count_determined_measurements_matches_unknown_input_subset",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Known-basis and unknown-input compilation paths count exact determined outcomes across pair measurements, Pauli products, repeated observations, and independent products without sampling random streams."
+        },
+        "negative_axes": [
+          "unknown-input-initialization-drift",
+          "repeat-count-drift",
+          "commuting-product-drift",
+          "random-stream-consumption"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingPlan::count_determined_measurements"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::count_determined_measurements"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledSampler::count_determined_measurements"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-reference-sample-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "sampling::tests::can_sample_against_zero_reference_sample",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A bounded Clifford circuit proves that the immutable plan's deterministic reference sample is distinct from seeded noisy execution while the zero-reference mode preserves the exact sampled frame-change record."
+        },
+        "negative_axes": [
+          "reference-sample-randomness",
+          "frame-change-sign-drift",
+          "compatibility-adapter-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingPlan::reference_sample"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::CompiledSampler::reference_sample"
+          }
         ],
         "standalone": true
       },
@@ -4728,7 +4844,6 @@
           { "crate_name": "stab_core", "owner_path": "stab_core::RunError" },
           { "crate_name": "stab_core", "owner_path": "stab_core::RunError::progress" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingExecutionError" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingExecutionError::into_circuit_error" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress::committed_shots" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingRunProgress::attempted_batch_shots" },
@@ -4749,7 +4864,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "sampling::api::tests::counter_overflow_rejects_before_work_without_poisoning",
             "--quiet",
@@ -4846,7 +4961,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "sampling::api::tests::internal_batch_invariant_failure_poisons_with_exact_progress",
             "--quiet",
@@ -4935,7 +5050,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "sampling::api::tests::warmed_session_allocation_does_not_scale_with_shot_count",
             "--quiet",
@@ -19918,16 +20033,6 @@
     },
     {
       "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::BackendPreference",
-      "canonical_owner_path": "stab_core::BackendPreference"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::BackendPreference::as_str",
-      "canonical_owner_path": "stab_core::BackendPreference::as_str"
-    },
-    {
-      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::CompiledSampler",
       "canonical_owner_path": "stab_core::CompiledSampler"
     },
@@ -19998,71 +20103,6 @@
     },
     {
       "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint",
-      "canonical_owner_path": "stab_core::PlanFingerprint"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::ALGORITHM",
-      "canonical_owner_path": "stab_core::PlanFingerprint::ALGORITHM"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::SCHEMA_VERSION",
-      "canonical_owner_path": "stab_core::PlanFingerprint::SCHEMA_VERSION"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::backend",
-      "canonical_owner_path": "stab_core::PlanFingerprint::backend"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::digest",
-      "canonical_owner_path": "stab_core::PlanFingerprint::digest"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::digest_hex",
-      "canonical_owner_path": "stab_core::PlanFingerprint::digest_hex"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_digest",
-      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_digest"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_digest_hex",
-      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_digest_hex"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::executable_contract_schema_version",
-      "canonical_owner_path": "stab_core::PlanFingerprint::executable_contract_schema_version"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::request_fingerprint",
-      "canonical_owner_path": "stab_core::PlanFingerprint::request_fingerprint"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::PlanFingerprint::schema_version",
-      "canonical_owner_path": "stab_core::PlanFingerprint::schema_version"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::RandomPolicy",
-      "canonical_owner_path": "stab_core::RandomPolicy"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleMode",
-      "canonical_owner_path": "stab_core::ReferenceSampleMode"
-    },
-    {
-      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::ReferenceSampleTree",
       "canonical_owner_path": "stab_core::ReferenceSampleTree"
     },
@@ -20100,261 +20140,6 @@
       "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::ReferenceSampleTree::stim_string",
       "canonical_owner_path": "stab_core::ReferenceSampleTree::stim_string"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::RunError",
-      "canonical_owner_path": "stab_core::RunError"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::RunError::progress",
-      "canonical_owner_path": "stab_core::RunError::progress"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingBackend",
-      "canonical_owner_path": "stab_core::SamplingBackend"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingBackend::as_str",
-      "canonical_owner_path": "stab_core::SamplingBackend::as_str"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCancellation",
-      "canonical_owner_path": "stab_core::SamplingCancellation"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCancellation::cancel",
-      "canonical_owner_path": "stab_core::SamplingCancellation::cancel"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCancellation::is_cancelled",
-      "canonical_owner_path": "stab_core::SamplingCancellation::is_cancelled"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCancellation::reset",
-      "canonical_owner_path": "stab_core::SamplingCancellation::reset"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompileError",
-      "canonical_owner_path": "stab_core::SamplingCompileError"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompileError::code",
-      "canonical_owner_path": "stab_core::SamplingCompileError::code"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompileError::into_circuit_error",
-      "canonical_owner_path": "stab_core::SamplingCompileError::into_circuit_error"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompileErrorCode",
-      "canonical_owner_path": "stab_core::SamplingCompileErrorCode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompileErrorCode::as_str",
-      "canonical_owner_path": "stab_core::SamplingCompileErrorCode::as_str"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompiler",
-      "canonical_owner_path": "stab_core::SamplingCompiler"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompiler::backend",
-      "canonical_owner_path": "stab_core::SamplingCompiler::backend"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompiler::compile",
-      "canonical_owner_path": "stab_core::SamplingCompiler::compile"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingCompiler::new",
-      "canonical_owner_path": "stab_core::SamplingCompiler::new"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingExecutionError",
-      "canonical_owner_path": "stab_core::SamplingExecutionError"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingExecutionError::into_circuit_error",
-      "canonical_owner_path": "stab_core::SamplingExecutionError::into_circuit_error"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan",
-      "canonical_owner_path": "stab_core::SamplingPlan"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION",
-      "canonical_owner_path": "stab_core::SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::backend",
-      "canonical_owner_path": "stab_core::SamplingPlan::backend"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::fingerprint",
-      "canonical_owner_path": "stab_core::SamplingPlan::fingerprint"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::measurement_width",
-      "canonical_owner_path": "stab_core::SamplingPlan::measurement_width"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::qubit_count",
-      "canonical_owner_path": "stab_core::SamplingPlan::qubit_count"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::request_fingerprint",
-      "canonical_owner_path": "stab_core::SamplingPlan::request_fingerprint"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::session",
-      "canonical_owner_path": "stab_core::SamplingPlan::session"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingPlan::session_with_reference_mode",
-      "canonical_owner_path": "stab_core::SamplingPlan::session_with_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunProgress",
-      "canonical_owner_path": "stab_core::SamplingRunProgress"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunProgress::attempted_batch_shots",
-      "canonical_owner_path": "stab_core::SamplingRunProgress::attempted_batch_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunProgress::committed_shots",
-      "canonical_owner_path": "stab_core::SamplingRunProgress::committed_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunStatus",
-      "canonical_owner_path": "stab_core::SamplingRunStatus"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunSummary",
-      "canonical_owner_path": "stab_core::SamplingRunSummary"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunSummary::committed_shots",
-      "canonical_owner_path": "stab_core::SamplingRunSummary::committed_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunSummary::requested_shots",
-      "canonical_owner_path": "stab_core::SamplingRunSummary::requested_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunSummary::status",
-      "canonical_owner_path": "stab_core::SamplingRunSummary::status"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingRunSummary::total_committed_shots",
-      "canonical_owner_path": "stab_core::SamplingRunSummary::total_committed_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingSession",
-      "canonical_owner_path": "stab_core::SamplingSession"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingSession::cancellation",
-      "canonical_owner_path": "stab_core::SamplingSession::cancellation"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingSession::is_poisoned",
-      "canonical_owner_path": "stab_core::SamplingSession::is_poisoned"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingSession::run",
-      "canonical_owner_path": "stab_core::SamplingSession::run"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SamplingSession::total_committed_shots",
-      "canonical_owner_path": "stab_core::SamplingSession::total_committed_shots"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::Seed",
-      "canonical_owner_path": "stab_core::Seed"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::Seed::get",
-      "canonical_owner_path": "stab_core::Seed::get"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::Seed::new",
-      "canonical_owner_path": "stab_core::Seed::new"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ShotCount",
-      "canonical_owner_path": "stab_core::ShotCount"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ShotCount::get",
-      "canonical_owner_path": "stab_core::ShotCount::get"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ShotCount::new",
-      "canonical_owner_path": "stab_core::ShotCount::new"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SinkFailurePhase",
-      "canonical_owner_path": "stab_core::SinkFailurePhase"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::SinkFailurePhase::as_str",
-      "canonical_owner_path": "stab_core::SinkFailurePhase::as_str"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::count_determined_measurements",
-      "canonical_owner_path": "stab_core::count_determined_measurements"
     },
     {
       "crate_name": "stab_core",

@@ -86,7 +86,8 @@ fn diagnostic_group_id(path: &str) -> Option<&'static str> {
             Some(A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID)
         }
         "stab_core::estimate_sampling_request" => Some(A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID),
-        "stab_core::SamplingCompiler::compile"
+        "stab_engine::SamplingCompiler::compile"
+        | "stab_core::SamplingCompiler::compile"
         | "stab_core::execution::SamplingCompiler::compile"
         | "stab_core::CompiledSampler::compile"
         | "stab_core::execution::CompiledSampler::compile" => Some(A2_SAMPLER_COMPILE_GROUP_ID),
