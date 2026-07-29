@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "926bc8d5bd6016c071bc06f61cc22a24728d26e0bc5da04fe10cfcf731581bcc",
+  "semantic_digest": "d1291c468119c382c6970b9dc99bf832f1b89a11ed91cb902e60f2f362cf9069",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -61128,6 +61128,32 @@
       ]
     },
     {
+      "id": "cq-api-item-2bfeeba8241ac94e",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 17,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-05bcac8118b3e2d9",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification::message",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 17,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
       "id": "cq-api-item-320852201196f2d0",
       "feature_id": "CQ-ANALYZER",
       "crate_name": "stab_analysis",
@@ -61431,6 +61457,19 @@
       ]
     },
     {
+      "id": "cq-api-item-a6861c4a4f9660c2",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_to_tableau",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_tableau.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
       "id": "cq-api-item-c306457841113d6f",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_analysis",
@@ -61439,6 +61478,20 @@
       "source_path": "crates/stab-analysis/src/circuit.rs",
       "source_line": 8,
       "owner_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-30dad6bde310b747",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::decomposed_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_simplify.rs",
+      "source_line": 21,
+      "owner_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -61967,6 +62020,20 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-e5d68b6747636132",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::simplified_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_simplify.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -67540,7 +67607,7 @@
       "path": "stab_core::CircuitError as From@2de935421934 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 203,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -67624,7 +67691,7 @@
       "path": "stab_core::CircuitError as From@ed6b9be3e5ee for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 209,
+      "source_line": 206,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -68242,7 +68309,7 @@
       "path": "stab_core::CircuitError::format_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 167,
+      "source_line": 164,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -68256,7 +68323,7 @@
       "path": "stab_core::CircuitError::invalid_result_format",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 163,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -68270,7 +68337,7 @@
       "path": "stab_core::CircuitError::parse_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 174,
+      "source_line": 171,
       "owner_case_id": "cq-evidence-qualification-bb06be3e4b51cd2c",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -68283,7 +68350,7 @@
       "path": "stab_core::CircuitError::resource_limit_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 181,
+      "source_line": 178,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -99825,7 +99892,7 @@
       "path": "stab_core::analysis::circuit_to_tableau",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_tableau.rs",
-      "source_line": 7,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -99879,7 +99946,7 @@
       "path": "stab_core::analysis::decomposed_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_simplify.rs",
-      "source_line": 19,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -100143,7 +100210,7 @@
       "path": "stab_core::analysis::simplified_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_simplify.rs",
-      "source_line": 12,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -102315,7 +102382,7 @@
       "path": "stab_core::circuit_to_tableau",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_tableau.rs",
-      "source_line": 7,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -102406,7 +102473,7 @@
       "path": "stab_core::decomposed_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_simplify.rs",
-      "source_line": 19,
+      "source_line": 7,
       "owner_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -115283,7 +115350,7 @@
       "path": "stab_core::simplified_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_simplify.rs",
-      "source_line": 12,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -189175,7 +189242,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_tableau",
           "circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim",
@@ -193584,7 +193651,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_tableau",
           "circuit_to_tableau_matches_stim_basic_examples",
@@ -197734,8 +197801,8 @@
           "maximum_generated_bytes": 0,
           "seeds": [],
           "case_count": 5,
-          "corpus_path": "crates/stab-core/tests/circuit_simplify.rs",
-          "corpus_sha256": "4e7f1ef239c3ffb338a4570c5d7b10eff5cb8e0a7463d32936240d8caa03118e",
+          "corpus_path": "crates/stab-analysis/tests/circuit_simplify.rs",
+          "corpus_sha256": "641fe75ed584220738286ee49acda8bb577a3946c79ec51aa4e24873fd93aa56",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -197747,7 +197814,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_simplify",
           "cq2_circuit_api_simplified_contract_matches_selected_stim_scope",

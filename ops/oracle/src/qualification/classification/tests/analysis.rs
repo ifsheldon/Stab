@@ -13,6 +13,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_simplify.rs",
+            "stab_analysis::simplified_circuit",
+            FeatureId::CircuitApi,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit_tableau.rs",
+            "stab_analysis::circuit_to_tableau",
+            FeatureId::Algebra,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/gate.rs",
             "stab_analysis::single_qubit_clifford_for_gate",
             FeatureId::Algebra,

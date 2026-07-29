@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "926bc8d5bd6016c071bc06f61cc22a24728d26e0bc5da04fe10cfcf731581bcc",
-  "semantic_digest": "acf10c4b76fa61e04a414309d109c2e195dd878e62092bad0c3b4779edc5a603",
+  "correctness_digest": "d1291c468119c382c6970b9dc99bf832f1b89a11ed91cb902e60f2f362cf9069",
+  "semantic_digest": "4136a8d75075d63a537385712bc99fd867a94bff48143a2936181f27efdcca26",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -7767,6 +7767,28 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-2bfeeba8241ac94e",
+      "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification",
+      "kind": "variant",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-05bcac8118b3e2d9",
+      "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification::message",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-320852201196f2d0",
       "path": "stab_analysis::AnalysisError::InvalidTableauConversion",
       "kind": "variant",
@@ -8045,6 +8067,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-a6861c4a4f9660c2",
+      "path": "stab_analysis::circuit_to_tableau",
+      "kind": "function",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c95587e3d0c5a40f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-c306457841113d6f",
       "path": "stab_analysis::circuit_without_tags",
       "kind": "function",
@@ -8053,6 +8086,19 @@
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "correctness_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-30dad6bde310b747",
+      "path": "stab_analysis::decomposed_circuit",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -8544,6 +8590,19 @@
         "PERF-ERROR-ANALYSIS"
       ],
       "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e5d68b6747636132",
+      "path": "stab_analysis::simplified_circuit",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

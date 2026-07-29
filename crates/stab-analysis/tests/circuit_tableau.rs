@@ -3,7 +3,9 @@
     reason = "M6 circuit/tableau parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, Tableau};
+use stab_algebra::Tableau;
+use stab_analysis::{AnalysisResult, circuit_to_tableau};
+use stab_model::Circuit;
 
 trait CircuitTableauTestExt {
     fn to_tableau(
@@ -11,7 +13,7 @@ trait CircuitTableauTestExt {
         ignore_noise: bool,
         ignore_measurement: bool,
         ignore_reset: bool,
-    ) -> stab_core::CircuitResult<Tableau>;
+    ) -> AnalysisResult<Tableau>;
 }
 
 impl CircuitTableauTestExt for Circuit {
@@ -20,13 +22,8 @@ impl CircuitTableauTestExt for Circuit {
         ignore_noise: bool,
         ignore_measurement: bool,
         ignore_reset: bool,
-    ) -> stab_core::CircuitResult<Tableau> {
-        stab_core::analysis::circuit_to_tableau(
-            self,
-            ignore_noise,
-            ignore_measurement,
-            ignore_reset,
-        )
+    ) -> AnalysisResult<Tableau> {
+        circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
     }
 }
 

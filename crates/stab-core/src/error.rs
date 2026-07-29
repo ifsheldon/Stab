@@ -130,6 +130,9 @@ impl From<stab_analysis::AnalysisError> for CircuitError {
             stab_analysis::AnalysisError::InvalidTableauConversion { message } => {
                 Self::InvalidTableauConversion { message }
             }
+            stab_analysis::AnalysisError::InvalidCircuitSimplification { message } => {
+                Self::InvalidCircuitSimplification { message }
+            }
         }
     }
 }
@@ -144,12 +147,6 @@ impl CircuitError {
 
     pub(crate) fn invalid_tableau_conversion(message: impl Into<String>) -> Self {
         Self::InvalidTableauConversion {
-            message: message.into(),
-        }
-    }
-
-    pub(crate) fn invalid_circuit_simplification(message: impl Into<String>) -> Self {
-        Self::InvalidCircuitSimplification {
             message: message.into(),
         }
     }

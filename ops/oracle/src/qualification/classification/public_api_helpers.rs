@@ -1,3 +1,21 @@
+use super::FeatureId;
+
+pub(super) fn classify_extracted_analysis_api(
+    source_path: &str,
+    api_lower: &str,
+) -> Option<FeatureId> {
+    if api_lower.ends_with("::decomposed_circuit")
+        || api_lower.ends_with("::simplified_circuit")
+        || source_path == "crates/stab-analysis/src/circuit_simplify.rs"
+    {
+        return Some(FeatureId::CircuitApi);
+    }
+    if source_path == "crates/stab-analysis/src/circuit_tableau.rs" {
+        return Some(FeatureId::Algebra);
+    }
+    None
+}
+
 pub(super) fn api_path_mentions_item(api_path: &str, item: &str) -> bool {
     api_path.split("::").any(|segment| {
         segment == item

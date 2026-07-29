@@ -2457,6 +2457,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_decomposed"}
       ],
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::decomposed_circuit"},
         {"crate_name": "stab_core", "owner_path": "stab_core::decomposed_circuit"}
       ],
       "oracle_fixture_owners": ["pf2-circuit-decomposed-public-rust"]
@@ -2467,11 +2468,12 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_simplify", "cq2_circuit_api_simplified_contract_matches_selected_stim_scope", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "circuit_simplify", "cq2_circuit_api_simplified_contract_matches_selected_stim_scope", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed selected-scope aggregate proves single- and two-qubit Clifford simplification, recursive repeats, unsupported-gate preservation, and classical-control preservation."},
-      "static_property_plan": {"generator_domain": "single-qubit, two-qubit, repeated, unsupported, and classical-control simplification cases", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_simplify.rs"},
+      "static_property_plan": {"generator_domain": "single-qubit, two-qubit, repeated, unsupported, and classical-control simplification cases", "case_count": 5, "corpus_path": "crates/stab-analysis/tests/circuit_simplify.rs"},
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::simplified_circuit"},
         {"crate_name": "stab_core", "owner_path": "stab_core::simplified_circuit"}
       ],
       "oracle_fixture_owners": ["coverage-util-top-simplified-circuit"]
@@ -17083,7 +17085,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_tableau",
           "circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim",
@@ -17127,7 +17129,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_tableau",
           "circuit_to_tableau_matches_stim_basic_examples",
@@ -17160,6 +17162,10 @@
         "coverage-util-top-circuit-vs-tableau"
       ],
       "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::circuit_to_tableau"
+        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::circuit_to_tableau"

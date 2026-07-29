@@ -4,7 +4,8 @@
     reason = "M6 simplified-circuit parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, CircuitItem, analysis::circuit_to_tableau, simplified_circuit};
+use stab_analysis::{AnalysisError, circuit_to_tableau, decomposed_circuit, simplified_circuit};
+use stab_model::{Circuit, CircuitItem};
 
 #[test]
 fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
@@ -110,6 +111,23 @@ fn cq2_circuit_api_simplified_contract_matches_selected_stim_scope() {
     simplified_circuit_recurses_into_repeat_blocks();
     simplified_circuit_preserves_unsupported_gates_for_later_slices();
     simplified_circuit_preserves_classical_controlled_pairs();
+}
+
+#[test]
+fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
+    assert_eq!(
+        decomposed_circuit(&circuit("MPP X0*X0 X0*!X0\n"))
+            .expect("constant products")
+            .to_stim_string(),
+        "MPAD 0 1\n"
+    );
+
+    let error = decomposed_circuit(&circuit("SPP X0*Z0\n")).expect_err("anti-Hermitian product");
+    assert!(matches!(
+        error,
+        AnalysisError::InvalidCircuitSimplification { ref message }
+            if message.contains("anti-Hermitian")
+    ));
 }
 
 fn circuit(text: &str) -> Circuit {

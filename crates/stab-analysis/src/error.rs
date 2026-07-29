@@ -12,11 +12,20 @@ pub enum AnalysisError {
 
     #[error("cannot convert circuit to tableau: {message}")]
     InvalidTableauConversion { message: String },
+
+    #[error("cannot simplify circuit: {message}")]
+    InvalidCircuitSimplification { message: String },
 }
 
 impl AnalysisError {
     pub(crate) fn invalid_tableau_conversion(message: impl Into<String>) -> Self {
         Self::InvalidTableauConversion {
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn invalid_circuit_simplification(message: impl Into<String>) -> Self {
+        Self::InvalidCircuitSimplification {
             message: message.into(),
         }
     }
