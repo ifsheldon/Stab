@@ -45,10 +45,36 @@ fn extracted_sampling_engine_keeps_sampling_ownership() {
             "crates/stab-core/src/lib.rs",
             "stab_core::SamplingCompiler::compile",
         ),
+        (
+            "crates/stab-engine/src/reference_sample_tree.rs",
+            "stab_engine::ReferenceSampleTree::decompress",
+        ),
+        (
+            "crates/stab-engine/src/reference_sample_tree.rs",
+            "stab_engine::ReferenceSampleTreeError",
+        ),
     ] {
         assert_eq!(
             classify_public_api_source("stab_engine", Path::new(source), api),
             Some(FeatureId::Sampling),
+            "{api}"
+        );
+    }
+}
+
+#[test]
+fn extracted_sampled_flow_engine_keeps_flow_utility_ownership() {
+    for api in [
+        "stab_engine::sample_if_circuit_has_stabilizer_flows",
+        "stab_engine::SampledFlowError",
+    ] {
+        assert_eq!(
+            classify_public_api_source(
+                "stab_engine",
+                Path::new("crates/stab-engine/src/sampled_flow.rs"),
+                api,
+            ),
+            Some(FeatureId::FlowUtils),
             "{api}"
         );
     }

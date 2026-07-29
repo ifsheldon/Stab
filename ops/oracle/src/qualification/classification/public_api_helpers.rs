@@ -61,6 +61,12 @@ pub(super) fn classify_extracted_engine_api(
     source_path: &str,
     api_lower: &str,
 ) -> Option<FeatureId> {
+    if source_path.starts_with("crates/stab-engine/src/sampled_flow")
+        || api_path_mentions_item(api_lower, "sampledflowerror")
+        || api_lower.ends_with("::sample_if_circuit_has_stabilizer_flows")
+    {
+        return Some(FeatureId::FlowUtils);
+    }
     if is_dem_sampling_resource_api(api_lower) {
         return Some(FeatureId::Resource);
     }
@@ -184,6 +190,8 @@ fn is_extracted_sampling_api(api_lower: &str) -> bool {
         "backendpreference",
         "planfingerprint",
         "randompolicy",
+        "referencesampletree",
+        "referencesampletreeerror",
         "referencesamplemode",
         "runerror",
         "samplingbackend",

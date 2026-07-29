@@ -673,7 +673,6 @@ pub(super) fn classify_public_api_source(
         || matches!(
             value.as_str(),
             "crates/stab-core/src/execution/circuit_adapters.rs"
-                | "crates/stab-core/src/execution/reference_sample_tree.rs"
                 | "crates/stab-core/src/probability_util.rs"
         )
     {

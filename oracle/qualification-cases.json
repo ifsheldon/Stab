@@ -4713,6 +4713,623 @@
         "standalone": true
       },
       {
+        "id": "a6-engine-reference-tree-structure-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "reference_sample_tree::tests::reference_sample_tree_matches_upstream_structure_and_string_subset",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Public compact tree values preserve exact structural equality, Stim-compatible diagnostic text, and nested suffix order without executing a sampling stream."
+        },
+        "negative_axes": [
+          "empty-tree-identity",
+          "prefix-bit-drift",
+          "nested-string-order"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.equality"
+          },
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.str"
+          }
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::stim_string"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::stim_string"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-reference-tree-simplification-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "reference_sample_tree::tests::reference_sample_tree_simplifies_empty_and_zero_repetition_children",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A fixed nested tree proves that empty and zero-repetition children are removed and adjacent repetition factors are folded into the exact compact Stim representation."
+        },
+        "negative_axes": [
+          "empty-child-retention",
+          "zero-repetition-retention",
+          "repetition-product-drift"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.simplified"
+          }
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::simplified"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::simplified"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-reference-tree-access-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "reference_sample_tree::tests::reference_sample_tree_decompresses_and_supports_random_access",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Decompression emits the exact repeated bit sequence, while random access and size arithmetic address a nine-million-bit logical tree without materializing it."
+        },
+        "negative_axes": [
+          "child-offset-drift",
+          "repeat-modulo-drift",
+          "last-index-off-by-one",
+          "out-of-range-access"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.decompress_into"
+          },
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.random_access_large_tree"
+          }
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::size"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::get"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::decompress"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::decompress_into"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::size"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::get"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::decompress"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::decompress_into"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-reference-tree-construction-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "reference_sample_tree::tests::reference_sample_tree_from_circuit_matches_sampling_plan_reference",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Tree construction uses the canonical sweep-aware sampling compiler and exactly matches the immutable plan's deterministic reference sample."
+        },
+        "negative_axes": [
+          "compiler-path-drift",
+          "reference-bit-drift",
+          "measurement-count-drift"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/reference_sample_tree.test.cc",
+            "symbol": "ReferenceSampleTree.simple_circuit"
+          }
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTree::from_circuit_reference_sample"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::ReferenceSampleTree::from_circuit_reference_sample"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-reference-tree-storage-admission-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "reference_sample_tree::tests::reference_sample_tree_construction_preserves_storage_admission",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A compact three-hundred-million-measurement repeat proves tree construction keeps the sampling engine's materialized compatibility-storage admission boundary before attempting allocation."
+        },
+        "negative_axes": [
+          "compact-repeat-allocation",
+          "storage-cap-bypass",
+          "typed-error-collapse"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::ReferenceSampleTreeError"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-core-reference-tree-facade-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_api",
+            "pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference_sample",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The compatibility facade constructs simple and repeated reference trees through the canonical engine and preserves exact decompression, random access, and aggregate CircuitError behavior."
+        },
+        "negative_axes": [
+          "facade-delegation-drift",
+          "repeat-result-drift",
+          "aggregate-error-mapping"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::execution::circuit_reference_sample_tree"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-unitary-record-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sampled_flow",
+            "sampled_flow_checks_signed_unitary_and_measurement_record_flows",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Fixed seeded 256-shot checks preserve Stim's signed unitary and measurement-record flow outcomes, including false-flow rejection, in source flow order."
+        },
+        "negative_axes": [
+          "flow-sign-loss",
+          "measurement-record-offset-drift",
+          "false-flow-survival",
+          "result-order-drift"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_checked_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_checked_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_checked_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_measurements_signed_checked_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_measurements_signed_checked_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_measurements_signed_checked_256",
+            "subcase": "W=256"
+          }
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::sample_if_circuit_has_stabilizer_flows"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-observable-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sampled_flow",
+            "sampled_flow_checks_record_and_pauli_observables",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Fixed seeded checks preserve signed observable flows backed by measurement records and direct Pauli targets, including sparse observable indices."
+        },
+        "negative_axes": [
+          "observable-record-parity-drift",
+          "pauli-observable-selection-drift",
+          "sparse-observable-index-drift",
+          "observable-sign-loss"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_obs_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_obs_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_signed_obs_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_obs_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_obs_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_obs_256",
+            "subcase": "W=256"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-inverted-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sampled_flow",
+            "sampled_flow_checks_inverted_observable_targets",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Fixed seeded checks preserve inversion parity for Pauli-backed and measurement-record-backed observable targets."
+        },
+        "negative_axes": [
+          "inverted-pauli-sign-drift",
+          "inverted-record-sign-drift",
+          "observable-feedback-order"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_pauli_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_pauli_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_pauli_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_rec_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_rec_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/util_top/has_flow.test.cc",
+            "symbol": "stabilizer_flow.sample_if_circuit_has_stabilizer_flows_inverted_obs_rec_256",
+            "subcase": "W=256"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-failure-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sampled_flow",
+            "sampled_flow_rejects_malformed_measurement_references",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "An out-of-range measurement-record dependency fails before sampling with a typed invalid-flow error and a diagnostic naming the sampled-flow circuit boundary."
+        },
+        "negative_axes": [
+          "record-underflow",
+          "typed-error-loss",
+          "diagnostic-context-loss"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SampledFlowError"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-storage-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sampled_flow",
+            "sampled_flow_preserves_sampling_storage_admission",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A compact three-hundred-million-measurement circuit fails at the compatibility storage boundary even when the requested sample count is zero."
+        },
+        "negative_axes": [
+          "zero-shot-admission-bypass",
+          "compact-repeat-allocation",
+          "sampling-error-collapse"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-sampled-flow-rounding-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "sampled_flow::tests::sampled_flow_counts_round_to_stim_word_width",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Requested confidence samples round upward to Stim's 256-bit public word boundary, preserve exact multiples and zero, and reject arithmetic overflow."
+        },
+        "negative_axes": [
+          "round-down",
+          "exact-multiple-drift",
+          "sample-count-overflow"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-core-sampled-flow-facade-contract",
+        "feature_id": "CQ-FLOW-UTILS",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "circuit_flows",
+            "sampled_flow_facade_preserves_engine_output_and_error_mapping",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The compatibility facade delegates to the canonical engine with identical seeded outcomes and maps typed sampled-flow failures into the documented aggregate CircuitError class."
+        },
+        "negative_axes": [
+          "facade-seed-drift",
+          "facade-result-drift",
+          "aggregate-error-mapping"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::sample_if_circuit_has_stabilizer_flows"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a4-sampling-session-cancellation-contract",
         "feature_id": "CQ-SAMPLING",
         "comparator": "state-equivalence",
@@ -20679,46 +21296,6 @@
       "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::CompiledSampler::sample_zero_one_with_seed_and_reference_mode",
       "canonical_owner_path": "stab_core::CompiledSampler::sample_zero_one_with_seed_and_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::decompress",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::decompress"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::decompress_into",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::decompress_into"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::from_circuit_reference_sample",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::from_circuit_reference_sample"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::get",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::get"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::simplified",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::simplified"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::size",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::size"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::ReferenceSampleTree::stim_string",
-      "canonical_owner_path": "stab_core::ReferenceSampleTree::stim_string"
     },
     {
       "crate_name": "stab_core",

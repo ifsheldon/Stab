@@ -136,9 +136,9 @@ fn classifications_distinguish_selected_execution_domains() {
     );
     assert_eq!(
         classify_public_api_source(
-            "stab_core",
-            Path::new("crates/stab-core/src/execution/reference_sample_tree.rs"),
-            "stab_core::ReferenceSampleTree",
+            "stab_engine",
+            Path::new("crates/stab-engine/src/reference_sample_tree.rs"),
+            "stab_engine::ReferenceSampleTree",
         ),
         Some(FeatureId::Sampling)
     );
@@ -147,6 +147,14 @@ fn classifications_distinguish_selected_execution_domains() {
             "stab_core",
             Path::new("crates/stab-core/src/execution/sampled_flow.rs"),
             "stab_core::sample_if_circuit_has_stabilizer_flows",
+        ),
+        Some(FeatureId::FlowUtils)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_engine",
+            Path::new("crates/stab-engine/src/sampled_flow.rs"),
+            "stab_engine::SampledFlowError",
         ),
         Some(FeatureId::FlowUtils)
     );

@@ -4674,7 +4674,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|sample_if_circuit_has_stabilizer_flows",
+            "argv": "cargo-test|-p|stab-engine|--test|sampled_flow|sampled_flow",
             "upstream_source": "src/stim/util_top/has_flow.test.cc"
           }
         }
