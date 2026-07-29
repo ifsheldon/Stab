@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "4d58d030d7b871cbda7740cf36a5c2e87a58cce082e85ceb41faf04b60aa7bd6",
-  "semantic_digest": "25285a77ebbf0c62bcf80d2502fe4743d785723aea545f7f4b25962165b8b45e",
+  "correctness_digest": "926bc8d5bd6016c071bc06f61cc22a24728d26e0bc5da04fe10cfcf731581bcc",
+  "semantic_digest": "acf10c4b76fa61e04a414309d109c2e195dd878e62092bad0c3b4779edc5a603",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -7668,6 +7668,898 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-c0fcb044eaf90168",
+      "path": "stab_analysis::AnalysisError",
+      "kind": "enum",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-be75dff2a0086fad",
+      "path": "stab_analysis::AnalysisError as Clone for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2a2e5a81c249364a",
+      "path": "stab_analysis::AnalysisError as Debug for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-73c74e4a35b917e0",
+      "path": "stab_analysis::AnalysisError as Display for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f647a29b8c4d5981",
+      "path": "stab_analysis::AnalysisError as Eq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4d2838cb56597907",
+      "path": "stab_analysis::AnalysisError as Error for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-669d51914364b8cb",
+      "path": "stab_analysis::AnalysisError as From@de5d41e1ff68 for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4583b32e43beb09f",
+      "path": "stab_analysis::AnalysisError as PartialEq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-73e49fa38baef671",
+      "path": "stab_analysis::AnalysisError as StructuralPartialEq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-320852201196f2d0",
+      "path": "stab_analysis::AnalysisError::InvalidTableauConversion",
+      "kind": "variant",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5855d2f5f7825666",
+      "path": "stab_analysis::AnalysisError::InvalidTableauConversion::message",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5e03adfcf0587a20",
+      "path": "stab_analysis::AnalysisError::Model",
+      "kind": "variant",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ddbd166ff955df11",
+      "path": "stab_analysis::AnalysisError::Model::0",
+      "kind": "field",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-772754edafddf03a",
+      "path": "stab_analysis::AnalysisResult",
+      "kind": "type-alias",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-342fd4a5d900648f",
+      "path": "stab_analysis::GateUnitaryMatrix",
+      "kind": "enum",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-83bc9cf6c5cadab1",
+      "path": "stab_analysis::GateUnitaryMatrix as Clone for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-65ded8bb20285f49",
+      "path": "stab_analysis::GateUnitaryMatrix as Copy for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b482e65f387c3315",
+      "path": "stab_analysis::GateUnitaryMatrix as Debug for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b552e2a61d1586cf",
+      "path": "stab_analysis::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f5a2c9bbba485e92",
+      "path": "stab_analysis::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e130d9a8bbf42731",
+      "path": "stab_analysis::GateUnitaryMatrix::One",
+      "kind": "variant",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-db32981bfef91eb5",
+      "path": "stab_analysis::GateUnitaryMatrix::One::0",
+      "kind": "field",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2a2b5583d1c70136",
+      "path": "stab_analysis::GateUnitaryMatrix::Two",
+      "kind": "variant",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-9955489bb72896f9",
+      "path": "stab_analysis::GateUnitaryMatrix::Two::0",
+      "kind": "field",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-099e0b9a9580097d",
+      "path": "stab_analysis::GateUnitaryMatrix::dimension",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a28d26c8201062e0",
+      "path": "stab_analysis::GateUnitaryMatrix::entry_count",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ede12b6468009458",
+      "path": "stab_analysis::GateUnitaryMatrix::num_qubits",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-b36602afc4262b8d",
+      "path": "stab_analysis::GateUnitaryMatrix::to_vecs",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d397157a11711ae4",
+      "path": "stab_analysis::circuit::circuit_without_tags",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c306457841113d6f",
+      "path": "stab_analysis::circuit_without_tags",
+      "kind": "function",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-3e23d549df33be55",
+      "path": "stab_analysis::gate::GateUnitaryMatrix",
+      "kind": "enum",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bdbf8b37f5c4bc6c",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Clone for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2f5147aaf6e260ed",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Copy for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c42c47618a445479",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Debug for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c80e6027594bff23",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2de7f316585f1cd9",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-635660e7123d02ce",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::One",
+      "kind": "variant",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b3411ce1c49e428a",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::One::0",
+      "kind": "field",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b87fdab008464c20",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::Two",
+      "kind": "variant",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-00e812565015fa7f",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::Two::0",
+      "kind": "field",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f5cedc85508d37eb",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::dimension",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-87197eda2f000676",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::entry_count",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-06561d98c748b57a",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::num_qubits",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e3d37349fdb96ae7",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::to_vecs",
+      "kind": "method",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-8ebef3db15fde455",
+      "path": "stab_analysis::gate::gate_decomposition_to_circuit",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c9df6e68b3aee5ef",
+      "path": "stab_analysis::gate::gate_flows",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e50d3d0c0ca9a8b7",
+      "path": "stab_analysis::gate::gate_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-27d8f218610cb8c7",
+      "path": "stab_analysis::gate::gate_has_flows",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-288276ead72f0e9d",
+      "path": "stab_analysis::gate::gate_has_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f880aa220717f141",
+      "path": "stab_analysis::gate::gate_has_tableau",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1790750c1ccf5b30",
+      "path": "stab_analysis::gate::gate_has_unitary_matrix",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-310d6d2a51dd421c",
+      "path": "stab_analysis::gate::gate_tableau",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-8f04b275b5d1a514",
+      "path": "stab_analysis::gate::gate_unitary_matrix",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-aa8b9f85297782a5",
+      "path": "stab_analysis::gate::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-160e73f3cc21bd79",
+      "path": "stab_analysis::gate_decomposition_to_circuit",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5cb31bdb79ffd3be",
+      "path": "stab_analysis::gate_flows",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f3c5646ff9d1dcf7",
+      "path": "stab_analysis::gate_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ec5f6379482104c0",
+      "path": "stab_analysis::gate_has_flows",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-6b7efdfe30200fe9",
+      "path": "stab_analysis::gate_has_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c3a4578281df7a0c",
+      "path": "stab_analysis::gate_has_tableau",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5a28e8e842449ad4",
+      "path": "stab_analysis::gate_has_unitary_matrix",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-64c0e05bcc447b6b",
+      "path": "stab_analysis::gate_tableau",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c245fafe9124be5e",
+      "path": "stab_analysis::gate_unitary_matrix",
+      "kind": "function",
+      "performance_feature": "PERF-GATE-CONTRACT",
+      "supporting_performance_features": [
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-db4d1ab6694ec4c7",
+      "path": "stab_analysis::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-d1830adf3334a09a",
       "path": "stab_bits::BIT_BLOCK_WORDS",
       "kind": "constant",
@@ -12508,6 +13400,19 @@
     {
       "id": "cq-api-item-827d25de12b458b0",
       "path": "stab_core::CircuitError as From@2de935421934 for@d79af8854017",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-8b17fce6e6337685",
+      "path": "stab_core::CircuitError as From@37729f8a61f8 for@d79af8854017",
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [

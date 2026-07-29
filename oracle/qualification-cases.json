@@ -2395,6 +2395,7 @@
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_tags"}
       ],
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::circuit_without_tags"},
         {"crate_name": "stab_core", "owner_path": "stab_core::analysis::circuit_without_tags"}
       ]
     },
@@ -12699,6 +12700,34 @@
       ],
       "public_api_owners": [
         {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::GateUnitaryMatrix"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::GateUnitaryMatrix::dimension"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::GateUnitaryMatrix::entry_count"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::GateUnitaryMatrix::num_qubits"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::GateUnitaryMatrix::to_vecs"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_unitary_matrix"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_has_unitary_matrix"
+        },
+        {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::gate_unitary_matrix"
         },
@@ -12785,6 +12814,18 @@
       ],
       "public_api_owners": [
         {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_h_s_cx_m_r_decomposition"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_has_h_s_cx_m_r_decomposition"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_decomposition_to_circuit"
+        },
+        {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::gate_h_s_cx_m_r_decomposition"
         },
@@ -12811,6 +12852,45 @@
       ],
       "oracle_fixture_owners": [
         "pf1-gate-decomposition-metadata"
+      ]
+    },
+    {
+      "id": "cq2-analysis-typed-error-contract",
+      "feature_id": "CQ-ANALYZER",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "gate_and_tag_contracts",
+          "gate_decomposition_is_a_valid_model_without_implying_tableau_support",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The rejected gate uses fixed metadata and a bounded diagnostic string."
+      },
+      "negative_axes": [
+        "unsupported-tableau-request",
+        "typed-analysis-error",
+        "facade-error-conversion"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::AnalysisError"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::AnalysisResult"
+        }
       ]
     },
     {
@@ -15071,6 +15151,10 @@
         "detail": "The complete scalar table uses fixed-size enum values and no input-sized allocation."
       },
       "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::single_qubit_clifford_for_gate"
+        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::SingleQubitClifford"
@@ -19039,29 +19123,84 @@
   ],
   "public_api_aliases": [
     {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::GateUnitaryMatrix",
-      "canonical_owner_path": "stab_core::GateUnitaryMatrix"
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::circuit::circuit_without_tags",
+      "canonical_owner_path": "stab_analysis::circuit_without_tags"
     },
     {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::GateUnitaryMatrix::dimension",
-      "canonical_owner_path": "stab_core::GateUnitaryMatrix::dimension"
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::GateUnitaryMatrix",
+      "canonical_owner_path": "stab_analysis::GateUnitaryMatrix"
     },
     {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::GateUnitaryMatrix::entry_count",
-      "canonical_owner_path": "stab_core::GateUnitaryMatrix::entry_count"
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::GateUnitaryMatrix::dimension",
+      "canonical_owner_path": "stab_analysis::GateUnitaryMatrix::dimension"
     },
     {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::GateUnitaryMatrix::num_qubits",
-      "canonical_owner_path": "stab_core::GateUnitaryMatrix::num_qubits"
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::GateUnitaryMatrix::entry_count",
+      "canonical_owner_path": "stab_analysis::GateUnitaryMatrix::entry_count"
     },
     {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::GateUnitaryMatrix::to_vecs",
-      "canonical_owner_path": "stab_core::GateUnitaryMatrix::to_vecs"
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::GateUnitaryMatrix::num_qubits",
+      "canonical_owner_path": "stab_analysis::GateUnitaryMatrix::num_qubits"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::GateUnitaryMatrix::to_vecs",
+      "canonical_owner_path": "stab_analysis::GateUnitaryMatrix::to_vecs"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_decomposition_to_circuit",
+      "canonical_owner_path": "stab_analysis::gate_decomposition_to_circuit"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_flows",
+      "canonical_owner_path": "stab_analysis::gate_flows"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_h_s_cx_m_r_decomposition",
+      "canonical_owner_path": "stab_analysis::gate_h_s_cx_m_r_decomposition"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_has_flows",
+      "canonical_owner_path": "stab_analysis::gate_has_flows"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_has_h_s_cx_m_r_decomposition",
+      "canonical_owner_path": "stab_analysis::gate_has_h_s_cx_m_r_decomposition"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_has_tableau",
+      "canonical_owner_path": "stab_analysis::gate_has_tableau"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_has_unitary_matrix",
+      "canonical_owner_path": "stab_analysis::gate_has_unitary_matrix"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_tableau",
+      "canonical_owner_path": "stab_analysis::gate_tableau"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::gate_unitary_matrix",
+      "canonical_owner_path": "stab_analysis::gate_unitary_matrix"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_owner_path": "stab_analysis::gate::single_qubit_clifford_for_gate",
+      "canonical_owner_path": "stab_analysis::single_qubit_clifford_for_gate"
     },
     {
       "crate_name": "stab_core",
@@ -19117,11 +19256,6 @@
       "crate_name": "stab_core",
       "alias_owner_path": "stab_core::analysis::simplified_circuit",
       "canonical_owner_path": "stab_core::simplified_circuit"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::analysis::single_qubit_clifford_for_gate",
-      "canonical_owner_path": "stab_core::single_qubit_clifford_for_gate"
     },
     {
       "crate_name": "stab_core",
@@ -19901,6 +20035,14 @@
       ],
       "public_api_owners": [
         {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_tableau"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_has_tableau"
+        },
+        {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::gate_tableau"
         },
@@ -19944,6 +20086,14 @@
         }
       ],
       "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_flows"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::gate_has_flows"
+        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::gate_flows"

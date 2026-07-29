@@ -276,6 +276,7 @@ fn is_allowed_test_package(package: &str) -> bool {
     matches!(
         package,
         "stab-algebra"
+            | "stab-analysis"
             | "stab-bits"
             | "stab-model"
             | "stab-records"

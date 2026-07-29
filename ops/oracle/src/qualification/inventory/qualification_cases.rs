@@ -897,8 +897,8 @@ fn validate_public_api_alias_shape(alias: &PublicApiAliasSpec) -> Result<(), Inv
             alias.crate_name, alias.alias_owner_path
         ));
     }
-    if alias.crate_name != "stab_core"
-        || !(alias
+    let core_namespace_alias = alias.crate_name == "stab_core"
+        && (alias
             .alias_owner_path
             .as_str()
             .starts_with("stab_core::analysis::")
@@ -906,21 +906,35 @@ fn validate_public_api_alias_shape(alias: &PublicApiAliasSpec) -> Result<(), Inv
                 .alias_owner_path
                 .as_str()
                 .starts_with("stab_core::execution::"))
-        || !alias
+        && alias
             .canonical_owner_path
             .as_str()
             .starts_with("stab_core::")
-        || alias
+        && !alias
             .canonical_owner_path
             .as_str()
             .starts_with("stab_core::analysis::")
-        || alias
+        && !alias
             .canonical_owner_path
             .as_str()
-            .starts_with("stab_core::execution::")
-    {
+            .starts_with("stab_core::execution::");
+    let analysis_root_alias = ["circuit", "gate"].iter().any(|module| {
+        alias.crate_name == "stab_analysis"
+            && alias
+                .canonical_owner_path
+                .as_str()
+                .strip_prefix("stab_analysis::")
+                .zip(
+                    alias
+                        .alias_owner_path
+                        .as_str()
+                        .strip_prefix(&format!("stab_analysis::{module}::")),
+                )
+                .is_some_and(|(canonical_suffix, alias_suffix)| canonical_suffix == alias_suffix)
+    });
+    if !core_namespace_alias && !analysis_root_alias {
         return invalid(format!(
-            "public API alias {}::{} -> {} is outside the A1 namespace/root contract",
+            "public API alias {}::{} -> {} is outside the namespace/root contract",
             alias.crate_name, alias.alias_owner_path, alias.canonical_owner_path
         ));
     }

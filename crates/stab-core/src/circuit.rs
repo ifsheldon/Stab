@@ -59,12 +59,6 @@ pub(crate) fn repeat_block_with_tag_bytes(
     stab_model::advanced::repeat_block_with_tag_bytes(repeat_count, body, tag)
 }
 
-pub(crate) fn circuit_instruction_without_tag(
-    instruction: &CircuitInstruction,
-) -> CircuitInstruction {
-    stab_model::advanced::circuit_instruction_without_tag(instruction)
-}
-
 pub(crate) fn circuit_simulated_qubit_count(circuit: &Circuit) -> usize {
     stab_model::advanced::circuit_simulated_qubit_count(circuit)
 }

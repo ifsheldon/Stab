@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "4d58d030d7b871cbda7740cf36a5c2e87a58cce082e85ceb41faf04b60aa7bd6",
+  "semantic_digest": "926bc8d5bd6016c071bc06f61cc22a24728d26e0bc5da04fe10cfcf731581bcc",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -61011,6 +61011,978 @@
       ]
     },
     {
+      "id": "cq-api-item-c0fcb044eaf90168",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-be75dff2a0086fad",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as Clone for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-2a2e5a81c249364a",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as Debug for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-73c74e4a35b917e0",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as Display for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-f647a29b8c4d5981",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as Eq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-4d2838cb56597907",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as Error for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-669d51914364b8cb",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as From@de5d41e1ff68 for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 11,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-4583b32e43beb09f",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as PartialEq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-73e49fa38baef671",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError as StructuralPartialEq for@d6e49049c9ce",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-320852201196f2d0",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::InvalidTableauConversion",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-5855d2f5f7825666",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::InvalidTableauConversion::message",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-5e03adfcf0587a20",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::Model",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 11,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-ddbd166ff955df11",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisError::Model::0",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 11,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-772754edafddf03a",
+      "feature_id": "CQ-ANALYZER",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::AnalysisResult",
+      "kind": "type-alias",
+      "source_path": "crates/stab-analysis/src/error.rs",
+      "source_line": 5,
+      "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-342fd4a5d900648f",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 17,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-83bc9cf6c5cadab1",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix as Clone for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-65ded8bb20285f49",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix as Copy for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-b482e65f387c3315",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix as Debug for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-b552e2a61d1586cf",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-f5a2c9bbba485e92",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-e130d9a8bbf42731",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::One",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 18,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-db32981bfef91eb5",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::One::0",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 18,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-2a2b5583d1c70136",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::Two",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-9955489bb72896f9",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::Two::0",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-099e0b9a9580097d",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::dimension",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 24,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-a28d26c8201062e0",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::entry_count",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 40,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-ede12b6468009458",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::num_qubits",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 32,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-b36602afc4262b8d",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GateUnitaryMatrix::to_vecs",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 46,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-d397157a11711ae4",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit::circuit_without_tags",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c306457841113d6f",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_without_tags",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-bb746be0177421a7",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-3e23d549df33be55",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 17,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-bdbf8b37f5c4bc6c",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Clone for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-2f5147aaf6e260ed",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Copy for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c42c47618a445479",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as Debug for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c80e6027594bff23",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-2de7f316585f1cd9",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-635660e7123d02ce",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::One",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 18,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-b3411ce1c49e428a",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::One::0",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 18,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-b87fdab008464c20",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::Two",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-00e812565015fa7f",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::Two::0",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-f5cedc85508d37eb",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::dimension",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 24,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-87197eda2f000676",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::entry_count",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 40,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-06561d98c748b57a",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::num_qubits",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 32,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-e3d37349fdb96ae7",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::GateUnitaryMatrix::to_vecs",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 46,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-8ebef3db15fde455",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_decomposition_to_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 193,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c9df6e68b3aee5ef",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_flows",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 112,
+      "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-e50d3d0c0ca9a8b7",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-27d8f218610cb8c7",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_has_flows",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 153,
+      "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-288276ead72f0e9d",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_has_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 188,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-f880aa220717f141",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_has_tableau",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-1790750c1ccf5b30",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_has_unitary_matrix",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 173,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-310d6d2a51dd421c",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_tableau",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 91,
+      "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-8f04b275b5d1a514",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::gate_unitary_matrix",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 158,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-aa8b9f85297782a5",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 55,
+      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
+      "id": "cq-api-item-160e73f3cc21bd79",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_decomposition_to_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 193,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-5cb31bdb79ffd3be",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_flows",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 112,
+      "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-f3c5646ff9d1dcf7",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-ec5f6379482104c0",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_has_flows",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 153,
+      "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-6b7efdfe30200fe9",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_has_h_s_cx_m_r_decomposition",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 188,
+      "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c3a4578281df7a0c",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_has_tableau",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-5a28e8e842449ad4",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_has_unitary_matrix",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 173,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-64c0e05bcc447b6b",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_tableau",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 91,
+      "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c245fafe9124be5e",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::gate_unitary_matrix",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 158,
+      "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
+      "performance_groups": [
+        "PERF-GATE-CONTRACT",
+        "PERF-SAMPLING",
+        "PERF-DETECTION",
+        "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-db4d1ab6694ec4c7",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::single_qubit_clifford_for_gate",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/gate.rs",
+      "source_line": 55,
+      "owner_case_id": "cq-evidence-qualification-18755da17912481c",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
       "id": "cq-api-item-d1830adf3334a09a",
       "feature_id": "CQ-BIT-KERNELS",
       "crate_name": "stab_bits",
@@ -66568,7 +67540,21 @@
       "path": "stab_core::CircuitError as From@2de935421934 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 192,
+      "source_line": 203,
+      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-8b17fce6e6337685",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::CircuitError as From@37729f8a61f8 for@d79af8854017",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/error.rs",
+      "source_line": 126,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -66638,7 +67624,7 @@
       "path": "stab_core::CircuitError as From@ed6b9be3e5ee for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 198,
+      "source_line": 209,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -67256,7 +68242,7 @@
       "path": "stab_core::CircuitError::format_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 156,
+      "source_line": 167,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67270,7 +68256,7 @@
       "path": "stab_core::CircuitError::invalid_result_format",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 152,
+      "source_line": 163,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -67284,7 +68270,7 @@
       "path": "stab_core::CircuitError::parse_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 163,
+      "source_line": 174,
       "owner_case_id": "cq-evidence-qualification-bb06be3e4b51cd2c",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -67297,7 +68283,7 @@
       "path": "stab_core::CircuitError::resource_limit_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 170,
+      "source_line": 181,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -80777,8 +81763,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 12,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80793,8 +81779,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix as Clone for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80809,8 +81795,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix as Copy for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80825,8 +81811,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix as Debug for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80841,8 +81827,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80857,8 +81843,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80873,8 +81859,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::One",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 13,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80889,8 +81875,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::One::0",
       "kind": "field",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 13,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80905,8 +81891,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::Two",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 14,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80921,8 +81907,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::Two::0",
       "kind": "field",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 14,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80937,8 +81923,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::dimension",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 19,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80953,8 +81939,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::entry_count",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 35,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80969,8 +81955,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::num_qubits",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 27,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -80985,7 +81971,7 @@
       "crate_name": "stab_core",
       "path": "stab_core::GateUnitaryMatrix::to_vecs",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
+      "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
@@ -98315,8 +99301,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 12,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98331,8 +99317,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix as Clone for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98347,8 +99333,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix as Copy for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98363,8 +99349,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix as Debug for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98379,8 +99365,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix as PartialEq for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98395,8 +99381,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix as StructuralPartialEq for@ad30a15c1f36",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98411,8 +99397,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::One",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 13,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98427,8 +99413,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::One::0",
       "kind": "field",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 13,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98443,8 +99429,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::Two",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 14,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98459,8 +99445,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::Two::0",
       "kind": "field",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 14,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98475,8 +99461,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::dimension",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 19,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98491,8 +99477,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::entry_count",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 35,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98507,8 +99493,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::num_qubits",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 27,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98523,8 +99509,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::GateUnitaryMatrix::to_vecs",
       "kind": "method",
-      "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 41,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -98878,8 +99864,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::circuit_without_tags",
       "kind": "function",
-      "source_path": "crates/stab-core/src/analysis/circuit_adapters.rs",
-      "source_line": 10,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 24,
       "owner_case_id": "cq-evidence-qualification-bb746be0177421a7",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -99000,7 +99986,7 @@
       "path": "stab_core::analysis::gate_decomposition_to_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 156,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99016,7 +100002,7 @@
       "path": "stab_core::analysis::gate_flows",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 68,
+      "source_line": 13,
       "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99032,7 +100018,7 @@
       "path": "stab_core::analysis::gate_h_s_cx_m_r_decomposition",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 141,
+      "source_line": 29,
       "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99048,7 +100034,7 @@
       "path": "stab_core::analysis::gate_has_flows",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 110,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-6920b8efebbbf181",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99064,7 +100050,7 @@
       "path": "stab_core::analysis::gate_has_h_s_cx_m_r_decomposition",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 151,
+      "source_line": 33,
       "owner_case_id": "cq-evidence-qualification-bf50af7713385820",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99080,7 +100066,7 @@
       "path": "stab_core::analysis::gate_has_tableau",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 58,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99096,7 +100082,7 @@
       "path": "stab_core::analysis::gate_has_unitary_matrix",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 133,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99112,7 +100098,7 @@
       "path": "stab_core::analysis::gate_tableau",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 53,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-oracle-19dff097db8d639e",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99128,7 +100114,7 @@
       "path": "stab_core::analysis::gate_unitary_matrix",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/gate_adapters.rs",
-      "source_line": 118,
+      "source_line": 21,
       "owner_case_id": "cq-evidence-qualification-72fa63586c3b56af",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -99170,8 +100156,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::analysis::single_qubit_clifford_for_gate",
       "kind": "function",
-      "source_path": "crates/stab-core/src/analysis/gate_semantics.rs",
-      "source_line": 7,
+      "source_path": "crates/stab-core/src/analysis/mod.rs",
+      "source_line": 34,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -114310,8 +115296,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::single_qubit_clifford_for_gate",
       "kind": "function",
-      "source_path": "crates/stab-core/src/analysis/gate_semantics.rs",
-      "source_line": 7,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-18755da17912481c",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -139303,6 +140289,86 @@
   ],
   "public_api_aliases": [
     {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::circuit::circuit_without_tags",
+      "canonical_path": "stab_analysis::circuit_without_tags"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::GateUnitaryMatrix",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::GateUnitaryMatrix::dimension",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix::dimension"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::GateUnitaryMatrix::entry_count",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix::entry_count"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::GateUnitaryMatrix::num_qubits",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix::num_qubits"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::GateUnitaryMatrix::to_vecs",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix::to_vecs"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_decomposition_to_circuit",
+      "canonical_path": "stab_analysis::gate_decomposition_to_circuit"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_flows",
+      "canonical_path": "stab_analysis::gate_flows"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_h_s_cx_m_r_decomposition",
+      "canonical_path": "stab_analysis::gate_h_s_cx_m_r_decomposition"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_has_flows",
+      "canonical_path": "stab_analysis::gate_has_flows"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_has_h_s_cx_m_r_decomposition",
+      "canonical_path": "stab_analysis::gate_has_h_s_cx_m_r_decomposition"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_has_tableau",
+      "canonical_path": "stab_analysis::gate_has_tableau"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_has_unitary_matrix",
+      "canonical_path": "stab_analysis::gate_has_unitary_matrix"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_tableau",
+      "canonical_path": "stab_analysis::gate_tableau"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::gate_unitary_matrix",
+      "canonical_path": "stab_analysis::gate_unitary_matrix"
+    },
+    {
+      "crate_name": "stab_analysis",
+      "alias_path": "stab_analysis::gate::single_qubit_clifford_for_gate",
+      "canonical_path": "stab_analysis::single_qubit_clifford_for_gate"
+    },
+    {
       "crate_name": "stab_core",
       "alias_path": "stab_core::BitBlock",
       "canonical_crate_name": "stab_bits",
@@ -139634,6 +140700,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::GateUnitaryMatrix",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::MeasureRecordOffset",
       "canonical_crate_name": "stab_model",
       "canonical_path": "stab_model::MeasureRecordOffset"
@@ -139911,27 +140983,8 @@
     {
       "crate_name": "stab_core",
       "alias_path": "stab_core::analysis::GateUnitaryMatrix",
-      "canonical_path": "stab_core::GateUnitaryMatrix"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_path": "stab_core::analysis::GateUnitaryMatrix::dimension",
-      "canonical_path": "stab_core::GateUnitaryMatrix::dimension"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_path": "stab_core::analysis::GateUnitaryMatrix::entry_count",
-      "canonical_path": "stab_core::GateUnitaryMatrix::entry_count"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_path": "stab_core::analysis::GateUnitaryMatrix::num_qubits",
-      "canonical_path": "stab_core::GateUnitaryMatrix::num_qubits"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_path": "stab_core::analysis::GateUnitaryMatrix::to_vecs",
-      "canonical_path": "stab_core::GateUnitaryMatrix::to_vecs"
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::GateUnitaryMatrix"
     },
     {
       "crate_name": "stab_core",
@@ -139980,6 +141033,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::analysis::circuit_without_tags",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::circuit_without_tags"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::analysis::decomposed_circuit",
       "canonical_path": "stab_core::decomposed_circuit"
     },
@@ -139991,7 +141050,8 @@
     {
       "crate_name": "stab_core",
       "alias_path": "stab_core::analysis::single_qubit_clifford_for_gate",
-      "canonical_path": "stab_core::single_qubit_clifford_for_gate"
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::single_qubit_clifford_for_gate"
     },
     {
       "crate_name": "stab_core",
@@ -140641,6 +141701,12 @@
       "alias_path": "stab_core::result_formats::SparseShot",
       "canonical_crate_name": "stab_records",
       "canonical_path": "stab_records::SparseShot"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_path": "stab_core::single_qubit_clifford_for_gate",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::single_qubit_clifford_for_gate"
     },
     {
       "crate_name": "stab_core",
@@ -191932,6 +192998,57 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-c1d27041c4f6f176",
+      "feature_id": "CQ-ANALYZER",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "cq2-analysis-typed-error-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "gate_and_tag_contracts",
+          "gate_decomposition_is_a_valid_model_without_implying_tableau_support",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The rejected gate uses fixed metadata and a bounded diagnostic string."
+      },
+      "negative_axes": [
+        "unsupported-tableau-request",
+        "typed-analysis-error",
+        "facade-error-conversion"
+      ],
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
       ],
       "status": "implemented"
     },

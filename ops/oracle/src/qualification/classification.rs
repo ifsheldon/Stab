@@ -326,7 +326,12 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::FlowUtils);
     }
-    if api_lower.ends_with("::to_tableau") {
+    if api_lower.ends_with("::circuit_without_tags") {
+        return Some(FeatureId::CircuitApi);
+    }
+    if api_lower.ends_with("::to_tableau")
+        || api_lower.ends_with("::single_qubit_clifford_for_gate")
+    {
         return Some(FeatureId::Algebra);
     }
     if [
@@ -500,6 +505,9 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::GateContract);
     }
+    if api_path_mentions_item(&api_lower, "gateunitarymatrix") {
+        return Some(FeatureId::GateContract);
+    }
     if gate_api::classifies(&api_lower) {
         return Some(FeatureId::GateContract);
     }
@@ -544,6 +552,22 @@ pub(super) fn classify_public_api_source(
             | "crates/stab-model/src/validation.rs"
     ) {
         return Some(FeatureId::CircuitApi);
+    }
+    if value == "crates/stab-analysis/src/circuit.rs" {
+        return Some(FeatureId::CircuitApi);
+    }
+    if value == "crates/stab-analysis/src/gate.rs" {
+        return Some(if api_lower.contains("single_qubit_clifford_for_gate") {
+            FeatureId::Algebra
+        } else {
+            FeatureId::GateContract
+        });
+    }
+    if matches!(
+        value.as_str(),
+        "crates/stab-analysis/src/error.rs" | "crates/stab-analysis/src/lib.rs"
+    ) {
+        return Some(FeatureId::Analyzer);
     }
     if value.starts_with("crates/stab-core/src/circuit_generation") {
         return Some(FeatureId::Generation);

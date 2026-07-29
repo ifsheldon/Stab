@@ -65,6 +65,40 @@ fn accepts_the_extracted_model_package() {
 }
 
 #[test]
+fn accepts_the_extracted_analysis_package() {
+    let selector = [
+        "cargo",
+        "test",
+        "-p",
+        "stab-analysis",
+        "--test",
+        "gate_and_tag_contracts",
+        "gate_semantics_bridge_model_metadata_into_algebra_values",
+        "--quiet",
+        "--exact",
+    ]
+    .map(String::from);
+
+    let parsed = CargoTestSelector::parse(&selector).expect("analysis selector");
+
+    assert!(parsed.is_exact());
+    assert_eq!(
+        parsed.run_args(),
+        [
+            "test",
+            "-p",
+            "stab-analysis",
+            "--test",
+            "gate_and_tag_contracts",
+            "--quiet",
+            "--",
+            "gate_semantics_bridge_model_metadata_into_algebra_values",
+            "--exact",
+        ]
+    );
+}
+
+#[test]
 fn rejects_feature_specific_product_selectors() {
     let selector = [
         "cargo",

@@ -30,6 +30,19 @@ const ADVANCED_GATE_APIS: &[&str] = &[
     "stab_model::advanced::validate_gate_targets",
 ];
 
+const GATE_SEMANTIC_ITEMS: &[&str] = &[
+    "gate_decomposition_to_circuit",
+    "gate_flows",
+    "gate_h_s_cx_m_r_decomposition",
+    "gate_has_flows",
+    "gate_has_h_s_cx_m_r_decomposition",
+    "gate_has_tableau",
+    "gate_has_unitary_matrix",
+    "gate_tableau",
+    "gate_unitary_matrix",
+    "gateunitarymatrix",
+];
+
 pub(super) fn classifies(api_path: &str) -> bool {
     GATE_API_ROOTS
         .iter()
@@ -40,4 +53,7 @@ pub(super) fn classifies(api_path: &str) -> bool {
                     .strip_prefix(prefix)
                     .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
         })
+        || GATE_SEMANTIC_ITEMS
+            .iter()
+            .any(|item| super::api_path_mentions_item(api_path, item))
 }

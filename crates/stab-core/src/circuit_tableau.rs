@@ -234,55 +234,8 @@ fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> CircuitResult<Vec<Qu
 }
 
 pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
-    if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && let Ok(clifford) = crate::analysis::single_qubit_clifford_for_gate(gate)
-    {
-        return Ok(clifford.tableau());
-    }
-    let outputs = two_qubit_outputs(gate_name).ok_or_else(|| {
-        CircuitError::invalid_tableau_conversion(format!(
-            "gate {gate_name} does not have tableau data"
-        ))
-    })?;
-    Tableau::gate2(outputs[0], outputs[1], outputs[2], outputs[3])
-        .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))
-}
-
-pub(crate) fn gate_has_tableau(gate_name: &str) -> bool {
-    if let Ok(gate) = crate::Gate::from_name(gate_name)
-        && crate::analysis::single_qubit_clifford_for_gate(gate).is_ok()
-    {
-        return true;
-    }
-    two_qubit_outputs(gate_name).is_some()
-}
-
-fn two_qubit_outputs(gate_name: &str) -> Option<[&'static str; 4]> {
-    match gate_name {
-        "II" => Some(["+X_", "+Z_", "+_X", "+_Z"]),
-        "XCX" => Some(["+X_", "+ZX", "+_X", "+XZ"]),
-        "XCY" => Some(["+X_", "+ZY", "+XX", "+XZ"]),
-        "XCZ" => Some(["+X_", "+ZZ", "+XX", "+_Z"]),
-        "YCX" => Some(["+XX", "+ZX", "+_X", "+YZ"]),
-        "YCY" => Some(["+XY", "+ZY", "+YX", "+YZ"]),
-        "YCZ" => Some(["+XZ", "+ZZ", "+YX", "+_Z"]),
-        "CX" => Some(["+XX", "+Z_", "+_X", "+ZZ"]),
-        "CY" => Some(["+XY", "+Z_", "+ZX", "+ZZ"]),
-        "CZ" => Some(["+XZ", "+Z_", "+ZX", "+_Z"]),
-        "SWAP" => Some(["+_X", "+_Z", "+X_", "+Z_"]),
-        "ISWAP" => Some(["+ZY", "+_Z", "+YZ", "+Z_"]),
-        "ISWAP_DAG" => Some(["-ZY", "+_Z", "-YZ", "+Z_"]),
-        "CXSWAP" => Some(["+XX", "+_Z", "+X_", "+ZZ"]),
-        "SWAPCX" => Some(["+_X", "+ZZ", "+XX", "+Z_"]),
-        "CZSWAP" => Some(["+ZX", "+_Z", "+XZ", "+Z_"]),
-        "SQRT_XX" => Some(["+X_", "-YX", "+_X", "-XY"]),
-        "SQRT_XX_DAG" => Some(["+X_", "+YX", "+_X", "+XY"]),
-        "SQRT_YY" => Some(["-ZY", "+XY", "-YZ", "+YX"]),
-        "SQRT_YY_DAG" => Some(["+ZY", "-XY", "+YZ", "-YX"]),
-        "SQRT_ZZ" => Some(["+YZ", "+Z_", "+ZY", "+_Z"]),
-        "SQRT_ZZ_DAG" => Some(["-YZ", "+Z_", "-ZY", "+_Z"]),
-        _ => None,
-    }
+    let gate = crate::Gate::from_name(gate_name).map_err(CircuitError::from)?;
+    stab_analysis::gate_tableau(gate).map_err(Into::into)
 }
 
 fn scatter_tableau(

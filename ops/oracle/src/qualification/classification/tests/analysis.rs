@@ -1,0 +1,63 @@
+use std::path::Path;
+
+use super::super::{FeatureId, classify_public_api_source};
+
+#[test]
+fn extracted_analysis_apis_keep_semantic_feature_ownership() {
+    for (crate_name, source, api, expected) in [
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit.rs",
+            "stab_analysis::circuit_without_tags",
+            FeatureId::CircuitApi,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/gate.rs",
+            "stab_analysis::single_qubit_clifford_for_gate",
+            FeatureId::Algebra,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/gate.rs",
+            "stab_analysis::gate_tableau",
+            FeatureId::GateContract,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/error.rs",
+            "stab_analysis::AnalysisError",
+            FeatureId::Analyzer,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/lib.rs",
+            "stab_core::GateUnitaryMatrix",
+            FeatureId::GateContract,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/analysis/mod.rs",
+            "stab_core::analysis::gate_tableau",
+            FeatureId::GateContract,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/analysis/mod.rs",
+            "stab_core::analysis::single_qubit_clifford_for_gate",
+            FeatureId::Algebra,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/analysis/mod.rs",
+            "stab_core::analysis::circuit_without_tags",
+            FeatureId::CircuitApi,
+        ),
+    ] {
+        assert_eq!(
+            classify_public_api_source(crate_name, Path::new(source), api),
+            Some(expected),
+            "{api}",
+        );
+    }
+}

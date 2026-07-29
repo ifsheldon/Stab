@@ -7,8 +7,8 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 ## Current State
 
 - A0 through A5 are complete. A5 closes at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
-- The physical product crates are currently `stab-algebra`, `stab-bits`, `stab-model`, `stab-records`, `stab-core`, and `stab-cli`.
-- `stab-algebra`, `stab-bits`, `stab-model`, and `stab-records` build on Stable Rust 1.97.1. `stab-model` physically owns typed IDs and targets, model errors and resource vocabulary, the closed gate registry, `Circuit` and `DetectorErrorModel` storage, exact byte parsing, canonical printing, compact traversal, structural queries, opaque tags, and model fingerprints. `stab-core` reexports those values through compatibility facades and retains filesystem policy plus the remaining analysis and execution implementations; portable SIMD is temporarily absent until `stab-kernels-simd` is extracted as a dependency-free raw kernel owner.
+- The physical product crates are currently `stab-algebra`, `stab-analysis`, `stab-bits`, `stab-model`, `stab-records`, `stab-core`, and `stab-cli`.
+- `stab-algebra`, `stab-analysis`, `stab-bits`, `stab-model`, and `stab-records` build on Stable Rust 1.97.1. `stab-model` physically owns the complete circuit and DEM compatibility models. The first `stab-analysis` slice physically owns gate semantic projections, fixed-shape unitary metadata, decomposition lowering, single-qubit Clifford lookup, recursive circuit tag removal, and typed analysis failures. `stab-core` preserves the established public facade and still owns the remaining analysis and execution implementations; portable SIMD is temporarily absent until `stab-kernels-simd` is extracted as a dependency-free raw kernel owner.
 - `ops-contracts` is removed. Qualification policy is oracle-owned, and analyzer benchmarks derive compact-work witnesses from public DEM output instead of hidden product counters.
 - Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
 - A6 must still extract `stab-analysis`, `stab-engine`, and `stab-kernels-simd`, then curate `stab-core` as the final facade rather than another implementation owner.
@@ -30,7 +30,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 1. Freeze an exact module-to-crate move map, public replacement map, feature map, and dependency DAG before moving files.
 2. Keep the extracted scalar `stab-algebra` green on Stable and add its external-consumer fixture with the consolidated A6 fixture matrix.
 3. Completed: move circuit and DEM syntax, parsing, printing, fingerprints, tags, diagnostics, compact traversal, and resource vocabulary into `stab-model`.
-4. Extract `stab-analysis` over model and algebra only; keep pure transforms and semantic projections free of records, execution, CLI, and ops.
+4. In progress: extract `stab-analysis` over model and algebra only. Gate semantic projections and circuit tag stripping have moved; transforms, flows, generation, DEM analysis/search, matching, MBQC, and reverse tracking remain. Keep every slice free of records, execution, CLI, and ops.
 5. Extract `stab-engine` over model, records, algebra, and analysis; move every A4/A5 compiler, plan, session, and compatibility adapter without changing public behavior.
 6. Extract dependency-free `stab-kernels-simd`, move the only direct `std::simd` site into it, and make `portable-simd` an additive facade and engine feature with scalar default behavior.
 7. Curate `stab-core` root, `advanced`, and `experimental` APIs, and add exact `=0.2.0` path versions to every publishable edge.

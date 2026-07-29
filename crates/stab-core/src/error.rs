@@ -123,6 +123,17 @@ impl From<stab_model::ValidationError> for CircuitError {
     }
 }
 
+impl From<stab_analysis::AnalysisError> for CircuitError {
+    fn from(error: stab_analysis::AnalysisError) -> Self {
+        match error {
+            stab_analysis::AnalysisError::Model(error) => error.into(),
+            stab_analysis::AnalysisError::InvalidTableauConversion { message } => {
+                Self::InvalidTableauConversion { message }
+            }
+        }
+    }
+}
+
 impl CircuitError {
     pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
         Self::InvalidDomainValue {

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "tests/analysis.rs"]
+mod analysis;
+
 #[test]
 fn classifications_keep_deferred_products_out_of_selected_features() {
     let diagram = classify_upstream_path(Path::new("src/stim/cmd/command_diagram.test.cc"));

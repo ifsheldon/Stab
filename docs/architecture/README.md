@@ -68,16 +68,18 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A6 product graph after the scalar algebra extraction is:
+The current A6 product graph after complete model extraction and the first analysis extraction slice is:
 
 ```text
 stab-cli -> stab-core
-stab-core -> stab-algebra + stab-bits + stab-records
+stab-core -> stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
+stab-analysis -> stab-model + stab-algebra
+stab-model -> stab-algebra
 stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
 
-`stab-bits`, `stab-records`, and `stab-algebra` are physical Cargo packages. `stab-algebra` owns Pauli, Clifford, tableau, and stabilizer-flow values over Stable scalar word kernels; `stab_core::stabilizers` is now a reexport-only compatibility module. `stab-records` owns the strict Stim result codecs, structured format diagnostics, typed semantic widths, shot-major and 64-shot bit-plane batches, bounded visitors, and typed measurement, detection, and DEM-sample sinks. Inside `stab-core`, circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling expose operation-specific compiler, immutable-plan, mutable-session, cancellation, progress, and typed-sink APIs through `stab_core::execution`; incremental conversion binds one session to one sink lifecycle, direct detector-frame compilation admits its complete retained plan before materialization, and DEM replay admits total work before caller-record traversal. Legacy root APIs remain compatibility facades. Model, analysis, engine, and SIMD-kernel ownership is still logical until their later A6 extraction steps. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, and `stab-analysis` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. The first `stab-analysis` slice owns gate-to-algebra semantic projections and recursive circuit tag stripping; the remaining transform, flow, generation, DEM-analysis, search, matching, and reverse-tracking families still reside in `stab-core` until their compiling slices move. `stab-core` preserves existing root and `analysis` namespace paths as compatibility facades. Inside `stab-core`, circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling expose operation-specific compiler, immutable-plan, mutable-session, cancellation, progress, and typed-sink APIs through `stab_core::execution`; incremental conversion binds one session to one sink lifecycle, direct detector-frame compilation admits its complete retained plan before materialization, and DEM replay admits total work before caller-record traversal. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -103,13 +105,13 @@ The checker classifies workspace packages as product, operations, or test suppor
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-During the pre-0.2 migration the checker reports one exact temporary allowance instead of hiding it: direct portable-SIMD use in `crates/stab-core/src/bits/clifford.rs`. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, or additional direct `std::simd` source site fails the check.
+Portable SIMD is currently absent from product code after the scalar algebra extraction removed the former direct implementation. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, or direct `std::simd` source site outside the future `stab-kernels-simd` crate fails the check.
 
 The record-boundary and Nightly-isolation milestones remove these allowances; they are not permanent permitted dependencies.
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits`, `stab-records`, and scalar-default `stab-algebra` packages build on that compiler.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, and pure analysis components. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, and current `stab-analysis` package build on that compiler.
 
 `stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
 

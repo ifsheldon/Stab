@@ -422,28 +422,28 @@ fn source_ledger_separates_owner_functions_from_facade_reexports() {
 
     for (index, (alias, canonical, feature_id)) in [
         (
-            "stab_core::analysis::GateUnitaryMatrix",
-            "stab_core::GateUnitaryMatrix",
+            "stab_analysis::gate::GateUnitaryMatrix",
+            "stab_analysis::GateUnitaryMatrix",
             FeatureId::GateContract,
         ),
         (
-            "stab_core::analysis::GateUnitaryMatrix::dimension",
-            "stab_core::GateUnitaryMatrix::dimension",
+            "stab_analysis::gate::GateUnitaryMatrix::dimension",
+            "stab_analysis::GateUnitaryMatrix::dimension",
             FeatureId::GateContract,
         ),
         (
-            "stab_core::analysis::GateUnitaryMatrix::entry_count",
-            "stab_core::GateUnitaryMatrix::entry_count",
+            "stab_analysis::gate::GateUnitaryMatrix::entry_count",
+            "stab_analysis::GateUnitaryMatrix::entry_count",
             FeatureId::GateContract,
         ),
         (
-            "stab_core::analysis::GateUnitaryMatrix::num_qubits",
-            "stab_core::GateUnitaryMatrix::num_qubits",
+            "stab_analysis::gate::GateUnitaryMatrix::num_qubits",
+            "stab_analysis::GateUnitaryMatrix::num_qubits",
             FeatureId::GateContract,
         ),
         (
-            "stab_core::analysis::GateUnitaryMatrix::to_vecs",
-            "stab_core::GateUnitaryMatrix::to_vecs",
+            "stab_analysis::gate::GateUnitaryMatrix::to_vecs",
+            "stab_analysis::GateUnitaryMatrix::to_vecs",
             FeatureId::GateContract,
         ),
     ]
@@ -567,6 +567,7 @@ fn implemented_parent(id: CaseId, feature_id: FeatureId) -> EvidenceCase {
 }
 
 fn public_api_item(path: &str, feature_id: FeatureId, owner_case_id: &CaseId) -> PublicApiItem {
+    let crate_name = path.split("::").next().expect("crate-qualified API path");
     PublicApiItem {
         id: CaseId::try_new(format!(
             "cq-api-item-{}",
@@ -576,11 +577,13 @@ fn public_api_item(path: &str, feature_id: FeatureId, owner_case_id: &CaseId) ->
         ))
         .expect("item id"),
         feature_id,
-        crate_name: "stab_core".to_string(),
+        crate_name: crate_name.to_string(),
         path: api_path(path),
         kind: PublicApiKind::Function,
-        source_path: RelativeSourcePath::try_new("crates/stab-core/src/analysis/mod.rs".into())
-            .expect("source path"),
+        source_path: RelativeSourcePath::try_new(
+            format!("crates/{}/src/lib.rs", crate_name.replace('_', "-")).into(),
+        )
+        .expect("source path"),
         source_line: 1,
         owner_case_id: owner_case_id.clone(),
         performance_groups: feature_id
