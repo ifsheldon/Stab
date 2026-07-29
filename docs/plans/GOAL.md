@@ -12,7 +12,7 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 - The A6 SIMD audit rejects treating build-time bit or Clifford acceleration as a sampling backend. The first raw-kernel slice is limited to dense XOR and non-identity Clifford composition; explicit `PortableSimd` sampling remains unavailable until a later packed-frame plan exists.
 - `ops-contracts` is removed. Qualification policy is oracle-owned, and analyzer benchmarks derive compact-work witnesses from public DEM output instead of hidden product counters.
 - Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
-- A6 must finish scalar-versus-SIMD evidence, curate `stab-core` as the final facade rather than another implementation owner, and close the API-tier and evidence matrix.
+- A6 source work and source-current diagnostic evidence are complete at clean revision `81489b10b561585f898cec46a1faa11380738bdd`; milestone-audit and full-code-review remain before closure.
 
 ## Sources Of Truth
 
@@ -35,8 +35,9 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 5. Completed: extract circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM sampling, reference-sample trees, and sampled-flow execution into `stab-engine` without changing facade or CLI behavior.
 6. Completed at `a465009c`: create dependency-free `stab-kernels-simd`, restore four-word XOR and Clifford composition against the current scalar references, and keep engine backend registration scalar-only.
 7. Completed in source: curate `stab-core` root, `advanced`, and intentionally empty `experimental` tiers; move explicit storage, records, backends, traversal, algebra iterators, and pre-0.2 adapters out of the common root; coordinate every publishable package and path edge at exact `=0.2.0`.
-8. Completed through clean revision `c57e4339`: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, dependency rejection checks, schema-version-7 feature-aware worker receipts, and the fixed scalar-versus-SIMD diagnostic harness are implemented. The nine-pair AArch64 diagnostic keeps portable SIMD opt-in because dense XOR is neutral while non-identity Clifford composition is approximately `1.35x` slower. Current CLI, oracle, benchmark, and qualification builds select scalar explicitly.
-9. Rerun every benchmark family whose call path moved, then run milestone-audit and full-code-review; fix all findings before A6 closure.
+8. Completed at clean revision `81489b10`: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, dependency rejection checks, schema-version-7 feature-aware worker receipts, curated facade export inventory, and fixed scalar-versus-SIMD diagnostic harness are implemented. The nine-pair AArch64 diagnostic keeps portable SIMD opt-in because dense XOR is neutral while non-identity Clifford composition is approximately `1.35x` slower. Current CLI, oracle, benchmark, and qualification builds select scalar explicitly.
+9. Source-current M5 and M6 correctness, scalar-versus-SIMD, and pinned-Stim timing reports pass their exact semantic and numeric checks. The reports are diagnostic because unrelated sustained host load caused swap and thermal policy violations; formal promotable parity remains an A9 controlled-host requirement.
+10. Run milestone-audit and full-code-review, fix every finding, complete the required verification matrix, and only then close A6.
 
 ## Nonnegotiable Contracts
 
