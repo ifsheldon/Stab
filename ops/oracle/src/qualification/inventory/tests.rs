@@ -50,7 +50,7 @@ fn flow_utility_cargo_fixtures_do_not_fall_back_to_circuit_api() {
     }
     assert_eq!(
         infer_feature_from_oracle_argv(
-            "cargo-test|-p|stab-core|--test|circuit_inverse_qec|unitary_subset"
+            "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|unitary_subset"
         ),
         None
     );

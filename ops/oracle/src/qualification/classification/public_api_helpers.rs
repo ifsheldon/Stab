@@ -15,6 +15,7 @@ pub(super) fn classify_extracted_analysis_api(
     }
     if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
         || source_path.starts_with("crates/stab-analysis/src/sparse_rev_frame_tracker")
+        || source_path.starts_with("crates/stab-analysis/src/circuit_inverse")
     {
         return Some(FeatureId::FlowUtils);
     }
@@ -60,6 +61,8 @@ fn is_flow_api(api_lower: &str) -> bool {
     [
         "unsignedstabilizerflowcheck",
         "unsignedstabilizerflowfailure",
+        "inverseqecoptions",
+        "timereversedforflowsoptions",
     ]
     .iter()
     .any(|item| api_path_mentions_item(api_lower, item))
@@ -67,9 +70,14 @@ fn is_flow_api(api_lower: &str) -> bool {
             [
                 "check_if_circuit_has_unsigned_stabilizer_flows",
                 "check_unsigned_stabilizer_flows_with_diagnostics",
+                "circuit_inverse_qec",
+                "circuit_inverse_qec_with_options",
+                "circuit_inverse_unitary",
                 "circuit_flow_generators",
                 "circuit_has_all_unsigned_stabilizer_flows",
                 "circuit_has_unsigned_stabilizer_flow",
+                "circuit_time_reversed_for_flows",
+                "circuit_time_reversed_for_flows_with_options",
                 "solve_for_flow_measurements",
             ]
             .contains(&function)

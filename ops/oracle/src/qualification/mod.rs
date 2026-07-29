@@ -31,7 +31,7 @@ mod tier;
 mod validation;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "b673242fe4cc7e55b79c79df01b79bdf5600b0bd0ab500e24648754c84869788";
+    "4810270ad3cb1183d13c293ef74f3ec4938ead76a8130d85dcf72409f2ac0d68";
 const MAX_MANIFEST_BYTES: usize = 32 << 20;
 const PROVENANCE_PROBE_CASE_ID: &str = "cq-evidence-oracle-d4836033794f54f7";
 const PROVENANCE_PROBE_OUTPUT_DIR: &str = "target/qualification/correctness/provenance-probe";

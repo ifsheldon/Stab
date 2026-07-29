@@ -55,6 +55,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_inverse.rs",
+            "stab_analysis::InverseQecOptions",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/circuit_inverse.rs",
+            "stab_analysis::circuit_time_reversed_for_flows",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,

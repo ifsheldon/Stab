@@ -44,7 +44,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed",
@@ -59,7 +59,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
             }
           },
@@ -86,7 +86,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement",
@@ -133,7 +133,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_pair_measurement",
@@ -180,7 +180,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_unitary_subset_supports_flow_past_end",
@@ -320,7 +320,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_resets",
@@ -367,7 +367,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_resets",
@@ -414,7 +414,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "pfm_b1_python_measurement_kept_by_flow",
@@ -461,7 +461,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_can_keep_measurements",
@@ -598,7 +598,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits",
@@ -645,7 +645,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "pfm_b1_python_measurement_ordering_m",
@@ -660,7 +660,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_m|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_m|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -688,7 +688,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "pfm_b1_python_measurement_ordering_mzz",
@@ -703,7 +703,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mzz|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mzz|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -731,7 +731,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec",
               "pfm_b1_python_measurement_ordering_mr",
@@ -746,7 +746,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mr|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mr|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },

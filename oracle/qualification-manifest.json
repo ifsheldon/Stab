@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "b673242fe4cc7e55b79c79df01b79bdf5600b0bd0ab500e24648754c84869788",
+  "semantic_digest": "4810270ad3cb1183d13c293ef74f3ec4938ead76a8130d85dcf72409f2ac0d68",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -62392,6 +62392,123 @@
       ]
     },
     {
+      "id": "cq-api-item-8713daa2075bd9b0",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 15,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-1c1900f9383ab43e",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as Clone for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b37c81f5e1da22a2",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as Copy for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b86042a4ea008313",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as Debug for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-0910c27b63b2a492",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as Default for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-172d3220676047a0",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as Eq for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-97c4941ad5d768dc",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as PartialEq for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-431654fb3d9de474",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions as StructuralPartialEq for@77eb7b58deae",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-d582f9079b8e87b0",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::InverseQecOptions::keep_measurements",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 22,
+      "owner_case_id": "cq-evidence-api-01d64d7164ab56b5",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
       "id": "cq-api-item-3559ba704dd0c374",
       "feature_id": "CQ-GENERATION",
       "crate_name": "stab_analysis",
@@ -63715,6 +63832,123 @@
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-96378c879ce5fdcc",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 26,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-0c54acbb36674b83",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as Clone for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-ba8009b8d77a881e",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as Copy for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-432d2532d0a27d18",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as Debug for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-6848ae1f6fde9036",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as Default for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-9858d9810d788760",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as Eq for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b7fe6e77244962e9",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as PartialEq for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c1d5a5f4131dd1de",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions as StructuralPartialEq for@e9d15374b975",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-21ae62f53a4e65ae",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::TimeReversedForFlowsOptions::dont_turn_measurements_into_resets",
+      "kind": "field",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 31,
+      "owner_case_id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -65222,6 +65456,71 @@
       "source_path": "crates/stab-analysis/src/circuit_flow/checker.rs",
       "source_line": 159,
       "owner_case_id": "cq-evidence-api-1fb8a78222b41a79",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-d050c6ca98cf5011",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_inverse_qec",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 69,
+      "owner_case_id": "cq-evidence-api-0aa1f66083dd48af",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-737052c1731c13f2",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_inverse_qec_with_options",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 77,
+      "owner_case_id": "cq-evidence-api-a02272420c8a074a",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7e6c237f18acc17e",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_inverse_unitary",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 38,
+      "owner_case_id": "cq-evidence-api-edfe8cc13dae11f1",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b20774ec6e5d82d2",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_time_reversed_for_flows",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 107,
+      "owner_case_id": "cq-evidence-api-44eab8b9a1f1f5fa",
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-53f06541c3dc78ef",
+      "feature_id": "CQ-FLOW-UTILS",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::circuit_time_reversed_for_flows_with_options",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_inverse.rs",
+      "source_line": 121,
+      "owner_case_id": "cq-evidence-api-96dfe96053ead864",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
@@ -71511,7 +71810,7 @@
       "path": "stab_core::CircuitError as From@2de935421934 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 210,
+      "source_line": 204,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -71595,7 +71894,7 @@
       "path": "stab_core::CircuitError as From@ed6b9be3e5ee for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 216,
+      "source_line": 210,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -72213,7 +72512,7 @@
       "path": "stab_core::CircuitError::format_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 174,
+      "source_line": 168,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -72227,7 +72526,7 @@
       "path": "stab_core::CircuitError::invalid_result_format",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 170,
+      "source_line": 164,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -72241,7 +72540,7 @@
       "path": "stab_core::CircuitError::parse_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 181,
+      "source_line": 175,
       "owner_case_id": "cq-evidence-qualification-bb06be3e4b51cd2c",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -72254,7 +72553,7 @@
       "path": "stab_core::CircuitError::resource_limit_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 188,
+      "source_line": 182,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -86180,7 +86479,7 @@
       "path": "stab_core::InverseQecOptions",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 14,
+      "source_line": 4,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86193,7 +86492,7 @@
       "path": "stab_core::InverseQecOptions as Clone for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86206,7 +86505,7 @@
       "path": "stab_core::InverseQecOptions as Copy for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86219,7 +86518,7 @@
       "path": "stab_core::InverseQecOptions as Debug for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86232,7 +86531,7 @@
       "path": "stab_core::InverseQecOptions as Default for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86245,7 +86544,7 @@
       "path": "stab_core::InverseQecOptions as Eq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86258,7 +86557,7 @@
       "path": "stab_core::InverseQecOptions as PartialEq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86271,7 +86570,7 @@
       "path": "stab_core::InverseQecOptions as StructuralPartialEq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -86284,7 +86583,7 @@
       "path": "stab_core::InverseQecOptions::keep_measurements",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 21,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -101964,7 +102263,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 25,
+      "source_line": 10,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -101977,7 +102276,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as Clone for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -101990,7 +102289,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as Copy for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102003,7 +102302,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as Debug for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102016,7 +102315,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as Default for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102029,7 +102328,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as Eq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102042,7 +102341,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as PartialEq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102055,7 +102354,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions as StructuralPartialEq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102068,7 +102367,7 @@
       "path": "stab_core::TimeReversedForFlowsOptions::dont_turn_measurements_into_resets",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 30,
+      "source_line": 12,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103509,7 +103808,7 @@
       "path": "stab_core::analysis::InverseQecOptions",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 14,
+      "source_line": 4,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103522,7 +103821,7 @@
       "path": "stab_core::analysis::InverseQecOptions as Clone for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103535,7 +103834,7 @@
       "path": "stab_core::analysis::InverseQecOptions as Copy for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103548,7 +103847,7 @@
       "path": "stab_core::analysis::InverseQecOptions as Debug for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103561,7 +103860,7 @@
       "path": "stab_core::analysis::InverseQecOptions as Default for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103574,7 +103873,7 @@
       "path": "stab_core::analysis::InverseQecOptions as Eq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103587,7 +103886,7 @@
       "path": "stab_core::analysis::InverseQecOptions as PartialEq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103600,7 +103899,7 @@
       "path": "stab_core::analysis::InverseQecOptions as StructuralPartialEq for@77eb7b58deae",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 13,
+      "source_line": 3,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103613,7 +103912,7 @@
       "path": "stab_core::analysis::InverseQecOptions::keep_measurements",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 21,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-api-a1a4bc6e0f86e216",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103626,7 +103925,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 25,
+      "source_line": 10,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103639,7 +103938,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as Clone for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103652,7 +103951,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as Copy for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103665,7 +103964,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as Debug for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103678,7 +103977,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as Default for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103691,7 +103990,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as Eq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103704,7 +104003,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as PartialEq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103717,7 +104016,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions as StructuralPartialEq for@e9d15374b975",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 24,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103730,7 +104029,7 @@
       "path": "stab_core::analysis::TimeReversedForFlowsOptions::dont_turn_measurements_into_resets",
       "kind": "field",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 30,
+      "source_line": 12,
       "owner_case_id": "cq-evidence-api-4665053c29208dde",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103743,7 +104042,7 @@
       "path": "stab_core::analysis::circuit_inverse_qec",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 68,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-api-f07e7c6ee1a2dc95",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103756,7 +104055,7 @@
       "path": "stab_core::analysis::circuit_inverse_qec_with_options",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 76,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-api-35f02da7aa4575ca",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103769,7 +104068,7 @@
       "path": "stab_core::analysis::circuit_inverse_unitary",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 37,
+      "source_line": 15,
       "owner_case_id": "cq-evidence-api-f8b0e0ccab49c48f",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103782,7 +104081,7 @@
       "path": "stab_core::analysis::circuit_time_reversed_for_flows",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 106,
+      "source_line": 36,
       "owner_case_id": "cq-evidence-api-c46fb379e2d22526",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103795,7 +104094,7 @@
       "path": "stab_core::analysis::circuit_time_reversed_for_flows_with_options",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 120,
+      "source_line": 43,
       "owner_case_id": "cq-evidence-api-3f55f2de5299763e",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106181,7 +106480,7 @@
       "path": "stab_core::circuit_flow_generators",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_flow.rs",
-      "source_line": 18,
+      "source_line": 12,
       "owner_case_id": "cq-evidence-api-0ac00d9fcd332314",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106220,7 +106519,7 @@
       "path": "stab_core::circuit_inverse_qec",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 68,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-api-f07e7c6ee1a2dc95",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106233,7 +106532,7 @@
       "path": "stab_core::circuit_inverse_qec_with_options",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 76,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-api-35f02da7aa4575ca",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106246,7 +106545,7 @@
       "path": "stab_core::circuit_inverse_unitary",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 37,
+      "source_line": 15,
       "owner_case_id": "cq-evidence-api-f8b0e0ccab49c48f",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106259,7 +106558,7 @@
       "path": "stab_core::circuit_time_reversed_for_flows",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 106,
+      "source_line": 36,
       "owner_case_id": "cq-evidence-api-c46fb379e2d22526",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -106272,7 +106571,7 @@
       "path": "stab_core::circuit_time_reversed_for_flows_with_options",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_inverse.rs",
-      "source_line": 120,
+      "source_line": 43,
       "owner_case_id": "cq-evidence-api-3f55f2de5299763e",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -119293,7 +119592,7 @@
       "path": "stab_core::solve_for_flow_measurements",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_flow.rs",
-      "source_line": 22,
+      "source_line": 16,
       "owner_case_id": "cq-evidence-api-ce4b4fd43f8cdfe0",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -145962,6 +146261,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-01d64d7164ab56b5",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::InverseQecOptions",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_01d64d7164ab56b5",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-022f94c9c211267e",
       "feature_id": "CQ-STIM-FORMAT",
       "behavioral_surface": "rust-api",
@@ -146278,6 +146621,50 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-0aa1f66083dd48af",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_inverse_qec",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_0aa1f66083dd48af",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -148966,6 +149353,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-44eab8b9a1f1f5fa",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_time_reversed_for_flows",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_44eab8b9a1f1f5fa",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-4665053c29208dde",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "rust-api",
@@ -151650,6 +152081,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-96dfe96053ead864",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_time_reversed_for_flows_with_options",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_96dfe96053ead864",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-9968ef7d38c63382",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "rust-api",
@@ -152148,6 +152623,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-a02272420c8a074a",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_inverse_qec_with_options",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_a02272420c8a074a",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-a1a4bc6e0f86e216",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "rust-api",
@@ -152488,6 +153007,50 @@
           "-p",
           "stab-analysis",
           "cq_evidence_api_a8e5ac792a57c642",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-a8ea5b9c3ec13240",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::TimeReversedForFlowsOptions",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_a8ea5b9c3ec13240",
           "--quiet",
           "--exact"
         ]
@@ -154934,6 +155497,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-edfe8cc13dae11f1",
+      "feature_id": "CQ-FLOW-UTILS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_analysis::circuit_inverse_unitary",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "cq_evidence_api_edfe8cc13dae11f1",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-eeedaf9afe6b8f28",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -155745,7 +156352,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_measurement_rich_subset_can_keep_measurements",
@@ -156087,7 +156694,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement",
@@ -156199,7 +156806,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_measurement_rich_subset_reverses_resets",
@@ -156658,7 +157265,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "pfm_b1_python_measurement_ordering_mzz",
@@ -158349,7 +158956,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "pfm_b1_python_measurement_ordering_m",
@@ -158412,7 +159019,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed",
@@ -160520,7 +161127,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_resets",
@@ -161333,7 +161940,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits",
@@ -161937,7 +162544,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "pfm_b1_python_measurement_kept_by_flow",
@@ -162278,7 +162885,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_unitary_subset_supports_flow_past_end",
@@ -162613,7 +163220,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "pfm_b1_python_measurement_ordering_mr",
@@ -164766,7 +165373,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_inverse_qec",
           "time_reversed_for_flows_measurement_rich_subset_reverses_pair_measurement",
@@ -165331,7 +165938,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_noisy_measure_reset",
             "--quiet"
@@ -166673,7 +167280,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec",
             "unitary_subset",
@@ -166960,7 +167567,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec",
             "time_reversed_for_flows_",
@@ -167356,7 +167963,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_m_det",
             "--quiet"
@@ -169407,7 +170014,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_noisy_measure_reset_detector",
             "--quiet"
@@ -171199,7 +171806,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_obs_include_pauli",
             "--quiet"
@@ -172197,7 +172804,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec",
             "circuit_inverse_qec_",
@@ -172343,7 +172950,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_mpp",
             "--quiet"
@@ -173412,7 +174019,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_mzz",
             "--quiet"
@@ -173573,7 +174180,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_time_reverse_flow_mzz_suffix",
             "--quiet"
@@ -175742,7 +176349,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec",
             "two_to_one",
@@ -176281,7 +176888,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse",
             "--quiet"
@@ -177571,7 +178178,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec",
             "pass_through",
@@ -179625,7 +180232,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_mpad",
             "--quiet"
@@ -180409,7 +181016,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_reset_measure_detector",
             "--quiet"
@@ -181470,7 +182077,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "circuit_inverse_qec_noisy_measurement",
             "--quiet"

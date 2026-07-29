@@ -156,7 +156,7 @@ The complete model slice is physically extracted. `stab-model` owns `Circuit`, `
 | `mbqc_decomposition.rs` | `mbqc.rs` | Own MBQC decomposition. |
 | `sparse_rev_frame_tracker*` | `sparse_reverse_tracker/*` | Own pure reverse tracking shared by flow and DEM analysis. |
 
-Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, circuit-flatten resource admission, repetition/surface/color generation, MBQC decomposition, unsigned flow checking/generation/solving, and sparse reverse-frame tracking are physically extracted. `stab-core` wrappers retain the old aggregate error, generated-value, flow, and resource signatures, while the canonical Stable implementation and owning tests live in `stab-analysis`. Inversion, feedback, detecting regions, missing-detector analysis, DEM analysis/search, and error matching remain active.
+Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, circuit-flatten resource admission, repetition/surface/color generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, and tracker-driven flow reversal are physically extracted. `stab-core` wrappers retain the old aggregate error, generated-value, flow, inversion-option, and resource signatures, while the canonical Stable implementation and owning tests live in `stab-analysis`. Feedback, detecting regions, missing-detector analysis, DEM analysis/search, and error matching remain active.
 
 The crate depends only on exact-version `stab-model` and `stab-algebra` edges.
 
@@ -184,7 +184,7 @@ Execution code does not import `SampleFormat`, text codecs, filesystem paths, CL
 
 | Current source | Destination | Public ownership and rationale |
 | --- | --- | --- |
-| Portable-SIMD block logic in `stab-core/src/bits/clifford.rs` | `stab-kernels-simd/src/clifford.rs` | Own direct `std::simd` code over raw word blocks. |
+| Restored portable-SIMD fixed-block kernels over `stab-bits` and `stab-algebra` scalar references | `stab-kernels-simd/src/lib.rs` | Own new direct `std::simd` code over raw four-word bit and Clifford blocks without absorbing tails, model values, or backend policy. |
 | Measured portable-SIMD packed-bit kernels introduced during A6 | Focused raw modules | Give the optional bit-storage edge a genuine implementation rather than an empty feature. |
 
 This crate has no Stab dependency. It is the only crate containing `#![feature(portable_simd)]` or direct `std::simd` paths.

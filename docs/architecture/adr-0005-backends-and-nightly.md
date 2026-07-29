@@ -12,7 +12,9 @@ A future GPU backend will require a distinct plan and data layout, not merely re
 
 ## Decision
 
-Every direct `std::simd` use moves from the current ordinary and Clifford bit kernels to `stab-kernels-simd`.
+No executable product source currently uses `std::simd`; the former ordinary and Clifford implementations were removed during scalar component extraction.
+
+Any restored direct `std::simd` use belongs only to `stab-kernels-simd` and must be differential-tested against the current scalar references.
 
 `stab-kernels-simd` has no Stab dependency and accepts raw word slices and fixed word blocks only.
 
