@@ -17,7 +17,9 @@ mod circuit_to_dem;
 mod circuit_transforms;
 mod dem;
 mod error;
+mod error_matcher;
 pub mod gate;
+mod matched_error;
 mod mbqc_decomposition;
 mod resources;
 mod sparse_rev_frame_tracker;
@@ -69,10 +71,15 @@ pub use dem::{
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
 pub use error::{AnalysisError, AnalysisResult};
+pub use error_matcher::explain_errors_from_circuit;
 pub use gate::{
     GateUnitaryMatrix, gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition,
     gate_has_flows, gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix,
     gate_tableau, gate_unitary_matrix, single_qubit_clifford_for_gate,
+};
+pub use matched_error::{
+    CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
+    DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use resources::{ResourceKind, ResourceLimitError, ResourceOperation};

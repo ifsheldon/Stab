@@ -4,7 +4,8 @@
     reason = "compatibility tests use direct assertions for compact diagnostics"
 )]
 
-use stab_core::{Circuit, ExplainedError, explain_errors_from_circuit};
+use stab_analysis::{ExplainedError, explain_errors_from_circuit};
+use stab_model::Circuit;
 
 #[test]
 fn pauli_channel2_components_match_stim_error_matcher_order() {

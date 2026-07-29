@@ -4,11 +4,12 @@
     reason = "compatibility tests use direct assertions for compact diagnostics"
 )]
 
-use stab_core::{
-    CodeDistance, DetectorErrorModel, Probability, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SurfaceCodeParams, SurfaceCodeTask, explain_errors_from_circuit,
+use stab_analysis::{
+    CodeDistance, ExplainedError, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, explain_errors_from_circuit,
     generate_repetition_code_circuit, generate_surface_code_circuit,
 };
+use stab_model::{DetectorErrorModel, Probability};
 
 #[test]
 fn generated_repetition_code_data_depolarization_matches_stim_error_matcher() {
@@ -278,7 +279,7 @@ fn explain_generated_repetition_code(reduce_to_one_representative_error: bool) -
     format_explanations(actual)
 }
 
-fn format_explanations(actual: Vec<stab_core::ExplainedError>) -> String {
+fn format_explanations(actual: Vec<ExplainedError>) -> String {
     let mut out = String::new();
     for matched_error in actual {
         out.push('\n');

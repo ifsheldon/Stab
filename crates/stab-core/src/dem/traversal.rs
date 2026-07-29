@@ -1,4 +1,1 @@
-pub(crate) use stab_model::advanced::{
-    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor,
-};
+pub(crate) use stab_model::advanced::{FoldedDemBlock, FoldedDemItem, FoldedDemTraversal};

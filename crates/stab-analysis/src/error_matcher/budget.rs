@@ -1,5 +1,7 @@
-use crate::dem::MAX_DEM_REPEAT_NESTING;
-use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult};
+use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
+use stab_model::{Circuit, CircuitInstruction, CircuitItem};
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::is_pure_noise;
 
@@ -14,17 +16,17 @@ struct ErrorMatcherExpansionBudget {
 }
 
 impl ErrorMatcherExpansionBudget {
-    fn add_expanded_instructions(&mut self, count: u64) -> CircuitResult<()> {
+    fn add_expanded_instructions(&mut self, count: u64) -> AnalysisResult<()> {
         self.expanded_instructions =
             self.expanded_instructions
                 .checked_add(count)
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "ErrorMatcher expanded instruction count overflowed",
                     )
                 })?;
         if self.expanded_instructions > MAX_ERROR_MATCHER_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "ErrorMatcher currently supports at most {MAX_ERROR_MATCHER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
                 self.expanded_instructions
             )));
@@ -32,14 +34,14 @@ impl ErrorMatcherExpansionBudget {
         Ok(())
     }
 
-    fn add_repeat_iterations(&mut self, count: u64) -> CircuitResult<()> {
+    fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
         self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "ErrorMatcher repeat iteration count overflowed",
             )
         })?;
         if self.repeat_iterations > MAX_ERROR_MATCHER_REPEAT_ITERATIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "ErrorMatcher currently supports at most {MAX_ERROR_MATCHER_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
                 self.repeat_iterations
             )));
@@ -48,7 +50,7 @@ impl ErrorMatcherExpansionBudget {
     }
 }
 
-pub(super) fn validate_error_matcher_circuit(circuit: &Circuit) -> CircuitResult<()> {
+pub(super) fn validate_error_matcher_circuit(circuit: &Circuit) -> AnalysisResult<()> {
     let mut budget = ErrorMatcherExpansionBudget::default();
     validate_error_matcher_circuit_items(circuit, 1, 0, false, &mut budget)
 }
@@ -59,9 +61,9 @@ fn validate_error_matcher_circuit_items(
     depth: usize,
     inside_repeat: bool,
     budget: &mut ErrorMatcherExpansionBudget,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(CircuitError::invalid_detector_error_model(format!(
+        return Err(AnalysisError::invalid_detector_error_model(format!(
             "ErrorMatcher repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
         )));
     }
@@ -70,7 +72,7 @@ fn validate_error_matcher_circuit_items(
             CircuitItem::Instruction(instruction) => {
                 budget.add_expanded_instructions(multiplier)?;
                 if inside_repeat && has_repeat_contained_stochastic_effect(instruction)? {
-                    return Err(CircuitError::invalid_detector_error_model(
+                    return Err(AnalysisError::invalid_detector_error_model(
                         "ErrorMatcher does not yet support repeat-contained noise",
                     ));
                 }
@@ -78,13 +80,13 @@ fn validate_error_matcher_circuit_items(
             CircuitItem::RepeatBlock(repeat) => {
                 let repeat_count = repeat.repeat_count().get();
                 if repeat_count > MAX_ERROR_MATCHER_REPEAT_UNROLL {
-                    return Err(CircuitError::invalid_detector_error_model(format!(
+                    return Err(AnalysisError::invalid_detector_error_model(format!(
                         "ErrorMatcher currently supports repeat counts up to {MAX_ERROR_MATCHER_REPEAT_UNROLL}, got {repeat_count}"
                     )));
                 }
                 let repeated_multiplier =
                     multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
+                        AnalysisError::invalid_detector_error_model(
                             "ErrorMatcher repeat expansion count overflowed",
                         )
                     })?;
@@ -102,7 +104,9 @@ fn validate_error_matcher_circuit_items(
     Ok(())
 }
 
-fn has_repeat_contained_stochastic_effect(instruction: &CircuitInstruction) -> CircuitResult<bool> {
+fn has_repeat_contained_stochastic_effect(
+    instruction: &CircuitInstruction,
+) -> AnalysisResult<bool> {
     let gate_name = instruction.gate().canonical_name();
     if is_pure_noise(gate_name)
         || matches!(gate_name, "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1")

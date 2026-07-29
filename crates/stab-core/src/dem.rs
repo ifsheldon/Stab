@@ -22,18 +22,11 @@ pub use stab_model::{
 };
 
 pub(crate) use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
-pub(crate) use traversal::{
-    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor,
-};
+pub(crate) use traversal::{FoldedDemBlock, FoldedDemItem, FoldedDemTraversal};
 
 use crate::CircuitResult;
 #[cfg(test)]
 use crate::{CircuitError, Probability};
-
-pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
-pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-pub(crate) const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
 
 pub(crate) fn dem_instruction_detector_shift(instruction: &DemInstruction) -> CircuitResult<u64> {
     stab_model::advanced::dem_instruction_detector_shift(instruction).map_err(Into::into)

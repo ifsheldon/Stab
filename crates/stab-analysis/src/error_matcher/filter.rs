@@ -1,19 +1,23 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
-use crate::dem::{
+use stab_model::advanced::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor, MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
-    MAX_DEM_FLATTEN_REPEAT_UNROLL,
+    FoldedDemVisitor,
 };
-use crate::{
-    CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
-    DetectorErrorModel,
+use stab_model::{
+    DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DetectorErrorModel,
 };
+
+use crate::{AnalysisError, AnalysisResult};
+
+const MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL: u64 = 100_000;
+const MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+const MAX_ERROR_MATCHER_FILTER_REPEAT_ITERATIONS: u64 = 1_000_000;
 
 pub(super) fn error_keys_from_dem(
     model: &DetectorErrorModel,
-) -> CircuitResult<Vec<Vec<DemTarget>>> {
+) -> AnalysisResult<Vec<Vec<DemTarget>>> {
     let traversal = FoldedDemTraversal::new(model)?;
     traversal.validate_repeat_depth("ErrorMatcher filter")?;
     let block_policies = FilterBlockPolicies::new(traversal.root());
@@ -34,16 +38,16 @@ struct ErrorMatcherFilterVisitor<'a> {
 }
 
 impl ErrorMatcherFilterVisitor<'_> {
-    fn add_expanded_instruction(&mut self) -> CircuitResult<()> {
+    fn add_expanded_instruction(&mut self) -> AnalysisResult<()> {
         self.expanded_instructions =
             self.expanded_instructions.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "DEM ErrorMatcher filter expanded instruction count overflowed",
                 )
             })?;
-        if self.expanded_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM ErrorMatcher filter currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
+        if self.expanded_instructions > MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS {
+            return Err(AnalysisError::invalid_detector_error_model(format!(
+                "DEM ErrorMatcher filter currently supports at most {MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
                 self.expanded_instructions
             )));
         }
@@ -52,13 +56,13 @@ impl ErrorMatcherFilterVisitor<'_> {
 }
 
 impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
-    type Error = CircuitError;
+    type Error = AnalysisError;
 
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
         state: &DemTraversalState,
-    ) -> CircuitResult<ControlFlow<()>> {
+    ) -> AnalysisResult<ControlFlow<()>> {
         if state.folded_repeat_depth() == 0 || instruction.kind() == DemInstructionKind::Error {
             self.add_expanded_instruction()?;
         }
@@ -76,7 +80,7 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
         repeat: &DemRepeatBlock,
         body: &FoldedDemBlock<'_>,
         _state: &DemTraversalState,
-    ) -> CircuitResult<DemRepeatSelection> {
+    ) -> AnalysisResult<DemRepeatSelection> {
         if body.summary().error_count()? == 0 {
             return Ok(DemRepeatSelection::Skip);
         }
@@ -90,13 +94,13 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
             return Ok(DemRepeatSelection::FoldOnce);
         }
         let repeat_count = repeat.repeat_count().get();
-        if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM ErrorMatcher filter currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
+        if repeat_count > MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL {
+            return Err(AnalysisError::invalid_detector_error_model(format!(
+                "DEM ErrorMatcher filter currently supports repeat counts up to {MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL}, got {repeat_count}"
             )));
         }
         Ok(DemRepeatSelection::Expand {
-            max_total_iterations: MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
+            max_total_iterations: MAX_ERROR_MATCHER_FILTER_REPEAT_ITERATIONS,
             context: "ErrorMatcher filter",
         })
     }
@@ -104,7 +108,7 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
 
 #[derive(Clone, Debug)]
 struct FilterBlockPolicy {
-    compact_error_count: CircuitResult<Option<u64>>,
+    compact_error_count: AnalysisResult<Option<u64>>,
 }
 
 #[derive(Debug)]
@@ -119,9 +123,9 @@ impl FilterBlockPolicies {
         Self { by_block }
     }
 
-    fn policy_for(&self, block: &FoldedDemBlock<'_>) -> CircuitResult<&FilterBlockPolicy> {
+    fn policy_for(&self, block: &FoldedDemBlock<'_>) -> AnalysisResult<&FilterBlockPolicy> {
         self.by_block.get(&block.compact_id()).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "DEM ErrorMatcher filter compact policy is missing a folded block",
             )
         })
@@ -153,7 +157,7 @@ fn summarize_filter_block_policy(
                 compact_error_count = body
                     .summary()
                     .detector_shift()
-                    .map_err(CircuitError::from)
+                    .map_err(AnalysisError::from)
                     .and_then(|detector_shift| {
                         if detector_shift != 0 {
                             return Ok(None);
@@ -163,7 +167,7 @@ fn summarize_filter_block_policy(
                                 return Ok(None);
                             };
                             count.checked_add(child_count).map(Some).ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
+                                AnalysisError::invalid_detector_error_model(
                                     "DEM ErrorMatcher filter compact-repeat error count overflowed",
                                 )
                             })
@@ -180,7 +184,7 @@ fn summarize_filter_block_policy(
     policy
 }
 
-fn active_compact_count(count: &CircuitResult<Option<u64>>) -> Option<u64> {
+fn active_compact_count(count: &AnalysisResult<Option<u64>>) -> Option<u64> {
     match count {
         Ok(Some(count)) => Some(*count),
         Ok(None) | Err(_) => None,
@@ -190,7 +194,7 @@ fn active_compact_count(count: &CircuitResult<Option<u64>>) -> Option<u64> {
 fn update_filter_instruction_count(
     count: u64,
     instruction: &DemInstruction,
-) -> CircuitResult<Option<u64>> {
+) -> AnalysisResult<Option<u64>> {
     match instruction.kind() {
         DemInstructionKind::Error => {
             if instruction
@@ -201,13 +205,13 @@ fn update_filter_instruction_count(
                 return Ok(None);
             }
             count.checked_add(1).map(Some).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "DEM ErrorMatcher filter compact-repeat error count overflowed",
                 )
             })
         }
         DemInstructionKind::ShiftDetectors
-            if crate::dem::dem_instruction_detector_shift(instruction)? == 0 =>
+            if stab_model::advanced::dem_instruction_detector_shift(instruction)? == 0 =>
         {
             Ok(Some(count))
         }
@@ -219,13 +223,13 @@ fn update_filter_instruction_count(
 fn canonical_error_key(
     targets: &[DemTarget],
     detector_offset: u64,
-) -> CircuitResult<Vec<DemTarget>> {
+) -> AnalysisResult<Vec<DemTarget>> {
     let mut toggled = BTreeSet::new();
     for target in targets {
         let shifted = match *target {
             DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
                 detector.get().checked_add(detector_offset).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("detector id overflowed")
+                    AnalysisError::invalid_detector_error_model("detector id overflowed")
                 })?,
             )?,
             DemTarget::LogicalObservable(_) => *target,

@@ -4,7 +4,8 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{Circuit, DetectorErrorModel, ExplainedError, explain_errors_from_circuit};
+use stab_analysis::{ExplainedError, explain_errors_from_circuit};
+use stab_model::{Circuit, DetectorErrorModel};
 
 fn explain(text: &str) -> Vec<ExplainedError> {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
