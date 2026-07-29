@@ -12,7 +12,7 @@ A future GPU backend will require a distinct plan and data layout, not merely re
 
 ## Decision
 
-No executable product source currently uses `std::simd`; the former ordinary and Clifford implementations were removed during scalar component extraction.
+The optional `stab-kernels-simd` crate owns executable four-word XOR and Clifford-composition kernels. Stable component defaults do not compile it.
 
 Any restored direct `std::simd` use belongs only to `stab-kernels-simd` and must be differential-tested against the current scalar references.
 
@@ -28,7 +28,9 @@ Backend requests occur during compilation through `Auto`, `Scalar`, and `Portabl
 
 A4 registers only the scalar implementation: `Auto` selects scalar, explicit scalar succeeds, and explicit portable SIMD returns a typed unavailable-backend diagnostic before lowering.
 
-A6 registers portable SIMD only after `stab-kernels-simd` owns a distinct measured implementation.
+A6 does not register portable SIMD as a sampling backend. Build-time bit and algebra acceleration cannot represent two runtime backends after Cargo feature unification, and the current sampling plans do not execute through these raw kernels.
+
+A later packed-frame milestone may register portable SIMD only after the engine owns a distinct executable plan, a distinct plan fingerprint, semantic equivalence for each affected plan family, and phase-specific performance evidence.
 
 Public plans wrap private backend-specific variants.
 
@@ -39,5 +41,5 @@ No unimplemented GPU capability is advertised.
 ## Consequences
 
 - Stable consumers can use reusable toolkit components.
-- Full Stab performance retains portable SIMD.
+- Nightly consumers can opt into measured portable bit and algebra kernels without changing sampling capability claims.
 - A later device backend must prove a real plan and batch contract before becoming public.

@@ -40,7 +40,7 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 - Keep decoders outside the simulation core and prove integration through a public batch boundary.
 - Replace scattered configurable limits with operation-owned resource policies.
 - Add structured diagnostics and machine-readable capability introspection.
-- Select scalar or portable-SIMD execution once during compilation instead of dispatching in hot loops.
+- Select an execution backend once during compilation and register only implementations with a genuinely distinct executable plan.
 - Isolate every direct `std::simd` use behind a Nightly-only kernel component.
 - Remove qualification-only exports from the product feature graph.
 - Keep an ergonomic facade and avoid one crate per source module.
@@ -50,6 +50,8 @@ Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` remains the accepted p
 - The claim that models own algorithms is directionally correct at the API boundary, but many `Circuit` methods already delegate to free-function implementations.
 - The migration therefore separates enforceable ownership and dependencies instead of rewriting algorithms that are already internally separated.
 - Logical ownership is established before physical crate extraction so dependency cycles and public replacements are resolved while behavior still has one compilation boundary. A3 extracts the two stable leaf crates, `stab-bits` and `stab-records`, after their boundaries are ready; A6 extracts the remaining model, algebra, analysis, engine, facade, and SIMD components after those broader seams are tested.
+- The additive `portable-simd` feature selects measured packed-bit and Clifford kernels at build time. It is not a `SamplingBackend`: Cargo feature unification cannot preserve both scalar and SIMD leaf implementations inside one binary, and the current sampling plans do not execute through those packed kernels.
+- A6 therefore keeps `PortableSimd` unavailable as an explicit sampling backend. Registration moves to a later packed-frame milestone that must supply a distinct executable plan, plan fingerprint, semantic-equivalence evidence, and phase-specific performance evidence.
 - One universal `RecordBatch` would erase meaningful differences between measurements, typed `M` or `D` or `L` records, detector-observable pairs, sparse records, and 64-shot bit planes.
 - Stab will define focused batch families over shared packed storage instead.
 - A global `ResourcePolicy` would become another broad configuration object.
@@ -111,9 +113,9 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-kernels-simd
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records
-stab-core -> all product components
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-cli -> stab-core
 
 product crates -X-> ops
@@ -215,7 +217,7 @@ Compiled plans are not serializable.
 
 No feature checklist or manually synchronized capability manifest is used at runtime.
 
-The first registry reads gates from `Gate::all()`, codecs from one records-owned six-format table, and sampling from a descriptor colocated with the sampling compiler. A4 registers scalar as the only selectable backend; A6 adds portable SIMD only after a distinct implementation exists.
+The first registry reads gates from `Gate::all()`, codecs from one records-owned six-format table, and sampling from a descriptor colocated with the sampling compiler. Scalar remains the only selectable sampling backend until a later packed-frame implementation supplies a distinct executable plan; A6's build-time SIMD leaf kernels are not advertised as an engine backend.
 
 ### Plans, Sessions, And Execution
 
@@ -349,7 +351,7 @@ A4 introduces this selection boundary with `Scalar` as the only registered sampl
 
 `Auto` therefore selects `Scalar`, while an explicit `PortableSimd` request returns an unavailable-backend diagnostic without compiling or executing work.
 
-A6 registers `PortableSimd` only after `stab-kernels-simd` owns a genuinely distinct measured implementation; selecting a differently named backend that executes the scalar path is forbidden.
+A6 leaves `PortableSimd` unavailable because the current direct-Z, small-frame, and general-frame plans do not execute through the extracted word kernels. A later packed-frame milestone may register it only after the engine owns a genuinely distinct measured plan; selecting a differently named backend that executes the scalar plan is forbidden.
 
 ## Milestone A0: Architecture Contract And Baseline
 
@@ -601,7 +603,7 @@ Status: Complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e
 - Replace `CompiledSampler` as the architectural center.
 - Introduce compiler, immutable plan, mutable session, random policy, run summary, sink finalization, and sink error composition.
 - Keep the executable IR private.
-- Select a registered backend at compilation; A4 registers only scalar, while A6 adds portable SIMD after extracting a genuine SIMD implementation.
+- Select a registered backend at compilation; A4 registers only scalar, and A6 preserves that registry because build-time SIMD acceleration of leaf algebra is not an engine backend.
 - Complete the backend-bearing `PlanFingerprint` only after backend selection and bind it to the request fingerprint and executable-contract identity.
 - Reuse frames, RNG, reference samples, records, and output batches across calls.
 - Preserve direct-Z, small-frame, and general stabilizer-frame execution as private plan variants.
@@ -612,7 +614,7 @@ Status: Complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e
 ### Tests
 
 - Compilation and unsupported-capability diagnostics.
-- Plan-fingerprint determinism, schema separation, selected-backend binding, unavailable-backend rejection, and executable-contract distinction; A6 adds cross-backend distinction tests when a second backend exists.
+- Plan-fingerprint determinism, schema separation, selected-backend binding, unavailable-backend rejection, and executable-contract distinction; cross-backend distinction tests wait for a later milestone with a second executable plan.
 - Plan sharing across threads and session isolation.
 - Same-session chunking equivalence.
 - Zero-shot behavior.
@@ -633,7 +635,7 @@ Status: Complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e
 - Consumption of one prebuilt typed batch, excluding simulation and encoding.
 - Encoding of one prebuilt typed batch, excluding simulation and sink delivery.
 - Repeated execution on one session.
-- Scalar compilation and backend-selection overhead; A6 owns scalar-versus-portable-SIMD comparison.
+- Scalar compilation and backend-selection overhead; a later packed-frame milestone owns sampling-backend comparison.
 - CLI end-to-end sampling.
 
 The source-owned `m8-sample-analysis-1shot` row uses these exact Stab measurements:
@@ -748,8 +750,9 @@ Status: Active.
 - Keep the full facade, engine, and CLI on pinned Nightly.
 - Give `stab-kernels-simd` no Stab dependencies and restrict its cross-crate API to raw `[u64]`, `&mut [u64]`, and fixed `[u64; 4]` kernels.
 - Make scalar behavior the absence of the additive `portable-simd` feature; do not create mutually exclusive scalar and SIMD features.
+- Limit the first SIMD surface to four-word XOR and non-identity Clifford right multiplication. Defer scans, masks, transpose, sampling, and additional kernels until an affected workload proves a real benefit.
 - Add exact `=0.2.0` versions beside every publishable path dependency.
-- Make CLI, oracle, and benchmark Nightly intent explicit by enabling the facade's `portable-simd` feature instead of relying on feature unification.
+- Forward the facade's `portable-simd` feature to bits and algebra only. Make CLI, oracle, and benchmark Nightly intent explicit instead of relying on incidental workspace feature unification.
 - Remove `ops-contracts`.
 - Move useful capability descriptions into product descriptors.
 - Move statistical plans and benchmark-only descriptors into ops.
@@ -760,22 +763,24 @@ Status: Active.
 - Stable and Nightly CI matrices.
 - Default-feature and portable-SIMD feature-unification checks.
 - Stable external-consumer and Nightly facade-consumer fixtures.
-- Architecture rejection of `std::simd` outside `stab-kernels-simd`, any Stab dependency from that kernel crate, Stable default features reaching Nightly, and Stable dev dependencies reaching engine, facade, CLI, or ops.
-- Scalar and SIMD semantic equivalence.
+- Architecture rejection of `std::simd`, `core::simd`, or `#![feature(portable_simd)]` outside `stab-kernels-simd`, any Stab dependency from that kernel crate, mandatory Stable-to-kernel edges, Stable default features reaching Nightly, and Stable dev dependencies reaching engine, facade, CLI, or ops.
+- Scalar and SIMD equivalence for every affected public bit and Clifford operation, including tails, all 24-by-24 valid Clifford products, metadata counts, unequal widths, and allocation-free mutation.
 - Architecture dependency checks.
 - Rustdoc public API inventory and tier checks.
 - No product-to-ops dependency or qualification-only public item.
 
 ### Benchmarks
 
-- Re-run every bit, algebra, parse, records, sampler, converter, DEM, and analysis row whose call path moved.
-- Attribute regressions to phase-specific measurements instead of aggregate facades.
+- Compare scalar and SIMD builds of the affected dense-XOR and non-identity Clifford workloads using identical inputs and exact output witnesses.
+- Re-run Stim-relative M5 XOR and M6 non-identity Clifford parity for the selected portable build without changing the `1.25x` gate.
+- Treat not-zero, popcount, sparse XOR, transpose, Pauli, sampling, parser, records, conversion, DEM, and analysis rows as continuity checks only when their executed call path actually changes.
 
 ### Done Criteria
 
 - Stable component consumers do not compile `std::simd`.
-- The Nightly facade preserves high-performance execution.
+- The Nightly facade can opt into source-current SIMD leaf kernels without advertising a nonexistent sampling backend.
 - Only `stab-kernels-simd` contains `#![feature(portable_simd)]`.
+- Medium and large scalar-versus-SIMD XOR and non-identity Clifford evidence is source-current. SIMD remains opt-in unless affected families demonstrate a material benefit without parity or confidence regression.
 - Every product crate has a documented contract and permitted dependencies only.
 
 ## Milestone A7: Decoder Interoperability And Reference Decoder

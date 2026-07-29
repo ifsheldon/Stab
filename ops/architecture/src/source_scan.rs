@@ -34,7 +34,7 @@ pub(super) fn scan_workspace_sources(
                 source,
             }
         })?;
-        if !contains_direct_std_simd(&source) {
+        if !contains_portable_simd_site(&source) {
             continue;
         }
         let package = package_for_source(source_path, packages);
@@ -42,9 +42,9 @@ pub(super) fn scan_workspace_sources(
             SimdSite::Kernel => {}
             SimdSite::Forbidden => {
                 violations.push(Violation::new(
-                    "direct-std-simd-outside-kernel",
+                    "portable-simd-outside-kernel",
                     format!(
-                        "direct portable-SIMD use in {} must move to {}",
+                        "portable-SIMD source in {} must move to {}",
                         source_path.display(),
                         SIMD_PACKAGE
                     ),
@@ -133,18 +133,24 @@ fn package_for_source<'a>(
         .max_by_key(|package| package.relative_path.components().count())
 }
 
-fn contains_direct_std_simd(source: &str) -> bool {
+fn contains_portable_simd_site(source: &str) -> bool {
     let compact = source
         .chars()
         .filter(|character| !character.is_ascii_whitespace())
         .collect::<String>();
-    if compact.contains(concat!("std", "::", "simd")) {
+    contains_rooted_simd(&compact, "std")
+        || contains_rooted_simd(&compact, "core")
+        || compact.contains(&["#![feature(", "portable", "_simd", ")]"].concat())
+}
+
+fn contains_rooted_simd(compact: &str, root: &str) -> bool {
+    if compact.contains(&format!("{root}::simd")) {
         return true;
     }
 
-    let grouped_prefix = concat!("std", "::{");
-    let mut remainder = compact.as_str();
-    while let Some(prefix_index) = remainder.find(grouped_prefix) {
+    let grouped_prefix = format!("{root}::{{");
+    let mut remainder = compact;
+    while let Some(prefix_index) = remainder.find(&grouped_prefix) {
         let Some(group) = remainder.get(prefix_index + grouped_prefix.len()..) else {
             return false;
         };
@@ -170,24 +176,29 @@ fn contains_direct_std_simd(source: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn direct_import() -> String {
-        ["use ", "std", "::", "simd", "::Simd;"].concat()
+    fn direct_import(root: &str) -> String {
+        ["use ", root, "::", "simd", "::Simd;"].concat()
     }
 
-    fn grouped_import() -> String {
-        ["use ", "std", "::{mem, ", "simd", "::{Simd}};"].concat()
+    fn grouped_import(root: &str) -> String {
+        ["use ", root, "::{mem, ", "simd", "::{Simd}};"].concat()
     }
 
     #[test]
-    fn finds_direct_and_grouped_std_simd_paths() {
-        assert!(contains_direct_std_simd(&direct_import()));
-        assert!(contains_direct_std_simd(&grouped_import()));
+    fn finds_direct_grouped_and_feature_gated_portable_simd() {
+        assert!(contains_portable_simd_site(&direct_import("std")));
+        assert!(contains_portable_simd_site(&grouped_import("std")));
+        assert!(contains_portable_simd_site(&direct_import("core")));
+        assert!(contains_portable_simd_site(&grouped_import("core")));
+        assert!(contains_portable_simd_site(
+            &["#![feature(", "portable", "_simd", ")]"].concat()
+        ));
     }
 
     #[test]
     fn does_not_confuse_simd_like_identifiers_with_std_simd() {
         let unrelated = ["use crate::simd; fn f() { let std_simd = 1; }"].concat();
-        assert!(!contains_direct_std_simd(&unrelated));
+        assert!(!contains_portable_simd_site(&unrelated));
     }
 
     #[test]

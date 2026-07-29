@@ -26,6 +26,8 @@ struct FixtureEdge {
     from: String,
     to: String,
     kind: FixtureDependencyKind,
+    #[serde(default)]
+    optional: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -69,6 +71,7 @@ fn assert_fixture(source: &str) {
                 from: edge.from,
                 to: edge.to,
                 kind: edge.kind.into(),
+                optional: edge.optional,
             })
             .collect(),
     };
@@ -105,7 +108,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         "stab-model",
         "stab-records",
     ];
-    const PERMITTED_EDGES: [(&str, &str); 23] = [
+    const PERMITTED_EDGES: [(&str, &str); 21] = [
         ("stab-bits", "stab-kernels-simd"),
         ("stab-records", "stab-bits"),
         ("stab-algebra", "stab-bits"),
@@ -117,7 +120,6 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         ("stab-engine", "stab-records"),
         ("stab-engine", "stab-algebra"),
         ("stab-engine", "stab-analysis"),
-        ("stab-engine", "stab-kernels-simd"),
         ("stab-decoder", "stab-model"),
         ("stab-decoder", "stab-records"),
         ("stab-core", "stab-algebra"),
@@ -125,7 +127,6 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         ("stab-core", "stab-bits"),
         ("stab-core", "stab-decoder"),
         ("stab-core", "stab-engine"),
-        ("stab-core", "stab-kernels-simd"),
         ("stab-core", "stab-model"),
         ("stab-core", "stab-records"),
         ("stab-cli", "stab-core"),
@@ -147,18 +148,16 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                         from: from.to_string(),
                         to: to.to_string(),
                         kind: kind.into(),
+                        optional: to == "stab-kernels-simd",
                     }],
                 };
                 let report = validate_graph(&graph);
                 let is_permitted = PERMITTED_EDGES.contains(&(from, to));
-                let forbidden_edges = report
-                    .violations
-                    .iter()
-                    .filter(|violation| violation.code == "forbidden-product-edge")
-                    .count();
+                let valid_kernel_edge =
+                    to != "stab-kernels-simd" || matches!(kind, FixtureDependencyKind::Normal);
                 assert_eq!(
-                    forbidden_edges,
-                    usize::from(!is_permitted),
+                    report.violations.is_empty(),
+                    is_permitted && valid_kernel_edge,
                     "{kind:?} product edge {from} -> {to}"
                 );
                 assert!(

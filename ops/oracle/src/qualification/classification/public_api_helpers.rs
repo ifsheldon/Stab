@@ -1,5 +1,23 @@
 use super::FeatureId;
 
+pub(super) fn classify_component_crate_api(
+    crate_name: &str,
+    source_path: &str,
+    api_path: &str,
+) -> Option<FeatureId> {
+    if crate_name == "stab_cli" {
+        return Some(FeatureId::Cli);
+    }
+    if source_path.starts_with("crates/stab-kernels-simd/") || crate_name == "stab_kernels_simd" {
+        return Some(if api_path.contains("clifford") {
+            FeatureId::Algebra
+        } else {
+            FeatureId::BitKernels
+        });
+    }
+    None
+}
+
 pub(super) fn classify_extracted_analysis_api(
     source_path: &str,
     api_lower: &str,

@@ -11,6 +11,7 @@ pub(super) struct ExtractedApis {
 }
 
 pub(super) fn extract(root: &RepoRoot) -> Result<ExtractedApis, InventoryError> {
+    let kernels = generate_rustdoc_inventory(&root.path, "stab-kernels-simd", "stab_kernels_simd")?;
     let bits = generate_rustdoc_inventory(&root.path, "stab-bits", "stab_bits")?;
     let records = generate_rustdoc_inventory(&root.path, "stab-records", "stab_records")?;
     let mut algebra = generate_rustdoc_inventory(&root.path, "stab-algebra", "stab_algebra")?;
@@ -39,7 +40,8 @@ pub(super) fn extract(root: &RepoRoot) -> Result<ExtractedApis, InventoryError> 
             engine.clone(),
         ],
     )?);
-    if facade.format_version != bits.format_version
+    if facade.format_version != kernels.format_version
+        || facade.format_version != bits.format_version
         || facade.format_version != records.format_version
         || facade.format_version != algebra.format_version
         || facade.format_version != model.format_version
@@ -49,6 +51,7 @@ pub(super) fn extract(root: &RepoRoot) -> Result<ExtractedApis, InventoryError> 
         return Err(PublicApiError::InvalidField("rustdoc format version mismatch").into());
     }
 
+    facade.items.extend(kernels.items);
     facade.items.extend(bits.items);
     facade.items.extend(records.items);
     facade.items.extend(algebra.items);

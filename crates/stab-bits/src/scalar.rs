@@ -1,5 +1,6 @@
 use super::BIT_BLOCK_WORDS;
 
+#[cfg(not(feature = "portable-simd"))]
 pub(super) fn xor_block(
     mut left: [u64; BIT_BLOCK_WORDS],
     right: [u64; BIT_BLOCK_WORDS],

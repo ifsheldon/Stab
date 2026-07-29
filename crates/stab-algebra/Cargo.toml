@@ -11,10 +11,15 @@ homepage.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+portable-simd = ["dep:stab-kernels-simd", "stab-bits/portable-simd"]
+
 [dependencies]
 num-complex = { workspace = true }
 rand = { workspace = true }
 stab-bits = { workspace = true }
+stab-kernels-simd = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

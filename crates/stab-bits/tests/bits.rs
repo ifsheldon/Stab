@@ -161,6 +161,24 @@ fn bits_bitvec_multi_block_boundaries_match_reference() {
     }
 }
 
+#[cfg(feature = "portable-simd")]
+#[test]
+fn bits_portable_xor_reuses_owned_storage_without_allocating() {
+    let bit_count = 65_537;
+    let mut left = BitVec::from_words_truncated(bit_count, vec![0x55aa_1234_9876_cdef; 1_025]);
+    let right = BitVec::from_words_truncated(bit_count, vec![0xf0f0_0f0f_dead_beef; 1_025]);
+
+    let allocations = allocation_counter::measure(|| {
+        left.xor_assign(&right.as_bitslice())
+            .expect("same-width xor");
+    });
+
+    assert_eq!(allocations.count_total, 0);
+    assert_eq!(allocations.bytes_total, 0);
+    assert_eq!(left.words()[0], 0xa55a_1d3b_46db_7300);
+    assert_eq!(left.words()[1_024], 0);
+}
+
 #[test]
 fn bits_range_xor_word_chunk_edges_match_reference() {
     for (len, target_start, source_start, count) in [

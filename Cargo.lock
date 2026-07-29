@@ -2156,6 +2156,7 @@ dependencies = [
  "proptest",
  "rand 0.10.1",
  "stab-bits",
+ "stab-kernels-simd",
  "thiserror",
 ]
 
@@ -2211,7 +2212,9 @@ dependencies = [
 name = "stab-bits"
 version = "0.1.1"
 dependencies = [
+ "allocation-counter",
  "proptest",
+ "stab-kernels-simd",
  "thiserror",
 ]
 
@@ -2276,6 +2279,10 @@ dependencies = [
  "stab-records",
  "thiserror",
 ]
+
+[[package]]
+name = "stab-kernels-simd"
+version = "0.1.1"
 
 [[package]]
 name = "stab-model"

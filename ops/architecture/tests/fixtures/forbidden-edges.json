@@ -9,6 +9,7 @@
   ],
   "edges": [
     { "from": "stab-kernels-simd", "to": "stab-bits", "kind": "normal" },
+    { "from": "stab-bits", "to": "stab-kernels-simd", "kind": "normal" },
     { "from": "stab-records", "to": "stab-engine", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-engine", "kind": "normal" },
     { "from": "stab-bits", "to": "stab-architecture", "kind": "development" }
@@ -17,6 +18,7 @@
     "forbidden-product-edge",
     "forbidden-product-edge",
     "forbidden-product-edge",
+    "nightly-kernel-edge-not-optional",
     "product-to-ops"
   ]
 }

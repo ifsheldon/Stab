@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "93f9664bc271114f4930a3bab1b18fdbc7bdde8b4363cf8641a815731a0481e4",
-  "semantic_digest": "653ff20436adb0670024ace140b02c7a9e6ad3025f113466fe978b3bc0747794",
+  "correctness_digest": "d374edd7cb5da937d31e50ec15c6adddab86651230d6607f802760c41bcb7f42",
+  "semantic_digest": "2f9a0f5bb682b6fe57fe9d32f9898c37564d5e6f4a6e911e4e26ef2d49488485",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -74978,6 +74978,72 @@
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-6ae1db63ed89cbcd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e233a51c726ff43f",
+      "path": "stab_kernels_simd::CLIFFORD_PLANES",
+      "kind": "constant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bd4add87351350cb",
+      "path": "stab_kernels_simd::CliffordWordBlock",
+      "kind": "type-alias",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e4e01e8103e1afe6",
+      "path": "stab_kernels_simd::WORD_LANES",
+      "kind": "constant",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-7eef3526c61a009a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c623196e5884034c",
+      "path": "stab_kernels_simd::WordBlock",
+      "kind": "type-alias",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-7eef3526c61a009a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2c5ea72decb65f95",
+      "path": "stab_kernels_simd::clifford_right_multiply_block",
+      "kind": "function",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4ae6e8e260190533",
+      "path": "stab_kernels_simd::xor_assign_block",
+      "kind": "function",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-7eef3526c61a009a",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

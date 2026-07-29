@@ -11,8 +11,14 @@ homepage.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+portable-simd = ["dep:stab-kernels-simd"]
+
 [dependencies]
+stab-kernels-simd = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+allocation-counter = { workspace = true }
 proptest = { workspace = true }

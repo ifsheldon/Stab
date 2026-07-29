@@ -687,6 +687,34 @@ mod tests {
         assert_eq!(left, expected);
     }
 
+    #[cfg(feature = "portable-simd")]
+    #[test]
+    fn portable_right_multiply_matches_every_single_qubit_product() {
+        let width = 257;
+        for left_gate in SingleQubitClifford::all() {
+            for right_gate in SingleQubitClifford::all() {
+                let expected_gate = left_gate.multiply(right_gate).unwrap();
+                let mut left =
+                    CliffordString::from_gates(std::iter::repeat_n(left_gate, width)).unwrap();
+                let right =
+                    CliffordString::from_gates(std::iter::repeat_n(right_gate, width)).unwrap();
+
+                left.right_multiply_in_place(&right).unwrap();
+
+                assert_eq!(
+                    left,
+                    CliffordString::from_gates(std::iter::repeat_n(expected_gate, width)).unwrap(),
+                    "left={left_gate} right={right_gate}"
+                );
+                assert_eq!(
+                    left.non_identity_count,
+                    usize::from(expected_gate != SingleQubitClifford::I) * width,
+                    "left={left_gate} right={right_gate}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn right_multiply_in_place_extends_shorter_left_side() {
         let mut left = CliffordString::from_gates([SingleQubitClifford::H]).unwrap();
@@ -801,5 +829,22 @@ mod tests {
             .filter(|&index| value.gate_at(index) != Some(SingleQubitClifford::I))
             .count();
         assert_eq!(value.non_identity_count, observed_count);
+    }
+
+    #[cfg(feature = "portable-simd")]
+    #[test]
+    fn portable_right_multiply_reuses_packed_storage_without_allocating() {
+        let width = 65_537;
+        let mut left =
+            CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::H, width)).unwrap();
+        let right =
+            CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::S, width)).unwrap();
+
+        let allocations =
+            allocation_counter::measure(|| left.right_multiply_in_place(&right).unwrap());
+
+        assert_eq!(allocations.count_total, 0);
+        assert_eq!(allocations.bytes_total, 0);
+        assert_eq!(left.non_identity_count, width);
     }
 }

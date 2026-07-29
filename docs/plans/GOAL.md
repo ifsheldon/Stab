@@ -8,10 +8,11 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 
 - A0 through A5 are complete. A5 closes at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
 - The physical product crates are currently `stab-algebra`, `stab-analysis`, `stab-bits`, `stab-engine`, `stab-model`, `stab-records`, `stab-core`, and `stab-cli`.
-- `stab-algebra`, `stab-analysis`, `stab-bits`, `stab-model`, `stab-records`, and the current scalar `stab-engine` build on Stable Rust 1.97.1. `stab-model` physically owns the complete circuit and DEM compatibility models, `stab-analysis` physically owns every implemented pure analysis surface, and `stab-engine` physically owns compilation-request fingerprints, execution-side biased randomization, circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM compilation and execution, reference-sample trees, and sampled-flow execution. `stab-core` preserves compatibility reexports plus materialized and byte-oriented adapters. Portable SIMD remains to be extracted.
+- `stab-algebra`, `stab-analysis`, `stab-bits`, `stab-model`, `stab-records`, and the current scalar `stab-engine` build on Stable Rust 1.97.1. `stab-model` physically owns the complete circuit and DEM compatibility models, `stab-analysis` physically owns every implemented pure analysis surface, and `stab-engine` physically owns compilation-request fingerprints, execution-side biased randomization, circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM compilation and execution, reference-sample trees, and sampled-flow execution. `stab-core` preserves compatibility reexports plus materialized and byte-oriented adapters.
+- The A6 SIMD audit rejects treating build-time bit or Clifford acceleration as a sampling backend. The first raw-kernel slice is limited to dense XOR and non-identity Clifford composition; explicit `PortableSimd` sampling remains unavailable until a later packed-frame plan exists.
 - `ops-contracts` is removed. Qualification policy is oracle-owned, and analyzer benchmarks derive compact-work witnesses from public DEM output instead of hidden product counters.
 - Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
-- A6 must add the measured portable-SIMD backend through `stab-kernels-simd`, curate `stab-core` as the final facade rather than another implementation owner, and close the consumer and evidence matrix.
+- A6 must add measured portable-SIMD leaf acceleration through `stab-kernels-simd`, curate `stab-core` as the final facade rather than another implementation owner, and close the consumer and evidence matrix.
 
 ## Sources Of Truth
 
@@ -32,7 +33,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 3. Completed: move circuit and DEM syntax, parsing, printing, fingerprints, tags, diagnostics, compact traversal, and resource vocabulary into `stab-model`.
 4. Completed: extract `stab-analysis` over model and algebra only, including error matching and matched-error provenance values. Keep it free of records, execution, CLI, and ops.
 5. Completed: extract circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM sampling, reference-sample trees, and sampled-flow execution into `stab-engine` without changing facade or CLI behavior.
-6. In progress: create dependency-free `stab-kernels-simd`, restore a minimal four-word portable-SIMD implementation against the current scalar references, and make `portable-simd` an additive facade and engine feature with scalar default behavior.
+6. In progress: create dependency-free `stab-kernels-simd`, restore four-word XOR and Clifford composition against the current scalar references, and make `portable-simd` an additive bits, algebra, and facade feature. Keep engine backend registration scalar-only.
 7. Curate `stab-core` root, `advanced`, and `experimental` APIs, and add exact `=0.2.0` path versions to every publishable edge.
 8. Add Stable and Nightly consumer fixtures, feature-unification tests, dependency rejection fixtures, rustdoc tier checks, and scalar-versus-SIMD equivalence.
 9. Rerun every benchmark family whose call path moved, then run milestone-audit and full-code-review; fix all findings before A6 closure.
@@ -43,7 +44,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 - Only `stab-kernels-simd` may contain `#![feature(portable_simd)]` or direct `std::simd`.
 - `stab-kernels-simd` has no Stab dependency and exposes only raw word slices, mutable word slices, and fixed `[u64; 4]` kernels.
 - Scalar behavior is the absence of the additive `portable-simd` feature. There are no mutually exclusive scalar and SIMD feature flags.
-- CLI, oracle, and benchmark crates enable the facade's `portable-simd` feature explicitly instead of relying on workspace feature unification.
+- CLI, oracle, and benchmark crates declare their intended scalar or portable build explicitly instead of relying on workspace feature unification.
 - Product crates never depend on ops or test support at runtime. Stable dev dependencies cannot reach engine, facade, CLI, or ops.
 - Every publishable path dependency includes exact version `=0.2.0`; ops and external conformance fixtures remain unpublished.
 - Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, statistical Stim, resource, cancellation, poisoning, and sink-lifecycle contracts remain unchanged.
@@ -53,7 +54,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 ## Done Criteria
 
 - The target dependency graph is physical and architecture checks reject every forbidden edge.
-- Stable component consumers compile and test on Rust 1.97.1 without `std::simd`; the Nightly facade retains portable-SIMD execution.
+- Stable component consumers compile and test on Rust 1.97.1 without portable-SIMD code; Nightly consumers can opt into measured leaf kernels without changing sampling capability claims.
 - Every product crate documents purpose, dependencies, invariants, resource behavior, extension points, conformance tests, benchmarks, and synchronized files.
 - Public API and qualification inventories regenerate exactly, with no qualification-only product item.
 - Moved bit, algebra, parser, records, sampler, converter, DEM, and analysis benchmark phases have no unexplained regression.

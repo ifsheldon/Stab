@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "93f9664bc271114f4930a3bab1b18fdbc7bdde8b4363cf8641a815731a0481e4",
+  "semantic_digest": "d374edd7cb5da937d31e50ec15c6adddab86651230d6607f802760c41bcb7f42",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -69756,7 +69756,7 @@
       "path": "stab_bits::BIT_BLOCK_WORDS",
       "kind": "constant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 11,
+      "source_line": 18,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69769,7 +69769,7 @@
       "path": "stab_bits::BitBlock",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 101,
+      "source_line": 108,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69782,7 +69782,7 @@
       "path": "stab_bits::BitBlock as Clone for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69795,7 +69795,7 @@
       "path": "stab_bits::BitBlock as Copy for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69808,7 +69808,7 @@
       "path": "stab_bits::BitBlock as Debug for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69821,7 +69821,7 @@
       "path": "stab_bits::BitBlock as Eq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69834,7 +69834,7 @@
       "path": "stab_bits::BitBlock as PartialEq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69847,7 +69847,7 @@
       "path": "stab_bits::BitBlock as StructuralPartialEq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 100,
+      "source_line": 107,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69860,7 +69860,7 @@
       "path": "stab_bits::BitBlock::and",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 124,
+      "source_line": 131,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69873,7 +69873,7 @@
       "path": "stab_bits::BitBlock::from_words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 112,
+      "source_line": 119,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69886,7 +69886,7 @@
       "path": "stab_bits::BitBlock::or",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 128,
+      "source_line": 135,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69899,7 +69899,7 @@
       "path": "stab_bits::BitBlock::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 132,
+      "source_line": 139,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69912,7 +69912,7 @@
       "path": "stab_bits::BitBlock::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 116,
+      "source_line": 123,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69925,7 +69925,7 @@
       "path": "stab_bits::BitBlock::xor",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 120,
+      "source_line": 127,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69938,7 +69938,7 @@
       "path": "stab_bits::BitBlock::zero",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 106,
+      "source_line": 113,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69951,7 +69951,7 @@
       "path": "stab_bits::BitError",
       "kind": "enum",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 19,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69964,7 +69964,7 @@
       "path": "stab_bits::BitError as Clone for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69977,7 +69977,7 @@
       "path": "stab_bits::BitError as Debug for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -69990,7 +69990,7 @@
       "path": "stab_bits::BitError as Display for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70003,7 +70003,7 @@
       "path": "stab_bits::BitError as Eq for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70016,7 +70016,7 @@
       "path": "stab_bits::BitError as Error for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70029,7 +70029,7 @@
       "path": "stab_bits::BitError as PartialEq for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70042,7 +70042,7 @@
       "path": "stab_bits::BitError as StructuralPartialEq for@186faf85a291",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 18,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70055,7 +70055,7 @@
       "path": "stab_bits::BitError::BitIndexOutOfRange",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 24,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70068,7 +70068,7 @@
       "path": "stab_bits::BitError::BitIndexOutOfRange::index",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 24,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70081,7 +70081,7 @@
       "path": "stab_bits::BitError::BitIndexOutOfRange::len",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 24,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70094,7 +70094,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 47,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70107,7 +70107,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::end",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 49,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70120,7 +70120,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::len",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 50,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70133,7 +70133,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::start",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 48,
+      "source_line": 55,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70146,7 +70146,7 @@
       "path": "stab_bits::BitError::LengthMismatch",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 21,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70159,7 +70159,7 @@
       "path": "stab_bits::BitError::LengthMismatch::left",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 21,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70172,7 +70172,7 @@
       "path": "stab_bits::BitError::LengthMismatch::right",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 21,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70185,7 +70185,7 @@
       "path": "stab_bits::BitError::MatrixShapeMismatch",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 30,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70198,7 +70198,7 @@
       "path": "stab_bits::BitError::MatrixShapeMismatch::left_cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 32,
+      "source_line": 39,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70211,7 +70211,7 @@
       "path": "stab_bits::BitError::MatrixShapeMismatch::left_rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 31,
+      "source_line": 38,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70224,7 +70224,7 @@
       "path": "stab_bits::BitError::MatrixShapeMismatch::right_cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 34,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70237,7 +70237,7 @@
       "path": "stab_bits::BitError::MatrixShapeMismatch::right_rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 33,
+      "source_line": 40,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70250,7 +70250,7 @@
       "path": "stab_bits::BitError::MatrixSizeOverflow",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 41,
+      "source_line": 48,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70263,7 +70263,7 @@
       "path": "stab_bits::BitError::MatrixSizeOverflow::cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 41,
+      "source_line": 48,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70276,7 +70276,7 @@
       "path": "stab_bits::BitError::MatrixSizeOverflow::rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 41,
+      "source_line": 48,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70289,7 +70289,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 38,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70302,7 +70302,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix::cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 38,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70315,7 +70315,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix::rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 38,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70328,7 +70328,7 @@
       "path": "stab_bits::BitError::RowIndexOutOfRange",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 27,
+      "source_line": 34,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70341,7 +70341,7 @@
       "path": "stab_bits::BitError::RowIndexOutOfRange::row",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 27,
+      "source_line": 34,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70354,7 +70354,7 @@
       "path": "stab_bits::BitError::RowIndexOutOfRange::rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 27,
+      "source_line": 34,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70367,7 +70367,7 @@
       "path": "stab_bits::BitError::StorageAllocationFailed",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 44,
+      "source_line": 51,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70380,7 +70380,7 @@
       "path": "stab_bits::BitError::StorageAllocationFailed::words",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 44,
+      "source_line": 51,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70393,7 +70393,7 @@
       "path": "stab_bits::BitLen",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 55,
+      "source_line": 62,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70406,7 +70406,7 @@
       "path": "stab_bits::BitLen as Clone for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70419,7 +70419,7 @@
       "path": "stab_bits::BitLen as Copy for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70432,7 +70432,7 @@
       "path": "stab_bits::BitLen as Debug for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70445,7 +70445,7 @@
       "path": "stab_bits::BitLen as Default for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70458,7 +70458,7 @@
       "path": "stab_bits::BitLen as Eq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70471,7 +70471,7 @@
       "path": "stab_bits::BitLen as From@fd379cf58020 for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 94,
+      "source_line": 101,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70484,7 +70484,7 @@
       "path": "stab_bits::BitLen as Ord for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70497,7 +70497,7 @@
       "path": "stab_bits::BitLen as PartialEq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70510,7 +70510,7 @@
       "path": "stab_bits::BitLen as PartialOrd for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70523,7 +70523,7 @@
       "path": "stab_bits::BitLen as StructuralPartialEq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70536,7 +70536,7 @@
       "path": "stab_bits::BitLen::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 62,
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70549,7 +70549,7 @@
       "path": "stab_bits::BitLen::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 58,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70562,7 +70562,7 @@
       "path": "stab_bits::BitLen::word_count",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 66,
+      "source_line": 73,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70575,7 +70575,7 @@
       "path": "stab_bits::BitMatrix",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 380,
+      "source_line": 387,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70588,7 +70588,7 @@
       "path": "stab_bits::BitMatrix as Clone for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 379,
+      "source_line": 386,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70601,7 +70601,7 @@
       "path": "stab_bits::BitMatrix as Debug for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 379,
+      "source_line": 386,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70614,7 +70614,7 @@
       "path": "stab_bits::BitMatrix as Eq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 379,
+      "source_line": 386,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70627,7 +70627,7 @@
       "path": "stab_bits::BitMatrix as PartialEq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 379,
+      "source_line": 386,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70640,7 +70640,7 @@
       "path": "stab_bits::BitMatrix as StructuralPartialEq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 379,
+      "source_line": 386,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70653,7 +70653,7 @@
       "path": "stab_bits::BitMatrix::cols",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 422,
+      "source_line": 429,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70666,7 +70666,7 @@
       "path": "stab_bits::BitMatrix::copy_row_from_bools",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 450,
+      "source_line": 457,
       "owner_case_id": "cq-evidence-qualification-45d7bf3342de43a6",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70679,7 +70679,7 @@
       "path": "stab_bits::BitMatrix::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 426,
+      "source_line": 433,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70692,7 +70692,7 @@
       "path": "stab_bits::BitMatrix::identity",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 410,
+      "source_line": 417,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70705,7 +70705,7 @@
       "path": "stab_bits::BitMatrix::masked_xor_row_into",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 502,
+      "source_line": 509,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70718,7 +70718,7 @@
       "path": "stab_bits::BitMatrix::row",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 474,
+      "source_line": 481,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70731,7 +70731,7 @@
       "path": "stab_bits::BitMatrix::rows",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 418,
+      "source_line": 425,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70744,7 +70744,7 @@
       "path": "stab_bits::BitMatrix::set",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 434,
+      "source_line": 441,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70757,7 +70757,7 @@
       "path": "stab_bits::BitMatrix::swap_rows",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 521,
+      "source_line": 528,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70770,7 +70770,7 @@
       "path": "stab_bits::BitMatrix::transpose",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 532,
+      "source_line": 539,
       "owner_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70783,7 +70783,7 @@
       "path": "stab_bits::BitMatrix::transpose_square_in_place",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 538,
+      "source_line": 545,
       "owner_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70796,7 +70796,7 @@
       "path": "stab_bits::BitMatrix::xor_row_into",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 490,
+      "source_line": 497,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70809,7 +70809,7 @@
       "path": "stab_bits::BitMatrix::zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 388,
+      "source_line": 395,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70822,7 +70822,7 @@
       "path": "stab_bits::BitResult",
       "kind": "type-alias",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 16,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70835,7 +70835,7 @@
       "path": "stab_bits::BitSlice",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 138,
+      "source_line": 145,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70848,7 +70848,7 @@
       "path": "stab_bits::BitSlice as Clone for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70861,7 +70861,7 @@
       "path": "stab_bits::BitSlice as Copy for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70874,7 +70874,7 @@
       "path": "stab_bits::BitSlice as Debug for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70887,7 +70887,7 @@
       "path": "stab_bits::BitSlice as Eq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70900,7 +70900,7 @@
       "path": "stab_bits::BitSlice as PartialEq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70913,7 +70913,7 @@
       "path": "stab_bits::BitSlice as StructuralPartialEq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 137,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70926,7 +70926,7 @@
       "path": "stab_bits::BitSlice::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 174,
+      "source_line": 181,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70939,7 +70939,7 @@
       "path": "stab_bits::BitSlice::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 161,
+      "source_line": 168,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70952,7 +70952,7 @@
       "path": "stab_bits::BitSlice::len",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 157,
+      "source_line": 164,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70965,7 +70965,7 @@
       "path": "stab_bits::BitSlice::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 145,
+      "source_line": 152,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70978,7 +70978,7 @@
       "path": "stab_bits::BitSlice::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 178,
+      "source_line": 185,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -70991,7 +70991,7 @@
       "path": "stab_bits::BitSlice::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 170,
+      "source_line": 177,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71004,7 +71004,7 @@
       "path": "stab_bits::BitVec",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 210,
+      "source_line": 217,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71017,7 +71017,7 @@
       "path": "stab_bits::BitVec as Clone for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 209,
+      "source_line": 216,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71030,7 +71030,7 @@
       "path": "stab_bits::BitVec as Debug for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 209,
+      "source_line": 216,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71043,7 +71043,7 @@
       "path": "stab_bits::BitVec as Eq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 209,
+      "source_line": 216,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71056,7 +71056,7 @@
       "path": "stab_bits::BitVec as PartialEq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 209,
+      "source_line": 216,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71069,7 +71069,7 @@
       "path": "stab_bits::BitVec as StructuralPartialEq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 209,
+      "source_line": 216,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71082,7 +71082,7 @@
       "path": "stab_bits::BitVec::and_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 301,
+      "source_line": 308,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71095,7 +71095,7 @@
       "path": "stab_bits::BitVec::as_bitslice",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 275,
+      "source_line": 282,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71108,7 +71108,7 @@
       "path": "stab_bits::BitVec::clear",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 290,
+      "source_line": 297,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71121,7 +71121,7 @@
       "path": "stab_bits::BitVec::copy_from_bitslice",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 323,
+      "source_line": 330,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71134,7 +71134,7 @@
       "path": "stab_bits::BitVec::from_bits",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 231,
+      "source_line": 238,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71147,7 +71147,7 @@
       "path": "stab_bits::BitVec::from_words_truncated",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 224,
+      "source_line": 231,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71160,7 +71160,7 @@
       "path": "stab_bits::BitVec::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 282,
+      "source_line": 289,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71173,7 +71173,7 @@
       "path": "stab_bits::BitVec::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 249,
+      "source_line": 256,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71186,7 +71186,7 @@
       "path": "stab_bits::BitVec::len",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 245,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71199,7 +71199,7 @@
       "path": "stab_bits::BitVec::masked_xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 315,
+      "source_line": 322,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71212,7 +71212,7 @@
       "path": "stab_bits::BitVec::not_zero",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 370,
+      "source_line": 377,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71225,7 +71225,7 @@
       "path": "stab_bits::BitVec::or_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 308,
+      "source_line": 315,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71238,7 +71238,7 @@
       "path": "stab_bits::BitVec::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 366,
+      "source_line": 373,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71251,7 +71251,7 @@
       "path": "stab_bits::BitVec::resize_zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 268,
+      "source_line": 275,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71264,7 +71264,7 @@
       "path": "stab_bits::BitVec::set",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 286,
+      "source_line": 293,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71277,7 +71277,7 @@
       "path": "stab_bits::BitVec::word_count",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 253,
+      "source_line": 260,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71290,7 +71290,7 @@
       "path": "stab_bits::BitVec::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 257,
+      "source_line": 264,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71303,7 +71303,7 @@
       "path": "stab_bits::BitVec::words_mut",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 261,
+      "source_line": 268,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71316,7 +71316,7 @@
       "path": "stab_bits::BitVec::xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 294,
+      "source_line": 301,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71329,7 +71329,7 @@
       "path": "stab_bits::BitVec::xor_range_from",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 330,
+      "source_line": 337,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71342,7 +71342,7 @@
       "path": "stab_bits::BitVec::zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 223,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71355,7 +71355,7 @@
       "path": "stab_bits::BitWordsMut",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 184,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71368,7 +71368,7 @@
       "path": "stab_bits::BitWordsMut as Debug for@5e174bd88b12",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 183,
+      "source_line": 190,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71381,7 +71381,7 @@
       "path": "stab_bits::BitWordsMut as Deref for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 189,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71394,7 +71394,7 @@
       "path": "stab_bits::BitWordsMut as DerefMut for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 197,
+      "source_line": 204,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71407,7 +71407,7 @@
       "path": "stab_bits::BitWordsMut as Drop for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 203,
+      "source_line": 210,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71420,7 +71420,7 @@
       "path": "stab_bits::SparseXorVec",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 633,
+      "source_line": 640,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71433,7 +71433,7 @@
       "path": "stab_bits::SparseXorVec as Clone for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71446,7 +71446,7 @@
       "path": "stab_bits::SparseXorVec as Debug for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71459,7 +71459,7 @@
       "path": "stab_bits::SparseXorVec as Default for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71472,7 +71472,7 @@
       "path": "stab_bits::SparseXorVec as Display for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 733,
+      "source_line": 740,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71485,7 +71485,7 @@
       "path": "stab_bits::SparseXorVec as Eq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71498,7 +71498,7 @@
       "path": "stab_bits::SparseXorVec as Ord for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71511,7 +71511,7 @@
       "path": "stab_bits::SparseXorVec as PartialEq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71524,7 +71524,7 @@
       "path": "stab_bits::SparseXorVec as PartialOrd for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71537,7 +71537,7 @@
       "path": "stab_bits::SparseXorVec as StructuralPartialEq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 632,
+      "source_line": 639,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71550,7 +71550,7 @@
       "path": "stab_bits::SparseXorVec::contains",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 660,
+      "source_line": 667,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71563,7 +71563,7 @@
       "path": "stab_bits::SparseXorVec::from_sorted_items",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 643,
+      "source_line": 650,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71576,7 +71576,7 @@
       "path": "stab_bits::SparseXorVec::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 655,
+      "source_line": 662,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71589,7 +71589,7 @@
       "path": "stab_bits::SparseXorVec::is_superset_of",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 728,
+      "source_line": 735,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71602,7 +71602,7 @@
       "path": "stab_bits::SparseXorVec::items",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 650,
+      "source_line": 657,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71615,7 +71615,7 @@
       "path": "stab_bits::SparseXorVec::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 638,
+      "source_line": 645,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71628,7 +71628,7 @@
       "path": "stab_bits::SparseXorVec::xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 723,
+      "source_line": 730,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71641,7 +71641,7 @@
       "path": "stab_bits::SparseXorVec::xor_item",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 665,
+      "source_line": 672,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71654,7 +71654,7 @@
       "path": "stab_bits::first_set_bit",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 787,
+      "source_line": 794,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71667,7 +71667,7 @@
       "path": "stab_bits::floor_lg2",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 783,
+      "source_line": 790,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71680,7 +71680,7 @@
       "path": "stab_bits::inplace_xor_sort",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 766,
+      "source_line": 773,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71693,7 +71693,7 @@
       "path": "stab_bits::is_power_of_2",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 779,
+      "source_line": 786,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71706,7 +71706,7 @@
       "path": "stab_bits::is_subset_of_sorted",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 746,
+      "source_line": 753,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -138436,6 +138436,84 @@
       ]
     },
     {
+      "id": "cq-api-item-e233a51c726ff43f",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::CLIFFORD_PLANES",
+      "kind": "constant",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 7,
+      "owner_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
+      "id": "cq-api-item-bd4add87351350cb",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::CliffordWordBlock",
+      "kind": "type-alias",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 10,
+      "owner_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
+      "id": "cq-api-item-e4e01e8103e1afe6",
+      "feature_id": "CQ-BIT-KERNELS",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::WORD_LANES",
+      "kind": "constant",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-7eef3526c61a009a",
+      "performance_groups": [
+        "PERF-BIT-KERNELS"
+      ]
+    },
+    {
+      "id": "cq-api-item-c623196e5884034c",
+      "feature_id": "CQ-BIT-KERNELS",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::WordBlock",
+      "kind": "type-alias",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-7eef3526c61a009a",
+      "performance_groups": [
+        "PERF-BIT-KERNELS"
+      ]
+    },
+    {
+      "id": "cq-api-item-2c5ea72decb65f95",
+      "feature_id": "CQ-ALGEBRA",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::clifford_right_multiply_block",
+      "kind": "function",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-qualification-737bc03a3e037441",
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ]
+    },
+    {
+      "id": "cq-api-item-4ae6e8e260190533",
+      "feature_id": "CQ-BIT-KERNELS",
+      "crate_name": "stab_kernels_simd",
+      "path": "stab_kernels_simd::xor_assign_block",
+      "kind": "function",
+      "source_path": "crates/stab-kernels-simd/src/lib.rs",
+      "source_line": 16,
+      "owner_case_id": "cq-evidence-qualification-7eef3526c61a009a",
+      "performance_groups": [
+        "PERF-BIT-KERNELS"
+      ]
+    },
+    {
       "id": "cq-api-item-15a2558f23bdd4fd",
       "feature_id": "CQ-RESULT-FORMATS",
       "crate_name": "stab_model",
@@ -181695,7 +181773,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "5ce6a862d41f00e4b0b5e8709c359dc368e55e8ba99bacb06d15ea54b0f0614b",
+          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -192104,7 +192182,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "5ce6a862d41f00e4b0b5e8709c359dc368e55e8ba99bacb06d15ea54b0f0614b",
+          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -193457,7 +193535,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "5ce6a862d41f00e4b0b5e8709c359dc368e55e8ba99bacb06d15ea54b0f0614b",
+          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -195842,7 +195920,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "5ce6a862d41f00e4b0b5e8709c359dc368e55e8ba99bacb06d15ea54b0f0614b",
+          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -208194,6 +208272,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-737bc03a3e037441",
+      "feature_id": "CQ-ALGEBRA",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-portable-simd-clifford-kernel-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-kernels-simd",
+          "--lib",
+          "tests::clifford_block_matches_scalar_lane_products",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Four independent packed lanes use an independent scalar Clifford formula and exact before-and-after non-identity masks with no allocation, tail policy, or Stab domain value."
+      },
+      "negative_axes": [
+        "invalid-plane-order",
+        "before-count-collapse",
+        "after-count-collapse",
+        "lane-product-drift"
+      ],
+      "performance_groups": [
+        "PERF-STABILIZER-ALGEBRA"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-755e88a35019401a",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -208878,6 +209006,56 @@
       ],
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-7eef3526c61a009a",
+      "feature_id": "CQ-BIT-KERNELS",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-portable-simd-xor-kernel-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-kernels-simd",
+          "--lib",
+          "tests::raw_xor_block_matches_scalar_formula",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The dependency-free Nightly kernel mutates exactly one four-word left block from one borrowed four-word right block with no allocation, tail policy, or Stab domain value."
+      },
+      "negative_axes": [
+        "left-right-order",
+        "lane-order",
+        "all-zero-word",
+        "all-one-word"
+      ],
+      "performance_groups": [
+        "PERF-BIT-KERNELS"
       ],
       "status": "implemented"
     },

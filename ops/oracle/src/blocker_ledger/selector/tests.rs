@@ -31,6 +31,38 @@ fn accepts_the_extracted_algebra_package() {
 }
 
 #[test]
+fn accepts_the_portable_simd_kernel_package() {
+    let selector = [
+        "cargo",
+        "test",
+        "-p",
+        "stab-kernels-simd",
+        "--lib",
+        "tests::clifford_block_matches_scalar_lane_products",
+        "--quiet",
+        "--exact",
+    ]
+    .map(String::from);
+
+    let parsed = CargoTestSelector::parse(&selector).expect("kernel selector");
+
+    assert!(parsed.is_exact());
+    assert_eq!(
+        parsed.run_args(),
+        [
+            "test",
+            "-p",
+            "stab-kernels-simd",
+            "--lib",
+            "--quiet",
+            "--",
+            "tests::clifford_block_matches_scalar_lane_products",
+            "--exact",
+        ]
+    );
+}
+
+#[test]
 fn accepts_the_extracted_model_package() {
     let selector = [
         "cargo",

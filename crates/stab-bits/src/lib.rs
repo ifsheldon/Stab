@@ -1,7 +1,14 @@
 //! Stable packed bit storage, checked views, scalar kernels, and layout primitives.
 
+#[cfg(feature = "portable-simd")]
+mod portable;
 mod scalar;
 mod transpose;
+
+#[cfg(feature = "portable-simd")]
+use portable as selected;
+#[cfg(not(feature = "portable-simd"))]
+use scalar as selected;
 
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut, Range};
@@ -118,7 +125,7 @@ impl BitBlock {
     }
 
     pub fn xor(self, rhs: Self) -> Self {
-        Self::from_words(scalar::xor_block(self.words, rhs.words))
+        Self::from_words(selected::xor_block(self.words, rhs.words))
     }
 
     pub fn and(self, rhs: Self) -> Self {
@@ -293,7 +300,7 @@ impl BitVec {
 
     pub fn xor_assign(&mut self, rhs: &BitSlice<'_>) -> BitResult<()> {
         ensure_same_bit_len(self.len(), rhs.len())?;
-        scalar::xor_assign_words(&mut self.words, rhs.words());
+        selected::xor_assign_words(&mut self.words, rhs.words());
         self.mask_unused_tail_bits();
         Ok(())
     }
@@ -495,7 +502,7 @@ impl BitMatrix {
             return Ok(());
         }
         let (source_words, target_words) = self.row_pair_words_mut(source, target)?;
-        scalar::xor_assign_words(target_words, source_words);
+        selected::xor_assign_words(target_words, source_words);
         Ok(())
     }
 

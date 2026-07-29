@@ -14,7 +14,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
     let metadata_root =
         std::fs::canonicalize(metadata.workspace_root.as_std_path()).map_err(|source| {
             CheckError::ResolveRoot {
-                path: metadata.workspace_root.into_std_path_buf(),
+                path: metadata.workspace_root.as_std_path().to_path_buf(),
                 source,
             }
         })?;
@@ -62,7 +62,10 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
     }
     packages.sort();
 
-    let resolve = metadata.resolve.ok_or(CheckError::MissingResolve)?;
+    let resolve = metadata
+        .resolve
+        .as_ref()
+        .ok_or(CheckError::MissingResolve)?;
     let mut edges = BTreeSet::new();
     for node in resolve
         .nodes
@@ -80,14 +83,17 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
                     from: from.clone(),
                     to,
                     kind: DependencyKind::Normal,
+                    optional: false,
                 });
                 continue;
             }
             for dependency_kind in &dependency.dep_kinds {
+                let cargo_kind = dependency_kind.kind;
                 edges.insert(WorkspaceEdge {
                     from: from.clone(),
                     to: to.clone(),
-                    kind: DependencyKind::from_cargo(dependency_kind.kind),
+                    kind: DependencyKind::from_cargo(cargo_kind),
+                    optional: dependency_is_optional(&metadata, &node.id, &to, cargo_kind)?,
                 });
             }
         }
@@ -97,6 +103,25 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
         packages,
         edges: edges.into_iter().collect(),
     })
+}
+
+fn dependency_is_optional(
+    metadata: &cargo_metadata::Metadata,
+    source_id: &PackageId,
+    target_name: &str,
+    kind: CargoDependencyKind,
+) -> Result<bool, CheckError> {
+    let package = metadata
+        .packages
+        .iter()
+        .find(|package| package.id == *source_id)
+        .ok_or_else(|| CheckError::UnknownPackageId(source_id.repr.clone()))?;
+    let declarations = package
+        .dependencies
+        .iter()
+        .filter(|dependency| dependency.name == target_name && dependency.kind == kind)
+        .collect::<Vec<_>>();
+    Ok(!declarations.is_empty() && declarations.iter().all(|dependency| dependency.optional))
 }
 
 fn metadata_options() -> Vec<String> {

@@ -46,6 +46,7 @@ pub struct WorkspaceEdge {
     pub from: String,
     pub to: String,
     pub kind: DependencyKind,
+    pub optional: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -176,6 +177,23 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             ));
             continue;
         }
+        if to_class == PackageClass::Product
+            && edge.to == "stab-kernels-simd"
+            && matches!(edge.from.as_str(), "stab-bits" | "stab-algebra")
+            && (edge.kind != DependencyKind::Normal || !edge.optional)
+        {
+            violations.push(Violation::new(
+                "nightly-kernel-edge-not-optional",
+                format!(
+                    "{} -> {} must be an optional normal dependency, found {} optional={}",
+                    edge.from,
+                    edge.to,
+                    edge.kind.as_str(),
+                    edge.optional
+                ),
+            ));
+            continue;
+        }
         if to_class == PackageClass::Product && !is_permitted_product_edge(&edge.from, &edge.to) {
             violations.push(Violation::new(
                 "forbidden-product-edge",
@@ -246,13 +264,12 @@ fn is_permitted_product_edge(from: &str, to: &str) -> bool {
         "stab-analysis" => matches!(to, "stab-model" | "stab-algebra"),
         "stab-engine" => matches!(
             to,
-            "stab-model" | "stab-records" | "stab-algebra" | "stab-analysis" | "stab-kernels-simd"
+            "stab-model" | "stab-records" | "stab-algebra" | "stab-analysis"
         ),
         "stab-decoder" => matches!(to, "stab-model" | "stab-records"),
-        "stab-core" => KNOWN_PRODUCT_PACKAGES
-            .iter()
-            .copied()
-            .any(|package| package == to && package != "stab-core" && package != "stab-cli"),
+        "stab-core" => KNOWN_PRODUCT_PACKAGES.iter().copied().any(|package| {
+            package == to && !matches!(package, "stab-core" | "stab-cli" | "stab-kernels-simd")
+        }),
         "stab-cli" => to == "stab-core",
         _ => false,
     }
@@ -283,6 +300,7 @@ mod tests {
                 from: "stab-core".to_owned(),
                 to: "stab-compat-corpus".to_owned(),
                 kind: DependencyKind::Development,
+                optional: false,
             }],
         };
         let report = validate_graph(&graph);
@@ -318,6 +336,7 @@ mod tests {
                 from: "stab-compat-corpus".to_owned(),
                 to: "stab-core".to_owned(),
                 kind: DependencyKind::Development,
+                optional: false,
             }],
         };
         assert_eq!(

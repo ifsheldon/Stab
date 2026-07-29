@@ -278,6 +278,7 @@ fn is_allowed_test_package(package: &str) -> bool {
         "stab-algebra"
             | "stab-analysis"
             | "stab-bits"
+            | "stab-kernels-simd"
             | "stab-model"
             | "stab-records"
             | "stab-engine"

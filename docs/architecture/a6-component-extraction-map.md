@@ -31,8 +31,8 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-kernels-simd
-stab-core -> all product components
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-cli -> stab-core
 ```
 
@@ -176,7 +176,9 @@ Any helper that samples, constructs a mutable execution frame, or depends on `st
 | `compilation_fingerprint.rs` | `fingerprint.rs` | Own backend-neutral request fingerprints. |
 | Engine-owned portions of `capabilities.rs` | `capabilities.rs` | Own compiler and backend descriptors. |
 
-The crate depends on exact-version `stab-model`, `stab-records`, `stab-algebra`, `stab-analysis`, and optional or direct raw `stab-kernels-simd` as required by the selected build.
+The crate depends on exact-version `stab-model`, `stab-records`, `stab-algebra`, and `stab-analysis`.
+
+It does not depend on `stab-kernels-simd`: the current sampling plans do not execute through the raw XOR or Clifford kernels, so a kernel edge would blur build-time leaf acceleration with engine backend ownership.
 
 Execution code does not import `SampleFormat`, text codecs, filesystem paths, CLI types, or ops descriptors. Byte-oriented materializers that remain for compatibility live in the facade and delegate through typed sinks.
 
@@ -189,11 +191,11 @@ The scalar engine is physically extracted. `stab-engine` owns `CompilationOperat
 | Current source | Destination | Public ownership and rationale |
 | --- | --- | --- |
 | Restored portable-SIMD fixed-block kernels over `stab-bits` and `stab-algebra` scalar references | `stab-kernels-simd/src/lib.rs` | Own new direct `std::simd` code over raw four-word bit and Clifford blocks without absorbing tails, model values, or backend policy. |
-| Measured portable-SIMD packed-bit kernels introduced during A6 | Focused raw modules | Give the optional bit-storage edge a genuine implementation rather than an empty feature. |
+| Measured four-word XOR and non-identity Clifford right-multiplication kernels introduced during A6 | Focused raw modules | Give the optional bit and algebra edges genuine implementations while keeping unmeasured masks, scans, transpose, and execution policy out of the raw crate. |
 
 This crate has no Stab dependency. It is the only crate containing `#![feature(portable_simd)]` or direct `std::simd` paths.
 
-Public functions accept raw `&[u64]`, `&mut [u64]`, arrays of those slices, or fixed `[u64; 4]` blocks. The crate does not expose circuits, gates, algebra values, layouts, policies, or backend enums.
+Public functions accept fixed `[u64; 4]` word blocks and fixed arrays of Clifford planes. The crate does not expose circuits, gates, algebra values, layouts, policies, or backend enums.
 
 ### `stab-core` Facade
 
@@ -220,8 +222,8 @@ The facade does not retain implementation modules after their owner moves.
 | `stab-algebra` | Stable scalar | Enables raw Clifford kernels from `stab-kernels-simd`. |
 | `stab-model` | Stable | No SIMD feature. |
 | `stab-analysis` | Stable | No SIMD feature. |
-| `stab-engine` | Scalar when absent | Registers and executes a distinct portable-SIMD backend when present. |
-| `stab-core` | High-performance facade | Forwards the additive feature to bits, algebra, and engine. |
+| `stab-engine` | Scalar | Does not depend on the raw kernel crate and keeps explicit `PortableSimd` requests unavailable until a later packed-frame implementation supplies a distinct execution plan. |
+| `stab-core` | Scalar by default | Forwards the additive feature to bits and algebra only; it does not reinterpret build-time leaf acceleration as sampling-backend selection. |
 | `stab-cli`, `stab-oracle`, `stab-bench` | Nightly consumer | Explicitly enable `stab-core/portable-simd`; they do not rely on another package to unify it. |
 
 There is no `scalar` feature. Scalar behavior is defined by the absence of `portable-simd`.
@@ -259,7 +261,7 @@ The physical work is split into focused commits:
 6. Complete Stable `stab-model` and facade error/path adapters.
 7. Extract Stable `stab-analysis`.
 8. Extract Nightly `stab-engine`.
-9. Extract dependency-free `stab-kernels-simd`, add feature forwarding, and register the distinct backend.
+9. Extract dependency-free `stab-kernels-simd` and add feature forwarding for measured bit and algebra kernels while retaining scalar-only sampling backend registration.
 10. Add external-consumer fixtures, dependency rejection fixtures, API-tier checks, and generated inventory ownership.
 11. Run moved-path benchmarks, audit, review, and A6 evidence closure.
 
@@ -280,7 +282,7 @@ External fixture crates prove that Stable consumers do not compile facade, engin
 
 ### Algebra
 
-Move or retarget the exact Pauli, Clifford, tableau, flow, conversion, limit, and amplitude-comparison tests. Add scalar-versus-SIMD property tests over empty, tail-only, one-block, multi-block, alias-rejected, and maximum practical inputs.
+Move or retarget the exact Pauli, Clifford, tableau, flow, conversion, limit, and amplitude-comparison tests. Add scalar-versus-SIMD tests over empty, tail-only, one-block, and multi-block inputs, dirty logical tails, every 24-by-24 valid Clifford product, unequal widths, metadata counts, cancellation-free mutation, and allocation-free warmed execution. Safe Rust prevents mutable and immutable aliases before a fixed-block kernel is called, so alias rejection is a compile-time language property rather than a runtime test.
 
 ### Model
 
@@ -294,7 +296,7 @@ Move or retarget every transform, flow, generation, circuit-to-DEM, graphlike, h
 
 ### Engine
 
-Retarget every A4 and A5 compiler, plan, session, cancellation, poisoning, sink-lifecycle, replay, direct-frame, fused-conversion, seeded partitioning, deterministic, and statistical test. Add scalar-versus-portable-backend equivalence for every private plan family.
+Retarget every A4 and A5 compiler, plan, session, cancellation, poisoning, sink-lifecycle, replay, direct-frame, fused-conversion, seeded partitioning, deterministic, and statistical test. Preserve exact unavailable-backend behavior for `PortableSimd`; private sampling-plan equivalence is deferred until two real engine implementations exist.
 
 ### Facade And Features
 
@@ -305,7 +307,7 @@ Add external-consumer fixtures for:
 - Nightly facade with `portable-simd`;
 - CLI, oracle, and benchmark explicit feature intent;
 - feature unification from multiple consumers;
-- forbidden product-to-ops, kernel-to-Stab, Stable-to-engine, Stable-to-facade, and direct-`std::simd` edges;
+- forbidden product-to-ops, kernel-to-Stab, mandatory Stable-to-kernel, Stable-to-engine, Stable-to-facade, and direct `std::simd`, `core::simd`, or portable-SIMD feature-gate sites outside the kernel crate;
 - root, `advanced`, and `experimental` rustdoc tiers;
 - absence of qualification-only product exports.
 
@@ -313,11 +315,13 @@ Add external-consumer fixtures for:
 
 The extraction does not invent new aggregate benchmark rows.
 
-Rerun every existing row whose implementation call path moves:
+Rerun the existing rows whose implementation call path changes:
 
-- M4 circuit parsing, canonical printing, and gate lookup;
-- M5 packed-bit and sparse XOR kernels;
-- M6 Pauli, Clifford, tableau, and flow algebra;
+- M5 dense packed-bit XOR;
+- M6 non-identity Clifford right multiplication;
+- M5 and M6 continuity rows only where the selected feature changes an executed function.
+
+Parser, records, sampling, conversion, DEM, and analysis rows are not SIMD evidence merely because their owning crates were extracted. They are rerun only when a later source change affects their timed boundary.
 - M7 record conversion paths affected by feature forwarding;
 - M8 sampling compilation, session construction, execution, typed batch consumption, encoding, and CLI sampling;
 - M9 measurement-to-detection compilation, conversion, fused detection sampling, replay, routing, and CLI paths;
@@ -337,7 +341,8 @@ All output-producing rows keep their independent semantic witness. Compile-and-r
 | Stable components exclude Nightly | Rust 1.97.1 component and external-consumer checks plus source scanning |
 | Only kernel crate owns direct SIMD | Architecture source scan and rustdoc/build fixtures |
 | Scalar and SIMD are semantically identical | Cross-backend property, frozen-vector, deterministic, and statistical tests |
-| Portable backend is genuine | Distinct backend plan identity, exercised kernel counter or test seam, and phase benchmark evidence |
+| Portable kernels are genuine | Distinct SIMD instructions over affected raw blocks, exact scalar equivalence, allocation evidence, and scalar-versus-SIMD XOR and non-identity Clifford reports |
+| Sampling backend claims remain honest | Scalar remains the sole registered backend and explicit portable requests remain unavailable until a distinct packed-frame plan exists |
 | Facade preserves intended compatibility | API migration inventory, facade tests, CLI oracle, and implemented-only oracle |
 | Product graph has no qualification exports | All-features rustdoc inventory and source scan |
 | Moved paths have no unexplained regression | Source-current phase reports tied to exact moved rows |
@@ -349,6 +354,6 @@ All output-producing rows keep their independent semantic witness. Compile-and-r
 2. Foreign inherent compatibility adapters cannot be reimplemented after their types move. Call sites must migrate to free functions first.
 3. The gate semantic-contract tree mixes product descriptors, tests, and statistical qualification plans. Its product and ops portions must be separated deliberately.
 4. DEM folded traversal uses crate-private internals from several consumers. The advanced boundary must expose behavior, not storage representation.
-5. Backend selection currently advertises portable SIMD as unavailable. Registration is valid only after a genuinely distinct raw kernel path exists.
+5. Backend selection currently advertises portable SIMD as unavailable. Raw bit and Clifford kernels do not change the engine's direct-Z, small-frame, or general-frame representation, so registration remains deferred until a genuinely distinct packed execution plan exists.
 6. Feature unification can accidentally pull Nightly code into Stable consumers. External fixtures must inspect the resolved graph, not only compile one package in the workspace.
 7. Qualification ownership paths and rustdoc identities will change substantially. Inventories must regenerate only after reviewers confirm the new canonical owners and facade aliases.

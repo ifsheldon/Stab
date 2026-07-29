@@ -14915,6 +14915,94 @@
       ]
     },
     {
+      "id": "a6-portable-simd-xor-kernel-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-kernels-simd",
+          "--lib",
+          "tests::raw_xor_block_matches_scalar_formula",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The dependency-free Nightly kernel mutates exactly one four-word left block from one borrowed four-word right block with no allocation, tail policy, or Stab domain value."
+      },
+      "negative_axes": [
+        "left-right-order",
+        "lane-order",
+        "all-zero-word",
+        "all-one-word"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::WORD_LANES"
+        },
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::WordBlock"
+        },
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::xor_assign_block"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a6-portable-simd-clifford-kernel-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-kernels-simd",
+          "--lib",
+          "tests::clifford_block_matches_scalar_lane_products",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Four independent packed lanes use an independent scalar Clifford formula and exact before-and-after non-identity masks with no allocation, tail policy, or Stab domain value."
+      },
+      "negative_axes": [
+        "invalid-plane-order",
+        "before-count-collapse",
+        "after-count-collapse",
+        "lane-product-drift"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::CLIFFORD_PLANES"
+        },
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::CliffordWordBlock"
+        },
+        {
+          "crate_name": "stab_kernels_simd",
+          "owner_path": "stab_kernels_simd::clifford_right_multiply_block"
+        }
+      ],
+      "standalone": true
+    },
+    {
       "id": "cq2-bit-len-slice-access-contract",
       "feature_id": "CQ-BIT-KERNELS",
       "comparator": "semantic-invariant",

@@ -113,7 +113,7 @@ The report contains:
 - descriptor-derived `commands`, `dialects`, `gates`, `codecs`, and `compilers`;
 - `selectable_backends`, currently containing only `scalar`.
 
-`portable-simd` remains absent until A6 registers a distinct executable implementation.
+`portable-simd` remains absent from sampling capabilities until a later packed-frame milestone registers a distinct executable implementation. A6 build-time bit and Clifford acceleration does not change this runtime schema.
 
 Compiler entries report operation, input dialect, compiler schema, request-fingerprint schema, configurable-limit availability, and backend-selection availability.
 

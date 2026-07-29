@@ -9,8 +9,8 @@ mod simulator;
 mod stabilizer;
 
 use public_api_helpers::{
-    api_path_mentions_item, classify_extracted_analysis_api, classify_extracted_engine_api,
-    is_analyzer_api, is_resource_policy_api,
+    api_path_mentions_item, classify_component_crate_api, classify_extracted_analysis_api,
+    classify_extracted_engine_api, is_analyzer_api, is_resource_policy_api,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -284,11 +284,11 @@ pub(super) fn classify_public_api_source(
     source_path: &Path,
     api_path: &str,
 ) -> Option<FeatureId> {
-    if crate_name == "stab_cli" {
-        return Some(FeatureId::Cli);
-    }
     let value = source_path.to_string_lossy().replace('\\', "/");
     let api_lower = api_path.to_ascii_lowercase();
+    if let Some(feature_id) = classify_component_crate_api(crate_name, &value, &api_lower) {
+        return Some(feature_id);
+    }
     if api_lower.contains("bounded_parse_diagnostic_text") {
         return Some(FeatureId::Resource);
     }

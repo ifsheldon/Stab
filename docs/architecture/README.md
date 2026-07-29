@@ -91,9 +91,9 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> stab-algebra
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-kernels-simd
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records
-stab-core -> all product components
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-cli -> stab-core
 
 ops -> product crates
@@ -106,19 +106,19 @@ The checker classifies workspace packages as product, operations, or test suppor
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-Portable SIMD is currently absent from product code after the scalar algebra extraction removed the former direct implementation. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, or direct `std::simd` source site outside the future `stab-kernels-simd` crate fails the check.
+Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, or mandatory Stable-component dependency on that crate fails the check.
 
 The record-boundary and Nightly-isolation milestones remove these allowances; they are not permanent permitted dependencies.
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and complete scalar `stab-engine` packages build on that compiler. Completed portable-backend integration retains the pinned Nightly target.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and complete scalar `stab-engine` packages build on that compiler. The optional raw SIMD crate and consumers that enable it require the pinned Nightly target.
 
-`stab-kernels-simd`, `stab-engine`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler.
+`stab-kernels-simd`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler. `stab-engine` currently remains Stable-compatible because its only registered sampling backend is scalar.
 
-Every direct `std::simd` use will belong to `stab-kernels-simd` after A6.
+Every direct portable-SIMD import and feature gate belongs to `stab-kernels-simd`.
 
-Generic packed storage and scalar kernels live in Stable `stab-bits`, while quantum-specific scalar Clifford and Pauli-word kernels live in Stable `stab-algebra`. The former direct SIMD implementation has been removed from `stab-core`; portable SIMD is registered again only after the dependency-free raw kernel crate provides a distinct tested implementation.
+Generic packed storage and scalar kernels live in Stable `stab-bits`, while quantum-specific scalar Clifford and Pauli-word kernels live in Stable `stab-algebra`. The former direct SIMD implementation has been removed from `stab-core`; the optional raw kernel crate accelerates only source-current measured leaf operations. It does not register a sampling backend because the engine has no distinct packed-frame plan yet.
 
 Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs now live in Stable `stab-records`. `SampleFormat` remains the five-format compatibility enum used by legacy record-at-a-time APIs, while `RecordFormat` is the six-format component registry that also represents PTB64. The overlap is explicit migration debt rather than an assertion that the two enums are interchangeable.
 

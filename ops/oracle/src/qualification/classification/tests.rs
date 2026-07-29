@@ -4,6 +4,8 @@ use super::*;
 mod analysis;
 #[path = "tests/engine.rs"]
 mod engine;
+#[path = "tests/kernels.rs"]
+mod kernels;
 
 #[test]
 fn classifications_keep_deferred_products_out_of_selected_features() {
@@ -37,7 +39,6 @@ fn classifications_distinguish_selected_execution_domains() {
         "stab_core::BitBlock::xor_assign",
     );
     assert_eq!(bits, Some(FeatureId::BitKernels));
-
     assert_eq!(
         classify_public_api_source(
             "stab_analysis",

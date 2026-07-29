@@ -13,10 +13,10 @@
     { "name": "stab-architecture", "path": "ops/architecture" }
   ],
   "edges": [
-    { "from": "stab-bits", "to": "stab-kernels-simd", "kind": "normal" },
+    { "from": "stab-bits", "to": "stab-kernels-simd", "kind": "normal", "optional": true },
     { "from": "stab-records", "to": "stab-bits", "kind": "normal" },
     { "from": "stab-algebra", "to": "stab-bits", "kind": "normal" },
-    { "from": "stab-algebra", "to": "stab-kernels-simd", "kind": "normal" },
+    { "from": "stab-algebra", "to": "stab-kernels-simd", "kind": "normal", "optional": true },
     { "from": "stab-model", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-model", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-algebra", "kind": "normal" },
@@ -24,7 +24,6 @@
     { "from": "stab-engine", "to": "stab-records", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-analysis", "kind": "normal" },
-    { "from": "stab-engine", "to": "stab-kernels-simd", "kind": "normal" },
     { "from": "stab-decoder", "to": "stab-model", "kind": "normal" },
     { "from": "stab-decoder", "to": "stab-records", "kind": "normal" },
     { "from": "stab-core", "to": "stab-engine", "kind": "normal" },
