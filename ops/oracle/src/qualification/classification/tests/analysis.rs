@@ -43,6 +43,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_flow/generators.rs",
+            "stab_analysis::circuit_flow_generators",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
+            "stab_analysis::advanced::SparseReverseFrameTracker",
+            FeatureId::FlowUtils,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,
@@ -106,6 +118,12 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
             "crates/stab-core/src/analysis/mod.rs",
             "stab_core::analysis::circuit_without_tags",
             FeatureId::CircuitApi,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/circuit_flow.rs",
+            "stab_core::circuit_flow_generators",
+            FeatureId::FlowUtils,
         ),
     ] {
         assert_eq!(

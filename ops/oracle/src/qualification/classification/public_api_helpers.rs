@@ -7,8 +7,16 @@ pub(super) fn classify_extracted_analysis_api(
     if is_generation_api(api_lower) {
         return Some(FeatureId::Generation);
     }
+    if is_flow_api(api_lower) {
+        return Some(FeatureId::FlowUtils);
+    }
     if source_path.starts_with("crates/stab-analysis/src/circuit_generation") {
         return Some(FeatureId::Generation);
+    }
+    if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
+        || source_path.starts_with("crates/stab-analysis/src/sparse_rev_frame_tracker")
+    {
+        return Some(FeatureId::FlowUtils);
     }
     if source_path == "crates/stab-analysis/src/mbqc_decomposition.rs" {
         return Some(FeatureId::CircuitApi);
@@ -46,6 +54,26 @@ fn is_generation_api(api_lower: &str) -> bool {
         || api_lower.ends_with("::generate_repetition_code_circuit")
         || api_lower.ends_with("::generate_surface_code_circuit")
         || api_lower.ends_with("::generate_color_code_circuit")
+}
+
+fn is_flow_api(api_lower: &str) -> bool {
+    [
+        "unsignedstabilizerflowcheck",
+        "unsignedstabilizerflowfailure",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
+        || api_lower.rsplit("::").next().is_some_and(|function| {
+            [
+                "check_if_circuit_has_unsigned_stabilizer_flows",
+                "check_unsigned_stabilizer_flows_with_diagnostics",
+                "circuit_flow_generators",
+                "circuit_has_all_unsigned_stabilizer_flows",
+                "circuit_has_unsigned_stabilizer_flow",
+                "solve_for_flow_measurements",
+            ]
+            .contains(&function)
+        })
 }
 
 pub(super) fn api_path_mentions_item(api_path: &str, item: &str) -> bool {

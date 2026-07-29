@@ -4703,7 +4703,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_empty",
@@ -4718,7 +4718,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4746,7 +4746,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_x",
@@ -4761,7 +4761,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4789,7 +4789,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_h",
@@ -4804,7 +4804,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4832,7 +4832,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_measurement",
@@ -4847,7 +4847,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4875,7 +4875,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_duplicate_measurement",
@@ -4890,7 +4890,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4918,7 +4918,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_mxx",
@@ -4933,7 +4933,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4961,7 +4961,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_myy",
@@ -4976,7 +4976,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5004,7 +5004,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_mzz",
@@ -5019,7 +5019,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5047,7 +5047,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_iswap",
@@ -5062,7 +5062,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5090,7 +5090,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_s",
@@ -5105,7 +5105,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5133,7 +5133,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_s_dag",
@@ -5148,7 +5148,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5176,7 +5176,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_spp_z",
@@ -5191,7 +5191,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5219,7 +5219,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_composed_unitary",
@@ -5234,7 +5234,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5262,7 +5262,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_spp_multigroup",
@@ -5277,7 +5277,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5305,7 +5305,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_spp_two_qubit",
@@ -5320,7 +5320,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5348,7 +5348,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_spp_dag",
@@ -5363,7 +5363,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5391,7 +5391,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_cx_feedback",
@@ -5406,7 +5406,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5434,7 +5434,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_reset",
@@ -5449,7 +5449,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5477,7 +5477,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_measure_reset",
@@ -5492,7 +5492,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5520,7 +5520,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_xcz_feedback",
@@ -5535,7 +5535,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5563,7 +5563,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_mpad",
@@ -5578,7 +5578,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5606,7 +5606,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_cy_feedback",
@@ -5621,7 +5621,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5649,7 +5649,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_heralded_mpp",
@@ -5664,7 +5664,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5692,7 +5692,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_various_mpp_yy",
@@ -5707,7 +5707,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5735,7 +5735,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_flow_generators",
               "circuit_flow_generators_measurement_subset_promotes_generated_all_operations_fixture",
@@ -5750,7 +5750,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_flow_generators|measurement",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5778,7 +5778,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_solve_empty",
@@ -5793,7 +5793,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5821,7 +5821,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_solve_simple",
@@ -5836,7 +5836,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5864,7 +5864,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_solve_repetition_code",
@@ -5879,7 +5879,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -5907,7 +5907,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_python_measurement_solve",
@@ -5922,7 +5922,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -5950,7 +5950,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_flow_generators",
               "circuit_flow_generators_promotes_python_multi_target_examples",
@@ -5965,7 +5965,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|circuit_flow_generators_promotes_python_multi_target_examples|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_flow_generators|circuit_flow_generators_promotes_python_multi_target_examples|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -5993,7 +5993,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_python_multitarget_solve",
@@ -6008,7 +6008,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -6036,7 +6036,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_evidence",
               "pfm_b4_flow_python_fewer_measurements",
@@ -6051,7 +6051,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -8441,7 +8441,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "sparse_rev_frame_tracker::unitary_repeat::tests::unitary_repeat_folding_handles_huge_periodic_loop",
               "--quiet",
               "--exact"
@@ -8454,7 +8454,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|unitary_repeat",
+              "argv": "cargo-test|-p|stab-analysis|unitary_repeat",
               "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
             }
           },
@@ -8482,7 +8482,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "sparse_rev_frame_tracker::tests::sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period",
               "--quiet",
               "--exact"
@@ -8495,7 +8495,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|sparse_rev_frame_tracker::tests::sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|sparse_rev_frame_tracker::tests::sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period|--|--exact",
               "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
             }
           },
