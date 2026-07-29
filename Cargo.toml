@@ -48,6 +48,7 @@ serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
 sha2 = "0.11.0"
 signal-hook = "0.4.4"
 smallvec = { version = "1.15.2", features = ["union"] }
+syn = { version = "3.0.3", default-features = false, features = ["full", "parsing"] }
 stab-algebra = { path = "crates/stab-algebra", version = "=0.2.0" }
 stab-analysis = { path = "crates/stab-analysis", version = "=0.2.0" }
 stab-bits = { path = "crates/stab-bits", version = "=0.2.0" }

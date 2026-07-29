@@ -40,12 +40,12 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 
 ## Nonnegotiable Contracts
 
-- Stable 1.97.1 owns model, bits, records, scalar algebra, and pure analysis; Stable default builds cannot parse or compile Nightly-only code.
+- Stable 1.97.1 owns model, bits, records, scalar algebra, pure analysis, and the scalar engine; Stable default builds cannot parse or compile Nightly-only code.
 - Only `stab-kernels-simd` may contain `#![feature(portable_simd)]` or direct `std::simd`.
 - `stab-kernels-simd` has no Stab dependency and exposes only raw word slices, mutable word slices, and fixed `[u64; 4]` kernels.
 - Scalar behavior is the absence of the additive `portable-simd` feature. There are no mutually exclusive scalar and SIMD feature flags.
 - CLI, oracle, and benchmark crates declare their intended scalar or portable build explicitly instead of relying on workspace feature unification.
-- Product crates never depend on ops or test support at runtime. Stable dev dependencies cannot reach engine, facade, CLI, or ops.
+- Product crates never depend on ops or test support at runtime. Stable development edges may reach Stable product components such as `stab-engine` and test-support fixtures, but they cannot make a Stable default build reach the Nightly facade, CLI, portable-SIMD kernel, or ops.
 - Every publishable path dependency includes exact version `=0.2.0`; ops and external conformance fixtures remain unpublished.
 - Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, statistical Stim, resource, cancellation, poisoning, and sink-lifecycle contracts remain unchanged.
 - Move implementation without duplicating it. Compatibility adapters delegate through the new owner and leave the root only where the migration inventory requires.

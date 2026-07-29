@@ -100,17 +100,15 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-`just architecture::check` currently enforces every edge that exists in the workspace, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, rejects Stable defaults that reach portable SIMD, and will enforce the remaining target edges as later component crates are extracted.
+`just architecture::check` enforces every workspace edge, rejects product dependencies on operational crates, permits test-support dependencies only as development edges, and rejects Stable defaults that reach portable SIMD.
 
-The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code.
+The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code. It also parses `stab-core` with `syn`, requires the exact public root modules, rejects root glob exports and direct definitions, and compares every named root reexport against `ops/architecture/facade-root-reexports.txt`.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
 Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check.
 
 `just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through bits, algebra, and core in each portable graph.
-
-The record-boundary and Nightly-isolation milestones remove these allowances; they are not permanent permitted dependencies.
 
 ## Toolchain Boundary
 

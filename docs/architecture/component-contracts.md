@@ -55,6 +55,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: engine, records, CLI, ops.
 - Resource behavior: `ParseLimits` owns caller-selectable source-line admission and a caller-tightenable 256-level parsed-model repeat envelope. Programmatic models may exceed that parser envelope only for APIs with an established deeper contract; those consumers must be iterative or reject before recursive work. `DemFlattenLimits` belongs to the analysis adapter rather than the model.
 - Extension points: immutable typed circuit passes consume and return models.
+- Conformance tests: pinned-Stim circuit and DEM parsing and printing, exact byte spans and diagnostics, gate and target validation, typed identifier and probability bounds, repeat-depth admission, folded traversal, canonical fingerprints, and external Stable consumers.
+- Benchmarks: circuit and DEM parsing and printing, gate lookup, folded traversal, and model fingerprinting as separately timed phases with pinned-Stim comparators where the semantic work is faithful.
+- Files changed together: model source and tests, facade reexports and error conversions, parser and dialect fixtures, API migration inventory, correctness ownership, affected runtime contracts and profiler notes, and architecture documentation.
 
 ### Bits
 
@@ -78,6 +81,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: circuit execution, filesystem paths, CLI, ops.
 - Resource behavior: dense and packed codec scratch is bounded by declared record width and the active batch, never total stream length or duplicate-token count. Raw sparse and typed-token visitors may retain one encoded record because duplicate order is their returned value. An explicitly in-memory codec sink may retain its caller-requested encoded output bytes; that materialized result is reported separately from bounded working scratch.
 - Extension points: typed record sinks and bounded record visitors.
+- Conformance tests: the pinned-Stim result-format corpus across materialized and streaming readers, exact width and namespace bounds, malformed grammar, PTB64 groups, duplicate-token semantics, visitor cancellation, bounded allocation, sink lifecycle, and external Stable consumers.
+- Benchmarks: phase-specific `01`, `b8`, `r8`, HITS, DETS, and PTB64 decode and encode workloads, plus process-symmetric conversion rows when the CLI boundary is the public operation under study.
+- Files changed together: records source and tests, shared compatibility corpus, facade compatibility adapters, CLI conversion and replay paths, oracle fixtures, correctness ownership, benchmark runtime contracts and profiler notes, and format documentation.
 
 ### Algebra
 
@@ -88,6 +94,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: Stim parsing, CLI, ops.
 - Resource behavior: scalar stable defaults with bounded construction and optional Nightly acceleration above storage kernels.
 - Extension points: pure functions and owned values.
+- Conformance tests: exact Pauli phase and commutation laws, all valid Clifford products, tableau composition and inversion, flow semantics, width and resource rejection, scalar-versus-SIMD equivalence, allocation bounds, and external Stable consumers.
+- Benchmarks: Pauli, Clifford, tableau, and flow phases with exact semantic witnesses, including scalar-versus-SIMD diagnostics only for kernels whose executed path changes and pinned-Stim comparators where faithful.
+- Files changed together: algebra source and tests, bits and optional kernel feature maps, facade reexports and compatibility conversions, analysis and engine callers, correctness ownership, affected runtime contracts and profiler notes, and Stable/Nightly documentation.
 
 ### SIMD Kernels
 
@@ -111,6 +120,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: textual codecs, filesystem paths, CLI, ops.
 - Resource behavior: `DetectionConversionLimits` and `DemSamplerLimits` own the caller-selectable conversion and DEM execution budgets. Circuit sampling, measurement-to-detection conversion, circuit detection sampling, and DEM sampling each have operation-specific compiler, immutable-plan, mutable-session, and typed-sink boundaries. Session construction uses fallible reservation and conservatively rejects more than 256 MiB of reusable frame, reference, record, error, and bit-plane storage before allocation; fused detection admits the aggregate sampling-plus-conversion estimate, not each component independently. DEM logical returned-record limits remain distinct from its active retained-byte limit, which shrinks the reusable batch when necessary and includes compatibility-sink scratch. Detection and DEM execution otherwise reuse at most one 64-shot batch, conversion may accept smaller caller batches or one record at a time, and cancellation is checked only at documented batch boundaries. One expensive shot has no wall-clock cancellation deadline.
 - Extension points: measurement, detection, and DEM-sample sinks.
+- Conformance tests: seeded reproducibility, pinned-Stim statistical semantics, compilation and plan fingerprints, capability and backend selection, session reuse, cancellation and poisoning, resource admission, sink lifecycle, reference samples, sampled flows, and composed sampling-to-detection behavior.
+- Benchmarks: compilation, execution, conversion, and delivery phases for circuit sampling, detection conversion, fused detection, and DEM sampling with exact work and output witnesses; aggregate facade or CLI timing cannot substitute for an owning engine phase.
+- Files changed together: engine source and tests, model and analysis lowering contracts, records sink interfaces, facade adapters and error conversions, capability and plan schemas, correctness ownership, runtime contracts and profiler notes, and resource documentation.
 
 ### Analysis
 
@@ -121,6 +133,9 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Forbidden: CLI, ops, and engine.
 - Resource behavior: `CircuitFlattenLimits`, `DemFlattenLimits`, `LogicalErrorSearchLimits`, and `SatMaterializationLimits` own their independent expansion, retained-state, and output budgets. Other partial analysis algorithms retain documented fixed safety contracts instead of sharing a generic policy.
 - Extension points: typed circuit passes.
+- Conformance tests: pinned-Stim transforms and circuit-to-DEM behavior, exact generated circuits and decompositions, tableau and flow analysis, logical-error and SAT witnesses, error matching and provenance, folded-repeat handling, deterministic resource rejection, and external Stable consumers.
+- Benchmarks: circuit-to-DEM lowering, transforms, generation, flow solving, logical-error search, SAT materialization, and error matching as separate semantic phases with exact work witnesses and pinned-Stim comparators where faithful.
+- Files changed together: analysis source and tests, model and algebra contracts, facade wrappers and aggregate errors, generator and oracle fixtures, correctness ownership, affected runtime contracts and profiler notes, and operation-specific resource documentation.
 
 ### Facade
 
@@ -133,7 +148,7 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Extension points: `advanced` exposes proven lower-level component seams and `experimental` contains only externally proven pre-stable contracts. Neither namespace is a dynamic plugin registry.
 - Conformance tests: facade-to-owner identity, error conversion, compatibility adapters, filesystem safety, root/advanced/experimental API tiers, downstream consumers, implemented CLI oracle, and generated ownership.
 - Benchmarks: facade adapters are measured only when they are the public workload under study; canonical component phases remain separately timed and cannot be inferred from a facade aggregate.
-- Files changed together: facade exports and adapters, the API migration inventory, architecture tier policy, external consumers, correctness ownership, affected benchmark callers, README, and migration documentation.
+- Files changed together: facade exports and adapters, `ops/architecture/facade-root-reexports.txt`, the API migration inventory, architecture tier policy and tests, external consumers, correctness ownership, affected benchmark callers, README, and migration documentation.
 
 ### CLI
 
