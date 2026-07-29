@@ -33,7 +33,6 @@ pub mod result_streaming;
 mod sampling;
 mod sampling_estimate;
 mod sampling_output_compat;
-mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
 

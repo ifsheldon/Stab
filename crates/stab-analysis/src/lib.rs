@@ -13,6 +13,7 @@ mod circuit_inverse;
 mod circuit_missing_detectors;
 mod circuit_simplify;
 mod circuit_tableau;
+mod circuit_to_dem;
 mod circuit_transforms;
 mod error;
 pub mod gate;
@@ -47,6 +48,11 @@ pub use circuit_inverse::{
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
+pub use circuit_to_dem::{
+    DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
+    circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
+    try_disjoint_to_independent_xyz_errors,
+};
 pub use circuit_transforms::{
     CircuitFlattenLimits, circuit_without_noise, flattened_circuit, flattened_circuit_operations,
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
