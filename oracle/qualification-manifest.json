@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "2df530fc348fbcd6d98399c7a35acebfbe5d240f6c42c809b16d076b60d92dc6",
+  "semantic_digest": "75d55ffc3e39bc37ff99fe2d2cf166aa7765c19911e8b22968e7a0e81b6cfb99",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -171160,7 +171160,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
+          "corpus_sha256": "8917f758c9f6c3a44007c7cded725e765ba22991eb4794d0e8a1227136888ab3",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -181584,7 +181584,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
+          "corpus_sha256": "8917f758c9f6c3a44007c7cded725e765ba22991eb4794d0e8a1227136888ab3",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -182937,7 +182937,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
+          "corpus_sha256": "8917f758c9f6c3a44007c7cded725e765ba22991eb4794d0e8a1227136888ab3",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -185326,7 +185326,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-bits/tests/bits.rs",
-          "corpus_sha256": "fec90f97d01aeefa67d8460a15174d19e2e81a971f0daeea94adb023b622fffa",
+          "corpus_sha256": "8917f758c9f6c3a44007c7cded725e765ba22991eb4794d0e8a1227136888ab3",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
