@@ -10,13 +10,13 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
     BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
-    Probability, RecordFormat, ReferenceSampleTree, SampleFormat,
+    Probability, RecordFormat, SampleFormat,
     result_formats::{write_ptb64_records_checked, write_records},
     result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
 };
 use stab_engine::{
-    BackendPreference, RandomPolicy, SamplingCompiler, SamplingPlan, SamplingSession, Seed,
-    ShotCount, biased_randomize_bits,
+    BackendPreference, RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan,
+    SamplingSession, Seed, ShotCount, biased_randomize_bits,
 };
 
 use crate::error::BenchError;

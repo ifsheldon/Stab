@@ -1,7 +1,8 @@
-//! Compact deterministic reference samples owned by the execution layer.
+//! Compact deterministic reference samples owned by the execution engine.
 
-use super::CompiledSampler;
-use crate::{Circuit, CircuitResult};
+use stab_model::Circuit;
+
+use crate::{SamplingCompileError, SamplingCompiler};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceSampleTree {
@@ -11,8 +12,8 @@ pub struct ReferenceSampleTree {
 }
 
 impl ReferenceSampleTree {
-    pub fn from_circuit_reference_sample(circuit: &Circuit) -> CircuitResult<Self> {
-        let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
+    pub fn from_circuit_reference_sample(circuit: &Circuit) -> Result<Self, SamplingCompileError> {
+        let sampler = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
         Ok(Self {
             prefix_bits: sampler.reference_sample(),
             suffix_children: Vec::new(),
@@ -114,10 +115,13 @@ mod tests {
         reason = "reference-sample-tree tests use compact upstream-style assertions"
     )]
 
-    use super::*;
+    use stab_model::Circuit;
+
+    use super::ReferenceSampleTree;
+    use crate::SamplingCompiler;
 
     #[test]
-    fn reference_sample_tree_matches_upstream_equality_and_string_subset() {
+    fn reference_sample_tree_matches_upstream_structure_and_string_subset() {
         let empty1 = ReferenceSampleTree {
             prefix_bits: Vec::new(),
             suffix_children: Vec::new(),
@@ -210,10 +214,18 @@ mod tests {
             assert_eq!(tree.get(index), Some(bit), "index {index}");
         }
         assert_eq!(tree.get(expected.len()), None);
+
+        let large = ReferenceSampleTree {
+            repetitions: 1_000_000,
+            ..tree
+        };
+        assert_eq!(large.size(), 9_000_000);
+        assert_eq!(large.get(8_999_999), Some(true));
+        assert_eq!(large.get(9_000_000), None);
     }
 
     #[test]
-    fn reference_sample_tree_from_circuit_matches_sampler_reference_sample() {
+    fn reference_sample_tree_from_circuit_matches_sampling_plan_reference() {
         let circuit = Circuit::from_stim_str(
             "
             M 0
@@ -224,8 +236,10 @@ mod tests {
         .expect("parse circuit");
         let tree =
             ReferenceSampleTree::from_circuit_reference_sample(&circuit).expect("reference tree");
-        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
-        assert_eq!(tree.decompress(), sampler.reference_sample());
+        let plan = SamplingCompiler::new()
+            .compile(&circuit)
+            .expect("compile sampling plan");
+        assert_eq!(tree.decompress(), plan.reference_sample());
         assert_eq!(tree.size(), 2);
         assert_eq!(tree.stim_string(), "1*('01')");
     }

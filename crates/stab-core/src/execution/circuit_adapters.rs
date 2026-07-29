@@ -1,4 +1,4 @@
-use super::{CompiledSampler, reference_sample_tree::ReferenceSampleTree};
+use super::{CompiledSampler, ReferenceSampleTree};
 use crate::{Circuit, CircuitResult};
 
 /// Computes Stim's deterministic reference sample for a circuit.
@@ -8,5 +8,5 @@ pub fn circuit_reference_sample(circuit: &Circuit) -> CircuitResult<Vec<bool>> {
 
 /// Computes a reference-sample tree for a circuit.
 pub fn circuit_reference_sample_tree(circuit: &Circuit) -> CircuitResult<ReferenceSampleTree> {
-    ReferenceSampleTree::from_circuit_reference_sample(circuit)
+    ReferenceSampleTree::from_circuit_reference_sample(circuit).map_err(Into::into)
 }
