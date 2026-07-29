@@ -10003,7 +10003,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "sat_materialization_limits",
             "default_policy_keeps_frozen_literals_and_existing_entry_points",
@@ -10021,6 +10021,90 @@
           "weighted-shortest-policy-drift"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_REPEAT_UNROLL"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_REPEAT_ITERATIONS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_ERROR_MECHANISMS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_VARIABLES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_CLAUSES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_CLAUSE_LITERALS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::DEFAULT_MAX_OUTPUT_BYTES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_error_mechanisms"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_variables"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_clauses"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_clause_literals"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::max_output_bytes"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::shortest_error_sat_problem_with_limits"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::likeliest_error_sat_problem_with_limits"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::SatMaterializationLimits"
@@ -10119,7 +10203,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "sat_materialization_limits",
             "traversal_limits_accept_exact_maxima_and_reject_first_excesses",
@@ -10137,6 +10221,18 @@
           "collection-before-traversal-admission"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_repeat_iterations"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::SatMaterializationLimits::with_max_repeat_unroll"
@@ -10163,7 +10259,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "sat_materialization_limits",
             "flattened_error_and_target_limits_are_admitted_before_collection",
@@ -10181,6 +10277,14 @@
           "collection-before-admission"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_error_mechanisms"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_target_occurrences"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::SatMaterializationLimits::with_max_error_mechanisms"
@@ -10203,7 +10307,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "sat_materialization_limits",
             "cnf_shape_limits_accept_exact_maxima_and_reject_first_excess",
@@ -10221,6 +10325,18 @@
           "literal-off-by-one"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_variables"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_clauses"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_clause_literals"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::SatMaterializationLimits::with_max_variables"
@@ -10247,7 +10363,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "sat_materialization_limits",
             "every_early_unsat_path_obeys_the_output_byte_limit",
@@ -10266,9 +10382,43 @@
         ],
         "public_api_owners": [
           {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::SatMaterializationLimits::with_max_output_bytes"
+          },
+          {
             "crate_name": "stab_core",
             "owner_path": "stab_core::SatMaterializationLimits::with_max_output_bytes"
           }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-sat-resource-facade-conversion",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "analysis_owner_facade",
+            "sat_resource_conversion_preserves_the_facade_contract",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The compatibility facade preserves exact SAT output and converts an analysis-owned target-admission rejection without losing operation, resource dimension, actual value, limit, or human diagnostic."
+        },
+        "negative_axes": [
+          "sat-facade-output-drift",
+          "sat-resource-class-loss",
+          "sat-facade-display-drift"
         ],
         "standalone": true
       },

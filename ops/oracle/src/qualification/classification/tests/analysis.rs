@@ -127,6 +127,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/dem/sat.rs",
+            "stab_analysis::shortest_error_sat_problem",
+            FeatureId::Search,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/dem/sat/limits.rs",
+            "stab_analysis::SatMaterializationLimits",
+            FeatureId::Resource,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,

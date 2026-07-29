@@ -40,6 +40,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-circuit-flatten-repeat-envelope",
     "a2-circuit-flatten-platform-capacity",
     "a6-analysis-resource-facade-conversion",
+    "a6-sat-resource-facade-conversion",
     "a2-dem-flatten-policy-admission",
     "a2-dem-flatten-payload-policy",
     "a2-dem-flatten-platform-capacity",

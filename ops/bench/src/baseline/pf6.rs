@@ -1,11 +1,11 @@
 use std::hint::black_box;
 
+use stab_analysis::{likeliest_error_sat_problem, shortest_error_sat_problem};
 use stab_core::{
     Circuit, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
     ErrorAnalyzerOptions, Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     circuit_to_detector_error_model, find_undetectable_logical_error,
-    generate_surface_code_circuit, likeliest_error_sat_problem, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    generate_surface_code_circuit, shortest_graphlike_undetectable_logical_error,
 };
 
 use crate::error::BenchError;
@@ -504,13 +504,13 @@ fn run_wcnf_direct_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErro
     let shortest_measurement = measure_wcnf(
         row,
         "stab_pfm_b5_wcnf_shortest_direct",
-        || shortest_error_sat_problem(&model),
+        || shortest_error_sat_problem(&model).map_err(Into::into),
         shortest_stats,
     )?;
     let likeliest_measurement = measure_wcnf(
         row,
         "stab_pfm_b5_wcnf_likeliest_direct",
-        || likeliest_error_sat_problem(&model, 100),
+        || likeliest_error_sat_problem(&model, 100).map_err(Into::into),
         likeliest_stats,
     )?;
     Ok(vec![shortest_measurement, likeliest_measurement])
@@ -526,13 +526,13 @@ fn run_wcnf_generated_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchE
         measure_wcnf(
             row,
             "stab_pfm_b5_wcnf_shortest_generated",
-            || shortest_error_sat_problem(&model),
+            || shortest_error_sat_problem(&model).map_err(Into::into),
             wcnf_stats(row, &shortest)?,
         )?,
         measure_wcnf(
             row,
             "stab_pfm_b5_wcnf_likeliest_generated",
-            || likeliest_error_sat_problem(&model, 100),
+            || likeliest_error_sat_problem(&model, 100).map_err(Into::into),
             wcnf_stats(row, &likeliest)?,
         )?,
     ])
