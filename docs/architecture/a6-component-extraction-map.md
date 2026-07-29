@@ -109,6 +109,8 @@ The crate depends on `stab-bits = { path = "../stab-bits", version = "=0.2.0" }`
 
 Its default feature set is empty. The additive `portable-simd` feature enables `stab-kernels-simd` and selects its raw kernel only when the caller explicitly asks for that implementation.
 
+Canonical Pauli, Clifford, Flow, Tableau, iterator, solver, resource, and unitary-conversion qualification executes integration targets under `crates/stab-algebra/tests/`. The facade keeps only tests that exercise a real model, circuit, analysis, CLI, or reexport boundary. The generated inventory rejects an implemented `stab_algebra` API parent whose primary Cargo selector does not name `stab-algebra`; the same rule applies to `stab_bits`.
+
 ### `stab-model`
 
 | Current source | Destination | Public ownership and rationale |
@@ -349,6 +351,8 @@ Measurements remain phase-specific. A facade call-path move is not evidence for 
 
 All output-producing rows keep their independent semantic witness. Compile-and-release rows keep source-owned plan dimensions or fingerprints outside the timed region.
 
+The final A6 ownership-continuity matrix is the complete 166-row pre-M12 manifest: M4 through M11 and PF1 through PF7. This deliberately includes adjacent unchanged rows so the source-current report cannot hide a moved path behind a hand-selected subset. The final comparison uses one fresh pinned-Stim baseline, a warmup, and three recorded Stab runs. Existing comparator classes, thresholds, and waivers do not change. A report-only phase whose median is more than 15% worse than its latest clean per-extraction report must be profiled and either repaired or explained in the progress report before closure.
+
 ## Acceptance Matrix
 
 | Requirement | Authoritative evidence |
@@ -360,6 +364,7 @@ All output-producing rows keep their independent semantic witness. Compile-and-r
 | Portable kernels are genuine | Distinct SIMD instructions over affected raw blocks, exact scalar equivalence, allocation evidence, and scalar-versus-SIMD XOR and non-identity Clifford reports |
 | Sampling backend claims remain honest | Scalar remains the sole registered backend and explicit portable requests remain unavailable until a distinct packed-frame plan exists |
 | Facade preserves intended compatibility | API migration inventory, facade tests, CLI oracle, and implemented-only oracle |
+| Canonical semantics do not depend on the facade | Generated API ownership plus direct-package selector guards for every implemented `stab_bits` and `stab_algebra` item |
 | Product graph has no qualification exports | All-features rustdoc inventory and source scan |
 | Moved paths have no unexplained regression | Source-current phase reports tied to exact moved rows |
 | Documentation matches physical state | Generated API/status checks and architecture link checks |

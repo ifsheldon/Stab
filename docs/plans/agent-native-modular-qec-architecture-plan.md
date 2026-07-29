@@ -768,6 +768,7 @@ Status: Active.
 - Architecture dependency checks.
 - Rustdoc public API inventory and tier checks.
 - No product-to-ops dependency or qualification-only public item.
+- Canonical-package ownership checks requiring every implemented `stab_bits` and `stab_algebra` API parent and owned oracle fixture to execute its Stable package directly; only explicit circuit, analysis, CLI, or facade integration cases may remain under `stab-core`.
 
 ### Benchmarks
 
@@ -775,6 +776,7 @@ Status: Active.
 - Bind `--no-default-features` scalar and `--no-default-features --features portable-simd` builds into distinct schema-version-7 private worker receipts. Use the fixed medium and large scales, three alternating warmup pairs, and at least nine alternating retained pairs. Report portable-over-scalar normalized ratios and a deterministic confidence interval; call the result a material benefit only when the complete interval is below `1.0`.
 - Re-run diagnostic Stim-relative M5 XOR and M6 non-identity Clifford continuity for the selected default scalar implementation after the SIMD diagnostics without changing the `1.25x` boundary. A9 owns promotable controlled-host parity evidence.
 - Treat not-zero, popcount, sparse XOR, transpose, Pauli, sampling, parser, records, conversion, DEM, and analysis rows as continuity checks only when their executed call path actually changes.
+- On the final reviewed A6 source revision, run one complete 166-row ownership-continuity matrix covering M4 through M11 and PF1 through PF7. Use one fresh pinned-Stim baseline, one warmed three-run Stab comparison, unchanged comparator classes, and exact output witnesses. Threshold-eligible rows must retain their existing Stim policies. For report-only phases, compare the source-current median with the latest clean per-extraction report; a deterioration greater than 15% requires a focused profile and either a fix or a source-owned explanation in the A6 progress report.
 
 ### Done Criteria
 
@@ -782,6 +784,8 @@ Status: Active.
 - The Nightly facade can opt into source-current SIMD leaf kernels without advertising a nonexistent sampling backend.
 - Only `stab-kernels-simd` contains `#![feature(portable_simd)]`.
 - Medium and large scalar-versus-SIMD XOR and non-identity Clifford evidence is source-current. SIMD remains opt-in unless affected families demonstrate a material benefit without diagnostic Stim-relative continuity or confidence regression; A9 separately owns promotable parity evidence.
+- The final 166-row ownership-continuity report is source-current, has no missing runner or failed semantic witness, and records every report-only phase that crossed the 15% review threshold together with its disposition.
+- Pure bit and algebra compatibility and resource suites execute `stab-bits` and `stab-algebra` directly; `stab-core` owns only deliberate cross-component and facade integration.
 - Every product crate has a documented contract and permitted dependencies only.
 - The A6 closure commit has green source-current CI; documentation-only closure commits may cite the immediately preceding clean product-source revision when they change no compiled source, contract, inventory, policy, fixture, or workflow.
 

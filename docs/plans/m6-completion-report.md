@@ -13,7 +13,9 @@ Complete against the clarified M6 stabilizer-algebra contract.
 M6 implements owned Pauli, flexible Pauli, Clifford string, flow, tableau, tableau iterator, circuit-to-tableau, inverse-circuit, simplified-circuit, MBQC decomposition, stabilizers-to-tableau, and unitary-to-tableau subsets needed by the Rust core and later CLI workflows.
 Python binding APIs, exact C++ random-stream parity, public borrowed Pauli-string views, full state-vector round trips, full all-gate decomposition, measurement-rich flow semantics, and exact random 10k-qubit performance parity remain deferred by the roadmap.
 
-CQ2 qualification later hardened caller-sized Algebra APIs without expanding the selected product surface. `PauliString`, `FlexPauliString`, `CliffordString`, `Tableau`, `PauliStringIterator`, and `Flow` constructors now return typed resource errors; Clifford growth, aggregate Flow classical terms, dense Tableau and circuit conversion, stabilizer solving, random Tableau construction, unitary conversion, width-weighted compact-repeat Tableau work, and annotation-only identity-flow output have explicit admission contracts documented in the roadmap and checked by `crates/stab-core/tests/cq2_algebra_resources.rs`. `Circuit::to_tableau` also covers Hermitian `SPP` and `SPP_DAG` operations, including repeated-qubit phase reduction, and raises compact repeat bodies by identity-aware binary exponentiation.
+This report records the original M6 closure before the A6 physical extraction. The canonical algebra implementation and pure qualification suites now execute `stab-algebra` directly. Circuit, analysis, and facade integration remains in the owning higher-level packages; historical command results below retain their original package identity.
+
+CQ2 qualification later hardened caller-sized Algebra APIs without expanding the selected product surface. `PauliString`, `FlexPauliString`, `CliffordString`, `Tableau`, `PauliStringIterator`, and `Flow` constructors now return typed resource errors; Clifford growth, aggregate Flow classical terms, dense Tableau and circuit conversion, stabilizer solving, random Tableau construction, unitary conversion, width-weighted compact-repeat Tableau work, and annotation-only identity-flow output have explicit admission contracts documented in the roadmap. `crates/stab-algebra/tests/cq2_algebra_resources.rs` owns the direct algebra boundaries, while `crates/stab-core/tests/cq2_algebra_integration_resources.rs` owns only circuit-derived admission and compact-repeat integration. `Circuit::to_tableau` also covers Hermitian `SPP` and `SPP_DAG` operations, including repeated-qubit phase reduction, and raises compact repeat bodies by identity-aware binary exponentiation.
 
 ## Tests Ported Or Created
 
@@ -25,10 +27,9 @@ CQ2 qualification later hardened caller-sized Algebra APIs without expanding the
 
 ## Implementation Areas
 
-- `crates/stab-core/src/stabilizers/` owns `PauliString`, `FlexPauliString`, `CliffordString`, `Tableau`, tableau iteration, stabilizer conversion, Pauli multiplication, sign handling, random hooks, and unitary-to-tableau conversion.
-- `crates/stab-core/src/flow.rs` and `crates/stab-core/src/circuit_flow.rs` own flow parsing, display, multiplication, circuit generator derivation, and M6 deterministic unitary flow checks.
-- `crates/stab-core/src/circuit_tableau.rs`, `circuit_inverse.rs`, `circuit_simplify.rs`, and `mbqc_decomposition.rs` own M6 circuit algebra helpers.
-- `crates/stab-core/tests/stabilizers.rs`, `stabilizer_flows.rs`, `circuit_flow_generators.rs`, `circuit_inverse.rs`, `circuit_inverse_qec.rs`, `circuit_tableau.rs`, `circuit_flows.rs`, `mbqc_decomposition.rs`, `circuit_simplify.rs`, `stabilizers_to_tableau.rs`, and `stabilizers_vs_amplitudes.rs` hold the direct M6 test surface.
+- `crates/stab-algebra/src/` owns `PauliString`, `FlexPauliString`, `CliffordString`, `Flow`, `Tableau`, algebra iterators, stabilizer conversion, Pauli multiplication, sign handling, random hooks, resource admission, and unitary-to-tableau conversion.
+- `crates/stab-analysis/src/circuit_flow/`, `circuit_tableau.rs`, `circuit_inverse.rs`, `circuit_simplify.rs`, and `mbqc_decomposition.rs` own model-aware circuit algebra and flow analysis.
+- `crates/stab-algebra/tests/` holds the pure M6 semantic, property, conversion, and resource qualification surface. `crates/stab-analysis/tests/` and `crates/stab-core/tests/` hold deliberate analysis, circuit, and facade integration.
 - `oracle/fixtures/manifest.csv` records the implemented M6 oracle rows and the owned or deferred subcases in each row note.
 - `benchmarks/manifest.csv` records six M6 benchmark rows for Clifford strings, Pauli strings, Pauli iterators, tableaus, tableau iterators, and stabilizers-to-tableau conversion.
 
@@ -36,18 +37,18 @@ CQ2 qualification later hardened caller-sized Algebra APIs without expanding the
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Implement `PauliString`, `CliffordString`, `Tableau`, and related iterators or views with typed lengths and sign handling | Satisfied | `crates/stab-core/src/stabilizers/`; implemented rows `coverage-stabilizers-pauli-string`, `coverage-stabilizers-flex-pauli-string`, `coverage-stabilizers-clifford-string`, `coverage-stabilizers-tableau`, `coverage-stabilizers-pauli-string-iter`, and `coverage-stabilizers-tableau-iter` |
-| Implement tableau composition, inversion, gate conjugation, commutation, Pauli products, sign multiplication, random hooks, and text round trips | Satisfied | `crates/stab-core/tests/stabilizers.rs`; `cargo test -p stab-core stabilizers --quiet`; `just oracle::run --milestone M6` |
-| Implement single-qubit Clifford gates, two-qubit Clifford gates, swaps, Pauli-product operations, and derived operations used by Stim tests | Satisfied | `crates/stab-core/src/stabilizers/`; `crates/stab-core/src/circuit_tableau.rs`; direct M6 tests and oracle rows |
-| Implement conversion helpers needed by later `Circuit::to_tableau`, inverse-circuit, flow, and stabilizer-to-tableau operations | Satisfied | `crates/stab-core/src/circuit_tableau.rs`; `crates/stab-core/src/circuit_inverse.rs`; `crates/stab-core/src/flow.rs`; `crates/stab-core/src/stabilizers/conversions.rs` |
-| Add property tests for inverse, identity, associativity, commutation, conjugation, text round trips, and scalar or reference equivalence | Satisfied | `crates/stab-core/tests/stabilizers.rs`; `crates/stab-core/tests/stabilizers_to_tableau.rs`; `just oracle::run --milestone M6`; `cargo test -p stab-core stabilizers --quiet` covers the stabilizer-named property slice |
+| Implement `PauliString`, `CliffordString`, `Tableau`, and related iterators or views with typed lengths and sign handling | Satisfied | `crates/stab-algebra/src/`; implemented rows `coverage-stabilizers-pauli-string`, `coverage-stabilizers-flex-pauli-string`, `coverage-stabilizers-clifford-string`, `coverage-stabilizers-tableau`, `coverage-stabilizers-pauli-string-iter`, and `coverage-stabilizers-tableau-iter` |
+| Implement tableau composition, inversion, gate conjugation, commutation, Pauli products, sign multiplication, random hooks, and text round trips | Satisfied | `crates/stab-algebra/tests/`; `cargo test -p stab-algebra --all-targets`; `just oracle::run --milestone M6` |
+| Implement single-qubit Clifford gates, two-qubit Clifford gates, swaps, Pauli-product operations, and derived operations used by Stim tests | Satisfied | `crates/stab-algebra/src/`; `crates/stab-analysis/src/circuit_tableau.rs`; direct M6 tests and oracle rows |
+| Implement conversion helpers needed by later `Circuit::to_tableau`, inverse-circuit, flow, and stabilizer-to-tableau operations | Satisfied | `crates/stab-analysis/src/circuit_tableau.rs`; `crates/stab-analysis/src/circuit_inverse.rs`; `crates/stab-analysis/src/circuit_flow.rs`; `crates/stab-algebra/src/conversions.rs` |
+| Add property tests for inverse, identity, associativity, commutation, conjugation, text round trips, and scalar or reference equivalence | Satisfied | `crates/stab-algebra/tests/`; `just oracle::run --milestone M6`; `cargo test -p stab-algebra --all-targets` |
 | `cargo test -p stab-core stabilizers` passes direct and property tests | Satisfied | Command passed for the stabilizer-named property slice; util-top M6 rows are covered by their manifest commands and by `just oracle::run --milestone M6` |
 | `cargo test -p stab-core --test stabilizers_vs_amplitudes` passes the M6-owned unitary-to-tableau parity subset | Satisfied | Command passed 5 tests |
 | `just oracle::run --milestone M6` passes selected C++ Stim algebra comparisons | Satisfied | Command passed all 17 implemented M6 property and structural rows |
 | `just oracle::list --milestone M6` shows implemented M6 rows, and the fixture manifest names owned and deferred util-top subcases | Satisfied | `just oracle::list --milestone M6` lists all M6 rows as implemented with property or structural grouping; `oracle/fixtures/manifest.csv` contains the owned and deferred subcase notes |
 | `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads with normalized rates and compare notes | Satisfied | `target/benchmarks/m6-completion-compare/compare.json`; strict compare passed all six M6 rows |
 | Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented | Satisfied | M6 public API uses owned `PauliString`, `FlexPauliString`, `CliffordString`, and `Tableau`; public borrowed view parity is explicitly deferred |
-| Caller-sized Algebra APIs reject deterministically before unbounded materialization or later algorithmic work | Satisfied by CQ2 hardening | `crates/stab-core/src/stabilizers/limits.rs`; exact resource parents in `oracle/qualification-cases.json`; `cargo test -p stab-core --test cq2_algebra_resources --quiet` |
+| Caller-sized Algebra APIs reject deterministically before unbounded materialization or later algorithmic work | Satisfied by CQ2 hardening | `crates/stab-algebra/src/limits.rs`; exact resource parents in `oracle/qualification-cases.json`; `cargo test -p stab-algebra --test cq2_algebra_resources --quiet`; `cargo test -p stab-core --test cq2_algebra_integration_resources --quiet` |
 
 ## Oracle And Benchmark Evidence
 
@@ -69,13 +70,12 @@ CQ2 qualification later hardened caller-sized Algebra APIs without expanding the
 
 - The 2026-06-28 GPT-5.5/xhigh full-code-review pass found no blocking M6 documentation, workflow, or implementation issues.
 - The review found two documentation nits, both fixed here: `just oracle::list --milestone M6` is now cited only for row status and grouping, and manifest notes are cited through `oracle/fixtures/manifest.csv`.
-- Large-file review watch list: `crates/stab-core/tests/stabilizers.rs` and `crates/stab-core/src/stabilizers/pauli.rs` are under the 1200-line threshold but remain above the 900-line watch-list threshold for later algebra work.
+- Large-file review watch list: the former core algebra files were decomposed during A6 extraction; `just maintenance::large-files` remains the current repository-wide guard.
 
 ## Verification Commands
 
-- `cargo test -p stab-core stabilizers --quiet`
-- `cargo test -p stab-core --test cq2_algebra_resources --quiet`
-- `cargo test -p stab-core --test stabilizers_vs_amplitudes --quiet`
+- `cargo test -p stab-algebra --all-targets`
+- `cargo test -p stab-core --test cq2_algebra_integration_resources --quiet`
 - `just oracle::matrix --milestone M6`
 - `just oracle::list --milestone M6`
 - `just oracle::run --milestone M6`

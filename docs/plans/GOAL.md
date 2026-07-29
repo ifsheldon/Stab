@@ -12,7 +12,10 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 - The A6 SIMD audit rejects treating build-time bit or Clifford acceleration as a sampling backend. The first raw-kernel slice is limited to dense XOR and non-identity Clifford composition; explicit `PortableSimd` sampling remains unavailable until a later packed-frame plan exists.
 - `ops-contracts` is removed. Qualification policy is oracle-owned, and analyzer benchmarks derive compact-work witnesses from public DEM output instead of hidden product counters.
 - Logical ownership, typed diagnostics, resource policies, fingerprints, capabilities, plans, sessions, batches, and sinks are already tested inside the current compilation boundary.
-- The `81489b10b561585f898cec46a1faa11380738bdd` A6 correctness and timing artifacts are historical. Later architecture, CI, replay, and profiler-contract fixes changed their source identities, so no source-current A6 evidence exists until the final reviewed revision is committed and regenerated on unique paths.
+- The `81489b10b561585f898cec46a1faa11380738bdd` and `25de99cfe0d683b9571b45ef9c1c76286bb17f1f` A6 correctness and timing artifacts are historical. The latter clean diagnostic round proved the repaired replay path and selected scalar implementation, but the final audit then found a facade-tier enforcement bypass and an under-specified moved-path evidence matrix.
+- Commits `3db96902` and `eaa6221f` reject inline facade root tiers, path-overridden modules regardless of visibility, and direct foreign blocks. Commit `cd02eb0d` moves every pure M5 bit and M6 algebra suite to its canonical Stable package and makes the generated inventory reject facade-owned primary selectors for implemented `stab_bits` or `stab_algebra` APIs.
+- The current correctness inventory contains 2,090 evidence parents with digest `55c63ce8db4e36a4264481512338a28a1171e2629aa7ee596a96422a83a9a9ba`; the rebound performance inventory digest is `d1c23e90c4c5fbae8536d876b5c0119cd8212bc17b895ccb542489d31aec0401`. Formal evidence for these identities has not started.
+- The final reviewed A6 revision still needs the complete 166-row M4–M11 and PF1–PF7 ownership-continuity matrix, fresh M5/M6 correctness and scalar-versus-SIMD diagnostics, final audits, and green source-current GitHub CI.
 
 ## Sources Of Truth
 
@@ -35,9 +38,10 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 5. Completed: extract circuit sampling, measurement-to-detection conversion, circuit detection sampling, DEM sampling, reference-sample trees, and sampled-flow execution into `stab-engine` without changing facade or CLI behavior.
 6. Completed at `a465009c`: create dependency-free `stab-kernels-simd`, restore four-word XOR and Clifford composition against the current scalar references, and keep engine backend registration scalar-only.
 7. Completed in source: curate `stab-core` root, `advanced`, and intentionally empty `experimental` tiers; move explicit storage, records, backends, traversal, algebra iterators, and pre-0.2 adapters out of the common root; coordinate every publishable package and path edge at exact `=0.2.0`.
-8. Completed in source through review-remediation commits `04d590de`, `e9d57a8f`, and `5e30fb38`: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, dependency rejection checks, schema-version-7 feature-aware worker receipts, curated facade export inventory, oracle package-owner guards, and hardened scalar-versus-SIMD diagnostic replay are implemented. Historical AArch64 diagnostics keep portable SIMD opt-in because dense XOR was neutral while non-identity Clifford composition was approximately `1.35x` slower. Current CLI, oracle, benchmark, and qualification builds select scalar explicitly.
-9. Regenerate M5 and M6 correctness, scalar-versus-SIMD, and pinned-Stim timing diagnostics from one later clean revision after the final documentation commit. Treat host-unverified reports as continuity diagnostics only; formal promotable parity remains an A9 controlled-host requirement.
-10. Run milestone-audit and full-code-review, fix every finding, complete the required verification matrix, and only then close A6.
+8. Completed in source through review-remediation commits `04d590de`, `e9d57a8f`, `5e30fb38`, `25de99cf`, `3db96902`, `eaa6221f`, and `cd02eb0d`: the explicit feature map, Stable, scalar-facade, portable-facade, mixed consumers, feature-unification checks, dependency rejection checks, schema-version-7 feature-aware worker receipts, curated facade export inventory, oracle package-owner guards, retained-root replay, canonical facade-module enforcement, foreign-block rejection, and direct bits/algebra qualification ownership are implemented. Historical AArch64 diagnostics keep portable SIMD opt-in because dense XOR was neutral while non-identity Clifford composition was approximately `1.35x` slower. Current CLI, oracle, benchmark, and qualification builds select scalar explicitly.
+9. Commit the final A6 contract and documentation state, then generate one fresh pinned-Stim baseline and one warmed three-run comparison for all 166 M4–M11 and PF1–PF7 rows. Review every report-only phase that is more than 15% slower than its latest clean per-extraction report and fix or explain it without changing comparator classes, thresholds, or waivers.
+10. Regenerate M5 and M6 correctness, scalar-versus-SIMD, and selected scalar pinned-Stim diagnostics from that same clean revision on unique paths. Treat host-unverified reports as continuity diagnostics only; formal promotable parity remains an A9 controlled-host requirement.
+11. Run milestone-audit and full-code-review again, fix every finding, complete the required verification matrix, obtain green GitHub CI for the exact source revision, and only then close A6.
 
 ## Nonnegotiable Contracts
 
@@ -50,6 +54,7 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 - Every publishable path dependency includes exact version `=0.2.0`; ops and external conformance fixtures remain unpublished.
 - Existing `.stim`, `.dem`, result-format, CLI, seeded Stab, statistical Stim, resource, cancellation, poisoning, and sink-lifecycle contracts remain unchanged.
 - Move implementation without duplicating it. Compatibility adapters delegate through the new owner and leave the root only where the migration inventory requires.
+- Implemented canonical bit and algebra API parents execute `stab-bits` and `stab-algebra` directly; only deliberate circuit, analysis, CLI, or facade integration remains under `stab-core`.
 - A second backend is registered only when portable SIMD executes a genuinely distinct implementation and passes semantic and performance evidence.
 
 ## Done Criteria
@@ -58,9 +63,10 @@ Stop and repair the owning source when Cargo metadata, architecture checks, publ
 - Stable component consumers compile and test on Rust 1.97.1 without portable-SIMD code; Nightly consumers can opt into measured leaf kernels without changing sampling capability claims.
 - Every product crate documents purpose, dependencies, invariants, resource behavior, extension points, conformance tests, benchmarks, and synchronized files.
 - Public API and qualification inventories regenerate exactly, with no qualification-only product item.
-- Moved bit, algebra, parser, records, sampler, converter, DEM, and analysis benchmark phases have no unexplained regression.
+- The source-current 166-row ownership-continuity matrix has no missing runner or semantic-witness failure, every unchanged threshold policy passes, and every report-only phase above the 15% review threshold is fixed or explained.
+- Source-current M5 and M6 correctness, scalar-versus-SIMD, and selected scalar diagnostics preserve the scalar-default decision without claiming controlled-host parity.
 - Milestone-audit, full-code-review, full verification, and pre-commit have no open A6 finding.
 
 ## Required Checks
 
-Use targeted crate and fixture tests after each extraction. Before every focused commit, run formatting, warnings-denied checks for touched crates, targeted tests, architecture enforcement, and staged pre-commit. Before A6 closure, run Stable and Nightly matrices, default and portable-SIMD feature checks, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture and API checks, implemented and result-format oracles, qualification check/regeneration, generated status, benchmark smoke, and source-current phase evidence for every moved call path.
+Use targeted crate and fixture tests after each extraction. Before every focused commit, run formatting, warnings-denied checks for touched crates, targeted tests, architecture enforcement, and staged pre-commit. Before A6 closure, run Stable and Nightly matrices, default and portable-SIMD feature checks, warnings-denied workspace Clippy and rustdoc, all workspace tests, architecture and API checks, implemented and result-format oracles, qualification check/regeneration, generated status, benchmark smoke, the exact 166-row ownership-continuity matrix, and the focused M5/M6 evidence.
