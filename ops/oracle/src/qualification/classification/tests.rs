@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "tests/analysis.rs"]
 mod analysis;
+#[path = "tests/engine.rs"]
+mod engine;
 
 #[test]
 fn classifications_keep_deferred_products_out_of_selected_features() {

@@ -2200,6 +2200,7 @@ dependencies = [
  "stab-analysis",
  "stab-cli",
  "stab-core",
+ "stab-engine",
  "stab-model",
  "stab-records",
  "tempfile",

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "7d15a17f698f037e179970d42a020ecb6a4d444d226b6ff5ec84e20a4dc47be1",
+  "semantic_digest": "d69fd880593870446f8b63e6cea424579cdafcc4700f72e4617a0f47b02f4381",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -78492,8 +78492,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 10,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78505,8 +78505,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Clone for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78518,8 +78518,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Copy for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78531,8 +78531,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Debug for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78544,8 +78544,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Eq for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78557,8 +78557,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Hash for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78570,8 +78570,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as PartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78583,8 +78583,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 9,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78596,8 +78596,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation::Sampling",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 11,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78609,8 +78609,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation::as_str",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 15,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78622,8 +78622,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint",
       "kind": "struct",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 38,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78635,8 +78635,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as Clone for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78648,8 +78648,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as Copy for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78661,8 +78661,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as Debug for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78674,8 +78674,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as Eq for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78687,8 +78687,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as Hash for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78700,8 +78700,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as PartialEq for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78713,8 +78713,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint as StructuralPartialEq for@8bc40ad41b61",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 37,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78726,8 +78726,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::ALGORITHM",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 49,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78739,8 +78739,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 48,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78752,8 +78752,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::SCHEMA_VERSION",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 47,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78765,8 +78765,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::compiler_schema_version",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 84,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78778,8 +78778,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::digest",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 96,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78791,8 +78791,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::digest_hex",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 100,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78804,8 +78804,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::for_sampling",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 51,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78817,8 +78817,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::model_fingerprint",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 92,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78830,8 +78830,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::operation",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 88,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -78843,8 +78843,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::CompilationRequestFingerprint::schema_version",
       "kind": "method",
-      "source_path": "crates/stab-core/src/compilation_fingerprint.rs",
-      "source_line": 80,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -107948,9 +107948,9 @@
       "crate_name": "stab_core",
       "path": "stab_core::biased_randomize_bits",
       "kind": "function",
-      "source_path": "crates/stab-core/src/probability_util.rs",
-      "source_line": 11,
-      "owner_case_id": "cq-evidence-api-6853013926d3fcdf",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 125,
+      "owner_case_id": "cq-evidence-qualification-09cfc17cfb412f99",
       "performance_groups": [
         "PERF-SAMPLING"
       ]
@@ -127565,6 +127565,760 @@
       "owner_case_id": "cq-evidence-qualification-24066267c4c9e76c",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
+      ]
+    },
+    {
+      "id": "cq-api-item-d484eb1174a08bc5",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation",
+      "kind": "enum",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-92ce1ce0fe2dddf9",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as Clone for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-7bd5721bf751fc2e",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as Copy for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-130b1ce9c3fc40cf",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as Debug for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-391b01e5d443027d",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as Eq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-f5bb2a410a9a7dfb",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as Hash for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-ddce1dd186965713",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as PartialEq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-dab1f589f5bb86aa",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-f32a0f556f1d8e51",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation::Sampling",
+      "kind": "variant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 10,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-3d8d5f365ce3a8e8",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation::as_str",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-5e4a8f1e033d387f",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint",
+      "kind": "struct",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 37,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-3af6c501679cbd3b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as Clone for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-a1e362039cbf9696",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as Copy for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-0fc41fa8380d1670",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as Debug for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-3fac06223024e2b0",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as Eq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-cb4f8c4a9af104aa",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as Hash for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-6333babc1601ba64",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as PartialEq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-e76769610a96a9db",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint as StructuralPartialEq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-7bcf16ef468440bd",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::ALGORITHM",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 48,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-452f29f5ee641e79",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 47,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-66eaa2da480a3b1b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::SCHEMA_VERSION",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 46,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-d8213b85c57d0182",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::compiler_schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 83,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-8811c9ce5d80cf31",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::digest",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 95,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-82547319fb0c84a7",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::digest_hex",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-8a0d80ec3ee0c755",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::for_sampling",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 50,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-ec37d6dd792d46d4",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::model_fingerprint",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 91,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-3d5047c45e627f91",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::operation",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-0caa1f95f1c03bf3",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationRequestFingerprint::schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 79,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-eb7c20f001f3f3cc",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::biased_randomize_bits",
+      "kind": "function",
+      "source_path": "crates/stab-engine/src/probability.rs",
+      "source_line": 10,
+      "owner_case_id": "cq-evidence-qualification-09cfc17cfb412f99",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-0b066a7b19efc5f8",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation",
+      "kind": "enum",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-5cda3987a27fbe5d",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as Clone for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-ecd19b7699bc742d",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as Copy for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-752c43dfd2323a56",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as Debug for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-a2a2f024bb5e2643",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as Eq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-9076b6c4e67dbbe6",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as Hash for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-b7ac343b007bc380",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as PartialEq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-1521e85bb8343935",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 8,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-48c53bb0a79ba486",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation::Sampling",
+      "kind": "variant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 10,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-828dd166d392915b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationOperation::as_str",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 14,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-e896fca5a70add78",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint",
+      "kind": "struct",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 37,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-ccbe2d0306f7b96c",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Clone for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-5d6e12628b3605b5",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Copy for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-153837c43c55cac6",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Debug for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-a0113988f8b58cd6",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Eq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-55e4528ef5e4551a",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Hash for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-ff09629a5d09923c",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as PartialEq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-137741751dd482e4",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as StructuralPartialEq for@8bc40ad41b61",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-03169755b0909e83",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::ALGORITHM",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 48,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-cfa0647d572b2baa",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 47,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-af9cba1093d282eb",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::SCHEMA_VERSION",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 46,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-000caaad92eb3e9f",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::compiler_schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 83,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-80068b81e4db836b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 95,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-35aef4efe1b40c2b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-8beda9f23e19302a",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 50,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-6ef7df6b378e05aa",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::model_fingerprint",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 91,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-eb411310bdad3b22",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::operation",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-479765258457e34b",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 79,
+      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-4fc74e99de9b56a7",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::probability::biased_randomize_bits",
+      "kind": "function",
+      "source_path": "crates/stab-engine/src/probability.rs",
+      "source_line": 10,
+      "owner_case_id": "cq-evidence-qualification-09cfc17cfb412f99",
+      "performance_groups": [
+        "PERF-SAMPLING"
       ]
     },
     {
@@ -148287,6 +149041,18 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::CompilationOperation",
+      "canonical_crate_name": "stab_engine",
+      "canonical_path": "stab_engine::CompilationOperation"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_path": "stab_core::CompilationRequestFingerprint",
+      "canonical_crate_name": "stab_engine",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::CorrectionWidth",
       "canonical_crate_name": "stab_records",
       "canonical_path": "stab_records::CorrectionWidth"
@@ -148957,6 +149723,12 @@
       "alias_path": "stab_core::analysis::single_qubit_clifford_for_gate",
       "canonical_crate_name": "stab_analysis",
       "canonical_path": "stab_analysis::single_qubit_clifford_for_gate"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_path": "stab_core::biased_randomize_bits",
+      "canonical_crate_name": "stab_engine",
+      "canonical_path": "stab_engine::biased_randomize_bits"
     },
     {
       "crate_name": "stab_core",
@@ -149756,6 +150528,76 @@
       "alias_path": "stab_core::unitary_to_tableau",
       "canonical_crate_name": "stab_algebra",
       "canonical_path": "stab_algebra::unitary_to_tableau"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationOperation",
+      "canonical_path": "stab_engine::CompilationOperation"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationOperation::as_str",
+      "canonical_path": "stab_engine::CompilationOperation::as_str"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::ALGORITHM",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::ALGORITHM"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::SCHEMA_VERSION",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::compiler_schema_version",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::compiler_schema_version"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::digest"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::digest_hex"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::for_sampling"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::model_fingerprint",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::model_fingerprint"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::operation",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::operation"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::fingerprint::CompilationRequestFingerprint::schema_version",
+      "canonical_path": "stab_engine::CompilationRequestFingerprint::schema_version"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_path": "stab_engine::probability::biased_randomize_bits",
+      "canonical_path": "stab_engine::biased_randomize_bits"
     }
   ],
   "evidence_cases": [
@@ -154404,54 +155246,6 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-6853013926d3fcdf",
-      "feature_id": "CQ-SAMPLING",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_core::biased_randomize_bits",
-      "comparator": "statistical",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": {
-        "state": "planned",
-        "source": "qualification-case",
-        "id": "cq-evidence-api-6853013926d3fcdf"
-      },
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "cq_evidence_api_6853013926d3fcdf",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-SAMPLING"
       ],
       "status": "planned"
     },
@@ -188684,6 +189478,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-09cfc17cfb412f99",
+      "feature_id": "CQ-SAMPLING",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a2-biased-randomize-bits",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-engine",
+          "--lib",
+          "probability::tests::biased_randomize_bits_is_seed_deterministic_and_probability_sensitive",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed seeded word buffer proves deterministic replay, low-probability rare-hit behavior, high-probability complement behavior, and probability-sensitive output without claiming exact C++ random stream identity."
+      },
+      "negative_axes": [
+        "seed-drift",
+        "probability-complement-drift",
+        "rare-probability-density-drift"
+      ],
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-0a34124c6ffefe9e",
       "feature_id": "CQ-RESULT-FORMATS",
       "behavioral_surface": "file-format",
@@ -205917,10 +206761,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
-          "--test",
-          "agent_capabilities",
-          "sampling_compilation_fingerprint_normalizes_source_spelling",
+          "stab-engine",
+          "--lib",
+          "fingerprint::tests::sampling_compilation_fingerprint_normalizes_source_spelling",
           "--quiet",
           "--exact"
         ]

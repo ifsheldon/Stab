@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "945bfb72bd431a90979f55578f9fe487fba16649521ba5230e119a578a627cbd",
+  "performance_inventory_sha256": "0d27ed46bfff8cd4c790fd8f382c531cd2177d25dae590c5b001cf63985d53df",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -106,7 +106,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-d63aa8cd2dc62e63"
       ],
-      "owner": "stab-core/compilation-request",
+      "owner": "stab-engine/compilation-request",
       "profiler_note": null
     },
     {

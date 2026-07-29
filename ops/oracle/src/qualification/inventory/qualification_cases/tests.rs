@@ -446,6 +446,16 @@ fn source_ledger_separates_owner_functions_from_facade_reexports() {
             "stab_analysis::GateUnitaryMatrix::to_vecs",
             FeatureId::GateContract,
         ),
+        (
+            "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
+            "stab_engine::CompilationRequestFingerprint::for_sampling",
+            FeatureId::Sampling,
+        ),
+        (
+            "stab_engine::probability::biased_randomize_bits",
+            "stab_engine::biased_randomize_bits",
+            FeatureId::Sampling,
+        ),
     ]
     .into_iter()
     .enumerate()

@@ -9,8 +9,8 @@ mod simulator;
 mod stabilizer;
 
 use public_api_helpers::{
-    api_path_mentions_item, classify_extracted_analysis_api, is_analyzer_api,
-    is_resource_policy_api,
+    api_path_mentions_item, classify_extracted_analysis_api, classify_extracted_engine_api,
+    is_analyzer_api, is_resource_policy_api,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -296,6 +296,9 @@ pub(super) fn classify_public_api_source(
         return Some(FeatureId::Resource);
     }
     if let Some(feature_id) = classify_extracted_analysis_api(&value, &api_lower) {
+        return Some(feature_id);
+    }
+    if let Some(feature_id) = classify_extracted_engine_api(&value, &api_lower) {
         return Some(feature_id);
     }
     if api_lower.contains("parseerror")

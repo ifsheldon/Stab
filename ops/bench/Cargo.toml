@@ -29,6 +29,7 @@ signal-hook = { workspace = true }
 stab-analysis = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-core = { path = "../../crates/stab-core" }
+stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 tempfile = { workspace = true }

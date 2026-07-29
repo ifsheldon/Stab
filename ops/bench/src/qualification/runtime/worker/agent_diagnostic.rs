@@ -2,9 +2,10 @@ use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
 use stab_core::{
-    Circuit, CompilationRequestFingerprint, Estimate, ModelFingerprint, PlanFingerprint,
-    RecordFormat, ResourceEstimate, SamplingCompiler, estimate_sampling_request,
+    Circuit, Estimate, ModelFingerprint, PlanFingerprint, RecordFormat, ResourceEstimate,
+    SamplingCompiler, estimate_sampling_request,
 };
+use stab_engine::CompilationRequestFingerprint;
 
 use super::{
     WorkerError, byte_digest, circuit_parse_fixture, semantic_digest, workload::WorkerWorkload,

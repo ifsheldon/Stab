@@ -280,6 +280,7 @@ fn is_allowed_test_package(package: &str) -> bool {
             | "stab-bits"
             | "stab-model"
             | "stab-records"
+            | "stab-engine"
             | "stab-core"
             | "stab-cli"
             | "stab-oracle"

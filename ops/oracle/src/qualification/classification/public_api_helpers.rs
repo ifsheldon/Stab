@@ -57,6 +57,21 @@ pub(super) fn classify_extracted_analysis_api(
     None
 }
 
+pub(super) fn classify_extracted_engine_api(
+    source_path: &str,
+    api_lower: &str,
+) -> Option<FeatureId> {
+    if source_path.starts_with("crates/stab-engine/src/fingerprint")
+        || source_path.starts_with("crates/stab-engine/src/probability")
+        || api_path_mentions_item(api_lower, "compilationoperation")
+        || api_path_mentions_item(api_lower, "compilationrequestfingerprint")
+        || api_path_mentions_item(api_lower, "biased_randomize_bits")
+    {
+        return Some(FeatureId::Sampling);
+    }
+    None
+}
+
 fn is_generation_api(api_lower: &str) -> bool {
     [
         "codedistance",

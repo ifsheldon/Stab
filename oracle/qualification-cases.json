@@ -3855,10 +3855,9 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "--test",
-            "agent_capabilities",
-            "sampling_compilation_fingerprint_normalizes_source_spelling",
+            "stab-engine",
+            "--lib",
+            "fingerprint::tests::sampling_compilation_fingerprint_normalizes_source_spelling",
             "--quiet",
             "--exact"
           ]
@@ -3878,56 +3877,91 @@
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationOperation"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationOperation"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationOperation::as_str"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationOperation::as_str"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::SCHEMA_VERSION"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::SCHEMA_VERSION"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::ALGORITHM"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::ALGORITHM"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::for_sampling"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::for_sampling"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::schema_version"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::schema_version"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::compiler_schema_version"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::compiler_schema_version"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::operation"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::operation"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::model_fingerprint"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::model_fingerprint"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::digest"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::digest"
           },
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::CompilationRequestFingerprint::digest_hex"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationRequestFingerprint::digest_hex"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a2-biased-randomize-bits",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "semantic-invariant",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "probability::tests::biased_randomize_bits_is_seed_deterministic_and_probability_sensitive",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A fixed seeded word buffer proves deterministic replay, low-probability rare-hit behavior, high-probability complement behavior, and probability-sensitive output without claiming exact C++ random stream identity."
+        },
+        "negative_axes": [
+          "seed-drift",
+          "probability-complement-drift",
+          "rare-probability-density-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::biased_randomize_bits"
           }
         ],
         "standalone": true
@@ -19677,6 +19711,76 @@
     }
   ],
   "public_api_aliases": [
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationOperation",
+      "canonical_owner_path": "stab_engine::CompilationOperation"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationOperation::as_str",
+      "canonical_owner_path": "stab_engine::CompilationOperation::as_str"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::ALGORITHM",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::ALGORITHM"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::SCHEMA_VERSION",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::SCHEMA_VERSION"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::compiler_schema_version",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::compiler_schema_version"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::digest"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::digest_hex"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::for_sampling"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::model_fingerprint",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::model_fingerprint"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::operation",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::operation"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::fingerprint::CompilationRequestFingerprint::schema_version",
+      "canonical_owner_path": "stab_engine::CompilationRequestFingerprint::schema_version"
+    },
+    {
+      "crate_name": "stab_engine",
+      "alias_owner_path": "stab_engine::probability::biased_randomize_bits",
+      "canonical_owner_path": "stab_engine::biased_randomize_bits"
+    },
     {
       "crate_name": "stab_analysis",
       "alias_owner_path": "stab_analysis::circuit::circuit_without_tags",

@@ -11,10 +11,11 @@ use rand::rngs::SmallRng;
 use stab_core::{
     BackendPreference, BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink,
     MeasurementSink, Probability, RandomPolicy, RecordFormat, ReferenceSampleTree, SampleFormat,
-    SamplingCompiler, Seed, ShotCount, biased_randomize_bits,
+    SamplingCompiler, Seed, ShotCount,
     result_formats::{write_ptb64_records_checked, write_records},
     result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
 };
+use stab_engine::biased_randomize_bits;
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

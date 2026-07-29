@@ -932,7 +932,21 @@ fn validate_public_api_alias_shape(alias: &PublicApiAliasSpec) -> Result<(), Inv
                 )
                 .is_some_and(|(canonical_suffix, alias_suffix)| canonical_suffix == alias_suffix)
     });
-    if !core_namespace_alias && !analysis_root_alias {
+    let engine_root_alias = ["fingerprint", "probability"].iter().any(|module| {
+        alias.crate_name == "stab_engine"
+            && alias
+                .canonical_owner_path
+                .as_str()
+                .strip_prefix("stab_engine::")
+                .zip(
+                    alias
+                        .alias_owner_path
+                        .as_str()
+                        .strip_prefix(&format!("stab_engine::{module}::")),
+                )
+                .is_some_and(|(canonical_suffix, alias_suffix)| canonical_suffix == alias_suffix)
+    });
+    if !core_namespace_alias && !analysis_root_alias && !engine_root_alias {
         return invalid(format!(
             "public API alias {}::{} -> {} is outside the namespace/root contract",
             alias.crate_name, alias.alias_owner_path, alias.canonical_owner_path

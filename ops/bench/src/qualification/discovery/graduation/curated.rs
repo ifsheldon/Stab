@@ -94,7 +94,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             performance_feature: "PERF-SAMPLING",
             phase: Phase::Compile,
             correctness_cases: &["cq-evidence-qualification-d63aa8cd2dc62e63"],
-            owner: "stab-core/compilation-request",
+            owner: "stab-engine/compilation-request",
             reason: "Measures the inclusive CompilationRequestFingerprint::for_sampling call, including its model fingerprint, over a pre-parsed deterministic circuit.",
         },
         AgentDiagnosticSpec {
