@@ -1,18 +1,16 @@
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, RepeatBlock,
-    circuit::CircuitAssembler,
-};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock, advanced::CircuitBuilder};
 
 use super::{
     MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS, MAX_MISSING_DETECTOR_REPEAT_ITERATIONS,
     MissingDetectorFinder, MissingDetectorOptions, expanded_circuit_work_units,
     validate_repeat_budget,
 };
+use crate::{AnalysisError, AnalysisResult};
 
 pub(super) fn try_missing_detectors_folded_final_repeat(
     circuit: &Circuit,
     options: MissingDetectorOptions,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let Some((prefix, repeat)) = final_repeat_with_prefix(circuit) else {
         return Ok(None);
     };
@@ -55,26 +53,26 @@ fn final_repeat_with_prefix(circuit: &Circuit) -> Option<(Circuit, &RepeatBlock)
         return None;
     };
     Some((
-        CircuitAssembler::from_unfused_items(prefix_items.to_vec()).finish(),
+        CircuitBuilder::from_unfused_items(prefix_items.to_vec()).finish(),
         repeat,
     ))
 }
 
-fn repeat_exceeds_materialized_budget(repeat: &RepeatBlock) -> CircuitResult<bool> {
+fn repeat_exceeds_materialized_budget(repeat: &RepeatBlock) -> AnalysisResult<bool> {
     let repeat_count = repeat.repeat_count().get();
     if repeat_count > MAX_MISSING_DETECTOR_REPEAT_ITERATIONS {
         return Ok(true);
     }
     let body_work_units = expanded_circuit_work_units(repeat.body())?;
     let expanded_work_units = body_work_units.checked_mul(repeat_count).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(
+        AnalysisError::invalid_detector_error_model(
             "missing-detector repeat work-unit expansion count overflowed",
         )
     })?;
     Ok(expanded_work_units > MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS)
 }
 
-fn repeat_body_proof_circuit(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+fn repeat_body_proof_circuit(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     let mut measurements_seen = 0_i64;
     let mut proof_items = Vec::with_capacity(circuit.items().len());
     for item in circuit.items() {
@@ -117,14 +115,14 @@ fn repeat_body_proof_circuit(circuit: &Circuit) -> CircuitResult<Option<Circuit>
         }
     }
     Ok(Some(
-        CircuitAssembler::from_unfused_items(proof_items).finish(),
+        CircuitBuilder::from_unfused_items(proof_items).finish(),
     ))
 }
 
 fn circuit_record_targets_are_local(
     circuit: &Circuit,
     measurements_seen: &mut i64,
-) -> CircuitResult<bool> {
+) -> AnalysisResult<bool> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {

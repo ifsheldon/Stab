@@ -13,12 +13,6 @@ impl CircuitAssembler {
         Self(stab_model::advanced::CircuitBuilder::new())
     }
 
-    pub(crate) fn from_unfused_items(items: Vec<CircuitItem>) -> Self {
-        Self(stab_model::advanced::CircuitBuilder::from_unfused_items(
-            items,
-        ))
-    }
-
     pub(crate) fn try_reserve_exact(&mut self, additional: usize) -> CircuitResult<()> {
         self.0.try_reserve_exact(additional).map_err(Into::into)
     }

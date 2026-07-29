@@ -10,6 +10,7 @@ mod circuit_feedback;
 mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
+mod circuit_missing_detectors;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_transforms;
@@ -43,6 +44,7 @@ pub use circuit_inverse::{
     circuit_inverse_qec_with_options, circuit_inverse_unitary, circuit_time_reversed_for_flows,
     circuit_time_reversed_for_flows_with_options,
 };
+pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
 pub use circuit_transforms::{
