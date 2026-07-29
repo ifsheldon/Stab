@@ -5,6 +5,7 @@
 //! contracts.
 
 pub mod circuit;
+mod circuit_feedback;
 mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
@@ -18,6 +19,7 @@ mod resources;
 mod sparse_rev_frame_tracker;
 
 pub use circuit::circuit_without_tags;
+pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
