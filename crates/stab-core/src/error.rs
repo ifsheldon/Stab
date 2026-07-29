@@ -127,14 +127,14 @@ impl From<stab_analysis::AnalysisError> for CircuitError {
     fn from(error: stab_analysis::AnalysisError) -> Self {
         match error {
             stab_analysis::AnalysisError::Model(error) => error.into(),
+            stab_analysis::AnalysisError::InvalidDomainValue { kind, value } => {
+                Self::InvalidDomainValue { kind, value }
+            }
             stab_analysis::AnalysisError::InvalidTableauConversion { message } => {
                 Self::InvalidTableauConversion { message }
             }
             stab_analysis::AnalysisError::InvalidCircuitSimplification { message } => {
                 Self::InvalidCircuitSimplification { message }
-            }
-            stab_analysis::AnalysisError::InvalidDomainValue { kind, value } => {
-                Self::InvalidDomainValue { kind, value }
             }
             stab_analysis::AnalysisError::InvalidResultFormat { message } => {
                 Self::invalid_result_format(message)

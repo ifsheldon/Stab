@@ -7,7 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Circuit, CircuitError, CircuitResult};
+use crate::{AnalysisError, AnalysisResult};
+use stab_model::Circuit;
 
 use super::{
     ColorCodeParams, ColorCodeTask, GeneratedCircuit, append_begin_round_tick, append_circuit,
@@ -20,16 +21,16 @@ use super::{
 ///
 /// Returns an error before materialization if the projected circuit exceeds the generator's
 /// 131,072-physical-qubit resource limit. This admits valid odd distances through 341.
-pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<GeneratedCircuit> {
+pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<GeneratedCircuit> {
     let ColorCodeTask::MemoryXyz = params.task;
     if params.rounds().get() < 2 {
-        return Err(CircuitError::invalid_domain_value(
+        return Err(AnalysisError::invalid_domain_value(
             "color code round count",
             params.rounds().get(),
         ));
     }
     if params.distance().get() < 3 || params.distance().get().is_multiple_of(2) {
-        return Err(CircuitError::invalid_domain_value(
+        return Err(AnalysisError::invalid_domain_value(
             "color code distance",
             params.distance().get(),
         ));
@@ -47,7 +48,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
         for x in 0..(width - y) {
             let coord = ColorCoord::new((2 * x + y) as i32, y as i32);
             let qubit = u32::try_from(p2q.len()).map_err(|_| {
-                CircuitError::invalid_domain_value("color code qubit count", p2q.len())
+                AnalysisError::invalid_domain_value("color code qubit count", p2q.len())
             })?;
             p2q.insert(coord, qubit);
             if (x + 2 * y) % 3 == 2 {
@@ -74,13 +75,13 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
     let mut measure_coord_to_order = BTreeMap::new();
     for qubit in &data_qubits {
         let order = u32::try_from(data_coord_to_order.len()).map_err(|_| {
-            CircuitError::invalid_domain_value("data qubit count", data_qubits.len())
+            AnalysisError::invalid_domain_value("data qubit count", data_qubits.len())
         })?;
         data_coord_to_order.insert(q2p[qubit], order);
     }
     for qubit in &measurement_qubits {
         let order = u32::try_from(measure_coord_to_order.len()).map_err(|_| {
-            CircuitError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+            AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
         })?;
         measure_coord_to_order.insert(q2p[qubit], order);
     }
@@ -128,11 +129,11 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
     append_repeated_body(&mut head, cycle_actions.clone(), 2)?;
 
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
-        CircuitError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+        AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
     })?;
     for k in (0..measurement_count).rev() {
         let index = usize::try_from(measurement_count - k - 1)
-            .map_err(|_| CircuitError::invalid_domain_value("measurement index", k))?;
+            .map_err(|_| AnalysisError::invalid_domain_value("measurement index", k))?;
         let coord = q2p[&measurement_qubits[index]];
         append_instruction(
             &mut head,
@@ -146,7 +147,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
     append_instruction(&mut body, "SHIFT_COORDS", vec![0.0, 0.0, 1.0], Vec::new())?;
     for k in (0..measurement_count).rev() {
         let index = usize::try_from(measurement_count - k - 1)
-            .map_err(|_| CircuitError::invalid_domain_value("measurement index", k))?;
+            .map_err(|_| AnalysisError::invalid_domain_value("measurement index", k))?;
         let coord = q2p[&measurement_qubits[index]];
         append_instruction(
             &mut body,
@@ -168,7 +169,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
     };
     append_measure(common, &mut tail, &data_qubits, tail_basis)?;
     let data_count = u32::try_from(data_qubits.len())
-        .map_err(|_| CircuitError::invalid_domain_value("data qubit count", data_qubits.len()))?;
+        .map_err(|_| AnalysisError::invalid_domain_value("data qubit count", data_qubits.len()))?;
     for measurement_qubit in &measurement_qubits {
         let measure = q2p[measurement_qubit];
         let mut detectors = Vec::new();
@@ -220,8 +221,9 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> CircuitResult<Ge
     }
     let rgb = ['R', 'G', 'B'];
     for coord in &measure_coords {
-        let index = usize::try_from((coord.x2 + coord.y).rem_euclid(3))
-            .map_err(|_| CircuitError::invalid_domain_value("color code layout color", coord.x2))?;
+        let index = usize::try_from((coord.x2 + coord.y).rem_euclid(3)).map_err(|_| {
+            AnalysisError::invalid_domain_value("color code layout color", coord.x2)
+        })?;
         layout.insert((coord.x2 as u32, coord.y as u32), (rgb[index], p2q[coord]));
     }
 

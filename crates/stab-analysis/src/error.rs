@@ -12,14 +12,14 @@ pub enum AnalysisError {
     #[error("{0}")]
     Model(#[from] ModelError),
 
+    #[error("invalid {kind} value {value}")]
+    InvalidDomainValue { kind: &'static str, value: String },
+
     #[error("cannot convert circuit to tableau: {message}")]
     InvalidTableauConversion { message: String },
 
     #[error("cannot simplify circuit: {message}")]
     InvalidCircuitSimplification { message: String },
-
-    #[error("invalid {kind} value {value}")]
-    InvalidDomainValue { kind: &'static str, value: String },
 
     #[error("invalid result format data: {message}")]
     InvalidResultFormat { message: String },
@@ -32,6 +32,13 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
+        Self::InvalidDomainValue {
+            kind,
+            value: value.to_string(),
+        }
+    }
+
     pub(crate) fn invalid_tableau_conversion(message: impl Into<String>) -> Self {
         Self::InvalidTableauConversion {
             message: message.into(),
@@ -41,13 +48,6 @@ impl AnalysisError {
     pub(crate) fn invalid_circuit_simplification(message: impl Into<String>) -> Self {
         Self::InvalidCircuitSimplification {
             message: message.into(),
-        }
-    }
-
-    pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
-        Self::InvalidDomainValue {
-            kind,
-            value: value.to_string(),
         }
     }
 

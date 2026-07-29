@@ -7,7 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Circuit, CircuitError, CircuitResult};
+use crate::{AnalysisError, AnalysisResult};
+use stab_model::Circuit;
 
 use super::{
     CircuitGenParams, GeneratedCircuit, SurfaceCodeParams, SurfaceCodeTask,
@@ -23,7 +24,7 @@ use super::{
 /// distances through 181.
 pub fn generate_surface_code_circuit(
     params: &SurfaceCodeParams,
-) -> CircuitResult<GeneratedCircuit> {
+) -> AnalysisResult<GeneratedCircuit> {
     validate_surface_generation_size(
         params.distance().get(),
         matches!(
@@ -62,7 +63,7 @@ impl SurfaceCoord {
 fn generate_rotated_surface_code_circuit(
     params: &SurfaceCodeParams,
     is_memory_x: bool,
-) -> CircuitResult<GeneratedCircuit> {
+) -> AnalysisResult<GeneratedCircuit> {
     let distance = params.distance().get();
     let mut data_coords = BTreeSet::new();
     let mut x_observable = Vec::new();
@@ -132,7 +133,7 @@ fn generate_rotated_surface_code_circuit(
 fn generate_unrotated_surface_code_circuit(
     params: &SurfaceCodeParams,
     is_memory_x: bool,
-) -> CircuitResult<GeneratedCircuit> {
+) -> AnalysisResult<GeneratedCircuit> {
     let distance = params.distance().get();
     let mut data_coords = BTreeSet::new();
     let mut x_measure_coords = BTreeSet::new();
@@ -187,7 +188,7 @@ fn generate_unrotated_surface_code_circuit(
     reason = "The shared surface-code finisher mirrors Stim's generator boundary and keeps the rotated and unrotated setup code small."
 )]
 fn finish_surface_code_circuit(
-    coord_to_index: impl Fn(SurfaceCoord) -> CircuitResult<u32>,
+    coord_to_index: impl Fn(SurfaceCoord) -> AnalysisResult<u32>,
     data_coords: BTreeSet<SurfaceCoord>,
     x_measure_coords: BTreeSet<SurfaceCoord>,
     z_measure_coords: BTreeSet<SurfaceCoord>,
@@ -197,7 +198,7 @@ fn finish_surface_code_circuit(
     x_observable: Vec<SurfaceCoord>,
     z_observable: Vec<SurfaceCoord>,
     is_memory_x: bool,
-) -> CircuitResult<GeneratedCircuit> {
+) -> AnalysisResult<GeneratedCircuit> {
     let chosen_basis_observable = if is_memory_x {
         &x_observable
     } else {
@@ -251,13 +252,13 @@ fn finish_surface_code_circuit(
     let mut measure_coord_to_order = BTreeMap::new();
     for qubit in &data_qubits {
         let order = u32::try_from(data_coord_to_order.len()).map_err(|_| {
-            CircuitError::invalid_domain_value("data qubit count", data_qubits.len())
+            AnalysisError::invalid_domain_value("data qubit count", data_qubits.len())
         })?;
         data_coord_to_order.insert(q2p[qubit], order);
     }
     for qubit in &measurement_qubits {
         let order = u32::try_from(measure_coord_to_order.len()).map_err(|_| {
-            CircuitError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+            AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
         })?;
         measure_coord_to_order.insert(q2p[qubit], order);
     }
@@ -311,7 +312,7 @@ fn finish_surface_code_circuit(
             vec![f64::from(measure.x), f64::from(measure.y), 0.0],
             vec![rec_target(
                 u32::try_from(measurement_qubits.len()).map_err(|_| {
-                    CircuitError::invalid_domain_value(
+                    AnalysisError::invalid_domain_value(
                         "measurement qubit count",
                         measurement_qubits.len(),
                     )
@@ -322,7 +323,7 @@ fn finish_surface_code_circuit(
 
     let mut body = cycle_actions;
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
-        CircuitError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+        AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
     })?;
     append_instruction(&mut body, "SHIFT_COORDS", vec![0.0, 0.0, 1.0], Vec::new())?;
     for qubit in &measurement_qubits {
@@ -339,7 +340,7 @@ fn finish_surface_code_circuit(
     let mut tail = Circuit::new();
     append_measure(params, &mut tail, &data_qubits, measurement_basis)?;
     let data_count = u32::try_from(data_qubits.len())
-        .map_err(|_| CircuitError::invalid_domain_value("data qubit count", data_qubits.len()))?;
+        .map_err(|_| AnalysisError::invalid_domain_value("data qubit count", data_qubits.len()))?;
     for measure in chosen_basis_measure_coords {
         let mut detectors = Vec::new();
         for delta in z_order {
@@ -396,23 +397,23 @@ fn finish_surface_code_circuit(
     })
 }
 
-fn rotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> CircuitResult<u32> {
+fn rotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> AnalysisResult<u32> {
     let adjusted_y = coord.y - coord.x.rem_euclid(2);
     let width = distance
         .checked_mul(2)
         .and_then(|value| value.checked_add(1))
-        .ok_or_else(|| CircuitError::invalid_domain_value("surface code distance", distance))?;
+        .ok_or_else(|| AnalysisError::invalid_domain_value("surface code distance", distance))?;
     let index = i64::from(coord.x) + i64::from(adjusted_y / 2) * i64::from(width);
     u32::try_from(index)
-        .map_err(|_| CircuitError::invalid_domain_value("surface code qubit index", index))
+        .map_err(|_| AnalysisError::invalid_domain_value("surface code qubit index", index))
 }
 
-fn unrotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> CircuitResult<u32> {
+fn unrotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> AnalysisResult<u32> {
     let width = distance
         .checked_mul(2)
         .and_then(|value| value.checked_sub(1))
-        .ok_or_else(|| CircuitError::invalid_domain_value("surface code distance", distance))?;
+        .ok_or_else(|| AnalysisError::invalid_domain_value("surface code distance", distance))?;
     let index = i64::from(coord.x) + i64::from(coord.y) * i64::from(width);
     u32::try_from(index)
-        .map_err(|_| CircuitError::invalid_domain_value("surface code qubit index", index))
+        .map_err(|_| AnalysisError::invalid_domain_value("surface code qubit index", index))
 }

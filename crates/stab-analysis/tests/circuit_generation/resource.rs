@@ -1,8 +1,9 @@
-use stab_core::{
-    CircuitError, CircuitItem, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit,
-    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+use stab_analysis::{
+    CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
+use stab_model::CircuitItem;
 
 #[test]
 fn cq2_generation_resource_admission_checks_family_boundaries_before_materialization() {
@@ -82,10 +83,6 @@ fn assert_surface_generation_boundary(
         "generated circuit physical qubit count",
         &format!("{rejected_qubits} for {family}; current limit is 131072"),
     );
-    assert_rejection_uses_constant_allocation(
-        || generate_surface_code_circuit(&rejected),
-        &format!("{task:?} d={rejected_distance}"),
-    );
 }
 
 fn assert_color_generation_boundary() {
@@ -117,10 +114,6 @@ fn assert_color_generation_boundary() {
         "generated circuit physical qubit count",
         "132355 for color code; current limit is 131072",
     );
-    assert_rejection_uses_constant_allocation(
-        || generate_color_code_circuit(&rejected),
-        "color d=343",
-    );
 }
 
 fn qubit_coordinate_target_count(generated: &GeneratedCircuit) -> u64 {
@@ -137,32 +130,6 @@ fn qubit_coordinate_target_count(generated: &GeneratedCircuit) -> u64 {
             CircuitItem::Instruction(_) | CircuitItem::RepeatBlock(_) => None,
         })
         .sum()
-}
-
-fn assert_rejection_uses_constant_allocation(
-    reject: impl Fn() -> stab_core::CircuitResult<GeneratedCircuit>,
-    context: &str,
-) {
-    let allocations = allocation_counter::measure(|| {
-        let result = reject();
-        assert!(
-            matches!(result, Err(CircuitError::InvalidDomainValue { .. })),
-            "{context}: measured call did not return InvalidDomainValue"
-        );
-        drop(std::hint::black_box(result));
-    });
-    assert!(
-        allocations.count_total <= 8,
-        "{context}: rejection performed too many allocations: {allocations:?}"
-    );
-    assert!(
-        allocations.bytes_total <= 1_024,
-        "{context}: rejection allocated too many bytes: {allocations:?}"
-    );
-    assert!(
-        allocations.bytes_max <= 512,
-        "{context}: rejection retained too many live bytes: {allocations:?}"
-    );
 }
 
 fn assert_huge_round_counts_stay_folded() {

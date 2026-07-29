@@ -3,7 +3,8 @@
     reason = "M6 MBQC decomposition parity tests mirror compact upstream table entries"
 )]
 
-use stab_core::{Gate, mbqc_decomposition};
+use stab_analysis::mbqc_decomposition;
+use stab_model::{Circuit, Gate};
 
 #[test]
 fn mbqc_decomposition_returns_none_for_non_flow_gates_like_stim() {
@@ -86,7 +87,7 @@ fn mbqc_decomposition_current_subset_is_valid_stim_text() {
         let circuit = decomposition.expect("checked decomposition");
         let printed = circuit.to_stim_string();
         assert_eq!(printed, expected, "{gate}");
-        let reparsed = stab_core::Circuit::from_stim_str(&printed).expect("reparse decomposition");
+        let reparsed = Circuit::from_stim_str(&printed).expect("reparse decomposition");
         assert_eq!(reparsed, circuit, "{gate}");
     }
 }

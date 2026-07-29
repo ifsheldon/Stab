@@ -1,11 +1,12 @@
-use crate::{Circuit, CircuitResult, CodeDistance, Probability, RoundCount};
+use crate::{AnalysisResult, CodeDistance, RoundCount};
+use stab_model::{Circuit, Probability};
 
 use super::{
     CircuitGenParams, append_begin_round_tick, append_measure, append_measure_reset, append_reset,
     append_unitary_1, append_unitary_2,
 };
 
-fn base_params() -> CircuitResult<CircuitGenParams> {
+fn base_params() -> AnalysisResult<CircuitGenParams> {
     CircuitGenParams::new(RoundCount::try_new(3)?, CodeDistance::try_new(5)?)
 }
 
@@ -15,7 +16,7 @@ fn assert_circuit_text(circuit: &Circuit, expected: &str) {
 }
 
 #[test]
-fn append_begin_round_tick_matches_stim() -> CircuitResult<()> {
+fn append_begin_round_tick_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
@@ -31,7 +32,7 @@ fn append_begin_round_tick_matches_stim() -> CircuitResult<()> {
 }
 
 #[test]
-fn append_unitary_1_matches_stim() -> CircuitResult<()> {
+fn append_unitary_1_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
@@ -47,7 +48,7 @@ fn append_unitary_1_matches_stim() -> CircuitResult<()> {
 }
 
 #[test]
-fn append_unitary_2_matches_stim() -> CircuitResult<()> {
+fn append_unitary_2_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
@@ -63,7 +64,7 @@ fn append_unitary_2_matches_stim() -> CircuitResult<()> {
 }
 
 #[test]
-fn append_reset_matches_stim() -> CircuitResult<()> {
+fn append_reset_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
@@ -96,7 +97,7 @@ fn append_reset_matches_stim() -> CircuitResult<()> {
 }
 
 #[test]
-fn append_measure_matches_stim() -> CircuitResult<()> {
+fn append_measure_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
@@ -129,7 +130,7 @@ fn append_measure_matches_stim() -> CircuitResult<()> {
 }
 
 #[test]
-fn append_measure_reset_matches_stim() -> CircuitResult<()> {
+fn append_measure_reset_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
