@@ -53,6 +53,11 @@ diagnostic-run *args:
 simd-compare *args:
     cargo run -q -p stab-bench --profile release -- qualification-simd-compare {{args}}
 
+# Replay one scalar-versus-portable-SIMD report from its raw invocation rows.
+[working-directory: '..']
+simd-report *args:
+    cargo run -q -p stab-bench --profile release -- qualification-simd-report {{args}}
+
 # Validate a paired qualification report and regenerate its derived artifacts.
 [working-directory: '..']
 qualification-report *args:

@@ -27,6 +27,10 @@ use super::statistics::{
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
+mod replay;
+
+pub(crate) use replay::SimdReportArgs;
+
 const REPORT_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/a6-simd-compare-latest";
 const SUITE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -278,7 +282,16 @@ pub(super) fn run_with_repository(
         portable_worker: portable_evidence,
         groups: group_evidence,
     };
-    validate_report(&report)?;
+    replay::validate_report(
+        root,
+        source_root,
+        live_repository,
+        performance_inventory_sha256,
+        correctness_inventory_sha256,
+        &groups,
+        &report,
+        Some(&output_path),
+    )?;
     let report_json = render_json(&report)?;
     let report_markdown = render_markdown(&report, &super::run::sha256_hex(&report_json));
     let repository_evidence = report.repository.clone();
@@ -291,6 +304,24 @@ pub(super) fn run_with_repository(
         super::run::require_current_repository(root, &repository_evidence, repository)
     })?;
     Ok(relative)
+}
+
+pub(super) fn run_report_with_repository(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    live_repository: &RepositoryBinding,
+    performance_inventory_sha256: &str,
+    correctness_inventory_sha256: &str,
+    args: SimdReportArgs,
+) -> Result<PathBuf, SimdCompareError> {
+    replay::run_with_repository(
+        root,
+        source_root,
+        live_repository,
+        performance_inventory_sha256,
+        correctness_inventory_sha256,
+        args,
+    )
 }
 
 fn worker_evidence(
@@ -653,73 +684,6 @@ fn only_row(rows: &[WorkerMeasurement]) -> Result<&WorkerMeasurement, SimdCompar
     Ok(row)
 }
 
-fn validate_report(report: &SimdCompareReport) -> Result<(), SimdCompareError> {
-    if report.schema_version != REPORT_SCHEMA_VERSION
-        || report.scope != ComparisonScope::ScalarVsPortableSimd
-        || report.timing_boundary != RAW_WORK_TIMING_BOUNDARY
-        || report.repository.local_modifications_before
-        || report.repository.local_modifications_after
-        || report.scalar_worker.variant != StabBuildVariant::Scalar
-        || report.portable_worker.variant != StabBuildVariant::PortableSimd
-        || report.scalar_worker.build_receipt.variant() != StabBuildVariant::Scalar
-        || report.portable_worker.build_receipt.variant() != StabBuildVariant::PortableSimd
-        || report.groups.len() != GROUP_IDS.len()
-    {
-        return Err(SimdCompareError::InvalidReport);
-    }
-    for (group, expected_group) in report.groups.iter().zip(GROUP_IDS) {
-        if group.group_id != expected_group || group.scales.len() != SCALE_IDS.len() {
-            return Err(SimdCompareError::InvalidReport);
-        }
-        for (scale, expected_scale) in group.scales.iter().zip(SCALE_IDS) {
-            if scale.scale_id != expected_scale
-                || scale.warmups.len() != WARMUP_BATCHES
-                || scale.samples.len() != report.command.retained_pairs
-                || scale.paired_samples.len() != report.command.retained_pairs
-                || scale.summary.pair_count != report.command.retained_pairs
-                || !summary_matches(&scale.summary, &summarize(&scale.paired_samples)?)
-            {
-                return Err(SimdCompareError::InvalidReport);
-            }
-            exact_pair_output(&scale.semantic_validation)?;
-            for (pair_index, pair) in scale.warmups.iter().enumerate() {
-                validate_pair(pair, pair_index)?;
-            }
-            for (pair_index, (pair, sample)) in
-                scale.samples.iter().zip(&scale.paired_samples).enumerate()
-            {
-                validate_pair(pair, pair_index)?;
-                if sample.pair_index != pair_index
-                    || sample.order != VariantPairOrder::for_pair(pair_index)
-                {
-                    return Err(SimdCompareError::InvalidReport);
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_pair(pair: &VariantPairExecution, pair_index: usize) -> Result<(), SimdCompareError> {
-    if pair.pair_index != pair_index || pair.order != VariantPairOrder::for_pair(pair_index) {
-        return Err(SimdCompareError::InvalidReport);
-    }
-    exact_pair_output(pair)?;
-    Ok(())
-}
-
-fn summary_matches(left: &VariantSummary, right: &VariantSummary) -> bool {
-    left.pair_count == right.pair_count
-        && left.median_portable_over_scalar_ratio.to_bits()
-            == right.median_portable_over_scalar_ratio.to_bits()
-        && left.confidence_interval_lower.to_bits() == right.confidence_interval_lower.to_bits()
-        && left.confidence_interval_upper.to_bits() == right.confidence_interval_upper.to_bits()
-        && left.scalar_relative_mad.to_bits() == right.scalar_relative_mad.to_bits()
-        && left.portable_relative_mad.to_bits() == right.portable_relative_mad.to_bits()
-        && left.ratio_relative_mad.to_bits() == right.ratio_relative_mad.to_bits()
-        && left.material_benefit == right.material_benefit
-}
-
 fn render_json(value: &impl Serialize) -> Result<Vec<u8>, SimdCompareError> {
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
@@ -791,6 +755,8 @@ pub(super) enum SimdCompareError {
     #[error(transparent)]
     Invocation(#[from] InvocationError),
     #[error(transparent)]
+    Protocol(#[from] super::protocol::ProtocolError),
+    #[error(transparent)]
     Run(#[from] super::run::RunError),
     #[error(transparent)]
     Statistics(#[from] StatisticsError),
@@ -808,6 +774,28 @@ pub(super) enum SimdCompareError {
     InvalidIterations,
     #[error("SIMD comparison report failed internal validation")]
     InvalidReport,
+    #[error("SIMD comparison report inventory identities are stale")]
+    InventoryEvidence,
+    #[error("SIMD comparison report repository identity is stale")]
+    RepositoryEvidence,
+    #[error("SIMD comparison worker build evidence is stale or inconsistent")]
+    WorkerEvidence,
+    #[error("SIMD comparison group or scale evidence differs from its runtime contract")]
+    GroupEvidence,
+    #[error("SIMD comparison calibration evidence does not replay")]
+    CalibrationEvidence,
+    #[error("SIMD comparison raw invocation evidence is invalid")]
+    RawInvocation,
+    #[error("SIMD comparison paired samples do not reproduce from raw invocation rows")]
+    DerivedSamples,
+    #[error("SIMD comparison summary does not reproduce from raw paired samples")]
+    SummaryEvidence,
+    #[error("SIMD comparison report JSON must be nonempty and newline terminated")]
+    ReportBoundary,
+    #[error("SIMD comparison report JSON is not canonical")]
+    NonCanonicalReport,
+    #[error("SIMD comparison Markdown does not reproduce from report.json")]
+    MarkdownBinding,
     #[error("SIMD comparison suite exceeded its 30-minute deadline")]
     SuiteTimeout,
     #[error("SIMD comparison suite deadline cannot be represented")]
@@ -819,7 +807,7 @@ pub(super) enum SimdCompareError {
         expected: StabBuildVariant,
         actual: StabBuildVariant,
     },
-    #[error("failed to serialize SIMD comparison evidence: {0}")]
+    #[error("failed to process SIMD comparison JSON: {0}")]
     Json(#[from] serde_json::Error),
 }
 

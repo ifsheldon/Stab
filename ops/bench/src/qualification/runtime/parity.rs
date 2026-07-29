@@ -151,6 +151,7 @@ fn evaluate_report_with_policy(
         report.promotable,
         selected.parity_eligibility,
         &report.group_id,
+        &report.host.violations,
     )? {
         RuleDisposition::ReportOnly => {
             return Ok(ParitySummary {
@@ -274,6 +275,7 @@ fn rule_disposition(
     promotable: bool,
     parity_eligibility: ParityEligibility,
     group_id: &str,
+    host_violations: &[String],
 ) -> Result<RuleDisposition, ParityError> {
     match (claim_class, promotable, parity_eligibility) {
         (ClaimClass::DiagnosticInfrastructure, false, ParityEligibility::ReportOnly) => {
@@ -281,6 +283,17 @@ fn rule_disposition(
         }
         (ClaimClass::PromotablePerformance, true, ParityEligibility::ThresholdEligible) => {
             Ok(RuleDisposition::Gated)
+        }
+        (ClaimClass::PromotablePerformance, false, ParityEligibility::ThresholdEligible) => {
+            let host_diagnostics = if host_violations.is_empty() {
+                "no host-policy violations were recorded; inspect tier, correctness, source cleanliness, and --allow-unverified-host".to_string()
+            } else {
+                host_violations.join("; ")
+            };
+            Err(ParityError::UnpromotableEvidence {
+                group_id: group_id.to_string(),
+                host_diagnostics,
+            })
         }
         _ => Err(ParityError::DispositionMismatch(group_id.to_string())),
     }
@@ -393,6 +406,13 @@ pub(super) enum ParityError {
     MissingGroup(String),
     #[error("qualification group {0} has an incompatible claim and parity disposition")]
     DispositionMismatch(String),
+    #[error(
+        "qualification group {group_id} is threshold-eligible, but its evidence is not promotable; host diagnostics: {host_diagnostics}"
+    )]
+    UnpromotableEvidence {
+        group_id: String,
+        host_diagnostics: String,
+    },
     #[error("qualification report omits threshold measurement {0}")]
     MissingMeasurement(String),
     #[error("qualification measurement {measurement_id} has non-passing outcome {outcome:?}")]
@@ -480,7 +500,8 @@ mod tests {
                 ClaimClass::DiagnosticInfrastructure,
                 false,
                 ParityEligibility::ReportOnly,
-                "group"
+                "group",
+                &[],
             )
             .expect("diagnostic report-only disposition"),
             RuleDisposition::ReportOnly
@@ -490,19 +511,35 @@ mod tests {
                 ClaimClass::DiagnosticInfrastructure,
                 false,
                 ParityEligibility::ThresholdEligible,
-                "group"
+                "group",
+                &[],
             )
             .is_err()
         );
-        assert!(
-            rule_disposition(
-                ClaimClass::PromotablePerformance,
-                false,
-                ParityEligibility::ThresholdEligible,
-                "group"
-            )
-            .is_err()
-        );
+        let host_violations = vec![
+            "swap activity changed during the run".to_string(),
+            "maximum temperature exceeded 85000".to_string(),
+        ];
+        let error = rule_disposition(
+            ClaimClass::PromotablePerformance,
+            false,
+            ParityEligibility::ThresholdEligible,
+            "group",
+            &host_violations,
+        )
+        .expect_err("unpromotable threshold evidence must fail");
+        assert!(matches!(
+            &error,
+            ParityError::UnpromotableEvidence {
+                group_id,
+                host_diagnostics,
+            } if group_id == "group"
+                && host_diagnostics.contains("swap activity")
+                && host_diagnostics.contains("maximum temperature")
+        ));
+        let rendered = error.to_string();
+        assert!(rendered.contains("not promotable"));
+        assert!(rendered.contains("swap activity changed during the run"));
     }
 
     #[test]

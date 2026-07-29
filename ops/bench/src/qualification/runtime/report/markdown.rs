@@ -49,14 +49,15 @@ pub(super) fn render(
     let common_batch_mode = code(report.calibration.common_batch_mode.as_str());
     let batch_policy = code(report.calibration.batch_policy.as_str());
     let report_sha256 = code(report_sha256);
+    let parity_eligibility = parity_eligibility_line(report.parity_eligibility);
     Ok(format!(
-        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Independent calibration ceiling: `{:.3}` seconds\n- Wide-ratio common ceiling: `{:.3}` seconds\n- Timing batch policy: {}\n- Common batch mode: {}\n- Stim selected iterations: `{}`\n- Stab selected iterations: `{}`\n- Common semantic iterations: `{}`\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median normalized Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
+        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n{}- Owner: {}\n- Profiler note: {}\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Independent calibration ceiling: `{:.3}` seconds\n- Wide-ratio common ceiling: `{:.3}` seconds\n- Timing batch policy: {}\n- Common batch mode: {}\n- Stim selected iterations: `{}`\n- Stab selected iterations: `{}`\n- Common semantic iterations: `{}`\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median normalized Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
         group_id,
         scale_id,
         report.command.work_items,
         group_contract_sha256,
         report.claim_class,
-        report.parity_eligibility,
+        parity_eligibility,
         owner,
         profiler_note,
         input.0,
@@ -112,9 +113,26 @@ pub(super) fn render(
     ))
 }
 
+fn parity_eligibility_line(value: super::super::group::ParityEligibility) -> String {
+    format!("- Parity eligibility: `{value:?}`\n")
+}
+
 fn display_optional_bytes(value: Option<u64>) -> String {
     value.map_or_else(
         || "unobserved".to_string(),
         |value| format!("{value} bytes"),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::group::ParityEligibility;
+    use super::*;
+
+    #[test]
+    fn generated_report_names_stim_parity_eligibility() {
+        let line = parity_eligibility_line(ParityEligibility::ThresholdEligible);
+        assert_eq!(line, "- Parity eligibility: `ThresholdEligible`\n");
+        assert!(!line.contains("Baseline eligibility"));
+    }
 }

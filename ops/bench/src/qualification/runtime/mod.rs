@@ -37,7 +37,7 @@ pub(crate) use report::ReportArgs;
 pub(crate) use rollup::{RollupArgs, RollupReportArgs};
 pub(crate) use run::RunArgs;
 pub(crate) use self_regression::{BaselineCandidateArgs, SelfRegressionArgs};
-pub(crate) use simd_compare::SimdCompareArgs;
+pub(crate) use simd_compare::{SimdCompareArgs, SimdReportArgs};
 pub(crate) use worker::WorkerArgs;
 
 pub(super) struct QualificationSession {
@@ -207,6 +207,23 @@ pub(crate) fn run_simd_compare(
     args: SimdCompareArgs,
 ) -> Result<std::path::PathBuf, String> {
     simd_compare::run_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn run_simd_report(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: SimdReportArgs,
+) -> Result<std::path::PathBuf, String> {
+    simd_compare::run_report_with_repository(
         &session.root,
         &session.source_root,
         &session.repository,

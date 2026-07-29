@@ -330,6 +330,38 @@ impl StabBuildReceipt {
                 .is_ok_and(|actual| actual == self.build_fingerprint)
     }
 
+    pub(super) fn validate_replayed_identity(
+        &self,
+        source_root: &RepoRoot,
+        source_sha256: &str,
+        build_fingerprint: &str,
+        binary_sha256: &str,
+        repository_commit: &str,
+        toolchain: &ToolchainEvidence,
+    ) -> Result<(), StabBuildError> {
+        let source_matches =
+            digest_materialized_worker_source(&source_root.path)? == self.worker_source_sha256;
+        let manifests_match = digest_file(&source_root.path.join("Cargo.lock"))?
+            == self.cargo_lock_sha256
+            && digest_file(&source_root.path.join("Cargo.toml"))? == self.workspace_manifest_sha256
+            && digest_file(&source_root.path.join("ops/bench/Cargo.toml"))?
+                == self.package_manifest_sha256;
+        if source_matches
+            && manifests_match
+            && self.validates_report_identity(
+                source_sha256,
+                build_fingerprint,
+                binary_sha256,
+                repository_commit,
+                toolchain,
+            )
+        {
+            Ok(())
+        } else {
+            Err(StabBuildError::StaleIdentity)
+        }
+    }
+
     fn recomputed_build_fingerprint(&self) -> Result<String, StabBuildError> {
         let material = serde_json::to_vec(&serde_json::json!({
             "schema_version": self.schema_version,

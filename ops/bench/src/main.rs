@@ -114,6 +114,9 @@ enum Command {
     /// Compare explicit scalar and portable-SIMD Stab builds on affected workloads.
     QualificationSimdCompare(qualification::SimdCompareArgs),
 
+    /// Replay and validate a scalar-versus-portable-SIMD diagnostic report.
+    QualificationSimdReport(qualification::SimdReportArgs),
+
     /// Validate a paired qualification report and regenerate derived artifacts.
     QualificationReport(qualification::ReportArgs),
 
@@ -316,6 +319,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationSimdCompare(args) => {
             qualification::run_simd_compare(&root, args)?;
+        }
+        Command::QualificationSimdReport(args) => {
+            qualification::simd_report(&root, args)?;
         }
         Command::QualificationReport(args) => {
             qualification::report(&root, args)?;
