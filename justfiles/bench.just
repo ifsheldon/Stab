@@ -49,6 +49,7 @@ diagnostic-run *args:
     cargo run -q -p stab-bench --profile release -- qualification-diagnostic {{args}}
 
 # Compare explicit scalar and portable-SIMD builds on the A6 kernel workloads.
+[working-directory: '..']
 simd-compare *args:
     cargo run -q -p stab-bench --profile release -- qualification-simd-compare {{args}}
 
