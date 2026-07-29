@@ -1,11 +1,10 @@
 use std::hint::black_box;
 
+use stab_analysis::{flattened_detector_error_model, rounded_detector_error_model};
 use stab_core::{
     Circuit, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    ErrorAnalyzerOptions,
-    analysis::{flattened_detector_error_model, rounded_detector_error_model},
-    circuit_to_detector_error_model, explain_errors_from_circuit, find_undetectable_logical_error,
-    likeliest_error_sat_problem, shortest_error_sat_problem,
+    ErrorAnalyzerOptions, circuit_to_detector_error_model, explain_errors_from_circuit,
+    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 

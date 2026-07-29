@@ -97,6 +97,36 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/dem/transforms.rs",
+            "stab_analysis::rounded_detector_error_model",
+            FeatureId::DemFormat,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/dem/transforms.rs",
+            "stab_analysis::detector_error_model_without_tags",
+            FeatureId::DemFormat,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/dem/flatten.rs",
+            "stab_analysis::flattened_detector_error_model",
+            FeatureId::DemFormat,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/dem/flatten.rs",
+            "stab_analysis::DemFlattenLimits",
+            FeatureId::Resource,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/dem/flatten.rs",
+            "stab_analysis::flattened_detector_error_model_with_limits",
+            FeatureId::Resource,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/mbqc_decomposition.rs",
             "stab_analysis::mbqc_decomposition",
             FeatureId::CircuitApi,

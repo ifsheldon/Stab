@@ -722,9 +722,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_flattened_iteration_contract_matches_stim",
           "--quiet",
           "--exact"
@@ -761,6 +761,10 @@
           "owner_path": "stab_model::DetectorErrorModel::iter_flattened_instructions"
         },
         {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::flattened_detector_error_model"
+        },
+        {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::flattened_detector_error_model"
         }
@@ -777,9 +781,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_compact_transform_contract_matches_stim",
           "--quiet",
           "--exact"
@@ -808,6 +812,14 @@
         }
       ],
       "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::rounded_detector_error_model"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::detector_error_model_without_tags"
+        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::analysis::rounded_detector_error_model"
@@ -955,9 +967,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_materialized_transform_matrix_matches_stim",
           "--quiet",
           "--exact"
@@ -7648,9 +7660,9 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
-            "opaque_tag_transform_regressions",
+            "dem_transforms",
             "rounded_dem_preserves_opaque_instruction_and_repeat_tags",
             "--quiet",
             "--exact"
@@ -7678,9 +7690,9 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
-            "opaque_tag_transform_regressions",
+            "dem_transforms",
             "flattened_dem_preserves_opaque_tags_on_materialized_instructions",
             "--quiet",
             "--exact"
@@ -8159,7 +8171,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "dem_flatten_limits",
             "each_limit_accepts_its_exact_boundary_and_rejects_the_first_excess",
@@ -8177,6 +8189,50 @@
           "expanded-output-off-by-one"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_UNROLL"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_ITERATIONS"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_repeat_unroll"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_expanded_instructions"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_repeat_iterations"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::flattened_detector_error_model_with_limits"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::DemFlattenLimits"
@@ -8235,7 +8291,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "dem_flatten_limits",
             "retained_payload_dimensions_have_exact_boundaries",
@@ -8254,6 +8310,42 @@
           "allocation-before-payload-admission"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_ARGUMENT_VALUES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_argument_values"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::max_materialized_bytes"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_target_occurrences"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_argument_values"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::DemFlattenLimits::with_max_materialized_bytes"
+          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
@@ -8304,7 +8396,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "dem_flatten_limits",
             "caller_raised_limit_cannot_exceed_platform_materialization_capacity",
@@ -8334,7 +8426,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-analysis",
             "--test",
             "dem_flatten_limits",
             "practical_default_repeat_boundaries_are_executed_exactly",

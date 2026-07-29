@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "999411729ac3297c0247d44c8d64babc12dcbc55208be8e94fb25e37058ce28f",
+  "semantic_digest": "f7515d4b8e1ee765ccf19208f86b53c8651b7922a724e4cd952c88baa6a19e05",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -62064,6 +62064,344 @@
       ]
     },
     {
+      "id": "cq-api-item-4cd45f2c9b692dd1",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 21,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-23af8bcf666c9b3f",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as Clone for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-29e84ab035638d32",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as Copy for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-5a94a59cb93ae43b",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as Debug for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-5f18c0d61fe1e2e6",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as Default for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 114,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-94638b73f4c5336d",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as Eq for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b765256247f3cfbc",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as PartialEq for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-c7ddafa16a66cb81",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits as StructuralPartialEq for@b2cba6525483",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-a8b8c0520a52fc89",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_ARGUMENT_VALUES",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-48649c99799c8ee5",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 32,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-4fb71ca3cdd4d681",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-8aa7d5f5d7b10938",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_ITERATIONS",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 33,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-a62fd45142d42601",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_UNROLL",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 31,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-f171766a17c78627",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES",
+      "kind": "constant",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 34,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-2994bed3fe921354",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_argument_values",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 62,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7c28fbffc5570ee0",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_expanded_instructions",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 44,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-1dde81ad3189814a",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_materialized_bytes",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 67,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-5e71e5704c224ef0",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_repeat_iterations",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 52,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-59c768947e8fec9f",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_repeat_unroll",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 39,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-4c41981cf56958bb",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::max_target_occurrences",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 57,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-4cd3156fa64fe0ba",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_argument_values",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 101,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-9b0191b1708006d2",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_expanded_instructions",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 80,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-3305bdc23c55879f",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_materialized_bytes",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 108,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-a5cc955744e862a6",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_repeat_iterations",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 87,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-86544a2162245038",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_repeat_unroll",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 73,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-aa13fad93cdac582",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::DemFlattenLimits::with_max_target_occurrences",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/dem/flatten.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
       "id": "cq-api-item-099356e0eccfb10b",
       "feature_id": "CQ-FLOW-UTILS",
       "crate_name": "stab_analysis",
@@ -63607,7 +63945,7 @@
       "path": "stab_analysis::ResourceKind",
       "kind": "enum",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 19,
+      "source_line": 21,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63620,7 +63958,7 @@
       "path": "stab_analysis::ResourceKind as Clone for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63633,7 +63971,7 @@
       "path": "stab_analysis::ResourceKind as Copy for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63646,7 +63984,7 @@
       "path": "stab_analysis::ResourceKind as Debug for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63659,7 +63997,7 @@
       "path": "stab_analysis::ResourceKind as Eq for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63672,7 +64010,7 @@
       "path": "stab_analysis::ResourceKind as Hash for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63685,7 +64023,7 @@
       "path": "stab_analysis::ResourceKind as PartialEq for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63698,7 +64036,7 @@
       "path": "stab_analysis::ResourceKind as StructuralPartialEq for@51e07938fdff",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63711,7 +64049,7 @@
       "path": "stab_analysis::ResourceKind::ArgumentValues",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 25,
+      "source_line": 29,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63724,7 +64062,7 @@
       "path": "stab_analysis::ResourceKind::ExpandedOperations",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 21,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63737,7 +64075,7 @@
       "path": "stab_analysis::ResourceKind::MaterializedBytes",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 23,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63750,7 +64088,33 @@
       "path": "stab_analysis::ResourceKind::MaterializedUnits",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 22,
+      "source_line": 26,
+      "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-ab9fbc280f0d07e6",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ResourceKind::RepeatCount",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/resources.rs",
+      "source_line": 24,
+      "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-f198ae5a7a07ba71",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ResourceKind::RepeatIterations",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/resources.rs",
+      "source_line": 25,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63763,7 +64127,7 @@
       "path": "stab_analysis::ResourceKind::RepeatNesting",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 20,
+      "source_line": 22,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63776,7 +64140,7 @@
       "path": "stab_analysis::ResourceKind::TargetOccurrences",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 24,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63789,7 +64153,7 @@
       "path": "stab_analysis::ResourceKind::as_str",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 29,
+      "source_line": 33,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63802,7 +64166,7 @@
       "path": "stab_analysis::ResourceLimitError",
       "kind": "struct",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 53,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63815,7 +64179,7 @@
       "path": "stab_analysis::ResourceLimitError as Clone for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63828,7 +64192,7 @@
       "path": "stab_analysis::ResourceLimitError as Copy for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63841,7 +64205,7 @@
       "path": "stab_analysis::ResourceLimitError as Debug for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63854,7 +64218,7 @@
       "path": "stab_analysis::ResourceLimitError as Display for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 136,
+      "source_line": 232,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63867,7 +64231,7 @@
       "path": "stab_analysis::ResourceLimitError as Eq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63880,7 +64244,7 @@
       "path": "stab_analysis::ResourceLimitError as Error for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 173,
+      "source_line": 304,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63893,7 +64257,7 @@
       "path": "stab_analysis::ResourceLimitError as Hash for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63906,7 +64270,7 @@
       "path": "stab_analysis::ResourceLimitError as PartialEq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63919,7 +64283,7 @@
       "path": "stab_analysis::ResourceLimitError as StructuralPartialEq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 52,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63932,7 +64296,7 @@
       "path": "stab_analysis::ResourceLimitError::actual",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 127,
+      "source_line": 223,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63945,7 +64309,7 @@
       "path": "stab_analysis::ResourceLimitError::code",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 108,
+      "source_line": 177,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63958,7 +64322,7 @@
       "path": "stab_analysis::ResourceLimitError::limit",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 131,
+      "source_line": 227,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63971,7 +64335,7 @@
       "path": "stab_analysis::ResourceLimitError::operation",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 112,
+      "source_line": 181,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -63984,7 +64348,7 @@
       "path": "stab_analysis::ResourceLimitError::resource",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 116,
+      "source_line": 203,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -64108,13 +64472,26 @@
       ]
     },
     {
+      "id": "cq-api-item-3081b97cfb0b1682",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ResourceOperation::DetectorErrorModelFlatten",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/resources.rs",
+      "source_line": 7,
+      "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
       "id": "cq-api-item-1d92d68755e66266",
       "feature_id": "CQ-RESOURCE",
       "crate_name": "stab_analysis",
       "path": "stab_analysis::ResourceOperation::as_str",
       "kind": "method",
       "source_path": "crates/stab-analysis/src/resources.rs",
-      "source_line": 10,
+      "source_line": 11,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -66426,6 +66803,19 @@
       ]
     },
     {
+      "id": "cq-api-item-348c140cfb4c7305",
+      "feature_id": "CQ-DEM-FORMAT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::detector_error_model_without_tags",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/dem/transforms.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ]
+    },
+    {
       "id": "cq-api-item-27b68d07b4e0a1b2",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_analysis",
@@ -66475,6 +66865,32 @@
       "source_path": "crates/stab-analysis/src/circuit_transforms.rs",
       "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-2d90447ee7d0948c",
+      "feature_id": "CQ-DEM-FORMAT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::flattened_detector_error_model",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/dem/transforms.rs",
+      "source_line": 33,
+      "owner_case_id": "cq-evidence-qualification-459deaaad2f535c2",
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ]
+    },
+    {
+      "id": "cq-api-item-4494c41c0c8f1801",
+      "feature_id": "CQ-RESOURCE",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::flattened_detector_error_model_with_limits",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/dem/transforms.rs",
+      "source_line": 44,
+      "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
       ]
@@ -67081,6 +67497,19 @@
       "owner_case_id": "cq-evidence-api-b1926a3dd159950d",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b7034cd327faeaf4",
+      "feature_id": "CQ-DEM-FORMAT",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::rounded_detector_error_model",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/dem/transforms.rs",
+      "source_line": 65,
+      "owner_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
+      "performance_groups": [
+        "PERF-DEM-MODEL"
       ]
     },
     {
@@ -77427,8 +77856,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits",
       "kind": "struct",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 18,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77440,8 +77869,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as Clone for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77453,8 +77882,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as Copy for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77466,8 +77895,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as Debug for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77479,8 +77908,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as Default for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 111,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77492,8 +77921,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as Eq for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77505,8 +77934,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as PartialEq for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77518,8 +77947,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits as StructuralPartialEq for@b2cba6525483",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 17,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77531,8 +77960,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_ARGUMENT_VALUES",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 32,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77544,8 +77973,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 29,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77557,8 +77986,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 33,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77570,8 +77999,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_REPEAT_ITERATIONS",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 30,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77583,8 +78012,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_REPEAT_UNROLL",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 28,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77596,8 +78025,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES",
       "kind": "constant",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 31,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77609,8 +78038,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_argument_values",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 59,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77622,8 +78051,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_expanded_instructions",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 41,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77635,8 +78064,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_materialized_bytes",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 64,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77648,8 +78077,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_repeat_iterations",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 49,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77661,8 +78090,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_repeat_unroll",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 36,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77674,8 +78103,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::max_target_occurrences",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 54,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77687,8 +78116,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_argument_values",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 98,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77700,8 +78129,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_expanded_instructions",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 77,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77713,8 +78142,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_materialized_bytes",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 105,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77726,8 +78155,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_repeat_iterations",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 84,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77739,8 +78168,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_repeat_unroll",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 70,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -77752,8 +78181,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::DemFlattenLimits::with_max_target_occurrences",
       "kind": "method",
-      "source_path": "crates/stab-core/src/dem/flatten.rs",
-      "source_line": 91,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 76,
       "owner_case_id": "cq-evidence-qualification-3580b77b42e444b1",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96033,7 +96462,7 @@
       "path": "stab_core::ResourceLimitError",
       "kind": "struct",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 199,
+      "source_line": 192,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96046,7 +96475,7 @@
       "path": "stab_core::ResourceLimitError as Clone for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96059,7 +96488,7 @@
       "path": "stab_core::ResourceLimitError as Debug for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96072,7 +96501,7 @@
       "path": "stab_core::ResourceLimitError as Display for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 624,
+      "source_line": 533,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96085,7 +96514,7 @@
       "path": "stab_core::ResourceLimitError as Eq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96098,7 +96527,7 @@
       "path": "stab_core::ResourceLimitError as Error for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 886,
+      "source_line": 760,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96111,7 +96540,7 @@
       "path": "stab_core::ResourceLimitError as From@998cc4079a13 for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 618,
+      "source_line": 527,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96124,7 +96553,7 @@
       "path": "stab_core::ResourceLimitError as From@ad159244d585 for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 612,
+      "source_line": 521,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96137,7 +96566,7 @@
       "path": "stab_core::ResourceLimitError as Hash for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96150,7 +96579,7 @@
       "path": "stab_core::ResourceLimitError as PartialEq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96163,7 +96592,7 @@
       "path": "stab_core::ResourceLimitError as StructuralPartialEq for@20942bcc4511",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 198,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96176,7 +96605,7 @@
       "path": "stab_core::ResourceLimitError::actual",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 599,
+      "source_line": 508,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96189,7 +96618,7 @@
       "path": "stab_core::ResourceLimitError::code",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 459,
+      "source_line": 389,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96202,7 +96631,7 @@
       "path": "stab_core::ResourceLimitError::limit",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 603,
+      "source_line": 512,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96215,7 +96644,7 @@
       "path": "stab_core::ResourceLimitError::operation",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 463,
+      "source_line": 393,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96228,7 +96657,7 @@
       "path": "stab_core::ResourceLimitError::resource",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 505,
+      "source_line": 429,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -96241,7 +96670,7 @@
       "path": "stab_core::ResourceLimitError::span",
       "kind": "method",
       "source_path": "crates/stab-core/src/resources.rs",
-      "source_line": 607,
+      "source_line": 516,
       "owner_case_id": "cq-evidence-qualification-dfc84724820209cc",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -105059,7 +105488,7 @@
       "path": "stab_core::analysis::detector_error_model_without_tags",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/dem_adapters.rs",
-      "source_line": 16,
+      "source_line": 4,
       "owner_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -105126,7 +105555,7 @@
       "path": "stab_core::analysis::flattened_detector_error_model",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/dem_adapters.rs",
-      "source_line": 36,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -105139,7 +105568,7 @@
       "path": "stab_core::analysis::flattened_detector_error_model_with_limits",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/dem_adapters.rs",
-      "source_line": 47,
+      "source_line": 16,
       "owner_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -105296,7 +105725,7 @@
       "path": "stab_core::analysis::rounded_detector_error_model",
       "kind": "function",
       "source_path": "crates/stab-core/src/analysis/dem_adapters.rs",
-      "source_line": 65,
+      "source_line": 24,
       "owner_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -114378,7 +114807,7 @@
       "path": "stab_core::find_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 99,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-api-32578357b1eddffd",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -114391,7 +114820,7 @@
       "path": "stab_core::find_undetectable_logical_error_with_limits",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 113,
+      "source_line": 80,
       "owner_case_id": "cq-evidence-qualification-e6b906b0657cf170",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -120423,7 +120852,7 @@
       "path": "stab_core::shortest_graphlike_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 80,
+      "source_line": 47,
       "owner_case_id": "cq-evidence-api-2e502a23c3336410",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -120436,7 +120865,7 @@
       "path": "stab_core::shortest_graphlike_undetectable_logical_error_with_limits",
       "kind": "function",
       "source_path": "crates/stab-core/src/dem.rs",
-      "source_line": 87,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-e6b906b0657cf170",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -145680,6 +146109,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::DemFlattenLimits",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::DemFlattenLimits"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::DemFlattenedInstructionIter",
       "canonical_crate_name": "stab_model",
       "canonical_path": "stab_model::DemFlattenedInstructionIter"
@@ -162161,9 +162596,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "dem_folded_traversal",
+          "dem_transforms",
           "pfm_b3_folded_traversal_transforms",
           "--quiet",
           "--exact"
@@ -185221,7 +185656,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "dem_flatten_limits",
           "practical_default_repeat_boundaries_are_executed_exactly",
@@ -187087,9 +187522,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_materialized_transform_matrix_matches_stim",
           "--quiet",
           "--exact"
@@ -189004,7 +189439,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "dem_flatten_limits",
           "retained_payload_dimensions_have_exact_boundaries",
@@ -190412,9 +190847,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_flattened_iteration_contract_matches_stim",
           "--quiet",
           "--exact"
@@ -191264,7 +191699,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "dem_flatten_limits",
           "each_limit_accepts_its_exact_boundary_and_rejects_the_first_excess",
@@ -196986,9 +197421,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "opaque_tag_transform_regressions",
+          "dem_transforms",
           "rounded_dem_preserves_opaque_instruction_and_repeat_tags",
           "--quiet",
           "--exact"
@@ -201034,9 +201469,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "cq2_dem_format",
+          "dem_transforms",
           "cq2_dem_compact_transform_contract_matches_stim",
           "--quiet",
           "--exact"
@@ -204439,9 +204874,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "opaque_tag_transform_regressions",
+          "dem_transforms",
           "flattened_dem_preserves_opaque_tags_on_materialized_instructions",
           "--quiet",
           "--exact"
@@ -206034,7 +206469,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "dem_flatten_limits",
           "caller_raised_limit_cannot_exceed_platform_materialization_capacity",

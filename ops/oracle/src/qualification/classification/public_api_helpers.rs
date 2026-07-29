@@ -16,6 +16,9 @@ pub(super) fn classify_extracted_analysis_api(
     if source_path.starts_with("crates/stab-analysis/src/circuit_to_dem") {
         return Some(FeatureId::Analyzer);
     }
+    if source_path.starts_with("crates/stab-analysis/src/dem") {
+        return Some(FeatureId::DemFormat);
+    }
     if source_path.starts_with("crates/stab-analysis/src/circuit_flow")
         || source_path.starts_with("crates/stab-analysis/src/circuit_feedback")
         || source_path.starts_with("crates/stab-analysis/src/circuit_detecting_regions")

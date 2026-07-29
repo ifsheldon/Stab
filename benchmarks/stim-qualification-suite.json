@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "999411729ac3297c0247d44c8d64babc12dcbc55208be8e94fb25e37058ce28f",
-  "semantic_digest": "a8ac03892be5def364c6309200fe0763e6d2b6b564a9333fef1dec33a3dcf28e",
+  "correctness_digest": "f7515d4b8e1ee765ccf19208f86b53c8651b7922a724e4cd952c88baa6a19e05",
+  "semantic_digest": "66f15f1242ad2c6d1b58256d6b3a01344a254bf2e9c1bfe751a742ff5f9c8874",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -8559,6 +8559,292 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-4cd45f2c9b692dd1",
+      "path": "stab_analysis::DemFlattenLimits",
+      "kind": "struct",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-23af8bcf666c9b3f",
+      "path": "stab_analysis::DemFlattenLimits as Clone for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-29e84ab035638d32",
+      "path": "stab_analysis::DemFlattenLimits as Copy for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5a94a59cb93ae43b",
+      "path": "stab_analysis::DemFlattenLimits as Debug for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5f18c0d61fe1e2e6",
+      "path": "stab_analysis::DemFlattenLimits as Default for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-94638b73f4c5336d",
+      "path": "stab_analysis::DemFlattenLimits as Eq for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b765256247f3cfbc",
+      "path": "stab_analysis::DemFlattenLimits as PartialEq for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-c7ddafa16a66cb81",
+      "path": "stab_analysis::DemFlattenLimits as StructuralPartialEq for@b2cba6525483",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a8b8c0520a52fc89",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_ARGUMENT_VALUES",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-48649c99799c8ee5",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_EXPANDED_INSTRUCTIONS",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4fb71ca3cdd4d681",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_MATERIALIZED_BYTES",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8aa7d5f5d7b10938",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_ITERATIONS",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a62fd45142d42601",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_REPEAT_UNROLL",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f171766a17c78627",
+      "path": "stab_analysis::DemFlattenLimits::DEFAULT_MAX_TARGET_OCCURRENCES",
+      "kind": "constant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2994bed3fe921354",
+      "path": "stab_analysis::DemFlattenLimits::max_argument_values",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-7c28fbffc5570ee0",
+      "path": "stab_analysis::DemFlattenLimits::max_expanded_instructions",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1dde81ad3189814a",
+      "path": "stab_analysis::DemFlattenLimits::max_materialized_bytes",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-5e71e5704c224ef0",
+      "path": "stab_analysis::DemFlattenLimits::max_repeat_iterations",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-59c768947e8fec9f",
+      "path": "stab_analysis::DemFlattenLimits::max_repeat_unroll",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4c41981cf56958bb",
+      "path": "stab_analysis::DemFlattenLimits::max_target_occurrences",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4cd3156fa64fe0ba",
+      "path": "stab_analysis::DemFlattenLimits::with_max_argument_values",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9b0191b1708006d2",
+      "path": "stab_analysis::DemFlattenLimits::with_max_expanded_instructions",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-3305bdc23c55879f",
+      "path": "stab_analysis::DemFlattenLimits::with_max_materialized_bytes",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a5cc955744e862a6",
+      "path": "stab_analysis::DemFlattenLimits::with_max_repeat_iterations",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-86544a2162245038",
+      "path": "stab_analysis::DemFlattenLimits::with_max_repeat_unroll",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-aa13fad93cdac582",
+      "path": "stab_analysis::DemFlattenLimits::with_max_target_occurrences",
+      "kind": "method",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-3580b77b42e444b1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-099356e0eccfb10b",
       "path": "stab_analysis::DetectingRegionMap",
       "kind": "type-alias",
@@ -10012,6 +10298,28 @@
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-ab9fbc280f0d07e6",
+      "path": "stab_analysis::ResourceKind::RepeatCount",
+      "kind": "variant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f198ae5a7a07ba71",
+      "path": "stab_analysis::ResourceKind::RepeatIterations",
+      "kind": "variant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-f11fdaefcba0c09a",
       "path": "stab_analysis::ResourceKind::RepeatNesting",
       "kind": "variant",
@@ -10300,6 +10608,17 @@
     {
       "id": "cq-api-item-a49d338717912881",
       "path": "stab_analysis::ResourceOperation::CircuitFlatten",
+      "kind": "variant",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3081b97cfb0b1682",
+      "path": "stab_analysis::ResourceOperation::DetectorErrorModelFlatten",
       "kind": "variant",
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
@@ -12275,6 +12594,17 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-348c140cfb4c7305",
+      "path": "stab_analysis::detector_error_model_without_tags",
+      "kind": "function",
+      "performance_feature": "PERF-DEM-MODEL",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-27b68d07b4e0a1b2",
       "path": "stab_analysis::flattened_circuit",
       "kind": "function",
@@ -12318,6 +12648,28 @@
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-2d90447ee7d0948c",
+      "path": "stab_analysis::flattened_detector_error_model",
+      "kind": "function",
+      "performance_feature": "PERF-DEM-MODEL",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-4494c41c0c8f1801",
+      "path": "stab_analysis::flattened_detector_error_model_with_limits",
+      "kind": "function",
+      "performance_feature": "PERF-RESOURCE-BOUNDARIES",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-4b7985bd7509b7ac",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -12877,6 +13229,17 @@
       "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-b1926a3dd159950d",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-b7034cd327faeaf4",
+      "path": "stab_analysis::rounded_detector_error_model",
+      "kind": "function",
+      "performance_feature": "PERF-DEM-MODEL",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
