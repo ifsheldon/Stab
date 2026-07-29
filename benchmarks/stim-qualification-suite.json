@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "75d55ffc3e39bc37ff99fe2d2cf166aa7765c19911e8b22968e7a0e81b6cfb99",
-  "semantic_digest": "12b25bebacfc2c580a1533042ba567c661c8fba6454f65e70f587d241e66d06f",
+  "semantic_digest": "fd5c7e5467758824100c36bd6c3898ef286f0cf9741f002ff3bd03f2140ae247",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -84667,7 +84667,7 @@
       },
       "threshold_policy": "report-only",
       "reason": "Measures only Circuit::fingerprint over a pre-parsed deterministic circuit; the result is compared with an untimed typed fingerprint witness.",
-      "owner": "stab-core/model-fingerprint",
+      "owner": "stab-model/model-fingerprint",
       "status": "implemented"
     },
     {

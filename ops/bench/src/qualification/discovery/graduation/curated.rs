@@ -85,7 +85,7 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
             performance_feature: "PERF-CIRCUIT-MODEL",
             phase: Phase::Transform,
             correctness_cases: &["cq-evidence-qualification-e16abe30d8c7992c"],
-            owner: "stab-core/model-fingerprint",
+            owner: "stab-model/model-fingerprint",
             reason: "Measures only Circuit::fingerprint over a pre-parsed deterministic circuit; the result is compared with an untimed typed fingerprint witness.",
         },
         AgentDiagnosticSpec {

@@ -13,6 +13,7 @@ use crate::manifest::BenchmarkManifest;
 mod counts;
 mod features;
 mod issues;
+mod ownership;
 mod planned;
 mod replacements;
 mod source;
@@ -44,6 +45,7 @@ pub(super) fn validate(
     let mut issues = Issues::default();
     validate_header(suite, manifest, &mut issues);
     features::validate(suite, &mut issues);
+    ownership::validate(suite, &mut issues);
     validate_checklist(suite, &mut issues);
     validate_apis(suite, references, &mut issues);
     validate_groups(suite, manifest, references, &mut issues);

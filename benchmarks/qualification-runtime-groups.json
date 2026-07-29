@@ -1,7 +1,7 @@
 {
   "schema_version": 9,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "12b25bebacfc2c580a1533042ba567c661c8fba6454f65e70f587d241e66d06f",
+  "performance_inventory_sha256": "fd5c7e5467758824100c36bd6c3898ef286f0cf9741f002ff3bd03f2140ae247",
   "product_diagnostic_suite_timeout_seconds": 600,
   "groups": [
     {
@@ -65,7 +65,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-e16abe30d8c7992c"
       ],
-      "owner": "stab-core/model-fingerprint",
+      "owner": "stab-model/model-fingerprint",
       "profiler_note": null
     },
     {

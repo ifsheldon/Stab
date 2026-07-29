@@ -738,6 +738,24 @@ fn validation_rejects_dropped_api_domains_and_wrong_exact_owner() {
 }
 
 #[test]
+fn validation_rejects_facade_ownership_for_model_fingerprinting() {
+    let (mut suite, manifest, references) = fixture();
+    let group = suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT")
+        .expect("A2 circuit model fingerprint group");
+    assert_eq!(group.owner, "stab-model/model-fingerprint");
+    group.owner = "stab-core/model-fingerprint".to_string();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("model fingerprint ownership must not drift to the facade");
+    assert!(error.to_string().contains(
+        "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT has owner stab-core/model-fingerprint, expected canonical owner stab-model/model-fingerprint"
+    ));
+}
+
+#[test]
 fn validation_rejects_changed_threshold_ratio_and_waiver_reason() {
     let (mut suite, manifest, references) = fixture();
     let thresholded = suite
