@@ -7,6 +7,7 @@
 pub mod circuit;
 mod circuit_flow;
 mod circuit_generation;
+mod circuit_inverse;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_transforms;
@@ -28,6 +29,11 @@ pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
+};
+pub use circuit_inverse::{
+    InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
+    circuit_inverse_qec_with_options, circuit_inverse_unitary, circuit_time_reversed_for_flows,
+    circuit_time_reversed_for_flows_with_options,
 };
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;

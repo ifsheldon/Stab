@@ -1,7 +1,9 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use stab_core::{Circuit, Flow, circuit_time_reversed_for_flows};
+use stab_algebra::Flow;
+use stab_analysis::circuit_time_reversed_for_flows;
+use stab_model::Circuit;
 
 fn circuit(text: &str) -> Result<Circuit, String> {
     Circuit::from_stim_str(text).map_err(|error| error.to_string())

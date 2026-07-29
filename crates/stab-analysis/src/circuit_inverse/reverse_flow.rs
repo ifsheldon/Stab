@@ -1,8 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use stab_algebra::{Flow, PauliSign, PauliString};
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, MeasureRecordOffset, QubitId, Target,
+};
+
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Flow, Gate,
-    MeasureRecordOffset, PauliSign, QubitId, Target,
+    AnalysisError, AnalysisResult,
     circuit_flow::{check_unsigned_flows_with_sparse_tracker, transitions::ReverseFlowTransition},
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
@@ -23,7 +27,7 @@ pub(super) fn reverse_flows(
     circuit: &Circuit,
     flows: &[Flow],
     options: TimeReversedForFlowsOptions,
-) -> CircuitResult<(Circuit, Vec<Flow>)> {
+) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     validate_general_reversal(circuit)?;
     let measurement_count = usize::try_from(circuit.count_measurements()?)
         .map_err(|_| reverse_error("measurement count does not fit the platform index width"))?;
@@ -80,14 +84,14 @@ struct ReverseFlowEngine {
 
 struct ReverseFlowState<'a> {
     target: DemTarget,
-    input: &'a crate::PauliString,
-    output: &'a crate::PauliString,
+    input: &'a PauliString,
+    output: &'a PauliString,
     measurements: Vec<i32>,
     observables: Vec<u32>,
 }
 
 impl ReverseFlowState<'_> {
-    fn original_flow(&self) -> CircuitResult<Flow> {
+    fn original_flow(&self) -> AnalysisResult<Flow> {
         Flow::new(
             self.input.clone(),
             self.output.clone(),
@@ -99,7 +103,7 @@ impl ReverseFlowState<'_> {
 }
 
 impl ReverseFlowEngine {
-    fn seed_flow_outputs(&mut self, states: &[ReverseFlowState<'_>]) -> CircuitResult<()> {
+    fn seed_flow_outputs(&mut self, states: &[ReverseFlowState<'_>]) -> AnalysisResult<()> {
         for state in states {
             self.toggle_pauli(state.output, state.target)?;
             for measurement in state.measurements.iter().copied() {
@@ -111,14 +115,14 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn seed_flow_inputs(&mut self, states: &[ReverseFlowState<'_>]) -> CircuitResult<()> {
+    fn seed_flow_inputs(&mut self, states: &[ReverseFlowState<'_>]) -> AnalysisResult<()> {
         for state in states {
             self.toggle_pauli(state.input, state.target)?;
         }
         Ok(())
     }
 
-    fn toggle_pauli(&mut self, pauli: &crate::PauliString, target: DemTarget) -> CircuitResult<()> {
+    fn toggle_pauli(&mut self, pauli: &PauliString, target: DemTarget) -> AnalysisResult<()> {
         for (index, basis) in pauli.active_terms() {
             let qubit = QubitId::new(u32::try_from(index).map_err(|_| {
                 reverse_error(format!("flow qubit index {index} exceeds {}", u32::MAX))
@@ -128,7 +132,7 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn reverse_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(_) => self.reverse_measurement(instruction),
             ReverseFlowTransition::Reset(_) | ReverseFlowTransition::MeasureReset(_) => {
@@ -157,7 +161,7 @@ impl ReverseFlowEngine {
         }
     }
 
-    fn reverse_measurement(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_measurement(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let reset_gate = measurement_reset_gate(instruction.gate().canonical_name())?;
         for group in instruction.target_groups().into_iter().rev() {
             let [target] = group else {
@@ -197,7 +201,7 @@ impl ReverseFlowEngine {
                 )?;
             }
 
-            let tracker_instruction = crate::circuit::circuit_instruction_with_tag_bytes(
+            let tracker_instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
                 vec![target.clone()],
@@ -212,7 +216,7 @@ impl ReverseFlowEngine {
     fn reverse_reset_or_measure_reset(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let transition = reverse_flow_transition(instruction);
         let is_measure_reset = matches!(transition, ReverseFlowTransition::MeasureReset(_));
         let targets = reversed_target_groups(instruction);
@@ -260,7 +264,7 @@ impl ReverseFlowEngine {
     fn reverse_measuring_instruction(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let measurement_count = instruction.target_groups().len();
         if self.remaining_measurements < measurement_count {
             return Err(reverse_error(format!(
@@ -284,7 +288,7 @@ impl ReverseFlowEngine {
         self.flush_detectors_and_observables()
     }
 
-    fn reverse_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_detector(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.undo_instruction(instruction)?;
         self.remaining_detectors = self
             .remaining_detectors
@@ -300,7 +304,7 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn reverse_observable(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_observable(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let observable = instruction
             .observable_id_argument()?
             .ok_or_else(|| reverse_error("OBSERVABLE_INCLUDE is missing an observable id"))?;
@@ -326,7 +330,7 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn reverse_simple(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_simple(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.undo_instruction(instruction)?;
         self.append_instruction(
             instruction.gate().best_candidate_inverse()?,
@@ -336,17 +340,18 @@ impl ReverseFlowEngine {
         )
     }
 
-    fn reverse_ignored(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn reverse_ignored(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         match instruction.gate().canonical_name() {
             "QUBIT_COORDS" => {
                 let shifted = shifted_coordinates(instruction.args(), &self.coordinate_shift);
-                self.qubit_coordinates
-                    .push(crate::circuit::circuit_instruction_with_tag_bytes(
+                self.qubit_coordinates.push(
+                    stab_model::advanced::circuit_instruction_with_tag_bytes(
                         instruction.gate(),
                         shifted,
                         instruction.targets().to_vec(),
                         instruction.tag_bytes(),
-                    )?);
+                    )?,
+                );
                 Ok(())
             }
             "SHIFT_COORDS" => {
@@ -367,7 +372,7 @@ impl ReverseFlowEngine {
         self.new_measurement_count += 1;
     }
 
-    fn flush_detectors_and_observables(&mut self) -> CircuitResult<()> {
+    fn flush_detectors_and_observables(&mut self) -> AnalysisResult<()> {
         let active_targets = self.tracker.active_targets();
         let ready = self
             .detector_measurements
@@ -392,7 +397,7 @@ impl ReverseFlowEngine {
                 .map(|measurement| {
                     output_measurement_target(measurement, self.new_measurement_count)
                 })
-                .collect::<CircuitResult<Vec<_>>>()?;
+                .collect::<AnalysisResult<Vec<_>>>()?;
             let tag = self.target_tags.remove(&target).flatten();
             match target {
                 DemTarget::RelativeDetector(_) => {
@@ -426,7 +431,7 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn verify_closed_targets(&self, states: &[ReverseFlowState<'_>]) -> CircuitResult<()> {
+    fn verify_closed_targets(&self, states: &[ReverseFlowState<'_>]) -> AnalysisResult<()> {
         let active = self.tracker.active_targets();
         if let Some(target) = active.first() {
             if let Some(state) = states.iter().find(|state| state.target == *target) {
@@ -443,7 +448,7 @@ impl ReverseFlowEngine {
         Ok(())
     }
 
-    fn build_output_flows(&self, states: &[ReverseFlowState<'_>]) -> CircuitResult<Vec<Flow>> {
+    fn build_output_flows(&self, states: &[ReverseFlowState<'_>]) -> AnalysisResult<Vec<Flow>> {
         states
             .iter()
             .map(|state| {
@@ -456,7 +461,7 @@ impl ReverseFlowEngine {
                     .map(|measurement| {
                         output_measurement_index(measurement, self.new_measurement_count)
                     })
-                    .collect::<CircuitResult<Vec<_>>>()?;
+                    .collect::<AnalysisResult<Vec<_>>>()?;
                 Flow::new(
                     state.output.with_sign(PauliSign::Plus),
                     state.input.with_sign(PauliSign::Plus),
@@ -474,12 +479,12 @@ impl ReverseFlowEngine {
         args: Vec<f64>,
         targets: Vec<Target>,
         tag: Option<&[u8]>,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         if targets.is_empty() && gate.canonical_name() != "TICK" {
             return Ok(());
         }
         self.inverted
-            .append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
+            .append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
                 gate, args, targets, tag,
             )?);
         Ok(())
@@ -519,7 +524,7 @@ fn item_requires_general_reversal(item: &CircuitItem) -> bool {
     }
 }
 
-fn validate_general_reversal(circuit: &Circuit) -> CircuitResult<()> {
+fn validate_general_reversal(circuit: &Circuit) -> AnalysisResult<()> {
     let expanded = expanded_instruction_count(circuit)?;
     if expanded > MAX_MEASUREMENT_RICH_EXPANDED_INSTRUCTIONS {
         return Err(reverse_error(format!(
@@ -529,7 +534,7 @@ fn validate_general_reversal(circuit: &Circuit) -> CircuitResult<()> {
     validate_items(circuit.items())
 }
 
-fn expanded_instruction_count(circuit: &Circuit) -> CircuitResult<u64> {
+fn expanded_instruction_count(circuit: &Circuit) -> AnalysisResult<u64> {
     let mut total = 0_u64;
     for item in circuit.items() {
         let count = match item {
@@ -548,7 +553,7 @@ fn expanded_instruction_count(circuit: &Circuit) -> CircuitResult<u64> {
     Ok(total)
 }
 
-fn validate_items(items: &[CircuitItem]) -> CircuitResult<()> {
+fn validate_items(items: &[CircuitItem]) -> AnalysisResult<()> {
     for item in items {
         match item {
             CircuitItem::Instruction(instruction) => validate_instruction(instruction)?,
@@ -558,7 +563,7 @@ fn validate_items(items: &[CircuitItem]) -> CircuitResult<()> {
     Ok(())
 }
 
-fn validate_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     if instruction.args().iter().any(|arg| !arg.is_finite()) {
         return Err(reverse_error(format!(
             "time reversal requires finite instruction arguments: {}",
@@ -602,7 +607,7 @@ fn validate_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
     Ok(())
 }
 
-fn validate_sweep_target_order(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_sweep_target_order(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     let invalid_side = match instruction.gate().canonical_name() {
         "CX" | "CY" => SweepInvalidSide::Right,
         "XCZ" | "YCZ" => SweepInvalidSide::Left,
@@ -632,7 +637,7 @@ enum SweepInvalidSide {
     Right,
 }
 
-fn reject_duplicate_qubits(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn reject_duplicate_qubits(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     let mut seen = BTreeSet::new();
     for target in instruction.targets() {
         if let Some(qubit) = target.qubit_id()
@@ -648,7 +653,7 @@ fn reject_duplicate_qubits(instruction: &CircuitInstruction) -> CircuitResult<()
     Ok(())
 }
 
-fn flow_aware_qubit_count(circuit: &Circuit, flows: &[Flow]) -> CircuitResult<usize> {
+fn flow_aware_qubit_count(circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<usize> {
     let flow_qubits = flows
         .iter()
         .flat_map(|flow| [flow.input().len(), flow.output().len()])
@@ -668,7 +673,7 @@ fn reverse_flow_states<'a>(
     observable_count: u64,
     measurement_count: usize,
     flows: &'a [Flow],
-) -> CircuitResult<Vec<ReverseFlowState<'a>>> {
+) -> AnalysisResult<Vec<ReverseFlowState<'a>>> {
     flows
         .iter()
         .enumerate()
@@ -694,7 +699,7 @@ fn reject_measurement_record_aliases(
     flow_index: usize,
     flow: &Flow,
     measurement_count: usize,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let mut resolved = BTreeMap::new();
     for measurement in flow.measurements() {
         let absolute = absolute_measurement_index(measurement, measurement_count)?;
@@ -709,7 +714,7 @@ fn reject_measurement_record_aliases(
     Ok(())
 }
 
-fn absolute_measurement_index(index: i32, measurement_count: usize) -> CircuitResult<usize> {
+fn absolute_measurement_index(index: i32, measurement_count: usize) -> AnalysisResult<usize> {
     let count = i64::try_from(measurement_count)
         .map_err(|_| reverse_error("measurement count does not fit i64"))?;
     let index = i64::from(index);
@@ -729,13 +734,13 @@ fn absolute_measurement_index(index: i32, measurement_count: usize) -> CircuitRe
         .map_err(|_| reverse_error("absolute flow measurement index does not fit usize"))
 }
 
-fn output_measurement_target(index: usize, count: usize) -> CircuitResult<Target> {
+fn output_measurement_target(index: usize, count: usize) -> AnalysisResult<Target> {
     Ok(Target::measurement_record(MeasureRecordOffset::try_new(
         output_measurement_index(index, count)?,
     )?))
 }
 
-fn output_measurement_index(index: usize, count: usize) -> CircuitResult<i32> {
+fn output_measurement_index(index: usize, count: usize) -> AnalysisResult<i32> {
     let index = i64::try_from(index)
         .map_err(|_| reverse_error("output measurement index does not fit i64"))?;
     let count = i64::try_from(count)
@@ -744,7 +749,7 @@ fn output_measurement_index(index: usize, count: usize) -> CircuitResult<i32> {
         .map_err(|_| reverse_error("output measurement record offset does not fit i32"))
 }
 
-fn measurement_reset_gate(measurement: &str) -> CircuitResult<&'static str> {
+fn measurement_reset_gate(measurement: &str) -> AnalysisResult<&'static str> {
     match measurement {
         "M" => Ok("R"),
         "MX" => Ok("RX"),
@@ -771,7 +776,7 @@ fn add_coordinate_shift(shift: &mut Vec<f64>, delta: &[f64]) {
     }
 }
 
-fn validate_output_flows(circuit: &Circuit, flows: &[Flow]) -> CircuitResult<()> {
+fn validate_output_flows(circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<()> {
     let checks = check_unsigned_flows_with_sparse_tracker(circuit, flows)
         .map_err(|error| reverse_error(format!("failed to validate reversed flows: {error}")))?;
     for (index, (flow, satisfied)) in flows.iter().zip(checks).enumerate() {
@@ -790,6 +795,6 @@ fn instruction_text(instruction: &CircuitInstruction) -> String {
     circuit.to_stim_string().trim().to_owned()
 }
 
-fn reverse_error(message: impl Into<String>) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(message)
+fn reverse_error(message: impl Into<String>) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(message)
 }

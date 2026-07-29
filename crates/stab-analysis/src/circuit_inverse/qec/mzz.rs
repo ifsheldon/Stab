@@ -1,9 +1,8 @@
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    MeasureRecordOffset, Target,
-};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, Target};
 
-pub(super) fn selected_mzz_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+use crate::{AnalysisError, AnalysisResult};
+
+pub(super) fn selected_mzz_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(first_mry),
         CircuitItem::Instruction(first_m),
@@ -53,7 +52,7 @@ struct SelectedMzzPacket<'a> {
     detector: &'a CircuitInstruction,
 }
 
-fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> CircuitResult<Circuit> {
+fn build_selected_mzz_inverse(packet: SelectedMzzPacket<'_>) -> AnalysisResult<Circuit> {
     let SelectedMzzPacket {
         first_mry,
         first_m,
@@ -168,7 +167,7 @@ fn exact_plain_targets<const N: usize>(
     instruction: &CircuitInstruction,
     expected_ids: [u32; N],
     label: &str,
-) -> CircuitResult<[Target; N]> {
+) -> AnalysisResult<[Target; N]> {
     let targets = super::plain_unique_single_qubit_targets(instruction)
         .ok_or_else(|| inverse_qec_mzz_error("targets must be plain unique qubits"))?;
     let Ok(targets) = <Vec<Target> as TryInto<[Target; N]>>::try_into(targets) else {
@@ -189,7 +188,7 @@ fn exact_plain_targets<const N: usize>(
     Ok(targets)
 }
 
-fn exact_mzz_targets(instruction: &CircuitInstruction) -> CircuitResult<[Target; 4]> {
+fn exact_mzz_targets(instruction: &CircuitInstruction) -> AnalysisResult<[Target; 4]> {
     if instruction.target_groups().len() != 2 {
         return Err(inverse_qec_mzz_error(
             "MZZ must contain exactly two target pairs",
@@ -225,8 +224,8 @@ fn exact_mzz_targets(instruction: &CircuitInstruction) -> CircuitResult<[Target;
     ])
 }
 
-fn inverse_qec_mzz_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_mzz_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected MZZ detector subset requires exact top-level MRY 0 1, M 0, TICK, MZZ(p) 0 1 2 3, TICK, M 1, MRY 0 1, and DETECTOR rec[-3] rec[-5] rec[-6]; {reason}"
     ))
 }

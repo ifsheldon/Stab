@@ -3,9 +3,8 @@
     reason = "PF2 QEC inverse reset-measure-detector parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{
-    Circuit, InverseQecOptions, circuit_inverse_qec, circuit_inverse_qec_with_options,
-};
+use stab_analysis::{InverseQecOptions, circuit_inverse_qec, circuit_inverse_qec_with_options};
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_qec_supports_reset_measure_detector_triplet() {

@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    MeasureRecordOffset, Target,
-};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, Target};
+
+use crate::{AnalysisError, AnalysisResult};
 
 struct RecordTailOutput {
     gate: Gate,
@@ -14,7 +13,7 @@ struct RecordTailOutput {
 
 pub(super) fn selected_mpad_record_tail_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [CircuitItem::Instruction(mpad), tail @ ..] = circuit.items() else {
         return Ok(None);
     };
@@ -29,7 +28,7 @@ pub(super) fn selected_mpad_record_tail_inverse(
 fn build_selected_mpad_record_tail_inverse(
     mpad: &CircuitInstruction,
     tail: &[CircuitItem],
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     validate_mpad_targets(mpad)?;
     let measurement_count = i64::try_from(mpad.targets().len())
         .map_err(|_| inverse_qec_mpad_error("MPAD target count exceeds supported range"))?;
@@ -85,7 +84,7 @@ fn build_selected_mpad_record_tail_inverse(
     }
 
     let mut result = Circuit::new();
-    result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
+    result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
         mpad.gate(),
         mpad.args().to_vec(),
         mpad.targets().iter().rev().cloned().collect(),
@@ -98,7 +97,7 @@ fn build_selected_mpad_record_tail_inverse(
         if output.targets.is_empty() {
             continue;
         }
-        result.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
+        result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
             output.gate,
             output.args,
             output.targets,
@@ -108,7 +107,7 @@ fn build_selected_mpad_record_tail_inverse(
     Ok(result)
 }
 
-fn validate_mpad_targets(mpad: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_mpad_targets(mpad: &CircuitInstruction) -> AnalysisResult<()> {
     for target in mpad.targets() {
         let Some(pad) = target.qubit_id() else {
             return Err(inverse_qec_mpad_error(
@@ -127,7 +126,7 @@ fn validate_mpad_targets(mpad: &CircuitInstruction) -> CircuitResult<()> {
 fn remapped_mpad_record_targets(
     instruction: &CircuitInstruction,
     measurement_count: i64,
-) -> CircuitResult<Vec<Target>> {
+) -> AnalysisResult<Vec<Target>> {
     let mut parity = BTreeSet::new();
     for target in instruction.targets() {
         let offset = target
@@ -153,7 +152,7 @@ fn remapped_mpad_record_targets(
         .map(|offset| {
             MeasureRecordOffset::try_new(offset)
                 .map(Target::measurement_record)
-                .map_err(CircuitError::from)
+                .map_err(AnalysisError::from)
         })
         .collect()
 }
@@ -161,7 +160,7 @@ fn remapped_mpad_record_targets(
 fn merge_record_targets_by_parity(
     existing: &mut Vec<Target>,
     incoming: Vec<Target>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let mut parity = BTreeSet::new();
     for target in existing.iter().chain(incoming.iter()) {
         let offset = target
@@ -178,14 +177,14 @@ fn merge_record_targets_by_parity(
         .map(|offset| {
             MeasureRecordOffset::try_new(offset)
                 .map(Target::measurement_record)
-                .map_err(CircuitError::from)
+                .map_err(AnalysisError::from)
         })
-        .collect::<CircuitResult<_>>()?;
+        .collect::<AnalysisResult<_>>()?;
     Ok(())
 }
 
-fn inverse_qec_mpad_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_mpad_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected MPAD record-tail subset requires a top-level MPAD followed only by record-only DETECTOR or OBSERVABLE_INCLUDE instructions referencing that MPAD packet; {reason}"
     ))
 }

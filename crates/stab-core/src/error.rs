@@ -155,12 +155,6 @@ impl CircuitError {
         }
     }
 
-    pub(crate) fn invalid_tableau_conversion(message: impl Into<String>) -> Self {
-        Self::InvalidTableauConversion {
-            message: message.into(),
-        }
-    }
-
     pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
         Self::InvalidSamplerCompilation {
             message: message.into(),

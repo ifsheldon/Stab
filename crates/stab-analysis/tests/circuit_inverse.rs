@@ -3,10 +3,9 @@
     reason = "M6 inverse-circuit parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{
-    Circuit, Tableau,
-    analysis::{circuit_inverse_unitary, circuit_to_tableau},
-};
+use stab_algebra::Tableau;
+use stab_analysis::{circuit_inverse_unitary, circuit_to_tableau};
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_unitary_matches_stim_example() {

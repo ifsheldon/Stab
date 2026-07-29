@@ -3,7 +3,8 @@
     reason = "PFM2 QEC inverse m_det tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, circuit_inverse_qec};
+use stab_analysis::circuit_inverse_qec;
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_qec_supports_selected_m_det_detector_flow() {

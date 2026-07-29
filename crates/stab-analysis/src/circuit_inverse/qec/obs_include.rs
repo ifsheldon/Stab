@@ -1,11 +1,12 @@
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    MeasureRecordOffset, Pauli, QubitId, Target,
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, Pauli, QubitId, Target,
 };
+
+use crate::{AnalysisError, AnalysisResult};
 
 pub(super) fn selected_obs_include_pauli_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(observable),
@@ -28,7 +29,7 @@ pub(super) fn selected_obs_include_pauli_inverse(
 fn build_selected_obs_include_pauli_inverse(
     reset: &CircuitInstruction,
     observable: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     validate_selected_reset(reset)?;
     validate_selected_observable(observable)?;
 
@@ -51,7 +52,7 @@ fn build_selected_obs_include_pauli_inverse(
     Ok(result)
 }
 
-fn validate_selected_reset(reset: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_selected_reset(reset: &CircuitInstruction) -> AnalysisResult<()> {
     if !reset.args().is_empty() {
         return Err(inverse_qec_obs_include_pauli_error(
             "RX instruction must be noiseless",
@@ -78,7 +79,7 @@ fn validate_selected_reset(reset: &CircuitInstruction) -> CircuitResult<()> {
     Ok(())
 }
 
-fn validate_selected_observable(observable: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_selected_observable(observable: &CircuitInstruction) -> AnalysisResult<()> {
     if observable.observable_id_argument()?.map(|id| id.get()) != Some(1) {
         return Err(inverse_qec_obs_include_pauli_error(
             "observable id must be exactly 1",
@@ -105,8 +106,8 @@ fn validate_selected_observable(observable: &CircuitInstruction) -> CircuitResul
     Ok(())
 }
 
-fn inverse_qec_obs_include_pauli_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_obs_include_pauli_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected observable Pauli include subset requires exact RX 1 followed by OBSERVABLE_INCLUDE[test](1) X1: {reason}"
     ))
 }

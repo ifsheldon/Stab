@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    MeasureRecordOffset, Pauli, PauliBasis, Target,
+use stab_algebra::PauliBasis;
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, Pauli, Target,
 };
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::{InverseQecOptions, is_plain_qubit_target, reset_inverse_gate_and_basis};
 
@@ -12,7 +14,7 @@ mod mpad;
 mod mzz;
 mod obs_include;
 
-pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+pub(super) fn selected_qec_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
         return Ok(Some(inverse));
     }
@@ -53,7 +55,7 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
 
 pub(super) fn selected_keep_measurements_qec_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(measurement),
@@ -81,7 +83,7 @@ fn is_exact_keep_measurements_reset_measure_detector_packet(
     reset: &CircuitInstruction,
     measurement: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<bool> {
+) -> AnalysisResult<bool> {
     if reset.gate().canonical_name() != "R"
         || measurement.gate().canonical_name() != "M"
         || detector.gate().canonical_name() != "DETECTOR"
@@ -116,7 +118,7 @@ fn is_exact_keep_measurements_reset_measure_detector_packet(
 
 fn selected_reset_cx_measure_two_to_one_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(cx),
@@ -148,7 +150,7 @@ fn build_selected_reset_cx_measure_two_to_one_inverse(
     cx: &CircuitInstruction,
     measurement: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !reset.args().is_empty() || !cx.args().is_empty() || !measurement.args().is_empty() {
         return Err(inverse_qec_two_to_one_error(
             "reset, CX, and measurement instructions must be noiseless",
@@ -237,7 +239,7 @@ fn build_selected_reset_cx_measure_two_to_one_inverse(
     Ok(result)
 }
 
-fn selected_mpp_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+fn selected_mpp_detector_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(mpp),
         CircuitItem::Instruction(detector),
@@ -256,7 +258,7 @@ fn selected_mpp_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circ
 fn build_selected_mpp_detector_inverse(
     mpp: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !mpp.args().is_empty() {
         return Err(inverse_qec_mpp_detector_error(
             "MPP instruction must be noiseless",
@@ -301,15 +303,15 @@ fn build_selected_mpp_detector_inverse(
             .map(|offset| {
                 MeasureRecordOffset::try_new(*offset)
                     .map(Target::measurement_record)
-                    .map_err(CircuitError::from)
+                    .map_err(AnalysisError::from)
             })
-            .collect::<CircuitResult<Vec<_>>>()?,
+            .collect::<AnalysisResult<Vec<_>>>()?,
         detector.tag_bytes(),
     )?;
     Ok(result)
 }
 
-fn selected_noisy_measurement_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+fn selected_noisy_measurement_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     if circuit.items().is_empty() {
         return Ok(None);
     }
@@ -337,7 +339,7 @@ fn selected_noisy_measurement_inverse(circuit: &Circuit) -> CircuitResult<Option
     Ok(Some(result))
 }
 
-fn reversed_measurement_targets(instruction: &CircuitInstruction) -> CircuitResult<Vec<Target>> {
+fn reversed_measurement_targets(instruction: &CircuitInstruction) -> AnalysisResult<Vec<Target>> {
     let mut targets = Vec::with_capacity(instruction.targets().len());
     for group in instruction.target_groups().into_iter().rev() {
         let [target] = group else {
@@ -355,7 +357,7 @@ fn reversed_measurement_targets(instruction: &CircuitInstruction) -> CircuitResu
     Ok(targets)
 }
 
-fn selected_noisy_measure_reset_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+fn selected_noisy_measure_reset_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     if circuit.items().is_empty() {
         return Ok(None);
     }
@@ -380,7 +382,7 @@ fn selected_noisy_measure_reset_inverse(circuit: &Circuit) -> CircuitResult<Opti
 fn append_measure_reset_inverse(
     result: &mut Circuit,
     instruction: &CircuitInstruction,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let noisy = !instruction.args().is_empty();
     if instruction.args().len() > 1 {
         return Err(inverse_qec_noisy_measure_reset_error(
@@ -423,7 +425,7 @@ fn append_measure_reset_inverse(
 fn reversed_measure_reset_targets(
     instruction: &CircuitInstruction,
     allow_inverted: bool,
-) -> CircuitResult<Vec<Target>> {
+) -> AnalysisResult<Vec<Target>> {
     let mut targets = Vec::with_capacity(instruction.targets().len());
     for group in instruction.target_groups().into_iter().rev() {
         let [target] = group else {
@@ -446,7 +448,7 @@ fn reversed_measure_reset_targets(
     Ok(targets)
 }
 
-fn split_noisy_measure_reset_targets(targets: Vec<Target>) -> CircuitResult<Vec<Vec<Target>>> {
+fn split_noisy_measure_reset_targets(targets: Vec<Target>) -> AnalysisResult<Vec<Vec<Target>>> {
     let mut chunks = Vec::new();
     let mut chunk = Vec::new();
     let mut seen = HashSet::new();
@@ -469,7 +471,7 @@ fn split_noisy_measure_reset_targets(targets: Vec<Target>) -> CircuitResult<Vec<
     Ok(chunks)
 }
 
-fn noisy_measure_reset_error_gate(gate_name: &str) -> CircuitResult<&'static str> {
+fn noisy_measure_reset_error_gate(gate_name: &str) -> AnalysisResult<&'static str> {
     match gate_name {
         "MR" => Ok("X_ERROR"),
         "MRX" | "MRY" => Ok("Z_ERROR"),
@@ -481,7 +483,7 @@ fn noisy_measure_reset_error_gate(gate_name: &str) -> CircuitResult<&'static str
 
 fn selected_noisy_measure_reset_detector_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(pre_tick),
         CircuitItem::Instruction(tick),
@@ -513,7 +515,7 @@ fn build_selected_noisy_measure_reset_detector_inverse(
     middle: &CircuitInstruction,
     last: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !tick.args().is_empty() || !tick.targets().is_empty() {
         return Err(inverse_qec_noisy_measure_reset_detector_error(
             "TICK must not have arguments or targets",
@@ -564,7 +566,7 @@ fn is_measure_reset_gate(gate_name: &str) -> bool {
     matches!(gate_name, "MR" | "MRX" | "MRY")
 }
 
-fn single_noisy_measure_reset_target(instruction: &CircuitInstruction) -> CircuitResult<Target> {
+fn single_noisy_measure_reset_target(instruction: &CircuitInstruction) -> AnalysisResult<Target> {
     if instruction.args().len() != 1 {
         return Err(inverse_qec_noisy_measure_reset_detector_error(
             "measure-reset instructions must have exactly one probability argument",
@@ -581,7 +583,7 @@ fn single_noisy_measure_reset_target(instruction: &CircuitInstruction) -> Circui
 
 fn selected_measure_reset_pass_through_inverse(
     circuit: &Circuit,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(measurement),
@@ -617,7 +619,7 @@ fn build_selected_measure_reset_pass_through_inverse(
     measurement: &CircuitInstruction,
     measure_reset: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !reset.args().is_empty()
         || !measurement.args().is_empty()
         || !measure_reset.args().is_empty()
@@ -760,7 +762,7 @@ fn build_selected_measure_reset_pass_through_inverse(
 fn selected_reset_measure_detector_inverse(
     circuit: &Circuit,
     options: InverseQecOptions,
-) -> CircuitResult<Option<Circuit>> {
+) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(measurement),
@@ -794,7 +796,7 @@ fn build_selected_reset_measure_detector_inverse(
     measurement: &CircuitInstruction,
     detector: &CircuitInstruction,
     options: InverseQecOptions,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !reset.args().is_empty() || !measurement.args().is_empty() {
         return Err(inverse_qec_reset_measure_detector_error(
             "reset and measurement instructions must be noiseless",
@@ -956,7 +958,7 @@ fn append_one_target_instruction(
     args: &[f64],
     target: Target,
     tag: Option<&[u8]>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     append_target_instruction(circuit, gate, args, vec![target], tag)
 }
 
@@ -966,11 +968,11 @@ fn append_target_instruction(
     args: &[f64],
     targets: Vec<Target>,
     tag: Option<&[u8]>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if targets.is_empty() {
         return Ok(());
     }
-    circuit.append_instruction(crate::circuit::circuit_instruction_with_tag_bytes(
+    circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
         gate,
         args.to_vec(),
         targets,
@@ -1004,8 +1006,8 @@ fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option
 
 fn detector_offsets(
     detector: &CircuitInstruction,
-    error: fn(&str) -> CircuitError,
-) -> CircuitResult<Vec<i32>> {
+    error: fn(&str) -> AnalysisError,
+) -> AnalysisResult<Vec<i32>> {
     detector
         .targets()
         .iter()
@@ -1020,8 +1022,8 @@ fn detector_offsets(
 
 fn consecutive_negative_offsets(
     count: usize,
-    error: fn(&str) -> CircuitError,
-) -> CircuitResult<Vec<i32>> {
+    error: fn(&str) -> AnalysisError,
+) -> AnalysisResult<Vec<i32>> {
     (1..=count)
         .map(|index| {
             i32::try_from(index)
@@ -1031,7 +1033,7 @@ fn consecutive_negative_offsets(
         .collect()
 }
 
-fn reversed_pauli_product_targets(groups: &[&[Target]]) -> CircuitResult<Vec<Target>> {
+fn reversed_pauli_product_targets(groups: &[&[Target]]) -> AnalysisResult<Vec<Target>> {
     let mut targets = Vec::new();
     for group in groups.iter().rev() {
         let factors = group
@@ -1053,7 +1055,7 @@ fn reversed_pauli_product_targets(groups: &[&[Target]]) -> CircuitResult<Vec<Tar
     Ok(targets)
 }
 
-fn validate_hermitian_mpp_product(group: &[Target]) -> CircuitResult<()> {
+fn validate_hermitian_mpp_product(group: &[Target]) -> AnalysisResult<()> {
     let mut terms = Vec::new();
     let mut phase = 0u8;
     for target in group {
@@ -1077,7 +1079,7 @@ fn validate_hermitian_mpp_product(group: &[Target]) -> CircuitResult<()> {
     }
 }
 
-fn validate_selected_mpp_detector_parity_determined(groups: &[&[Target]]) -> CircuitResult<()> {
+fn validate_selected_mpp_detector_parity_determined(groups: &[&[Target]]) -> AnalysisResult<()> {
     let mut terms = Vec::new();
     let mut phase = 0u8;
     for group in groups {
@@ -1150,44 +1152,44 @@ fn measure_reset_gate_for_basis(basis: PauliBasis) -> &'static str {
     }
 }
 
-fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_reset_measure_detector_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected reset-measure-detector subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, and one detector referencing only those measurement records; {reason}"
     ))
 }
 
-fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected measure-reset pass-through subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, one matching noiseless plain measure-reset instruction, and one detector referencing only those measure-reset records; {reason}"
     ))
 }
 
-fn inverse_qec_mpp_detector_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_mpp_detector_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected MPP detector subset requires one noiseless MPP instruction with Hermitian Pauli products and one detector referencing exactly all selected MPP records; {reason}"
     ))
 }
 
-fn inverse_qec_noisy_measurement_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_noisy_measurement_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected noisy measurement subset requires only top-level M, MX, and MY instructions with qubit targets; {reason}"
     ))
 }
 
-fn inverse_qec_noisy_measure_reset_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_noisy_measure_reset_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected noisy measure-reset subset requires only top-level MR, MRX, and MRY instructions with qubit targets; {reason}"
     ))
 }
 
-fn inverse_qec_noisy_measure_reset_detector_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_noisy_measure_reset_detector_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected noisy measure-reset detector subset requires one noisy single-target MR, MRX, or MRY instruction, one TICK, two matching noisy single-target measure-reset instructions, and one detector containing exactly rec[-1]; {reason}"
     ))
 }
 
-fn inverse_qec_two_to_one_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_two_to_one_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected two_to_one subset requires one noiseless plain two-target R instruction, one matching CX pair, one matching noiseless plain two-target M instruction, and one detector containing exactly rec[-1] rec[-2]; {reason}"
     ))
 }

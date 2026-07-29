@@ -1,9 +1,8 @@
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, MeasureRecordOffset,
-    Target,
-};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, Target};
 
-pub(super) fn selected_m_det_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+use crate::{AnalysisError, AnalysisResult};
+
+pub(super) fn selected_m_det_inverse(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(first_tick),
@@ -47,7 +46,7 @@ fn build_selected_m_det_inverse(
     last: &CircuitInstruction,
     first_detector: &CircuitInstruction,
     second_detector: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     if !reset.args().is_empty() || !middle.args().is_empty() || !last.args().is_empty() {
         return Err(inverse_qec_m_det_error(
             "reset and measurement instructions must be noiseless",
@@ -146,7 +145,7 @@ fn build_selected_m_det_inverse(
     Ok(result)
 }
 
-fn exact_m_det_targets(instruction: &CircuitInstruction) -> CircuitResult<[Target; 3]> {
+fn exact_m_det_targets(instruction: &CircuitInstruction) -> AnalysisResult<[Target; 3]> {
     let targets = super::plain_unique_single_qubit_targets(instruction)
         .ok_or_else(|| inverse_qec_m_det_error("targets must be plain unique qubits"))?;
     let [target0, target1, target2] = targets.as_slice() else {
@@ -163,8 +162,8 @@ fn exact_m_det_targets(instruction: &CircuitInstruction) -> CircuitResult<[Targe
     Ok([target0.clone(), target1.clone(), target2.clone()])
 }
 
-fn inverse_qec_m_det_error(reason: &str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn inverse_qec_m_det_error(reason: &str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "inverse_qec selected m_det subset requires exact top-level R 0 1 2, TICK, M 0 1 2, TICK, M 0 1 2, DETECTOR rec[-1], and DETECTOR rec[-2]; {reason}"
     ))
 }

@@ -3,7 +3,8 @@
     reason = "PFM2 QEC inverse noisy measurement tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, circuit_inverse_qec};
+use stab_analysis::circuit_inverse_qec;
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_qec_supports_selected_noisy_measurement_only_reverse() {

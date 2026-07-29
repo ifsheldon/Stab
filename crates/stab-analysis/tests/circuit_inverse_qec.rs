@@ -5,11 +5,12 @@
 
 use std::str::FromStr;
 
-use stab_core::{
-    Circuit, Flow, TimeReversedForFlowsOptions, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_inverse_qec, circuit_time_reversed_for_flows,
-    circuit_time_reversed_for_flows_with_options,
+use stab_algebra::Flow;
+use stab_analysis::{
+    TimeReversedForFlowsOptions, circuit_has_all_unsigned_stabilizer_flows, circuit_inverse_qec,
+    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
 };
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_qec_unitary_matches_stim() {

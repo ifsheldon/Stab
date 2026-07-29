@@ -5,10 +5,12 @@
 
 use std::str::FromStr;
 
-use stab_core::{
-    Circuit, Flow, InverseQecOptions, circuit_inverse_qec, circuit_inverse_qec_with_options,
+use stab_algebra::Flow;
+use stab_analysis::{
+    InverseQecOptions, circuit_inverse_qec, circuit_inverse_qec_with_options,
     circuit_time_reversed_for_flows,
 };
+use stab_model::Circuit;
 
 #[test]
 fn circuit_inverse_qec_supports_selected_mpad_record_tail() {
