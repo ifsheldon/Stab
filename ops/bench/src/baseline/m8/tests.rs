@@ -1,6 +1,9 @@
 use std::path::Path;
 
+use crate::comparability::ComparabilityClass;
+use crate::compare::{BaselineCompareStatus, CompareRowBuild, build_compare_row_result};
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
+use crate::report::Measurement;
 use crate::root::RepoRoot;
 
 use super::{
@@ -70,7 +73,7 @@ fn m8_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m8-reference-sample-tree",
-            &["stab_reference_sample_tree_nested_circuit"][..],
+            &["stab_reference_sample_tree_flat_20x20"][..],
         ),
         (
             "m8-sample-analysis-1shot",
@@ -167,6 +170,43 @@ fn m8_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn reference_sample_tree_diagnostic_cannot_form_a_stim_ratio() {
+    let row = BenchmarkRow {
+        id: "m8-reference-sample-tree".to_string(),
+        milestone: Milestone::M8,
+        threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
+        runner: Runner::StimPerf,
+        upstream_source: "src/stim/util_top/reference_sample_tree.perf.cc".to_string(),
+        stim_perf_filter: "reference_sample_tree_*".to_string(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "analysis".to_string(),
+        measurement: "reference-sample".to_string(),
+        description: "reference sample tree workloads".to_string(),
+        comparability: ComparabilityClass::ReportOnly,
+    };
+    let result = build_compare_row_result(CompareRowBuild {
+        row: &row,
+        status: "measured",
+        baseline_summary: "stim",
+        stab_summary: "stab",
+        note: compare_note(&row.id).map(str::to_owned),
+        stim_measurements: vec![
+            measurement("reference_sample_tree_surface_code_d31_r1000000000", 1.0),
+            measurement("reference_sample_tree_nested_circuit", 1.0),
+        ],
+        stab_measurements: vec![measurement("stab_reference_sample_tree_flat_20x20", 1.0)],
+        baseline_status: BaselineCompareStatus::Comparable,
+    });
+
+    assert_eq!(result.threshold_class, "non-primary-report-only");
+    assert_eq!(result.comparability, ComparabilityClass::ReportOnly);
+    assert!(result.relative_ratio.is_none());
+    assert!(result.measurement_ratios.is_empty());
+    assert_eq!(result.pass_fail_status, "not-comparable");
+}
+
+#[test]
 fn gated_sample_cli_rows_have_frozen_process_preflight_witnesses() {
     for (row_id, bytes, digest) in [
         (
@@ -196,4 +236,17 @@ fn gated_sample_cli_rows_have_frozen_process_preflight_witnesses() {
         assert!(note.contains("frozen pre-A4"));
     }
     assert_eq!(frozen_pre_a4_cli_witness("m8-sample-analysis-1shot"), None);
+}
+
+fn measurement(name: &str, seconds: f64) -> Measurement {
+    Measurement {
+        name: name.to_string(),
+        seconds,
+        variance_seconds: Some(0.0),
+        allocation: None,
+        resident_bytes: None,
+        resident_delta_bytes: None,
+        observations: Vec::new(),
+        iterations: Some(1),
+    }
 }

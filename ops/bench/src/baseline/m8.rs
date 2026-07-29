@@ -245,7 +245,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((32.0 * 4.0, "op-qubits/s"))
         }
         ("m8-tableau-simulator", "stab_tableau_sample_cx_1shot") => Some((16.0, "op-qubits/s")),
-        ("m8-reference-sample-tree", "stab_reference_sample_tree_nested_circuit") => {
+        ("m8-reference-sample-tree", "stab_reference_sample_tree_flat_20x20") => {
             Some((422.0, "measurements/s"))
         }
         (
@@ -535,7 +535,7 @@ fn run_reference_sample_tree_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     let fixture = reference_sample_tree_fixture();
     let circuit = sample_circuit(&row.id, &fixture)?;
     Ok(vec![measure_stab_iterations(
-        "stab_reference_sample_tree_nested_circuit",
+        "stab_reference_sample_tree_flat_20x20",
         SIMULATOR_COMPARE_ITERATIONS,
         || {
             let tree = ReferenceSampleTree::from_circuit_reference_sample(&circuit)
