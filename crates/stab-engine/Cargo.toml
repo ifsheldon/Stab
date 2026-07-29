@@ -1,0 +1,21 @@
+[package]
+name = "stab-engine"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+description = "Backend-neutral compilation identities and execution kernels for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hex = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+stab-model = { workspace = true }
+
+[dev-dependencies]
+allocation-counter = { workspace = true }

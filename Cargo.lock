@@ -2255,9 +2255,21 @@ dependencies = [
  "stab-analysis",
  "stab-bits",
  "stab-compat-corpus",
+ "stab-engine",
  "stab-model",
  "stab-records",
  "thiserror",
+]
+
+[[package]]
+name = "stab-engine"
+version = "0.1.1"
+dependencies = [
+ "allocation-counter",
+ "hex",
+ "rand 0.10.1",
+ "sha2",
+ "stab-model",
 ]
 
 [[package]]
