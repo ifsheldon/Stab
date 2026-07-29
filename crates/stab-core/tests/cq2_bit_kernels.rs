@@ -6,8 +6,10 @@
 
 use std::collections::BTreeSet;
 
-use stab_core::bits::{self, BIT_BLOCK_WORDS};
-use stab_core::{BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec, SparseXorVec};
+use stab_core::advanced::storage::{
+    self as bits, BIT_BLOCK_WORDS, BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec,
+    SparseXorVec,
+};
 
 const WORD_BITS: usize = u64::BITS as usize;
 const BOUNDARY_WIDTHS: &[usize] = &[

@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
-use stab_core::SparseXorVec;
+use stab_core::advanced::storage::SparseXorVec;
 
 use super::{WorkerError, byte_digest, byte_digest_words};
 

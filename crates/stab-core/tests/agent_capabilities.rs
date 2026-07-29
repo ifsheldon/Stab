@@ -5,13 +5,15 @@
 
 use std::collections::BTreeSet;
 
+use stab_core::advanced::compat::CompiledSampler;
 use stab_core::{
-    CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint, CompiledSampler,
+    CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint,
     EncodedSizeEstimate, Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
-    SampleFormat, estimate_sampling_request,
-    result_formats::{
+    SampleFormat,
+    advanced::records::{
         read_ptb64_records_all, read_records, write_ptb64_records_checked, write_records,
     },
+    estimate_sampling_request,
 };
 
 const RICH_CIRCUIT: &str = "X_ERROR[π](0.12345641) 0\n\

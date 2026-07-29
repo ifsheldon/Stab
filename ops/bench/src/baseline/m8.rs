@@ -8,11 +8,14 @@ use std::path::{Component, Path, PathBuf};
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
+use stab_core::advanced::records::MeasurementCodecSink;
 use stab_core::{
-    BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
-    Probability, RecordFormat, SampleFormat,
-    result_formats::{write_ptb64_records_checked, write_records},
-    result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
+    BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementSink, Probability, RecordFormat,
+    SampleFormat,
+    advanced::records::{
+        for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record,
+    },
+    advanced::records::{write_ptb64_records_checked, write_records},
 };
 use stab_engine::{
     BackendPreference, RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan,

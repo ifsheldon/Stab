@@ -18,12 +18,13 @@ pub use crate::detection::{
     MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter,
 };
 pub use crate::sampling::{
-    BackendPreference, CompiledSampler, PlanFingerprint, RandomPolicy, ReferenceSampleMode,
-    RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,
-    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
-    SinkFailurePhase, count_determined_measurements,
+    PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError, SamplingCancellation,
+    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
+    Seed, ShotCount, SinkFailurePhase, count_determined_measurements,
 };
 pub use circuit_adapters::{circuit_reference_sample, circuit_reference_sample_tree};
 pub use sampled_flow::sample_if_circuit_has_stabilizer_flows;
 pub use stab_engine::ReferenceSampleTree;
+
+use crate::sampling::CompiledSampler;

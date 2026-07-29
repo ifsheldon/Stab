@@ -8,9 +8,8 @@ use std::str::FromStr;
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_core::{
-    PauliBasis, PauliSign, PauliString, Tableau, TableauIterator, stabilizers_to_tableau,
-};
+use stab_core::advanced::algebra::TableauIterator;
+use stab_core::{PauliBasis, PauliSign, PauliString, Tableau, stabilizers_to_tableau};
 
 #[test]
 fn stabilizers_to_tableau_bell_pair_matches_stim() {

@@ -9,16 +9,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
+use stab_core::advanced::compat::{
+    CompiledDetectionConverter, CompiledSampler, convert_measurements_to_detection_events,
+};
 use stab_core::{
-    Circuit, CircuitItem, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    ErrorAnalyzerOptions, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    Circuit, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, GateArgumentRule,
+    GateTargetGroupKind, GateTargetRule, Probability,
     analysis::{
         circuit_to_tableau, gate_decomposition_to_circuit, gate_flows,
         gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
         gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
     },
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
-    convert_measurements_to_detection_events, unitary_to_tableau,
+    unitary_to_tableau,
 };
 
 #[test]

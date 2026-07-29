@@ -3,12 +3,12 @@
     reason = "generation integration checks use direct assertions for compact diagnostics"
 )]
 
+use stab_core::advanced::compat::{DetectionConversionOutput, sample_detection_events};
 use stab_core::{
     CircuitError, CodeDistance, ColorCodeParams, ColorCodeTask, ErrorAnalyzerOptions,
     GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
-    sample_detection_events,
 };
 
 #[test]
@@ -355,7 +355,7 @@ fn assert_generated_samples_are_zero(generated: &GeneratedCircuit, shots: usize,
 }
 
 fn assert_detection_output_is_zero(
-    output: &stab_core::DetectionConversionOutput,
+    output: &DetectionConversionOutput,
     shots: usize,
     context: &str,
 ) {

@@ -69,10 +69,6 @@ where
         .map_err(map_stream_error)
 }
 
-pub fn ptb64_record_count(input: &[u8], bits_per_record: usize) -> CircuitResult<usize> {
-    crate::result_formats::ptb64_record_count(input, bits_per_record)
-}
-
 pub fn for_each_dets_record<F>(input: &[u8], layout: DetsLayout, visit: F) -> CircuitResult<()>
 where
     F: FnMut(&[bool]) -> CircuitResult<()>,

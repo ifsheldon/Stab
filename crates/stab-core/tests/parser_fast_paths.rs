@@ -3,10 +3,12 @@
     reason = "parser fast-path tests use direct fixture assertions for compact diagnostics"
 )]
 
+use stab_core::advanced::compat::{
+    CompiledDetectionConverter, CompiledSampler, sample_detection_events,
+};
 use stab_core::{
-    Circuit, CircuitError, CircuitItem, CompiledDetectionConverter, CompiledSampler,
-    DetectionConversionOptions, ErrorAnalyzerOptions, MeasureRecordOffset, Target,
-    circuit_to_detector_error_model, sample_detection_events,
+    Circuit, CircuitError, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions,
+    MeasureRecordOffset, Target, circuit_to_detector_error_model,
 };
 
 #[test]

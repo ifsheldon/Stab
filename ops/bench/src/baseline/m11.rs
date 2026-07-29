@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::hint::black_box;
 
-use stab_core::CompiledDemSampler;
+use stab_core::advanced::compat::CompiledDemSampler;
 use stab_engine::{DemSamplingCompiler, RandomPolicy, Seed, ShotCount};
 use stab_model::DetectorErrorModel;
 

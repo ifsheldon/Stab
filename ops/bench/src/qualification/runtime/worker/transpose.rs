@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
-use stab_core::BitMatrix;
+use stab_core::advanced::storage::BitMatrix;
 
 use super::WorkerError;
 

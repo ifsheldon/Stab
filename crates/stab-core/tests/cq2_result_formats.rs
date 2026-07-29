@@ -6,11 +6,11 @@
 
 use stab_core::{
     SampleFormat,
-    result_formats::{
+    advanced::records::{
         DetsLayout, MeasureRecord, MeasureRecordBatch, MeasureRecordBatchWriter,
         MeasureRecordWriter, read_dets_records, read_records,
     },
-    result_streaming::{
+    advanced::records::{
         for_each_dets_packed_record, for_each_dets_token_record, for_each_record,
         for_each_sparse_record,
     },

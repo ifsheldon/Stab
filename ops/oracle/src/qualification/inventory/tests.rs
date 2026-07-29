@@ -349,12 +349,9 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         "stab_records::DetsLayout",
         "stab_records::DetsResultType",
         "stab_records::DetsToken",
-        "stab_core::DetsLayout",
-        "stab_core::DetsResultType",
-        "stab_core::DetsToken",
-        "stab_core::result_formats::DetsLayout",
-        "stab_core::result_formats::DetsResultType",
-        "stab_core::result_formats::DetsToken",
+        "stab_core::advanced::records::DetsLayout",
+        "stab_core::advanced::records::DetsResultType",
+        "stab_core::advanced::records::DetsToken",
     ] {
         let item = result_api_items
             .iter()
@@ -367,11 +364,11 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .find(|case| case.source_id == "cq2-result-reader-boundary-type-newline-contract")
         .expect("accepted result-format corpus parent");
     for path in [
-        "stab_core::result_formats::read_dets_records",
-        "stab_core::result_streaming::for_each_dets_record",
-        "stab_core::result_streaming::for_each_dets_packed_record",
-        "stab_core::result_streaming::for_each_dets_token_record",
-        "stab_core::result_streaming::for_each_dets_sparse_shot",
+        "stab_core::advanced::records::read_dets_records",
+        "stab_core::advanced::records::for_each_dets_record",
+        "stab_core::advanced::records::for_each_dets_packed_record",
+        "stab_core::advanced::records::for_each_dets_token_record",
+        "stab_core::advanced::records::for_each_dets_sparse_shot",
     ] {
         let item = result_api_items
             .iter()

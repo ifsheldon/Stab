@@ -240,22 +240,6 @@ fn parent_public_api_alias_cannot_authorize_an_undeclared_child_owner() {
                             .as_str()
                             .strip_prefix(parent.alias_path.as_str())
                             .is_some_and(|suffix| suffix.starts_with("::"))
-                        && manifest
-                            .public_api_items
-                            .iter()
-                            .find(|item| {
-                                item.crate_name == parent.crate_name
-                                    && item.path == parent.alias_path
-                            })
-                            .and_then(|item| {
-                                manifest
-                                    .evidence_cases
-                                    .iter()
-                                    .find(|case| case.id == item.owner_case_id)
-                            })
-                            .is_some_and(|case| {
-                                case.provenance == EvidenceProvenance::PublicRustApi
-                            })
                 })
                 .map(|(parent_index, _)| (child_index, parent_index))
         })
@@ -268,7 +252,8 @@ fn parent_public_api_alias_cannot_authorize_an_undeclared_child_owner() {
     let parent = manifest
         .public_api_aliases
         .get(parent_index)
-        .expect("selected parent alias");
+        .expect("selected parent alias")
+        .clone();
     let parent_owner = manifest
         .public_api_items
         .iter()
@@ -276,12 +261,30 @@ fn parent_public_api_alias_cannot_authorize_an_undeclared_child_owner() {
         .expect("parent alias item")
         .owner_case_id
         .clone();
+    let mut alias_owner = manifest
+        .evidence_cases
+        .iter()
+        .find(|case| case.id == parent_owner)
+        .expect("parent semantic owner")
+        .clone();
+    alias_owner.id =
+        CaseId::try_new("cq-evidence-api-test-parent-alias".to_string()).expect("valid test id");
+    alias_owner.provenance = EvidenceProvenance::PublicRustApi;
+    alias_owner.source_id = parent.canonical_path.to_string();
+    let alias_owner_id = alias_owner.id.clone();
+    manifest.evidence_cases.push(alias_owner);
+    manifest
+        .public_api_items
+        .iter_mut()
+        .find(|item| item.crate_name == parent.crate_name && item.path == parent.alias_path)
+        .expect("parent alias item")
+        .owner_case_id = alias_owner_id.clone();
     manifest
         .public_api_items
         .iter_mut()
         .find(|item| item.crate_name == child.crate_name && item.path == child.alias_path)
         .expect("child alias item")
-        .owner_case_id = parent_owner;
+        .owner_case_id = alias_owner_id;
     manifest.public_api_aliases.remove(child_index);
     refresh_digest(&mut manifest);
 

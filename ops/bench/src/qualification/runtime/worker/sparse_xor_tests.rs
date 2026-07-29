@@ -1,4 +1,4 @@
-use stab_core::SparseXorVec;
+use stab_core::advanced::storage::SparseXorVec;
 
 use super::sparse_xor::{
     SPARSE_ITEM_BASE_WORK_ITEMS, SPARSE_ITEM_MAX_WORK_ITEMS, SPARSE_ROW_BASE_WORK_ITEMS,

@@ -5,8 +5,9 @@
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
+use stab_core::advanced::compat::CompiledDemSampler;
 use stab_core::{
-    Circuit, CompiledDemSampler, DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel,
+    Circuit, DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel,
     analysis::{
         detector_error_model_without_tags, flattened_detector_error_model,
         rounded_detector_error_model,

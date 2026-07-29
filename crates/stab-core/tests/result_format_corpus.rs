@@ -7,13 +7,17 @@
 
 use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, Layout, ResultFormat};
 use stab_core::{
-    BitSlice, CircuitResult, DetsLayout, DetsResultType, DetsToken, SampleFormat,
-    result_formats::{SparseShot, read_dets_records, read_measurement_records, read_records},
-    result_streaming::{
+    CircuitResult, SampleFormat,
+    advanced::records::{
+        DetsLayout, DetsResultType, DetsToken, SparseShot, read_dets_records,
+        read_measurement_records, read_records,
+    },
+    advanced::records::{
         for_each_dets_packed_record, for_each_dets_record, for_each_dets_sparse_shot,
         for_each_dets_token_record, for_each_packed_record, for_each_record,
         for_each_sparse_record,
     },
+    advanced::storage::BitSlice,
 };
 
 const fn sample_format(format: ResultFormat) -> SampleFormat {

@@ -1,5 +1,5 @@
 use super::run_from;
-use stab_core::result_formats::write_ptb64_records_checked;
+use stab_core::advanced::records::write_ptb64_records_checked;
 use std::ffi::OsString;
 use tempfile::tempdir;
 

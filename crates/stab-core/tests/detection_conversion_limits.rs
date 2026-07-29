@@ -7,15 +7,16 @@ use std::cell::Cell;
 use std::hint::black_box;
 use std::mem::ManuallyDrop;
 
-use stab_core::{
-    Circuit, CircuitError, CircuitInstruction, CompiledDetectionConverter,
-    DetectionConversionLimits, DetectionConversionOptions, Gate, QubitId, RepeatBlock, RepeatCount,
-    RepeatNestingLimit, ResourceKind, ResourceOperation, Target,
-    convert_measurements_to_detection_events_with_limits,
+use stab_core::advanced::compat::{
+    CompiledDetectionConverter, convert_measurements_to_detection_events_with_limits,
     convert_measurements_to_detection_events_with_sweep_and_limits,
-    detection_record_width_with_limits, measurement_record_count_with_limits,
     sample_detection_events_with_limits, try_for_each_sampled_detection_event_with_limits,
-    validate_detection_sampling_circuit_with_limits,
+};
+use stab_core::{
+    Circuit, CircuitError, CircuitInstruction, DetectionConversionLimits,
+    DetectionConversionOptions, Gate, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
+    ResourceKind, ResourceOperation, Target, detection_record_width_with_limits,
+    measurement_record_count_with_limits, validate_detection_sampling_circuit_with_limits,
 };
 
 fn skip_reference_sample() -> DetectionConversionOptions {

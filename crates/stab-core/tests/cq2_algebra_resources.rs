@@ -4,11 +4,12 @@ use num_complex::Complex32;
 use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_core::{
-    Circuit, CircuitError, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
-    PauliBasis, PauliSign, PauliString, PauliStringIterator, RepeatBlock, RepeatCount,
-    SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
-    TableauIterator, analysis::circuit_to_tableau, circuit_flow_generators, stabilizers_to_tableau,
-    unitary_to_tableau,
+    Circuit, CircuitError, CliffordString, FlexPauliString, Flow, PauliBasis, PauliSign,
+    PauliString, RepeatBlock, RepeatCount, SingleQubitClifford, StabilizerError,
+    StabilizerResource, StabilizerResult, Tableau,
+    advanced::algebra::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator},
+    analysis::circuit_to_tableau,
+    circuit_flow_generators, stabilizers_to_tableau, unitary_to_tableau,
 };
 
 fn assert_resource_limit<T>(

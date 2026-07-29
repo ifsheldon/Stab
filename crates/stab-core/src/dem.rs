@@ -16,8 +16,8 @@ pub use sat::{
 };
 pub use stab_analysis::LogicalErrorSearchLimits;
 pub use stab_model::{
-    DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
-    DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
+    DemTarget, DetectorErrorModel,
 };
 
 use crate::CircuitResult;

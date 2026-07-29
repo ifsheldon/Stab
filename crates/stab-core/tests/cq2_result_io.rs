@@ -5,18 +5,20 @@
 )]
 
 use stab_core::{
-    BitPlane64Batch, BitSlice, CircuitError, CircuitResult, PackedShotBatch, SampleFormat,
-    result_formats::{
+    BitPlane64Batch, CircuitError, CircuitResult, PackedShotBatch, SampleFormat,
+    advanced::records::{
         MeasureRecordBatchWriter, MeasureRecordWriter, SparseShot, ptb64_record_count,
         read_measurement_records, read_ptb64_records, read_ptb64_records_all, read_records,
         validate_ptb64_shot_count, write_bit_plane_64_batch, write_ptb64_records_checked,
         write_records,
     },
-    result_streaming::{
+    advanced::records::{
         for_each_packed_record, for_each_ptb64_record, for_each_ptb64_record_all, for_each_record,
-        for_each_sparse_record, ptb64_record_count as streaming_ptb64_record_count,
+        for_each_sparse_record,
     },
+    advanced::storage::BitSlice,
 };
+use stab_records::ptb64_record_count as canonical_ptb64_record_count;
 
 fn unpack_bytes(bytes: &[u8], width: usize) -> Vec<bool> {
     (0..width)
@@ -452,7 +454,7 @@ fn cq_result_ptb64_dense_sparse_prefix_and_validation_match_stim() {
         encoded[..71 * size_of::<u64>()]
     );
     assert_eq!(ptb64_record_count(&encoded, 71).unwrap(), 128);
-    assert_eq!(streaming_ptb64_record_count(&encoded, 71).unwrap(), 128);
+    assert_eq!(canonical_ptb64_record_count(&encoded, 71).unwrap(), 128);
     assert_eq!(read_ptb64_records(&encoded, 71, 64).unwrap(), records[..64]);
     assert_eq!(read_ptb64_records_all(&encoded, 71).unwrap(), records);
 

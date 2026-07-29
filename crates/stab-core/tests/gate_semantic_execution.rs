@@ -4,11 +4,13 @@
     reason = "PF3 gate semantic execution tests use compact per-gate diagnostics"
 )]
 
+use stab_core::advanced::compat::{
+    CompiledDetectionConverter, CompiledSampler, DetectionEventRecord, sample_detection_events,
+};
 use stab_core::{
-    Circuit, CircuitError, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    DetectionEventRecord, ErrorAnalyzerOptions, Gate,
+    Circuit, CircuitError, DetectionConversionOptions, ErrorAnalyzerOptions, Gate,
     analysis::{decomposed_circuit, gate_has_tableau, gate_tableau},
-    circuit_to_detector_error_model, sample_detection_events,
+    circuit_to_detector_error_model,
 };
 
 #[test]

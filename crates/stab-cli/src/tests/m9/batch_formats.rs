@@ -2,7 +2,7 @@ use std::ffi::OsString;
 
 use stab_core::{
     SampleFormat,
-    result_formats::{write_ptb64_records_checked, write_records},
+    advanced::records::{write_ptb64_records_checked, write_records},
 };
 use tempfile::tempdir;
 

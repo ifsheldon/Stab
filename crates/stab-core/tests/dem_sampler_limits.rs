@@ -4,9 +4,9 @@
     reason = "limit tests use direct fixture assertions for compact diagnostics"
 )]
 
+use stab_core::advanced::compat::{CompiledDemSampler, DetectionEventRecord};
 use stab_core::{
-    CircuitError, CompiledDemSampler, DemSamplerLimits, DetectionEventRecord, DetectorErrorModel,
-    ResourceKind, ResourceOperation,
+    CircuitError, DemSamplerLimits, DetectorErrorModel, ResourceKind, ResourceOperation,
 };
 
 fn compile_dem(text: &str) -> CompiledDemSampler {

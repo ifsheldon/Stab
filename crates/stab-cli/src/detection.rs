@@ -6,12 +6,13 @@ use clap::Args;
 use stab_core::{
     ByteSpan, CircuitError, DetectionBatchView, DetectionObservableOutputMode, DetectionSink,
     FormatError, FormatErrorCode, MeasurementBatchView, PackedShotBatch, RandomPolicy,
-    ReferenceSampleMode, Seed, ShotCount, circuit_with_inlined_feedback,
+    ReferenceSampleMode, Seed, ShotCount,
+    advanced::records::{read_measurement_records, validate_ptb64_shot_count},
+    circuit_with_inlined_feedback,
     execution::{
         DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
         MeasurementToDetectionSinkAdapter,
     },
-    result_formats::{read_measurement_records, validate_ptb64_shot_count},
 };
 
 use crate::{

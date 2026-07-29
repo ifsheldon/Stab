@@ -5,9 +5,10 @@
 
 use std::convert::Infallible;
 
+use stab_core::advanced::compat::CompiledDemSampler;
 use stab_core::{
-    CompiledDemSampler, DemSampleBatchView, DemSampleSink, DemSamplerLimits, DetectorErrorModel,
-    RandomPolicy, ResourceKind, ResourceOperation, Seed, ShotCount,
+    DemSampleBatchView, DemSampleSink, DemSamplerLimits, DetectorErrorModel, RandomPolicy,
+    ResourceKind, ResourceOperation, Seed, ShotCount,
 };
 
 #[derive(Default)]

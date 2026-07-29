@@ -89,8 +89,9 @@ fn diagnostic_group_id(path: &str) -> Option<&'static str> {
         "stab_engine::SamplingCompiler::compile"
         | "stab_core::SamplingCompiler::compile"
         | "stab_core::execution::SamplingCompiler::compile"
-        | "stab_core::CompiledSampler::compile"
-        | "stab_core::execution::CompiledSampler::compile" => Some(A2_SAMPLER_COMPILE_GROUP_ID),
+        | "stab_core::advanced::compat::CompiledSampler::compile" => {
+            Some(A2_SAMPLER_COMPILE_GROUP_ID)
+        }
         _ => None,
     }
 }
@@ -154,27 +155,18 @@ fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
             | "stab_core::CodecCapability::can_decode"
             | "stab_core::CodecCapability::can_encode"
             | "stab_core::CodecCapability::requires_typed_layout"
-            | "stab_core::result_formats::RecordEncoding::as_str"
-            | "stab_core::result_formats::RecordFormat::all"
-            | "stab_core::result_formats::RecordFormat::as_str"
-            | "stab_core::result_formats::RecordFormat::encoding"
-            | "stab_core::result_formats::RecordFormat::records_per_group"
-            | "stab_core::result_formats::RecordFormat::estimate_output_bytes"
-            | "stab_core::result_formats::CodecCapability::format"
-            | "stab_core::result_formats::CodecCapability::can_decode"
-            | "stab_core::result_formats::CodecCapability::can_encode"
-            | "stab_core::result_formats::CodecCapability::requires_typed_layout"
     )
 }
 
 fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> Option<String> {
     if performance_feature == "PERF-BIT-KERNELS" {
         match item.path.as_str() {
-            "stab_core::BitMatrix::transpose" | "stab_core::bits::BitMatrix::transpose" => {
+            "stab_bits::BitMatrix::transpose"
+            | "stab_core::advanced::storage::BitMatrix::transpose" => {
                 return Some(BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID.to_string());
             }
-            "stab_core::BitMatrix::transpose_square_in_place"
-            | "stab_core::bits::BitMatrix::transpose_square_in_place" => {
+            "stab_bits::BitMatrix::transpose_square_in_place"
+            | "stab_core::advanced::storage::BitMatrix::transpose_square_in_place" => {
                 return Some(BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID.to_string());
             }
             _ => {}
@@ -185,7 +177,6 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
             item.path.as_str(),
             "stab_algebra::CliffordString::right_multiply_in_place"
                 | "stab_core::CliffordString::right_multiply_in_place"
-                | "stab_core::stabilizers::CliffordString::right_multiply_in_place"
         )
     {
         return Some(CLIFFORD_STRING_NON_IDENTITY_GROUP_ID.to_string());
@@ -195,7 +186,6 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
             item.path.as_str(),
             "stab_algebra::PauliString::right_multiply_in_place_returning_log_i_scalar"
                 | "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar"
-                | "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar"
         )
     {
         return Some(PAULI_STRING_MULTIPLY_GROUP_ID.to_string());
@@ -206,12 +196,9 @@ fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> O
             "stab_algebra::PauliStringIterator::new"
                 | "stab_algebra::PauliStringIterator::iter_next"
                 | "stab_algebra::PauliStringIterator::result"
-                | "stab_core::PauliStringIterator::new"
-                | "stab_core::PauliStringIterator::iter_next"
-                | "stab_core::PauliStringIterator::result"
-                | "stab_core::stabilizers::PauliStringIterator::new"
-                | "stab_core::stabilizers::PauliStringIterator::iter_next"
-                | "stab_core::stabilizers::PauliStringIterator::result"
+                | "stab_core::advanced::algebra::PauliStringIterator::new"
+                | "stab_core::advanced::algebra::PauliStringIterator::iter_next"
+                | "stab_core::advanced::algebra::PauliStringIterator::result"
         )
     {
         return Some(PAULI_STRING_ITER_GROUP_ID.to_string());
@@ -259,7 +246,7 @@ mod tests {
             "stab_core::CompilationCapability::compiler_schema_version",
             "stab_core::RecordFormat::records_per_group",
             "stab_core::RecordFormat::estimate_output_bytes",
-            "stab_core::result_formats::CodecCapability::requires_typed_layout",
+            "stab_core::CodecCapability::requires_typed_layout",
         ] {
             let disposition = make_disposition(&api(path, "method"));
             assert_eq!(
@@ -276,8 +263,7 @@ mod tests {
             "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
             "stab_core::CompilationRequestFingerprint::for_sampling",
             "stab_core::estimate_sampling_request",
-            "stab_core::CompiledSampler::compile",
-            "stab_core::execution::CompiledSampler::compile",
+            "stab_core::advanced::compat::CompiledSampler::compile",
         ]
         .into_iter()
         .zip([
@@ -286,7 +272,6 @@ mod tests {
             A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
             A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
             A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID,
-            A2_SAMPLER_COMPILE_GROUP_ID,
             A2_SAMPLER_COMPILE_GROUP_ID,
         ]) {
             let disposition = make_disposition(&api(path, "method"));
@@ -319,7 +304,6 @@ mod tests {
         for path in [
             "stab_algebra::CliffordString::right_multiply_in_place",
             "stab_core::CliffordString::right_multiply_in_place",
-            "stab_core::stabilizers::CliffordString::right_multiply_in_place",
         ] {
             assert_eq!(
                 qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),
@@ -330,7 +314,6 @@ mod tests {
         for path in [
             "stab_algebra::PauliString::right_multiply_in_place_returning_log_i_scalar",
             "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar",
-            "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar",
         ] {
             assert_eq!(
                 qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),
@@ -342,8 +325,7 @@ mod tests {
             "stab_algebra::PauliStringIterator::new",
             "stab_algebra::PauliStringIterator::iter_next",
             "stab_algebra::PauliStringIterator::result",
-            "stab_core::PauliStringIterator::new",
-            "stab_core::stabilizers::PauliStringIterator::new",
+            "stab_core::advanced::algebra::PauliStringIterator::new",
         ] {
             assert_eq!(
                 qualification_group_id(&api(path, "method"), "PERF-STABILIZER-ALGEBRA").as_deref(),

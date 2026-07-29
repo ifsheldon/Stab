@@ -1,10 +1,12 @@
 use std::hint::black_box;
 
+use stab_core::advanced::compat::{
+    CompiledDetectionConverter, CompiledSampler, sample_detection_events,
+};
 use stab_core::{
-    Circuit, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    ErrorAnalyzerOptions, Gate, Probability,
+    Circuit, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, Probability,
     analysis::{gate_has_tableau, gate_tableau},
-    circuit_flow_generators, circuit_to_detector_error_model, sample_detection_events,
+    circuit_flow_generators, circuit_to_detector_error_model,
 };
 
 use crate::error::BenchError;

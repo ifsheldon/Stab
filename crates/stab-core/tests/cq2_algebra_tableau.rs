@@ -10,8 +10,9 @@ use num_complex::Complex32;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
-    CommutingPauliStringIterator, PauliString, PauliStringIterator, StabilizerError, Tableau,
-    TableauIterator, stabilizers_to_tableau, unitary_to_tableau,
+    PauliString, StabilizerError, Tableau,
+    advanced::algebra::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator},
+    stabilizers_to_tableau, unitary_to_tableau,
 };
 
 #[test]

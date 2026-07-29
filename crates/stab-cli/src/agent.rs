@@ -7,7 +7,7 @@ use stab_core::{
     CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, EncodedSizeEstimate,
     Estimate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule,
     ModelFingerprint, ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate,
-    SamplingCompiler, estimate_sampling_request, result_formats::validate_ptb64_shot_count,
+    SamplingCompiler, advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
 };
 
 use crate::{

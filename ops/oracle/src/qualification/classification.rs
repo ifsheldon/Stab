@@ -10,7 +10,8 @@ mod stabilizer;
 
 use public_api_helpers::{
     api_path_mentions_item, classify_component_crate_api, classify_extracted_analysis_api,
-    classify_extracted_engine_api, is_analyzer_api, is_resource_policy_api,
+    classify_extracted_engine_api, classify_facade_tier_api, is_analyzer_api,
+    is_resource_policy_api,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -301,6 +302,9 @@ pub(super) fn classify_public_api_source(
     if let Some(feature_id) = classify_extracted_engine_api(&value, &api_lower) {
         return Some(feature_id);
     }
+    if let Some(feature_id) = classify_facade_tier_api(crate_name, &api_lower) {
+        return Some(feature_id);
+    }
     if api_lower.contains("parseerror")
         || api_lower.contains("parse_error")
         || api_lower.contains("parse_diagnostic")
@@ -356,30 +360,22 @@ pub(super) fn classify_public_api_source(
     ]
     .iter()
     .any(|marker| api_lower.contains(marker))
-        || [
-            "stab_algebra::flow",
-            "stab_core::flow",
-            "stab_core::stabilizers::flow",
-        ]
-        .iter()
-        .any(|prefix| {
-            api_lower == *prefix
-                || api_lower
-                    .strip_prefix(prefix)
-                    .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
-        })
-        || [
-            "stab_algebra::tableau",
-            "stab_core::stabilizers::tableau",
-            "stab_core::tableau",
-        ]
-        .iter()
-        .any(|prefix| {
-            api_lower == *prefix
-                || api_lower
-                    .strip_prefix(prefix)
-                    .is_some_and(|suffix| suffix.starts_with("::") || suffix.starts_with(" as "))
-        })
+        || ["stab_algebra::flow", "stab_core::flow"]
+            .iter()
+            .any(|prefix| {
+                api_lower == *prefix
+                    || api_lower.strip_prefix(prefix).is_some_and(|suffix| {
+                        suffix.starts_with("::") || suffix.starts_with(" as ")
+                    })
+            })
+        || ["stab_algebra::tableau", "stab_core::tableau"]
+            .iter()
+            .any(|prefix| {
+                api_lower == *prefix
+                    || api_lower.strip_prefix(prefix).is_some_and(|suffix| {
+                        suffix.starts_with("::") || suffix.starts_with(" as ")
+                    })
+            })
         || api_lower.contains("stabilizers_to_tableau")
         || api_lower.contains("unitary_to_tableau")
     {

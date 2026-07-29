@@ -4,9 +4,11 @@
     reason = "PF3 sampler sweep target-order tests use direct fixture assertions for compact diagnostics"
 )]
 
+use stab_core::advanced::compat::{
+    convert_measurements_to_detection_events_with_sweep, sample_detection_events,
+};
 use stab_core::{
-    Circuit, DetectionConversionOptions, convert_measurements_to_detection_events_with_sweep,
-    execution::circuit_reference_sample, sample_detection_events,
+    Circuit, DetectionConversionOptions, execution::circuit_reference_sample,
     validate_detection_sampling_circuit,
 };
 

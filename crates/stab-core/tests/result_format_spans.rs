@@ -5,10 +5,13 @@
 )]
 
 use stab_core::{
-    ByteSpan, CircuitError, CircuitResult, DetsLayout, DiagnosticSeverity, FormatError,
-    FormatErrorCode, FormatErrorContext, SampleFormat,
-    result_formats::{read_dets_records, read_ptb64_records, read_ptb64_records_all, read_records},
-    result_streaming::{
+    ByteSpan, CircuitError, CircuitResult, DiagnosticSeverity, FormatError, FormatErrorCode,
+    FormatErrorContext, SampleFormat,
+    advanced::records::{
+        DetsLayout, DetsResultType, read_dets_records, read_ptb64_records, read_ptb64_records_all,
+        read_records,
+    },
+    advanced::records::{
         for_each_packed_record, for_each_ptb64_record, for_each_ptb64_record_all, for_each_record,
         for_each_sparse_record,
     },
@@ -196,7 +199,7 @@ fn dets_errors_report_prefix_namespace_and_index_spans() -> CircuitResult<()> {
         FormatErrorCode::IndexOutOfRange,
         span(6, 1),
         FormatErrorContext::Index {
-            result_type: Some(stab_core::DetsResultType::Detector),
+            result_type: Some(DetsResultType::Detector),
             index: 2,
             exclusive_bound: 2,
         },

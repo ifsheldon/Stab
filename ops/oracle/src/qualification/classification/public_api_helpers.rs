@@ -18,6 +18,53 @@ pub(super) fn classify_component_crate_api(
     None
 }
 
+pub(super) fn classify_facade_tier_api(crate_name: &str, api_path: &str) -> Option<FeatureId> {
+    if crate_name != "stab_core" {
+        return None;
+    }
+    if api_path.starts_with("stab_core::advanced::storage::") {
+        return Some(FeatureId::BitKernels);
+    }
+    if api_path.starts_with("stab_core::advanced::algebra::") {
+        return Some(FeatureId::Algebra);
+    }
+    if api_path.starts_with("stab_core::advanced::records::") {
+        return Some(FeatureId::ResultFormats);
+    }
+    if api_path.starts_with("stab_core::advanced::backend::") {
+        return Some(
+            if api_path_mentions_item(api_path, "samplingcompilationdescriptor")
+                || api_path.ends_with("::compilation_descriptor")
+            {
+                FeatureId::CircuitApi
+            } else {
+                FeatureId::Sampling
+            },
+        );
+    }
+    if api_path.starts_with("stab_core::advanced::traversal::") {
+        return Some(
+            if api_path_mentions_item(api_path, "circuitflattenedinstructioniter")
+                || api_path_mentions_item(api_path, "circuitflattenedinstructionreviter")
+            {
+                FeatureId::CircuitApi
+            } else {
+                FeatureId::DemFormat
+            },
+        );
+    }
+    if api_path.starts_with("stab_core::advanced::compat::") {
+        return Some(if api_path.contains("compileddemsampler") {
+            FeatureId::DemSampling
+        } else if api_path.contains("compiledsampler") {
+            FeatureId::Sampling
+        } else {
+            FeatureId::Detection
+        });
+    }
+    None
+}
+
 pub(super) fn classify_extracted_analysis_api(
     source_path: &str,
     api_lower: &str,

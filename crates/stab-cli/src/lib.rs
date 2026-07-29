@@ -44,9 +44,9 @@ use stab_core::{
     ColorCodeParams, ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink,
     Probability, RandomPolicy, ReferenceSampleMode, RepetitionCodeParams, RepetitionCodeTask,
     RoundCount, RunError, SampleFormat, SamplingCompiler, SamplingSession, Seed, ShotCount,
-    SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
-    generate_repetition_code_circuit, generate_surface_code_circuit,
-    result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
+    SurfaceCodeParams, SurfaceCodeTask,
+    advanced::records::{MeasureRecordWriter, validate_ptb64_shot_count},
+    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;

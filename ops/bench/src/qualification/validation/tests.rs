@@ -593,15 +593,15 @@ fn bit_matrix_transpose_paths_have_exact_independent_parents() {
     assert_eq!(
         in_place.public_api_items,
         [
-            "stab_core::BitMatrix::transpose_square_in_place",
-            "stab_core::bits::BitMatrix::transpose_square_in_place",
+            "stab_bits::BitMatrix::transpose_square_in_place",
+            "stab_core::advanced::storage::BitMatrix::transpose_square_in_place",
         ]
     );
     assert_eq!(
         allocating.public_api_items,
         [
-            "stab_core::BitMatrix::transpose",
-            "stab_core::bits::BitMatrix::transpose",
+            "stab_bits::BitMatrix::transpose",
+            "stab_core::advanced::storage::BitMatrix::transpose",
         ]
     );
     assert!(suite.qualification_groups.iter().all(|group| {

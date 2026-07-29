@@ -7,7 +7,7 @@ use stab_bits::BitVec;
 
 pub fn exercise_unified_portable_dependencies() -> Result<(usize, usize), Box<dyn Error>> {
     let mut direct_bits = BitVec::from_words_truncated(256, vec![1; 4]);
-    let facade_bits = stab_core::BitVec::from_words_truncated(256, vec![2; 4]);
+    let facade_bits = stab_core::advanced::storage::BitVec::from_words_truncated(256, vec![2; 4]);
     direct_bits.xor_assign(&facade_bits.as_bitslice())?;
 
     let direct_clifford =

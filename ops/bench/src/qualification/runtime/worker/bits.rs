@@ -1,5 +1,7 @@
 use std::sync::atomic::{Ordering, compiler_fence};
 
+use stab_core::advanced::storage::BitVec;
+
 use super::{WorkerError, byte_digest_word_pair, byte_digest_words};
 
 pub(super) const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
@@ -12,7 +14,7 @@ pub(super) const DENSE_XOR_MAX_BITS: u64 = 268_435_456;
 
 #[derive(Clone)]
 pub(super) struct PopcountFixture {
-    pub(super) bits: stab_core::BitVec,
+    pub(super) bits: BitVec,
     pub(super) input_bytes: u64,
     pub(super) input_digest: [u64; 4],
 }
@@ -35,7 +37,7 @@ pub(super) fn popcount_fixture(bit_count: u64) -> Result<PopcountFixture, Worker
         .ok_or(WorkerError::InputSizeRange)?;
     let input_digest = byte_digest_words(&words);
     Ok(PopcountFixture {
-        bits: stab_core::BitVec::from_words_truncated(bit_count_usize, words),
+        bits: BitVec::from_words_truncated(bit_count_usize, words),
         input_bytes,
         input_digest,
     })
@@ -109,8 +111,8 @@ pub(super) fn popcount_output_digest(
 
 #[derive(Clone)]
 pub(super) struct DenseXorFixture {
-    pub(super) destination: stab_core::BitVec,
-    pub(super) source: stab_core::BitVec,
+    pub(super) destination: BitVec,
+    pub(super) source: BitVec,
     pub(super) input_bytes: u64,
     pub(super) input_digest: [u64; 4],
 }
@@ -144,8 +146,8 @@ pub(super) fn dense_xor_fixture(bit_count: u64) -> Result<DenseXorFixture, Worke
         .ok_or(WorkerError::InputSizeRange)?;
     let input_digest = byte_digest_word_pair(&destination_words, &source_words);
     Ok(DenseXorFixture {
-        destination: stab_core::BitVec::from_words_truncated(bit_count_usize, destination_words),
-        source: stab_core::BitVec::from_words_truncated(bit_count_usize, source_words),
+        destination: BitVec::from_words_truncated(bit_count_usize, destination_words),
+        source: BitVec::from_words_truncated(bit_count_usize, source_words),
         input_bytes,
         input_digest,
     })

@@ -1,6 +1,8 @@
 use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
+use stab_core::advanced::storage::BitVec;
+
 use super::{WorkerError, byte_digest_words};
 
 pub(super) const NOT_ZERO_MIN_BITS: u64 = 64;
@@ -33,7 +35,7 @@ impl NotZeroPattern {
 
 #[derive(Clone)]
 pub(super) struct NotZeroFixture {
-    pub(super) bits: stab_core::BitVec,
+    pub(super) bits: BitVec,
     pub(super) input_bytes: u64,
     pub(super) input_digest: [u64; 4],
     pub(super) pattern: NotZeroPattern,
@@ -69,7 +71,7 @@ pub(super) fn not_zero_fixture(
         .ok_or(WorkerError::InputSizeRange)?;
     let input_digest = byte_digest_words(&words);
     Ok(NotZeroFixture {
-        bits: stab_core::BitVec::from_words_truncated(bit_count_usize, words),
+        bits: BitVec::from_words_truncated(bit_count_usize, words),
         input_bytes,
         input_digest,
         pattern,

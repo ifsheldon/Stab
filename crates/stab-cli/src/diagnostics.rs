@@ -6,8 +6,9 @@ use clap::ValueEnum;
 use serde::Serialize;
 use serde_json::{Value, json};
 use stab_core::{
-    ByteSpan, CircuitError, DetsResultType, DiagnosticSeverity, FormatError, FormatErrorContext,
-    ModelDialect, ModelError, ParseError, ParseErrorContext, ResourceLimitError, RunError,
+    ByteSpan, CircuitError, DiagnosticSeverity, FormatError, FormatErrorContext, ModelDialect,
+    ModelError, ParseError, ParseErrorContext, ResourceLimitError, RunError,
+    advanced::records::DetsResultType,
 };
 use thiserror::Error;
 

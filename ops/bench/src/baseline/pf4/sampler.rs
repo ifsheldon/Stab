@@ -1,6 +1,7 @@
 use std::hint::black_box;
 
-use stab_core::{CompiledDemSampler, DetectionConversionOutput, DetectorErrorModel};
+use stab_core::DetectorErrorModel;
+use stab_core::advanced::compat::{CompiledDemSampler, DetectionConversionOutput};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

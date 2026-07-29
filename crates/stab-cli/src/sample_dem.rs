@@ -5,9 +5,9 @@ use clap::{Args, ValueEnum};
 use stab_core::{
     CircuitError, DemSampleBatchView, DemSampleSink, DetectionObservableOutputMode,
     DetectorErrorModel, RandomPolicy, RecordFormat, SampleFormat, Seed, ShotCount,
+    advanced::records::for_each_sparse_record,
+    advanced::records::{read_measurement_records, validate_ptb64_shot_count},
     execution::{DemSamplingCompiler, DemSamplingRunError},
-    result_formats::{read_measurement_records, validate_ptb64_shot_count},
-    result_streaming::for_each_sparse_record,
 };
 
 use super::{

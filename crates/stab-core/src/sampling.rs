@@ -5,10 +5,10 @@ use crate::{Circuit, CircuitError, CircuitResult};
 mod stream;
 
 pub use engine_sampling::{
-    BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+    PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError, SamplingCancellation,
+    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
+    Seed, ShotCount, SinkFailurePhase,
 };
 
 #[derive(Clone, Debug)]

@@ -2565,39 +2565,35 @@
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SampleFormat"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::new"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::write_bit"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bit"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::write_end"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_end"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::into_bytes"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::into_bytes"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::begin_result_type"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::begin_result_type"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::with_capacity"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::with_capacity"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bytes"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::write_bytes"
         }
       ]
       },
@@ -2669,7 +2665,7 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bits"
+          "owner_path": "stab_core::advanced::records::MeasureRecordWriter::write_bits"
         }
       ]
       },
@@ -2735,19 +2731,19 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::write_end"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatchWriter::write_end"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::new"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatchWriter::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::batch_write_bit"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatchWriter::batch_write_bit"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatchWriter"
         }
       ]
       },
@@ -2832,23 +2828,23 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord::write_unwritten_results_to"
+          "owner_path": "stab_core::advanced::records::MeasureRecord::write_unwritten_results_to"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord::new"
+          "owner_path": "stab_core::advanced::records::MeasureRecord::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord::record_result"
+          "owner_path": "stab_core::advanced::records::MeasureRecord::record_result"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord"
+          "owner_path": "stab_core::advanced::records::MeasureRecord"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord::storage_len"
+          "owner_path": "stab_core::advanced::records::MeasureRecord::storage_len"
         }
       ]
       },
@@ -2883,11 +2879,11 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecord::lookback"
+          "owner_path": "stab_core::advanced::records::MeasureRecord::lookback"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::lookback"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::lookback"
         }
       ]
       },
@@ -2938,31 +2934,31 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::stored"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::stored"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::final_write_unwritten_results_to"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::final_write_unwritten_results_to"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::record_result"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::record_result"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::intermediate_write_unwritten_results_to"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::intermediate_write_unwritten_results_to"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::unwritten"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::unwritten"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::new"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::new"
         }
       ]
       },
@@ -3012,7 +3008,7 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::MeasureRecordBatch::record_zero_result_to_edit"
+          "owner_path": "stab_core::advanced::records::MeasureRecordBatch::record_zero_result_to_edit"
         }
       ]
       },
@@ -3374,23 +3370,23 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::write_records"
+          "owner_path": "stab_core::advanced::records::write_records"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::read_records"
+          "owner_path": "stab_core::advanced::records::read_records"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_record"
+          "owner_path": "stab_core::advanced::records::for_each_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_sparse_record"
+          "owner_path": "stab_core::advanced::records::for_each_sparse_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_packed_record"
+          "owner_path": "stab_core::advanced::records::for_each_packed_record"
         }
       ]
       },
@@ -4191,58 +4187,6 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::CodecCapability::requires_typed_layout"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordEncoding"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordEncoding::as_str"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat::all"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat::as_str"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat::encoding"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat::records_per_group"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::RecordFormat::estimate_output_bytes"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::CodecCapability"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::CodecCapability::format"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::CodecCapability::can_decode"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::CodecCapability::can_encode"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::CodecCapability::requires_typed_layout"
           }
         ],
         "standalone": true
@@ -4352,16 +4296,16 @@
           "request-plan-identity-confusion"
         ],
         "public_api_owners": [
-          { "crate_name": "stab_core", "owner_path": "stab_core::BackendPreference" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::BackendPreference::as_str" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingBackend" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::SamplingBackend::as_str" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::advanced::backend::BackendPreference" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::advanced::backend::BackendPreference::as_str" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::advanced::backend::SamplingBackend" },
+          { "crate_name": "stab_core", "owner_path": "stab_core::advanced::backend::SamplingBackend::as_str" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::new" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::backend" },
           { "crate_name": "stab_core", "owner_path": "stab_core::SamplingCompiler::compile" },
           { "crate_name": "stab_engine", "owner_path": "stab_engine::REGISTERED_BACKENDS" },
-          { "crate_name": "stab_core", "owner_path": "stab_core::CompiledSampler::compile" }
+          { "crate_name": "stab_core", "owner_path": "stab_core::advanced::compat::CompiledSampler::compile" }
         ],
         "standalone": true
       },
@@ -4668,7 +4612,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledSampler::count_determined_measurements"
+            "owner_path": "stab_core::advanced::compat::CompiledSampler::count_determined_measurements"
           }
         ],
         "standalone": true
@@ -4707,7 +4651,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledSampler::reference_sample"
+            "owner_path": "stab_core::advanced::compat::CompiledSampler::reference_sample"
           }
         ],
         "standalone": true
@@ -5532,7 +5476,7 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledSampler::try_for_each_sample_with_seed_and_reference_mode"
+            "owner_path": "stab_core::advanced::compat::CompiledSampler::try_for_each_sample_with_seed_and_reference_mode"
           }
         ],
         "standalone": true
@@ -5773,7 +5717,7 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::session_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::session_with_limits"
           },
           {
             "crate_name": "stab_core",
@@ -7201,11 +7145,11 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::plan"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::plan"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::session"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::session"
           },
           {
             "crate_name": "stab_core",
@@ -9831,7 +9775,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDetectionConverter::compile_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDetectionConverter::compile_with_limits"
           },
           {
             "crate_name": "stab_engine",
@@ -10179,11 +10123,11 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::write_detection_records"
+            "owner_path": "stab_core::advanced::compat::write_detection_records"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::write_observable_records"
+            "owner_path": "stab_core::advanced::compat::write_observable_records"
           }
         ],
         "standalone": true
@@ -10217,11 +10161,11 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::write_ptb64_detection_records"
+            "owner_path": "stab_core::advanced::compat::write_ptb64_detection_records"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::write_ptb64_observable_records"
+            "owner_path": "stab_core::advanced::compat::write_ptb64_observable_records"
           }
         ],
         "standalone": true
@@ -10265,7 +10209,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::convert_measurements_to_detection_events_with_limits"
+            "owner_path": "stab_core::advanced::compat::convert_measurements_to_detection_events_with_limits"
           }
         ],
         "standalone": true
@@ -10377,11 +10321,11 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::convert_measurements_to_detection_events_with_sweep_and_limits"
+            "owner_path": "stab_core::advanced::compat::convert_measurements_to_detection_events_with_sweep_and_limits"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::try_for_each_sampled_detection_event_with_limits"
+            "owner_path": "stab_core::advanced::compat::try_for_each_sampled_detection_event_with_limits"
           }
         ],
         "standalone": true
@@ -10417,7 +10361,7 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::sample_detection_events_with_limits"
+            "owner_path": "stab_core::advanced::compat::sample_detection_events_with_limits"
           },
           {
             "crate_name": "stab_core",
@@ -10473,7 +10417,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_with_seed_and_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::try_for_each_detection_event_with_seed_and_limits"
           }
         ],
         "standalone": true
@@ -10517,19 +10461,19 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::validate_replay_work_units"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::validate_replay_work_units"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::validate_replay_work_units_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::validate_replay_work_units_with_limits"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::try_for_each_detection_event_from_error_records"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::try_for_each_detection_event_from_error_records_with_limits"
           }
         ],
         "standalone": true
@@ -10660,7 +10604,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_with_seed_and_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::sample_detection_events_with_seed_and_limits"
           }
         ],
         "standalone": true
@@ -10704,7 +10648,7 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::validate_sample_buffer_units_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::validate_sample_buffer_units_with_limits"
           }
         ],
         "standalone": true
@@ -10770,11 +10714,11 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_and_errors_with_seed_and_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::sample_detection_events_and_errors_with_seed_and_limits"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::try_for_each_detection_event_and_error_with_seed_and_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::try_for_each_detection_event_and_error_with_seed_and_limits"
           }
         ],
         "standalone": true
@@ -10810,7 +10754,7 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::CompiledDemSampler::sample_detection_events_from_error_records_with_limits"
+            "owner_path": "stab_core::advanced::compat::CompiledDemSampler::sample_detection_events_from_error_records_with_limits"
           }
         ],
         "standalone": true
@@ -12543,107 +12487,55 @@
         "public_api_owners": [
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout"
+            "owner_path": "stab_core::advanced::records::DetsLayout"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::try_new"
+            "owner_path": "stab_core::advanced::records::DetsLayout::try_new"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::measurement_only"
+            "owner_path": "stab_core::advanced::records::DetsLayout::measurement_only"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::measurements"
+            "owner_path": "stab_core::advanced::records::DetsLayout::measurements"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::detectors"
+            "owner_path": "stab_core::advanced::records::DetsLayout::detectors"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::observables"
+            "owner_path": "stab_core::advanced::records::DetsLayout::observables"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsLayout::total_bits"
+            "owner_path": "stab_core::advanced::records::DetsLayout::total_bits"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsResultType"
+            "owner_path": "stab_core::advanced::records::DetsResultType"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsResultType::prefix"
+            "owner_path": "stab_core::advanced::records::DetsResultType::prefix"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsToken"
+            "owner_path": "stab_core::advanced::records::DetsToken"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsToken::new"
+            "owner_path": "stab_core::advanced::records::DetsToken::new"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsToken::result_type"
+            "owner_path": "stab_core::advanced::records::DetsToken::result_type"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::DetsToken::index"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::try_new"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::measurement_only"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::measurements"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::detectors"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::observables"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsLayout::total_bits"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsResultType"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsResultType::prefix"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsToken"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsToken::new"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsToken::result_type"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::result_formats::DetsToken::index"
+            "owner_path": "stab_core::advanced::records::DetsToken::index"
           }
         ],
         "standalone": true
@@ -12756,27 +12648,27 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::read_measurement_records"
+          "owner_path": "stab_core::advanced::records::read_measurement_records"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::read_dets_records"
+          "owner_path": "stab_core::advanced::records::read_dets_records"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_dets_record"
+          "owner_path": "stab_core::advanced::records::for_each_dets_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_dets_packed_record"
+          "owner_path": "stab_core::advanced::records::for_each_dets_packed_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_dets_token_record"
+          "owner_path": "stab_core::advanced::records::for_each_dets_token_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_dets_sparse_shot"
+          "owner_path": "stab_core::advanced::records::for_each_dets_sparse_shot"
         }
       ]
       },
@@ -13184,39 +13076,35 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_ptb64_record_all"
+          "owner_path": "stab_core::advanced::records::for_each_ptb64_record_all"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::ptb64_record_count"
+          "owner_path": "stab_core::advanced::records::ptb64_record_count"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::ptb64_record_count"
+          "owner_path": "stab_core::advanced::records::validate_ptb64_shot_count"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::validate_ptb64_shot_count"
+          "owner_path": "stab_core::advanced::records::for_each_ptb64_record"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_streaming::for_each_ptb64_record"
+          "owner_path": "stab_core::advanced::records::write_bit_plane_64_batch"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::write_bit_plane_64_batch"
+          "owner_path": "stab_core::advanced::records::write_ptb64_records_checked"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::write_ptb64_records_checked"
+          "owner_path": "stab_core::advanced::records::read_ptb64_records"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::read_ptb64_records"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::read_ptb64_records_all"
+          "owner_path": "stab_core::advanced::records::read_ptb64_records_all"
         }
       ]
       },
@@ -13337,19 +13225,19 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SparseShot::new"
+          "owner_path": "stab_core::advanced::records::SparseShot::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SparseShot::stim_debug_string"
+          "owner_path": "stab_core::advanced::records::SparseShot::stim_debug_string"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SparseShot::obs_mask_as_u64"
+          "owner_path": "stab_core::advanced::records::SparseShot::obs_mask_as_u64"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::result_formats::SparseShot"
+          "owner_path": "stab_core::advanced::records::SparseShot"
         }
       ]
       },
@@ -15043,65 +14931,45 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::word_count" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::len" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::as_bitslice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::from_words_truncated" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::len" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::set" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::word_count" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::zeros" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitLen" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitLen::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitLen::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitLen::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::as_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::from_words_truncated" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::zeros" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::get" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::new" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::word_count" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitLen::word_count" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::get" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::is_empty" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::len" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::len" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::new" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::words" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::as_bitslice" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::as_bitslice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::from_words_truncated" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::from_words_truncated" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::get" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::is_empty" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::len" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::len" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::set" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::set" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::word_count" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::word_count" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::words" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::zeros" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::zeros" }
       ]
     },
@@ -15221,29 +15089,21 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::and_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::clear" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::masked_xor_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::not_zero" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::or_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitSlice::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::and_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::clear" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::masked_xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::not_zero" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::or_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::xor_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitSlice::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::and_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::and_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::clear" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::clear" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::masked_xor_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::masked_xor_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::not_zero" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::not_zero" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::or_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::or_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::popcount" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::xor_assign" }
       ],
       "oracle_fixture_owners": [
@@ -15281,17 +15141,13 @@
         "dirty-source-tail"
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitError" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitResult" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::copy_from_bitslice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_range_from" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitError" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitError" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitResult" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::copy_from_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::xor_range_from" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitError" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitResult" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitResult" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::copy_from_bitslice" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::copy_from_bitslice" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_range_from" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::xor_range_from" }
       ],
       "oracle_fixture_owners": [
@@ -15331,14 +15187,10 @@
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::resize_zeros" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitVec::words_mut" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitWordsMut" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::from_bits" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::resize_zeros" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::words_mut" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitWordsMut" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::from_bits" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::resize_zeros" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::words_mut" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitWordsMut" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::from_bits" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::resize_zeros" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitVec::words_mut" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitWordsMut" }
       ]
     },
     {
@@ -15393,31 +15245,23 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::and" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::from_words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::or" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::xor" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::zero" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BIT_BLOCK_WORDS" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::and" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::from_words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::or" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::xor" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitBlock::zero" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BIT_BLOCK_WORDS" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BIT_BLOCK_WORDS" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::and" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::and" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::from_words" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::from_words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::or" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::or" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::popcount" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::popcount" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::words" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::words" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::xor" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::xor" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::zero" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitBlock::zero" }
       ]
     },
@@ -15465,38 +15309,27 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::cols" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::identity" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::masked_xor_row_into" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::row" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::rows" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::set" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::swap_rows" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::xor_row_into" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::zeros" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::cols" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::identity" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::masked_xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::row" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::swap_rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::zeros" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::cols" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::cols" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::get" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::get" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::identity" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::identity" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::masked_xor_row_into" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::masked_xor_row_into" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::row" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::row" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::rows" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::rows" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::set" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::set" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::swap_rows" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::swap_rows" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::xor_row_into" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::xor_row_into" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::zeros" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::zeros" }
       ],
       "oracle_fixture_owners": [
@@ -15532,8 +15365,7 @@
         "row-index-out-of-range"
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::copy_row_from_bools" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::copy_row_from_bools" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::copy_row_from_bools" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::copy_row_from_bools" }
       ]
     },
@@ -15594,11 +15426,9 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose_square_in_place" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::transpose" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::BitMatrix::transpose_square_in_place" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::transpose" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose_square_in_place" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::BitMatrix::transpose_square_in_place" }
       ]
     },
@@ -15651,36 +15481,27 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::contains" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::from_sorted_items" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::is_superset_of" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::items" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_item" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::contains" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::from_sorted_items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::is_superset_of" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::SparseXorVec::xor_item" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::contains" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::contains" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::from_sorted_items" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::from_sorted_items" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_empty" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::is_empty" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_superset_of" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::is_superset_of" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::items" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::items" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::new" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::new" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_assign" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::xor_assign" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_item" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::SparseXorVec::xor_item" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::inplace_xor_sort" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::inplace_xor_sort" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::inplace_xor_sort" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_subset_of_sorted" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::is_subset_of_sorted" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::is_subset_of_sorted" }
       ],
       "oracle_fixture_owners": [
@@ -15731,11 +15552,11 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::first_set_bit" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::first_set_bit" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::first_set_bit" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::floor_lg2" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::floor_lg2" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::floor_lg2" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_power_of_2" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::storage::is_power_of_2" },
         { "crate_name": "stab_bits", "owner_path": "stab_bits::is_power_of_2" }
       ]
     },
@@ -16399,58 +16220,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliSign::is_negative"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis::from_xz"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis::log_i_scalar_byproduct"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis::x_bit"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliBasis::z_bit"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliPhase"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliPhase::is_imaginary"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliPhase::is_negative"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliPhase::is_real"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliPhase::sign"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliSign"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliSign::is_negative"
         }
       ]
     },
@@ -16579,54 +16348,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::z_bits"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::from_bases"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::get"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::identity"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::is_empty"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::len"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::phase"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::set"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::sign"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::sparse_string"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::x_bits"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::z_bits"
         }
       ]
     },
@@ -16672,10 +16393,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::log_i_scalar_byproduct"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::log_i_scalar_byproduct"
         }
       ]
     },
@@ -16729,18 +16446,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::multiply_real"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar"
         }
       ]
     },
@@ -16796,10 +16501,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::commutes"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::commutes"
         }
       ]
     },
@@ -16844,14 +16545,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::randomize"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::random"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::randomize"
         }
       ]
     },
@@ -16933,43 +16626,23 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::PauliStringIterator"
+          "owner_path": "stab_core::advanced::algebra::PauliStringIterator"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::PauliStringIterator::iter_next"
+          "owner_path": "stab_core::advanced::algebra::PauliStringIterator::iter_next"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::PauliStringIterator::new"
+          "owner_path": "stab_core::advanced::algebra::PauliStringIterator::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::PauliStringIterator::restart"
+          "owner_path": "stab_core::advanced::algebra::PauliStringIterator::restart"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::PauliStringIterator::result"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliStringIterator"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliStringIterator::iter_next"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliStringIterator::new"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliStringIterator::restart"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliStringIterator::result"
+          "owner_path": "stab_core::advanced::algebra::PauliStringIterator::result"
         }
       ]
     },
@@ -17063,46 +16736,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::FlexPauliString::value"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::from_phase_and_bases"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::get"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::identity"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::is_empty"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::len"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::phase"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::try_into_real"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlexPauliString::value"
         }
       ]
     },
@@ -17158,22 +16791,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::SingleQubitClifford::token"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::all"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::canonical_name"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::token"
         }
       ]
     },
@@ -17262,58 +16879,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::CliffordString::set_gate_at"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::concat"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::from_gates"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::gate_at"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::identity"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::is_empty"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::len"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::random"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::randomize"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::repeat"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::right_multiply_in_place"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CliffordString::set_gate_at"
         }
       ]
     },
@@ -17443,10 +17008,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::SingleQubitClifford::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::multiply"
         }
       ]
     },
@@ -17498,10 +17059,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::SingleQubitClifford::random"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::SingleQubitClifford::random"
         }
       ]
     },
@@ -17581,42 +17138,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::FlowMeasurementIndex::new"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::input"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::measurements"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::new"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::observables"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::output"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex::get"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex::new"
         }
       ]
     },
@@ -17660,10 +17181,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Flow::multiply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Flow::multiply"
         }
       ]
     },
@@ -17907,22 +17424,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::StabilizerResult"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::StabilizerError"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::StabilizerResource"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::StabilizerResource::limit"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::StabilizerResult"
         }
       ]
     },
@@ -18407,66 +17908,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Tableau::z_output_pauli_xyz"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::from_pauli_string"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::gate1"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::gate2"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::identity"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::is_empty"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::len"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::satisfies_invariants"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::to_pauli_string"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::x_output"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::x_output_pauli_xyz"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::y_output"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::y_output_pauli_xyz"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::z_output"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::z_output_pauli_xyz"
         }
       ]
     },
@@ -18512,10 +17953,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Tableau::apply"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::apply"
         }
       ]
     },
@@ -18570,10 +18007,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Tableau::then"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::then"
         }
       ]
     },
@@ -18666,14 +18099,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Tableau::inverse_skipping_signs"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::inverse"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::inverse_skipping_signs"
         }
       ]
     },
@@ -18726,10 +18151,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::Tableau::random"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::Tableau::random"
         }
       ]
     },
@@ -18794,35 +18215,19 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::CommutingPauliStringIterator"
+          "owner_path": "stab_core::advanced::algebra::CommutingPauliStringIterator"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::CommutingPauliStringIterator::new"
+          "owner_path": "stab_core::advanced::algebra::CommutingPauliStringIterator::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::CommutingPauliStringIterator::restart_iter"
+          "owner_path": "stab_core::advanced::algebra::CommutingPauliStringIterator::restart_iter"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::CommutingPauliStringIterator::restart_iter_same_constraints"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::new"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::restart_iter"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::restart_iter_same_constraints"
+          "owner_path": "stab_core::advanced::algebra::CommutingPauliStringIterator::restart_iter_same_constraints"
         }
       ]
     },
@@ -18856,27 +18261,15 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::TableauIterator"
+          "owner_path": "stab_core::advanced::algebra::TableauIterator"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::TableauIterator::new"
+          "owner_path": "stab_core::advanced::algebra::TableauIterator::new"
         },
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::TableauIterator::restart"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::TableauIterator"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::TableauIterator::new"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::TableauIterator::restart"
+          "owner_path": "stab_core::advanced::algebra::TableauIterator::restart"
         }
       ]
     },
@@ -19209,10 +18602,6 @@
       "public_api_owners": [
         {
           "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::stabilizers_to_tableau"
-        },
-        {
-          "crate_name": "stab_core",
           "owner_path": "stab_core::stabilizers_to_tableau"
         }
       ]
@@ -19442,10 +18831,6 @@
         "coverage-util-top-stabilizers-vs-amplitudes"
       ],
       "public_api_owners": [
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::unitary_to_tableau"
-        },
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::unitary_to_tableau"
@@ -19898,8 +19283,8 @@
       "public_api_owners": [
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::buffered_bytes" },
         { "crate_name": "stab_records", "owner_path": "stab_records::MeasureRecordWriter::clear_buffered_bytes" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::result_formats::MeasureRecordWriter::buffered_bytes" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::result_formats::MeasureRecordWriter::clear_buffered_bytes" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::records::MeasureRecordWriter::buffered_bytes" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::advanced::records::MeasureRecordWriter::clear_buffered_bytes" }
       ]
     },
     {
@@ -21317,76 +20702,6 @@
     },
     {
       "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler",
-      "canonical_owner_path": "stab_core::CompiledSampler"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::compile",
-      "canonical_owner_path": "stab_core::CompiledSampler::compile"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::count_determined_measurements",
-      "canonical_owner_path": "stab_core::CompiledSampler::count_determined_measurements"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::for_each_sample_with_seed_and_reference_mode",
-      "canonical_owner_path": "stab_core::CompiledSampler::for_each_sample_with_seed_and_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::reference_sample",
-      "canonical_owner_path": "stab_core::CompiledSampler::reference_sample"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_bytes",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_bytes"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_bytes_with_seed",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_bytes_with_seed"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_bytes_with_seed_and_reference_mode",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_bytes_with_seed_and_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_ptb64_bytes_with_seed",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_ptb64_bytes_with_seed"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_ptb64_bytes_with_seed_and_reference_mode",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_ptb64_bytes_with_seed_and_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_zero_one",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_zero_one"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_zero_one_bytes",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_zero_one_bytes"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_zero_one_with_seed",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_zero_one_with_seed"
-    },
-    {
-      "crate_name": "stab_core",
-      "alias_owner_path": "stab_core::execution::CompiledSampler::sample_zero_one_with_seed_and_reference_mode",
-      "canonical_owner_path": "stab_core::CompiledSampler::sample_zero_one_with_seed_and_reference_mode"
-    },
-    {
-      "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::sample_if_circuit_has_stabilizer_flows",
       "canonical_owner_path": "stab_core::sample_if_circuit_has_stabilizer_flows"
     }
@@ -21453,22 +20768,6 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::PauliString::weight"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::active_terms"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::has_no_pauli_terms"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::intersects"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::stabilizers::PauliString::weight"
         }
       ]
     },

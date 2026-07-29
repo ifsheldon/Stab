@@ -3,9 +3,13 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use stab_core::advanced::{
+    algebra::{PauliStringIterator, TableauIterator},
+    storage::{BitMatrix, BitVec, SparseXorVec},
+};
 use stab_core::{
-    BitMatrix, BitVec, Circuit, PauliBasis, PauliSign, PauliString, PauliStringIterator,
-    SparseXorVec, TableauIterator, analysis::circuit_to_tableau, stabilizers_to_tableau,
+    Circuit, PauliBasis, PauliSign, PauliString, analysis::circuit_to_tableau,
+    stabilizers_to_tableau,
 };
 
 use crate::allocations::measure_tracked_memory;

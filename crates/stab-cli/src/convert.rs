@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_core::{
     Circuit, CircuitError, CircuitItem, DetectorErrorModel, RepeatBlock, SampleFormat,
+    advanced::records::{DetsLayout, MeasureRecordWriter},
+    advanced::records::{for_each_dets_record, for_each_ptb64_record_all, for_each_record},
     detection_record_width, measurement_record_count,
-    result_formats::{DetsLayout, MeasureRecordWriter},
-    result_streaming::{for_each_dets_record, for_each_ptb64_record_all, for_each_record},
 };
 
 use crate::{

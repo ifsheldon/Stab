@@ -2,7 +2,8 @@
 
 use std::error::Error;
 
-use stab_core::{BitVec, CliffordString, SingleQubitClifford};
+use stab_core::advanced::storage::BitVec;
+use stab_core::{CliffordString, SingleQubitClifford};
 
 pub fn exercise_portable_facade() -> Result<(usize, usize), Box<dyn Error>> {
     let mut left = BitVec::from_words_truncated(257, vec![0x5555_aaaa; 5]);

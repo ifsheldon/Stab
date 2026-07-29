@@ -5,17 +5,17 @@
 )]
 
 use stab_core::{
-    CircuitError, CircuitResult,
-    bits::BitSlice,
-    result_formats::{
-        DetsLayout, DetsResultType, DetsToken, SampleFormat, SparseShot, read_dets_records,
+    CircuitError, CircuitResult, SampleFormat,
+    advanced::records::{
+        DetsLayout, DetsResultType, DetsToken, SparseShot, read_dets_records,
         read_measurement_records, read_records,
     },
-    result_streaming::{
+    advanced::records::{
         for_each_dets_packed_record, for_each_dets_record, for_each_dets_sparse_shot,
         for_each_dets_token_record, for_each_packed_record, for_each_record,
         for_each_sparse_record,
     },
+    advanced::storage::BitSlice,
 };
 
 #[test]

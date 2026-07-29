@@ -8,11 +8,15 @@ use std::convert::Infallible;
 use std::thread;
 
 use sha2::{Digest as _, Sha256};
+use stab_core::advanced::{
+    backend::{BackendPreference, SamplingBackend},
+    compat::CompiledSampler,
+    records::MeasurementCodecSink,
+};
 use stab_core::{
-    BackendPreference, Circuit, CircuitError, CompiledSampler, MeasurementBatchView,
-    MeasurementCodecSink, MeasurementSink, RandomPolicy, RecordFormat, RunError, SamplingBackend,
-    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
-    SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    Circuit, CircuitError, MeasurementBatchView, MeasurementSink, RandomPolicy, RecordFormat,
+    RunError, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
 };
 
 #[derive(Debug, Default)]

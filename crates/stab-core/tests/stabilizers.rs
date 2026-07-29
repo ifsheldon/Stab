@@ -10,9 +10,11 @@ use proptest::prelude::*;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
-    CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
-    PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
-    analysis::gate_unitary_matrix, single_qubit_clifford_for_gate, unitary_to_tableau,
+    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliSign, PauliString,
+    SingleQubitClifford, Tableau,
+    advanced::algebra::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator},
+    analysis::gate_unitary_matrix,
+    single_qubit_clifford_for_gate, unitary_to_tableau,
 };
 
 #[test]

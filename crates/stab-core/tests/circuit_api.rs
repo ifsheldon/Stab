@@ -13,9 +13,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use stab_core::advanced::compat::CompiledSampler;
 use stab_core::{
-    Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CompiledSampler,
-    ParseErrorCode, QubitId, RepeatBlock, RepeatCount, detection_record_width,
+    Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, ParseErrorCode,
+    QubitId, RepeatBlock, RepeatCount, detection_record_width,
     execution::{
         circuit_reference_sample, circuit_reference_sample_tree, count_determined_measurements,
     },

@@ -1,3 +1,4 @@
+use stab_core::advanced::storage::BitError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -13,7 +14,7 @@ pub(crate) enum WorkerError {
     #[error(transparent)]
     SamplingCompile(#[from] stab_core::SamplingCompileError),
     #[error(transparent)]
-    Bits(#[from] stab_core::BitError),
+    Bits(#[from] BitError),
     #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
     MeasurementMismatch {
         workload: &'static str,

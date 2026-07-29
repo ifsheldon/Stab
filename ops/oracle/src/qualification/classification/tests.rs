@@ -4,6 +4,8 @@ use super::*;
 mod analysis;
 #[path = "tests/engine.rs"]
 mod engine;
+#[path = "tests/facade.rs"]
+mod facade;
 #[path = "tests/kernels.rs"]
 mod kernels;
 
@@ -359,19 +361,19 @@ fn classifications_distinguish_selected_execution_domains() {
         ),
         (
             "crates/stab-core/src/detection.rs",
-            "stab_core::CompiledDetectionConverter::compile_with_limits",
+            "stab_core::advanced::compat::CompiledDetectionConverter::compile_with_limits",
         ),
         (
             "crates/stab-core/src/dem_sampler.rs",
-            "stab_core::CompiledDemSampler::sample_detection_events_with_seed_and_limits",
+            "stab_core::advanced::compat::CompiledDemSampler::sample_detection_events_with_seed_and_limits",
         ),
         (
             "crates/stab-core/src/dem_sampler.rs",
-            "stab_core::CompiledDemSampler::validate_replay_work_units",
+            "stab_core::advanced::compat::CompiledDemSampler::validate_replay_work_units",
         ),
         (
             "crates/stab-core/src/dem_sampler.rs",
-            "stab_core::CompiledDemSampler::try_for_each_detection_event_from_error_records",
+            "stab_core::advanced::compat::CompiledDemSampler::try_for_each_detection_event_from_error_records",
         ),
         (
             "crates/stab-core/src/dem.rs",

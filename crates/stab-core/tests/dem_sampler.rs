@@ -3,10 +3,11 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{
-    CircuitError, CompiledDemSampler, DemRepeatBlock, DemRepeatCount, DetectionEventRecord,
-    DetectionObservableOutputMode, DetectorErrorModel, SampleFormat, write_detection_records,
+use stab_core::advanced::compat::{
+    CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
+    write_detection_records,
 };
+use stab_core::{CircuitError, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, SampleFormat};
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
     let model = DetectorErrorModel::from_dem_str(text).expect("parse DEM");

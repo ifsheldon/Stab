@@ -3,12 +3,13 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use stab_core::advanced::compat::try_for_each_sampled_detection_event;
 use stab_core::{
     Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, SampleFormat,
-    Seed, ShotCount, check_if_circuit_has_unsigned_stabilizer_flows,
+    Seed, ShotCount, advanced::records::read_records,
+    advanced::records::write_ptb64_records_checked, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
-    measurement_record_count, result_formats::read_records,
-    result_formats::write_ptb64_records_checked, try_for_each_sampled_detection_event,
+    measurement_record_count,
 };
 use stab_engine::{DetectionSamplingCompiler, MeasurementToDetectionCompiler};
 

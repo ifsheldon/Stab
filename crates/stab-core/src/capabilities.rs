@@ -112,7 +112,7 @@ impl CapabilitySet {
         stab_engine::REGISTERED_BACKENDS
             .iter()
             .copied()
-            .map(crate::SamplingBackend::as_str)
+            .map(stab_engine::SamplingBackend::as_str)
     }
 
     pub const fn default_parse_limits(self, _dialect: ModelDialect) -> ParseLimits {

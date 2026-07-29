@@ -2,8 +2,8 @@ use std::io::{self, Write};
 
 use stab_core::{
     BitPlane64Batch, CircuitError, DemSampleBatchView, DetectionBatchView,
-    DetectionObservableOutputMode, DetsResultType, PackedShotBatchView, RecordFormat, SampleFormat,
-    result_formats::MeasureRecordWriter,
+    DetectionObservableOutputMode, PackedShotBatchView, RecordFormat, SampleFormat,
+    advanced::records::{DetsResultType, MeasureRecordWriter},
 };
 
 use crate::{
@@ -302,7 +302,7 @@ impl RecordBatchEncoder {
     fn write_part(
         &mut self,
         result_type: DetsResultType,
-        bits: stab_core::BitSlice<'_>,
+        bits: stab_core::advanced::storage::BitSlice<'_>,
         output_bit: &mut usize,
     ) -> io::Result<()> {
         match self {

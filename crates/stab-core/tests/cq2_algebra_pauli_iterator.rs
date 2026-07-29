@@ -3,10 +3,8 @@
     reason = "integration tests use direct assertions for semantic mismatch diagnostics"
 )]
 
-use stab_core::{
-    PauliBasis, PauliSign, PauliStringIterator, StabilizerError, StabilizerResource,
-    StabilizerResult,
-};
+use stab_core::advanced::algebra::PauliStringIterator;
+use stab_core::{PauliBasis, PauliSign, StabilizerError, StabilizerResource, StabilizerResult};
 use thiserror::Error;
 
 const RANGE_SPECS: [IteratorSpec; 3] = [

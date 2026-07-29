@@ -9,9 +9,10 @@ use std::str::FromStr;
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
+use stab_core::advanced::storage::BitError;
 use stab_core::{
-    BitError, CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, Gate, PauliBasis,
-    PauliPhase, PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
+    CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, Gate, PauliBasis, PauliPhase,
+    PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
     StabilizerResult, single_qubit_clifford_for_gate,
 };
 
@@ -335,7 +336,7 @@ fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
     assert_eq!(identity_left, identity_left_before);
     assert_eq!(identity_right, identity_right_before);
 
-    let mut cycle_left = stab_core::stabilizers::CliffordString::from_gates(
+    let mut cycle_left = stab_core::CliffordString::from_gates(
         (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[index % 24]),
     )
     .expect("complete non-identity cycle left operand");
