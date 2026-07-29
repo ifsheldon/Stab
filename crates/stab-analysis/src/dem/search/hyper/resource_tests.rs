@@ -1,7 +1,7 @@
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
-    reason = "unit tests use direct assertions for compact diagnostics"
+    reason = "logical-search resource tests use direct assertions for compact diagnostics"
 )]
 
 use super::{

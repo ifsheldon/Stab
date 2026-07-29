@@ -1,13 +1,15 @@
 use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
 
-use super::{Graph, ObservableMask, SearchState};
-use crate::dem::search_budget::{LogicalErrorSearchLimits, SearchBudget};
-use crate::{CircuitError, CircuitResult, DemItem, DetectorErrorModel};
+use stab_model::{DemItem, DetectorErrorModel};
 
-pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
+use super::{Graph, ObservableMask, SearchState};
+use crate::dem::search::budget::{LogicalErrorSearchLimits, SearchBudget};
+use crate::{AnalysisError, AnalysisResult};
+
+pub fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     shortest_graphlike_undetectable_logical_error_with_limits(
         model,
         ignore_ungraphlike_errors,
@@ -15,11 +17,11 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
     )
 }
 
-pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
+pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
     limits: LogicalErrorSearchLimits,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     let graph = Graph::from_dem_with_limits(model, ignore_ungraphlike_errors, limits)?;
     let empty = SearchState::new(None, None, ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
@@ -45,7 +47,7 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
                     .checked_add(1)
                     .and_then(|count| count.checked_add(usize::from(edge.detector.is_some())))
                     .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
+                        AnalysisError::invalid_detector_error_model(
                             "graphlike initial search state term count overflowed",
                         )
                     })?;
@@ -62,13 +64,13 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
 
     while let Some(current) = queue.pop_front() {
         let Some(active) = current.detector_active else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike search reached a state without an active detector",
             ));
         };
         let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike active detector is outside the graph",
             ));
         };
@@ -81,7 +83,7 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
                 .checked_add(usize::from(edge.detector.is_some()))
                 .and_then(|count| count.checked_add(usize::from(current.detector_held.is_some())))
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "graphlike next search state term count overflowed",
                     )
                 })?;
@@ -107,7 +109,7 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
         }
     }
 
-    Err(CircuitError::invalid_detector_error_model(
+    Err(AnalysisError::invalid_detector_error_model(
         no_graphlike_logical_error_message(model, &graph)?,
     ))
 }
@@ -115,12 +117,12 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error_with_limits(
 fn backtrack_path(
     back_map: &BTreeMap<SearchState, SearchState>,
     final_state: &SearchState,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     let mut out = DetectorErrorModel::new();
     let mut current = final_state.clone();
     loop {
         let Some(previous) = back_map.get(&current) else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike search backtracking reached an unknown state",
             ));
         };
@@ -133,11 +135,11 @@ fn backtrack_path(
     sorted_error_model(out)
 }
 
-fn sorted_error_model(model: DetectorErrorModel) -> CircuitResult<DetectorErrorModel> {
+fn sorted_error_model(model: DetectorErrorModel) -> AnalysisResult<DetectorErrorModel> {
     let mut instructions = Vec::new();
     for item in model.items() {
         let DemItem::Instruction(instruction) = item else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike search produced a repeat block unexpectedly",
             ));
         };
@@ -155,7 +157,7 @@ fn sorted_error_model(model: DetectorErrorModel) -> CircuitResult<DetectorErrorM
 fn no_graphlike_logical_error_message(
     model: &DetectorErrorModel,
     graph: &Graph,
-) -> CircuitResult<String> {
+) -> AnalysisResult<String> {
     let mut message = String::from("Failed to find any graphlike logical errors.");
     if graph.num_observables == 0 {
         message.push_str(
@@ -284,13 +286,13 @@ mod tests {
         DetectorErrorModel::from_dem_str(&text).expect("valid variable-payload model")
     }
 
-    fn shortest(dem: &str) -> CircuitResult<String> {
+    fn shortest(dem: &str) -> AnalysisResult<String> {
         let model = DetectorErrorModel::from_dem_str(dem)?;
         shortest_graphlike_undetectable_logical_error(&model, false)
             .map(|error| error.to_dem_string())
     }
 
-    fn shortest_ignoring_ungraphlike(dem: &str) -> CircuitResult<String> {
+    fn shortest_ignoring_ungraphlike(dem: &str) -> AnalysisResult<String> {
         let model = DetectorErrorModel::from_dem_str(dem)?;
         shortest_graphlike_undetectable_logical_error(&model, true)
             .map(|error| error.to_dem_string())

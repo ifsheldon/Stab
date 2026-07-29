@@ -1,6 +1,6 @@
 #![allow(
     clippy::expect_used,
-    reason = "resource tests use direct assertions for fixed admission boundaries"
+    reason = "logical-search resource tests use direct assertions for fixed admission boundaries"
 )]
 
 use std::collections::BTreeSet;

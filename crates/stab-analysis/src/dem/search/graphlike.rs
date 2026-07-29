@@ -1,10 +1,8 @@
-#![allow(dead_code, reason = "search internals land before all callers")]
-
 mod algo;
 #[cfg(test)]
 mod resource_tests;
 
-pub(super) use algo::{
+pub use algo::{
     shortest_graphlike_undetectable_logical_error,
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
@@ -14,18 +12,21 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
 #[cfg(test)]
-use super::DemItem;
+use stab_model::DemItem;
+use stab_model::{
+    DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel, Probability,
+};
+
 use super::{
-    DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel,
     arena_index::ArenaIndex,
+    budget::{GraphConstructionBudget, LogicalErrorSearchLimits},
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
         visit_search_graph_errors_with_limits,
     },
-    search_budget::{GraphConstructionBudget, LogicalErrorSearchLimits},
     traversal::{FoldedDemTraversal, shifted_targets},
 };
-use crate::{CircuitError, CircuitResult, Probability};
+use crate::{AnalysisError, AnalysisResult};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ObservableMask {
@@ -76,7 +77,7 @@ impl ObservableMask {
         }
     }
 
-    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> CircuitResult<()> {
+    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
         for observable in &self.observables {
             targets.push(DemTarget::logical_observable(observable.get())?);
         }
@@ -122,12 +123,12 @@ impl Edge {
         }
     }
 
-    fn term_count(&self) -> CircuitResult<usize> {
+    fn term_count(&self) -> AnalysisResult<usize> {
         self.observables
             .len()
             .checked_add(usize::from(self.detector.is_some()))
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("graphlike edge term count overflowed")
+                AnalysisError::invalid_detector_error_model("graphlike edge term count overflowed")
             })
     }
 }
@@ -158,19 +159,20 @@ impl PartialEq for Node {
 impl Eq for Node {}
 
 impl Node {
+    #[cfg(test)]
     pub(super) fn new(edges: Vec<Edge>) -> Self {
         let edge_index = ArenaIndex::from_arena(&edges);
         Self { edges, edge_index }
     }
 
-    fn add_edge(&mut self, edge: Edge, budget: &mut GraphConstructionBudget) -> CircuitResult<()> {
+    fn add_edge(&mut self, edge: Edge, budget: &mut GraphConstructionBudget) -> AnalysisResult<()> {
         if self.edge_index.find(&edge, &self.edges).is_some() {
             return Ok(());
         }
         let edge_hash = self.edge_index.hash(&edge);
         let admission = budget.preflight_unique_edge(edge.term_count()?, 1, 1)?;
         self.edges.try_reserve(1).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "graphlike search cannot allocate another outward edge",
             )
         })?;
@@ -218,6 +220,7 @@ impl Eq for Graph {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum DetectorIndex {
+    #[cfg(test)]
     Identity,
     Sparse {
         node_to_detector: Vec<DemDetectorId>,
@@ -241,11 +244,12 @@ impl Graph {
         }
     }
 
+    #[cfg(test)]
     fn try_new_sparse(
         detectors: BTreeSet<DemDetectorId>,
         num_observables: usize,
         has_declared_detectors: bool,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         Self::try_new_sparse_with_limits(
             detectors,
             num_observables,
@@ -259,11 +263,11 @@ impl Graph {
         num_observables: usize,
         has_declared_detectors: bool,
         limits: LogicalErrorSearchLimits,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
         nodes.try_reserve_exact(node_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "graphlike search cannot allocate {node_count} sparse detector nodes"
             ))
         })?;
@@ -289,6 +293,7 @@ impl Graph {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn from_parts(
         nodes: Vec<Node>,
         num_observables: usize,
@@ -307,11 +312,12 @@ impl Graph {
         }
     }
 
-    pub(super) fn detector_for_node_index(&self, index: usize) -> CircuitResult<DemDetectorId> {
+    pub(super) fn detector_for_node_index(&self, index: usize) -> AnalysisResult<DemDetectorId> {
         match &self.detector_index {
+            #[cfg(test)]
             DetectorIndex::Identity => {
                 let index = u64::try_from(index).map_err(|_| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "graphlike node index does not fit detector id",
                     )
                 })?;
@@ -320,17 +326,18 @@ impl Graph {
             DetectorIndex::Sparse {
                 node_to_detector, ..
             } => node_to_detector.get(index).copied().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "graphlike sparse node index {index} is outside the graph"
                 ))
             }),
         }
     }
 
-    pub(super) fn node_index_for_detector(&self, detector: DemDetectorId) -> CircuitResult<usize> {
+    pub(super) fn node_index_for_detector(&self, detector: DemDetectorId) -> AnalysisResult<usize> {
         match &self.detector_index {
+            #[cfg(test)]
             DetectorIndex::Identity => usize::try_from(detector.get()).map_err(|_| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "graphlike detector D{} does not fit usize",
                     detector.get()
                 ))
@@ -338,7 +345,7 @@ impl Graph {
             DetectorIndex::Sparse {
                 detector_to_node, ..
             } => detector_to_node.get(&detector).copied().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "graphlike detector D{} is outside the sparse graph",
                     detector.get()
                 ))
@@ -351,10 +358,10 @@ impl Graph {
         source: DemDetectorId,
         destination: Option<DemDetectorId>,
         observables: ObservableMask,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let source_index = self.node_index_for_detector(source)?;
         let Some(node) = self.nodes.get_mut(source_index) else {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "graphlike source detector D{} is outside the graph",
                 source.get()
             )));
@@ -370,7 +377,7 @@ impl Graph {
         &mut self,
         targets: &[DemTarget],
         ignore_ungraphlike_errors: bool,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let mut detectors = Vec::new();
         let mut observables = ObservableMask::new();
         for target in targets {
@@ -380,7 +387,7 @@ impl Graph {
                         if ignore_ungraphlike_errors {
                             return Ok(());
                         }
-                        return Err(CircuitError::invalid_detector_error_model(
+                        return Err(AnalysisError::invalid_detector_error_model(
                             "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
                         ));
                     }
@@ -410,7 +417,7 @@ impl Graph {
         &mut self,
         targets: &[DemTarget],
         ignore_ungraphlike_errors: bool,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let mut start = 0;
         for (index, target) in targets.iter().enumerate() {
             if matches!(target, DemTarget::Separator) {
@@ -418,7 +425,7 @@ impl Graph {
                     return Ok(());
                 }
                 let component = targets.get(start..index).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "graphlike target component range is invalid",
                     )
                 })?;
@@ -427,17 +434,18 @@ impl Graph {
             }
         }
         let component = targets.get(start..).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "graphlike target component range is invalid",
             )
         })?;
         self.add_edges_from_targets_with_no_separators(component, ignore_ungraphlike_errors)
     }
 
+    #[cfg(test)]
     pub(super) fn from_dem(
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         Self::from_dem_with_limits(
             model,
             ignore_ungraphlike_errors,
@@ -449,7 +457,7 @@ impl Graph {
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
         limits: LogicalErrorSearchLimits,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
         let full_observable_count = traversal.root().summary().observable_count();
@@ -462,7 +470,7 @@ impl Graph {
             limits,
         )?;
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model("observable count does not fit usize")
+            AnalysisError::invalid_detector_error_model("observable count does not fit usize")
         })?;
         let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
@@ -517,18 +525,19 @@ impl SearchState {
         self.canonical_detectors() == (None, None)
     }
 
-    pub(super) fn term_count(&self) -> CircuitResult<usize> {
+    pub(super) fn term_count(&self) -> AnalysisResult<usize> {
         self.observables
             .len()
             .checked_add(usize::from(self.detector_active.is_some()))
             .and_then(|count| count.checked_add(usize::from(self.detector_held.is_some())))
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "graphlike search state term count overflowed",
                 )
             })
     }
 
+    #[cfg(test)]
     pub(super) fn canonical(&self) -> Self {
         let (detector_active, detector_held) = self.canonical_detectors();
         Self::new(detector_active, detector_held, self.observables.clone())
@@ -538,7 +547,7 @@ impl SearchState {
         &self,
         next: &Self,
         out: &mut DetectorErrorModel,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let (current_active, current_held) = self.canonical_detectors();
         let (next_active, next_held) = next.canonical_detectors();
         let mut detector_targets = BTreeSet::new();
@@ -640,13 +649,9 @@ fn format_observable(observable: DemObservableId) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests use direct assertions")]
+#[allow(clippy::unwrap_used, reason = "tests use direct assertions")]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "unit tests use direct assertions for compact diagnostics"
-    )]
-
     use std::collections::hash_map::DefaultHasher;
 
     use super::*;

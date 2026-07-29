@@ -1,5 +1,5 @@
 use crate::resources::LogicalErrorSearchResource;
-use crate::{CircuitError, CircuitResult, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 const DEFAULT_MAX_REPEAT_UNROLL: u64 = 100_000;
 const DEFAULT_MAX_REPEAT_ITERATIONS: u64 = 1_000_000;
@@ -265,7 +265,7 @@ impl GraphConstructionBudget {
         edge_terms: usize,
         edge_stored_copies: usize,
         adjacency_stored_terms: usize,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let admission =
             self.preflight_unique_edge(edge_terms, edge_stored_copies, adjacency_stored_terms)?;
         self.commit_unique_edge(admission)
@@ -276,9 +276,9 @@ impl GraphConstructionBudget {
         edge_terms: usize,
         edge_stored_copies: usize,
         adjacency_stored_terms: usize,
-    ) -> CircuitResult<GraphEdgeAdmission> {
+    ) -> AnalysisResult<GraphEdgeAdmission> {
         let edges = self.edges.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{} graph edge count overflowed",
                 self.context
             ))
@@ -297,7 +297,7 @@ impl GraphConstructionBudget {
             .checked_mul(edge_stored_copies)
             .and_then(|terms| terms.checked_add(adjacency_stored_terms))
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "{} stored graph term count overflowed",
                     self.context
                 ))
@@ -314,10 +314,10 @@ impl GraphConstructionBudget {
     pub(super) fn commit_unique_edge(
         &mut self,
         admission: GraphEdgeAdmission,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         if self.edges != admission.prior_edges || self.stored_terms != admission.prior_stored_terms
         {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "{} graph construction admission became stale before commit",
                 self.context
             )));
@@ -328,14 +328,14 @@ impl GraphConstructionBudget {
     }
 
     #[cfg(test)]
-    pub(super) fn admit_adjacency(&mut self, stored_copies: usize) -> CircuitResult<()> {
+    pub(super) fn admit_adjacency(&mut self, stored_copies: usize) -> AnalysisResult<()> {
         self.stored_terms = self.checked_stored_terms(stored_copies)?;
         Ok(())
     }
 
-    fn checked_stored_terms(&self, added_terms: usize) -> CircuitResult<usize> {
+    fn checked_stored_terms(&self, added_terms: usize) -> AnalysisResult<usize> {
         let stored_terms = self.stored_terms.checked_add(added_terms).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{} stored graph term count overflowed",
                 self.context
             ))
@@ -374,7 +374,7 @@ impl SearchBudget {
         }
     }
 
-    pub(super) fn preflight_state_terms(&self, state_terms: usize) -> CircuitResult<()> {
+    pub(super) fn preflight_state_terms(&self, state_terms: usize) -> AnalysisResult<()> {
         let limit = self.limits.max_search_state_terms();
         if state_terms > limit {
             return Err(ResourceLimitError::logical_error_search(
@@ -393,11 +393,11 @@ impl SearchBudget {
         state_terms: usize,
         predecessor_terms: usize,
         queued: bool,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         self.preflight_state_terms(state_terms)?;
         self.preflight_state_terms(predecessor_terms)?;
         let next = self.states.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{} search state count overflowed",
                 self.context
             ))
@@ -417,7 +417,7 @@ impl SearchBudget {
             .checked_mul(state_copies)
             .and_then(|terms| terms.checked_add(predecessor_terms))
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "{} stored search-state term count overflowed",
                     self.context
                 ))
@@ -426,7 +426,7 @@ impl SearchBudget {
             .stored_state_terms
             .checked_add(added_state_terms)
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "{} stored search-state term count overflowed",
                     self.context
                 ))
@@ -446,9 +446,9 @@ impl SearchBudget {
         Ok(())
     }
 
-    pub(super) fn record_transition(&mut self) -> CircuitResult<()> {
+    pub(super) fn record_transition(&mut self) -> AnalysisResult<()> {
         let next = self.transitions.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{} search transition count overflowed",
                 self.context
             ))

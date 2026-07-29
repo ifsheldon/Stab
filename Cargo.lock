@@ -2164,6 +2164,7 @@ name = "stab-analysis"
 version = "0.1.1"
 dependencies = [
  "allocation-counter",
+ "hashbrown 0.17.1",
  "num-complex",
  "stab-algebra",
  "stab-model",
@@ -2244,7 +2245,6 @@ version = "0.1.1"
 dependencies = [
  "allocation-counter",
  "arrayvec",
- "hashbrown 0.17.1",
  "hex",
  "num-complex",
  "proptest",

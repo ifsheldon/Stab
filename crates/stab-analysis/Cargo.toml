@@ -12,6 +12,7 @@ homepage.workspace = true
 workspace = true
 
 [dependencies]
+hashbrown = { workspace = true }
 num-complex = { workspace = true }
 stab-algebra = { workspace = true }
 stab-model = { workspace = true }

@@ -3,7 +3,7 @@ use std::hash::{BuildHasher, Hash};
 
 use hashbrown::HashTable;
 
-use crate::{CircuitError, CircuitResult};
+use crate::{AnalysisError, AnalysisResult};
 
 #[derive(Clone, Debug)]
 pub(super) struct ArenaIndex {
@@ -19,6 +19,7 @@ impl ArenaIndex {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn from_arena<T: Eq + Hash>(arena: &[T]) -> Self {
         let mut index = Self {
             entries: HashTable::with_capacity(arena.len()),
@@ -46,7 +47,7 @@ impl ArenaIndex {
         &mut self,
         arena: &[T],
         context: &'static str,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let hash_builder = &self.hash_builder;
         self.entries
             .try_reserve(1, |index| {
@@ -55,7 +56,7 @@ impl ArenaIndex {
                     .map_or(0, |value| hash_builder.hash_one(value))
             })
             .map_err(|_| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "{context} cannot allocate another arena index entry"
                 ))
             })

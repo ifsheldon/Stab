@@ -1,13 +1,8 @@
 mod analyze;
-mod arena_index;
-mod error_traversal;
 mod flatten;
 #[cfg(test)]
 mod generated_qec_tests;
-mod graphlike;
-mod hyper;
 mod sat;
-mod search_budget;
 mod traversal;
 
 pub use analyze::{
@@ -20,7 +15,7 @@ pub use sat::{
     SatMaterializationLimits, likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
     shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
 };
-pub use search_budget::LogicalErrorSearchLimits;
+pub use stab_analysis::LogicalErrorSearchLimits;
 pub use stab_model::{
     DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
     DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
@@ -48,7 +43,8 @@ pub fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
 ) -> CircuitResult<DetectorErrorModel> {
-    graphlike::shortest_graphlike_undetectable_logical_error(model, ignore_ungraphlike_errors)
+    stab_analysis::shortest_graphlike_undetectable_logical_error(model, ignore_ungraphlike_errors)
+        .map_err(Into::into)
 }
 
 pub fn shortest_graphlike_undetectable_logical_error_with_limits(
@@ -56,11 +52,12 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     ignore_ungraphlike_errors: bool,
     limits: LogicalErrorSearchLimits,
 ) -> CircuitResult<DetectorErrorModel> {
-    graphlike::shortest_graphlike_undetectable_logical_error_with_limits(
+    stab_analysis::shortest_graphlike_undetectable_logical_error_with_limits(
         model,
         ignore_ungraphlike_errors,
         limits,
     )
+    .map_err(Into::into)
 }
 
 pub fn find_undetectable_logical_error(
@@ -69,12 +66,13 @@ pub fn find_undetectable_logical_error(
     dont_explore_edges_with_degree_above: usize,
     dont_explore_edges_increasing_symptom_degree: bool,
 ) -> CircuitResult<DetectorErrorModel> {
-    hyper::find_undetectable_logical_error(
+    stab_analysis::find_undetectable_logical_error(
         model,
         dont_explore_detection_event_sets_with_size_above,
         dont_explore_edges_with_degree_above,
         dont_explore_edges_increasing_symptom_degree,
     )
+    .map_err(Into::into)
 }
 
 pub fn find_undetectable_logical_error_with_limits(
@@ -84,13 +82,14 @@ pub fn find_undetectable_logical_error_with_limits(
     dont_explore_edges_increasing_symptom_degree: bool,
     limits: LogicalErrorSearchLimits,
 ) -> CircuitResult<DetectorErrorModel> {
-    hyper::find_undetectable_logical_error_with_limits(
+    stab_analysis::find_undetectable_logical_error_with_limits(
         model,
         dont_explore_detection_event_sets_with_size_above,
         dont_explore_edges_with_degree_above,
         dont_explore_edges_increasing_symptom_degree,
         limits,
     )
+    .map_err(Into::into)
 }
 
 #[cfg(test)]

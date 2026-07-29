@@ -2,7 +2,7 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::unwrap_used,
-    reason = "unit tests use direct assertions for compact diagnostics"
+    reason = "logical-search tests use direct assertions for compact diagnostics"
 )]
 
 use super::*;
@@ -68,7 +68,7 @@ fn find(
     dont_explore_detection_event_sets_with_size_above: usize,
     dont_explore_edges_with_degree_above: usize,
     dont_explore_edges_increasing_symptom_degree: bool,
-) -> CircuitResult<String> {
+) -> AnalysisResult<String> {
     let model = DetectorErrorModel::from_dem_str(dem)?;
     find_undetectable_logical_error(
         &model,

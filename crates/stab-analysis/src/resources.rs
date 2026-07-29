@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 pub enum ResourceOperation {
     CircuitFlatten,
     DetectorErrorModelFlatten,
+    LogicalErrorSearch,
     SatMaterialization,
 }
 
@@ -13,6 +14,7 @@ impl ResourceOperation {
         match self {
             Self::CircuitFlatten => "circuit-flatten",
             Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
+            Self::LogicalErrorSearch => "logical-error-search",
             Self::SatMaterialization => "sat-materialization",
         }
     }
@@ -30,6 +32,17 @@ pub enum ResourceKind {
     TargetOccurrences,
     ArgumentValues,
     ErrorMechanisms,
+    ErrorTargetOccurrencesPerMechanism,
+    TotalErrorTargetOccurrences,
+    EffectiveDetectorNodes,
+    UniqueGraphEdges,
+    StoredGraphTerms,
+    HyperedgeDegree,
+    HyperedgeIncidences,
+    SearchStates,
+    SearchTransitions,
+    SearchStateTerms,
+    StoredSearchStateTerms,
     Variables,
     Clauses,
     ClauseLiterals,
@@ -48,6 +61,17 @@ impl ResourceKind {
             Self::TargetOccurrences => "target-occurrences",
             Self::ArgumentValues => "argument-values",
             Self::ErrorMechanisms => "error-mechanisms",
+            Self::ErrorTargetOccurrencesPerMechanism => "error-target-occurrences-per-mechanism",
+            Self::TotalErrorTargetOccurrences => "total-error-target-occurrences",
+            Self::EffectiveDetectorNodes => "effective-detector-nodes",
+            Self::UniqueGraphEdges => "unique-graph-edges",
+            Self::StoredGraphTerms => "stored-graph-terms",
+            Self::HyperedgeDegree => "hyperedge-degree",
+            Self::HyperedgeIncidences => "hyperedge-incidences",
+            Self::SearchStates => "search-states",
+            Self::SearchTransitions => "search-transitions",
+            Self::SearchStateTerms => "search-state-terms",
+            Self::StoredSearchStateTerms => "stored-search-state-terms",
             Self::Variables => "variables",
             Self::Clauses => "clauses",
             Self::ClauseLiterals => "clause-literals",
@@ -69,6 +93,23 @@ pub(crate) enum SatMaterializationResource {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum LogicalErrorSearchResource {
+    RepeatCount,
+    ExpandedErrorMechanisms,
+    ErrorTargetOccurrencesPerMechanism,
+    TotalErrorTargetOccurrences,
+    EffectiveDetectorNodes,
+    UniqueGraphEdges,
+    StoredGraphTerms,
+    HyperedgeDegree,
+    HyperedgeIncidences,
+    SearchStates,
+    SearchTransitions,
+    SearchStateTerms,
+    StoredSearchStateTerms,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
     CircuitFlattenRepeatNesting,
     CircuitFlattenExpandedOperations,
@@ -87,6 +128,13 @@ enum ResourceLimitCause {
         resource: SatMaterializationResource,
     },
     SatTraversalRepeatIterations {
+        context: &'static str,
+    },
+    LogicalErrorSearch {
+        context: &'static str,
+        resource: LogicalErrorSearchResource,
+    },
+    LogicalErrorTraversalRepeatIterations {
         context: &'static str,
     },
 }
@@ -228,6 +276,31 @@ impl ResourceLimitError {
         }
     }
 
+    pub(crate) const fn logical_error_search(
+        context: &'static str,
+        resource: LogicalErrorSearchResource,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::LogicalErrorSearch { context, resource },
+            actual,
+            limit,
+        }
+    }
+
+    pub(crate) const fn logical_error_traversal_repeat_iterations(
+        context: &'static str,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::LogicalErrorTraversalRepeatIterations { context },
+            actual,
+            limit,
+        }
+    }
+
     pub const fn code(self) -> &'static str {
         "resource-limit-exceeded"
     }
@@ -254,6 +327,10 @@ impl ResourceLimitError {
             ResourceLimitCause::SatMaterialization { .. }
             | ResourceLimitCause::SatTraversalRepeatIterations { .. } => {
                 ResourceOperation::SatMaterialization
+            }
+            ResourceLimitCause::LogicalErrorSearch { .. }
+            | ResourceLimitCause::LogicalErrorTraversalRepeatIterations { .. } => {
+                ResourceOperation::LogicalErrorSearch
             }
         }
     }
@@ -288,6 +365,36 @@ impl ResourceLimitError {
                 SatMaterializationResource::OutputBytes => ResourceKind::OutputBytes,
             },
             ResourceLimitCause::SatTraversalRepeatIterations { .. } => {
+                ResourceKind::RepeatIterations
+            }
+            ResourceLimitCause::LogicalErrorSearch { resource, .. } => match resource {
+                LogicalErrorSearchResource::RepeatCount => ResourceKind::RepeatCount,
+                LogicalErrorSearchResource::ExpandedErrorMechanisms => {
+                    ResourceKind::ErrorMechanisms
+                }
+                LogicalErrorSearchResource::ErrorTargetOccurrencesPerMechanism => {
+                    ResourceKind::ErrorTargetOccurrencesPerMechanism
+                }
+                LogicalErrorSearchResource::TotalErrorTargetOccurrences => {
+                    ResourceKind::TotalErrorTargetOccurrences
+                }
+                LogicalErrorSearchResource::EffectiveDetectorNodes => {
+                    ResourceKind::EffectiveDetectorNodes
+                }
+                LogicalErrorSearchResource::UniqueGraphEdges => ResourceKind::UniqueGraphEdges,
+                LogicalErrorSearchResource::StoredGraphTerms => ResourceKind::StoredGraphTerms,
+                LogicalErrorSearchResource::HyperedgeDegree => ResourceKind::HyperedgeDegree,
+                LogicalErrorSearchResource::HyperedgeIncidences => {
+                    ResourceKind::HyperedgeIncidences
+                }
+                LogicalErrorSearchResource::SearchStates => ResourceKind::SearchStates,
+                LogicalErrorSearchResource::SearchTransitions => ResourceKind::SearchTransitions,
+                LogicalErrorSearchResource::SearchStateTerms => ResourceKind::SearchStateTerms,
+                LogicalErrorSearchResource::StoredSearchStateTerms => {
+                    ResourceKind::StoredSearchStateTerms
+                }
+            },
+            ResourceLimitCause::LogicalErrorTraversalRepeatIterations { .. } => {
                 ResourceKind::RepeatIterations
             }
         }
@@ -413,6 +520,78 @@ impl Display for ResourceLimitError {
                 ),
             },
             ResourceLimitCause::SatTraversalRepeatIterations { context } => write!(
+                formatter,
+                "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
+                self.limit, self.actual
+            ),
+            ResourceLimitCause::LogicalErrorSearch { context, resource } => match resource {
+                LogicalErrorSearchResource::RepeatCount => write!(
+                    formatter,
+                    "invalid detector error model: DEM {context} currently supports repeat counts up to {}, got {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::ExpandedErrorMechanisms => write!(
+                    formatter,
+                    "invalid detector error model: DEM {context} currently supports at most {} expanded nonzero error mechanisms, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::ErrorTargetOccurrencesPerMechanism => write!(
+                    formatter,
+                    "invalid detector error model: DEM {context} currently supports at most {} target occurrences per nonzero error mechanism, got {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::TotalErrorTargetOccurrences => write!(
+                    formatter,
+                    "invalid detector error model: DEM {context} currently supports at most {} total target occurrences across expanded nonzero error mechanisms, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::EffectiveDetectorNodes => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} effective detector nodes, got {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::UniqueGraphEdges => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} unique graph edges, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::StoredGraphTerms => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} stored graph payload terms, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::HyperedgeDegree => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports edges with at most {} detectors, got {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::HyperedgeIncidences => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} edge incidences, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::SearchStates => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} search states, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::SearchTransitions => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} search transitions, got at least {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::SearchStateTerms => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} detector and observable terms per search state, got {}",
+                    self.limit, self.actual
+                ),
+                LogicalErrorSearchResource::StoredSearchStateTerms => write!(
+                    formatter,
+                    "invalid detector error model: {context} currently supports at most {} stored detector and observable search-state terms, got at least {}",
+                    self.limit, self.actual
+                ),
+            },
+            ResourceLimitCause::LogicalErrorTraversalRepeatIterations { context } => write!(
                 formatter,
                 "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
                 self.limit, self.actual

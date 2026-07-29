@@ -1,23 +1,22 @@
-#![allow(
-    dead_code,
-    reason = "M10 hypergraph search internals are being landed in parity-tested slices before the full search algorithm consumes them"
-)]
-
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{Display, Formatter};
 
-use super::{
+use stab_model::{
     DemDetectorId, DemInstruction, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
+    Probability,
+};
+
+use super::{
     arena_index::ArenaIndex,
+    budget::{GraphConstructionBudget, LogicalErrorSearchLimits, SearchBudget},
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
         visit_search_graph_errors_with_limits,
     },
-    search_budget::{GraphConstructionBudget, LogicalErrorSearchLimits, SearchBudget},
     traversal::{FoldedDemTraversal, shifted_targets},
 };
 use crate::resources::LogicalErrorSearchResource;
-use crate::{CircuitError, CircuitResult, Probability, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 #[cfg(test)]
 const MAX_HYPERGRAPH_EDGE_DEGREE: usize = 64;
@@ -71,7 +70,7 @@ impl ObservableMask {
         }
     }
 
-    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> CircuitResult<()> {
+    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
         for observable in &self.observables {
             targets.push(DemTarget::logical_observable(observable.get())?);
         }
@@ -93,12 +92,12 @@ impl Edge {
         }
     }
 
-    fn term_count(&self) -> CircuitResult<usize> {
+    fn term_count(&self) -> AnalysisResult<usize> {
         self.detectors
             .len()
             .checked_add(self.observables.len())
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("hypergraph edge term count overflowed")
+                AnalysisError::invalid_detector_error_model("hypergraph edge term count overflowed")
             })
     }
 }
@@ -134,12 +133,12 @@ struct Node {
 }
 
 impl Node {
-    fn add_edge_id(&mut self, edge_id: usize) -> CircuitResult<bool> {
+    fn add_edge_id(&mut self, edge_id: usize) -> AnalysisResult<bool> {
         if self.edge_id_index.contains(&edge_id) {
             return Ok(false);
         }
         self.edge_ids.try_reserve(1).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "hypergraph search cannot allocate another edge incidence",
             )
         })?;
@@ -178,6 +177,7 @@ impl Eq for Graph {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum DetectorIndex {
+    #[cfg(test)]
     Identity,
     Sparse {
         node_to_detector: Vec<DemDetectorId>,
@@ -196,6 +196,7 @@ impl Graph {
         Self::new_with_limits(node_count, num_observables, limits)
     }
 
+    #[cfg(test)]
     fn new_with_limits(
         node_count: usize,
         num_observables: usize,
@@ -214,35 +215,12 @@ impl Graph {
         }
     }
 
-    fn try_new(node_count: usize, num_observables: usize) -> CircuitResult<Self> {
-        let mut nodes = Vec::new();
-        nodes.try_reserve_exact(node_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
-                "hypergraph search cannot allocate {node_count} detector nodes"
-            ))
-        })?;
-        nodes.resize(node_count, Node::default());
-        Ok(Self {
-            nodes,
-            edges: Vec::new(),
-            edge_index: ArenaIndex::new(),
-            edge_incidences: 0,
-            detector_index: DetectorIndex::Identity,
-            has_declared_detectors: node_count > 0,
-            num_observables,
-            distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new(
-                "hypergraph search",
-                LogicalErrorSearchLimits::default(),
-            ),
-        })
-    }
-
+    #[cfg(test)]
     fn try_new_sparse(
         detectors: BTreeSet<DemDetectorId>,
         num_observables: usize,
         has_declared_detectors: bool,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         Self::try_new_sparse_with_limits(
             detectors,
             num_observables,
@@ -256,11 +234,11 @@ impl Graph {
         num_observables: usize,
         has_declared_detectors: bool,
         limits: LogicalErrorSearchLimits,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
         nodes.try_reserve_exact(node_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "hypergraph search cannot allocate {node_count} sparse detector nodes"
             ))
         })?;
@@ -294,7 +272,7 @@ impl Graph {
         node_edges: Vec<Vec<Edge>>,
         num_observables: usize,
         distance_1_error_mask: ObservableMask,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let mut graph = Self::new(node_edges.len(), num_observables);
         graph.distance_1_error_mask = distance_1_error_mask;
         for (node_index, edges) in node_edges.into_iter().enumerate() {
@@ -304,7 +282,7 @@ impl Graph {
                     graph.construction_budget.admit_adjacency(2)?;
                 }
                 let node = graph.nodes.get_mut(node_index).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "hypergraph test node index is outside the graph",
                     )
                 })?;
@@ -316,9 +294,9 @@ impl Graph {
         Ok(graph)
     }
 
-    fn edge(&self, edge_id: usize) -> CircuitResult<&Edge> {
+    fn edge(&self, edge_id: usize) -> AnalysisResult<&Edge> {
         self.edges.get(edge_id).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "hypergraph edge index {edge_id} is outside the edge arena"
             ))
         })
@@ -328,7 +306,7 @@ impl Graph {
         &mut self,
         edge: Edge,
         adjacency_stored_terms: usize,
-    ) -> CircuitResult<(usize, bool)> {
+    ) -> AnalysisResult<(usize, bool)> {
         if let Some(edge_id) = self.edge_index.find(&edge, &self.edges) {
             return Ok((edge_id, false));
         }
@@ -336,7 +314,7 @@ impl Graph {
         let edge_id = self.edges.len();
         let stored_index_and_adjacency_terms =
             adjacency_stored_terms.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "hypergraph stored graph index count overflowed",
                 )
             })?;
@@ -346,7 +324,7 @@ impl Graph {
             stored_index_and_adjacency_terms,
         )?;
         self.edges.try_reserve(1).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "hypergraph search cannot allocate another edge",
             )
         })?;
@@ -359,11 +337,12 @@ impl Graph {
         Ok((edge_id, true))
     }
 
-    fn detector_for_node_index(&self, index: usize) -> CircuitResult<DemDetectorId> {
+    fn detector_for_node_index(&self, index: usize) -> AnalysisResult<DemDetectorId> {
         match &self.detector_index {
+            #[cfg(test)]
             DetectorIndex::Identity => {
                 let index = u64::try_from(index).map_err(|_| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "hypergraph node index does not fit detector id",
                     )
                 })?;
@@ -372,17 +351,18 @@ impl Graph {
             DetectorIndex::Sparse {
                 node_to_detector, ..
             } => node_to_detector.get(index).copied().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "hypergraph sparse node index {index} is outside the graph"
                 ))
             }),
         }
     }
 
-    fn node_index_for_detector(&self, detector: DemDetectorId) -> CircuitResult<usize> {
+    fn node_index_for_detector(&self, detector: DemDetectorId) -> AnalysisResult<usize> {
         match &self.detector_index {
+            #[cfg(test)]
             DetectorIndex::Identity => usize::try_from(detector.get()).map_err(|_| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "hypergraph detector D{} does not fit usize",
                     detector.get()
                 ))
@@ -390,7 +370,7 @@ impl Graph {
             DetectorIndex::Sparse {
                 detector_to_node, ..
             } => detector_to_node.get(&detector).copied().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "hypergraph detector D{} is outside the sparse graph",
                     detector.get()
                 ))
@@ -402,7 +382,7 @@ impl Graph {
         &mut self,
         targets: &[DemTarget],
         max_weight: usize,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let (detectors, observables) = toggled_dem_targets(targets)?;
         if detectors.is_empty() {
             if !observables.is_empty() {
@@ -432,7 +412,7 @@ impl Graph {
             .edge_incidences
             .checked_add(detectors.len())
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "hypergraph edge incidence count overflowed",
                 )
             })?;
@@ -448,7 +428,7 @@ impl Graph {
         }
 
         let adjacency_stored_terms = detectors.len().checked_mul(2).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "hypergraph stored edge incidence count overflowed",
             )
         })?;
@@ -459,14 +439,14 @@ impl Graph {
         for detector in detectors {
             let index = self.node_index_for_detector(detector)?;
             let Some(node) = self.nodes.get_mut(index) else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
+                return Err(AnalysisError::invalid_detector_error_model(format!(
                     "hypergraph detector D{} is outside the graph",
                     detector.get()
                 )));
             };
             let inserted = node.add_edge_id(edge_id)?;
             if !inserted {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "hypergraph search inserted a new edge into the same detector twice",
                 ));
             }
@@ -475,7 +455,8 @@ impl Graph {
         Ok(())
     }
 
-    fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> CircuitResult<Self> {
+    #[cfg(test)]
+    fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> AnalysisResult<Self> {
         Self::from_dem_with_limits(model, max_weight, LogicalErrorSearchLimits::default())
     }
 
@@ -483,7 +464,7 @@ impl Graph {
         model: &DetectorErrorModel,
         max_weight: usize,
         limits: LogicalErrorSearchLimits,
-    ) -> CircuitResult<Self> {
+    ) -> AnalysisResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
         let full_observable_count = traversal.root().summary().observable_count();
@@ -496,7 +477,7 @@ impl Graph {
             limits,
         )?;
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model("observable count does not fit usize")
+            AnalysisError::invalid_detector_error_model("observable count does not fit usize")
         })?;
         let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
@@ -561,12 +542,12 @@ impl SearchState {
         }
     }
 
-    fn term_count(&self) -> CircuitResult<usize> {
+    fn term_count(&self) -> AnalysisResult<usize> {
         self.detectors
             .len()
             .checked_add(self.observables.len())
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "hypergraph search state term count overflowed",
                 )
             })
@@ -576,7 +557,7 @@ impl SearchState {
         &self,
         next: &Self,
         out: &mut DetectorErrorModel,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let mut detector_targets = self.detectors.clone();
         for detector in &next.detectors {
             if !detector_targets.insert(*detector) {
@@ -615,12 +596,12 @@ impl Display for SearchState {
     }
 }
 
-pub(super) fn find_undetectable_logical_error(
+pub fn find_undetectable_logical_error(
     model: &DetectorErrorModel,
     dont_explore_detection_event_sets_with_size_above: usize,
     dont_explore_edges_with_degree_above: usize,
     dont_explore_edges_increasing_symptom_degree: bool,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     find_undetectable_logical_error_with_limits(
         model,
         dont_explore_detection_event_sets_with_size_above,
@@ -630,13 +611,13 @@ pub(super) fn find_undetectable_logical_error(
     )
 }
 
-pub(super) fn find_undetectable_logical_error_with_limits(
+pub fn find_undetectable_logical_error_with_limits(
     model: &DetectorErrorModel,
     dont_explore_detection_event_sets_with_size_above: usize,
     dont_explore_edges_with_degree_above: usize,
     dont_explore_edges_increasing_symptom_degree: bool,
     limits: LogicalErrorSearchLimits,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     if dont_explore_edges_with_degree_above == 2
         && dont_explore_detection_event_sets_with_size_above == 2
     {
@@ -676,7 +657,7 @@ pub(super) fn find_undetectable_logical_error_with_limits(
                 .len()
                 .checked_add(edge.observables.len())
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "hypergraph initial search state term count overflowed",
                     )
                 })?;
@@ -685,7 +666,7 @@ pub(super) fn find_undetectable_logical_error_with_limits(
             if !back_map.contains_key(&start) {
                 budget.admit_state(start_terms, 0, true)?;
                 if back_map.insert(start.clone(), empty.clone()).is_some() {
-                    return Err(CircuitError::invalid_detector_error_model(
+                    return Err(AnalysisError::invalid_detector_error_model(
                         "hypergraph initial search state was inserted twice",
                     ));
                 }
@@ -696,13 +677,13 @@ pub(super) fn find_undetectable_logical_error_with_limits(
 
     while let Some(current) = queue.pop_front() {
         let Some(active) = current.detectors.iter().next().copied() else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph search reached a state without an active detector",
             ));
         };
         let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph active detector is outside the graph",
             ));
         };
@@ -729,7 +710,7 @@ pub(super) fn find_undetectable_logical_error_with_limits(
                         .symmetric_difference_len(&edge.observables),
                 )
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "hypergraph next search state term count overflowed",
                     )
                 })?;
@@ -741,13 +722,13 @@ pub(super) fn find_undetectable_logical_error_with_limits(
             let undetected = next.is_undetected();
             budget.admit_state(next_terms, current_terms, !undetected)?;
             if back_map.insert(next.clone(), current.clone()).is_some() {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "hypergraph search state was inserted twice",
                 ));
             }
             if undetected {
                 if next.observables.is_empty() {
-                    return Err(CircuitError::invalid_detector_error_model(
+                    return Err(AnalysisError::invalid_detector_error_model(
                         "hypergraph search reached an empty logical state unexpectedly",
                     ));
                 }
@@ -757,7 +738,7 @@ pub(super) fn find_undetectable_logical_error_with_limits(
         }
     }
 
-    Err(CircuitError::invalid_detector_error_model(
+    Err(AnalysisError::invalid_detector_error_model(
         no_hypergraph_logical_error_message(model, &graph)?,
     ))
 }
@@ -765,12 +746,12 @@ pub(super) fn find_undetectable_logical_error_with_limits(
 fn backtrack_path(
     back_map: &BTreeMap<SearchState, SearchState>,
     final_state: &SearchState,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     let mut out = DetectorErrorModel::new();
     let mut current = final_state.clone();
     loop {
         let Some(previous) = back_map.get(&current) else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph search backtracking reached an unknown state",
             ));
         };
@@ -785,11 +766,11 @@ fn backtrack_path(
 
 fn sorted_error_model_with_cancelled_pairs(
     model: DetectorErrorModel,
-) -> CircuitResult<DetectorErrorModel> {
+) -> AnalysisResult<DetectorErrorModel> {
     let mut instructions = Vec::new();
     for item in model.items() {
         let DemItem::Instruction(instruction) = item else {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph search produced a repeat block unexpectedly",
             ));
         };
@@ -819,7 +800,7 @@ fn sorted_error_model_with_cancelled_pairs(
 fn no_hypergraph_logical_error_message(
     model: &DetectorErrorModel,
     graph: &Graph,
-) -> CircuitResult<String> {
+) -> AnalysisResult<String> {
     let mut message = String::from("Failed to find any logical errors.");
     if graph.num_observables == 0 {
         message.push_str(
@@ -841,7 +822,7 @@ fn no_hypergraph_logical_error_message(
 
 fn toggled_dem_targets(
     targets: &[DemTarget],
-) -> CircuitResult<(BTreeSet<DemDetectorId>, ObservableMask)> {
+) -> AnalysisResult<(BTreeSet<DemDetectorId>, ObservableMask)> {
     let mut detectors = BTreeSet::new();
     let mut observables = ObservableMask::new();
     for target in targets {
@@ -854,7 +835,7 @@ fn toggled_dem_targets(
             DemTarget::LogicalObservable(observable) => observables.toggle(observable),
             DemTarget::Separator => {}
             DemTarget::Numeric(_) => {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "hypergraph error targets cannot include numeric targets",
                 ));
             }

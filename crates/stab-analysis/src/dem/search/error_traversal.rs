@@ -1,23 +1,22 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
-use super::traversal::{
+use stab_model::advanced::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
     FoldedDemVisitor,
 };
-use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
-    search_budget::LogicalErrorSearchLimits,
-};
+use stab_model::{DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget};
+
+use super::budget::LogicalErrorSearchLimits;
 use crate::resources::LogicalErrorSearchResource;
-use crate::{CircuitError, CircuitResult, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 pub(in crate::dem) fn search_graph_nonzero_error_targets(
     traversal: &FoldedDemTraversal<'_>,
     context: &'static str,
     policy: SearchGraphTargetPolicy,
     limits: LogicalErrorSearchLimits,
-) -> CircuitResult<BTreeSet<DemDetectorId>> {
+) -> AnalysisResult<BTreeSet<DemDetectorId>> {
     let mut counts = DemErrorTargetCounts::new(limits.max_effective_detector_nodes());
     visit_search_graph_errors_with_limits(
         traversal,
@@ -40,9 +39,9 @@ pub(in crate::dem) fn visit_search_graph_errors_with_limits<F>(
     context: &'static str,
     limits: LogicalErrorSearchLimits,
     visit_error: F,
-) -> CircuitResult<()>
+) -> AnalysisResult<()>
 where
-    F: FnMut(&DemInstruction, u64) -> CircuitResult<()>,
+    F: FnMut(&DemInstruction, u64) -> AnalysisResult<()>,
 {
     traversal.validate_repeat_depth(context)?;
     let block_policies = SearchBlockPolicies::new(traversal.root());
@@ -69,15 +68,15 @@ struct SearchErrorVisitor<F> {
 
 impl<F> FoldedDemVisitor for SearchErrorVisitor<F>
 where
-    F: FnMut(&DemInstruction, u64) -> CircuitResult<()>,
+    F: FnMut(&DemInstruction, u64) -> AnalysisResult<()>,
 {
-    type Error = CircuitError;
+    type Error = AnalysisError;
 
     fn visit_instruction(
         &mut self,
         instruction: &DemInstruction,
         state: &DemTraversalState,
-    ) -> CircuitResult<ControlFlow<()>> {
+    ) -> AnalysisResult<ControlFlow<()>> {
         if instruction.kind() == DemInstructionKind::Error
             && instruction.args().first().copied().unwrap_or(0.0) != 0.0
         {
@@ -134,7 +133,7 @@ where
         repeat: &DemRepeatBlock,
         body: &FoldedDemBlock<'_>,
         _state: &DemTraversalState,
-    ) -> CircuitResult<DemRepeatSelection> {
+    ) -> AnalysisResult<DemRepeatSelection> {
         let policy = self.block_policies.policy_for(body)?;
         if !policy.has_nonzero_probability_error {
             return Ok(DemRepeatSelection::Skip);
@@ -164,21 +163,15 @@ where
         context: &'static str,
         actual: u64,
         limit: u64,
-    ) -> CircuitError {
-        ResourceLimitError::dem_traversal_repeat_iterations(
-            crate::ResourceOperation::LogicalErrorSearch,
-            context,
-            actual,
-            limit,
-        )
-        .into()
+    ) -> AnalysisError {
+        ResourceLimitError::logical_error_traversal_repeat_iterations(context, actual, limit).into()
     }
 }
 
 #[derive(Clone, Debug)]
 struct SearchBlockPolicy {
     has_nonzero_probability_error: bool,
-    compact_error_count: CircuitResult<Option<u64>>,
+    compact_error_count: AnalysisResult<Option<u64>>,
 }
 
 #[derive(Debug)]
@@ -193,9 +186,9 @@ impl SearchBlockPolicies {
         Self { by_block }
     }
 
-    fn policy_for(&self, block: &FoldedDemBlock<'_>) -> CircuitResult<&SearchBlockPolicy> {
+    fn policy_for(&self, block: &FoldedDemBlock<'_>) -> AnalysisResult<&SearchBlockPolicy> {
         self.by_block.get(&block.compact_id()).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "DEM search compact policy is missing a folded block",
             )
         })
@@ -241,7 +234,7 @@ fn summarize_search_block_policy(
                         return Ok(None);
                     }
                     count.checked_add(child_count).map(Some).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
+                        AnalysisError::invalid_detector_error_model(
                             "DEM search compact-repeat error count overflowed",
                         )
                     })
@@ -258,7 +251,7 @@ fn summarize_search_block_policy(
     policy
 }
 
-fn active_compact_count(count: &CircuitResult<Option<u64>>) -> Option<u64> {
+fn active_compact_count(count: &AnalysisResult<Option<u64>>) -> Option<u64> {
     match count {
         Ok(Some(count)) => Some(*count),
         Ok(None) | Err(_) => None,
@@ -268,7 +261,7 @@ fn active_compact_count(count: &CircuitResult<Option<u64>>) -> Option<u64> {
 fn update_search_instruction_count(
     count: u64,
     instruction: &DemInstruction,
-) -> CircuitResult<Option<u64>> {
+) -> AnalysisResult<Option<u64>> {
     match instruction.kind() {
         DemInstructionKind::Error => {
             if instruction.args().first().copied().unwrap_or(0.0) == 0.0 {
@@ -293,13 +286,13 @@ fn update_search_instruction_count(
                 return Ok(Some(count));
             }
             count.checked_add(1).map(Some).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "DEM search compact-repeat error count overflowed",
                 )
             })
         }
         DemInstructionKind::ShiftDetectors
-            if crate::dem::dem_instruction_detector_shift(instruction)? == 0 =>
+            if stab_model::advanced::dem_instruction_detector_shift(instruction)? == 0 =>
         {
             Ok(Some(count))
         }
@@ -308,8 +301,8 @@ fn update_search_instruction_count(
     }
 }
 
-fn traversal_error(context: &'static str, message: &'static str) -> CircuitError {
-    CircuitError::invalid_detector_error_model(format!("DEM {context} {message}"))
+fn traversal_error(context: &'static str, message: &'static str) -> AnalysisError {
+    AnalysisError::invalid_detector_error_model(format!("DEM {context} {message}"))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -325,7 +318,7 @@ impl SearchGraphTargetPolicy {
         detector_offset: u64,
         context: &'static str,
         counts: &mut DemErrorTargetCounts,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         match self {
             SearchGraphTargetPolicy::Graphlike {
                 ignore_ungraphlike_errors,
@@ -353,7 +346,7 @@ fn include_graphlike_error_targets(
     ignore_ungraphlike_errors: bool,
     context: &'static str,
     counts: &mut DemErrorTargetCounts,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if ignore_ungraphlike_errors
         && targets
             .iter()
@@ -366,7 +359,7 @@ fn include_graphlike_error_targets(
     for (index, target) in targets.iter().enumerate() {
         if matches!(target, DemTarget::Separator) {
             let component = targets.get(start..index).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "graphlike target component range is invalid",
                 )
             })?;
@@ -381,7 +374,7 @@ fn include_graphlike_error_targets(
         }
     }
     let component = targets.get(start..).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model("graphlike target component range is invalid")
+        AnalysisError::invalid_detector_error_model("graphlike target component range is invalid")
     })?;
     include_graphlike_target_component(
         component,
@@ -398,7 +391,7 @@ fn include_graphlike_target_component(
     ignore_ungraphlike_errors: bool,
     context: &'static str,
     counts: &mut DemErrorTargetCounts,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let mut detectors = Vec::new();
     for target in targets {
         if let DemTarget::RelativeDetector(detector) = *target {
@@ -406,7 +399,7 @@ fn include_graphlike_target_component(
                 if ignore_ungraphlike_errors {
                     return Ok(());
                 }
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
                 ));
             }
@@ -426,7 +419,7 @@ fn include_hypergraph_error_targets(
     max_weight: usize,
     context: &'static str,
     counts: &mut DemErrorTargetCounts,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let mut detectors = BTreeSet::new();
     for target in targets {
         match *target {
@@ -438,7 +431,7 @@ fn include_hypergraph_error_targets(
             }
             DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
             DemTarget::Numeric(_) => {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "hypergraph error targets cannot include numeric targets",
                 ));
             }
@@ -454,9 +447,12 @@ fn include_hypergraph_error_targets(
     Ok(())
 }
 
-fn shifted_detector(detector: DemDetectorId, detector_offset: u64) -> CircuitResult<DemDetectorId> {
+fn shifted_detector(
+    detector: DemDetectorId,
+    detector_offset: u64,
+) -> AnalysisResult<DemDetectorId> {
     let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model("DEM nonzero-error detector target overflowed")
+        AnalysisError::invalid_detector_error_model("DEM nonzero-error detector target overflowed")
     })?;
     DemDetectorId::try_new(detector_id).map_err(Into::into)
 }
@@ -479,12 +475,12 @@ impl DemErrorTargetCounts {
         &mut self,
         detector: DemDetectorId,
         context: &'static str,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         if self.detectors.contains(&detector) {
             return Ok(());
         }
         let next = self.detectors.len().checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{context} effective detector node count overflowed"
             ))
         })?;
@@ -495,7 +491,7 @@ impl DemErrorTargetCounts {
         Ok(())
     }
 
-    fn too_many_detectors_error(&self, context: &'static str, actual: usize) -> CircuitError {
+    fn too_many_detectors_error(&self, context: &'static str, actual: usize) -> AnalysisError {
         ResourceLimitError::logical_error_search(
             context,
             LogicalErrorSearchResource::EffectiveDetectorNodes,
@@ -515,7 +511,7 @@ mod tests {
     )]
 
     use super::*;
-    use crate::DetectorErrorModel;
+    use stab_model::DetectorErrorModel;
     use std::cell::Cell;
 
     #[test]
@@ -544,8 +540,8 @@ mod tests {
         let model = DetectorErrorModel::from_dem_str("error(0.1) D0\n").unwrap();
         let traversal = FoldedDemTraversal::new(&model).unwrap();
         let instruction = match model.items().first().expect("fixture has one item") {
-            super::super::DemItem::Instruction(instruction) => instruction,
-            super::super::DemItem::RepeatBlock(_) => {
+            stab_model::DemItem::Instruction(instruction) => instruction,
+            stab_model::DemItem::RepeatBlock(_) => {
                 unreachable!("fixture contains one instruction")
             }
         };
@@ -557,7 +553,7 @@ mod tests {
             visited_error_mechanisms: u64::MAX,
             visited_target_occurrences: 0,
             block_policies: SearchBlockPolicies::new(traversal.root()),
-            visit_error: |_: &DemInstruction, _: u64| -> CircuitResult<()> {
+            visit_error: |_: &DemInstruction, _: u64| -> AnalysisResult<()> {
                 forwarded.set(forwarded.get() + 1);
                 Ok(())
             },
@@ -580,7 +576,7 @@ mod tests {
             visited_error_mechanisms: 0,
             visited_target_occurrences: usize::MAX,
             block_policies: SearchBlockPolicies::new(traversal.root()),
-            visit_error: |_: &DemInstruction, _: u64| -> CircuitResult<()> {
+            visit_error: |_: &DemInstruction, _: u64| -> AnalysisResult<()> {
                 forwarded.set(forwarded.get() + 1);
                 Ok(())
             },

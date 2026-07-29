@@ -59,11 +59,14 @@ pub use circuit_transforms::{
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
 pub use dem::{
-    DemFlattenLimits, SatMaterializationLimits, detector_error_model_without_tags,
-    flattened_detector_error_model, flattened_detector_error_model_with_limits,
-    likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
-    rounded_detector_error_model, shortest_error_sat_problem,
-    shortest_error_sat_problem_with_limits,
+    DemFlattenLimits, LogicalErrorSearchLimits, SatMaterializationLimits,
+    detector_error_model_without_tags, find_undetectable_logical_error,
+    find_undetectable_logical_error_with_limits, flattened_detector_error_model,
+    flattened_detector_error_model_with_limits, likeliest_error_sat_problem,
+    likeliest_error_sat_problem_with_limits, rounded_detector_error_model,
+    shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
+    shortest_graphlike_undetectable_logical_error,
+    shortest_graphlike_undetectable_logical_error_with_limits,
 };
 pub use error::{AnalysisError, AnalysisResult};
 pub use gate::{

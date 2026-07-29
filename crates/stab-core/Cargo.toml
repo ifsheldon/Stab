@@ -12,7 +12,6 @@ workspace = true
 
 [dependencies]
 arrayvec = { workspace = true }
-hashbrown = { workspace = true }
 hex = { workspace = true }
 num-complex = { workspace = true }
 rand = { workspace = true }
