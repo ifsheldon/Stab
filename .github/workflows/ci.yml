@@ -39,6 +39,12 @@ jobs:
           just architecture::check
           just architecture::consumer-check
 
+      - name: Stable component tests
+        run: cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine --all-targets
+
+      - name: Portable SIMD component tests
+        run: cargo test --locked -p stab-bits -p stab-algebra --no-default-features --features portable-simd
+
       - name: Format
         run: cargo fmt --all --check
 
