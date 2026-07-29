@@ -51,6 +51,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Public API documentation
+        run: just docs::api-check
+
       - name: Test
         run: cargo test --workspace
 
