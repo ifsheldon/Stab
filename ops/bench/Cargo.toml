@@ -9,7 +9,7 @@ homepage.workspace = true
 publish = false
 
 [features]
-default = ["portable-simd"]
+default = []
 count-allocations = ["dep:allocation-counter"]
 portable-simd = ["stab-cli/portable-simd", "stab-core/portable-simd"]
 

@@ -25,17 +25,17 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     },
     FeatureContract {
         package: "stab-cli",
-        default: &["portable-simd"],
+        default: &[],
         portable: &["stab-core/portable-simd"],
     },
     FeatureContract {
         package: "stab-oracle",
-        default: &["portable-simd"],
+        default: &[],
         portable: &["stab-core/portable-simd"],
     },
     FeatureContract {
         package: "stab-bench",
-        default: &["portable-simd"],
+        default: &[],
         portable: &["stab-cli/portable-simd", "stab-core/portable-simd"],
     },
 ];

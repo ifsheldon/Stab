@@ -224,7 +224,7 @@ The facade does not retain implementation modules after their owner moves.
 | `stab-analysis` | Stable | No SIMD feature. |
 | `stab-engine` | Scalar | Does not depend on the raw kernel crate and keeps explicit `PortableSimd` requests unavailable until a later packed-frame implementation supplies a distinct execution plan. |
 | `stab-core` | Scalar by default | Forwards the additive feature to bits and algebra only; it does not reinterpret build-time leaf acceleration as sampling-backend selection. |
-| `stab-cli`, `stab-oracle`, `stab-bench` | Nightly consumer | Explicitly enable `stab-core/portable-simd`; they do not rely on another package to unify it. |
+| `stab-cli`, `stab-oracle`, `stab-bench` | Scalar by default | Expose an explicit `portable-simd` feature that forwards to `stab-core`; current qualification builds select scalar explicitly and the A6 diagnostic selects each variant independently. |
 
 There is no `scalar` feature. Scalar behavior is defined by the absence of `portable-simd`.
 

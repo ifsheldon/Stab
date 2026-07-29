@@ -12,7 +12,7 @@ publish = false
 workspace = true
 
 [features]
-default = ["portable-simd"]
+default = []
 portable-simd = ["stab-core/portable-simd"]
 
 [dependencies]

@@ -1,7 +1,7 @@
 # Contributing to Stab
 
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and current scalar `stab-engine` packages form a Stable Rust 1.97.1 component stack. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
+The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and current scalar `stab-engine` packages form a Stable Rust 1.97.1 component stack. The CLI and operational binaries also default to scalar behavior. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
 
 Check the Stable component directly with:
 

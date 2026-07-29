@@ -78,6 +78,8 @@ const WORKER_SOURCES: [(&str, &str); 14] = [
 const FINGERPRINT_PLACEHOLDER: &str = "$FINGERPRINT";
 const RUNTIME_PLACEHOLDER: &str = "$RUNTIME";
 const SOURCE_PLACEHOLDER: &str = "$SOURCE";
+pub(in crate::qualification::runtime) const CURRENT_STAB_BUILD_VARIANT: StabBuildVariant =
+    StabBuildVariant::Scalar;
 
 #[derive(Debug)]
 pub(super) struct StabWorkerExecutable {
@@ -98,7 +100,7 @@ impl StabWorkerExecutable {
             root,
             repository_commit,
             toolchain,
-            StabBuildVariant::PortableSimd,
+            CURRENT_STAB_BUILD_VARIANT,
         )
     }
 
@@ -807,6 +809,15 @@ mod tests {
             .recomputed_build_fingerprint()
             .expect("portable fingerprint");
         assert_ne!(scalar_fingerprint, portable_fingerprint);
+    }
+
+    #[test]
+    fn current_qualification_build_is_explicitly_scalar() {
+        assert_eq!(CURRENT_STAB_BUILD_VARIANT, StabBuildVariant::Scalar);
+        assert_eq!(
+            normalized_build_arguments(CURRENT_STAB_BUILD_VARIANT),
+            normalized_build_arguments(StabBuildVariant::Scalar)
+        );
     }
 
     #[test]

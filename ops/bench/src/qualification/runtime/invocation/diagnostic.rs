@@ -53,7 +53,7 @@ impl PreparedDiagnosticWorker {
             root,
             repository_commit,
             toolchain,
-            super::super::stab_build::StabBuildVariant::PortableSimd,
+            super::super::stab_build::CURRENT_STAB_BUILD_VARIANT,
         )
     }
 
