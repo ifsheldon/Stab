@@ -433,3 +433,50 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             && selector.value.as_slice() == ["pf4-dem-folded-traversal"]
     }));
 }
+
+#[test]
+fn implemented_bits_and_algebra_apis_execute_their_canonical_packages() {
+    let root = RepoRoot {
+        path: Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("workspace root")
+            .to_path_buf(),
+    };
+    let manifest = generate(&root).expect("generated qualification manifest");
+
+    for item in &manifest.public_api_items {
+        let expected_package = match item.crate_name.as_str() {
+            "stab_bits" => "stab-bits",
+            "stab_algebra" => "stab-algebra",
+            _ => continue,
+        };
+        let owner = manifest
+            .evidence_cases
+            .iter()
+            .find(|case| case.id == item.owner_case_id)
+            .expect("public API owner case");
+        if owner.status != EvidenceStatus::Implemented {
+            continue;
+        }
+
+        assert_eq!(
+            owner.primary_selector.kind,
+            SelectorKind::CargoTest,
+            "{} is implemented by a non-Cargo selector {}",
+            item.path,
+            owner.source_id
+        );
+        assert!(
+            owner
+                .primary_selector
+                .value
+                .windows(2)
+                .any(|pair| pair == ["-p", expected_package]),
+            "{} is implemented by {} instead of canonical package {}",
+            item.path,
+            owner.primary_selector.value.join(" "),
+            expected_package
+        );
+    }
+}

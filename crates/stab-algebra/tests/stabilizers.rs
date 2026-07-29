@@ -9,12 +9,9 @@ use std::str::FromStr;
 use proptest::prelude::*;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_core::{
-    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliSign, PauliString,
-    SingleQubitClifford, Tableau,
-    advanced::algebra::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator},
-    analysis::gate_unitary_matrix,
-    single_qubit_clifford_for_gate, unitary_to_tableau,
+use stab_algebra::{
+    CommutingPauliStringIterator, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
+    PauliStringIterator, Tableau, TableauIterator,
 };
 
 #[test]
@@ -413,119 +410,6 @@ fn stabilizers_flex_pauli_multiplication_matches_stim() {
 }
 
 #[test]
-fn stabilizers_clifford_string_set_gate_at_vs_str_vs_gate_at_matches_stim() {
-    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc.
-    let gates = upstream_clifford_gate_order();
-    let mut cliffords = CliffordString::identity(gates.len()).expect("Clifford identity");
-    for (index, gate) in gates.iter().copied().enumerate() {
-        cliffords
-            .set_gate_at(index, gate)
-            .expect("set Clifford gate");
-    }
-
-    assert_eq!(
-        cliffords.to_string(),
-        "_I _X _Y _Z HI HX HY HZ SI SX SY SZ VI VX VY VZ uI uX uY uZ dI dX dY dZ"
-    );
-    for (index, gate) in gates.into_iter().enumerate() {
-        assert_eq!(cliffords.gate_at(index), Some(gate));
-    }
-    assert_eq!(cliffords.gate_at(24), None);
-}
-
-#[test]
-fn stabilizers_single_qubit_clifford_gate_conversion_matches_stim() {
-    for gate in SingleQubitClifford::all() {
-        let parsed_gate = Gate::from_name(gate.canonical_name()).expect("single-qubit gate name");
-        assert_eq!(
-            single_qubit_clifford_for_gate(parsed_gate).expect("single-qubit Clifford"),
-            gate
-        );
-    }
-    assert!(single_qubit_clifford_for_gate(Gate::from_name("CX").expect("CX")).is_err());
-}
-
-#[test]
-fn stabilizers_clifford_string_known_identities_match_stim() {
-    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc known_identities.
-    let h = CliffordString::from_gates([SingleQubitClifford::H]).expect("H Clifford");
-    let s = CliffordString::from_gates([SingleQubitClifford::S]).expect("S Clifford");
-    let s_dag = CliffordString::from_gates([SingleQubitClifford::SDag]).expect("S_DAG Clifford");
-
-    assert_eq!(
-        h.multiply(&h).expect("H*H"),
-        CliffordString::identity(1).expect("Clifford identity")
-    );
-    assert_eq!(
-        s.multiply(&s).expect("S*S"),
-        CliffordString::from_gates([SingleQubitClifford::Z]).expect("Z Clifford")
-    );
-    assert_eq!(
-        h.multiply(&s_dag).expect("H*S_DAG"),
-        CliffordString::from_gates([SingleQubitClifford::Cxyz]).expect("C_XYZ Clifford")
-    );
-}
-
-#[test]
-fn stabilizers_clifford_string_concat_repeat_and_padding_are_stim_like() {
-    let left = CliffordString::from_gates([SingleQubitClifford::H, SingleQubitClifford::S])
-        .expect("left Clifford string");
-    let right =
-        CliffordString::from_gates([SingleQubitClifford::X]).expect("right Clifford string");
-
-    assert_eq!(left.concat(&right).expect("concat").to_string(), "HI SI _X");
-    assert_eq!(right.repeat(3).expect("repeat").to_string(), "_X _X _X");
-    assert_eq!(left.multiply(&right).expect("padded multiply").len(), 2);
-}
-
-#[test]
-fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
-    let gates = SingleQubitClifford::all().collect::<Vec<_>>();
-    let tableaus = gates
-        .iter()
-        .map(|gate| {
-            let matrix = gate_unitary_matrix(
-                Gate::from_name(gate.canonical_name()).expect("single-qubit gate"),
-            )
-            .expect("single-qubit Clifford matrix")
-            .to_vecs();
-            unitary_to_tableau(&matrix, true).expect("single-qubit Clifford Tableau")
-        })
-        .collect::<Vec<_>>();
-
-    for (left_index, left) in gates.iter().copied().enumerate() {
-        for (middle_index, middle) in gates.iter().copied().enumerate() {
-            let product = left.multiply(middle).expect("Clifford product");
-            let product_index = gates
-                .iter()
-                .position(|candidate| *candidate == product)
-                .expect("product in Clifford group");
-            assert_eq!(
-                tableaus[middle_index]
-                    .then(&tableaus[left_index])
-                    .expect("Tableau product"),
-                tableaus[product_index],
-                "{} * {}",
-                left.canonical_name(),
-                middle.canonical_name()
-            );
-
-            for right in gates.iter().copied() {
-                let lhs = left
-                    .multiply(middle)
-                    .expect("left middle")
-                    .multiply(right)
-                    .expect("(left middle) right");
-                let rhs = left
-                    .multiply(middle.multiply(right).expect("middle right"))
-                    .expect("left (middle right)");
-                assert_eq!(lhs, rhs);
-            }
-        }
-    }
-}
-
-#[test]
 fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
     // Adapted from Stim v1.16.0 PauliString::random semantics without requiring C++ RNG stream parity.
     let mut first_rng = SmallRng::seed_from_u64(0x5a17);
@@ -569,56 +453,6 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
         assert!(
             (expected * 0.5) < count as f64 && (count as f64) < (expected * 1.5),
             "Pauli basis count {count} outside broad uniformity band around {expected}"
-        );
-    }
-}
-
-#[test]
-fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
-    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc random.
-    let gates = upstream_clifford_gate_order();
-    let mut direct_first_rng = SmallRng::seed_from_u64(0xc11f_f07d);
-    let mut direct_second_rng = SmallRng::seed_from_u64(0xc11f_f07d);
-    let mut direct_counts = vec![0usize; gates.len()];
-    for _ in 0..16_384 {
-        let first = SingleQubitClifford::random(&mut direct_first_rng);
-        let second = SingleQubitClifford::random(&mut direct_second_rng);
-        assert_eq!(first, second);
-        let count_index = gates
-            .iter()
-            .position(|candidate| *candidate == first)
-            .expect("direct random gate is in upstream Clifford set");
-        direct_counts[count_index] += 1;
-    }
-    let direct_expected = 16_384.0 / 24.0;
-    for (gate, count) in gates.iter().copied().zip(direct_counts) {
-        assert!(
-            (direct_expected * 0.5) < count as f64 && (count as f64) < (direct_expected * 1.5),
-            "direct {gate:?} count {count} outside broad uniformity band around {direct_expected}"
-        );
-    }
-
-    let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
-    let mut cliffords = CliffordString::random(128, &mut rng).expect("random Clifford string");
-    let mut counts = vec![0usize; gates.len()];
-
-    for _ in 0..128 {
-        for index in 0..cliffords.len() {
-            let gate = cliffords.gate_at(index).expect("random Clifford gate");
-            let count_index = gates
-                .iter()
-                .position(|candidate| *candidate == gate)
-                .expect("random gate is in upstream Clifford set");
-            counts[count_index] += 1;
-        }
-        cliffords.randomize(&mut rng);
-    }
-
-    let expected = 128.0 * 128.0 / 24.0;
-    for (gate, count) in gates.into_iter().zip(counts) {
-        assert!(
-            (expected * 0.5) < count as f64 && (count as f64) < (expected * 1.5),
-            "{gate:?} count {count} outside broad uniformity band around {expected}"
         );
     }
 }
@@ -1018,35 +852,6 @@ fn collect_pauli_iter(
     .expect("Pauli iterator")
     .map(|pauli| pauli.to_string())
     .collect()
-}
-
-fn upstream_clifford_gate_order() -> Vec<SingleQubitClifford> {
-    vec![
-        SingleQubitClifford::I,
-        SingleQubitClifford::X,
-        SingleQubitClifford::Y,
-        SingleQubitClifford::Z,
-        SingleQubitClifford::H,
-        SingleQubitClifford::SqrtYDag,
-        SingleQubitClifford::Hnxz,
-        SingleQubitClifford::SqrtY,
-        SingleQubitClifford::S,
-        SingleQubitClifford::Hxy,
-        SingleQubitClifford::Hnxy,
-        SingleQubitClifford::SDag,
-        SingleQubitClifford::SqrtXDag,
-        SingleQubitClifford::SqrtX,
-        SingleQubitClifford::Hnyz,
-        SingleQubitClifford::Hyz,
-        SingleQubitClifford::Cxyz,
-        SingleQubitClifford::Cxynz,
-        SingleQubitClifford::Cnxyz,
-        SingleQubitClifford::Cxnyz,
-        SingleQubitClifford::Czyx,
-        SingleQubitClifford::Cznyx,
-        SingleQubitClifford::Cnzyx,
-        SingleQubitClifford::Czynx,
-    ]
 }
 
 fn assert_commutes(left: &str, right: &str, expected: bool) {

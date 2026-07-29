@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use stab_core::advanced::storage::{
+use stab_bits::{
     self as bits, BIT_BLOCK_WORDS, BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec,
     SparseXorVec,
 };

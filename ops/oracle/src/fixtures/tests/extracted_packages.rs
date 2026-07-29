@@ -32,6 +32,36 @@ fn result_format_fixtures_execute_the_canonical_records_package() {
 }
 
 #[test]
+fn bit_fixtures_execute_the_canonical_bits_package() {
+    const BIT_FIXTURES: [&str; 4] = [
+        "coverage-mem-simd-bit-table",
+        "coverage-mem-simd-bits",
+        "coverage-mem-simd-bits-range-ref",
+        "coverage-mem-sparse-xor-vec",
+    ];
+
+    assert_fixtures_execute_package(&BIT_FIXTURES, "stab-bits");
+}
+
+#[test]
+fn algebra_fixtures_execute_the_canonical_algebra_package() {
+    const ALGEBRA_FIXTURES: [&str; 10] = [
+        "coverage-stabilizers-clifford-string",
+        "coverage-stabilizers-flex-pauli-string",
+        "coverage-stabilizers-flow",
+        "coverage-stabilizers-pauli-string",
+        "coverage-stabilizers-pauli-string-iter",
+        "coverage-stabilizers-pauli-string-ref",
+        "coverage-stabilizers-tableau",
+        "coverage-stabilizers-tableau-iter",
+        "coverage-util-top-stabilizers-to-tableau",
+        "coverage-util-top-stabilizers-vs-amplitudes",
+    ];
+
+    assert_fixtures_execute_package(&ALGEBRA_FIXTURES, "stab-algebra");
+}
+
+#[test]
 fn model_fixtures_execute_the_canonical_model_package() {
     const MODEL_FIXTURES: [&str; 2] =
         ["coverage-gates-gates", "coverage-util-bot-probability-util"];

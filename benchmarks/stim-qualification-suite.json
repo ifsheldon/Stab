@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "75d55ffc3e39bc37ff99fe2d2cf166aa7765c19911e8b22968e7a0e81b6cfb99",
-  "semantic_digest": "fd5c7e5467758824100c36bd6c3898ef286f0cf9741f002ff3bd03f2140ae247",
+  "correctness_digest": "55c63ce8db4e36a4264481512338a28a1171e2629aa7ee596a96422a83a9a9ba",
+  "semantic_digest": "d1c23e90c4c5fbae8536d876b5c0119cd8212bc17b895ccb542489d31aec0401",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -14807,7 +14807,7 @@
       "kind": "function",
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "correctness_case_id": "cq-evidence-qualification-cb86d5db7b4cb287",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -15111,7 +15111,7 @@
       "kind": "function",
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "correctness_case_id": "cq-evidence-qualification-cb86d5db7b4cb287",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -51154,7 +51154,7 @@
       "kind": "function",
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "correctness_case_id": "cq-evidence-qualification-cb86d5db7b4cb287",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -56971,7 +56971,7 @@
       "kind": "function",
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-18755da17912481c",
+      "correctness_case_id": "cq-evidence-qualification-cb86d5db7b4cb287",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

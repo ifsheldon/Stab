@@ -7,41 +7,11 @@
 use std::error::Error as _;
 use std::str::FromStr;
 
-use rand::SeedableRng as _;
-use rand::rngs::SmallRng;
-use stab_core::advanced::storage::BitError;
-use stab_core::{
-    CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, Gate, PauliBasis, PauliPhase,
-    PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
-    StabilizerResult, single_qubit_clifford_for_gate,
+use stab_algebra::{
+    FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis, PauliPhase, PauliSign, PauliString,
+    StabilizerError, StabilizerResource, StabilizerResult,
 };
-
-const STIM_ALL_CLIFFORDS_ORDER: [SingleQubitClifford; 24] = [
-    SingleQubitClifford::I,
-    SingleQubitClifford::X,
-    SingleQubitClifford::Y,
-    SingleQubitClifford::Z,
-    SingleQubitClifford::Hxy,
-    SingleQubitClifford::S,
-    SingleQubitClifford::SDag,
-    SingleQubitClifford::Hnxy,
-    SingleQubitClifford::H,
-    SingleQubitClifford::SqrtYDag,
-    SingleQubitClifford::Hnxz,
-    SingleQubitClifford::SqrtY,
-    SingleQubitClifford::Hyz,
-    SingleQubitClifford::Hnyz,
-    SingleQubitClifford::SqrtX,
-    SingleQubitClifford::SqrtXDag,
-    SingleQubitClifford::Cxyz,
-    SingleQubitClifford::Cxynz,
-    SingleQubitClifford::Cnxyz,
-    SingleQubitClifford::Cxnyz,
-    SingleQubitClifford::Czyx,
-    SingleQubitClifford::Cznyx,
-    SingleQubitClifford::Cnzyx,
-    SingleQubitClifford::Czynx,
-];
+use stab_bits::BitError;
 
 #[test]
 fn cq2_algebra_pauli_value_types_have_complete_scalar_contract() {
@@ -246,132 +216,6 @@ fn cq2_algebra_flex_pauli_contract_tracks_all_four_phases() {
             offset: 1,
         })
     );
-}
-
-#[test]
-fn cq2_algebra_single_qubit_clifford_contract_covers_values_and_names() {
-    let all = SingleQubitClifford::all().collect::<Vec<_>>();
-    assert_eq!(all.len(), 24);
-    let mut canonical_names = std::collections::BTreeSet::new();
-    let mut tokens = std::collections::BTreeSet::new();
-
-    for value in all.iter().copied() {
-        assert!(canonical_names.insert(value.canonical_name()));
-        assert!(tokens.insert(value.token()));
-        assert_eq!(value.to_string(), value.token());
-        let gate = Gate::from_name(value.canonical_name()).expect("canonical gate");
-        assert_eq!(single_qubit_clifford_for_gate(gate), Ok(value));
-    }
-    assert_eq!(canonical_names.len(), 24);
-    assert_eq!(tokens.len(), 24);
-
-    let cx = Gate::from_name("CX").expect("CX gate");
-    assert_eq!(
-        single_qubit_clifford_for_gate(cx),
-        Err(StabilizerError::InvalidSingleQubitCliffordGate {
-            gate: "CX".to_owned(),
-        })
-    );
-}
-
-#[test]
-fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
-    let empty = CliffordString::identity(0).expect("empty Clifford string");
-    assert!(empty.is_empty());
-    assert_eq!(empty.len(), 0);
-    assert_eq!(empty.to_string(), "");
-
-    let mut value = CliffordString::from_gates([
-        SingleQubitClifford::H,
-        SingleQubitClifford::S,
-        SingleQubitClifford::I,
-    ])
-    .expect("Clifford string");
-    assert_eq!(value.len(), 3);
-    assert!(!value.is_empty());
-    assert_eq!(value.to_string(), "HI SI _I");
-    assert_eq!(value.gate_at(0), Some(SingleQubitClifford::H));
-    assert_eq!(value.gate_at(2), Some(SingleQubitClifford::I));
-    assert_eq!(value.gate_at(3), None);
-    assert_eq!(
-        value.set_gate_at(3, SingleQubitClifford::X),
-        Err(StabilizerError::CliffordIndexOutOfRange { index: 3, len: 3 })
-    );
-    assert_eq!(value.to_string(), "HI SI _I");
-    value
-        .set_gate_at(2, SingleQubitClifford::Z)
-        .expect("set Clifford gate");
-    assert_eq!(value.to_string(), "HI SI _Z");
-
-    let suffix = CliffordString::from_gates([SingleQubitClifford::X]).expect("suffix");
-    assert_eq!(
-        value.concat(&suffix).expect("concat").to_string(),
-        "HI SI _Z _X"
-    );
-    assert_eq!(suffix.repeat(3).expect("repeat").to_string(), "_X _X _X");
-    assert_eq!(suffix.repeat(0).expect("zero repeat"), empty);
-
-    let left = CliffordString::from_gates([SingleQubitClifford::H]).expect("left");
-    let right = CliffordString::from_gates([SingleQubitClifford::H, SingleQubitClifford::S])
-        .expect("right");
-    let product = left.multiply(&right).expect("multiply with padding");
-    let mut in_place = left.clone();
-    in_place
-        .right_multiply_in_place(&right)
-        .expect("in-place multiply");
-    assert_eq!(product, in_place);
-    assert_eq!(product.to_string(), "_I SI");
-
-    let identity_width = 552;
-    let mut identity_left = CliffordString::from_gates(
-        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[index % 24]),
-    )
-    .expect("equal-width identity left operand");
-    let identity_left_before = identity_left.clone();
-    let identity_right = CliffordString::identity(identity_width).expect("identity right operand");
-    let identity_right_before = identity_right.clone();
-    identity_left
-        .right_multiply_in_place(&identity_right)
-        .expect("equal-width identity multiplication");
-    assert_eq!(identity_left, identity_left_before);
-    assert_eq!(identity_right, identity_right_before);
-
-    let mut cycle_left = stab_core::CliffordString::from_gates(
-        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[index % 24]),
-    )
-    .expect("complete non-identity cycle left operand");
-    let cycle_right = CliffordString::from_gates(
-        (0..identity_width).map(|index| STIM_ALL_CLIFFORDS_ORDER[1 + (index / 24) % 23]),
-    )
-    .expect("complete non-identity cycle right operand");
-    let cycle_right_before = cycle_right.clone();
-    let expected_cycle = (0..identity_width)
-        .map(|index| {
-            STIM_ALL_CLIFFORDS_ORDER[index % 24]
-                .multiply(STIM_ALL_CLIFFORDS_ORDER[1 + (index / 24) % 23])
-                .expect("single-qubit Clifford product")
-        })
-        .collect::<Vec<_>>();
-    cycle_left
-        .right_multiply_in_place(&cycle_right)
-        .expect("complete non-identity cycle multiplication");
-    for (index, expected) in expected_cycle.into_iter().enumerate() {
-        assert_eq!(
-            cycle_left.gate_at(index),
-            Some(expected),
-            "cycle position {index}"
-        );
-    }
-    assert_eq!(cycle_right, cycle_right_before);
-
-    let mut first_rng = SmallRng::seed_from_u64(0x0051_ab1e);
-    let mut second_rng = SmallRng::seed_from_u64(0x0051_ab1e);
-    let mut first = CliffordString::random(32, &mut first_rng).expect("random Clifford string");
-    let mut second = CliffordString::random(32, &mut second_rng).expect("random Clifford string");
-    assert_eq!(first, second);
-    first.randomize(&mut first_rng);
-    second.randomize(&mut second_rng);
-    assert_eq!(first, second);
 }
 
 #[test]

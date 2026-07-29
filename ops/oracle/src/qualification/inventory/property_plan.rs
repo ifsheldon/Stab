@@ -57,7 +57,7 @@ pub(super) fn oracle_reference(
             "closed-unit probability boundary corpus",
         ),
         "coverage-stabilizers-pauli-string-ref" => (
-            "crates/stab-core/tests/stabilizers.rs",
+            "crates/stab-algebra/tests/stabilizers.rs",
             "Pauli reference weight and active-term corpus",
         ),
         _ => {

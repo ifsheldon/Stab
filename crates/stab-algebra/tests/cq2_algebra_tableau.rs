@@ -9,10 +9,9 @@ use std::str::FromStr;
 use num_complex::Complex32;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_core::{
-    PauliString, StabilizerError, Tableau,
-    advanced::algebra::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator},
-    stabilizers_to_tableau, unitary_to_tableau,
+use stab_algebra::{
+    CommutingPauliStringIterator, PauliBasis, PauliString, PauliStringIterator, StabilizerError,
+    Tableau, TableauIterator, stabilizers_to_tableau, unitary_to_tableau,
 };
 
 #[test]
@@ -158,14 +157,14 @@ fn cq2_algebra_tableau_access_and_value_contract_is_exact() {
             .expect("first wide X")
             .active_terms()
             .collect::<Vec<_>>(),
-        vec![(0, stab_core::PauliBasis::X)]
+        vec![(0, PauliBasis::X)]
     );
     assert_eq!(
         wide.x_output(499)
             .expect("last wide X")
             .active_terms()
             .collect::<Vec<_>>(),
-        vec![(499, stab_core::PauliBasis::X)]
+        vec![(499, PauliBasis::X)]
     );
 }
 

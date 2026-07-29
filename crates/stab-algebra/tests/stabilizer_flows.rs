@@ -5,7 +5,7 @@
 
 use std::str::FromStr;
 
-use stab_core::{Flow, PauliString};
+use stab_algebra::{Flow, PauliString};
 
 #[test]
 fn stabilizers_flow_from_str_canonicalizes_duplicate_terms() {
