@@ -57,6 +57,12 @@ impl AnalysisError {
         }
     }
 
+    pub(crate) fn invalid_detector_error_model(message: impl Into<String>) -> Self {
+        Self::InvalidDetectorErrorModel {
+            message: message.into(),
+        }
+    }
+
     pub const fn resource_limit_error(&self) -> Option<&ResourceLimitError> {
         match self {
             Self::ResourceLimit(error) => Some(error),

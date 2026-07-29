@@ -1,7 +1,10 @@
-use crate::{CircuitInstruction, GateCategory, PauliBasis};
+use stab_algebra::PauliBasis;
+use stab_model::{CircuitInstruction, GateCategory};
+
+use crate::gate_has_tableau;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ReverseFlowTransition {
+pub enum ReverseFlowTransition {
     Measurement(PauliBasis),
     Reset(PauliBasis),
     MeasureReset(PauliBasis),
@@ -20,7 +23,7 @@ pub(crate) enum ReverseFlowTransition {
 }
 
 impl ReverseFlowTransition {
-    pub(crate) fn is_measurement_rich(self) -> bool {
+    pub fn is_measurement_rich(self) -> bool {
         matches!(
             self,
             Self::Measurement(_)
@@ -35,7 +38,7 @@ impl ReverseFlowTransition {
     }
 }
 
-pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowTransition {
+pub fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowTransition {
     use ReverseFlowTransition as Transition;
 
     match instruction.gate().canonical_name() {
@@ -69,7 +72,7 @@ pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> Rever
         "CX" | "XCZ" => Transition::ControlledPauli(PauliBasis::X),
         "CY" | "YCZ" => Transition::ControlledPauli(PauliBasis::Y),
         "CZ" => Transition::ControlledPauli(PauliBasis::Z),
-        _ if crate::analysis::gate_has_tableau(instruction.gate()) => Transition::Tableau,
+        _ if gate_has_tableau(instruction.gate()) => Transition::Tableau,
         _ if matches!(
             instruction.gate().category(),
             GateCategory::Annotation | GateCategory::Noise

@@ -1,6 +1,10 @@
+use stab_algebra::{
+    Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau,
+};
+use stab_model::{Circuit, CircuitItem, DemTarget, QubitId};
+
 use crate::{
-    Circuit, CircuitError, CircuitItem, CircuitResult, DemTarget, Flow, FlowMeasurementIndex,
-    PauliBasis, PauliSign, PauliString, QubitId, StabilizerResource,
+    AnalysisError, AnalysisResult, circuit_to_tableau,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
@@ -15,7 +19,7 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
         return Vec::new();
     }
     if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = crate::analysis::circuit_to_tableau(circuit, false, false, false)
+        && let Ok(tableau) = circuit_to_tableau(circuit, false, false, false)
     {
         return flows
             .iter()
@@ -31,7 +35,7 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
 }
 
 fn check_unsigned_flows_with_tableau(
-    tableau: &crate::Tableau,
+    tableau: &Tableau,
     flows: &[Flow],
 ) -> Vec<UnsignedStabilizerFlowCheck> {
     flows
@@ -112,7 +116,7 @@ pub fn check_unsigned_stabilizer_flows_with_diagnostics(
         return Vec::new();
     }
     if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = crate::analysis::circuit_to_tableau(circuit, false, false, false)
+        && let Ok(tableau) = circuit_to_tableau(circuit, false, false, false)
     {
         return check_unsigned_flows_with_tableau(&tableau, flows);
     }
@@ -170,10 +174,10 @@ pub fn circuit_has_all_unsigned_stabilizer_flows(circuit: &Circuit, flows: &[Flo
         .all(|has_flow| has_flow)
 }
 
-pub(crate) fn check_unsigned_flows_with_sparse_tracker(
+pub fn check_unsigned_flows_with_sparse_tracker(
     circuit: &Circuit,
     flows: &[Flow],
-) -> CircuitResult<Vec<bool>> {
+) -> AnalysisResult<Vec<bool>> {
     Ok(diagnose_unsigned_flows_with_sparse_tracker(circuit, flows)?
         .into_iter()
         .map(|check| check.has_flow)
@@ -183,12 +187,12 @@ pub(crate) fn check_unsigned_flows_with_sparse_tracker(
 fn diagnose_unsigned_flows_with_sparse_tracker(
     circuit: &Circuit,
     flows: &[Flow],
-) -> CircuitResult<Vec<UnsignedStabilizerFlowCheck>> {
+) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
     if flows.is_empty() {
         return Ok(Vec::new());
     }
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        CircuitError::invalid_detector_error_model(
+        AnalysisError::invalid_detector_error_model(
             "circuit measurement count does not fit usize during flow checking",
         )
     })?;
@@ -205,7 +209,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
     let mut preliminary = Vec::with_capacity(flows.len());
     for (flow_index, flow) in flows.iter().enumerate() {
         let tracked_target = DemTarget::numeric(u64::try_from(flow_index).map_err(|_| {
-            CircuitError::invalid_detector_error_model("flow index does not fit u64")
+            AnalysisError::invalid_detector_error_model("flow index does not fit u64")
         })?);
         match flow_record_indices(flow, measurement_count) {
             Ok(record_indices) => {
@@ -236,7 +240,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 return Ok(UnsignedStabilizerFlowCheck::failed(failure));
             }
             let tracked_target = DemTarget::numeric(u64::try_from(flow_index).map_err(|_| {
-                CircuitError::invalid_detector_error_model("flow index does not fit u64")
+                AnalysisError::invalid_detector_error_model("flow index does not fit u64")
             })?);
             if tracker.target_anticommuted(tracked_target) {
                 return Ok(UnsignedStabilizerFlowCheck::failed(
@@ -278,13 +282,13 @@ fn seed_flow_pauli_output(
     tracker: &mut SparseReverseFrameTracker,
     output: &PauliString,
     target: DemTarget,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     for (index, basis) in output.active_terms() {
         let qubit = u32::try_from(index)
             .ok()
             .and_then(|index| QubitId::new(index).ok())
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "flow output qubit index {index} is outside the supported target range"
                 ))
             })?;
@@ -293,7 +297,7 @@ fn seed_flow_pauli_output(
     Ok(())
 }
 
-pub(crate) fn flow_record_index(index: i32, measurement_count: usize) -> Option<usize> {
+pub fn flow_record_index(index: i32, measurement_count: usize) -> Option<usize> {
     if index >= 0 {
         return usize::try_from(index)
             .ok()

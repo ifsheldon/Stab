@@ -1,27 +1,27 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{
-    CircuitError, CircuitInstruction, CircuitResult, Flow, Pauli, PauliBasis, PauliSign,
-    PauliString, Target,
-};
+use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerError, Tableau};
+use stab_model::{CircuitInstruction, Pauli, Target};
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::single_pauli;
 
 // Two rows per qubit, two Pauli strings per row, and two bit planes per string.
 const MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS: usize = 8 * 4096 * 4096;
 
-pub(super) fn validate_ignored_only_flow_generator_work(qubit_count: usize) -> CircuitResult<()> {
+pub(super) fn validate_ignored_only_flow_generator_work(qubit_count: usize) -> AnalysisResult<()> {
     let pauli_bits = qubit_count
         .checked_mul(qubit_count)
         .and_then(|bits| bits.checked_mul(8))
         .ok_or_else(|| {
-            CircuitError::invalid_domain_value(
+            AnalysisError::invalid_domain_value(
                 "ignored-only flow-generator Pauli bits",
                 "overflowed",
             )
         })?;
     if pauli_bits > MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS {
-        return Err(CircuitError::invalid_domain_value(
+        return Err(AnalysisError::invalid_domain_value(
             "ignored-only flow-generator Pauli bits",
             format!(
                 "{pauli_bits} exceeds current limit {MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS}"
@@ -46,9 +46,9 @@ pub(super) fn plain_tableau_targets(targets: &[Target]) -> Option<Vec<usize>> {
 pub(super) fn apply_local_tableau_to_global_pauli(
     input: &PauliString,
     targets: &[usize],
-    local_tableau: &crate::Tableau,
+    local_tableau: &Tableau,
     qubit_count: usize,
-) -> CircuitResult<PauliString> {
+) -> AnalysisResult<PauliString> {
     let local = stab_algebra::advanced::pauli_from_bases_unchecked(
         input.sign(),
         targets
@@ -66,7 +66,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
             internal_flow_error("local tableau output length did not match targets")
         })?;
         let Some(slot) = bases.get_mut(qubit) else {
-            return Err(CircuitError::invalid_tableau_conversion(format!(
+            return Err(AnalysisError::invalid_tableau_conversion(format!(
                 "flow tableau target qubit {qubit} is outside {qubit_count}-qubit state"
             )));
         };
@@ -108,7 +108,7 @@ pub(super) fn unique_plain_target_indices(instruction: &CircuitInstruction) -> O
 
 pub(super) fn measure_reset_targets(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Vec<(usize, bool)>> {
+) -> AnalysisResult<Vec<(usize, bool)>> {
     let mut targets = Vec::with_capacity(instruction.targets().len());
     for target in instruction.targets() {
         targets.push(pair_measurement_target_index(target)?);
@@ -143,11 +143,11 @@ pub(super) fn final_measure_reset_occurrences(
 pub(super) fn measurement_indices_reversed(
     measurements_in_past: &mut usize,
     count: usize,
-) -> CircuitResult<Vec<i32>> {
+) -> AnalysisResult<Vec<i32>> {
     let mut indices = Vec::with_capacity(count);
     for _ in 0..count {
         *measurements_in_past = measurements_in_past.checked_sub(1).ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(
+            AnalysisError::invalid_tableau_conversion(
                 "measurement count underflowed during flow generation",
             )
         })?;
@@ -156,29 +156,29 @@ pub(super) fn measurement_indices_reversed(
     Ok(indices)
 }
 
-pub(super) fn pair_measurement_target_index(target: &Target) -> CircuitResult<(usize, bool)> {
+pub(super) fn pair_measurement_target_index(target: &Target) -> AnalysisResult<(usize, bool)> {
     let qubit = target.qubit_id().ok_or_else(|| {
-        CircuitError::invalid_tableau_conversion(format!(
+        AnalysisError::invalid_tableau_conversion(format!(
             "pair-measurement flow generator target {target} does not identify a qubit"
         ))
     })?;
     Ok((qubit.get() as usize, target.is_inverted_result_target()))
 }
 
-pub(super) fn record_index_i32(record_index: usize) -> CircuitResult<i32> {
+pub(super) fn record_index_i32(record_index: usize) -> AnalysisResult<i32> {
     i32::try_from(record_index).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(format!(
+        AnalysisError::invalid_tableau_conversion(format!(
             "flow measurement record index {record_index} does not fit i32"
         ))
     })
 }
 
-pub(super) fn stabilizer_to_circuit_error(error: crate::StabilizerError) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(error.to_string())
+pub(super) fn stabilizer_to_circuit_error(error: StabilizerError) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(error.to_string())
 }
 
-pub(super) fn internal_flow_error(message: &'static str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(message)
+pub(super) fn internal_flow_error(message: &'static str) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(message)
 }
 
 pub(super) fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize> {
@@ -195,7 +195,7 @@ pub(super) fn input_measurement_flow(
     basis: PauliBasis,
     record_index: usize,
     record_sign: PauliSign,
-) -> CircuitResult<Flow> {
+) -> AnalysisResult<Flow> {
     Flow::new(
         single_pauli(qubit_count, qubit, basis),
         stab_algebra::advanced::pauli_from_bases_unchecked(record_sign, []),
@@ -205,7 +205,7 @@ pub(super) fn input_measurement_flow(
     .map_err(stabilizer_to_circuit_error)
 }
 
-pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
+pub(super) fn positive_record_flow(record_index: usize) -> AnalysisResult<Flow> {
     Flow::new(
         stab_algebra::advanced::pauli_identity_unchecked(0),
         stab_algebra::advanced::pauli_identity_unchecked(0),
@@ -215,7 +215,7 @@ pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
     .map_err(stabilizer_to_circuit_error)
 }
 
-pub(super) fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
+pub(super) fn negative_record_flow(record_index: usize) -> AnalysisResult<Flow> {
     Flow::new(
         stab_algebra::advanced::pauli_identity_unchecked(0),
         stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Minus, []),

@@ -1,12 +1,19 @@
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, PauliBasis,
-    PauliSign, PauliString, Target,
-};
+use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Target};
+
+use crate::{AnalysisError, AnalysisResult, circuit_to_tableau, gate_tableau};
 
 mod canonicalize;
+mod classification;
+mod flatten;
 mod helpers;
 
 use canonicalize::final_canonicalize_measurement_generators;
+use classification::{
+    circuit_is_ignored_only, circuit_requires_reverse_flow_solver,
+    instruction_requires_reverse_flow_solver,
+};
+use flatten::measurement_generator_instructions;
 use helpers::{
     apply_local_tableau_to_global_pauli, final_measure_reset_occurrences,
     has_duplicate_measure_reset_targets, input_measurement_flow, instruction_qubit_count,
@@ -24,9 +31,9 @@ const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 ///
 /// Repeat-contained measurement-rich circuits use bounded flattened operations plus a flow-row cap.
 /// Annotation-only identity output is guarded by an aggregate Pauli-bit budget; broader semantics fail closed.
-pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
+pub fn circuit_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
     if circuit_is_ignored_only(circuit) {
-        let qubit_count = crate::circuit::circuit_simulated_qubit_count(circuit);
+        let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
         validate_ignored_only_flow_generator_work(qubit_count)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
@@ -37,8 +44,8 @@ pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     unitary_flow_generators(circuit)
 }
 
-fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
-    let tableau = crate::analysis::circuit_to_tableau(circuit, true, false, false)?;
+fn unitary_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
+    let tableau = circuit_to_tableau(circuit, true, false, false)?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
     for index in (0..tableau.len()).rev() {
         flows.push(Flow::from_paulis(
@@ -59,38 +66,7 @@ fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     Ok(flows)
 }
 
-fn circuit_is_ignored_only(circuit: &Circuit) -> bool {
-    circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => {
-            matches!(
-                reverse_flow_transition(instruction),
-                ReverseFlowTransition::Ignored
-            )
-        }
-        CircuitItem::RepeatBlock(repeat) => circuit_is_ignored_only(repeat.body()),
-    })
-}
-
-fn circuit_requires_reverse_flow_solver(circuit: &Circuit) -> bool {
-    circuit.items().iter().any(|item| match item {
-        CircuitItem::Instruction(instruction) => {
-            instruction_requires_reverse_flow_solver(instruction)
-        }
-        CircuitItem::RepeatBlock(repeat) => circuit_requires_reverse_flow_solver(repeat.body()),
-    })
-}
-
-fn instruction_requires_reverse_flow_solver(instruction: &CircuitInstruction) -> bool {
-    let transition = reverse_flow_transition(instruction);
-    transition.is_measurement_rich()
-        || (matches!(transition, ReverseFlowTransition::ControlledPauli(_))
-            && instruction
-                .targets()
-                .iter()
-                .any(Target::is_classical_bit_target))
-}
-
-fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<Option<Vec<Flow>>> {
+fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> AnalysisResult<Option<Vec<Flow>>> {
     if let [CircuitItem::Instruction(instruction)] = circuit.items() {
         let transition = reverse_flow_transition(instruction);
         let simple = match transition {
@@ -123,7 +99,7 @@ fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<O
 fn simple_measurement_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
-) -> CircuitResult<Option<Vec<Flow>>> {
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     validate_measurement_rich_flow_generator_rows(qubit_count, instruction.targets().len())?;
     let mut measured_targets = Vec::with_capacity(instruction.targets().len());
@@ -163,7 +139,7 @@ fn simple_measurement_flows(
 fn simple_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
-) -> CircuitResult<Option<Vec<Flow>>> {
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     validate_measurement_rich_flow_generator_rows(qubit_count, 0)?;
     let qubits = match unique_plain_target_indices(instruction) {
@@ -182,7 +158,7 @@ fn simple_reset_flows(
 fn simple_measure_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
-) -> CircuitResult<Option<Vec<Flow>>> {
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let targets = measure_reset_targets(instruction)?;
     if has_duplicate_measure_reset_targets(&targets) {
@@ -217,7 +193,7 @@ fn duplicate_measure_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
     targets: &[(usize, bool)],
-) -> CircuitResult<Vec<Flow>> {
+) -> AnalysisResult<Vec<Flow>> {
     let qubit_count = instruction_qubit_count(instruction);
     validate_measurement_rich_flow_generator_rows(qubit_count, targets.len())?;
     let mut flows = identity_flow_rows(qubit_count);
@@ -271,7 +247,7 @@ fn duplicate_measure_reset_flows(
 fn simple_pair_measurement_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
-) -> CircuitResult<Option<Vec<Flow>>> {
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let groups = instruction.target_groups();
     validate_measurement_rich_flow_generator_rows(qubit_count, groups.len())?;
@@ -318,7 +294,7 @@ fn simple_pair_measurement_flows(
 
 fn simple_pauli_product_measurement_flows(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Option<Vec<Flow>>> {
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let mut measured_products = Vec::with_capacity(instruction.target_groups().len());
     for (record_index, group) in instruction.target_groups().into_iter().enumerate() {
@@ -336,7 +312,7 @@ fn simple_pauli_product_measurement_flows(
     Ok(Some(flows))
 }
 
-fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<Flow>> {
+fn measurement_pad_flows(instruction: &CircuitInstruction) -> AnalysisResult<Vec<Flow>> {
     validate_measurement_rich_flow_generator_rows(0, instruction.targets().len())?;
     let mut positive_records = Vec::new();
     let mut negative_records = Vec::new();
@@ -345,7 +321,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
             Some(0) => positive_records.push(record_index),
             Some(1) => negative_records.push(record_index),
             _ => {
-                return Err(CircuitError::invalid_tableau_conversion(format!(
+                return Err(AnalysisError::invalid_tableau_conversion(format!(
                     "MPAD flow generator has invalid pad target {target}"
                 )));
             }
@@ -363,15 +339,15 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
 
 fn scoped_composed_measurement_flow_generators(
     circuit: &Circuit,
-) -> CircuitResult<Option<Vec<Flow>>> {
-    let qubit_count = crate::circuit::circuit_simulated_qubit_count(circuit);
+) -> AnalysisResult<Option<Vec<Flow>>> {
+    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(
+        AnalysisError::invalid_tableau_conversion(
             "circuit measurement count does not fit usize during flow generation",
         )
     })?;
     validate_measurement_rich_flow_generator_rows(qubit_count, measurement_count)?;
-    let instructions = flattened_measurement_generator_instructions(circuit)?;
+    let instructions = measurement_generator_instructions(circuit)?;
     if !instructions
         .iter()
         .any(instruction_requires_reverse_flow_solver)
@@ -391,41 +367,23 @@ fn scoped_composed_measurement_flow_generators(
 fn validate_measurement_rich_flow_generator_rows(
     qubit_count: usize,
     measurement_count: usize,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let rows = qubit_count
         .checked_mul(2)
         .and_then(|rows| rows.checked_add(measurement_count))
         .ok_or_else(|| {
-            CircuitError::invalid_domain_value("measurement-rich flow-generator rows", "overflowed")
+            AnalysisError::invalid_domain_value(
+                "measurement-rich flow-generator rows",
+                "overflowed",
+            )
         })?;
     if rows > MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS {
-        return Err(CircuitError::invalid_domain_value(
+        return Err(AnalysisError::invalid_domain_value(
             "measurement-rich flow-generator rows",
             format!("{rows} exceeds current limit {MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS}"),
         ));
     }
     Ok(())
-}
-
-fn flattened_measurement_generator_instructions(
-    circuit: &Circuit,
-) -> CircuitResult<Vec<CircuitInstruction>> {
-    if circuit
-        .items()
-        .iter()
-        .any(|item| matches!(item, CircuitItem::RepeatBlock(_)))
-    {
-        crate::analysis::flattened_circuit_operations(circuit)
-    } else {
-        Ok(circuit
-            .items()
-            .iter()
-            .filter_map(|item| match item {
-                CircuitItem::Instruction(instruction) => Some(instruction.clone()),
-                CircuitItem::RepeatBlock(_) => None,
-            })
-            .collect())
-    }
 }
 
 struct MeasurementFeedbackFlowSolver {
@@ -445,7 +403,7 @@ impl MeasurementFeedbackFlowSolver {
         }
     }
 
-    fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
+    fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<bool> {
         match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(basis) => self.undo_measurement(instruction, basis),
             ReverseFlowTransition::Reset(basis) => self.undo_reset(instruction, basis),
@@ -481,7 +439,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let mut targets = Vec::with_capacity(instruction.targets().len());
         for target in instruction.targets() {
             targets.push(pair_measurement_target_index(target)?);
@@ -516,7 +474,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let qubits = match unique_plain_target_indices(instruction) {
             Some(qubits) => qubits,
             None => return Ok(false),
@@ -532,7 +490,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let targets = measure_reset_targets(instruction)?;
         let mut record_indices =
             measurement_indices_reversed(&mut self.measurements_in_past, targets.len())?;
@@ -597,7 +555,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let groups = instruction.target_groups();
         let mut pairs = Vec::with_capacity(groups.len());
         for group in &groups {
@@ -642,7 +600,7 @@ impl MeasurementFeedbackFlowSolver {
     fn undo_pauli_product_measurement(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let mut products = Vec::with_capacity(instruction.target_groups().len());
         for group in instruction.target_groups() {
             let product = measured_pauli_product(
@@ -666,7 +624,7 @@ impl MeasurementFeedbackFlowSolver {
         Ok(true)
     }
 
-    fn undo_measurement_pad(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
+    fn undo_measurement_pad(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<bool> {
         let mut record_indices = measurement_indices_reversed(
             &mut self.measurements_in_past,
             instruction.targets().len(),
@@ -704,7 +662,7 @@ impl MeasurementFeedbackFlowSolver {
     fn undo_heralded_flow_records(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         for (target, record_index) in
             instruction
                 .targets()
@@ -735,7 +693,7 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         for group in instruction.target_groups().into_iter().rev() {
             let [left, right] = group else {
                 return Ok(false);
@@ -781,7 +739,7 @@ impl MeasurementFeedbackFlowSolver {
     fn undo_tableau_instruction(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         for group in instruction.target_groups().into_iter().rev() {
             if !self.undo_tableau_target_group(instruction, group)? {
                 return Ok(false);
@@ -794,11 +752,11 @@ impl MeasurementFeedbackFlowSolver {
         &mut self,
         instruction: &CircuitInstruction,
         group: &[Target],
-    ) -> CircuitResult<bool> {
+    ) -> AnalysisResult<bool> {
         let Some(targets) = plain_tableau_targets(group) else {
             return Ok(false);
         };
-        let local_inverse = crate::analysis::gate_tableau(instruction.gate())?
+        let local_inverse = gate_tableau(instruction.gate())?
             .inverse()
             .map_err(stabilizer_to_circuit_error)?;
         if local_inverse.len() != targets.len() {
@@ -825,8 +783,8 @@ impl MeasurementFeedbackFlowSolver {
     fn undo_decomposed_instruction(
         &mut self,
         instruction: &CircuitInstruction,
-    ) -> CircuitResult<bool> {
-        let decomposed = crate::analysis::decomposed_single_instruction(instruction)?;
+    ) -> AnalysisResult<bool> {
+        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)?;
         for item in decomposed.items().iter().rev() {
             let CircuitItem::Instruction(instruction) = item else {
                 return Ok(false);
@@ -838,7 +796,7 @@ impl MeasurementFeedbackFlowSolver {
         Ok(true)
     }
 
-    fn finalize(mut self) -> CircuitResult<Vec<Flow>> {
+    fn finalize(mut self) -> AnalysisResult<Vec<Flow>> {
         final_canonicalize_measurement_generators(
             &mut self.flows,
             self.qubit_count,
@@ -852,19 +810,19 @@ fn measured_pauli_product(
     gate_name: &'static str,
     qubit_count: usize,
     targets: &[Target],
-) -> CircuitResult<PauliString> {
+) -> AnalysisResult<PauliString> {
     let mut product = stab_algebra::advanced::pauli_identity_unchecked(qubit_count);
     for target in targets {
         if target.is_combiner() {
             continue;
         }
         let qubit = target.qubit_id().ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(format!(
+            AnalysisError::invalid_tableau_conversion(format!(
                 "{gate_name} flow generator target {target} does not identify a qubit"
             ))
         })?;
         let pauli = target.pauli_type().ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(format!(
+            AnalysisError::invalid_tableau_conversion(format!(
                 "{gate_name} flow generator target {target} is not a Pauli target"
             ))
         })?;
@@ -879,7 +837,7 @@ fn measured_pauli_product(
             },
         );
         product = product.multiply_real(&term).map_err(|error| {
-            CircuitError::invalid_tableau_conversion(format!(
+            AnalysisError::invalid_tableau_conversion(format!(
                 "{gate_name} flow generator Pauli product is not Hermitian: {error}"
             ))
         })?;
@@ -921,7 +879,7 @@ fn remove_single_anticommutations(
     flows: &mut Vec<Flow>,
     qubit: usize,
     basis: PauliBasis,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let anticommuting_rows = rows_matching(flows, |flow| {
         anticommutes_with_single_measurement(flow.input(), qubit, basis)
     });
@@ -952,7 +910,7 @@ fn remove_pair_anticommutations(
     left: usize,
     right: usize,
     basis: PauliBasis,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let anticommuting_rows = rows_matching(flows, |flow| {
         anticommutes_with_pair_measurement(flow.input(), left, right, basis)
     });
@@ -983,7 +941,7 @@ fn add_pauli_product_measurement_flow(
     measured_product: &PauliString,
     record_index: i32,
     qubit_count: usize,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if measured_product.has_no_pauli_terms() {
         flows.push(
             Flow::new(
@@ -1015,7 +973,7 @@ fn add_pauli_product_measurement_flow(
 fn remove_pauli_product_anticommutations(
     flows: &mut Vec<Flow>,
     measured_product: &PauliString,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let anticommuting_rows = rows_matching(flows, |flow| {
         anticommutes_with_pauli_product(flow.input(), measured_product)
     });
@@ -1050,7 +1008,7 @@ fn anticommutes_with_pauli_product(input: &PauliString, measured_product: &Pauli
     })
 }
 
-fn clear_input_term(flows: &mut [Flow], qubit: usize) -> CircuitResult<()> {
+fn clear_input_term(flows: &mut [Flow], qubit: usize) -> AnalysisResult<()> {
     for flow in flows {
         let mut input = flow.input().clone();
         if qubit < input.len() {
@@ -1132,32 +1090,32 @@ fn single_pauli_with_sign(
     )
 }
 
-fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> CircuitResult<i32> {
+fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> AnalysisResult<i32> {
     let measurements_in_past = i64::try_from(measurements_in_past).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(
+        AnalysisError::invalid_tableau_conversion(
             "measurement count does not fit i64 during feedback flow generation",
         )
     })?;
     let index = measurements_in_past
         .checked_add(i64::from(record_offset))
         .ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(
+            AnalysisError::invalid_tableau_conversion(
                 "measurement record index overflowed during feedback flow generation",
             )
         })?;
     if index < 0 || index > measurements_in_past {
-        return Err(CircuitError::invalid_tableau_conversion(format!(
+        return Err(AnalysisError::invalid_tableau_conversion(format!(
             "measurement record offset {record_offset} is outside the flow generation history"
         )));
     }
     i32::try_from(index).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(format!(
+        AnalysisError::invalid_tableau_conversion(format!(
             "flow measurement record index {index} does not fit i32"
         ))
     })
 }
 
-fn flow_with_toggled_measurement(flow: &Flow, record_index: i32) -> CircuitResult<Flow> {
+fn flow_with_toggled_measurement(flow: &Flow, record_index: i32) -> AnalysisResult<Flow> {
     Flow::new(
         flow.input().clone(),
         flow.output().clone(),
@@ -1167,8 +1125,8 @@ fn flow_with_toggled_measurement(flow: &Flow, record_index: i32) -> CircuitResul
     .map_err(stabilizer_to_circuit_error)
 }
 
-fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(format!(
+fn unsupported_flow_generator_error(circuit: &Circuit) -> AnalysisError {
+    AnalysisError::invalid_tableau_conversion(format!(
         "circuit_flow_generators only supports unitary tableau circuits, supported measurement/reset/pair-measurement/MPP/MPAD circuits, scoped composed measurement-rich circuits, scoped measurement-record feedback circuits, and scoped heralded-noise record circuits; got {} top-level item(s)",
         circuit.items().len()
     ))

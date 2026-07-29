@@ -1,13 +1,15 @@
 use std::collections::BTreeSet;
 
-use crate::{CircuitError, CircuitResult, DemTarget, Pauli, QubitId};
+use stab_model::{DemTarget, Pauli, QubitId};
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::{
     Anticommutation, SparseReverseFrameTracker, TrackerBasis, TrackerLocation, toggle_targets,
 };
 
 impl SparseReverseFrameTracker {
-    pub(crate) fn new_for_error_analysis(
+    pub fn new_for_error_analysis(
         qubit_count: usize,
         measurement_count: usize,
         detector_count: u64,
@@ -24,15 +26,15 @@ impl SparseReverseFrameTracker {
         tracker
     }
 
-    pub(crate) fn take_gauge_errors(&mut self) -> Vec<BTreeSet<DemTarget>> {
+    pub fn take_gauge_errors(&mut self) -> Vec<BTreeSet<DemTarget>> {
         std::mem::take(&mut self.gauge_errors)
     }
 
-    pub(crate) fn error_sensitivity(
+    pub fn error_sensitivity(
         &self,
         qubit: QubitId,
         pauli: Pauli,
-    ) -> CircuitResult<BTreeSet<DemTarget>> {
+    ) -> AnalysisResult<BTreeSet<DemTarget>> {
         self.anticommuting_sensitivity(qubit, TrackerBasis::from_pauli(pauli))
     }
 
@@ -40,14 +42,14 @@ impl SparseReverseFrameTracker {
         &mut self,
         qubit: QubitId,
         basis: TrackerBasis,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
     }
 
     pub(super) fn check_product_measurement_gauge(
         &mut self,
         terms: &[(QubitId, TrackerBasis)],
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         let mut gauge = BTreeSet::new();
         for (qubit, basis) in terms {
             toggle_targets(
@@ -64,7 +66,7 @@ impl SparseReverseFrameTracker {
         &mut self,
         qubit: QubitId,
         basis: TrackerBasis,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
     }
 
@@ -73,7 +75,7 @@ impl SparseReverseFrameTracker {
         qubit: QubitId,
         basis: TrackerBasis,
         gauge: BTreeSet<DemTarget>,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         self.check_product_gauge(&[(qubit, basis)], gauge)
     }
 
@@ -81,7 +83,7 @@ impl SparseReverseFrameTracker {
         &mut self,
         terms: &[(QubitId, TrackerBasis)],
         gauge: BTreeSet<DemTarget>,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         if gauge.is_empty() {
             return Ok(());
         }
@@ -90,7 +92,7 @@ impl SparseReverseFrameTracker {
                 .iter()
                 .any(|target| matches!(target, DemTarget::LogicalObservable(_)))
             {
-                return Err(CircuitError::invalid_detector_error_model(
+                return Err(AnalysisError::invalid_detector_error_model(
                     "collapse anti-commuted with a logical observable during error analysis",
                 ));
             }
@@ -118,14 +120,14 @@ impl SparseReverseFrameTracker {
                     message.push_str("\n    ");
                     message.push_str(&target.to_string());
                 }
-                return Err(CircuitError::invalid_detector_error_model(message));
+                return Err(AnalysisError::invalid_detector_error_model(message));
             }
             let mut message = String::from("collapse anti-commuted with tracked targets:");
             for target in &gauge {
                 message.push_str("\n    ");
                 message.push_str(&target.to_string());
             }
-            return Err(CircuitError::invalid_detector_error_model(message));
+            return Err(AnalysisError::invalid_detector_error_model(message));
         }
         for (qubit, basis) in terms {
             for target in &gauge {

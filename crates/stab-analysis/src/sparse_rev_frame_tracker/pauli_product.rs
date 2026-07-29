@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
-use crate::{CircuitError, CircuitInstruction, CircuitResult, QubitId, Target};
+use stab_model::{CircuitInstruction, QubitId, Target};
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::TrackerBasis;
 
 pub(super) fn pauli_product_terms_reversed(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
+) -> AnalysisResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
     instruction
         .target_groups()
         .into_iter()
@@ -17,14 +19,14 @@ pub(super) fn pauli_product_terms_reversed(
 
 pub(super) fn pauli_product_measurement_terms_reversed(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
+) -> AnalysisResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
     pauli_product_terms_reversed(instruction)
 }
 
 fn normalize_pauli_product_terms(
     gate_name: &str,
     group: &[Target],
-) -> CircuitResult<Vec<(QubitId, TrackerBasis)>> {
+) -> AnalysisResult<Vec<(QubitId, TrackerBasis)>> {
     let mut terms = BTreeMap::new();
     let mut phase = 0u8;
     for target in group {
@@ -32,12 +34,12 @@ fn normalize_pauli_product_terms(
             continue;
         }
         let pauli = target.pauli_type().ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{gate_name} target {target} is not a Pauli target"
             ))
         })?;
         let qubit = target.qubit_id().ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
+            AnalysisError::invalid_detector_error_model(format!(
                 "{gate_name} target {target} does not identify a qubit"
             ))
         })?;
@@ -50,7 +52,7 @@ fn normalize_pauli_product_terms(
     }
     match phase {
         0 | 2 => Ok(terms.into_iter().collect()),
-        _ => Err(CircuitError::invalid_detector_error_model(format!(
+        _ => Err(AnalysisError::invalid_detector_error_model(format!(
             "{gate_name} Pauli product is anti-Hermitian"
         ))),
     }

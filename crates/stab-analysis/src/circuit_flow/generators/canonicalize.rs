@@ -1,4 +1,6 @@
-use crate::{CircuitResult, Flow, PauliSign, PauliString};
+use stab_algebra::{Flow, PauliSign, PauliString};
+
+use crate::AnalysisResult;
 
 use super::helpers::{internal_flow_error, record_index_i32, stabilizer_to_circuit_error};
 
@@ -6,7 +8,7 @@ pub(super) fn final_canonicalize_measurement_generators(
     flows: &mut [Flow],
     qubit_count: usize,
     measurement_count: usize,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let mut eliminated = 0;
     for qubit in 0..qubit_count {
         eliminate_rows_with(flows, &mut eliminated, |flow| {
@@ -42,7 +44,7 @@ fn eliminate_rows_with(
     flows: &mut [Flow],
     eliminated: &mut usize,
     predicate: impl Fn(&Flow) -> bool,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     let matching_rows = rows_matching(flows, predicate);
     let Some(pivot) = matching_rows
         .iter()
@@ -81,7 +83,7 @@ fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize
         .collect()
 }
 
-fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> CircuitResult<Flow> {
+fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> AnalysisResult<Flow> {
     let output_sign = xor_sign(flow.output().sign(), flow.input().sign());
     Flow::new(
         trimmed_pauli_with_sign(flow.input(), PauliSign::Plus),

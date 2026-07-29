@@ -5,7 +5,9 @@
 
 use std::str::FromStr;
 
-use stab_core::{Circuit, Flow, circuit_flow_generators, solve_for_flow_measurements};
+use stab_algebra::Flow;
+use stab_analysis::{circuit_flow_generators, solve_for_flow_measurements};
+use stab_model::Circuit;
 
 macro_rules! exact_generator_case {
     ($name:ident, $circuit:expr, [$($expected:expr),* $(,)?]) => {

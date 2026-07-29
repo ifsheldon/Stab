@@ -1,18 +1,18 @@
-use crate::{CircuitError, CircuitResult};
+use crate::{AnalysisError, AnalysisResult};
 
 use super::SparseReverseFrameTracker;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ShiftedRecurrence {
-    pub(crate) cycle_start_state: SparseReverseFrameTracker,
-    pub(crate) cycle_end_state: SparseReverseFrameTracker,
-    pub(crate) transient_iterations: u64,
-    pub(crate) cycle_end_iterations: u64,
-    pub(crate) period: u64,
+pub struct ShiftedRecurrence {
+    pub cycle_start_state: SparseReverseFrameTracker,
+    pub cycle_end_state: SparseReverseFrameTracker,
+    pub transient_iterations: u64,
+    pub cycle_end_iterations: u64,
+    pub period: u64,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum ShiftedRecurrenceSearch {
+pub enum ShiftedRecurrenceSearch {
     Found {
         recurrence: ShiftedRecurrence,
         max_boundary_entries: usize,
@@ -24,13 +24,13 @@ pub(crate) enum ShiftedRecurrenceSearch {
     },
 }
 
-pub(crate) fn search_shifted_recurrence<F>(
+pub fn search_shifted_recurrence<F>(
     initial: &SparseReverseFrameTracker,
     max_iterations: u64,
     mut step: F,
-) -> CircuitResult<ShiftedRecurrenceSearch>
+) -> AnalysisResult<ShiftedRecurrenceSearch>
 where
-    F: FnMut(&mut SparseReverseFrameTracker) -> CircuitResult<()>,
+    F: FnMut(&mut SparseReverseFrameTracker) -> AnalysisResult<()>,
 {
     let mut tortoise = initial.clone();
     let mut hare = initial.clone();
@@ -42,7 +42,7 @@ where
         step(&mut hare)?;
         max_boundary_entries = max_boundary_entries.max(hare.boundary_entry_count());
         hare_iterations = hare_iterations.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "shifted recurrence probe step count overflowed",
             )
         })?;
@@ -60,7 +60,7 @@ where
             step(&mut tortoise)?;
             max_boundary_entries = max_boundary_entries.max(tortoise.boundary_entry_count());
             tortoise_iterations = tortoise_iterations.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "shifted recurrence tortoise step count overflowed",
                 )
             })?;
@@ -89,14 +89,14 @@ fn found(
     transient_iterations: u64,
     cycle_end_iterations: u64,
     max_boundary_entries: usize,
-) -> CircuitResult<ShiftedRecurrenceSearch> {
+) -> AnalysisResult<ShiftedRecurrenceSearch> {
     let period = cycle_end_iterations
         .checked_sub(transient_iterations)
         .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("shifted recurrence period underflowed")
+            AnalysisError::invalid_detector_error_model("shifted recurrence period underflowed")
         })?;
     if period == 0 {
-        return Err(CircuitError::invalid_detector_error_model(
+        return Err(AnalysisError::invalid_detector_error_model(
             "shifted recurrence period was zero",
         ));
     }

@@ -5,6 +5,7 @@
 //! contracts.
 
 pub mod circuit;
+mod circuit_flow;
 mod circuit_generation;
 mod circuit_simplify;
 mod circuit_tableau;
@@ -13,8 +14,16 @@ mod error;
 pub mod gate;
 mod mbqc_decomposition;
 mod resources;
+mod sparse_rev_frame_tracker;
 
 pub use circuit::circuit_without_tags;
+pub use circuit_flow::{
+    UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
+    check_if_circuit_has_unsigned_stabilizer_flows,
+    check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
+    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
+    solve_for_flow_measurements,
+};
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
@@ -37,5 +46,11 @@ pub use resources::{ResourceKind, ResourceLimitError, ResourceOperation};
 
 /// Low-level lowering operations shared with compilation engines.
 pub mod advanced {
+    pub use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
+    pub use crate::circuit_flow::{check_unsigned_flows_with_sparse_tracker, flow_record_index};
     pub use crate::circuit_simplify::decomposed_single_instruction;
+    pub use crate::sparse_rev_frame_tracker::{
+        AnalyzerProbeBudget, ShiftedRecurrence, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
+        search_shifted_recurrence,
+    };
 }

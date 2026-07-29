@@ -115,7 +115,8 @@ impl WithoutFeedbackHelper {
         }
         self.reversed_output
             .push(CircuitItem::Instruction(instruction.clone()));
-        self.tracker.undo_instruction(instruction)
+        self.tracker.undo_instruction(instruction)?;
+        Ok(())
     }
 
     fn undo_feedback_capable_controlled_pauli(

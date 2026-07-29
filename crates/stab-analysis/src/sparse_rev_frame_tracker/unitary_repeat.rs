@@ -1,16 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
-    RepeatBlock, Target, circuit::CircuitAssembler,
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, DemTarget, QubitId, RepeatBlock, Target,
+    advanced::{CircuitBuilder, circuit_instruction_with_tag_bytes, repeat_block_with_tag_bytes},
 };
 
 use super::{SparseReverseFrameTracker, qubit_index, replace_qubit_set, toggle_targets};
+use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
 
 pub(super) fn try_undo_supported_unitary_repeat(
     tracker: &mut SparseReverseFrameTracker,
     repeat: &RepeatBlock,
-) -> CircuitResult<bool> {
+) -> AnalysisResult<bool> {
     if !is_supported_unitary_circuit(repeat.body()) {
         return Ok(false);
     }
@@ -38,17 +39,17 @@ impl SlotTransform {
         }
     }
 
-    fn for_body(body: &Circuit, tracker_qubit_count: usize) -> CircuitResult<Self> {
+    fn for_body(body: &Circuit, tracker_qubit_count: usize) -> AnalysisResult<Self> {
         let qubits = touched_qubits(body);
         if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= tracker_qubit_count) {
-            return Err(CircuitError::invalid_detector_error_model(format!(
+            return Err(AnalysisError::invalid_detector_error_model(format!(
                 "unitary repeat touches qubit {qubit} outside the sparse reverse tracker"
             )));
         }
         let dense_body = remap_circuit_to_dense_qubits(body, &qubits)?;
         let dense_qubit_count = qubits.len();
         let slot_count = dense_qubit_count.checked_mul(2).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat slot count overflowed",
             )
         })?;
@@ -66,7 +67,7 @@ impl SlotTransform {
         })
     }
 
-    fn pow(&self, mut exponent: u64) -> CircuitResult<Self> {
+    fn pow(&self, mut exponent: u64) -> AnalysisResult<Self> {
         let mut result = self.identity();
         let mut base = self.clone();
         while exponent > 0 {
@@ -81,9 +82,9 @@ impl SlotTransform {
         Ok(result)
     }
 
-    fn then(&self, next: &Self) -> CircuitResult<Self> {
+    fn then(&self, next: &Self) -> AnalysisResult<Self> {
         if self.qubits != next.qubits {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "unitary repeat transforms have different active qubit mappings",
             ));
         }
@@ -94,7 +95,7 @@ impl SlotTransform {
                 let mut result = BTreeSet::new();
                 for middle in middle_slots {
                     let next_slots = next.destinations.get(*middle).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(format!(
+                        AnalysisError::invalid_detector_error_model(format!(
                             "unitary repeat transform slot {middle} is out of bounds"
                         ))
                     })?;
@@ -102,14 +103,14 @@ impl SlotTransform {
                 }
                 Ok(result)
             })
-            .collect::<CircuitResult<Vec<_>>>()?;
+            .collect::<AnalysisResult<Vec<_>>>()?;
         Ok(Self {
             qubits: self.qubits.clone(),
             destinations,
         })
     }
 
-    fn apply_to(&self, tracker: &mut SparseReverseFrameTracker) -> CircuitResult<()> {
+    fn apply_to(&self, tracker: &mut SparseReverseFrameTracker) -> AnalysisResult<()> {
         let active_qubit_count = self.qubits.len();
         let slot_count = self.destinations.len();
         let mut old_slots = Vec::with_capacity(slot_count);
@@ -126,14 +127,14 @@ impl SlotTransform {
                 continue;
             }
             let destination_slots = self.destinations.get(source_slot).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
+                AnalysisError::invalid_detector_error_model(format!(
                     "unitary repeat source slot {source_slot} is out of bounds"
                 ))
             })?;
             for destination_slot in destination_slots {
                 let destination_targets =
                     new_slots.get_mut(*destination_slot).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(format!(
+                        AnalysisError::invalid_detector_error_model(format!(
                             "unitary repeat destination slot {destination_slot} is out of bounds"
                         ))
                     })?;
@@ -159,8 +160,8 @@ impl SlotTransform {
     }
 }
 
-fn active_slot_error(basis: &str, qubit: usize) -> CircuitError {
-    CircuitError::invalid_detector_error_model(format!(
+fn active_slot_error(basis: &str, qubit: usize) -> AnalysisError {
+    AnalysisError::invalid_detector_error_model(format!(
         "missing active {basis} slot for qubit {qubit} during unitary repeat folding"
     ))
 }
@@ -188,26 +189,26 @@ fn touched_qubits(circuit: &Circuit) -> Vec<usize> {
     qubits.into_iter().collect()
 }
 
-fn remap_circuit_to_dense_qubits(circuit: &Circuit, qubits: &[usize]) -> CircuitResult<Circuit> {
+fn remap_circuit_to_dense_qubits(circuit: &Circuit, qubits: &[usize]) -> AnalysisResult<Circuit> {
     let dense_ids = qubits
         .iter()
         .enumerate()
         .map(|(dense, &original)| {
             let dense = u32::try_from(dense).map_err(|_| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "active unitary repeat qubit count does not fit u32",
                 )
             })?;
             Ok((original, QubitId::new(dense)?))
         })
-        .collect::<CircuitResult<BTreeMap<_, _>>>()?;
+        .collect::<AnalysisResult<BTreeMap<_, _>>>()?;
     remap_circuit_items(circuit, &dense_ids)
 }
 
 fn remap_circuit_items(
     circuit: &Circuit,
     dense_ids: &BTreeMap<usize, QubitId>,
-) -> CircuitResult<Circuit> {
+) -> AnalysisResult<Circuit> {
     let items = circuit
         .items()
         .iter()
@@ -218,7 +219,7 @@ fn remap_circuit_items(
                     .iter()
                     .map(|target| {
                         let original = target.qubit_id().ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(format!(
+                            AnalysisError::invalid_detector_error_model(format!(
                                 "unitary repeat target {target} is not a plain qubit"
                             ))
                         })?;
@@ -226,16 +227,16 @@ fn remap_circuit_items(
                             .get(&(original.get() as usize))
                             .copied()
                             .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(format!(
+                                AnalysisError::invalid_detector_error_model(format!(
                                     "unitary repeat target qubit {} has no dense mapping",
                                     original.get()
                                 ))
                             })?;
                         Ok(Target::qubit(dense, false))
                     })
-                    .collect::<CircuitResult<Vec<_>>>()?;
+                    .collect::<AnalysisResult<Vec<_>>>()?;
                 Ok(CircuitItem::Instruction(
-                    crate::circuit::circuit_instruction_with_tag_bytes(
+                    circuit_instruction_with_tag_bytes(
                         instruction.gate(),
                         instruction.args().to_vec(),
                         targets,
@@ -243,16 +244,16 @@ fn remap_circuit_items(
                     )?,
                 ))
             }
-            CircuitItem::RepeatBlock(repeat) => Ok(CircuitItem::RepeatBlock(
-                crate::circuit::repeat_block_with_tag_bytes(
+            CircuitItem::RepeatBlock(repeat) => {
+                Ok(CircuitItem::RepeatBlock(repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     remap_circuit_items(repeat.body(), dense_ids)?,
                     repeat.tag_bytes(),
-                ),
-            )),
+                )))
+            }
         })
-        .collect::<CircuitResult<Vec<_>>>()?;
-    Ok(CircuitAssembler::from_unfused_items(items).finish())
+        .collect::<AnalysisResult<Vec<_>>>()?;
+    Ok(CircuitBuilder::from_unfused_items(items).finish())
 }
 
 fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
@@ -263,11 +264,11 @@ fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
 }
 
 fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
-    if crate::analysis::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
+    if single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
         return has_plain_qubit_groups(instruction, 1);
     }
     instruction.gate().is_two_qubit_gate()
-        && crate::analysis::gate_has_tableau(instruction.gate())
+        && gate_has_tableau(instruction.gate())
         && has_plain_qubit_groups(instruction, 2)
 }
 
@@ -293,22 +294,22 @@ fn seed_slot(
     qubit_count: usize,
     slot: usize,
     target: DemTarget,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if slot < qubit_count {
         let qubit = QubitId::new(u32::try_from(slot).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat slot does not fit u32",
             )
         })?)?;
         tracker.toggle_xs(qubit, &BTreeSet::from([target]))
     } else {
         let z_slot = slot.checked_sub(qubit_count).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat z slot underflowed",
             )
         })?;
         let qubit = QubitId::new(u32::try_from(z_slot).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat slot does not fit u32",
             )
         })?)?;
@@ -319,7 +320,7 @@ fn seed_slot(
 fn collect_target_slots(
     tracker: &SparseReverseFrameTracker,
     target: DemTarget,
-) -> CircuitResult<BTreeSet<usize>> {
+) -> AnalysisResult<BTreeSet<usize>> {
     let mut slots = BTreeSet::new();
     let qubit_count = tracker.qubit_count;
     for (qubit, targets) in &tracker.xs {
@@ -332,7 +333,7 @@ fn collect_target_slots(
             let slot = qubit_index(*qubit)?
                 .checked_add(qubit_count)
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "unitary repeat target slot overflowed",
                     )
                 })?;
@@ -342,17 +343,17 @@ fn collect_target_slots(
     Ok(slots)
 }
 
-fn qubit_id_from_index(index: usize) -> CircuitResult<QubitId> {
+fn qubit_id_from_index(index: usize) -> AnalysisResult<QubitId> {
     Ok(QubitId::new(u32::try_from(index).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "unitary repeat qubit index {index} does not fit u32"
         ))
     })?)?)
 }
 
-fn slot_target(slot: usize) -> CircuitResult<DemTarget> {
+fn slot_target(slot: usize) -> AnalysisResult<DemTarget> {
     let observable = u64::try_from(slot).map_err(|_| {
-        CircuitError::invalid_detector_error_model(
+        AnalysisError::invalid_detector_error_model(
             "sparse reverse unitary repeat slot does not fit u64",
         )
     })?;
@@ -377,7 +378,8 @@ mod tests {
     )]
 
     use super::*;
-    use crate::{Gate, SingleQubitClifford};
+    use stab_algebra::SingleQubitClifford;
+    use stab_model::Gate;
 
     const FIXED_TWO_QUBIT_TABLEAU_GATES: &[&str] = &[
         "II",
@@ -435,7 +437,7 @@ mod tests {
     fn undo_circuit_naively(
         tracker: &mut SparseReverseFrameTracker,
         circuit: &Circuit,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         for item in circuit.items().iter().rev() {
             match item {
                 CircuitItem::Instruction(instruction) => tracker.undo_instruction(instruction)?,
@@ -448,7 +450,7 @@ mod tests {
     fn undo_repeat_naively(
         tracker: &mut SparseReverseFrameTracker,
         repeat: &RepeatBlock,
-    ) -> CircuitResult<()> {
+    ) -> AnalysisResult<()> {
         for _ in 0..repeat.repeat_count().get() {
             undo_circuit_naively(tracker, repeat.body())?;
         }
@@ -558,7 +560,7 @@ mod tests {
         for (index, gate_name) in FIXED_TWO_QUBIT_TABLEAU_GATES.iter().enumerate() {
             let gate = Gate::from_name(gate_name).unwrap();
             assert!(gate.is_two_qubit_gate(), "{gate_name}");
-            assert!(crate::analysis::gate_has_tableau(gate), "{gate_name}");
+            assert!(gate_has_tableau(gate), "{gate_name}");
             let left = index % 4;
             let right = (index + 1) % 4;
             text.push_str("    ");

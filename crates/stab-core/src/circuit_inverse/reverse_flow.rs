@@ -322,7 +322,8 @@ impl ReverseFlowEngine {
                 instruction.tag_bytes(),
             )?;
         }
-        self.tracker.undo_instruction(instruction)
+        self.tracker.undo_instruction(instruction)?;
+        Ok(())
     }
 
     fn reverse_simple(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {

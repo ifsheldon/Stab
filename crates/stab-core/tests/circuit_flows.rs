@@ -6,12 +6,31 @@
 use std::str::FromStr;
 
 use stab_core::{
-    Circuit, Flow, FlowMeasurementIndex, PauliString, UnsignedStabilizerFlowFailure,
+    Circuit, CircuitError, Flow, FlowMeasurementIndex, PauliString, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
-    check_unsigned_stabilizer_flows_with_diagnostics, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_has_unsigned_stabilizer_flow, sample_if_circuit_has_stabilizer_flows,
-    solve_for_flow_measurements,
+    check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
+    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
+    sample_if_circuit_has_stabilizer_flows, solve_for_flow_measurements,
 };
+
+#[test]
+fn core_flow_generator_preserves_coordinate_flattening_errors() {
+    let circuit = circuit(
+        "
+        REPEAT 2 {
+            SHIFT_COORDS(1e308)
+            M 0
+        }
+    ",
+    );
+    let error = circuit_flow_generators(&circuit)
+        .expect_err("core facade must retain coordinate-aware repeat preflight");
+    assert!(matches!(error, CircuitError::InvalidResultFormat(_)));
+    assert_eq!(
+        error.to_string(),
+        "invalid result format data: coordinate shift overflowed"
+    );
+}
 
 #[test]
 fn check_if_circuit_has_unsigned_stabilizer_flows_historical_failure() {

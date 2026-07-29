@@ -238,14 +238,16 @@ fn undo_detecting_region_instruction(
     tracker: &mut SparseReverseFrameTracker,
 ) -> CircuitResult<()> {
     if instruction.gate().canonical_name() != "CZ" {
-        return tracker.undo_instruction(instruction);
+        tracker.undo_instruction(instruction)?;
+        return Ok(());
     }
 
     let mut kept_targets = Vec::new();
     let mut skipped_classical_noop = false;
     for group in instruction.target_groups() {
         let [left, right] = group else {
-            return tracker.undo_instruction(instruction);
+            tracker.undo_instruction(instruction)?;
+            return Ok(());
         };
         if is_cz_classical_bit_noop("CZ", left, right) {
             skipped_classical_noop = true;
@@ -254,7 +256,8 @@ fn undo_detecting_region_instruction(
         }
     }
     if !skipped_classical_noop {
-        return tracker.undo_instruction(instruction);
+        tracker.undo_instruction(instruction)?;
+        return Ok(());
     }
     if kept_targets.is_empty() {
         return Ok(());
@@ -266,7 +269,8 @@ fn undo_detecting_region_instruction(
         kept_targets,
         instruction.tag_bytes(),
     )?;
-    tracker.undo_instruction(&kept_instruction)
+    tracker.undo_instruction(&kept_instruction)?;
+    Ok(())
 }
 
 fn snapshot_regions(

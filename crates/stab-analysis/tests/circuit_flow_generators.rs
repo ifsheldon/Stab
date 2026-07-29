@@ -5,10 +5,11 @@
 
 use std::str::FromStr;
 
-use stab_core::{
-    Circuit, Flow, PauliBasis, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_flow_generators, decomposed_circuit,
+use stab_algebra::{Flow, PauliBasis};
+use stab_analysis::{
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators, decomposed_circuit,
 };
+use stab_model::Circuit;
 
 #[test]
 fn circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim() {

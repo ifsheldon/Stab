@@ -1,17 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Circuit, CircuitError, CircuitResult, DemTarget};
+use stab_model::{Circuit, DemTarget};
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::{
     AnalyzerProbeBudget, GaugeOutputPolicy, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
     search_shifted_recurrence,
 };
 
+#[cfg(test)]
 pub(super) fn undo_loop(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     repetitions: u64,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     undo_loop_with_gauge_output(
         tracker,
         body,
@@ -27,7 +30,7 @@ pub(super) fn undo_loop_with_gauge_output(
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
     mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     if repetitions < 5 {
         return undo_loop_by_unrolling_with_gauge_output(
             tracker,
@@ -57,7 +60,7 @@ pub(super) fn undo_loop_with_gauge_output(
                 tracker,
                 body,
                 repetitions.checked_sub(iterations).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "sparse reverse repeat remainder underflowed",
                     )
                 })?,
@@ -70,7 +73,7 @@ pub(super) fn undo_loop_with_gauge_output(
     let remaining_after_cycle = repetitions
         .checked_sub(recurrence.cycle_end_iterations)
         .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat cycle end exceeded its repeat count",
             )
         })?;
@@ -80,7 +83,7 @@ pub(super) fn undo_loop_with_gauge_output(
         .measurement_count
         .checked_sub(recurrence.cycle_end_state.measurement_count)
         .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat measurement period underflowed",
             )
         })?;
@@ -89,7 +92,7 @@ pub(super) fn undo_loop_with_gauge_output(
         .detector_count
         .checked_sub(recurrence.cycle_end_state.detector_count)
         .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat detector period underflowed",
             )
         })?;
@@ -106,13 +109,13 @@ pub(super) fn undo_loop_with_gauge_output(
             skipped_iterations
                 .checked_mul(recurrence.period)
                 .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
+                    AnalysisError::invalid_detector_error_model(
                         "sparse reverse repeat skipped step count overflowed",
                     )
                 })?,
         )
         .ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
+            AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat step count overflowed",
             )
         })?;
@@ -123,7 +126,7 @@ pub(super) fn undo_loop_with_gauge_output(
         repetitions
             .checked_sub(completed_iterations)
             .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "sparse reverse repeat remainder underflowed",
                 )
             })?,
@@ -132,11 +135,12 @@ pub(super) fn undo_loop_with_gauge_output(
     )
 }
 
+#[cfg(test)]
 pub(super) fn undo_loop_by_unrolling(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     repetitions: u64,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     undo_loop_by_unrolling_with_gauge_output(
         tracker,
         body,
@@ -152,7 +156,7 @@ fn undo_loop_by_unrolling_with_gauge_output(
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
     mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     for _ in 0..repetitions {
         undo_probe_iteration(
             tracker,
@@ -169,12 +173,12 @@ fn undo_probe_iteration(
     body: &Circuit,
     gauge_output: GaugeOutputPolicy,
     analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     match gauge_output {
         GaugeOutputPolicy::Preserve => tracker.undo_circuit(body),
         GaugeOutputPolicy::Discard => {
             let budget = analyzer_probe_budget.ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
+                AnalysisError::invalid_detector_error_model(
                     "analyzer recurrence probe is missing its nested work budget",
                 )
             })?;
@@ -221,7 +225,7 @@ pub(super) fn shift(
     tracker: &mut SparseReverseFrameTracker,
     measurement_offset: i128,
     detector_offset: i128,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     tracker.measurement_count = add_signed_usize(
         tracker.measurement_count,
         measurement_offset,
@@ -238,7 +242,7 @@ pub(super) fn shift(
             .insert(shifted_index, shifted_targets)
             .is_some()
         {
-            return Err(CircuitError::invalid_detector_error_model(
+            return Err(AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat shift merged measurement records unexpectedly",
             ));
         }
@@ -259,7 +263,7 @@ pub(super) fn shift(
                 location: anticommutation.location,
             })
         })
-        .collect::<CircuitResult<_>>()?;
+        .collect::<AnalysisResult<_>>()?;
     Ok(())
 }
 
@@ -344,7 +348,7 @@ fn target_set_matches_shifted(
 fn shift_target_sets<K>(
     sets: &mut BTreeMap<K, BTreeSet<DemTarget>>,
     detector_offset: i128,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     for targets in sets.values_mut() {
         *targets = shift_target_set(targets, detector_offset)?;
     }
@@ -354,14 +358,14 @@ fn shift_target_sets<K>(
 fn shift_target_set(
     targets: &BTreeSet<DemTarget>,
     detector_offset: i128,
-) -> CircuitResult<BTreeSet<DemTarget>> {
+) -> AnalysisResult<BTreeSet<DemTarget>> {
     targets
         .iter()
         .map(|target| shifted_detector_target(*target, detector_offset))
         .collect()
 }
 
-fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> CircuitResult<DemTarget> {
+fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> AnalysisResult<DemTarget> {
     match target {
         DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(add_signed_u64(
             detector.get(),
@@ -375,63 +379,71 @@ fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> CircuitR
     }
 }
 
-fn offset_between_usize(left: usize, right: usize) -> CircuitResult<i128> {
+fn offset_between_usize(left: usize, right: usize) -> AnalysisResult<i128> {
     let left = i128::try_from(left).map_err(|_| {
-        CircuitError::invalid_detector_error_model("sparse reverse tracker count does not fit i128")
+        AnalysisError::invalid_detector_error_model(
+            "sparse reverse tracker count does not fit i128",
+        )
     })?;
     let right = i128::try_from(right).map_err(|_| {
-        CircuitError::invalid_detector_error_model("sparse reverse tracker count does not fit i128")
+        AnalysisError::invalid_detector_error_model(
+            "sparse reverse tracker count does not fit i128",
+        )
     })?;
     Ok(right - left)
 }
 
-fn signed_product_usize(value: usize, multiplier: u64, label: &'static str) -> CircuitResult<i128> {
+fn signed_product_usize(
+    value: usize,
+    multiplier: u64,
+    label: &'static str,
+) -> AnalysisResult<i128> {
     let value = i128::try_from(value).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse repeat {label} value does not fit i128"
         ))
     })?;
     let multiplier = i128::from(multiplier);
     value.checked_mul(multiplier).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse repeat skipped {label} count overflowed"
         ))
     })
 }
 
-fn signed_product_u64(value: u64, multiplier: u64, label: &'static str) -> CircuitResult<i128> {
+fn signed_product_u64(value: u64, multiplier: u64, label: &'static str) -> AnalysisResult<i128> {
     let value = i128::from(value);
     let multiplier = i128::from(multiplier);
     value.checked_mul(multiplier).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse repeat skipped {label} count overflowed"
         ))
     })
 }
 
-fn add_signed_usize(value: usize, offset: i128, label: &'static str) -> CircuitResult<usize> {
+fn add_signed_usize(value: usize, offset: i128, label: &'static str) -> AnalysisResult<usize> {
     let value = i128::try_from(value).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse {label} does not fit i128"
         ))
     })?;
     let shifted = value.checked_add(offset).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
+        AnalysisError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
     })?;
     usize::try_from(shifted).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse {label} shifted out of range"
         ))
     })
 }
 
-fn add_signed_u64(value: u64, offset: i128, label: &'static str) -> CircuitResult<u64> {
+fn add_signed_u64(value: u64, offset: i128, label: &'static str) -> AnalysisResult<u64> {
     let value = i128::from(value);
     let shifted = value.checked_add(offset).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
+        AnalysisError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
     })?;
     u64::try_from(shifted).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
+        AnalysisError::invalid_detector_error_model(format!(
             "sparse reverse {label} shifted out of range"
         ))
     })

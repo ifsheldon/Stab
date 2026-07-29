@@ -1,4 +1,7 @@
-use crate::{Circuit, CircuitError, CircuitResult, Flow, PauliBasis, PauliString};
+use stab_algebra::{Flow, PauliBasis, PauliString};
+use stab_model::Circuit;
+
+use crate::{AnalysisError, AnalysisResult};
 
 use super::circuit_flow_generators;
 
@@ -14,7 +17,7 @@ use super::circuit_flow_generators;
 pub fn solve_for_flow_measurements(
     circuit: &Circuit,
     flows: &[Flow],
-) -> CircuitResult<Vec<Option<Vec<i32>>>> {
+) -> AnalysisResult<Vec<Option<Vec<i32>>>> {
     validate_non_empty_flow_queries(flows)?;
     if flows.is_empty() {
         return Ok(Vec::new());
@@ -23,10 +26,10 @@ pub fn solve_for_flow_measurements(
     solve_with_generator_rows(circuit, flows)
 }
 
-fn validate_non_empty_flow_queries(flows: &[Flow]) -> CircuitResult<()> {
+fn validate_non_empty_flow_queries(flows: &[Flow]) -> AnalysisResult<()> {
     for flow in flows {
         if flow.input().has_no_pauli_terms() && flow.output().has_no_pauli_terms() {
-            return Err(CircuitError::invalid_tableau_conversion(
+            return Err(AnalysisError::invalid_tableau_conversion(
                 "solve_for_flow_measurements only supports flows with non-empty Pauli input or output",
             ));
         }
@@ -37,7 +40,7 @@ fn validate_non_empty_flow_queries(flows: &[Flow]) -> CircuitResult<()> {
 fn solve_with_generator_rows(
     circuit: &Circuit,
     flows: &[Flow],
-) -> CircuitResult<Vec<Option<Vec<i32>>>> {
+) -> AnalysisResult<Vec<Option<Vec<i32>>>> {
     let generators = circuit_flow_generators(circuit)?;
     let qubit_count = solved_qubit_count(circuit, flows, &generators);
     let vector_len = qubit_count.saturating_mul(4);
@@ -60,7 +63,7 @@ fn solve_with_generator_rows(
             };
             eliminate_implicit_idle_suffix(
                 &mut row.vector,
-                crate::circuit::circuit_simulated_qubit_count(circuit),
+                stab_model::advanced::circuit_simulated_qubit_count(circuit),
                 qubit_count,
             );
             reduce_row(&mut row, &basis);
@@ -99,7 +102,7 @@ fn add_basis_row(
     mut row: SolveRow,
     basis: &mut [Option<SolveRow>],
     zero_measurement_rows: &mut Vec<Vec<i32>>,
-) -> CircuitResult<()> {
+) -> AnalysisResult<()> {
     reduce_row(&mut row, basis);
     if row.is_zero() {
         if !row.measurements.is_empty() {
@@ -109,7 +112,7 @@ fn add_basis_row(
     }
     if let Some(pivot) = row.pivot() {
         let slot = basis.get_mut(pivot).ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(
+            AnalysisError::invalid_tableau_conversion(
                 "flow solver pivot row is outside the basis table",
             )
         })?;
@@ -145,7 +148,7 @@ fn reduce_measurements_with_zero_rows(
 
 fn solved_qubit_count(circuit: &Circuit, flows: &[Flow], generators: &[Flow]) -> usize {
     let count = flows.iter().fold(
-        crate::circuit::circuit_simulated_qubit_count(circuit),
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
         |count, flow| count.max(flow.input().len()).max(flow.output().len()),
     );
     generators.iter().fold(count, |count, flow| {
