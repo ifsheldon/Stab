@@ -169,6 +169,16 @@ pub enum RandomPolicy {
     Seeded(Seed),
 }
 
+impl RandomPolicy {
+    /// Returns the deterministic seed, or `None` when entropy should initialize the stream.
+    pub const fn seed(self) -> Option<Seed> {
+        match self {
+            Self::Entropy => None,
+            Self::Seeded(seed) => Some(seed),
+        }
+    }
+}
+
 /// Whether sampling uses Stim's reference sample.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

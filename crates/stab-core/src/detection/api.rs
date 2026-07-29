@@ -1099,11 +1099,7 @@ fn validate_session_storage(estimated_bytes: u128) -> Result<(), DetectionExecut
 }
 
 fn detection_rng(policy: RandomPolicy) -> SmallRng {
-    match policy {
-        RandomPolicy::Entropy => SmallRng::seed_from_u64(rand::random()),
-        RandomPolicy::Seeded(seed) => SmallRng::seed_from_u64(seed.get()),
-        _ => SmallRng::seed_from_u64(rand::random()),
-    }
+    SmallRng::seed_from_u64(policy.seed().map_or_else(rand::random, |seed| seed.get()))
 }
 
 fn storage_error(error: stab_records::FormatError) -> DetectionExecutionError {

@@ -246,11 +246,7 @@ impl DemSamplingSession {
             }
         })?;
         let batch = SessionBatch::try_new(&plan, batch_capacity)?;
-        let rng = match random_policy {
-            RandomPolicy::Entropy => dem_sampler_rng(None),
-            RandomPolicy::Seeded(seed) => dem_sampler_rng(Some(seed.get())),
-            _ => dem_sampler_rng(None),
-        };
+        let rng = dem_sampler_rng(random_policy.seed().map(|seed| seed.get()));
         Ok(Self {
             plan,
             limits,
