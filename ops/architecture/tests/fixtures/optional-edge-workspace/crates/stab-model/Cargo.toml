@@ -2,6 +2,7 @@
 name = "stab-model"
 edition.workspace = true
 version.workspace = true
+publish = false
 
 [features]
 execution-leak = ["dep:stab-engine"]

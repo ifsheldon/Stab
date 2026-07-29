@@ -2149,7 +2149,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "stab-algebra"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "num-complex",
@@ -2162,7 +2162,7 @@ dependencies = [
 
 [[package]]
 name = "stab-analysis"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "hashbrown 0.17.1",
@@ -2174,7 +2174,7 @@ dependencies = [
 
 [[package]]
 name = "stab-architecture"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "clap",
@@ -2185,7 +2185,7 @@ dependencies = [
 
 [[package]]
 name = "stab-bench"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "clap",
@@ -2210,7 +2210,7 @@ dependencies = [
 
 [[package]]
 name = "stab-bits"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "proptest",
@@ -2220,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "stab-cli"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "clap",
@@ -2235,7 +2235,7 @@ dependencies = [
 
 [[package]]
 name = "stab-compat-corpus"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "serde",
@@ -2245,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "stab-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "arrayvec",
@@ -2267,7 +2267,7 @@ dependencies = [
 
 [[package]]
 name = "stab-engine"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "hex",
@@ -2282,11 +2282,11 @@ dependencies = [
 
 [[package]]
 name = "stab-kernels-simd"
-version = "0.1.1"
+version = "0.2.0"
 
 [[package]]
 name = "stab-model"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "arrayvec",
@@ -2299,7 +2299,7 @@ dependencies = [
 
 [[package]]
 name = "stab-oracle"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "csv",
@@ -2317,7 +2317,7 @@ dependencies = [
 
 [[package]]
 name = "stab-pre-commit"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "gix",
@@ -2329,7 +2329,7 @@ dependencies = [
 
 [[package]]
 name = "stab-records"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "allocation-counter",
  "proptest",

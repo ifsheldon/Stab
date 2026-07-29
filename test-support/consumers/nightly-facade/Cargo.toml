@@ -8,4 +8,4 @@ publish = false
 resolver = "3"
 
 [dependencies]
-stab-core = { path = "../../../crates/stab-core", version = "=0.1.1", default-features = false, features = ["portable-simd"] }
+stab-core = { path = "../../../crates/stab-core", version = "=0.2.0", default-features = false, features = ["portable-simd"] }

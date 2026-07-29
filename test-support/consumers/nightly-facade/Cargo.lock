@@ -215,7 +215,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "stab-algebra"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "num-complex",
  "rand",
@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "stab-analysis"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hashbrown",
  "num-complex",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "stab-bits"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "stab-kernels-simd",
  "thiserror",
@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "stab-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "arrayvec",
  "hex",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "stab-engine"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hex",
  "rand",
@@ -278,11 +278,11 @@ dependencies = [
 
 [[package]]
 name = "stab-kernels-simd"
-version = "0.1.1"
+version = "0.2.0"
 
 [[package]]
 name = "stab-model"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "arrayvec",
  "hex",
@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "stab-records"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "stab-bits",
  "thiserror",
