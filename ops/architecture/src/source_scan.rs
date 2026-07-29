@@ -388,6 +388,16 @@ fn parse_facade_surface(
             Item::ExternCrate(item) if is_public(&item.vis) => {
                 report_direct_item(path, tier, "extern crate", &item.ident, violations);
             }
+            Item::ForeignMod(_) => {
+                violations.push(Violation::new(
+                    tier.direct_item_code(),
+                    format!(
+                        "{} contains a foreign module directly in the {}; foreign declarations cannot bypass its tier policy",
+                        path.display(),
+                        tier.label()
+                    ),
+                ));
+            }
             Item::Fn(item) if is_public(&item.vis) => {
                 report_direct_item(path, tier, "function", &item.sig.ident, violations);
             }
@@ -765,7 +775,7 @@ mod tests {
         let violations = facade_tier_violations(
             FacadeSource::new(
                 Path::new("lib.rs"),
-                "pub mod advanced {}\npub mod analysis;\npub mod execution;\npub mod experimental { pub struct UnreviewedExtension; }\n#[path = \"../../outside.rs\"] mod hidden;\n#[cfg_attr(all(), cfg_attr(any(), path = \"../../alternate.rs\"))] mod nested_hidden;\n",
+                "pub mod advanced {}\npub mod analysis;\npub mod execution;\npub mod experimental { pub struct UnreviewedExtension; }\n#[path = \"../../outside.rs\"] mod hidden;\n#[cfg_attr(all(), cfg_attr(any(), path = \"../../alternate.rs\"))] mod nested_hidden;\nunsafe extern \"C\" { pub fn unreviewed_foreign_export(); }\n",
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
@@ -793,6 +803,7 @@ mod tests {
                 .count(),
             2
         );
+        assert!(codes.contains(&"facade-root-direct-item"));
     }
 
     #[test]
