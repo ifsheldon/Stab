@@ -5370,6 +5370,126 @@
         "standalone": true
       },
       {
+        "id": "a6-engine-compiled-detection-converter-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "detection::tests::compiled_detection_converter_streams_like_materialized_conversion",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "The canonical compiled converter reports exact semantic widths, prepares reusable detector and reference storage, and produces identical direct, streamed, and independently materialized records."
+        },
+        "negative_axes": [
+          "semantic-width-drift",
+          "direct-streamed-record-drift",
+          "detector-observable-routing-drift",
+          "reusable-storage-shape-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::compile"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::convert_record"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::try_for_each_detection_event"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::measurement_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::detector_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::observable_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::reusable_detection_record"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::reusable_reference_sample"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionConversionOptions"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionEventRecord"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-compiled-detection-sweep-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--lib",
+            "detection::tests::streamed_sweep_conversion_adds_no_per_shot_scratch_allocations",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Sweep-conditioned direct and streamed conversion reuse bounded reference and result storage, preserve exact detector and observable values, and add no allocation growth with shot count beyond reference sampling."
+        },
+        "negative_axes": [
+          "sweep-width-drift",
+          "sweep-reference-drift",
+          "direct-streamed-sweep-drift",
+          "per-shot-conversion-allocation"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::sweep_bit_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::convert_record_with_sweep_into"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::try_for_each_detection_event_with_sweep"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a5-measurement-detection-plan-contract",
         "feature_id": "CQ-DETECTION",
         "comparator": "exact-value",
@@ -5380,7 +5500,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::plans_are_shareable_and_streamed_conversion_matches_materialized_output",
             "--quiet",
@@ -5441,6 +5561,54 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSession::run"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionCompiler"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionCompiler::new"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionCompiler::compile"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan::measurement_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan::sweep_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionPlan::session"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession::run"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::measurement_record_count"
           }
         ],
         "standalone": true
@@ -5456,7 +5624,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::sweep_batches_and_reference_modes_match_materialized_conversion",
             "--quiet",
@@ -5475,6 +5643,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionCompiler::reference_sample_mode"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionCompiler::reference_sample_mode"
           }
         ],
         "standalone": true
@@ -5490,7 +5662,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle",
             "--quiet",
@@ -5518,6 +5690,18 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSinkAdapter::finish"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSinkAdapter"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSinkAdapter::write_batch_with_sweep"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSinkAdapter::finish"
           }
         ],
         "standalone": true
@@ -5533,7 +5717,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::incremental_delivery_finalizes_once_and_rejects_post_finish_writes",
             "--quiet",
@@ -5554,6 +5738,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSession::start_delivery"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession::start_delivery"
           }
         ],
         "standalone": true
@@ -5569,7 +5757,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::incremental_finish_failure_reports_committed_prefix_and_poisons_session",
             "--quiet",
@@ -5598,7 +5786,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::dropping_a_committed_incremental_delivery_poisons_the_parent_session",
             "--quiet",
@@ -5626,7 +5814,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse",
             "--quiet",
@@ -5650,6 +5838,14 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSession::total_committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession::is_poisoned"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession::total_committed_shots"
           }
         ],
         "standalone": true
@@ -5665,7 +5861,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::conversion_cancellation_rejects_a_whole_batch_and_is_resumable",
             "--quiet",
@@ -5685,6 +5881,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::MeasurementToDetectionSession::cancellation"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionSession::cancellation"
           }
         ],
         "standalone": true
@@ -5700,7 +5900,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::automatic_fused_and_direct_sampling_match_legacy_materialization",
             "--quiet",
@@ -5757,6 +5957,54 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionSamplingSession::run"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingCompiler"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingCompiler::new"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingCompiler::compile"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingPlan"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingPlan::measurement_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingPlan::session"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingSession"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingSession::run"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::detection_record_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::validate_detection_sampling_circuit"
           }
         ],
         "standalone": true
@@ -5772,7 +6020,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::seeded_same_session_partitioning_is_exact_for_both_private_variants",
             "--quiet",
@@ -5792,6 +6040,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionSamplingSession::total_committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingSession::total_committed_shots"
           }
         ],
         "standalone": true
@@ -5807,7 +6059,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::cancellation_stops_between_bounded_batches_and_finalizes_sink",
             "--quiet",
@@ -5852,6 +6104,34 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionRunSummary::total_committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingSession::cancellation"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunStatus"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunSummary"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunSummary::status"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunSummary::requested_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunSummary::committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunSummary::total_committed_shots"
           }
         ],
         "standalone": true
@@ -5867,7 +6147,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::sink_failures_preserve_first_error_progress_and_poison_sessions",
             "--quiet",
@@ -5916,6 +6196,38 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionSamplingSession::is_poisoned"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionExecutionError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunError::progress"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunProgress"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunProgress::committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRunProgress::attempted_batch_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingSession::is_poisoned"
           }
         ],
         "standalone": true
@@ -5931,7 +6243,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::compilation_rejects_limits_before_session_or_sink_work",
             "--quiet",
@@ -5963,6 +6275,18 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionCompileError::into_circuit_error"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MeasurementToDetectionCompiler::limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionSamplingCompiler::limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionCompileError"
           }
         ],
         "standalone": true
@@ -5978,7 +6302,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::warmed_conversion_reuses_width_and_batch_bounded_storage",
             "--quiet",
@@ -6007,7 +6331,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::warmed_detection_variants_reuse_session_and_batch_storage",
             "--quiet",
@@ -6036,7 +6360,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::fused_detection_storage_admission_uses_the_combined_session_estimate",
             "--quiet",
@@ -6064,7 +6388,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::direct_frame_compilation_charges_executable_targets_before_materialization",
             "--quiet",
@@ -6093,7 +6417,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
             "detection::api::tests::direct_frame_compilation_admits_repeats_and_filtered_targets_before_materialization",
             "--quiet",
@@ -8705,6 +9029,34 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::CompiledDetectionConverter::compile_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::compile_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionResourceKind"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionRecordLimitSubject"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionResourceLimitError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionResourceLimitError::kind"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionResourceLimitError::actual"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DetectionResourceLimitError::limit"
           }
         ],
         "standalone": true
@@ -9008,19 +9360,18 @@
             "-p",
             "stab-core",
             "--lib",
-            "detection::tests::detection_record_writers_cover_text_and_bit_packed_formats",
+            "detection::tests::facade_detection_writers_preserve_text_and_packed_formats",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "bounded-materialized",
-          "detail": "Detection and observable writers produce exact 01, DETS, HITS, B8, and PTB64 bytes for detector-only, appended, prepended, and side-output layouts."
+          "detail": "Facade detection and observable writers produce exact 01, DETS, HITS, and B8 bytes for appended, prepended, and side-output layouts."
         },
         "negative_axes": [
           "detector-observable-order-drift",
-          "result-format-byte-drift",
-          "ptb64-layout-drift"
+          "result-format-byte-drift"
         ],
         "public_api_owners": [
           {
@@ -9030,7 +9381,37 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::write_observable_records"
-          },
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-detection-ptb64-writer-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "detection::tests::facade_detection_writers_preserve_ptb64_routing",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Facade PTB64 writers preserve exact detector, appended-observable, and observable-side-output 64-record bit-plane routing."
+        },
+        "negative_axes": [
+          "ptb64-layout-drift",
+          "ptb64-observable-routing-drift"
+        ],
+        "public_api_owners": [
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::write_ptb64_detection_records"
@@ -9184,6 +9565,14 @@
             "owner_path": "stab_core::detection_record_width_with_limits"
           },
           {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::measurement_record_count_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::detection_record_width_with_limits"
+          },
+          {
             "crate_name": "stab_core",
             "owner_path": "stab_core::convert_measurements_to_detection_events_with_sweep_and_limits"
           },
@@ -9230,6 +9619,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::validate_detection_sampling_circuit_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::validate_detection_sampling_circuit_with_limits"
           }
         ],
         "standalone": true

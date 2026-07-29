@@ -7,12 +7,10 @@ use stab_core::{
     Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, SampleFormat,
     Seed, ShotCount, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
-    execution::{DetectionSamplingCompiler, MeasurementToDetectionCompiler},
-    measurement_record_count,
-    result_formats::read_records,
-    result_formats::write_ptb64_records_checked,
-    try_for_each_sampled_detection_event,
+    measurement_record_count, result_formats::read_records,
+    result_formats::write_ptb64_records_checked, try_for_each_sampled_detection_event,
 };
+use stab_engine::{DetectionSamplingCompiler, MeasurementToDetectionCompiler};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

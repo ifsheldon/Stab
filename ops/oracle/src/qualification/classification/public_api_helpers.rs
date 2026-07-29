@@ -61,6 +61,14 @@ pub(super) fn classify_extracted_engine_api(
     source_path: &str,
     api_lower: &str,
 ) -> Option<FeatureId> {
+    if api_path_mentions_item(api_lower, "measurementtodetectionsinkadapter") {
+        return Some(FeatureId::ResultFormats);
+    }
+    if source_path.starts_with("crates/stab-engine/src/detection")
+        || is_extracted_detection_api(api_lower)
+    {
+        return Some(FeatureId::Detection);
+    }
     if api_path_mentions_item(api_lower, "samplingcompilationdescriptor")
         || api_lower.ends_with("::compilation_descriptor")
     {
@@ -77,6 +85,46 @@ pub(super) fn classify_extracted_engine_api(
         return Some(FeatureId::Sampling);
     }
     None
+}
+
+fn is_extracted_detection_api(api_lower: &str) -> bool {
+    if !api_lower.starts_with("stab_engine::") && !api_lower.starts_with("stab_core::") {
+        return false;
+    }
+    [
+        "compileddetectionconverter",
+        "detectioncompileerror",
+        "detectionconversionlimits",
+        "detectionconversionoptions",
+        "detectionerror",
+        "detectioneventrecord",
+        "detectionexecutionerror",
+        "detectionresourcekind",
+        "detectionresourcelimiterror",
+        "detectionrunerror",
+        "detectionrunprogress",
+        "detectionrunstatus",
+        "detectionrunsummary",
+        "detectionsamplingcompiler",
+        "detectionsamplingplan",
+        "detectionsamplingsession",
+        "measurementtodetectioncompiler",
+        "measurementtodetectionplan",
+        "measurementtodetectionsession",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
+        || api_lower.rsplit("::").next().is_some_and(|function| {
+            [
+                "detection_record_width",
+                "detection_record_width_with_limits",
+                "measurement_record_count",
+                "measurement_record_count_with_limits",
+                "validate_detection_sampling_circuit",
+                "validate_detection_sampling_circuit_with_limits",
+            ]
+            .contains(&function)
+        })
 }
 
 fn is_extracted_sampling_api(api_lower: &str) -> bool {
@@ -210,6 +258,7 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
             "circuitflattenlimits",
             "demflattenlimits",
             "detectionconversionlimits",
+            "detectionrecordlimitsubject",
             "demsamplerlimits",
             "logicalerrorsearchlimits",
             "resourcekind",
