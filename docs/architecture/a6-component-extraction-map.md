@@ -156,7 +156,7 @@ The complete model slice is physically extracted. `stab-model` owns `Circuit`, `
 | `mbqc_decomposition.rs` | `mbqc.rs` | Own MBQC decomposition. |
 | `sparse_rev_frame_tracker*` | `sparse_reverse_tracker/*` | Own pure reverse tracking shared by flow and DEM analysis. |
 
-Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, and circuit-flatten resource admission are physically extracted. `stab-core` wrappers retain the old aggregate error and resource signatures, while the canonical Stable implementation and owning tests live in `stab-analysis`. The remaining rows are still active.
+Gate semantic projections, recursive tag removal, full-circuit tableau conversion, simplification, decomposition, bounded circuit flattening, noise removal, circuit-flatten resource admission, repetition/surface/color generation, and MBQC decomposition are physically extracted. `stab-core` wrappers retain the old aggregate error, generated-value, and resource signatures, while the canonical Stable implementation and owning tests live in `stab-analysis`. Flow, inversion, feedback, detecting regions, missing-detector analysis, DEM analysis/search, error matching, and sparse reverse tracking remain active.
 
 The crate depends only on exact-version `stab-model` and `stab-algebra` edges.
 

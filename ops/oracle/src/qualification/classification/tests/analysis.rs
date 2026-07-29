@@ -37,6 +37,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
+            "crates/stab-analysis/src/circuit_generation.rs",
+            "stab_analysis::generate_surface_code_circuit",
+            FeatureId::Generation,
+        ),
+        (
+            "stab_analysis",
+            "crates/stab-analysis/src/mbqc_decomposition.rs",
+            "stab_analysis::mbqc_decomposition",
+            FeatureId::CircuitApi,
+        ),
+        (
+            "stab_analysis",
             "crates/stab-analysis/src/resources.rs",
             "stab_analysis::ResourceKind",
             FeatureId::Resource,
@@ -64,6 +76,18 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
             "crates/stab-core/src/lib.rs",
             "stab_core::GateUnitaryMatrix",
             FeatureId::GateContract,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/lib.rs",
+            "stab_core::ColorCodeTask",
+            FeatureId::Generation,
+        ),
+        (
+            "stab_core",
+            "crates/stab-core/src/lib.rs",
+            "stab_core::GeneratedCircuit::layout_text",
+            FeatureId::Generation,
         ),
         (
             "stab_core",

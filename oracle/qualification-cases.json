@@ -2487,11 +2487,12 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "mbqc_decomposition", "cq2_circuit_api_mbqc_decomposition_contract_matches_selected_stim_scope", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "mbqc_decomposition", "cq2_circuit_api_mbqc_decomposition_contract_matches_selected_stim_scope", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed selected-scope aggregate proves unsupported-category None results and canonical measurement, reset, Pauli, phase, identity, and CX decomposition text."},
-      "static_property_plan": {"generator_domain": "nine unsupported representatives plus exact canonical output and reparsing for all seventeen implemented measurement, reset, Pauli, phase, identity, and CX gates", "case_count": 26, "corpus_path": "crates/stab-core/tests/mbqc_decomposition.rs"},
+      "static_property_plan": {"generator_domain": "nine unsupported representatives plus exact canonical output and reparsing for all seventeen implemented measurement, reset, Pauli, phase, identity, and CX gates", "case_count": 26, "corpus_path": "crates/stab-analysis/tests/mbqc_decomposition.rs"},
       "public_api_owners": [
+        {"crate_name": "stab_analysis", "owner_path": "stab_analysis::mbqc_decomposition"},
         {"crate_name": "stab_core", "owner_path": "stab_core::mbqc_decomposition"}
       ],
       "oracle_fixture_owners": ["coverage-util-top-mbqc-decomposition"]
@@ -13950,7 +13951,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_parameter_contract_covers_typed_values_and_noise_builders",
@@ -14019,7 +14020,55 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_before_round_data_depolarization" },
         { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_before_measure_flip_probability" },
         { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_after_reset_flip_probability" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_after_clifford_depolarization" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::CodeDistance" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::CodeDistance::try_new" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::CodeDistance::get" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RoundCount" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RoundCount::try_new" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RoundCount::get" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeTask" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeTask" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeTask" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::new" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::rounds" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::distance" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::task" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::RepetitionCodeParams::with_after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::new" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::rounds" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::distance" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::task" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::SurfaceCodeParams::with_after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::new" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::rounds" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::distance" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::task" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::ColorCodeParams::with_after_clifford_depolarization" }
       ]
     },
     {
@@ -14033,7 +14082,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_repetition_matches_complete_pinned_stim_case",
@@ -14062,7 +14111,12 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::circuit" },
         { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::layout_text" },
         { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::hint_text" },
-        { "crate_name": "stab_core", "owner_path": "stab_core::generate_repetition_code_circuit" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_repetition_code_circuit" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::GeneratedCircuit" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::GeneratedCircuit::circuit" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::GeneratedCircuit::layout_text" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::GeneratedCircuit::hint_text" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::generate_repetition_code_circuit" }
       ],
       "oracle_fixture_owners": [
         "coverage-gen-gen-rep-code-structural"
@@ -14079,7 +14133,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_surface_matches_complete_pinned_stim_cases",
@@ -14109,7 +14163,8 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::generate_surface_code_circuit" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_surface_code_circuit" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::generate_surface_code_circuit" }
       ],
       "oracle_fixture_owners": [
         "coverage-gen-gen-surface-code-structural"
@@ -14126,7 +14181,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_color_matches_complete_pinned_stim_case",
@@ -14152,7 +14207,8 @@
         }
       ],
       "public_api_owners": [
-        { "crate_name": "stab_core", "owner_path": "stab_core::generate_color_code_circuit" }
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_color_code_circuit" },
+        { "crate_name": "stab_analysis", "owner_path": "stab_analysis::generate_color_code_circuit" }
       ],
       "oracle_fixture_owners": [
         "coverage-gen-gen-color-code-structural"
@@ -14169,7 +14225,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_color_rejects_invalid_family_parameters",
@@ -14250,7 +14306,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "resource::cq2_generation_resource_admission_checks_family_boundaries_before_materialization",
@@ -14304,13 +14360,55 @@
       "standalone": true
     },
     {
+      "id": "a6-generation-facade-resource-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_generation", "generation_facade_preserves_resource_rejection_contract", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The compatibility facade preserves analysis-owned domain and projected-size failures as CircuitError::InvalidDomainValue while rejecting before materialization with a fixed allocation ceiling."
+      },
+      "negative_axes": [
+        "invalid-distance-adapter",
+        "invalid-round-adapter",
+        "rotated-surface-resource-adapter",
+        "color-resource-adapter"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a6-generation-facade-parameter-allocation-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_generation", "generation_facade_preserves_zero_allocation_parameter_builders", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Constructing and updating all three compatibility parameter wrappers performs no heap allocation, preserving the fixed-size facade contract across the crate boundary."
+      },
+      "negative_axes": [
+        "repetition-parameter-wrapper",
+        "surface-parameter-wrapper",
+        "color-parameter-wrapper",
+        "all-noise-builders"
+      ],
+      "standalone": true
+    },
+    {
       "id": "cq2-generation-helper-begin-round-contract",
       "feature_id": "CQ-GENERATION",
       "comparator": "canonical",
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_begin_round_tick_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_begin_round_tick_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [
@@ -14325,7 +14423,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_unitary_1_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_unitary_1_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [
@@ -14340,7 +14438,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_unitary_2_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_unitary_2_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [
@@ -14355,7 +14453,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_reset_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_reset_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [
@@ -14370,7 +14468,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_measure_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_measure_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [
@@ -14385,7 +14483,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_measure_reset_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--lib", "circuit_generation::tests::append_measure_reset_matches_stim", "--quiet", "--exact"]
       },
       "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
       "upstream_owners": [

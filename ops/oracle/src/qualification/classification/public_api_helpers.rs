@@ -4,6 +4,15 @@ pub(super) fn classify_extracted_analysis_api(
     source_path: &str,
     api_lower: &str,
 ) -> Option<FeatureId> {
+    if is_generation_api(api_lower) {
+        return Some(FeatureId::Generation);
+    }
+    if source_path.starts_with("crates/stab-analysis/src/circuit_generation") {
+        return Some(FeatureId::Generation);
+    }
+    if source_path == "crates/stab-analysis/src/mbqc_decomposition.rs" {
+        return Some(FeatureId::CircuitApi);
+    }
     if api_lower.ends_with("::decomposed_circuit")
         || api_lower.ends_with("::simplified_circuit")
         || matches!(
@@ -18,6 +27,25 @@ pub(super) fn classify_extracted_analysis_api(
         return Some(FeatureId::Algebra);
     }
     None
+}
+
+fn is_generation_api(api_lower: &str) -> bool {
+    [
+        "codedistance",
+        "roundcount",
+        "repetitioncodetask",
+        "surfacecodetask",
+        "colorcodetask",
+        "repetitioncodeparams",
+        "surfacecodeparams",
+        "colorcodeparams",
+        "generatedcircuit",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
+        || api_lower.ends_with("::generate_repetition_code_circuit")
+        || api_lower.ends_with("::generate_surface_code_circuit")
+        || api_lower.ends_with("::generate_color_code_circuit")
 }
 
 pub(super) fn api_path_mentions_item(api_path: &str, item: &str) -> bool {

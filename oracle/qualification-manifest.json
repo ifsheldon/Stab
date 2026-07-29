@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "f568b21cad0700e06af7da1f550be46c5a48862a3fdc02a412fbdc27c73b61d2",
+  "semantic_digest": "a5235e781da44994ce3e872c0b469ddc80cd8e4770b75e70f4755484b712aca5",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -61147,7 +61147,7 @@
       "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 19,
+      "source_line": 22,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61160,7 +61160,7 @@
       "path": "stab_analysis::AnalysisError::InvalidCircuitSimplification::message",
       "kind": "field",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 19,
+      "source_line": 22,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61199,7 +61199,7 @@
       "path": "stab_analysis::AnalysisError::InvalidDomainValue",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 22,
+      "source_line": 16,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61212,7 +61212,7 @@
       "path": "stab_analysis::AnalysisError::InvalidDomainValue::kind",
       "kind": "field",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 22,
+      "source_line": 16,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61225,7 +61225,7 @@
       "path": "stab_analysis::AnalysisError::InvalidDomainValue::value",
       "kind": "field",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 22,
+      "source_line": 16,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61264,7 +61264,7 @@
       "path": "stab_analysis::AnalysisError::InvalidTableauConversion",
       "kind": "variant",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 16,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61277,7 +61277,7 @@
       "path": "stab_analysis::AnalysisError::InvalidTableauConversion::message",
       "kind": "field",
       "source_path": "crates/stab-analysis/src/error.rs",
-      "source_line": 16,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-qualification-c1d27041c4f6f176",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
@@ -61622,6 +61622,448 @@
       ]
     },
     {
+      "id": "cq-api-item-dbf4be7d82835329",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 20,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-71efe3d4fc5c1b20",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as Clone for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-de9be95f5aa5ef1d",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as Copy for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-528c45bddddc8088",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as Debug for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-95a494d51f901c27",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as Eq for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-fdf4597e9cfbf127",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as PartialEq for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-4f59b2e0e05ab76c",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance as StructuralPartialEq for@beacd38b0519",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 19,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-7506ba49df666213",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance::get",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 30,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-be6f795474193d72",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::CodeDistance::try_new",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 23,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-495bb16de18e9dce",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 255,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-43374315dd215c88",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams as Clone for@c238ca8d7edc",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 254,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-33827dbe9939f59a",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams as Debug for@c238ca8d7edc",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 254,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-e9e218b8e9537c47",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams as PartialEq for@c238ca8d7edc",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 254,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1750e93e7ce57b07",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams as StructuralPartialEq for@c238ca8d7edc",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 254,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-74ba30ad6db01b36",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 296,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-16f64a7c456c993f",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 292,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-818f0e14cf36a4a3",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 288,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-9fb920e8aafb983b",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 284,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-711f1027ec300746",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::distance",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 276,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-79c457e3bfe7323b",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::new",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 261,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-4f646174fd7129a2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::rounds",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 272,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1288fb5e163f9793",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::task",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 280,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-bc07618e1ebd28dd",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::with_after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 315,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-64b74282548483a2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::with_after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 310,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-90b89664ea5e1e7f",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::with_before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 305,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-0d77e0b7e4e714fe",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeParams::with_before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 300,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-de8b538d5686d56c",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 250,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-33356ea3fe5b0896",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as Clone for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d69a6b5e2428dafa",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as Copy for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-8504aa59137f30a9",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as Debug for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1b711afe6d1e34e2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as Eq for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d33eec94d2b8c6e1",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as PartialEq for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-264a9b09ef880f18",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask as StructuralPartialEq for@78397fab2ab7",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 249,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-4b9995c25bc75d08",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::ColorCodeTask::MemoryXyz",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 251,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
       "id": "cq-api-item-342fd4a5d900648f",
       "feature_id": "CQ-GATE-CONTRACT",
       "crate_name": "stab_analysis",
@@ -61843,6 +62285,435 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-3a14a84a4def804f",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 326,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d2969715644a3258",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit as Clone for@94ccabc0ef83",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 325,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-2c53d4a3caf7f235",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit as Debug for@94ccabc0ef83",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 325,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-4cc3aa5dd014f3d2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit as PartialEq for@94ccabc0ef83",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 325,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-84e2b74824d96b92",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit as StructuralPartialEq for@94ccabc0ef83",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 325,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-58145b9f597bc0e2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit::circuit",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 333,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-279911893fb7c40c",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit::hint_text",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 341,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-4bc2ad870c8f65ec",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::GeneratedCircuit::layout_text",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 337,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-3559ba704dd0c374",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 100,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-889ffc37193d9589",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams as Clone for@6f0aa026a80d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-c6f19344f27952fe",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams as Debug for@6f0aa026a80d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-51a37e611f3bcb95",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams as PartialEq for@6f0aa026a80d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-2b4acd4bfcbb5944",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams as StructuralPartialEq for@6f0aa026a80d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 99,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-17eb79034d98cfe5",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 141,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-92a24b8db1271e79",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 137,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d8468708df16933d",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 133,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-ba2a3888bcff43e4",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 129,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-6a821d7c2734ab56",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::distance",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 121,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-5f8786fd5ef1b6c7",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::new",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-452a57df73979f44",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::rounds",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 117,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-ec6bdf8b42c81d71",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::task",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 125,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d386eec85f882156",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::with_after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 160,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1f4ce81278921e44",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::with_after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 155,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d6ea3492becb1778",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::with_before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 150,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-120f9040ec715d2f",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeParams::with_before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 145,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-a13307d352ec1b49",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 95,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-ae841e875311257c",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as Clone for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-8938c516a159f673",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as Copy for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-8fd1063a407faa62",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as Debug for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-075c01d8aebe579e",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as Eq for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-22e3e4557f103ad8",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as PartialEq for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-722e365c9e313910",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask as StructuralPartialEq for@e69fa2ec3719",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 94,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-5dbc8e2de16f4f82",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RepetitionCodeTask::Memory",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 96,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
       ]
     },
     {
@@ -62363,6 +63234,487 @@
       "owner_case_id": "cq-evidence-qualification-5b795d6363b18cb0",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-968d812364934247",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 36,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1d724f07f7254b15",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as Clone for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-e0a03c160db21597",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as Copy for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-3e43e37844dd155f",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as Debug for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-05e939e6bea241ee",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as Eq for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-2d47f23c0d901f17",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as PartialEq for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-a81798541f82dde7",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount as StructuralPartialEq for@9cc01859b9c5",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-e22a6f8281d44313",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount::get",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 46,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-7cc06a830241373c",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::RoundCount::try_new",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 39,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-e2d69e9b6f170f0a",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams",
+      "kind": "struct",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 179,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-393e1051c14a02fa",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams as Clone for@9258a792bfaa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-32cc08a5e4e011f3",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams as Debug for@9258a792bfaa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b5205be66da4da2e",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams as PartialEq for@9258a792bfaa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d104b2bcf058abfb",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams as StructuralPartialEq for@9258a792bfaa",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 178,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b6f14163c26425c2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 220,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-7da62e490d347f6d",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 216,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-85c83048828d8c26",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 212,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-e2ad75ab820f0965",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 208,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-c8ea6d6a0dc9ff72",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::distance",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 200,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-fd31f793a07fad99",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::new",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 185,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-787373b54f9830a8",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::rounds",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 196,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-ae7df21aca403a96",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::task",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 204,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-0727b1c7727bdeed",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::with_after_clifford_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 239,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-490872a316023058",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::with_after_reset_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 234,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-5ddf8e54e239a308",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::with_before_measure_flip_probability",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 229,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-6a8b7ddd16a08be0",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeParams::with_before_round_data_depolarization",
+      "kind": "method",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 224,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b15e58fc09dbd918",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask",
+      "kind": "enum",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 171,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-8cf705542380b7db",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as Clone for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-c9124b354df1f4ec",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as Copy for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-7ff568539926685a",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as Debug for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-511017081e56ad8b",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as Eq for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b08dbcc7039e8969",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as PartialEq for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-344ffbfd7df84008",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask as StructuralPartialEq for@51adf382235c",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 170,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-cf0f95850d9408a2",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask::RotatedMemoryX",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 172,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-d40b46b73b7f5b4e",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask::RotatedMemoryZ",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 173,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-f0eb1da5a608d057",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask::UnrotatedMemoryX",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 174,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-7ed02b34113dcd89",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::SurfaceCodeTask::UnrotatedMemoryZ",
+      "kind": "variant",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 175,
+      "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
+      "performance_groups": [
+        "PERF-GENERATION"
       ]
     },
     {
@@ -63011,6 +64363,59 @@
         "PERF-SAMPLING",
         "PERF-DETECTION",
         "PERF-ERROR-ANALYSIS"
+      ]
+    },
+    {
+      "id": "cq-api-item-a7f7b059ccaa76c6",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::generate_color_code_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_generation/color.rs",
+      "source_line": 24,
+      "owner_case_id": "cq-evidence-qualification-a097671b0e696c17",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-1b00cce618b244ca",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::generate_repetition_code_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_generation.rs",
+      "source_line": 350,
+      "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b0dea34b5d5deb82",
+      "feature_id": "CQ-GENERATION",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::generate_surface_code_circuit",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/circuit_generation/surface.rs",
+      "source_line": 25,
+      "owner_case_id": "cq-evidence-qualification-76308e191be287f5",
+      "performance_groups": [
+        "PERF-GENERATION"
+      ]
+    },
+    {
+      "id": "cq-api-item-0e3237ff4dc1782f",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_analysis",
+      "path": "stab_analysis::mbqc_decomposition",
+      "kind": "function",
+      "source_path": "crates/stab-analysis/src/mbqc_decomposition.rs",
+      "source_line": 9,
+      "owner_case_id": "cq-evidence-qualification-e9c13d24e25ae340",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -70848,7 +72253,7 @@
       "path": "stab_core::CodeDistance",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 19,
+      "source_line": 6,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70861,7 +72266,7 @@
       "path": "stab_core::CodeDistance as Clone for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70874,7 +72279,7 @@
       "path": "stab_core::CodeDistance as Copy for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70887,7 +72292,7 @@
       "path": "stab_core::CodeDistance as Debug for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70900,7 +72305,7 @@
       "path": "stab_core::CodeDistance as Eq for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70913,7 +72318,7 @@
       "path": "stab_core::CodeDistance as PartialEq for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70926,7 +72331,7 @@
       "path": "stab_core::CodeDistance as StructuralPartialEq for@beacd38b0519",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 18,
+      "source_line": 5,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70939,7 +72344,7 @@
       "path": "stab_core::CodeDistance::get",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 29,
+      "source_line": 15,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -70952,7 +72357,7 @@
       "path": "stab_core::CodeDistance::try_new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 22,
+      "source_line": 9,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71133,7 +72538,7 @@
       "path": "stab_core::ColorCodeParams",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 254,
+      "source_line": 162,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71146,7 +72551,7 @@
       "path": "stab_core::ColorCodeParams as Clone for@c238ca8d7edc",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 253,
+      "source_line": 161,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71159,7 +72564,7 @@
       "path": "stab_core::ColorCodeParams as Debug for@c238ca8d7edc",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 253,
+      "source_line": 161,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71172,7 +72577,7 @@
       "path": "stab_core::ColorCodeParams as PartialEq for@c238ca8d7edc",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 253,
+      "source_line": 161,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71185,7 +72590,7 @@
       "path": "stab_core::ColorCodeParams as StructuralPartialEq for@c238ca8d7edc",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 253,
+      "source_line": 161,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71198,7 +72603,7 @@
       "path": "stab_core::ColorCodeParams::after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 295,
+      "source_line": 199,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71211,7 +72616,7 @@
       "path": "stab_core::ColorCodeParams::after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 291,
+      "source_line": 195,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71224,7 +72629,7 @@
       "path": "stab_core::ColorCodeParams::before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 287,
+      "source_line": 191,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71237,7 +72642,7 @@
       "path": "stab_core::ColorCodeParams::before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 283,
+      "source_line": 187,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71250,7 +72655,7 @@
       "path": "stab_core::ColorCodeParams::distance",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 275,
+      "source_line": 179,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71263,7 +72668,7 @@
       "path": "stab_core::ColorCodeParams::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 260,
+      "source_line": 165,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71276,7 +72681,7 @@
       "path": "stab_core::ColorCodeParams::rounds",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 271,
+      "source_line": 175,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71289,7 +72694,7 @@
       "path": "stab_core::ColorCodeParams::task",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 279,
+      "source_line": 183,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71302,7 +72707,7 @@
       "path": "stab_core::ColorCodeParams::with_after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 314,
+      "source_line": 218,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71315,7 +72720,7 @@
       "path": "stab_core::ColorCodeParams::with_after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 309,
+      "source_line": 213,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71328,7 +72733,7 @@
       "path": "stab_core::ColorCodeParams::with_before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 304,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71341,7 +72746,7 @@
       "path": "stab_core::ColorCodeParams::with_before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 299,
+      "source_line": 203,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71353,8 +72758,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 249,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71366,8 +72771,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as Clone for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71379,8 +72784,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as Copy for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71392,8 +72797,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as Debug for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71405,8 +72810,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as Eq for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71418,8 +72823,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as PartialEq for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71431,8 +72836,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask as StructuralPartialEq for@78397fab2ab7",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 248,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -71444,8 +72849,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::ColorCodeTask::MemoryXyz",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 250,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83046,7 +84451,7 @@
       "path": "stab_core::GeneratedCircuit",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 325,
+      "source_line": 225,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83059,7 +84464,7 @@
       "path": "stab_core::GeneratedCircuit as Clone for@94ccabc0ef83",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 324,
+      "source_line": 224,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83072,7 +84477,7 @@
       "path": "stab_core::GeneratedCircuit as Debug for@94ccabc0ef83",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 324,
+      "source_line": 224,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83085,7 +84490,7 @@
       "path": "stab_core::GeneratedCircuit as PartialEq for@94ccabc0ef83",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 324,
+      "source_line": 224,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83098,7 +84503,7 @@
       "path": "stab_core::GeneratedCircuit as StructuralPartialEq for@94ccabc0ef83",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 324,
+      "source_line": 224,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83111,7 +84516,7 @@
       "path": "stab_core::GeneratedCircuit::circuit",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 332,
+      "source_line": 228,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83124,7 +84529,7 @@
       "path": "stab_core::GeneratedCircuit::hint_text",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 340,
+      "source_line": 236,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -83137,7 +84542,7 @@
       "path": "stab_core::GeneratedCircuit::layout_text",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 336,
+      "source_line": 232,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90884,7 +92289,7 @@
       "path": "stab_core::RepetitionCodeParams",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 99,
+      "source_line": 36,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90897,7 +92302,7 @@
       "path": "stab_core::RepetitionCodeParams as Clone for@6f0aa026a80d",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 98,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90910,7 +92315,7 @@
       "path": "stab_core::RepetitionCodeParams as Debug for@6f0aa026a80d",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 98,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90923,7 +92328,7 @@
       "path": "stab_core::RepetitionCodeParams as PartialEq for@6f0aa026a80d",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 98,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90936,7 +92341,7 @@
       "path": "stab_core::RepetitionCodeParams as StructuralPartialEq for@6f0aa026a80d",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 98,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90949,7 +92354,7 @@
       "path": "stab_core::RepetitionCodeParams::after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 140,
+      "source_line": 73,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90962,7 +92367,7 @@
       "path": "stab_core::RepetitionCodeParams::after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 136,
+      "source_line": 69,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90975,7 +92380,7 @@
       "path": "stab_core::RepetitionCodeParams::before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 132,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -90988,7 +92393,7 @@
       "path": "stab_core::RepetitionCodeParams::before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 128,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91001,7 +92406,7 @@
       "path": "stab_core::RepetitionCodeParams::distance",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 120,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91014,7 +92419,7 @@
       "path": "stab_core::RepetitionCodeParams::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 105,
+      "source_line": 39,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91027,7 +92432,7 @@
       "path": "stab_core::RepetitionCodeParams::rounds",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 116,
+      "source_line": 49,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91040,7 +92445,7 @@
       "path": "stab_core::RepetitionCodeParams::task",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 124,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91053,7 +92458,7 @@
       "path": "stab_core::RepetitionCodeParams::with_after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 159,
+      "source_line": 92,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91066,7 +92471,7 @@
       "path": "stab_core::RepetitionCodeParams::with_after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 154,
+      "source_line": 87,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91079,7 +92484,7 @@
       "path": "stab_core::RepetitionCodeParams::with_before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 149,
+      "source_line": 82,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91092,7 +92497,7 @@
       "path": "stab_core::RepetitionCodeParams::with_before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 144,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91104,8 +92509,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 94,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91117,8 +92522,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as Clone for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91130,8 +92535,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as Copy for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91143,8 +92548,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as Debug for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91156,8 +92561,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as Eq for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91169,8 +92574,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as PartialEq for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91182,8 +92587,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask as StructuralPartialEq for@e69fa2ec3719",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 93,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -91195,8 +92600,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::RepetitionCodeTask::Memory",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 95,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92379,7 +93784,7 @@
       "path": "stab_core::RoundCount",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 35,
+      "source_line": 21,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92392,7 +93797,7 @@
       "path": "stab_core::RoundCount as Clone for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92405,7 +93810,7 @@
       "path": "stab_core::RoundCount as Copy for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92418,7 +93823,7 @@
       "path": "stab_core::RoundCount as Debug for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92431,7 +93836,7 @@
       "path": "stab_core::RoundCount as Eq for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92444,7 +93849,7 @@
       "path": "stab_core::RoundCount as PartialEq for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92457,7 +93862,7 @@
       "path": "stab_core::RoundCount as StructuralPartialEq for@9cc01859b9c5",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 34,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92470,7 +93875,7 @@
       "path": "stab_core::RoundCount::get",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 45,
+      "source_line": 30,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -92483,7 +93888,7 @@
       "path": "stab_core::RoundCount::try_new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 38,
+      "source_line": 24,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97592,7 +98997,7 @@
       "path": "stab_core::SurfaceCodeParams",
       "kind": "struct",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 178,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97605,7 +99010,7 @@
       "path": "stab_core::SurfaceCodeParams as Clone for@9258a792bfaa",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 177,
+      "source_line": 98,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97618,7 +99023,7 @@
       "path": "stab_core::SurfaceCodeParams as Debug for@9258a792bfaa",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 177,
+      "source_line": 98,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97631,7 +99036,7 @@
       "path": "stab_core::SurfaceCodeParams as PartialEq for@9258a792bfaa",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 177,
+      "source_line": 98,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97644,7 +99049,7 @@
       "path": "stab_core::SurfaceCodeParams as StructuralPartialEq for@9258a792bfaa",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 177,
+      "source_line": 98,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97657,7 +99062,7 @@
       "path": "stab_core::SurfaceCodeParams::after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 219,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97670,7 +99075,7 @@
       "path": "stab_core::SurfaceCodeParams::after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 215,
+      "source_line": 132,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97683,7 +99088,7 @@
       "path": "stab_core::SurfaceCodeParams::before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 211,
+      "source_line": 128,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97696,7 +99101,7 @@
       "path": "stab_core::SurfaceCodeParams::before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 207,
+      "source_line": 124,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97709,7 +99114,7 @@
       "path": "stab_core::SurfaceCodeParams::distance",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 199,
+      "source_line": 116,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97722,7 +99127,7 @@
       "path": "stab_core::SurfaceCodeParams::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 184,
+      "source_line": 102,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97735,7 +99140,7 @@
       "path": "stab_core::SurfaceCodeParams::rounds",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 195,
+      "source_line": 112,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97748,7 +99153,7 @@
       "path": "stab_core::SurfaceCodeParams::task",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 203,
+      "source_line": 120,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97761,7 +99166,7 @@
       "path": "stab_core::SurfaceCodeParams::with_after_clifford_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 238,
+      "source_line": 155,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97774,7 +99179,7 @@
       "path": "stab_core::SurfaceCodeParams::with_after_reset_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 233,
+      "source_line": 150,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97787,7 +99192,7 @@
       "path": "stab_core::SurfaceCodeParams::with_before_measure_flip_probability",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 228,
+      "source_line": 145,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97800,7 +99205,7 @@
       "path": "stab_core::SurfaceCodeParams::with_before_round_data_depolarization",
       "kind": "method",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 223,
+      "source_line": 140,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97812,8 +99217,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask",
       "kind": "enum",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 170,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97825,8 +99230,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as Clone for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97838,8 +99243,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as Copy for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97851,8 +99256,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as Debug for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97864,8 +99269,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as Eq for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97877,8 +99282,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as PartialEq for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97890,8 +99295,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask as StructuralPartialEq for@51adf382235c",
       "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 169,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97903,8 +99308,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask::RotatedMemoryX",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 171,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97916,8 +99321,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask::RotatedMemoryZ",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 172,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97929,8 +99334,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask::UnrotatedMemoryX",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 173,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -97942,8 +99347,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::SurfaceCodeTask::UnrotatedMemoryZ",
       "kind": "variant",
-      "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 174,
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 70,
       "owner_case_id": "cq-evidence-qualification-927161707c0c57ab",
       "performance_groups": [
         "PERF-GENERATION"
@@ -110307,8 +111712,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::generate_color_code_circuit",
       "kind": "function",
-      "source_path": "crates/stab-core/src/circuit_generation/color.rs",
-      "source_line": 23,
+      "source_path": "crates/stab-core/src/circuit_generation.rs",
+      "source_line": 270,
       "owner_case_id": "cq-evidence-qualification-a097671b0e696c17",
       "performance_groups": [
         "PERF-GENERATION"
@@ -110321,7 +111726,7 @@
       "path": "stab_core::generate_repetition_code_circuit",
       "kind": "function",
       "source_path": "crates/stab-core/src/circuit_generation.rs",
-      "source_line": 349,
+      "source_line": 245,
       "owner_case_id": "cq-evidence-qualification-fef9c1f153d184cc",
       "performance_groups": [
         "PERF-GENERATION"
@@ -110333,8 +111738,8 @@
       "crate_name": "stab_core",
       "path": "stab_core::generate_surface_code_circuit",
       "kind": "function",
-      "source_path": "crates/stab-core/src/circuit_generation/surface.rs",
-      "source_line": 24,
+      "source_path": "crates/stab-core/src/circuit_generation.rs",
+      "source_line": 258,
       "owner_case_id": "cq-evidence-qualification-76308e191be287f5",
       "performance_groups": [
         "PERF-GENERATION"
@@ -141560,6 +142965,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::ColorCodeTask",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::ColorCodeTask"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::CommutingPauliStringIterator",
       "canonical_crate_name": "stab_algebra",
       "canonical_path": "stab_algebra::CommutingPauliStringIterator"
@@ -141974,6 +143385,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::RepetitionCodeTask",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::RepetitionCodeTask"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::ResourceEstimate",
       "canonical_crate_name": "stab_model",
       "canonical_path": "stab_model::ResourceEstimate"
@@ -142025,6 +143442,12 @@
       "alias_path": "stab_core::StabilizerResult",
       "canonical_crate_name": "stab_algebra",
       "canonical_path": "stab_algebra::StabilizerResult"
+    },
+    {
+      "crate_name": "stab_core",
+      "alias_path": "stab_core::SurfaceCodeTask",
+      "canonical_crate_name": "stab_analysis",
+      "canonical_path": "stab_analysis::SurfaceCodeTask"
     },
     {
       "crate_name": "stab_core",
@@ -178493,7 +179916,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_measure_reset_matches_stim",
           "--quiet",
@@ -179229,7 +180652,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_begin_round_tick_matches_stim",
           "--quiet",
@@ -181125,6 +182548,58 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-2522b022e71fe04f",
+      "feature_id": "CQ-GENERATION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-generation-facade-parameter-allocation-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "generation_facade_preserves_zero_allocation_parameter_builders",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Constructing and updating all three compatibility parameter wrappers performs no heap allocation, preserving the fixed-size facade contract across the crate boundary."
+      },
+      "negative_axes": [
+        "repetition-parameter-wrapper",
+        "surface-parameter-wrapper",
+        "color-parameter-wrapper",
+        "all-noise-builders"
+      ],
+      "performance_groups": [
+        "PERF-GENERATION"
       ],
       "status": "implemented"
     },
@@ -186728,7 +188203,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_reset_matches_stim",
           "--quiet",
@@ -186932,7 +188407,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_unitary_2_matches_stim",
           "--quiet",
@@ -187738,7 +189213,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_surface_matches_complete_pinned_stim_cases",
@@ -189744,7 +191219,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_parameter_contract_covers_typed_values_and_noise_builders",
@@ -190854,7 +192329,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_color_matches_complete_pinned_stim_case",
@@ -191181,7 +192656,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "resource::cq2_generation_resource_admission_checks_family_boundaries_before_materialization",
@@ -191507,6 +192982,58 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-a858806f1b6c0bf9",
+      "feature_id": "CQ-GENERATION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-generation-facade-resource-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "generation_facade_preserves_resource_rejection_contract",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The compatibility facade preserves analysis-owned domain and projected-size failures as CircuitError::InvalidDomainValue while rejecting before materialization with a fixed allocation ceiling."
+      },
+      "negative_axes": [
+        "invalid-distance-adapter",
+        "invalid-round-adapter",
+        "rotated-surface-resource-adapter",
+        "color-resource-adapter"
+      ],
+      "performance_groups": [
+        "PERF-GENERATION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-a869377df1530b8f",
       "feature_id": "CQ-STIM-FORMAT",
       "behavioral_surface": "file-format",
@@ -191584,7 +193111,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_unitary_1_matches_stim",
           "--quiet",
@@ -194510,7 +196037,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_color_rejects_invalid_family_parameters",
@@ -197707,7 +199234,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--lib",
           "circuit_generation::tests::append_measure_matches_stim",
           "--quiet",
@@ -197862,8 +199389,8 @@
           "maximum_generated_bytes": 0,
           "seeds": [],
           "case_count": 26,
-          "corpus_path": "crates/stab-core/tests/mbqc_decomposition.rs",
-          "corpus_sha256": "76ac034580d3d73c952ce847335919974158c98a43d3bb011834e8939337add1",
+          "corpus_path": "crates/stab-analysis/tests/mbqc_decomposition.rs",
+          "corpus_sha256": "0ae645a286e8e5a4676e51395f544e4b12866dddb4d7014d82b22df61e9a98d5",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -197875,7 +199402,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "mbqc_decomposition",
           "cq2_circuit_api_mbqc_decomposition_contract_matches_selected_stim_scope",
@@ -199755,7 +201282,7 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
           "circuit_generation",
           "cq2_generation_repetition_matches_complete_pinned_stim_case",
