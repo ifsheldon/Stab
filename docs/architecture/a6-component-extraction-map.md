@@ -319,19 +319,28 @@ Add external-consumer fixtures for:
 
 The extraction does not invent new aggregate benchmark rows.
 
-Rerun the existing rows whose implementation call path changes:
+### Source-Owning SIMD Evidence
+
+Only the workloads that execute an extracted optional kernel are SIMD evidence:
 
 - M5 dense packed-bit XOR;
 - M6 non-identity Clifford right multiplication;
-- M5 and M6 continuity rows only where the selected feature changes an executed function.
+- selected M5 and M6 scalar-versus-Stim continuity rows after the scalar-versus-SIMD decision.
 
-Parser, records, sampling, conversion, DEM, and analysis rows are not SIMD evidence merely because their owning crates were extracted. They are rerun only when a later source change affects their timed boundary.
+Parser, records, sampling, conversion, DEM, and analysis rows are not SIMD evidence merely because their owning crates were extracted.
+
+### Extraction Continuity
+
+Retarget or rerun the following existing rows only when physical ownership or a moved implementation changes their executed call path:
+
 - M7 record conversion paths affected by feature forwarding;
 - M8 sampling compilation, session construction, execution, typed batch consumption, encoding, and CLI sampling;
 - M9 measurement-to-detection compilation, conversion, fused detection sampling, replay, routing, and CLI paths;
 - M10 DEM parsing, printing, analysis, decomposition, search, compilation, sampling, and replay;
 - PF analysis and query rows whose owner changes;
 - A2, A4, and A5 phase diagnostics whose source paths or crate identities change.
+
+These continuity rows prove owner migration and unchanged workload behavior. They do not become evidence for the optional SIMD kernels unless the selected feature changes the timed implementation.
 
 Measurements remain phase-specific. A facade call-path move is not evidence for a parser, compiler, session, or codec phase unless that exact phase is the timed boundary.
 

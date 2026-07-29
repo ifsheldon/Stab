@@ -1342,3 +1342,39 @@ Current text: the architecture plan and ADR required the complete engine to rema
 Gap: the written boundary treated mutable execution as inherently Nightly even though the scalar engine has no `stab-kernels-simd` dependency and no direct portable-SIMD code. Enforcing the text would make Stable decoder and orchestration crates import a Nightly engine without gaining a distinct execution plan or measured backend.
 Proposed amendment: keep `stab-engine` Stable while scalar is its only registered backend; reserve Nightly for the facade, CLI, the dependency-free SIMD kernel crate, and consumers that explicitly enable `portable-simd`.
 Resolution: the A6 plan, ADR 0005, extraction map, Stable test matrix, and external-consumer contract now name the scalar engine as part of the Rust 1.97.1 component stack. A future Nightly backend must use an explicit feature or separate implementation crate and prove a distinct executable plan, capability descriptor, fingerprint, semantic equivalence, and phase-specific performance evidence before changing the default engine boundary.
+
+## 2026-07-30 - A6: Diagnostic Continuity Versus Promotable Parity
+
+Status: Resolved
+Revealed by: milestone audit of the source-current M5 and M6 timing reports.
+Current text: A6 required Stim-relative parity after selecting the default scalar implementation, while the qualification reports were intentionally produced on an unverified host and could not support a promotable claim.
+Gap: the milestone did not distinguish a numerically passing paired ratio from controlled-host promotable parity, allowing diagnostic evidence to be described too strongly even though the parity operation failed closed.
+Proposed amendment: make A6 require diagnostic Stim-relative continuity under the unchanged `1.25x` boundary and assign promotable controlled-host parity exclusively to A9.
+Resolution: the A6 benchmark and done-criteria text now names diagnostic continuity explicitly, the progress report retains `promotable=false`, and A9 remains the sole owner of formal parity evidence.
+
+## 2026-07-30 - A6: Source Revision And Green-CI Closure
+
+Status: Resolved
+Revealed by: milestone audit after a documentation-only closure commit followed the clean product-source evidence revision.
+Current text: A6 required source-current evidence but did not define whether a documentation-only follow-up invalidated product evidence, and it did not explicitly require a green CI run for the closure commit.
+Gap: agents could either discard valid evidence after non-contract prose changed or close the milestone while the cited revision had a failed workflow unrelated to product behavior.
+Proposed amendment: distinguish the clean product-source revision from a later closure-document revision, define exactly which changes invalidate evidence, and require green source-current CI.
+Resolution: A6 now allows a documentation-only closure commit to cite the immediately preceding clean product-source revision only when no compiled source, contract, inventory, policy, fixture, or workflow changed. The closure commit must have green CI, and the contracts job now installs its required `uv` tool.
+
+## 2026-07-30 - A6: Staged Pre-Commit Evidence
+
+Status: Resolved
+Revealed by: milestone audit of the final verification sequence.
+Current text: the standard verification listed `just maintenance::pre-commit` without saying that the operation is staged-index aware.
+Gap: an invocation with no staged files reports skips and cannot prove the files already committed were checked.
+Proposed amendment: count the hook only when it runs against the actual staged index of each focused commit.
+Resolution: the architecture plan now states that commit-time staged hook results are the evidence and that a final no-staged-files invocation is a no-op.
+
+## 2026-07-30 - A6: SIMD Evidence Versus Extraction Continuity
+
+Status: Resolved
+Revealed by: milestone audit of the A6 extraction map's benchmark ownership section.
+Current text: the section interleaved the two kernel-owning workloads with parser, records, sampling, conversion, DEM, and analysis continuity rows.
+Gap: a moved-owner continuity run could be mistaken for evidence that portable SIMD affected or improved a workload whose timed path never reached the optional kernel.
+Proposed amendment: separate source-owning SIMD evidence from component-extraction continuity and state when a continuity row can change roles.
+Resolution: the extraction map now gives the M5 dense-XOR and M6 non-identity Clifford kernels their own evidence section and labels all other affected rows as owner-migration continuity unless feature selection changes the timed implementation.

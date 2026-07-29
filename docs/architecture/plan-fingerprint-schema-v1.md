@@ -42,7 +42,7 @@ Backend discriminators are:
 | Backend | Discriminator | Schema-1 availability |
 | --- | --- | --- |
 | Scalar | `1` | Registered |
-| Portable SIMD | `2` | Reserved for A6 registration |
+| Portable SIMD | `2` | Reserved; registration is deferred until a distinct measured engine plan exists |
 
 Private executable-variant discriminators are:
 

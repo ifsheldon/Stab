@@ -747,7 +747,7 @@ Status: Active.
 - Extract `stab-kernels-simd` as the only direct portable-SIMD owner.
 - Extract in dependency order: algebra after removing `Gate`, model after removing foreign inherent algorithm methods, analysis after model and algebra, engine after analysis, then SIMD kernels after scalar paths are explicit.
 - Make model, bits, records, scalar algebra, pure analysis, and the scalar engine compile on Stable 1.97.1.
-- Keep the full facade and CLI on pinned Nightly. Require Nightly only for `stab-kernels-simd` and consumers that explicitly enable `portable-simd`.
+- Keep the full facade and CLI on pinned Nightly. Within the Stable component graph, require Nightly only for consumers that explicitly enable `portable-simd`, which reaches `stab-kernels-simd`.
 - Give `stab-kernels-simd` no Stab dependencies and restrict its cross-crate API to raw `[u64]`, `&mut [u64]`, and fixed `[u64; 4]` kernels.
 - Make scalar behavior the absence of the additive `portable-simd` feature; do not create mutually exclusive scalar and SIMD features.
 - Limit the first SIMD surface to four-word XOR and non-identity Clifford right multiplication. Defer scans, masks, transpose, sampling, and additional kernels until an affected workload proves a real benefit.
@@ -773,7 +773,7 @@ Status: Active.
 
 - Compare scalar and SIMD builds of the affected dense-XOR and non-identity Clifford workloads using identical inputs and exact output witnesses.
 - Bind `--no-default-features` scalar and `--no-default-features --features portable-simd` builds into distinct schema-version-7 private worker receipts. Use the fixed medium and large scales, three alternating warmup pairs, and at least nine alternating retained pairs. Report portable-over-scalar normalized ratios and a deterministic confidence interval; call the result a material benefit only when the complete interval is below `1.0`.
-- Re-run Stim-relative M5 XOR and M6 non-identity Clifford parity for the selected default scalar implementation after the SIMD diagnostics without changing the `1.25x` gate.
+- Re-run diagnostic Stim-relative M5 XOR and M6 non-identity Clifford continuity for the selected default scalar implementation after the SIMD diagnostics without changing the `1.25x` boundary. A9 owns promotable controlled-host parity evidence.
 - Treat not-zero, popcount, sparse XOR, transpose, Pauli, sampling, parser, records, conversion, DEM, and analysis rows as continuity checks only when their executed call path actually changes.
 
 ### Done Criteria
@@ -781,8 +781,9 @@ Status: Active.
 - Stable component consumers, including scalar engine consumers, do not compile `std::simd`.
 - The Nightly facade can opt into source-current SIMD leaf kernels without advertising a nonexistent sampling backend.
 - Only `stab-kernels-simd` contains `#![feature(portable_simd)]`.
-- Medium and large scalar-versus-SIMD XOR and non-identity Clifford evidence is source-current. SIMD remains opt-in unless affected families demonstrate a material benefit without parity or confidence regression.
+- Medium and large scalar-versus-SIMD XOR and non-identity Clifford evidence is source-current. SIMD remains opt-in unless affected families demonstrate a material benefit without diagnostic Stim-relative continuity or confidence regression; A9 separately owns promotable parity evidence.
 - Every product crate has a documented contract and permitted dependencies only.
+- The A6 closure commit has green source-current CI; documentation-only closure commits may cite the immediately preceding clean product-source revision when they change no compiled source, contract, inventory, policy, fixture, or workflow.
 
 ## Milestone A7: Decoder Interoperability And Reference Decoder
 
@@ -911,6 +912,8 @@ just qualification::status --check
 just bench::smoke
 just maintenance::pre-commit
 ```
+
+`just maintenance::pre-commit` counts as closure evidence only when it checks the actual staged index for a focused commit. A later invocation with no staged files is a no-op and cannot substitute for those commit-time checks.
 
 ## Release Assumptions
 
