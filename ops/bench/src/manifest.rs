@@ -711,6 +711,7 @@ mod tests {
         );
         assert!(primary.iter().all(|row| !row.milestone.is_post_beta_plan()));
         for non_primary in [
+            "m8-reference-sample-tree",
             "m9-detecting-regions-basic-batch",
             "m9-missing-detectors-basic-batch",
             "m9-feedback-inline-mpp-batch",

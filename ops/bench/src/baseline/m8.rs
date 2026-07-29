@@ -314,7 +314,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures one-shot public sampler execution through Clifford tableau operations; upstream baseline is an internal 10K-qubit tableau simulator primitive",
         ),
         "m8-reference-sample-tree" => Some(
-            "partial-match: Stab measures the basic reference-sample-tree helper; optimized loop-folded construction remains a logged M8 spec gap",
+            "report-only: Stab measures bounded flat reference-sample-tree construction for a 20-by-20 nested circuit, while pinned Stim measures folded construction for a 100000-cubed nested repeat; optimized loop-folded construction remains deferred and no Stim-relative ratio is claimed",
         ),
         "m8-sample-analysis-1shot" => Some(
             "report-only: Stab phase-separates plan compilation, scalar selection, session construction, steady-state raw execution, consumption of a prebuilt typed batch, encoding of a prebuilt typed batch, and repeated-session execution; only raw and repeated measurements advance preconstructed sessions, while pinned Stim baseline is end-to-end CLI sample",

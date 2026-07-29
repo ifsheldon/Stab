@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "93f9664bc271114f4930a3bab1b18fdbc7bdde8b4363cf8641a815731a0481e4",
-  "semantic_digest": "938d3ee5ab49bc896cd91019c95e7f3fdcc106f6ad0b57f1e14f5850320d0199",
+  "semantic_digest": "653ff20436adb0670024ace140b02c7a9e6ad3025f113466fe978b3bc0747794",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -107555,7 +107555,7 @@
       "supporting_performance_features": [],
       "decision": "reworked",
       "classifications": [
-        "proxy",
+        "diagnostic",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
@@ -107567,17 +107567,9 @@
         "source": "src/stim/util_top/reference_sample_tree.perf.cc",
         "filter": "reference_sample_tree_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
+      "threshold_refs": [],
       "threshold_max_relative_ratio": null,
-      "threshold_measurement_pairs": [
-        {
-          "stim_name": "reference_sample_tree_nested_circuit",
-          "stab_name": "stab_reference_sample_tree_nested_circuit",
-          "max_relative_ratio": "1.25"
-        }
-      ],
+      "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
     {

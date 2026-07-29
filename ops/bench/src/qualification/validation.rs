@@ -1155,8 +1155,8 @@ fn validate_rows(
     validate_decision_count(suite, RowDecision::Superseded, 13, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 14, issues);
-    validate_classification_count(suite, RowClassification::Diagnostic, 140, issues);
-    validate_classification_count(suite, RowClassification::Proxy, 11, issues);
+    validate_classification_count(suite, RowClassification::Diagnostic, 141, issues);
+    validate_classification_count(suite, RowClassification::Proxy, 10, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 129, issues);
