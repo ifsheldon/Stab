@@ -1,9 +1,9 @@
 use std::hint::black_box;
 
-use stab_core::{
-    DetectorErrorModel, find_undetectable_logical_error,
-    shortest_graphlike_undetectable_logical_error,
+use stab_analysis::{
+    find_undetectable_logical_error, shortest_graphlike_undetectable_logical_error,
 };
+use stab_core::DetectorErrorModel;
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

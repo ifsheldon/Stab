@@ -1,11 +1,13 @@
 use std::hint::black_box;
 
-use stab_analysis::{likeliest_error_sat_problem, shortest_error_sat_problem};
+use stab_analysis::{
+    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
+    shortest_graphlike_undetectable_logical_error,
+};
 use stab_core::{
     Circuit, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
     ErrorAnalyzerOptions, Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    circuit_to_detector_error_model, find_undetectable_logical_error,
-    generate_surface_code_circuit, shortest_graphlike_undetectable_logical_error,
+    circuit_to_detector_error_model, generate_surface_code_circuit,
 };
 
 use crate::error::BenchError;

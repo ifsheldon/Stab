@@ -315,7 +315,7 @@ fn classifications_distinguish_selected_execution_domains() {
             "stab_core::DemSamplerLimits",
         ),
         (
-            "crates/stab-core/src/dem/search_budget.rs",
+            "crates/stab-core/src/dem.rs",
             "stab_core::LogicalErrorSearchLimits",
         ),
         (
@@ -349,6 +349,22 @@ fn classifications_distinguish_selected_execution_domains() {
             "{api}"
         );
     }
+    assert_eq!(
+        classify_public_api_source(
+            "stab_analysis",
+            Path::new("crates/stab-analysis/src/dem/search/budget.rs"),
+            "stab_analysis::LogicalErrorSearchLimits",
+        ),
+        Some(FeatureId::Resource)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_analysis",
+            Path::new("crates/stab-analysis/src/dem/search/graphlike/algo.rs"),
+            "stab_analysis::shortest_graphlike_undetectable_logical_error",
+        ),
+        Some(FeatureId::Search)
+    );
     for api in [
         "stab_core::ParseError",
         "stab_core::ParseErrorCode",

@@ -6,13 +6,12 @@ use std::time::{Duration, Instant};
 
 use stab_analysis::{
     ErrorAnalyzerOptions, circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
-    try_disjoint_to_independent_xyz_errors,
+    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
 use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, Flow, PauliBasis, PauliString, Probability,
     RoundCount, SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_flow_generators, generate_surface_code_circuit,
-    shortest_graphlike_undetectable_logical_error,
 };
 
 use crate::allocations::measure_tracked_memory;

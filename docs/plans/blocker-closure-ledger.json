@@ -6199,7 +6199,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
             "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
           }
         },
@@ -6209,7 +6209,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
             "upstream_source": "src/stim/search/graphlike/graph.test.cc"
           }
         },
@@ -6219,7 +6219,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
             "upstream_source": "src/stim/search/graphlike/graph.test.cc"
           }
         },
@@ -6239,7 +6239,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
             "upstream_source": "src/stim/search/hyper/search_state.test.cc"
           }
         },
@@ -6249,7 +6249,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
             "upstream_source": "src/stim/search/hyper/graph.test.cc"
           }
         },
@@ -7085,8 +7085,8 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
-              "dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads",
+              "stab-analysis",
+              "dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads",
               "--quiet",
               "--exact"
             ]
@@ -7098,7 +7098,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
               "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
             }
           },
@@ -7125,8 +7125,8 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
-              "dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work",
+              "stab-analysis",
+              "dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work",
               "--quiet",
               "--exact"
             ]
@@ -7138,7 +7138,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
               "upstream_source": "src/stim/search/graphlike/graph.test.cc"
             }
           },
@@ -7165,8 +7165,8 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
-              "dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload",
+              "stab-analysis",
+              "dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload",
               "--quiet",
               "--exact"
             ]
@@ -7178,7 +7178,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
               "upstream_source": "src/stim/search/graphlike/graph.test.cc"
             }
           },
@@ -7547,8 +7547,8 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
-              "dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads",
+              "stab-analysis",
+              "dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads",
               "--quiet",
               "--exact"
             ]
@@ -7560,7 +7560,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
               "upstream_source": "src/stim/search/hyper/search_state.test.cc"
             }
           },
@@ -7587,8 +7587,8 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
-              "dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload",
+              "stab-analysis",
+              "dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload",
               "--quiet",
               "--exact"
             ]
@@ -7600,7 +7600,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
               "upstream_source": "src/stim/search/hyper/graph.test.cc"
             }
           },
