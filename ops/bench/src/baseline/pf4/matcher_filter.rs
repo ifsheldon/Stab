@@ -1,6 +1,7 @@
 use std::hint::black_box;
 
-use stab_core::{Circuit, DetectorErrorModel, explain_errors_from_circuit};
+use stab_analysis::explain_errors_from_circuit;
+use stab_model::{Circuit, DetectorErrorModel};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

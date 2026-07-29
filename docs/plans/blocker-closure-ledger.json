@@ -3717,9 +3717,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
-              "dem_folded_traversal",
+              "error_matcher_resource",
               "pfm_b3_folded_traversal_matcher_filter",
               "--quiet",
               "--exact"
@@ -3732,7 +3732,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_matcher_filter|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|error_matcher_resource|pfm_b3_folded_traversal_matcher_filter|--|--exact",
               "upstream_source": "src/stim/simulators/error_matcher.test.cc"
             }
           },
@@ -8523,7 +8523,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "matched_error::tests::matched_error_canonicalize_sorts_terms_like_upstream",
               "--quiet",
               "--exact"
@@ -8536,7 +8536,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|matched_error::tests::matched_error_canonicalize_sorts_terms_like_upstream|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|matched_error::tests::matched_error_canonicalize_sorts_terms_like_upstream|--|--exact",
               "upstream_source": "src/stim/simulators/matched_error.test.cc"
             }
           },

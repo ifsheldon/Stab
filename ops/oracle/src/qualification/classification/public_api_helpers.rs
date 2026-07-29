@@ -16,6 +16,11 @@ pub(super) fn classify_extracted_analysis_api(
     if source_path.starts_with("crates/stab-analysis/src/circuit_to_dem") {
         return Some(FeatureId::Analyzer);
     }
+    if source_path.starts_with("crates/stab-analysis/src/error_matcher")
+        || source_path == "crates/stab-analysis/src/matched_error.rs"
+    {
+        return Some(FeatureId::Analyzer);
+    }
     if source_path.starts_with("crates/stab-analysis/src/dem/sat")
         || source_path.starts_with("crates/stab-analysis/src/dem/search")
     {
@@ -116,6 +121,17 @@ pub(super) fn is_analyzer_api(api_lower: &str) -> bool {
     api_lower.contains("erroranalyzeroptions")
         || api_path_mentions_item(api_lower, "disjointpauliprobabilities")
         || api_path_mentions_item(api_lower, "independentpauliprobabilities")
+        || [
+            "circuiterrorlocation",
+            "circuiterrorlocationstackframe",
+            "circuittargetsinsideinstruction",
+            "demtargetwithcoords",
+            "explainederror",
+            "flippedmeasurement",
+            "gatetargetwithcoords",
+        ]
+        .iter()
+        .any(|item| api_path_mentions_item(api_lower, item))
         || api_lower.contains("circuit_to_detector_error_model")
         || api_lower.ends_with("::independent_to_disjoint_xyz_errors")
         || api_lower.ends_with("::try_disjoint_to_independent_xyz_errors")

@@ -46,6 +46,30 @@ fn classifications_distinguish_selected_execution_domains() {
     );
     assert_eq!(
         classify_public_api_source(
+            "stab_analysis",
+            Path::new("crates/stab-analysis/src/error_matcher.rs"),
+            "stab_analysis::explain_errors_from_circuit",
+        ),
+        Some(FeatureId::Analyzer)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_analysis",
+            Path::new("crates/stab-analysis/src/matched_error.rs"),
+            "stab_analysis::ExplainedError",
+        ),
+        Some(FeatureId::Analyzer)
+    );
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/lib.rs"),
+            "stab_core::CircuitErrorLocationStackFrame",
+        ),
+        Some(FeatureId::Analyzer)
+    );
+    assert_eq!(
+        classify_public_api_source(
             "stab_core",
             Path::new("crates/stab-core/src/execution/circuit_adapters.rs"),
             "stab_core::execution::circuit_reference_sample",
