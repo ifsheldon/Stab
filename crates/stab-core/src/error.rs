@@ -213,6 +213,15 @@ impl From<stab_engine::DemError> for CircuitError {
     }
 }
 
+impl From<stab_engine::ReferenceSampleTreeError> for CircuitError {
+    fn from(error: stab_engine::ReferenceSampleTreeError) -> Self {
+        match error {
+            stab_engine::ReferenceSampleTreeError::SamplingCompile(error) => error.into(),
+            stab_engine::ReferenceSampleTreeError::SamplingExecution(error) => error.into(),
+        }
+    }
+}
+
 impl CircuitError {
     pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
         Self::InvalidDomainValue {

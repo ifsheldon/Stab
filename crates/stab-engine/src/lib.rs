@@ -26,7 +26,7 @@ pub use detection::{
 };
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;
-pub use reference_sample_tree::ReferenceSampleTree;
+pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use sampling::{
     BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
     SamplingBackend, SamplingCancellation, SamplingCompilationDescriptor, SamplingCompileError,

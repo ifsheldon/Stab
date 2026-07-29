@@ -1,8 +1,18 @@
 //! Compact deterministic reference samples owned by the execution engine.
 
 use stab_model::Circuit;
+use thiserror::Error;
 
-use crate::{SamplingCompileError, SamplingCompiler};
+use crate::{SamplingCompileError, SamplingCompiler, SamplingExecutionError};
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum ReferenceSampleTreeError {
+    #[error(transparent)]
+    SamplingCompile(#[from] SamplingCompileError),
+
+    #[error(transparent)]
+    SamplingExecution(#[from] SamplingExecutionError),
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceSampleTree {
@@ -12,8 +22,11 @@ pub struct ReferenceSampleTree {
 }
 
 impl ReferenceSampleTree {
-    pub fn from_circuit_reference_sample(circuit: &Circuit) -> Result<Self, SamplingCompileError> {
+    pub fn from_circuit_reference_sample(
+        circuit: &Circuit,
+    ) -> Result<Self, ReferenceSampleTreeError> {
         let sampler = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
+        sampler.validate_legacy_adapter_storage_for_core()?;
         Ok(Self {
             prefix_bits: sampler.reference_sample(),
             suffix_children: Vec::new(),
@@ -101,9 +114,11 @@ impl ReferenceSampleTree {
     }
 
     fn body_size(&self) -> usize {
-        self.prefix_bits
-            .len()
-            .saturating_add(self.suffix_children.iter().map(Self::size).sum::<usize>())
+        self.suffix_children
+            .iter()
+            .fold(self.prefix_bits.len(), |size, child| {
+                size.saturating_add(child.size())
+            })
     }
 }
 
@@ -118,7 +133,7 @@ mod tests {
     use stab_model::Circuit;
 
     use super::ReferenceSampleTree;
-    use crate::SamplingCompiler;
+    use crate::{ReferenceSampleTreeError, SamplingCompiler, SamplingExecutionError};
 
     #[test]
     fn reference_sample_tree_matches_upstream_structure_and_string_subset() {
@@ -222,6 +237,17 @@ mod tests {
         assert_eq!(large.size(), 9_000_000);
         assert_eq!(large.get(8_999_999), Some(true));
         assert_eq!(large.get(9_000_000), None);
+
+        let saturating = ReferenceSampleTree {
+            prefix_bits: vec![false],
+            suffix_children: vec![ReferenceSampleTree {
+                prefix_bits: vec![true],
+                suffix_children: Vec::new(),
+                repetitions: u64::MAX,
+            }],
+            repetitions: u64::MAX,
+        };
+        assert_eq!(saturating.size(), usize::MAX);
     }
 
     #[test]
@@ -242,5 +268,23 @@ mod tests {
         assert_eq!(tree.decompress(), plan.reference_sample());
         assert_eq!(tree.size(), 2);
         assert_eq!(tree.stim_string(), "1*('01')");
+    }
+
+    #[test]
+    fn reference_sample_tree_construction_preserves_storage_admission() {
+        let circuit = Circuit::from_stim_str(
+            "
+            REPEAT 300000000 {
+                M 0
+            }
+            ",
+        )
+        .expect("parse compact circuit");
+        assert!(matches!(
+            ReferenceSampleTree::from_circuit_reference_sample(&circuit),
+            Err(ReferenceSampleTreeError::SamplingExecution(
+                SamplingExecutionError::SessionStorageLimit { .. }
+            ))
+        ));
     }
 }
