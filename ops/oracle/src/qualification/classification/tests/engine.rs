@@ -109,6 +109,48 @@ fn detection_measurement_sink_adapters_keep_record_boundary_ownership() {
 }
 
 #[test]
+fn extracted_dem_engine_keeps_execution_and_resource_ownership() {
+    for (source, api, expected) in [
+        (
+            "crates/stab-engine/src/dem_sampling/plan.rs",
+            "stab_engine::DemSamplingCompiler::compile",
+            FeatureId::DemSampling,
+        ),
+        (
+            "crates/stab-engine/src/dem_sampling/session.rs",
+            "stab_engine::DemReplaySession::write_batch",
+            FeatureId::DemSampling,
+        ),
+        (
+            "crates/stab-engine/src/dem_sampling/limits.rs",
+            "stab_engine::DemSamplerLimits::with_max_replay_work_units",
+            FeatureId::Resource,
+        ),
+        (
+            "crates/stab-engine/src/dem_sampling/error.rs",
+            "stab_engine::DemResourceLimitError::kind",
+            FeatureId::Resource,
+        ),
+        (
+            "crates/stab-engine/src/dem_sampling/plan.rs",
+            "stab_engine::DemSamplingPlan::materialized_bytes_per_shot",
+            FeatureId::Resource,
+        ),
+        (
+            "crates/stab-engine/src/dem_sampling/plan.rs",
+            "stab_engine::DemSamplingPlan::try_reusable_error_record",
+            FeatureId::Resource,
+        ),
+    ] {
+        assert_eq!(
+            classify_public_api_source("stab_engine", Path::new(source), api),
+            Some(expected),
+            "{api}"
+        );
+    }
+}
+
+#[test]
 fn sampling_descriptor_keeps_capability_ownership() {
     for api in [
         "stab_engine::SamplingCompilationDescriptor",

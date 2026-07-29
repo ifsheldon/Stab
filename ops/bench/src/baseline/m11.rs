@@ -1,10 +1,9 @@
 use std::ffi::OsString;
 use std::hint::black_box;
 
-use stab_core::{
-    CompiledDemSampler, DetectorErrorModel, RandomPolicy, Seed, ShotCount,
-    execution::DemSamplingCompiler,
-};
+use stab_core::CompiledDemSampler;
+use stab_engine::{DemSamplingCompiler, RandomPolicy, Seed, ShotCount};
+use stab_model::DetectorErrorModel;
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

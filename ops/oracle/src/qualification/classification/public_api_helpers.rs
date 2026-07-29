@@ -61,6 +61,14 @@ pub(super) fn classify_extracted_engine_api(
     source_path: &str,
     api_lower: &str,
 ) -> Option<FeatureId> {
+    if is_dem_sampling_resource_api(api_lower) {
+        return Some(FeatureId::Resource);
+    }
+    if source_path.starts_with("crates/stab-engine/src/dem_sampling")
+        || is_extracted_dem_sampling_api(api_lower)
+    {
+        return Some(FeatureId::DemSampling);
+    }
     if api_path_mentions_item(api_lower, "measurementtodetectionsinkadapter") {
         return Some(FeatureId::ResultFormats);
     }
@@ -85,6 +93,47 @@ pub(super) fn classify_extracted_engine_api(
         return Some(FeatureId::Sampling);
     }
     None
+}
+
+fn is_dem_sampling_resource_api(api_lower: &str) -> bool {
+    [
+        "demresourcelimiterror",
+        "demresourcekind",
+        "demsamplerlimits",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
+        || api_lower.rsplit("::").next().is_some_and(|method| {
+            [
+                "materialized_bytes_per_shot",
+                "replay_work_units_per_shot",
+                "try_reusable_detection_record",
+                "try_reusable_error_record",
+            ]
+            .contains(&method)
+        })
+}
+
+fn is_extracted_dem_sampling_api(api_lower: &str) -> bool {
+    if !api_lower.starts_with("stab_engine::") && !api_lower.starts_with("stab_core::") {
+        return false;
+    }
+    [
+        "demerror",
+        "demreplaybatchstatus",
+        "demreplaysession",
+        "demsamplingcancellation",
+        "demsamplingcompiler",
+        "demsamplingexecutionerror",
+        "demsamplingplan",
+        "demsamplingrunerror",
+        "demsamplingrunprogress",
+        "demsamplingrunstatus",
+        "demsamplingrunsummary",
+        "demsamplingsession",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_lower, item))
 }
 
 fn is_extracted_detection_api(api_lower: &str) -> bool {

@@ -5135,7 +5135,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "work_limits_reject_before_rng_or_sink_and_leave_session_reusable",
@@ -5165,6 +5165,50 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingPlan::validate_replay_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::session_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_replay_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_replay_work_units_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::replay_work_units_per_shot"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_detector_sample_work_units_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_sampled_error_work_units_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemResourceKind"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemResourceLimitError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemResourceLimitError::kind"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemResourceLimitError::actual"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemResourceLimitError::limit"
           }
         ],
         "standalone": true
@@ -5180,7 +5224,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "session_batch_capacity_obeys_the_caller_active_byte_budget",
@@ -5196,6 +5240,28 @@
           "caller-byte-limit-bypass",
           "minimum-batch-off-by-one",
           "active-batch-growth"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_sample_buffer_units_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_materialized_bytes_with_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::try_reusable_detection_record"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::try_reusable_error_record"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::materialized_bytes_per_shot"
+          }
         ],
         "standalone": true
       },
@@ -6446,10 +6512,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
-            "public_compiler_and_compatibility_facade_share_one_plan_contract",
+            "public_compiler_exposes_the_engine_plan_contract",
             "--quiet",
             "--exact"
           ]
@@ -6543,6 +6609,58 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingRunSummary::total_committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingCompiler"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingCompiler::new"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingCompiler::compile"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::detector_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::observable_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::sampled_error_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::detector_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::observable_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::error_count"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::session"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_replay"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession"
           }
         ],
         "standalone": true
@@ -6558,7 +6676,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "streamed_sessions_match_materialized_sampling_across_dem_families",
@@ -6584,6 +6702,14 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingSession::run_with_sampled_errors"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::run"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::run_with_sampled_errors"
           }
         ],
         "standalone": true
@@ -6599,7 +6725,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "seeded_sessions_partition_exactly_for_both_sampling_algorithms",
@@ -6620,6 +6746,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingSession::total_committed_shots"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::total_committed_shots"
           }
         ],
         "standalone": true
@@ -6635,7 +6765,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng",
@@ -6677,6 +6807,34 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemReplayBatchStatus::is_accepted"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::replay"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::start_replay"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemReplaySession"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemReplaySession::write_batch"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemReplaySession::finish"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::validate_error_record_width"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingPlan::detection_record_from_error_record_into"
           }
         ],
         "standalone": true
@@ -6692,7 +6850,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "replay_batch_validation_is_retryable_but_abandoned_output_poisons",
@@ -6723,7 +6881,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "cancellation_commits_only_complete_batches_and_session_resumes",
@@ -6782,6 +6940,10 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemReplayBatchStatus::is_cancelled"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::cancellation"
           }
         ],
         "standalone": true
@@ -6797,7 +6959,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "sink_failures_preserve_progress_and_poison_sessions",
@@ -6847,6 +7009,30 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingSession::is_poisoned"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingExecutionError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingExecutionError::into_dem_error"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingRunError"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingRunError::progress"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemSamplingSession::is_poisoned"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DemError"
           }
         ],
         "standalone": true
@@ -6862,7 +7048,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "post_warmup_session_execution_allocations_are_record_count_independent",
@@ -9742,9 +9928,9 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--lib",
-            "dem_sampler::tests::replay_work_arithmetic_overflow_rejects_before_iteration",
+            "dem_sampling::tests::replay_work_arithmetic_overflow_rejects_before_execution",
             "--quiet",
             "--exact"
           ]
@@ -9771,7 +9957,7 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
             "dem_sampling_plan_session",
             "replay_convenience_api_admits_session_and_work_before_record_widths",
