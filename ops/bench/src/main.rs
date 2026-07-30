@@ -9,6 +9,7 @@
     )
 )]
 
+mod a6_focused_evidence;
 mod allocations;
 mod baseline;
 mod beta_gate;
@@ -70,6 +71,9 @@ enum Command {
 
     /// Validate benchmark contracts without running long benchmark workloads.
     Smoke,
+
+    /// Validate the checked A6 report-only crossing and focused-diagnostic ledger.
+    A6FocusedEvidence(a6_focused_evidence::A6FocusedEvidenceArgs),
 
     /// Validate the comprehensive performance qualification ledger.
     QualificationCheck,
@@ -286,6 +290,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                 "[{PREFIX}] benchmark manifest OK: {} planned rows",
                 manifest.rows.len()
             );
+        }
+        Command::A6FocusedEvidence(args) => {
+            a6_focused_evidence::check(&root, args)?;
         }
         Command::QualificationCheck => {
             let manifest = checked_manifest(&root)?;
