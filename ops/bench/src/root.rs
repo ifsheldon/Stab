@@ -168,6 +168,34 @@ impl RepoRoot {
         Ok(output_dir)
     }
 
+    pub(crate) fn create_new_benchmark_output_dir(
+        &self,
+        path: &Path,
+    ) -> Result<PathBuf, BenchError> {
+        let output_dir = self.benchmark_output_dir(path)?;
+        self.reject_existing_benchmark_output_symlink(path)?;
+        let parent = output_dir
+            .parent()
+            .ok_or_else(|| BenchError::CreateOutputDir {
+                path: output_dir.clone(),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "benchmark output has no parent",
+                ),
+            })?;
+        std::fs::create_dir_all(parent).map_err(|source| BenchError::CreateOutputDir {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+        self.reject_existing_benchmark_output_symlink(path)?;
+        std::fs::create_dir(&output_dir).map_err(|source| BenchError::CreateOutputDir {
+            path: output_dir.clone(),
+            source,
+        })?;
+        self.check_benchmark_output_contained(&output_dir)?;
+        Ok(output_dir)
+    }
+
     fn check_benchmark_output_contained(&self, path: &Path) -> Result<(), BenchError> {
         let benchmark_root = std::fs::canonicalize(self.benchmark_root()).map_err(|source| {
             BenchError::CreateOutputDir {
@@ -245,5 +273,22 @@ mod tests {
 
         assert!(error.to_string().contains("symlink"));
         assert!(!outside.path().join("new").exists());
+    }
+
+    #[test]
+    fn new_benchmark_output_rejects_an_existing_directory() {
+        let repo = tempfile::tempdir().expect("repo tempdir");
+        let output = repo.path().join("target/benchmarks/evidence");
+        std::fs::create_dir_all(&output).expect("create existing output");
+        std::fs::write(output.join("sentinel"), b"preserve\n").expect("write sentinel");
+        let root = RepoRoot::resolve(repo.path()).expect("resolve root");
+
+        root.create_new_benchmark_output_dir(Path::new("target/benchmarks/evidence"))
+            .expect_err("existing evidence output must not be reused");
+
+        assert_eq!(
+            std::fs::read(output.join("sentinel")).expect("read sentinel"),
+            b"preserve\n"
+        );
     }
 }

@@ -1,0 +1,1310 @@
+{
+  "schema_version": 1,
+  "provenance": "Measurement names were reviewed from the clean 3a93719b A6 matrix and witness owners were reviewed against the source-current dispatcher; this file freezes identities only and does not promote that report as semantic or timing evidence.",
+  "rows": [
+    {
+      "id": "m4-circuit-parse",
+      "measurements": [
+        "stab_circuit_parse",
+        "stab_circuit_parse_sparse"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m4-circuit-canonical-print",
+      "measurements": [
+        "stab_print_parser_basic"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m9-convert-measurements-dets",
+      "measurements": [
+        "stab_convert_measurements_to_dets"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m4-gate-lookup",
+      "measurements": [
+        "stab_gate_data_hash_all_gate_names",
+        "stab_gate_lookup_aliases_contract",
+        "stab_gate_lookup_lowercase_contract",
+        "stab_gate_lookup_invalid_contract"
+      ],
+      "witness_source": "ops/bench/src/baseline/m4.rs"
+    },
+    {
+      "id": "m8-probability-util",
+      "measurements": [
+        "stab_biased_random_1024_0point1percent",
+        "stab_biased_random_1024_0point01percent",
+        "stab_biased_random_1024_1percent",
+        "stab_biased_random_1024_40percent",
+        "stab_biased_random_1024_50percent",
+        "stab_biased_random_1024_90percent",
+        "stab_biased_random_1024_99percent"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m5-simd-bit-table",
+      "measurements": [
+        "stab_bit_matrix_row_xor_128x128_contract",
+        "stab_bit_matrix_transpose_128x128_contract"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m5-simd-bits",
+      "measurements": [
+        "stab_simd_bits_xor_10K",
+        "stab_simd_bits_not_zero_10K",
+        "stab_bitvec_masked_xor_10k_contract",
+        "stab_bitvec_range_xor_4096_contract",
+        "stab_bitvec_copy_10k_contract"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m5-simd-word",
+      "measurements": [
+        "stab_bitvec_popcount_262144"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m5-sparse-xor",
+      "measurements": [
+        "stab_sparse_table_row_xor_1000",
+        "stab_sparse_xor_item_7"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m6-clifford-string",
+      "measurements": [
+        "stab_clifford_string_multiplication_10K",
+        "stab_clifford_string_short_rhs_left_10K",
+        "stab_clifford_string_short_rhs_left_100K",
+        "stab_clifford_string_short_rhs_left_1M"
+      ],
+      "witness_source": "ops/bench/src/baseline/m6.rs"
+    },
+    {
+      "id": "m6-pauli-string",
+      "measurements": [
+        "stab_pauli_string_multiplication_1M",
+        "stab_pauli_string_multiplication_100K",
+        "stab_pauli_string_multiplication_10K"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m6-pauli-iter",
+      "measurements": [
+        "stab_pauli_iter_xz_2_to_5_of_5",
+        "stab_pauli_iter_xyz_1_of_1000"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m6-tableau",
+      "measurements": [
+        "stab_tableau_from_circuit_32q",
+        "stab_tableau_inverse_32q",
+        "stab_tableau_apply_32q"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m6-tableau-iter",
+      "measurements": [
+        "stab_tableau_iter_unsigned_2q"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m6-stabilizers-to-tableau",
+      "measurements": [
+        "stab_stabilizers_to_tableau_16q",
+        "stab_stabilizers_to_inverse_tableau_16q"
+      ],
+      "witness_source": "ops/bench/src/baseline.rs"
+    },
+    {
+      "id": "m7-perf-harness",
+      "measurements": [],
+      "witness_source": null
+    },
+    {
+      "id": "m7-cli-dispatch",
+      "measurements": [
+        "stab_cli_dispatch_gen_d3_r3"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-convert-stim-canonical",
+      "measurements": [
+        "stab_convert_stim_canonical"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-convert-01-to-b8",
+      "measurements": [
+        "stab_convert_01_to_b8_128"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-b8-to-01",
+      "measurements": [
+        "stab_convert_b8_to_01_128"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-b8-to-b8-wide",
+      "measurements": [
+        "stab_convert_b8_to_b8_2048"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-dets-to-b8",
+      "measurements": [
+        "stab_convert_dets_to_b8_dl72"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-b8-to-dets",
+      "measurements": [
+        "stab_convert_b8_to_dets_dl72"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-ptb64-to-01",
+      "measurements": [
+        "stab_convert_ptb64_to_01_128"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-01-to-ptb64",
+      "measurements": [
+        "stab_convert_01_to_ptb64_128"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-circuit-dl-obs-out",
+      "measurements": [
+        "stab_convert_circuit_dl_obs_out"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-convert-dem-dets-to-01",
+      "measurements": [
+        "stab_convert_dem_dets_to_01"
+      ],
+      "witness_source": "ops/bench/src/baseline/convert.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d3-r3",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d3-r30",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d5-r5",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d5-r50",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d9-r9",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d9-r90",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d17-r17",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-repetition-d17-r170",
+      "measurements": [
+        "stab_gen_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d3-r3",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d3-r30",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d5-r5",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d5-r50",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d9-r9",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d9-r90",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d17-r17",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-rotated-surface-d17-r170",
+      "measurements": [
+        "stab_gen_rotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d3-r3",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d3-r30",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d5-r5",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d5-r50",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d9-r9",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d9-r90",
+      "measurements": [
+        "stab_gen_unrotated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m7-gen-color-d5-r5",
+      "measurements": [
+        "stab_gen_color"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    },
+    {
+      "id": "m8-measure-reader-01",
+      "measurements": [
+        "stab_read_01_dense_per10",
+        "stab_read_01_sparse_per10"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-measure-reader-b8",
+      "measurements": [
+        "stab_read_b8_dense_per10",
+        "stab_read_b8_sparse_per10"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-measure-reader-r8",
+      "measurements": [
+        "stab_read_r8_dense_per10",
+        "stab_read_r8_dense_per100",
+        "stab_read_r8_sparse_per10",
+        "stab_read_r8_sparse_per100"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-measure-reader-hits",
+      "measurements": [
+        "stab_read_hits_dense_per10",
+        "stab_read_hits_dense_per100",
+        "stab_read_hits_sparse_per10",
+        "stab_read_hits_sparse_per100"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-measure-reader-dets",
+      "measurements": [
+        "stab_read_dets_dense_per10",
+        "stab_read_dets_dense_per100",
+        "stab_read_dets_sparse_per10",
+        "stab_read_dets_sparse_per100"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-measure-reader-ptb64-contract",
+      "measurements": [
+        "stab_measure_reader_ptb64_64x10k_contract"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-record-writer-contract",
+      "measurements": [
+        "stab_records_write_packed_batch_b8_64x10000",
+        "stab_records_write_bit_plane_ptb64_64x10000"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-record-batch-transpose-contract",
+      "measurements": [
+        "stab_records_shot_major_to_bit_plane_64x10000",
+        "stab_records_bit_plane_to_shot_major_10000x64"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-record-dets-layout-contract",
+      "measurements": [
+        "stab_records_read_dets_packed_dl72_4096"
+      ],
+      "witness_source": "ops/bench/src/baseline/records.rs"
+    },
+    {
+      "id": "m8-frame-simulator",
+      "measurements": [
+        "stab_frame_compile_depolarize1",
+        "stab_frame_sample_depolarize1_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-tableau-simulator",
+      "measurements": [
+        "stab_tableau_sample_cx_1shot"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-reference-sample-tree",
+      "measurements": [
+        "stab_reference_sample_tree_flat_20x20"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-analysis-1shot",
+      "measurements": [
+        "stab_sample_compile_plan_auto_noisy_1q",
+        "stab_sample_compile_plan_scalar_noisy_1q",
+        "stab_sample_construct_session_noisy_1q",
+        "stab_sample_execute_witness_sink_64_continuous_session",
+        "stab_sample_consume_typed_batch_64",
+        "stab_sample_encode_b8_64",
+        "stab_sample_repeated_session_16x4_continuous_session"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-throughput-1024",
+      "measurements": [
+        "stab_sample_1024_zero_one"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-throughput-1000000",
+      "measurements": [
+        "stab_sample_1000000_zero_one"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-primary-repetition-contract",
+      "measurements": [
+        "stab_sample_primary_repetition_d3_r3"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-primary-rotated-surface-contract",
+      "measurements": [
+        "stab_sample_primary_rotated_surface_d3_r3"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-primary-unrotated-surface-contract",
+      "measurements": [
+        "stab_sample_primary_unrotated_surface_d3_r3"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m8-sample-high-repeat-contract",
+      "measurements": [
+        "stab_sample_high_repeat_contract"
+      ],
+      "witness_source": "ops/bench/src/baseline/m8.rs"
+    },
+    {
+      "id": "m9-detect-text-cli",
+      "measurements": [
+        "stab_detect_1024_dets"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-detect-bitpacked-cli",
+      "measurements": [
+        "stab_detect_1024_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-detect-primary-matrix-contract",
+      "measurements": [
+        "stab_detect_primary_repetition_d3_r3_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-text-cli",
+      "measurements": [
+        "stab_m2d_dets"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-bitpacked-contract",
+      "measurements": [
+        "stab_m2d_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-sweep-01-cli",
+      "measurements": [
+        "stab_m2d_sweep_01_dets"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-sweep-b8-cli",
+      "measurements": [
+        "stab_m2d_sweep_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-sweep-obs-out-cli",
+      "measurements": [
+        "stab_m2d_sweep_obs_out"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-ran-without-feedback-cli",
+      "measurements": [
+        "stab_m2d_ran_without_feedback"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-detecting-regions-basic-batch",
+      "measurements": [
+        "stab_detecting_regions_basic_cases",
+        "stab_detecting_regions_basic_regions"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-missing-detectors-basic-batch",
+      "measurements": [
+        "stab_missing_detectors_basic_cases",
+        "stab_missing_detectors_basic_suggestions"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-feedback-inline-mpp-batch",
+      "measurements": [
+        "stab_feedback_inline_mpp_transforms"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-detection-batch-phases",
+      "measurements": [
+        "stab_detection_plan_compile_and_release_basic",
+        "stab_detection_session_sample_to_detection",
+        "stab_detect_ptb64_routing"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-batch-phases",
+      "measurements": [
+        "stab_m2d_plan_compile_and_release_basic",
+        "stab_m2d_session_convert_batch"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m9-m2d-primary-matrix-contract",
+      "measurements": [
+        "stab_m2d_primary_repetition_d3_r3_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "m10-graphlike-search",
+      "measurements": [
+        "stab_graphlike_search_chain"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-error-analyzer",
+      "measurements": [
+        "stab_error_analyzer_surface_code"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-error-decomp",
+      "measurements": [
+        "stab_independent_to_disjoint_xyz_errors",
+        "stab_disjoint_to_independent_xyz_errors_approx_exact",
+        "stab_disjoint_to_independent_xyz_errors_approx_p10",
+        "stab_disjoint_to_independent_xyz_errors_approx_p100"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-analyze-errors-decompose-cli",
+      "measurements": [
+        "stab_analyze_errors_decompose_basic"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-analyze-errors-fold-cli",
+      "measurements": [
+        "stab_analyze_errors_fold_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-analyze-errors-high-repeat-contract",
+      "measurements": [
+        "stab_analyze_errors_fold_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-dem-parse-contract",
+      "measurements": [
+        "stab_dem_parse_sample"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m10-dem-print-contract",
+      "measurements": [
+        "stab_dem_print_sample"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "m11-dem-sampler",
+      "measurements": [
+        "stab_dem_sampler_sample_surface_like_1024"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-sample-dem-cli",
+      "measurements": [
+        "stab_sample_dem_cli_1024_zero_one"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-sample-dem-sparse-contract",
+      "measurements": [
+        "stab_sample_dem_sparse_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-sample-dem-dense-contract",
+      "measurements": [
+        "stab_sample_dem_dense_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-sample-dem-repeated-contract",
+      "measurements": [
+        "stab_sample_dem_repeated_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-sample-dem-high-detector-contract",
+      "measurements": [
+        "stab_sample_dem_high_detector_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "m11-dem-batch-phases",
+      "measurements": [
+        "stab_dem_plan_compile_and_release_surface_like",
+        "stab_dem_session_detector_only",
+        "stab_dem_session_with_sampled_errors",
+        "stab_dem_session_replay",
+        "stab_sample_dem_cli_ptb64_routing"
+      ],
+      "witness_source": "ops/bench/src/baseline/m11.rs"
+    },
+    {
+      "id": "pf1-circuit-coordinate-query",
+      "measurements": [
+        "stab_circuit_counts_nested_repeat",
+        "stab_circuit_final_coordinate_shift_nested_repeat",
+        "stab_circuit_final_qubit_coordinates_nested_repeat",
+        "stab_circuit_detector_coordinates_nested_repeat",
+        "stab_circuit_detector_coordinates_late_nested_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf1.rs"
+    },
+    {
+      "id": "pf1-gate-metadata-lookup",
+      "measurements": [
+        "stab_gate_metadata_flags_all_gates",
+        "stab_gate_metadata_inverse_all_gates",
+        "stab_gate_metadata_tableau_supported_gates",
+        "stab_gate_metadata_flows_supported_gates",
+        "stab_gate_metadata_unitary_supported_gates",
+        "stab_gate_metadata_decomposition_text_supported_gates",
+        "stab_gate_metadata_decomposition_parse_supported_gates",
+        "stab_gate_metadata_alias_lookup_all_aliases"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf1.rs"
+    },
+    {
+      "id": "pf1-dem-counts-repeat",
+      "measurements": [
+        "stab_dem_counts_nested_repeat",
+        "stab_dem_final_coordinate_shift_nested_repeat",
+        "stab_dem_detector_coordinates_nested_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf1.rs"
+    },
+    {
+      "id": "pf1-dem-without-tags",
+      "measurements": [
+        "stab_dem_without_tags_nested_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf1.rs"
+    },
+    {
+      "id": "pf2-circuit-flatten-repeat",
+      "measurements": [
+        "stab_circuit_flatten_repeat_shifted_coords"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf2-circuit-without-noise",
+      "measurements": [
+        "stab_circuit_without_noise_top_level"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf2-circuit-decompose-mpp-spp",
+      "measurements": [
+        "stab_circuit_decompose_mpp_spp"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf2-feedback-inline-batch",
+      "measurements": [
+        "stab_circuit_with_inlined_feedback_mpp",
+        "stab_circuit_with_inlined_feedback_repeat_loop",
+        "stab_circuit_with_inlined_feedback_xcz_ycz"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf2-time-reverse-flow",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_unitary"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf2-time-reverse-flow-measurement",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_measurement"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pfm-b1-time-reverse-generated-surface",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_generated_surface_d3_r2",
+        "stab_circuit_time_reversed_for_flows_generated_surface_d5_r2",
+        "stab_circuit_time_reversed_for_flows_generated_surface_d7_r2"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pfm-b1-time-reverse-mpad-matrix",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_mpad_matrix",
+        "stab_circuit_time_reversed_for_flows_mpad_scale_1",
+        "stab_circuit_time_reversed_for_flows_mpad_scale_8",
+        "stab_circuit_time_reversed_for_flows_mpad_scale_64"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pfm-b1-time-reverse-large-unitary-repeat",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1",
+        "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1024",
+        "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1b",
+        "stab_circuit_time_reversed_for_flows_unitary_repeat_wide_body_1b"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pfm-b1-time-reverse-sparse-high-qubit",
+      "measurements": [
+        "stab_circuit_time_reversed_for_flows_sparse_qubit_0",
+        "stab_circuit_time_reversed_for_flows_sparse_qubit_1000000"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf2.rs"
+    },
+    {
+      "id": "pf3-m2d-sweep-b8",
+      "measurements": [
+        "stab_pf3_m2d_sweep_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf3-m2d-sweep-ptb64-input",
+      "measurements": [
+        "stab_pf3_m2d_sweep_ptb64"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf3-detect-sweep-sampling",
+      "measurements": [
+        "stab_detect_sweep_default_false",
+        "stab_detect_frame_sweep_default_false"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf3-analyze-errors-sweep",
+      "measurements": [
+        "stab_analyze_errors_sweep_control",
+        "stab_analyze_errors_sweep_id_low",
+        "stab_analyze_errors_sweep_id_max"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "pf3-gate-semantic-wide",
+      "measurements": [
+        "stab_pf3_gate_sampler_execution",
+        "stab_pf3_gate_reference_sampling",
+        "stab_pf3_gate_converter_compilation",
+        "stab_pf3_gate_detection_sampling",
+        "stab_pf3_gate_detector_frame_sampling",
+        "stab_pf3_gate_error_analysis",
+        "stab_pf3_gate_flow_generation"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf4-dem-flatten-repeat",
+      "measurements": [
+        "stab_pf4_dem_flatten_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-rounded",
+      "measurements": [
+        "stab_pf4_dem_rounded"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-coordinate-map",
+      "measurements": [
+        "stab_pf4_dem_coordinate_map_all_bounded",
+        "stab_pf4_dem_coordinate_map_selected_huge_repeat",
+        "stab_pf4_dem_coordinate_map_sparse_overlap",
+        "stab_pf4_dem_coordinate_map_nested_sparse_overlap",
+        "stab_pf4_dem_coordinate_map_flat_overlap_all"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-folded-traversal",
+      "measurements": [
+        "stab_pf4_dem_hyper_capped_repeat",
+        "stab_pf4_dem_hyper_zero_probability_repeat_skip",
+        "stab_pf4_dem_hyper_flat_repeat_fold",
+        "stab_pf4_dem_sat_capped_repeat",
+        "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip",
+        "stab_pf4_dem_analyzer_capped_repeat",
+        "stab_pf4_error_matcher_capped_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-folded-graphlike-traversal",
+      "measurements": [
+        "stab_pf4_dem_graphlike_capped_repeat",
+        "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
+        "stab_pf4_dem_graphlike_flat_repeat_fold",
+        "stab_pf4_dem_graphlike_logical_only_flat_repeat_fold",
+        "stab_pf4_dem_graphlike_no_target_repeat_skip"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-hypergraph-logical-repeat",
+      "measurements": [
+        "stab_pf4_dem_hyper_logical_only_flat_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-hypergraph-no-target-repeat",
+      "measurements": [
+        "stab_pf4_dem_hyper_no_target_repeat_skip"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-search-zero-shift-repeat",
+      "measurements": [
+        "stab_pf4_dem_graphlike_zero_shift_repeat_fold",
+        "stab_pf4_dem_hyper_zero_shift_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-search-annotation-repeat",
+      "measurements": [
+        "stab_pf4_dem_graphlike_annotation_repeat_fold",
+        "stab_pf4_dem_hyper_annotation_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-search-mixed-zero-probability-repeat",
+      "measurements": [
+        "stab_pf4_dem_graphlike_mixed_zero_probability_repeat_fold",
+        "stab_pf4_dem_hyper_mixed_zero_probability_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-search-nested-repeat",
+      "measurements": [
+        "stab_pf4_dem_graphlike_nested_repeat_fold",
+        "stab_pf4_dem_hyper_nested_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-sat-flat-repeat-fold",
+      "measurements": [
+        "stab_pf4_dem_sat_flat_repeat_fold",
+        "stab_pf4_dem_sat_zero_probability_flat_repeat_fold",
+        "stab_pf4_dem_sat_nested_repeat_fold",
+        "stab_pf4_dem_weighted_sat_flat_repeat_fold",
+        "stab_pf4_dem_weighted_sat_nested_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-error-matcher-filter-flat-repeat",
+      "measurements": [
+        "stab_pf4_error_matcher_filter_flat_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-error-matcher-filter-nested-repeat",
+      "measurements": [
+        "stab_pf4_error_matcher_filter_nested_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-error-matcher-filter-logical-repeat",
+      "measurements": [
+        "stab_pf4_error_matcher_filter_logical_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-error-matcher-filter-annotation-repeat",
+      "measurements": [
+        "stab_pf4_error_matcher_filter_annotation_repeat_fold"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf4-dem-sampler-folded-repeat",
+      "measurements": [
+        "stab_pf4_dem_sampler_compile_folded_repeat",
+        "stab_pf4_dem_sampler_sample_folded_repeat",
+        "stab_pf4_dem_sampler_sample_zero_probability_folded_repeat",
+        "stab_pf4_dem_sampler_sample_deterministic_parity_repeat",
+        "stab_pf4_dem_sampler_sample_single_stochastic_parity_repeat",
+        "stab_pf4_dem_sampler_sample_flat_stochastic_parity_repeat",
+        "stab_pf4_dem_sampler_sample_nested_stochastic_parity_repeat"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pfm-b3-dem-traversal-core",
+      "measurements": [
+        "stab_pfm_b3_dem_traversal_flat_equivalent",
+        "stab_pfm_b3_dem_traversal_nested_large_repeat",
+        "stab_pfm_b3_dem_traversal_sparse_selected_coordinate",
+        "stab_pfm_b3_dem_traversal_wide_coordinate_irrelevant"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf4.rs"
+    },
+    {
+      "id": "pf5-detecting-regions-repeat",
+      "measurements": [
+        "stab_pf5_detecting_regions_repeat_ticks"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-detecting-regions-targets",
+      "measurements": [
+        "stab_pf5_detecting_regions_target_filters"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-detecting-regions-clifford",
+      "measurements": [
+        "stab_pf5_detecting_regions_clifford_gates"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-detecting-regions-generated-repetition",
+      "measurements": [
+        "stab_pf5_detecting_regions_generated_repetition"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-detecting-regions-generated-surface",
+      "measurements": [
+        "stab_pf5_detecting_regions_generated_surface"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-missing-detectors-mpp",
+      "measurements": [
+        "stab_pf5_missing_detectors_mpp_cases",
+        "stab_pf5_missing_detectors_mpp_suggestions"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-missing-detectors-mpad",
+      "measurements": [
+        "stab_pf5_missing_detectors_mpad_cases",
+        "stab_pf5_missing_detectors_mpad_suggestions"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-missing-detectors-generated-code",
+      "measurements": [
+        "stab_pf5_missing_detectors_generated_cases",
+        "stab_pf5_missing_detectors_generated_suggestions"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-flow-solve-measurement-rich",
+      "measurements": [
+        "stab_pf5_flow_solve_measurement_cases",
+        "stab_pf5_flow_solve_measurement_queries"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-flow-solve-measurement-python",
+      "measurements": [
+        "stab_pf5_flow_solve_measurement_python_cases",
+        "stab_pf5_flow_solve_measurement_python_queries"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pfm-b4-flow-solve-matrix-sizes",
+      "measurements": [
+        "stab_pfm_b4_flow_solve_dense_32x64_input_bits",
+        "stab_pfm_b4_flow_solve_dense_32x64_queries",
+        "stab_pfm_b4_flow_solve_dense_128x256_input_bits",
+        "stab_pfm_b4_flow_solve_dense_128x256_queries",
+        "stab_pfm_b4_flow_solve_sparse_512x1024_input_bits",
+        "stab_pfm_b4_flow_solve_sparse_512x1024_queries"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-flow-generators-measurement-rich",
+      "measurements": [
+        "stab_pf5_flow_generators_measurement_cases",
+        "stab_pf5_flow_generators_measurement_flows"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-flow-generators-measurement-python",
+      "measurements": [
+        "stab_pf5_flow_generators_measurement_python_cases",
+        "stab_pf5_flow_generators_measurement_python_flows"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf5-has-all-flows-batch",
+      "measurements": [
+        "stab_pf5_has_flows_batch_cases",
+        "stab_pf5_has_flows_batch_flows"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf5.rs"
+    },
+    {
+      "id": "pf6-error-decomp-loop-folded",
+      "measurements": [
+        "stab_pf6_error_decomp_loop_folded"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pf6-sparse-rev-frame-loop",
+      "measurements": [
+        "stab_pf6_sparse_rev_unitary_repeat_flow",
+        "stab_pf6_sparse_rev_unitary_repeat_high_idle_flow",
+        "stab_pf6_sparse_rev_shifted_measurement_flow"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-analyzer-cycle-folding",
+      "measurements": [
+        "stab_pfm_b5_analyzer_transient",
+        "stab_pfm_b5_analyzer_short_period",
+        "stab_pfm_b5_analyzer_long_period",
+        "stab_pfm_b5_analyzer_nested",
+        "stab_pfm_b5_analyzer_gauge",
+        "stab_pfm_b5_analyzer_coordinate"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-analyzer-generated-qec",
+      "measurements": [
+        "stab_pfm_b5_analyzer_repetition_qec",
+        "stab_pfm_b5_analyzer_surface_qec"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-graphlike-search-direct-dem",
+      "measurements": [
+        "stab_pfm_b5_graphlike_direct_dem"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-graphlike-generated-d25",
+      "measurements": [
+        "stab_pfm_b5_graphlike_generated_d25"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-graphlike-generated-d11-r1000",
+      "measurements": [
+        "stab_pfm_b5_graphlike_generated_d11_r1000"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-hypergraph-search-direct-dem",
+      "measurements": [
+        "stab_pfm_b5_hypergraph_direct_dem"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-hypergraph-search-generated-qec",
+      "measurements": [
+        "stab_pfm_b5_hypergraph_generated_qec"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-wcnf-direct-dem",
+      "measurements": [
+        "stab_pfm_b5_wcnf_shortest_direct",
+        "stab_pfm_b5_wcnf_likeliest_direct"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pfm-b5-wcnf-generated-qec",
+      "measurements": [
+        "stab_pfm_b5_wcnf_shortest_generated",
+        "stab_pfm_b5_wcnf_likeliest_generated"
+      ],
+      "witness_source": "ops/bench/src/baseline/pf6.rs"
+    },
+    {
+      "id": "pf7-cli-m2d-sweep-b8",
+      "measurements": [
+        "stab_pf7_cli_m2d_sweep_b8"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf7-cli-m2d-feedback-inline",
+      "measurements": [
+        "stab_pf7_cli_m2d_feedback_inline"
+      ],
+      "witness_source": "ops/bench/src/baseline/m9.rs"
+    },
+    {
+      "id": "pf7-cli-analyze-errors-generated",
+      "measurements": [
+        "stab_pf7_cli_analyze_errors_generated"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "pf7-cli-analyze-errors-decompose",
+      "measurements": [
+        "stab_pf7_cli_analyze_errors_decompose"
+      ],
+      "witness_source": "ops/bench/src/baseline/m10.rs"
+    },
+    {
+      "id": "pf7-cli-legacy-dispatch-startup",
+      "measurements": [
+        "stab_pf7_cli_legacy_gen_d3_r3"
+      ],
+      "witness_source": "ops/bench/src/baseline/m7.rs"
+    }
+  ]
+}

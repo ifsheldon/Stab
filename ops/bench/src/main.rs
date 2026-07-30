@@ -178,6 +178,10 @@ enum Command {
         /// Force reconfiguration and rebuild of the pinned Stim benchmark binaries.
         #[arg(long)]
         rebuild_stim: bool,
+
+        /// Fail instead of reusing an existing output directory.
+        #[arg(long)]
+        new_output: bool,
     },
 
     /// Report planned Stab-vs-Stim benchmark comparisons.
@@ -205,6 +209,14 @@ enum Command {
         /// Directory receiving compare.json and report.md.
         #[arg(long)]
         report: Option<PathBuf>,
+
+        /// Fail instead of reusing an existing report directory.
+        #[arg(long)]
+        new_output: bool,
+
+        /// Bind a checked measurement-identity contract into the report.
+        #[arg(long, value_name = "PATH")]
+        measurement_contract: Option<PathBuf>,
 
         /// Fail when rows slower than the hot-path threshold do not have valid profiler notes beside the report.
         #[arg(long)]
@@ -362,6 +374,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             only,
             primary,
             rebuild_stim,
+            new_output,
         } => {
             let manifest = checked_manifest(&root)?;
             run_baseline(
@@ -375,6 +388,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     only,
                     primary,
                     rebuild_stim,
+                    new_output,
                 },
             )?;
         }
@@ -385,6 +399,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             only,
             baseline,
             report,
+            new_output,
+            measurement_contract,
             require_profiler_notes,
             profiler_notes_dir,
             require_beta_gate,
@@ -409,6 +425,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     primary,
                     only,
                     report,
+                    new_output,
+                    measurement_contract,
                     require_profiler_notes,
                     profiler_notes_dirs: profiler_notes_dir,
                     require_beta_gate,

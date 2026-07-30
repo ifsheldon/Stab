@@ -21,7 +21,23 @@ pub(crate) fn atomic_write_repo_regular_file(
 ) -> Result<(), BenchError> {
     #[cfg(unix)]
     {
-        atomic_write_repo_regular_file_unix(root, path, bytes)
+        atomic_write_repo_regular_file_unix(root, path, bytes, true)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (root, path, bytes);
+        Err(non_unix_unsupported("atomic source output"))
+    }
+}
+
+pub(crate) fn atomic_create_repo_regular_file(
+    root: &RepoRoot,
+    path: &Path,
+    bytes: &[u8],
+) -> Result<(), BenchError> {
+    #[cfg(unix)]
+    {
+        atomic_write_repo_regular_file_unix(root, path, bytes, false)
     }
     #[cfg(not(unix))]
     {
@@ -297,6 +313,7 @@ fn atomic_write_repo_regular_file_unix(
     root: &RepoRoot,
     path: &Path,
     bytes: &[u8],
+    replace: bool,
 ) -> Result<(), BenchError> {
     use rustix::fs::{AtFlags, Mode, OFlags};
 
@@ -358,8 +375,19 @@ fn atomic_write_repo_regular_file_unix(
                 path: path.to_path_buf(),
                 source,
             })?;
-        rustix::fs::renameat(&directory, &temporary_name, &directory, file_name)
+        if replace {
+            rustix::fs::renameat(&directory, &temporary_name, &directory, file_name)
+                .map_err(source_io(path))?;
+        } else {
+            rustix::fs::renameat_with(
+                &directory,
+                &temporary_name,
+                &directory,
+                file_name,
+                rustix::fs::RenameFlags::NOREPLACE,
+            )
             .map_err(source_io(path))?;
+        }
         rustix::fs::fsync(&directory).map_err(source_io(path))?;
         Ok(())
     })();
@@ -577,5 +605,30 @@ mod tests {
             read_repo_regular_file_bounded(&retained, &retained.path.join("tracked.txt"), 1024)
                 .expect("read retained source");
         assert_eq!(bytes, b"retained\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_create_preserves_existing_file() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(directory.path()).expect("resolve root");
+        let path = directory.path().join("ledger.json");
+        std::fs::write(&path, b"sentinel\n").expect("write sentinel");
+
+        atomic_create_repo_regular_file(&root, &path, b"replacement\n")
+            .expect_err("existing source artifact must not be replaced");
+
+        assert_eq!(std::fs::read(&path).expect("read sentinel"), b"sentinel\n");
+        let temporary_entries = std::fs::read_dir(directory.path())
+            .expect("read repository")
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".stab-bench-")
+            })
+            .count();
+        assert_eq!(temporary_entries, 0);
     }
 }

@@ -193,14 +193,14 @@ just bench::simd-report --input target/benchmarks/qualification/a6-simd-compare-
 
 The source-owned matrix is fixed to the medium and large scales of `PERFQ-M5-SIMD-BITS` and `PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY`. The controller builds `stab-bench` once with `--no-default-features` and once with `--no-default-features --features portable-simd`, binds each choice into a schema-version-7 private build receipt, independently calibrates the workers, selects one common iteration count, requires exact output identity, alternates scalar-first and portable-first pairs, and reports portable-SIMD seconds per work item divided by scalar seconds per work item. The replay command validates the source identities and runtime contracts, reconstructs calibration, rederives every paired sample from raw invocation rows, and recomputes the summary and Markdown. A confidence-interval upper bound below `1.0` is reported as a material benefit. This diagnostic does not make a Stim parity, Stab self-regression, release-rollup, or sampling-backend claim.
 
-After producing the final A6 continuity matrix and every required focused row, validate the checked digest ledger with:
+After producing the final A6 continuity matrix and every required focused row, write a selection request under `target/benchmarks`, publish the checked ledger once, and validate it with:
 
 ```sh
+just bench::a6-focused-evidence --publish-from target/benchmarks/A6-REQUEST.json
 just bench::a6-focused-evidence
-just bench::a6-focused-evidence --verify-artifacts
 ```
 
-The first command checks exact crossing coverage, row-native internal timing counts, source-revision binding, and profile dispositions. The second also reopens the immutable reports and witness sources, verifies their recorded SHA-256 values, and rederives every bound timing value.
+Publication requires a clean unchanged revision, derives the baseline binding, report and source digests, exact crossings, row-native internal timing counts, ratios, and typed outcomes, and atomically creates `benchmarks/a6-focused-evidence.json` without replacement. Validation always reopens every immutable report, contract-owned witness source, and optional profile; verifies its SHA-256; replays current threshold, waiver, and profiler-note policy; and rederives every bound timing value. The hidden legacy `--verify-artifacts` flag no longer changes validation strength.
 
 The following contracts apply to the general Stim-versus-Stab qualification controller invoked by `bench::qualification-run`, not to the preceding Stab-only SIMD diagnostic.
 

@@ -1,8 +1,12 @@
-use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::path::Path;
+use std::path::PathBuf;
+
+use sha2::Digest as _;
 
 use crate::allocations::AllocationTrackingGuard;
 use crate::baseline::{
-    compare_note, read_baseline_report, run_stab_compare_row_with_root, summarize_measurements,
+    compare_note, run_stab_compare_row_with_root, summarize_measurements,
     summarize_stab_measurements, validate_baseline_metadata,
 };
 use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
@@ -12,19 +16,27 @@ use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
-use crate::report::{
-    BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareCommandMetadata, CompareReport,
-    CompareRowResult, Measurement, machine_metadata, render_compare_markdown_report, stab_metadata,
-    unix_epoch_seconds,
-};
+use crate::report::{BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareRowResult, Measurement};
 use crate::root::RepoRoot;
+use crate::source_file::read_repo_regular_file_bounded;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
 mod options;
 mod profiler_notes;
+mod report_output;
+
+const MAX_COMPARE_SOURCE_BYTES: usize = 64 << 20;
 
 use options::validate_compare_options;
-use profiler_notes::{ProfilerNoteFindings, apply_profiler_notes, profiler_note_report_metadata};
+use profiler_notes::{ProfilerNoteFindings, apply_profiler_notes};
+use report_output::{CompareReportWrite, write_compare_report};
+
+pub(crate) fn reapply_profiler_notes(
+    rows: &mut [CompareRowResult],
+    note_dirs: &[(PathBuf, PathBuf)],
+) -> Vec<String> {
+    apply_profiler_notes(rows, note_dirs).blockers
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompareOptions {
@@ -46,6 +58,8 @@ pub(crate) struct CompareOptions {
     pub(crate) warmup: bool,
     pub(crate) measurement_runs: usize,
     pub(crate) strict: bool,
+    pub(crate) new_output: bool,
+    pub(crate) measurement_contract: Option<PathBuf>,
 }
 
 pub(crate) fn run_compare(
@@ -56,8 +70,21 @@ pub(crate) fn run_compare(
     validate_compare_options(options)?;
     let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
-    let baseline_report = read_baseline_report(&baseline_path)?;
+    let baseline_bytes =
+        read_repo_regular_file_bounded(root, &baseline_path, MAX_COMPARE_SOURCE_BYTES)?;
+    let baseline_sha256 = hex::encode(sha2::Sha256::digest(&baseline_bytes));
+    let baseline_report: BaselineReport = serde_json::from_slice(&baseline_bytes)?;
     validate_baseline_metadata(&baseline_report)?;
+    let measurement_contract_sha256 = options
+        .measurement_contract
+        .as_ref()
+        .map(|path| {
+            let resolved = root.resolve_relative(path);
+            let bytes = read_repo_regular_file_bounded(root, &resolved, MAX_COMPARE_SOURCE_BYTES)?;
+            Ok::<_, BenchError>(hex::encode(sha2::Sha256::digest(&bytes)))
+        })
+        .transpose()?
+        .unwrap_or_default();
     let threshold_path = options
         .thresholds
         .as_ref()
@@ -226,6 +253,9 @@ pub(crate) fn run_compare(
             root,
             baseline_report: &baseline_report,
             baseline_path: &baseline_path,
+            baseline_sha256: &baseline_sha256,
+            measurement_contract_path: options.measurement_contract.as_deref(),
+            measurement_contract_sha256: &measurement_contract_sha256,
             beta_waivers_path: beta_waivers_path.as_deref(),
             regression_waivers_path: regression_waivers_path.as_deref(),
             memory_baseline_path: memory_baseline_path.as_deref(),
@@ -299,94 +329,6 @@ fn mark_instrumented_timing_not_evaluated(rows: &mut [CompareRowResult]) {
         row.beta_gate_waiver_follow_up = None;
         row.beta_gate_error = None;
     }
-}
-
-struct CompareReportWrite<'a> {
-    root: &'a RepoRoot,
-    baseline_report: &'a BaselineReport,
-    baseline_path: &'a Path,
-    beta_waivers_path: Option<&'a Path>,
-    regression_waivers_path: Option<&'a Path>,
-    memory_baseline_path: Option<&'a Path>,
-    threshold_path: Option<&'a Path>,
-    report_dir: &'a Path,
-    options: &'a CompareOptions,
-    rows: Vec<CompareRowResult>,
-}
-
-fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFindings, BenchError> {
-    let CompareReportWrite {
-        root,
-        baseline_report,
-        baseline_path,
-        beta_waivers_path,
-        regression_waivers_path,
-        memory_baseline_path,
-        threshold_path,
-        report_dir,
-        options,
-        mut rows,
-    } = input;
-    let out_dir = root.create_benchmark_output_dir(report_dir)?;
-    let profiler_note_dirs = if options.profiler_notes_dirs.is_empty() {
-        vec![(
-            out_dir.join("profiler-notes"),
-            PathBuf::from("profiler-notes"),
-        )]
-    } else {
-        options
-            .profiler_notes_dirs
-            .iter()
-            .map(|path| (root.resolve_relative(path), path.clone()))
-            .collect()
-    };
-    let profiler_note_findings = apply_profiler_notes(&mut rows, &profiler_note_dirs);
-    let (profiler_notes_path, profiler_notes_paths) =
-        profiler_note_report_metadata(&options.profiler_notes_dirs);
-    let report = CompareReport {
-        schema_version: 2,
-        generated_unix_epoch_seconds: unix_epoch_seconds(),
-        machine: machine_metadata(root)?,
-        stim: baseline_report.stim.clone(),
-        stab: stab_metadata(root)?,
-        command: CompareCommandMetadata {
-            baseline_path: baseline_path.display().to_string(),
-            profile: options.profile.clone(),
-            milestone: options.milestone.clone(),
-            primary: options.primary,
-            filters: options.only.clone(),
-            require_profiler_notes: options.require_profiler_notes,
-            require_beta_gate: options.require_beta_gate,
-            beta_waivers_path: beta_waivers_path.map(|path| path.display().to_string()),
-            regression_waivers_path: regression_waivers_path.map(|path| path.display().to_string()),
-            require_memory_gate: options.require_memory_gate,
-            memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
-            thresholds_path: threshold_path.map(|path| path.display().to_string()),
-            profiler_notes_path,
-            profiler_notes_paths,
-            track_allocations: options.track_allocations,
-            warmup: options.warmup,
-            measurement_runs: options.measurement_runs,
-            strict: options.strict,
-        },
-        rows,
-    };
-    let json_path = out_dir.join("compare.json");
-    let json = serde_json::to_string_pretty(&report)?;
-    std::fs::write(&json_path, json).map_err(|source| BenchError::WriteOutput {
-        path: json_path.clone(),
-        source,
-    })?;
-    let report_path = out_dir.join("report.md");
-    std::fs::write(&report_path, render_compare_markdown_report(&report)).map_err(|source| {
-        BenchError::WriteOutput {
-            path: report_path.clone(),
-            source,
-        }
-    })?;
-    println!("[{PREFIX}] wrote {}", json_path.display());
-    println!("[{PREFIX}] wrote {}", report_path.display());
-    Ok(profiler_note_findings)
 }
 
 fn run_warmup_rows_with_root(

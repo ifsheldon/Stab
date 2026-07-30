@@ -12,6 +12,8 @@ use crate::process::{check_success, run_process};
 use crate::root::RepoRoot;
 
 pub(crate) const BETA_GATE_MAX_RELATIVE_RATIO: f64 = 1.25;
+pub(crate) const COMPARE_REPORT_SCHEMA_VERSION: u32 = 3;
+pub(crate) const COMPARE_TIMING_BOUNDARY: &str = "source-owned-row-native-v1";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineReport {
@@ -23,17 +25,19 @@ pub(crate) struct BaselineReport {
     pub(crate) rows: Vec<BaselineRowResult>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct MachineMetadata {
     os: String,
     arch: String,
     family: String,
+    #[serde(default)]
+    cpu_identity: String,
     available_parallelism: usize,
     rustc_version: String,
     cmake_version: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct StimMetadata {
     pub(crate) source_path: String,
     pub(crate) expected_tag: String,
@@ -42,7 +46,7 @@ pub(crate) struct StimMetadata {
     pub(crate) actual_commit: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct StabMetadata {
     pub(crate) commit: String,
     pub(crate) local_modifications: bool,
@@ -55,6 +59,8 @@ pub(crate) struct BaselineCommandMetadata {
     pub(crate) filters: Vec<String>,
     #[serde(default)]
     pub(crate) primary: bool,
+    #[serde(default)]
+    pub(crate) new_output: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -134,11 +140,21 @@ pub(crate) struct CompareReport {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct CompareCommandMetadata {
     pub(crate) baseline_path: String,
+    #[serde(default)]
+    pub(crate) baseline_sha256: String,
     pub(crate) profile: String,
     pub(crate) milestone: Option<String>,
     pub(crate) primary: bool,
     #[serde(default)]
     pub(crate) filters: Vec<String>,
+    #[serde(default)]
+    pub(crate) cargo_features: Vec<String>,
+    #[serde(default)]
+    pub(crate) timing_boundary: String,
+    #[serde(default)]
+    pub(crate) measurement_contract_path: Option<String>,
+    #[serde(default)]
+    pub(crate) measurement_contract_sha256: String,
     pub(crate) require_profiler_notes: bool,
     pub(crate) require_beta_gate: bool,
     #[serde(default)]
@@ -159,6 +175,8 @@ pub(crate) struct CompareCommandMetadata {
     #[serde(default = "default_measurement_runs")]
     pub(crate) measurement_runs: usize,
     pub(crate) strict: bool,
+    #[serde(default)]
+    pub(crate) new_output: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -274,10 +292,25 @@ pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, Bench
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         family: std::env::consts::FAMILY.to_string(),
+        cpu_identity: cpu_identity(),
         available_parallelism: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
         rustc_version: command_first_line("rustc", ["--version"], &root.path)?,
         cmake_version: command_first_line("cmake", ["--version"], &root.path)?,
     })
+}
+
+fn cpu_identity() -> String {
+    std::fs::read_to_string("/proc/cpuinfo")
+        .ok()
+        .and_then(|cpuinfo| {
+            cpuinfo.lines().find_map(|line| {
+                let (key, value) = line.split_once(':')?;
+                matches!(key.trim(), "model name" | "Processor")
+                    .then(|| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+            })
+        })
+        .unwrap_or_else(|| "unavailable".to_string())
 }
 
 pub(crate) fn stab_metadata(root: &RepoRoot) -> Result<StabMetadata, BenchError> {
@@ -386,6 +419,10 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     out.push_str(&format!("- Profile: {}\n", report.command.profile));
     out.push_str(&format!("- Baseline: {}\n", report.command.baseline_path));
     out.push_str(&format!(
+        "- Baseline SHA-256: {}\n",
+        report.command.baseline_sha256
+    ));
+    out.push_str(&format!(
         "- Filters: {}\n",
         if report.command.filters.is_empty() {
             "none".to_string()
@@ -393,6 +430,25 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             report.command.filters.join(", ")
         }
     ));
+    out.push_str(&format!(
+        "- Cargo features: {}\n",
+        if report.command.cargo_features.is_empty() {
+            "none".to_string()
+        } else {
+            report.command.cargo_features.join(", ")
+        }
+    ));
+    out.push_str(&format!(
+        "- Timing boundary: {}\n",
+        report.command.timing_boundary
+    ));
+    if let Some(path) = &report.command.measurement_contract_path {
+        out.push_str(&format!("- Measurement contract: {path}\n"));
+        out.push_str(&format!(
+            "- Measurement contract SHA-256: {}\n",
+            report.command.measurement_contract_sha256
+        ));
+    }
     out.push_str(&format!("- Primary matrix: {}\n", report.command.primary));
     if let Some(memory_baseline_path) = &report.command.memory_baseline_path {
         out.push_str(&format!("- Memory baseline: {memory_baseline_path}\n"));
@@ -607,9 +663,20 @@ fn default_measurement_runs() -> usize {
     1
 }
 
+pub(crate) fn active_benchmark_features() -> Vec<String> {
+    let mut features = Vec::new();
+    if cfg!(feature = "count-allocations") {
+        features.push("count-allocations".to_string());
+    }
+    if cfg!(feature = "portable-simd") {
+        features.push("portable-simd".to_string());
+    }
+    features
+}
+
 #[cfg(test)]
 mod tests {
-    use super::CompareCommandMetadata;
+    use super::{COMPARE_TIMING_BOUNDARY, CompareCommandMetadata};
 
     #[test]
     fn compare_command_metadata_keeps_legacy_profiler_note_reports_readable() {
@@ -639,16 +706,27 @@ mod tests {
             Some("benchmarks/profiler-notes/m12")
         );
         assert!(metadata.profiler_notes_paths.is_empty());
+        assert!(metadata.cargo_features.is_empty());
+        assert!(metadata.timing_boundary.is_empty());
+        assert!(metadata.baseline_sha256.is_empty());
+        assert!(metadata.measurement_contract_path.is_none());
+        assert!(metadata.measurement_contract_sha256.is_empty());
+        assert!(!metadata.new_output);
     }
 
     #[test]
     fn compare_command_metadata_serializes_structured_profiler_note_roots() {
         let metadata = CompareCommandMetadata {
             baseline_path: "baseline.json".to_string(),
+            baseline_sha256: "a".repeat(64),
             profile: "release".to_string(),
             milestone: None,
             primary: false,
             filters: Vec::new(),
+            cargo_features: vec!["portable-simd".to_string()],
+            timing_boundary: COMPARE_TIMING_BOUNDARY.to_string(),
+            measurement_contract_path: Some("benchmarks/a6-measurement-contract.json".to_string()),
+            measurement_contract_sha256: "b".repeat(64),
             require_profiler_notes: true,
             require_beta_gate: false,
             beta_waivers_path: None,
@@ -665,6 +743,7 @@ mod tests {
             warmup: true,
             measurement_runs: 3,
             strict: true,
+            new_output: true,
         };
 
         let value = serde_json::to_value(metadata).expect("metadata should serialize");
@@ -675,6 +754,7 @@ mod tests {
                 .expect("legacy profiler-note root"),
             "benchmarks/profiler-notes/m12"
         );
+        assert_eq!(value.get("new_output").expect("new-output policy"), true);
         assert_eq!(
             value
                 .get("profiler_notes_paths")
@@ -683,6 +763,32 @@ mod tests {
                 "benchmarks/profiler-notes/m12",
                 "benchmarks/profiler-notes/pfm-b5"
             ])
+        );
+        assert_eq!(
+            value
+                .get("cargo_features")
+                .expect("Cargo feature selection"),
+            &serde_json::json!(["portable-simd"])
+        );
+        assert_eq!(
+            value.get("timing_boundary").expect("timing boundary"),
+            COMPARE_TIMING_BOUNDARY
+        );
+        assert_eq!(
+            value.get("baseline_sha256").expect("baseline digest"),
+            &serde_json::json!("a".repeat(64))
+        );
+        assert_eq!(
+            value
+                .get("measurement_contract_path")
+                .expect("measurement contract path"),
+            "benchmarks/a6-measurement-contract.json"
+        );
+        assert_eq!(
+            value
+                .get("measurement_contract_sha256")
+                .expect("measurement contract digest"),
+            &serde_json::json!("b".repeat(64))
         );
     }
 }

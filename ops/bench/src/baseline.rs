@@ -78,7 +78,7 @@ const M6_TABLEAU_QUBITS: usize = 32;
 const M6_TABLEAU_ITER_QUBITS: usize = 2;
 const M6_STABILIZER_QUBITS: usize = 16;
 const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
-const BASELINE_SCHEMA_VERSION: u32 = 1;
+const BASELINE_SCHEMA_VERSION: u32 = 2;
 const M4_STIM_PARSE_DENSE_FIXTURE: &str = r#"
 H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 CNOT 4 5 6 7
@@ -94,6 +94,7 @@ pub(crate) struct BaselineOptions {
     pub(crate) only: Vec<String>,
     pub(crate) primary: bool,
     pub(crate) rebuild_stim: bool,
+    pub(crate) new_output: bool,
 }
 
 pub(crate) fn run_baseline(
@@ -132,9 +133,13 @@ pub(crate) fn run_baseline(
         )?);
     }
 
-    let out_dir = root.create_benchmark_output_dir(&options.out)?;
+    let out_dir = if options.new_output {
+        root.create_new_benchmark_output_dir(&options.out)?
+    } else {
+        root.create_benchmark_output_dir(&options.out)?
+    };
     let report = BaselineReport {
-        schema_version: 1,
+        schema_version: BASELINE_SCHEMA_VERSION,
         generated_unix_epoch_seconds: unix_epoch_seconds(),
         machine: machine_metadata(root)?,
         stim: StimMetadata {
@@ -149,6 +154,7 @@ pub(crate) fn run_baseline(
             cli_iterations: options.cli_iterations,
             filters: options.only.clone(),
             primary: options.primary,
+            new_output: options.new_output,
         },
         rows: results,
     };
@@ -185,19 +191,11 @@ fn selected_baseline_rows<'a>(
     Ok(rows)
 }
 
-pub(crate) fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
-    let content = std::fs::read_to_string(path).map_err(|source| BenchError::ReadBaseline {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    Ok(serde_json::from_str(&content)?)
-}
-
 pub(crate) fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError> {
     let mut details = Vec::new();
-    if report.schema_version != BASELINE_SCHEMA_VERSION {
+    if !matches!(report.schema_version, 1 | BASELINE_SCHEMA_VERSION) {
         details.push(format!(
-            "schema_version={} expected {}",
+            "schema_version={} expected 1 or {}",
             report.schema_version, BASELINE_SCHEMA_VERSION
         ));
     }

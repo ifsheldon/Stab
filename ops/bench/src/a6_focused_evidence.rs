@@ -1,25 +1,118 @@
 //! Checked A6 report-only crossing and focused-diagnostic evidence.
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Component, Path, PathBuf};
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
-use serde::Deserialize;
-use sha2::{Digest, Sha256};
+use serde::{Deserialize, Serialize};
 
+use self::artifacts::{
+    path_ends_with, read_bounded, valid_revision, validate_binding, verify_binding,
+};
+use self::structure::validate_structure;
+use crate::comparability::ComparabilityClass;
+use crate::compare::reapply_profiler_notes;
+use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
-use crate::manifest::is_safe_benchmark_id;
-use crate::report::{CompareReport, Measurement};
+use crate::manifest::{
+    BenchmarkManifest, BenchmarkRow, Milestone, Runner, ThresholdClass, is_safe_benchmark_id,
+};
+use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
+use crate::report::{
+    BaselineReport, BaselineRowResult, COMPARE_REPORT_SCHEMA_VERSION, COMPARE_TIMING_BOUNDARY,
+    CompareReport, CompareRowResult, Measurement,
+};
 use crate::root::RepoRoot;
-use crate::source_file::open_regular_file_bounded_descriptor;
+use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
-const SCHEMA_VERSION: u32 = 1;
+mod artifacts;
+mod measurement_contract;
+mod publication;
+mod revision;
+mod structure;
+
+const SCHEMA_VERSION: u32 = 2;
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_REPORT_BYTES: u64 = 64 << 20;
 const MAX_PHASES: usize = 256;
 const MAX_DIAGNOSTICS: usize = 128;
 const CROSSING_RATIO: f64 = 1.15;
 const RATIO_TOLERANCE: f64 = 1e-9;
+const A6_BASELINE_TARGET_SECONDS: f64 = 0.01;
+const A6_BASELINE_CLI_ITERATIONS: u32 = 3;
+const A6_MATRIX_FILTERS: [&str; 15] = [
+    "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6",
+    "PF7",
+];
+const INITIAL_SEED_PHASES: [(&str, &str); 19] = [
+    ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8"),
+    ("pf3-m2d-sweep-ptb64-input", "stab_pf3_m2d_sweep_ptb64"),
+    (
+        "pf3-detect-sweep-sampling",
+        "stab_detect_sweep_default_false",
+    ),
+    (
+        "pf3-detect-sweep-sampling",
+        "stab_detect_frame_sweep_default_false",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_transient",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_short_period",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_long_period",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_nested",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_gauge",
+    ),
+    (
+        "pfm-b5-analyzer-cycle-folding",
+        "stab_pfm_b5_analyzer_coordinate",
+    ),
+    (
+        "pfm-b5-analyzer-generated-qec",
+        "stab_pfm_b5_analyzer_repetition_qec",
+    ),
+    (
+        "pfm-b5-analyzer-generated-qec",
+        "stab_pfm_b5_analyzer_surface_qec",
+    ),
+    (
+        "pfm-b5-graphlike-search-direct-dem",
+        "stab_pfm_b5_graphlike_direct_dem",
+    ),
+    (
+        "pfm-b5-hypergraph-search-direct-dem",
+        "stab_pfm_b5_hypergraph_direct_dem",
+    ),
+    ("pf7-cli-m2d-sweep-b8", "stab_pf7_cli_m2d_sweep_b8"),
+    (
+        "pf7-cli-m2d-feedback-inline",
+        "stab_pf7_cli_m2d_feedback_inline",
+    ),
+    (
+        "pf7-cli-analyze-errors-generated",
+        "stab_pf7_cli_analyze_errors_generated",
+    ),
+    (
+        "pf7-cli-analyze-errors-decompose",
+        "stab_pf7_cli_analyze_errors_decompose",
+    ),
+    (
+        "pf7-cli-legacy-dispatch-startup",
+        "stab_pf7_cli_legacy_gen_d3_r3",
+    ),
+];
 
 #[derive(Debug, Args)]
 pub(crate) struct A6FocusedEvidenceArgs {
@@ -31,29 +124,34 @@ pub(crate) struct A6FocusedEvidenceArgs {
     )]
     ledger: PathBuf,
 
-    /// Reopen every bound report and source file and verify its SHA-256 and recorded values.
-    #[arg(long)]
+    /// Deprecated compatibility flag; full artifact verification is now mandatory.
+    #[arg(long, hide = true, conflicts_with = "publish_from")]
     verify_artifacts: bool,
+
+    /// Derive and atomically create the checked ledger from a source-owned publication request.
+    #[arg(long, value_name = "PATH", conflicts_with = "verify_artifacts")]
+    publish_from: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct FocusedEvidenceLedger {
     schema_version: u32,
     source_revision: String,
+    baseline_report: ArtifactBinding,
     matrix_report: ArtifactBinding,
     phases: Vec<PhaseEvidence>,
     diagnostics: Vec<FocusedDiagnostic>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ArtifactBinding {
     path: String,
     sha256: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct PhaseEvidence {
     row_id: String,
@@ -65,7 +163,7 @@ struct PhaseEvidence {
     initial_seed_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct FocusedDiagnostic {
     row_id: String,
@@ -73,11 +171,12 @@ struct FocusedDiagnostic {
     semantic_witness_source: ArtifactBinding,
     internal_timing_count: usize,
     measurements: Vec<FocusedMeasurement>,
+    outcome: DiagnosticOutcome,
     profile: ProfileDisposition,
-    disposition: String,
+    owner_action: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct FocusedMeasurement {
     measurement: String,
@@ -85,7 +184,7 @@ struct FocusedMeasurement {
     focused_over_predecessor: f64,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum ProfileStatus {
     Captured,
@@ -93,7 +192,15 @@ enum ProfileStatus {
     NotRequired,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum DiagnosticOutcome {
+    ResolvedWithinBoundary,
+    ReproducedProfiled,
+    ReproducedProfileUnavailable,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ProfileDisposition {
     status: ProfileStatus,
@@ -102,6 +209,10 @@ struct ProfileDisposition {
 }
 
 pub(crate) fn check(root: &RepoRoot, args: A6FocusedEvidenceArgs) -> Result<(), BenchError> {
+    if let Some(request) = &args.publish_from {
+        return publication::publish(root, &args.ledger, request);
+    }
+    let _deprecated_verify_artifacts = args.verify_artifacts;
     let ledger_path = root.resolve_relative(&args.ledger);
     let bytes = read_bounded(&ledger_path, MAX_LEDGER_BYTES)?;
     let ledger: FocusedEvidenceLedger = serde_json::from_slice(&bytes).map_err(|error| {
@@ -110,198 +221,147 @@ pub(crate) fn check(root: &RepoRoot, args: A6FocusedEvidenceArgs) -> Result<(), 
             args.ledger.display()
         ))
     })?;
-    validate_structure(&ledger)?;
-    if args.verify_artifacts {
-        verify_artifacts(root, &ledger)?;
-    }
+    validate_ledger(root, &ledger, true)?;
     println!(
-        "[stab-bench] A6 focused evidence OK: {} phases, {} focused row(s), artifacts_verified={}",
+        "[stab-bench] A6 focused evidence OK: {} phases, {} focused row(s), all_artifacts_verified=true",
         ledger.phases.len(),
-        ledger.diagnostics.len(),
-        args.verify_artifacts
+        ledger.diagnostics.len()
     );
     Ok(())
 }
 
-fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), BenchError> {
-    let mut issues = Vec::new();
-    if ledger.schema_version != SCHEMA_VERSION {
-        issues.push(format!(
-            "schema_version={} expected {SCHEMA_VERSION}",
-            ledger.schema_version
-        ));
-    }
-    validate_revision(&ledger.source_revision, &mut issues);
-    validate_binding("matrix_report", &ledger.matrix_report, &mut issues);
-    if ledger.phases.is_empty() || ledger.phases.len() > MAX_PHASES {
-        issues.push(format!(
-            "phases must contain 1..={MAX_PHASES} entries, got {}",
-            ledger.phases.len()
-        ));
-    }
-    if ledger.diagnostics.len() > MAX_DIAGNOSTICS {
-        issues.push(format!("diagnostics exceeds {MAX_DIAGNOSTICS} entries"));
-    }
-
-    let mut phase_keys = BTreeSet::new();
-    let mut predecessor_seconds = BTreeMap::new();
-    let mut required_crossings = BTreeSet::new();
-    for phase in &ledger.phases {
-        validate_row_and_measurement(&phase.row_id, &phase.measurement, &mut issues);
-        let key = (phase.row_id.clone(), phase.measurement.clone());
-        if !phase_keys.insert(key.clone()) {
-            issues.push(format!(
-                "duplicate phase {}/{}",
-                phase.row_id, phase.measurement
-            ));
-        }
-        validate_positive_seconds(
-            &format!(
-                "{}/{} source_current_seconds",
-                phase.row_id, phase.measurement
-            ),
-            phase.source_current_seconds,
-            &mut issues,
-        );
-        match (
-            &phase.predecessor_report,
-            phase.predecessor_seconds,
-            phase.source_over_predecessor,
-            phase.initial_seed_reason.as_deref(),
-        ) {
-            (Some(binding), Some(previous), Some(ratio), None) => {
-                validate_binding("predecessor_report", binding, &mut issues);
-                validate_positive_seconds(
-                    &format!("{}/{} predecessor_seconds", phase.row_id, phase.measurement),
-                    previous,
-                    &mut issues,
-                );
-                validate_ratio(
-                    &format!("{}/{} source_over_predecessor", phase.row_id, phase.measurement),
-                    phase.source_current_seconds,
-                    previous,
-                    ratio,
-                    &mut issues,
-                );
-                predecessor_seconds.insert(key.clone(), previous);
-                if ratio > CROSSING_RATIO {
-                    required_crossings.insert(key);
-                }
-            }
-            (None, None, None, Some(reason)) if !reason.trim().is_empty() => {}
-            _ => issues.push(format!(
-                "{}/{} must be exactly one comparable predecessor triple or one nonempty initial_seed_reason",
-                phase.row_id, phase.measurement
-            )),
-        }
-    }
-
-    let mut diagnostic_rows = BTreeSet::new();
-    let mut diagnostic_paths = BTreeSet::new();
-    let mut covered_crossings = BTreeSet::new();
+fn validate_ledger(
+    root: &RepoRoot,
+    ledger: &FocusedEvidenceLedger,
+    verify_remaining_artifacts: bool,
+) -> Result<(), BenchError> {
+    validate_structure(ledger)?;
+    revision::validate_source_revision(root, &ledger.source_revision)?;
+    let manifest = BenchmarkManifest::read(root)?;
+    manifest.check(root)?;
+    let measurement_contract =
+        measurement_contract::A6MeasurementContract::read_and_validate(root, &manifest)?;
     for diagnostic in &ledger.diagnostics {
-        if !is_safe_benchmark_id(&diagnostic.row_id) {
-            issues.push(format!(
-                "diagnostic row {:?} is not a safe benchmark id",
-                diagnostic.row_id
-            ));
-        }
-        if !diagnostic_rows.insert(diagnostic.row_id.clone()) {
-            issues.push(format!(
-                "duplicate focused diagnostic row {}",
-                diagnostic.row_id
-            ));
-        }
-        validate_binding("focused report", &diagnostic.report, &mut issues);
-        validate_binding(
-            "semantic witness source",
-            &diagnostic.semantic_witness_source,
-            &mut issues,
-        );
-        if !diagnostic_paths.insert(diagnostic.report.path.clone()) {
-            issues.push(format!(
-                "focused report path {} is reused by multiple rows",
-                diagnostic.report.path
-            ));
-        }
-        let revision_prefix = ledger.source_revision.chars().take(8).collect::<String>();
-        if !diagnostic.report.path.contains(&revision_prefix) {
-            issues.push(format!(
-                "focused report path {} does not bind the source revision prefix",
-                diagnostic.report.path
-            ));
-        }
-        if diagnostic.internal_timing_count < 8 {
-            issues.push(format!(
-                "{} retains {} internal timings, expected at least 8",
-                diagnostic.row_id, diagnostic.internal_timing_count
-            ));
-        }
-        if diagnostic.disposition.trim().is_empty() {
-            issues.push(format!("{} has an empty disposition", diagnostic.row_id));
-        }
-        if diagnostic.measurements.is_empty() {
-            issues.push(format!("{} has no focused measurements", diagnostic.row_id));
-        }
+        measurement_contract
+            .require_witness_source(&diagnostic.row_id, &diagnostic.semantic_witness_source.path)?;
+    }
+    let matrix = read_bound_report(root, &ledger.matrix_report)?;
+    require_matrix_contract(
+        root,
+        &matrix,
+        &ledger.source_revision,
+        &manifest,
+        &measurement_contract,
+    )?;
+    let baseline = read_bound_baseline(root, &ledger.baseline_report)?;
+    require_baseline_contract(&baseline, &matrix, &ledger.baseline_report, &manifest)?;
+    validate_matrix_phase_coverage(ledger, &matrix)?;
+    verify_matrix_phase_values(ledger, &matrix)?;
+    if verify_remaining_artifacts {
+        verify_artifacts(root, ledger, &matrix)?;
+    }
+    Ok(())
+}
 
-        let mut row_reproduces = false;
-        for measurement in &diagnostic.measurements {
-            validate_row_and_measurement(&diagnostic.row_id, &measurement.measurement, &mut issues);
-            let key = (diagnostic.row_id.clone(), measurement.measurement.clone());
-            if !covered_crossings.insert(key.clone()) {
+fn validate_matrix_phase_coverage(
+    ledger: &FocusedEvidenceLedger,
+    matrix: &CompareReport,
+) -> Result<(), BenchError> {
+    let mut expected = BTreeSet::new();
+    let mut issues = Vec::new();
+    for row in &matrix.rows {
+        if row.comparability != ComparabilityClass::ReportOnly {
+            continue;
+        }
+        for measurement in &row.stab_measurements {
+            let key = (row.id.clone(), measurement.name.clone());
+            if !expected.insert(key.clone()) {
                 issues.push(format!(
-                    "duplicate focused measurement {}/{}",
-                    diagnostic.row_id, measurement.measurement
+                    "matrix repeats report-only phase {}/{}",
+                    key.0, key.1
                 ));
             }
-            let Some(previous) = predecessor_seconds.get(&key).copied() else {
-                issues.push(format!(
-                    "focused measurement {}/{} has no comparable predecessor",
-                    diagnostic.row_id, measurement.measurement
-                ));
-                continue;
-            };
-            validate_positive_seconds(
-                &format!(
-                    "{}/{} focused_seconds",
-                    diagnostic.row_id, measurement.measurement
-                ),
-                measurement.focused_seconds,
-                &mut issues,
-            );
-            validate_ratio(
-                &format!(
-                    "{}/{} focused_over_predecessor",
-                    diagnostic.row_id, measurement.measurement
-                ),
-                measurement.focused_seconds,
-                previous,
-                measurement.focused_over_predecessor,
-                &mut issues,
-            );
-            row_reproduces |= measurement.focused_over_predecessor > CROSSING_RATIO;
         }
-        validate_profile(diagnostic, row_reproduces, &mut issues);
     }
-
-    for missing in required_crossings.difference(&covered_crossings) {
-        issues.push(format!(
-            "missing focused diagnostic for {}/{}",
-            missing.0, missing.1
-        ));
-    }
-    for extra in covered_crossings.difference(&required_crossings) {
-        issues.push(format!(
-            "focused diagnostic {}/{} is not a source-current crossing",
-            extra.0, extra.1
-        ));
-    }
-
+    let initial = INITIAL_SEED_PHASES
+        .iter()
+        .map(|(row, measurement)| ((*row).to_string(), (*measurement).to_string()))
+        .collect::<BTreeSet<_>>();
+    validate_phase_coverage(ledger, &expected, &initial, &mut issues);
     if issues.is_empty() {
         Ok(())
     } else {
         Err(focused_error(issues.join("\n")))
     }
+}
+
+fn validate_phase_coverage(
+    ledger: &FocusedEvidenceLedger,
+    expected: &BTreeSet<(String, String)>,
+    initial: &BTreeSet<(String, String)>,
+    issues: &mut Vec<String>,
+) {
+    let actual = ledger
+        .phases
+        .iter()
+        .map(|phase| (phase.row_id.clone(), phase.measurement.clone()))
+        .collect::<BTreeSet<_>>();
+    for missing in expected.difference(&actual) {
+        issues.push(format!(
+            "ledger omits report-only matrix phase {}/{}",
+            missing.0, missing.1
+        ));
+    }
+    for extra in actual.difference(expected) {
+        issues.push(format!(
+            "ledger invents non-report-only matrix phase {}/{}",
+            extra.0, extra.1
+        ));
+    }
+    for missing in initial.difference(expected) {
+        issues.push(format!(
+            "source-owned initial seed {}/{} is absent from the matrix",
+            missing.0, missing.1
+        ));
+    }
+    for phase in &ledger.phases {
+        let key = (phase.row_id.clone(), phase.measurement.clone());
+        let has_predecessor = phase.predecessor_report.is_some()
+            && phase.predecessor_seconds.is_some()
+            && phase.source_over_predecessor.is_some();
+        let has_seed_reason = phase
+            .initial_seed_reason
+            .as_deref()
+            .is_some_and(|reason| !reason.trim().is_empty());
+        if initial.contains(&key) {
+            if has_predecessor || !has_seed_reason {
+                issues.push(format!(
+                    "initial seed {}/{} must have only a nonempty initial_seed_reason",
+                    phase.row_id, phase.measurement
+                ));
+            }
+        } else if !has_predecessor || phase.initial_seed_reason.is_some() {
+            issues.push(format!(
+                "comparable phase {}/{} must have only a complete predecessor triple",
+                phase.row_id, phase.measurement
+            ));
+        }
+    }
+}
+
+fn verify_matrix_phase_values(
+    ledger: &FocusedEvidenceLedger,
+    matrix: &CompareReport,
+) -> Result<(), BenchError> {
+    for phase in &ledger.phases {
+        let current = find_measurement(matrix, &phase.row_id, &phase.measurement)?;
+        require_recorded_seconds(
+            &format!("{}/{} matrix", phase.row_id, phase.measurement),
+            current.seconds,
+            phase.source_current_seconds,
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_profile(
@@ -312,46 +372,40 @@ fn validate_profile(
     if diagnostic.profile.detail.trim().is_empty() {
         issues.push(format!("{} has an empty profile detail", diagnostic.row_id));
     }
-    match (&diagnostic.profile.status, &diagnostic.profile.artifact) {
-        (ProfileStatus::Captured, Some(binding)) => {
+    match (
+        row_reproduces,
+        &diagnostic.outcome,
+        &diagnostic.profile.status,
+        &diagnostic.profile.artifact,
+    ) {
+        (true, DiagnosticOutcome::ReproducedProfiled, ProfileStatus::Captured, Some(binding)) => {
             validate_binding("hardware profile artifact", binding, issues);
         }
-        (ProfileStatus::Captured, None) => issues.push(format!(
-            "{} says a profile was captured but has no artifact",
-            diagnostic.row_id
+        (
+            true,
+            DiagnosticOutcome::ReproducedProfileUnavailable,
+            ProfileStatus::Unavailable,
+            None,
+        )
+        | (false, DiagnosticOutcome::ResolvedWithinBoundary, ProfileStatus::NotRequired, None) => {}
+        _ => issues.push(format!(
+            "{} has outcome/profile state {:?}/{:?} inconsistent with reproduced={row_reproduces}",
+            diagnostic.row_id, diagnostic.outcome, diagnostic.profile.status
         )),
-        (ProfileStatus::Unavailable | ProfileStatus::NotRequired, Some(_)) => issues.push(format!(
-            "{} has a profile artifact with status {:?}",
-            diagnostic.row_id, diagnostic.profile.status
-        )),
-        (ProfileStatus::NotRequired, None) if row_reproduces => issues.push(format!(
-            "{} reproduces above {CROSSING_RATIO:.2}x but marks profiling not required",
-            diagnostic.row_id
-        )),
-        _ => {}
     }
 }
 
-fn verify_artifacts(root: &RepoRoot, ledger: &FocusedEvidenceLedger) -> Result<(), BenchError> {
-    let matrix = read_bound_report(root, &ledger.matrix_report)?;
-    require_matrix_contract(&matrix, &ledger.source_revision)?;
+fn verify_artifacts(
+    root: &RepoRoot,
+    ledger: &FocusedEvidenceLedger,
+    matrix: &CompareReport,
+) -> Result<(), BenchError> {
     for phase in &ledger.phases {
-        let current = find_measurement(&matrix, &phase.row_id, &phase.measurement)?;
-        require_recorded_seconds(
-            &format!("{}/{} matrix", phase.row_id, phase.measurement),
-            current.seconds,
-            phase.source_current_seconds,
-        )?;
         if let (Some(binding), Some(expected)) =
             (&phase.predecessor_report, phase.predecessor_seconds)
         {
             let report = read_bound_report(root, binding)?;
-            if report.stab.local_modifications {
-                return Err(focused_error(format!(
-                    "predecessor report {} has local modifications",
-                    binding.path
-                )));
-            }
+            require_predecessor_contract(matrix, &report, phase, &binding.path)?;
             let measurement = find_measurement(&report, &phase.row_id, &phase.measurement)?;
             require_recorded_seconds(
                 &format!("{}/{} predecessor", phase.row_id, phase.measurement),
@@ -367,36 +421,410 @@ fn verify_artifacts(root: &RepoRoot, ledger: &FocusedEvidenceLedger) -> Result<(
             verify_binding(root, artifact, MAX_REPORT_BYTES)?;
         }
         let report = read_bound_report(root, &diagnostic.report)?;
-        require_focused_contract(&report, diagnostic, &ledger.source_revision)?;
+        require_focused_contract(matrix, &report, diagnostic, &ledger.source_revision)?;
     }
     Ok(())
 }
 
-fn require_matrix_contract(report: &CompareReport, revision: &str) -> Result<(), BenchError> {
-    if report.stab.commit != revision
+fn require_baseline_contract(
+    baseline: &BaselineReport,
+    matrix: &CompareReport,
+    binding: &ArtifactBinding,
+    manifest: &BenchmarkManifest,
+) -> Result<(), BenchError> {
+    let expected_rows = a6_manifest_rows(manifest);
+    let filters_match = baseline
+        .command
+        .filters
+        .iter()
+        .map(String::as_str)
+        .eq(A6_MATRIX_FILTERS);
+    if baseline.schema_version != 2
+        || baseline.generated_unix_epoch_seconds > matrix.generated_unix_epoch_seconds
+        || baseline.machine != matrix.machine
+        || baseline.stim != matrix.stim
+        || baseline.stim.expected_tag != STIM_TAG
+        || baseline.stim.actual_tag != STIM_TAG
+        || baseline.stim.expected_commit != STIM_COMMIT
+        || baseline.stim.actual_commit != STIM_COMMIT
+        || baseline.command.target_seconds.to_bits() != A6_BASELINE_TARGET_SECONDS.to_bits()
+        || baseline.command.cli_iterations != A6_BASELINE_CLI_ITERATIONS
+        || baseline.command.primary
+        || !baseline.command.new_output
+        || !filters_match
+        || !path_ends_with(&matrix.command.baseline_path, &binding.path)
+        || matrix.command.baseline_sha256 != binding.sha256
+        || baseline.rows.len() != expected_rows.len()
+        || expected_rows.len() != 166
+    {
+        return Err(focused_error(
+            "baseline report does not bind the fresh same-host pinned-Stim 166-row A6 contract",
+        ));
+    }
+    for (actual, expected) in baseline.rows.iter().zip(expected_rows) {
+        require_baseline_manifest_row_contract(actual, expected)?;
+        require_baseline_evidence_status(actual)?;
+        let matrix_row = find_row(matrix, &actual.id)?;
+        if matrix_row.stim_measurements != actual.measurements {
+            return Err(focused_error(format!(
+                "matrix does not preserve baseline measurements for {}",
+                actual.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn require_matrix_contract(
+    root: &RepoRoot,
+    report: &CompareReport,
+    revision: &str,
+    manifest: &BenchmarkManifest,
+    measurement_contract: &measurement_contract::A6MeasurementContract,
+) -> Result<(), BenchError> {
+    let expected_rows = a6_manifest_rows(manifest);
+    let filters_match = report
+        .command
+        .filters
+        .iter()
+        .map(String::as_str)
+        .eq(A6_MATRIX_FILTERS);
+    let profiler_roots_match = report.command.profiler_notes_paths.len() == 2
+        && report
+            .command
+            .profiler_notes_paths
+            .first()
+            .is_some_and(|path| path_ends_with(path, "benchmarks/profiler-notes/m12"))
+        && report
+            .command
+            .profiler_notes_paths
+            .get(1)
+            .is_some_and(|path| path_ends_with(path, "benchmarks/profiler-notes/pfm-b5"));
+    if report.schema_version != COMPARE_REPORT_SCHEMA_VERSION
+        || report.stab.commit != revision
         || report.stab.local_modifications
+        || report.stim.expected_tag != STIM_TAG
+        || report.stim.actual_tag != STIM_TAG
+        || report.stim.expected_commit != STIM_COMMIT
+        || report.stim.actual_commit != STIM_COMMIT
         || report.command.profile != "release"
+        || report.command.milestone.is_some()
+        || report.command.primary
+        || !filters_match
+        || !report.command.cargo_features.is_empty()
+        || report.command.timing_boundary != COMPARE_TIMING_BOUNDARY
+        || report.command.measurement_contract_path.as_deref()
+            != Some("benchmarks/a6-measurement-contract.json")
+        || report.command.measurement_contract_sha256 != measurement_contract.source_sha256()
+        || !report.command.require_profiler_notes
+        || !profiler_roots_match
+        || report.command.require_beta_gate
+        || report.command.beta_waivers_path.is_some()
+        || report.command.require_memory_gate
+        || report.command.memory_baseline_path.is_some()
+        || report.command.track_allocations
+        || !report.command.strict
         || !report.command.warmup
         || report.command.measurement_runs != 3
-        || report.rows.len() != 166
+        || !report.command.new_output
+        || !report
+            .command
+            .thresholds_path
+            .as_deref()
+            .is_some_and(|path| path_ends_with(path, "benchmarks/m12-primary-thresholds.json"))
+        || !report
+            .command
+            .regression_waivers_path
+            .as_deref()
+            .is_some_and(|path| {
+                path_ends_with(path, "benchmarks/m12-primary-regression-waivers.json")
+            })
+        || report.rows.len() != expected_rows.len()
+        || expected_rows.len() != 166
     {
         return Err(focused_error(
             "matrix report does not bind the clean 166-row warmed three-run A6 contract",
         ));
     }
+    for (actual, expected) in report.rows.iter().zip(expected_rows) {
+        require_manifest_row_contract(actual, expected)?;
+        require_matrix_evidence_status(actual, expected.threshold_class)?;
+    }
+    measurement_contract.require_report(report)?;
+    require_matrix_policies(root, report)?;
     Ok(())
 }
 
+fn require_matrix_policies(root: &RepoRoot, report: &CompareReport) -> Result<(), BenchError> {
+    let thresholds = read_thresholds(&root.primary_thresholds())?;
+    let waivers = read_regression_waivers(&root.primary_regression_waivers())?;
+    let mut expected = report.rows.clone();
+    for row in &mut expected {
+        row.regression_threshold_status = "not-configured".to_string();
+        row.regression_threshold_max_ratio = None;
+        row.regression_threshold_waiver_reason = None;
+        row.regression_threshold_waiver_follow_up = None;
+        row.regression_threshold_error = None;
+        row.profiler_note_status.clear();
+        row.profiler_note_path = None;
+        row.profiler_note_error = None;
+    }
+    let threshold_findings = apply_regression_thresholds(&mut expected, &thresholds);
+    let waiver_findings = apply_regression_waivers(&mut expected, &waivers);
+    let profiler_roots = [
+        root.resolve_relative(PathBuf::from("benchmarks/profiler-notes/m12").as_path()),
+        root.resolve_relative(PathBuf::from("benchmarks/profiler-notes/pfm-b5").as_path()),
+    ];
+    let profiler_report_roots = [
+        PathBuf::from("benchmarks/profiler-notes/m12"),
+        PathBuf::from("benchmarks/profiler-notes/pfm-b5"),
+    ];
+    let profiler_dirs = profiler_roots
+        .into_iter()
+        .zip(profiler_report_roots)
+        .collect::<Vec<_>>();
+    let profiler_blockers = reapply_profiler_notes(&mut expected, &profiler_dirs);
+    let mut blockers = threshold_findings.blockers;
+    blockers.extend(waiver_findings.blockers);
+    blockers.extend(profiler_blockers);
+    if !blockers.is_empty() {
+        return Err(focused_error(format!(
+            "matrix source-owned policy replay failed:\n{}",
+            blockers.join("\n")
+        )));
+    }
+    for (actual, replayed) in report.rows.iter().zip(&expected) {
+        if actual.regression_threshold_status != replayed.regression_threshold_status
+            || actual.regression_threshold_max_ratio != replayed.regression_threshold_max_ratio
+            || actual.regression_threshold_waiver_reason
+                != replayed.regression_threshold_waiver_reason
+            || actual.regression_threshold_waiver_follow_up
+                != replayed.regression_threshold_waiver_follow_up
+            || actual.regression_threshold_error != replayed.regression_threshold_error
+            || actual.profiler_note_status != replayed.profiler_note_status
+            || actual.profiler_note_path != replayed.profiler_note_path
+            || actual.profiler_note_error != replayed.profiler_note_error
+        {
+            return Err(focused_error(format!(
+                "matrix policy result for {} differs from source-owned replay",
+                actual.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn a6_manifest_rows(manifest: &BenchmarkManifest) -> Vec<&BenchmarkRow> {
+    manifest
+        .rows
+        .iter()
+        .filter(|row| row.milestone != Milestone::M12)
+        .collect()
+}
+
+fn require_baseline_evidence_status(actual: &BaselineRowResult) -> Result<(), BenchError> {
+    let valid = match actual.runner {
+        Runner::ContractOnly => actual.status == "contract-only" && actual.measurements.is_empty(),
+        Runner::StimCli | Runner::StimPerf => {
+            actual.status == "measured" && !actual.measurements.is_empty()
+        }
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(focused_error(format!(
+            "{} has invalid pinned-Stim baseline evidence for runner {}",
+            actual.id,
+            actual.runner.as_str()
+        )))
+    }
+}
+
+fn require_baseline_manifest_row_contract(
+    actual: &BaselineRowResult,
+    expected: &BenchmarkRow,
+) -> Result<(), BenchError> {
+    let expected_program = match expected.runner {
+        Runner::ContractOnly => "",
+        Runner::StimCli => "stim",
+        Runner::StimPerf => "stim_perf",
+    };
+    let actual_program = Path::new(&actual.command.program)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let expected_args = match expected.runner {
+        Runner::ContractOnly => Vec::new(),
+        Runner::StimCli => expected.argv_tokens(),
+        Runner::StimPerf => vec![
+            "--only".to_string(),
+            expected.stim_perf_filter.clone(),
+            "--target_seconds".to_string(),
+            A6_BASELINE_TARGET_SECONDS.to_string(),
+        ],
+    };
+    if actual.id != expected.id
+        || actual.milestone != expected.milestone
+        || actual.threshold_class != expected.threshold_class.as_str()
+        || actual.runner != expected.runner
+        || actual.upstream_source != expected.upstream_source
+        || actual.phase != expected.phase
+        || actual.measurement != expected.measurement
+        || actual.command.stdin_path != expected.stdin_path
+        || actual_program != expected_program
+        || actual.command.args != expected_args
+    {
+        return Err(focused_error(format!(
+            "baseline row {} disagrees with the source-owned benchmark manifest",
+            actual.id
+        )));
+    }
+    Ok(())
+}
+
+fn require_matrix_evidence_status(
+    actual: &CompareRowResult,
+    threshold_class: ThresholdClass,
+) -> Result<(), BenchError> {
+    match threshold_class {
+        ThresholdClass::BaselineMetadata => {
+            if actual.status != "contract-only" || !actual.stab_measurements.is_empty() {
+                return Err(focused_error(format!(
+                    "{} is the metadata anchor but has runtime evidence",
+                    actual.id
+                )));
+            }
+        }
+        _ => {
+            if actual.status != "measured" || actual.stab_measurements.is_empty() {
+                return Err(focused_error(format!(
+                    "{} is an executable A6 row without measured Stab evidence",
+                    actual.id
+                )));
+            }
+        }
+    }
+    if !matches!(
+        actual.regression_threshold_status.as_str(),
+        "pass" | "not-configured" | "waived-not-thresholdable"
+    ) {
+        return Err(focused_error(format!(
+            "{} has unacceptable regression threshold status {}",
+            actual.id, actual.regression_threshold_status
+        )));
+    }
+    if !matches!(
+        actual.profiler_note_status.as_str(),
+        "present" | "not-required"
+    ) {
+        return Err(focused_error(format!(
+            "{} has unacceptable profiler-note status {}",
+            actual.id, actual.profiler_note_status
+        )));
+    }
+    Ok(())
+}
+
+fn require_manifest_row_contract(
+    actual: &CompareRowResult,
+    expected: &BenchmarkRow,
+) -> Result<(), BenchError> {
+    if actual.id != expected.id
+        || actual.milestone != expected.milestone
+        || actual.threshold_class != expected.threshold_class.as_str()
+        || actual.runner != expected.runner
+        || actual.comparability != expected.comparability
+        || actual.upstream_source != expected.upstream_source
+        || actual.phase != expected.phase
+        || actual.measurement != expected.measurement
+    {
+        return Err(focused_error(format!(
+            "matrix row {} disagrees with the source-owned benchmark manifest",
+            actual.id
+        )));
+    }
+    Ok(())
+}
+
+fn require_predecessor_contract(
+    matrix: &CompareReport,
+    predecessor: &CompareReport,
+    phase: &PhaseEvidence,
+    path: &str,
+) -> Result<(), BenchError> {
+    if predecessor.schema_version != COMPARE_REPORT_SCHEMA_VERSION
+        || predecessor.stab.local_modifications
+        || predecessor.stab.commit == matrix.stab.commit
+        || !valid_revision(&predecessor.stab.commit)
+        || predecessor.generated_unix_epoch_seconds > matrix.generated_unix_epoch_seconds
+        || predecessor.machine != matrix.machine
+        || predecessor.stim.expected_tag != STIM_TAG
+        || predecessor.stim.actual_tag != STIM_TAG
+        || predecessor.stim.expected_commit != STIM_COMMIT
+        || predecessor.stim.actual_commit != STIM_COMMIT
+        || predecessor.command.profile != "release"
+        || predecessor.command.cargo_features != matrix.command.cargo_features
+        || predecessor.command.timing_boundary != matrix.command.timing_boundary
+        || predecessor.command.measurement_contract_path != matrix.command.measurement_contract_path
+        || predecessor.command.measurement_contract_sha256
+            != matrix.command.measurement_contract_sha256
+        || predecessor.command.track_allocations
+        || !predecessor.command.new_output
+    {
+        return Err(focused_error(format!(
+            "predecessor report {path} is not a clean non-instrumented release report"
+        )));
+    }
+    let current_row = find_row(matrix, &phase.row_id)?;
+    let predecessor_row = find_row(predecessor, &phase.row_id)?;
+    require_same_row_contract(current_row, predecessor_row, path)?;
+    require_same_row_measurement_contract(
+        current_row,
+        matrix.command.measurement_runs,
+        predecessor_row,
+        predecessor.command.measurement_runs,
+        path,
+    )?;
+    let current_measurement = find_measurement(matrix, &phase.row_id, &phase.measurement)?;
+    let predecessor_measurement = find_measurement(predecessor, &phase.row_id, &phase.measurement)?;
+    require_same_row_native_iterations(
+        current_measurement,
+        matrix.command.measurement_runs,
+        predecessor_measurement,
+        predecessor.command.measurement_runs,
+        &phase.row_id,
+        &phase.measurement,
+        path,
+    )
+}
+
 fn require_focused_contract(
+    matrix: &CompareReport,
     report: &CompareReport,
     diagnostic: &FocusedDiagnostic,
     revision: &str,
 ) -> Result<(), BenchError> {
-    if report.stab.commit != revision
+    if report.schema_version != COMPARE_REPORT_SCHEMA_VERSION
+        || report.stab.commit != revision
         || report.stab.local_modifications
+        || report.generated_unix_epoch_seconds < matrix.generated_unix_epoch_seconds
+        || report.machine != matrix.machine
+        || report.stim != matrix.stim
+        || report.stim.expected_tag != STIM_TAG
+        || report.stim.actual_tag != STIM_TAG
+        || report.stim.expected_commit != STIM_COMMIT
+        || report.stim.actual_commit != STIM_COMMIT
         || report.command.profile != "release"
+        || report.command.baseline_sha256 != matrix.command.baseline_sha256
+        || report.command.cargo_features != matrix.command.cargo_features
+        || report.command.timing_boundary != matrix.command.timing_boundary
+        || report.command.measurement_contract_path != matrix.command.measurement_contract_path
+        || report.command.measurement_contract_sha256 != matrix.command.measurement_contract_sha256
         || !report.command.warmup
         || report.command.measurement_runs != 1
+        || !report.command.strict
+        || report.command.track_allocations
+        || !report.command.new_output
         || report.command.filters != [diagnostic.row_id.as_str()]
         || report.rows.len() != 1
     {
@@ -405,8 +833,32 @@ fn require_focused_contract(
             diagnostic.report.path, diagnostic.row_id
         )));
     }
+    let matrix_row = find_row(matrix, &diagnostic.row_id)?;
+    let focused_row = find_row(report, &diagnostic.row_id)?;
+    require_same_row_contract(matrix_row, focused_row, &diagnostic.report.path)?;
+    require_same_row_measurement_contract(
+        matrix_row,
+        matrix.command.measurement_runs,
+        focused_row,
+        report.command.measurement_runs,
+        &diagnostic.report.path,
+    )?;
+    if focused_row.stim_measurements != matrix_row.stim_measurements {
+        return Err(focused_error(format!(
+            "{} does not preserve pinned-Stim baseline measurements for {}",
+            diagnostic.report.path, diagnostic.row_id
+        )));
+    }
+    if focused_row.status != "measured" {
+        return Err(focused_error(format!(
+            "{} did not produce measured focused evidence",
+            diagnostic.report.path
+        )));
+    }
     for expected in &diagnostic.measurements {
         let measurement = find_measurement(report, &diagnostic.row_id, &expected.measurement)?;
+        let matrix_measurement =
+            find_measurement(matrix, &diagnostic.row_id, &expected.measurement)?;
         require_recorded_seconds(
             &format!("{}/{} focused", diagnostic.row_id, expected.measurement),
             measurement.seconds,
@@ -421,8 +873,117 @@ fn require_focused_contract(
                 diagnostic.internal_timing_count
             )));
         }
+        require_same_row_native_iterations(
+            matrix_measurement,
+            matrix.command.measurement_runs,
+            measurement,
+            report.command.measurement_runs,
+            &diagnostic.row_id,
+            &expected.measurement,
+            &diagnostic.report.path,
+        )?;
     }
     Ok(())
+}
+
+fn require_same_row_native_iterations(
+    current: &Measurement,
+    current_outer_runs: usize,
+    other: &Measurement,
+    other_outer_runs: usize,
+    row_id: &str,
+    measurement: &str,
+    other_path: &str,
+) -> Result<(), BenchError> {
+    let current_iterations = normalized_iterations(current.iterations, current_outer_runs);
+    let other_iterations = normalized_iterations(other.iterations, other_outer_runs);
+    match (current_iterations, other_iterations) {
+        (Some(current), Some(other)) if current == other => Ok(()),
+        _ => Err(focused_error(format!(
+            "{other_path} changes row-native iterations for {row_id}/{measurement}: matrix {:?} over {current_outer_runs} outer runs, other {:?} over {other_outer_runs}",
+            current.iterations, other.iterations
+        ))),
+    }
+}
+
+fn normalized_iterations(iterations: Option<usize>, outer_runs: usize) -> Option<usize> {
+    let iterations = iterations?;
+    if outer_runs == 0 || !iterations.is_multiple_of(outer_runs) {
+        return None;
+    }
+    Some(iterations / outer_runs)
+}
+
+fn require_same_row_contract(
+    current: &CompareRowResult,
+    other: &CompareRowResult,
+    other_path: &str,
+) -> Result<(), BenchError> {
+    if current.id != other.id
+        || current.milestone != other.milestone
+        || current.threshold_class != other.threshold_class
+        || current.runner != other.runner
+        || current.comparability != other.comparability
+        || current.upstream_source != other.upstream_source
+        || current.phase != other.phase
+        || current.measurement != other.measurement
+    {
+        return Err(focused_error(format!(
+            "{other_path} does not preserve the row contract for {}",
+            current.id
+        )));
+    }
+    Ok(())
+}
+
+fn require_same_row_measurement_contract(
+    current: &CompareRowResult,
+    current_outer_runs: usize,
+    other: &CompareRowResult,
+    other_outer_runs: usize,
+    other_path: &str,
+) -> Result<(), BenchError> {
+    if current.stab_measurements.len() != other.stab_measurements.len() {
+        return Err(focused_error(format!(
+            "{other_path} changes the measurement set for {}",
+            current.id
+        )));
+    }
+    for (current_measurement, other_measurement) in current
+        .stab_measurements
+        .iter()
+        .zip(&other.stab_measurements)
+    {
+        if current_measurement.name != other_measurement.name
+            || current_measurement.observations != other_measurement.observations
+        {
+            return Err(focused_error(format!(
+                "{other_path} changes measurement identity or workload observations for {}",
+                current.id
+            )));
+        }
+        require_same_row_native_iterations(
+            current_measurement,
+            current_outer_runs,
+            other_measurement,
+            other_outer_runs,
+            &current.id,
+            &current_measurement.name,
+            other_path,
+        )?;
+    }
+    Ok(())
+}
+
+fn find_row<'a>(
+    report: &'a CompareReport,
+    row_id: &str,
+) -> Result<&'a CompareRowResult, BenchError> {
+    report
+        .rows
+        .iter()
+        .find(|row| row.id == row_id)
+        .ok_or_else(|| focused_error(format!("report omits row {row_id}")))
 }
 
 fn find_measurement<'a>(
@@ -430,11 +991,7 @@ fn find_measurement<'a>(
     row_id: &str,
     name: &str,
 ) -> Result<&'a Measurement, BenchError> {
-    let row = report
-        .rows
-        .iter()
-        .find(|row| row.id == row_id)
-        .ok_or_else(|| focused_error(format!("report omits row {row_id}")))?;
+    let row = find_row(report, row_id)?;
     row.stab_measurements
         .iter()
         .find(|measurement| measurement.name == name)
@@ -450,64 +1007,13 @@ fn read_bound_report(
         .map_err(|error| focused_error(format!("failed to parse {}: {error}", binding.path)))
 }
 
-fn verify_binding(
+fn read_bound_baseline(
     root: &RepoRoot,
     binding: &ArtifactBinding,
-    max_bytes: u64,
-) -> Result<Vec<u8>, BenchError> {
-    let path = root.resolve_relative(Path::new(&binding.path));
-    let bytes = read_bounded(&path, max_bytes)?;
-    let actual = hex::encode(Sha256::digest(&bytes));
-    if actual != binding.sha256 {
-        return Err(focused_error(format!(
-            "{} SHA-256 is {actual}, expected {}",
-            binding.path, binding.sha256
-        )));
-    }
-    Ok(bytes)
-}
-
-fn read_bounded(path: &Path, max_bytes: u64) -> Result<Vec<u8>, BenchError> {
-    use std::io::Read as _;
-
-    let file = open_regular_file_bounded_descriptor(path, max_bytes)?;
-    let mut bytes = Vec::new();
-    file.take(max_bytes.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|error| focused_error(format!("failed to read {}: {error}", path.display())))?;
-    let too_large = match u64::try_from(bytes.len()) {
-        Ok(len) => len > max_bytes,
-        Err(_) => true,
-    };
-    if too_large {
-        return Err(focused_error(format!(
-            "{} grew beyond {max_bytes} bytes while reading",
-            path.display()
-        )));
-    }
-    Ok(bytes)
-}
-
-fn validate_binding(label: &str, binding: &ArtifactBinding, issues: &mut Vec<String>) {
-    if !valid_relative_path(&binding.path) {
-        issues.push(format!(
-            "{label} path {:?} is not safe and relative",
-            binding.path
-        ));
-    }
-    if !valid_sha256(&binding.sha256) {
-        issues.push(format!("{label} has invalid SHA-256 {:?}", binding.sha256));
-    }
-}
-
-fn validate_revision(revision: &str, issues: &mut Vec<String>) {
-    if revision.len() != 40
-        || !revision
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        issues.push("source_revision must be a lowercase 40-byte Git object id".to_string());
-    }
+) -> Result<BaselineReport, BenchError> {
+    let bytes = verify_binding(root, binding, MAX_REPORT_BYTES)?;
+    serde_json::from_slice(&bytes)
+        .map_err(|error| focused_error(format!("failed to parse {}: {error}", binding.path)))
 }
 
 fn validate_row_and_measurement(row_id: &str, measurement: &str, issues: &mut Vec<String>) {
@@ -548,31 +1054,13 @@ fn validate_ratio(
 }
 
 fn require_recorded_seconds(label: &str, actual: f64, recorded: f64) -> Result<(), BenchError> {
-    let scale = actual.abs().max(1.0);
-    if (actual - recorded).abs() <= RATIO_TOLERANCE * scale {
+    if actual.to_bits() == recorded.to_bits() {
         Ok(())
     } else {
         Err(focused_error(format!(
             "{label} records {recorded} seconds, bound report contains {actual}"
         )))
     }
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn valid_relative_path(value: &str) -> bool {
-    let path = Path::new(value);
-    !value.is_empty()
-        && !path.is_absolute()
-        && path.components().all(|component| {
-            matches!(component, Component::Normal(_))
-                && component.as_os_str().to_string_lossy() != "."
-        })
 }
 
 fn focused_error(message: impl Into<String>) -> BenchError {
@@ -583,107 +1071,4 @@ fn focused_error(message: impl Into<String>) -> BenchError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn binding(path: &str) -> ArtifactBinding {
-        ArtifactBinding {
-            path: path.to_string(),
-            sha256: "a".repeat(64),
-        }
-    }
-
-    fn phase(ratio: f64) -> PhaseEvidence {
-        PhaseEvidence {
-            row_id: "row".to_string(),
-            measurement: "stab_measurement".to_string(),
-            source_current_seconds: ratio,
-            predecessor_report: Some(binding("target/benchmarks/old/compare.json")),
-            predecessor_seconds: Some(1.0),
-            source_over_predecessor: Some(ratio),
-            initial_seed_reason: None,
-        }
-    }
-
-    fn diagnostic(ratio: f64, profile: ProfileStatus) -> FocusedDiagnostic {
-        FocusedDiagnostic {
-            row_id: "row".to_string(),
-            report: binding("target/benchmarks/focused-aaaaaaaa/compare.json"),
-            semantic_witness_source: binding("ops/bench/src/baseline/m9.rs"),
-            internal_timing_count: 8,
-            measurements: vec![FocusedMeasurement {
-                measurement: "stab_measurement".to_string(),
-                focused_seconds: ratio,
-                focused_over_predecessor: ratio,
-            }],
-            profile: ProfileDisposition {
-                status: profile,
-                detail: "source-owned disposition".to_string(),
-                artifact: None,
-            },
-            disposition: "retain after review".to_string(),
-        }
-    }
-
-    fn ledger(phase_ratio: f64, focused_ratio: f64) -> FocusedEvidenceLedger {
-        FocusedEvidenceLedger {
-            schema_version: SCHEMA_VERSION,
-            source_revision: "a".repeat(40),
-            matrix_report: binding("target/benchmarks/matrix/compare.json"),
-            phases: vec![phase(phase_ratio)],
-            diagnostics: vec![diagnostic(focused_ratio, ProfileStatus::NotRequired)],
-        }
-    }
-
-    #[test]
-    fn structure_requires_exact_crossing_coverage() {
-        validate_structure(&ledger(1.151, 1.149)).expect("valid crossing");
-
-        let mut missing = ledger(1.151, 1.149);
-        missing.diagnostics.clear();
-        let error = validate_structure(&missing).expect_err("missing diagnostic");
-        assert!(error.to_string().contains("missing focused diagnostic"));
-
-        let extra = ledger(1.149, 1.149);
-        let error = validate_structure(&extra).expect_err("extra diagnostic");
-        assert!(
-            error
-                .to_string()
-                .contains("is not a source-current crossing")
-        );
-    }
-
-    #[test]
-    fn reproducing_crossing_requires_profile_disposition() {
-        let error = validate_structure(&ledger(1.2, 1.151)).expect_err("profile required");
-        assert!(error.to_string().contains("marks profiling not required"));
-
-        let mut unavailable = ledger(1.2, 1.151);
-        unavailable
-            .diagnostics
-            .first_mut()
-            .expect("fixture has a diagnostic")
-            .profile
-            .status = ProfileStatus::Unavailable;
-        validate_structure(&unavailable).expect("explicit unavailable profile");
-    }
-
-    #[test]
-    fn structure_rejects_weak_samples_and_inconsistent_ratios() {
-        let mut invalid = ledger(1.2, 1.1);
-        invalid
-            .diagnostics
-            .first_mut()
-            .expect("fixture has a diagnostic")
-            .internal_timing_count = 7;
-        invalid
-            .phases
-            .first_mut()
-            .expect("fixture has a phase")
-            .source_over_predecessor = Some(1.3);
-        let error = validate_structure(&invalid).expect_err("invalid ledger");
-        let message = error.to_string();
-        assert!(message.contains("expected at least 8"));
-        assert!(message.contains("does not match recomputed ratio"));
-    }
-}
+mod tests;

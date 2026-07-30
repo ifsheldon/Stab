@@ -10,12 +10,6 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
-    #[error("failed to read benchmark baseline {path}: {source}")]
-    ReadBaseline {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
     #[error("failed to read benchmark compare report {path}: {source}")]
     ReadCompareReport {
         path: PathBuf,

@@ -80,6 +80,8 @@ mod tests {
             warmup: false,
             measurement_runs: 1,
             strict: false,
+            new_output: false,
+            measurement_contract: None,
         }
     }
 }

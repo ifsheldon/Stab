@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
-use crate::report::CompareRowResult;
+use crate::report::{COMPARE_REPORT_SCHEMA_VERSION, CompareRowResult};
 
 const RESIDENT_DELTA_ABSOLUTE_SLACK_BYTES: u64 = 64 * 1024;
 
@@ -56,10 +56,12 @@ pub(crate) struct MemoryBaseline {
 impl MemoryBaseline {
     fn from_report(report: MemoryBaselineReport) -> Result<Self, String> {
         let mut violations = Vec::new();
-        if !matches!(report.schema_version, 1 | 2) {
+        if !matches!(report.schema_version, 1 | 2)
+            && report.schema_version != COMPARE_REPORT_SCHEMA_VERSION
+        {
             violations.push(format!(
-                "memory baseline schema_version={} expected 1 or 2",
-                report.schema_version
+                "memory baseline schema_version={} expected 1, 2, or {COMPARE_REPORT_SCHEMA_VERSION}",
+                report.schema_version,
             ));
         }
         let mut ids = BTreeSet::new();
@@ -361,7 +363,7 @@ mod tests {
     #[test]
     fn memory_gate_rejects_unsupported_baseline_schema() {
         let error = MemoryBaseline::from_report(MemoryBaselineReport {
-            schema_version: 3,
+            schema_version: 4,
             rows: Vec::new(),
         })
         .expect_err("reject unsupported schema");
@@ -369,7 +371,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("memory baseline schema_version=3 expected 1 or 2")
+                .contains("memory baseline schema_version=4 expected 1, 2, or 3")
         );
     }
 
