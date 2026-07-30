@@ -1004,3 +1004,15 @@ The same inventory pass repaired the stale owner mapping left by the model resou
 The regenerated correctness inventory contains 2,886 upstream cases, 6,903 public API items, and 2,117 evidence parents: 866 implemented, 17 evidence-close, and 1,234 planned. Its digest is `2a96c64145aff7e27bdafdeeea9ddb3ea592eb25d77c6f6f2b5360c71d198c71`. The regenerated performance inventory contains 127 checklist rows, 6,903 public API items, 179 groups, and 167 inherited manifest decisions; its digest is `b995007d1b4daa7be80ce746c2b7e09afe14dff62fa6242751fb5601bb47588b`.
 
 All evidence bound to the preceding inventory identities remains historical. Fresh A6 timing still has not started, and the parked A7 decoder work remains excluded until A6 closure.
+
+## A6 Borrowed Matched-Error Views
+
+The next product-boundary review found that read-only matched-error behavior still crossed the facade by cloning complete `CircuitTargetsInsideInstruction`, `CircuitErrorLocation`, and explained-error DTO trees into `stab-analysis`. This preserved output semantics but made formatting and comparison allocate in proportion to the analyzed model and obscured the canonical algorithm owner.
+
+`stab-analysis` now owns public borrowed `CircuitTargetsInsideInstructionView` and `CircuitErrorLocationView` seams plus the canonical `write_explained_error` formatter. `stab-core` constructs those views over its compatibility DTOs for `Display` and `is_simpler_than`, while retaining owned conversion only for the historical mutating methods whose public `CircuitResult` signature remains a facade compatibility contract. The facade does not duplicate formatting or comparison algorithms.
+
+Direct `stab-analysis` tests own the borrowed-view semantics, and facade integration tests prove identical output and ordering through the compatibility DTOs. Allocation instrumentation covers 1,024-target locations and proves that formatting and comparison allocate zero bytes after test setup, independently of model width; cancellation and mutation behavior remain owned by their existing semantic tests. No timing benchmark was added because this path is not a release workload family and the defect was allocation proportionality, for which the zero-allocation resource invariant is the precise regression guard.
+
+The regenerated correctness inventory contains 2,886 upstream cases, 6,919 public API items, and 2,118 evidence parents: 867 implemented, 17 evidence-close, and 1,234 planned. Its digest is `b9370616a8c88caba5ca60a5acc1243064e910971784e2e20fed3746e9341647`. The regenerated performance inventory contains 127 checklist rows, 6,919 public API items, 179 groups, and 167 inherited manifest decisions; its digest is `84a44bac353ae2a66b8b4702b86f4003625bda98342c1e25eac750b674a48dd9`.
+
+Fresh A6 formal evidence still has not started. All reports and receipts bound to earlier inventory identities remain historical.

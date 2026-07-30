@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "2a96c64145aff7e27bdafdeeea9ddb3ea592eb25d77c6f6f2b5360c71d198c71",
-  "semantic_digest": "b995007d1b4daa7be80ce746c2b7e09afe14dff62fa6242751fb5601bb47588b",
+  "correctness_digest": "b9370616a8c88caba5ca60a5acc1243064e910971784e2e20fed3746e9341647",
+  "semantic_digest": "84a44bac353ae2a66b8b4702b86f4003625bda98342c1e25eac750b674a48dd9",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -13224,6 +13224,171 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-a9795ccca70e6563",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView",
+      "kind": "struct",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-bad91163d43b8151",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView as Clone for@961449667f54",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-a007012521968d45",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView as Copy for@961449667f54",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e5161cb5751736cb",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView as Debug for@961449667f54",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1a55729d6649171e",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView as Display for@5fa058742c99",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-f5ccf57098fd038a",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView as From@fcaf8a33dea9 for@961449667f54",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-465c30d5cfb2e39f",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView::is_simpler_than",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c9fe5702568f8421",
+      "path": "stab_analysis::advanced::CircuitErrorLocationView::new",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-6bf61d0080d872a3",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView",
+      "kind": "struct",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-331e6427067c2594",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView as Clone for@739c00f3cc65",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-58bc365acd496c90",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView as Copy for@739c00f3cc65",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-1f29ac7e9be4f198",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView as Debug for@739c00f3cc65",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-25a0fd23ae9c7a7e",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView as Display for@c33af465f5d6",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-3f6979df4a6cf18b",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView as From@67977f146bb6 for@739c00f3cc65",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-a34f2f3649887fe6",
+      "path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView::new",
+      "kind": "method",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-eba69e4ca374c047",
       "path": "stab_analysis::advanced::ReverseFlowTransition",
       "kind": "enum",
@@ -14099,6 +14264,17 @@
       "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-a21c86f2ed5f1f84",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-6931a5e521064c05",
+      "path": "stab_analysis::advanced::write_explained_error",
+      "kind": "function",
+      "performance_feature": "PERF-ERROR-ANALYSIS",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-be67f415fa041259",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

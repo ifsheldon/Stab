@@ -20812,6 +20812,63 @@
         }
       ],
       "standalone": true
+    },
+    {
+      "id": "a6-matched-error-borrowed-view-contract",
+      "feature_id": "CQ-ANALYZER",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "matched_error_borrowed_views",
+          "matched_error_borrowed_views_preserve_behavior_without_allocating",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Facade comparison and formatting traverse analysis-owned borrowed views without cloning instruction, Pauli-product, observable, location, or stack-frame vectors; allocation remains zero as matched-error storage grows."
+      },
+      "negative_axes": [
+        "comparison-drift",
+        "facade-dto-clone",
+        "record-count-allocation-growth",
+        "nested-vector-allocation-growth"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::CircuitErrorLocationView"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::CircuitErrorLocationView::new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::CircuitErrorLocationView::is_simpler_than"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::CircuitTargetsInsideInstructionView::new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::advanced::write_explained_error"
+        }
+      ],
+      "standalone": true
     }
   ],
   "public_api_aliases": [
