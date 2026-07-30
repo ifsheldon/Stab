@@ -4315,24 +4315,64 @@
             "stab-model",
             "--test",
             "canonical_owner_evidence",
-            "a2_sampling_request_resource_estimate",
+            "a2_resource_estimate_builder_preserves_named_quantities",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "constant-scratch",
-          "detail": "The model-owned constructor stores the supplied structural and work estimates in one fixed-size value while leaving unspecified scratch, resident, and output estimates explicitly unknown."
+          "detail": "The model-owned builder stores each explicitly named estimate in one fixed-size value while leaving every unspecified quantity explicitly unknown."
         },
         "negative_axes": [
-          "constructor-field-drift",
+          "builder-field-drift",
           "default-known-overclaim",
           "separate-allocation"
         ],
         "public_api_owners": [
           {
             "crate_name": "stab_model",
-            "owner_path": "stab_model::advanced::resource_estimate_for_sampling_request"
+            "owner_path": "stab_model::ResourceEstimate::builder"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::input_bytes"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::input_items"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::expanded_operations"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::folded_traversal"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::scratch_bytes"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::resident_bytes"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::output_bytes"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::work_units"
+          },
+          {
+            "crate_name": "stab_model",
+            "owner_path": "stab_model::ResourceEstimateBuilder::build"
           }
         ],
         "standalone": true
@@ -7061,10 +7101,6 @@
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::DetectionExecutionError::into_circuit_error"
-          },
-          {
-            "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionRunError"
           },
           {
@@ -7161,10 +7197,6 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DetectionCompileError"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::DetectionCompileError::into_circuit_error"
           },
           {
             "crate_name": "stab_engine",
@@ -7805,10 +7837,6 @@
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::execution::DemSamplingExecutionError"
-          },
-          {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::execution::DemSamplingExecutionError::into_circuit_error"
           },
           {
             "crate_name": "stab_core",
