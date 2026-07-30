@@ -38,6 +38,7 @@ jobs:
         run: |
           just architecture::check
           just architecture::consumer-check
+          just architecture::docs-check
 
       - name: Stable component tests
         run: cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine --all-targets

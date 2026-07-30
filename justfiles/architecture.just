@@ -7,3 +7,8 @@ check:
 [working-directory: '..']
 consumer-check:
     cargo run -q -p stab-architecture -- consumer-check
+
+# Validate repository-owned Markdown links and heading anchors.
+[working-directory: '..']
+docs-check:
+    cargo run -q -p stab-architecture -- docs-check

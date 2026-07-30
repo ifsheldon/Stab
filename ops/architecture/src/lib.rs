@@ -11,6 +11,7 @@
 )]
 
 mod consumer;
+mod markdown;
 mod metadata;
 mod policy;
 mod source_scan;
@@ -20,6 +21,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 pub use consumer::{ConsumerCheckError, ConsumerCheckSummary, check_external_consumers};
+pub use markdown::{DocsCheckError, DocsCheckReport, DocsViolation, check_markdown_docs};
 pub use policy::{
     DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
 };

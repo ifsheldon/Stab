@@ -23,6 +23,8 @@ enum Command {
     Check,
     /// Compile external Stable, Nightly, and mixed feature consumers.
     ConsumerCheck,
+    /// Validate repository-owned Markdown links and heading anchors.
+    DocsCheck,
 }
 
 fn main() -> ExitCode {
@@ -46,6 +48,20 @@ fn main() -> ExitCode {
             Ok(summary) => {
                 summary.print();
                 ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("[{PREFIX}] ERROR: {error}");
+                ExitCode::from(2)
+            }
+        },
+        Command::DocsCheck => match stab_architecture::check_markdown_docs(&cli.root) {
+            Ok(report) => {
+                report.print();
+                if report.passed() {
+                    ExitCode::SUCCESS
+                } else {
+                    ExitCode::from(1)
+                }
             }
             Err(error) => {
                 eprintln!("[{PREFIX}] ERROR: {error}");
