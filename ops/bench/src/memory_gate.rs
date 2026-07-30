@@ -126,7 +126,9 @@ pub(crate) fn apply_memory_gate(
         }
         match baseline.schema_version {
             1 => apply_absolute_resident_gate(&mut row_blockers, row, baseline_row, &mut findings),
-            2 => apply_resident_delta_gate(&mut row_blockers, row, baseline_row, &mut findings),
+            2 | COMPARE_REPORT_SCHEMA_VERSION => {
+                apply_resident_delta_gate(&mut row_blockers, row, baseline_row, &mut findings)
+            }
             _ => unreachable!("memory baseline validation rejects unsupported schema"),
         }
         if row.memory_gate_error.is_some() {
@@ -308,56 +310,63 @@ mod tests {
     }
 
     #[test]
-    fn memory_gate_v2_uses_resident_delta_instead_of_absolute_resident_bytes() {
-        let baseline = MemoryBaseline::from_report(MemoryBaselineReport {
-            schema_version: 2,
-            rows: vec![
-                baseline_row_with_delta("absolute-drift-row", Some(100), Some(1000), Some(10)),
-                baseline_row_with_delta("delta-fail-row", Some(100), Some(1000), Some(10)),
-                baseline_row_with_delta("missing-delta-row", Some(100), Some(1000), Some(10)),
-                baseline_row_with_delta("missing-baseline-delta-row", Some(100), Some(1000), None),
-            ],
-        })
-        .expect("baseline");
-        let mut rows = vec![
-            row_with_delta("absolute-drift-row", Some(125), Some(10_000), Some(12)),
-            row_with_delta("delta-fail-row", Some(125), Some(1000), Some(70_000)),
-            row_with_delta("missing-delta-row", Some(125), Some(1000), None),
-            row_with_delta("missing-baseline-delta-row", Some(125), Some(1000), Some(1)),
-        ];
+    fn modern_memory_schemas_use_resident_delta_instead_of_absolute_resident_bytes() {
+        for schema_version in [2, crate::report::COMPARE_REPORT_SCHEMA_VERSION] {
+            let baseline = MemoryBaseline::from_report(MemoryBaselineReport {
+                schema_version,
+                rows: vec![
+                    baseline_row_with_delta("absolute-drift-row", Some(100), Some(1000), Some(10)),
+                    baseline_row_with_delta("delta-fail-row", Some(100), Some(1000), Some(10)),
+                    baseline_row_with_delta("missing-delta-row", Some(100), Some(1000), Some(10)),
+                    baseline_row_with_delta(
+                        "missing-baseline-delta-row",
+                        Some(100),
+                        Some(1000),
+                        None,
+                    ),
+                ],
+            })
+            .expect("baseline");
+            let mut rows = vec![
+                row_with_delta("absolute-drift-row", Some(125), Some(10_000), Some(12)),
+                row_with_delta("delta-fail-row", Some(125), Some(1000), Some(70_000)),
+                row_with_delta("missing-delta-row", Some(125), Some(1000), None),
+                row_with_delta("missing-baseline-delta-row", Some(125), Some(1000), Some(1)),
+            ];
 
-        let findings = apply_memory_gate(&mut rows, &baseline);
+            let findings = apply_memory_gate(&mut rows, &baseline);
 
-        assert_eq!(rows.first().expect("drift row").memory_gate_status, "pass");
-        assert_eq!(
-            rows.first()
-                .expect("drift row")
-                .memory_gate_baseline_resident_delta_bytes_max,
-            Some(10)
-        );
-        assert_eq!(
-            rows.first()
-                .expect("drift row")
-                .memory_gate_allowed_resident_delta_bytes_max,
-            Some(65_546)
-        );
-        assert_eq!(rows.get(1).expect("delta fail").memory_gate_status, "fail");
-        assert_eq!(
-            rows.get(2).expect("missing current").memory_gate_status,
-            "missing-current-resident-delta"
-        );
-        assert_eq!(
-            rows.get(3).expect("missing baseline").memory_gate_status,
-            "missing-baseline-resident-delta"
-        );
-        assert_eq!(
-            findings.blockers,
-            vec![
-                "delta-fail-row: resident delta bytes 70000 exceeds memory gate limit 65546 from baseline 10",
-                "missing-delta-row: current row has no resident delta byte maximum",
-                "missing-baseline-delta-row: memory baseline row has no resident delta byte maximum",
-            ]
-        );
+            assert_eq!(rows.first().expect("drift row").memory_gate_status, "pass");
+            assert_eq!(
+                rows.first()
+                    .expect("drift row")
+                    .memory_gate_baseline_resident_delta_bytes_max,
+                Some(10)
+            );
+            assert_eq!(
+                rows.first()
+                    .expect("drift row")
+                    .memory_gate_allowed_resident_delta_bytes_max,
+                Some(65_546)
+            );
+            assert_eq!(rows.get(1).expect("delta fail").memory_gate_status, "fail");
+            assert_eq!(
+                rows.get(2).expect("missing current").memory_gate_status,
+                "missing-current-resident-delta"
+            );
+            assert_eq!(
+                rows.get(3).expect("missing baseline").memory_gate_status,
+                "missing-baseline-resident-delta"
+            );
+            assert_eq!(
+                findings.blockers,
+                vec![
+                    "delta-fail-row: resident delta bytes 70000 exceeds memory gate limit 65546 from baseline 10",
+                    "missing-delta-row: current row has no resident delta byte maximum",
+                    "missing-baseline-delta-row: memory baseline row has no resident delta byte maximum",
+                ]
+            );
+        }
     }
 
     #[test]

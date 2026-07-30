@@ -97,12 +97,6 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
-    #[error("failed to write benchmark output {path}: {source}")]
-    WriteOutput {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
     #[error("failed to process benchmark JSON: {0}")]
     Json(#[from] serde_json::Error),
 

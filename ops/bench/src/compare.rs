@@ -16,7 +16,10 @@ use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
-use crate::report::{BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareRowResult, Measurement};
+use crate::report::{
+    BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareRowResult, Measurement, StabMetadata,
+    stab_metadata,
+};
 use crate::root::RepoRoot;
 use crate::source_file::read_repo_regular_file_bounded;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
@@ -68,6 +71,7 @@ pub(crate) fn run_compare(
     options: &CompareOptions,
 ) -> Result<(), BenchError> {
     validate_compare_options(options)?;
+    let execution_identity = stab_metadata(root)?;
     let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_bytes =
@@ -248,6 +252,7 @@ pub(crate) fn run_compare(
     } else {
         apply_beta_gate(&mut report_rows, beta_waivers.as_ref())
     };
+    require_unchanged_execution_identity(root, &execution_identity)?;
     let profiler_note_findings = if let Some(report_dir) = &options.report {
         write_compare_report(CompareReportWrite {
             root,
@@ -262,11 +267,13 @@ pub(crate) fn run_compare(
             threshold_path: threshold_path.as_deref(),
             report_dir,
             options,
+            stab: execution_identity.clone(),
             rows: report_rows,
         })?
     } else {
         ProfilerNoteFindings::default()
     };
+    require_unchanged_execution_identity(root, &execution_identity)?;
     if options.require_profiler_notes && !profiler_note_findings.blockers.is_empty() {
         return Err(BenchError::ProfilerNotesMissing {
             details: profiler_note_findings.blockers.join("\n").into_boxed_str(),
@@ -313,6 +320,20 @@ pub(crate) fn run_compare(
         })
     } else {
         Ok(())
+    }
+}
+
+fn require_unchanged_execution_identity(
+    root: &RepoRoot,
+    expected: &StabMetadata,
+) -> Result<(), BenchError> {
+    let actual = stab_metadata(root)?;
+    if actual == *expected {
+        Ok(())
+    } else {
+        Err(BenchError::SourceInput(format!(
+            "benchmark source or executable changed during comparison: before={expected:?}, after={actual:?}"
+        )))
     }
 }
 

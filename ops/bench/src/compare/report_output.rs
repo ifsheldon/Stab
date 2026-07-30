@@ -9,9 +9,10 @@ use crate::error::BenchError;
 use crate::report::{
     BaselineReport, COMPARE_REPORT_SCHEMA_VERSION, COMPARE_TIMING_BOUNDARY, CompareCommandMetadata,
     CompareReport, CompareRowResult, active_benchmark_features, machine_metadata,
-    render_compare_markdown_report, stab_metadata, unix_epoch_seconds,
+    render_compare_markdown_report, unix_epoch_seconds,
 };
 use crate::root::RepoRoot;
+use crate::source_file::write_benchmark_report_file;
 
 pub(super) struct CompareReportWrite<'a> {
     pub(super) root: &'a RepoRoot,
@@ -26,6 +27,7 @@ pub(super) struct CompareReportWrite<'a> {
     pub(super) threshold_path: Option<&'a Path>,
     pub(super) report_dir: &'a Path,
     pub(super) options: &'a CompareOptions,
+    pub(super) stab: crate::report::StabMetadata,
     pub(super) rows: Vec<CompareRowResult>,
 }
 
@@ -45,6 +47,7 @@ pub(super) fn write_compare_report(
         threshold_path,
         report_dir,
         options,
+        stab,
         mut rows,
     } = input;
     let out_dir = if options.new_output {
@@ -72,7 +75,7 @@ pub(super) fn write_compare_report(
         generated_unix_epoch_seconds: unix_epoch_seconds(),
         machine: machine_metadata(root)?,
         stim: baseline_report.stim.clone(),
-        stab: stab_metadata(root)?,
+        stab,
         command: CompareCommandMetadata {
             baseline_path: baseline_path.display().to_string(),
             baseline_sha256: baseline_sha256.to_string(),
@@ -104,17 +107,10 @@ pub(super) fn write_compare_report(
     };
     let json_path = out_dir.join("compare.json");
     let json = serde_json::to_string_pretty(&report)?;
-    std::fs::write(&json_path, json).map_err(|source| BenchError::WriteOutput {
-        path: json_path.clone(),
-        source,
-    })?;
+    write_benchmark_report_file(root, &json_path, json.as_bytes(), options.new_output)?;
     let report_path = out_dir.join("report.md");
-    std::fs::write(&report_path, render_compare_markdown_report(&report)).map_err(|source| {
-        BenchError::WriteOutput {
-            path: report_path.clone(),
-            source,
-        }
-    })?;
+    let markdown = render_compare_markdown_report(&report);
+    write_benchmark_report_file(root, &report_path, markdown.as_bytes(), options.new_output)?;
     println!("[{PREFIX}] wrote {}", json_path.display());
     println!("[{PREFIX}] wrote {}", report_path.display());
     Ok(profiler_note_findings)

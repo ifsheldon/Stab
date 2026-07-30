@@ -1,9 +1,10 @@
 use std::ffi::{OsStr, OsString};
 use std::num::NonZeroUsize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use sha2::Digest as _;
 
 use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
@@ -50,6 +51,8 @@ pub(crate) struct StimMetadata {
 pub(crate) struct StabMetadata {
     pub(crate) commit: String,
     pub(crate) local_modifications: bool,
+    #[serde(default)]
+    pub(crate) executable_sha256: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -294,8 +297,8 @@ pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, Bench
         family: std::env::consts::FAMILY.to_string(),
         cpu_identity: cpu_identity(),
         available_parallelism: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
-        rustc_version: command_first_line("rustc", ["--version"], &root.path)?,
-        cmake_version: command_first_line("cmake", ["--version"], &root.path)?,
+        rustc_version: command_first_line("rustc", ["--version"], &root.process_working_dir())?,
+        cmake_version: command_first_line("cmake", ["--version"], &root.process_working_dir())?,
     })
 }
 
@@ -315,11 +318,22 @@ fn cpu_identity() -> String {
 
 pub(crate) fn stab_metadata(root: &RepoRoot) -> Result<StabMetadata, BenchError> {
     let status_args = [OsString::from("status"), OsString::from("--short")];
-    let status = run_process(Path::new("git"), &status_args, b"", &root.path, true)?;
+    let working_dir = root.process_working_dir();
+    let status = run_process(Path::new("git"), &status_args, b"", &working_dir, true)?;
     check_success(Path::new("git"), &status)?;
+    let executable = std::env::current_exe().map_err(|source| BenchError::SourceInputIo {
+        path: PathBuf::from("current benchmark executable"),
+        source,
+    })?;
+    let executable_bytes =
+        std::fs::read(&executable).map_err(|source| BenchError::SourceInputIo {
+            path: executable.clone(),
+            source,
+        })?;
     Ok(StabMetadata {
-        commit: command_first_line("git", ["rev-parse", "HEAD"], &root.path)?,
+        commit: command_first_line("git", ["rev-parse", "HEAD"], &working_dir)?,
         local_modifications: !status.stdout.is_empty(),
+        executable_sha256: hex::encode(sha2::Sha256::digest(executable_bytes)),
     })
 }
 

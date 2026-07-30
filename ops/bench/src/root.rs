@@ -29,10 +29,25 @@ impl RepoRoot {
             path: path.to_path_buf(),
             source,
         })?;
+        #[cfg(unix)]
+        let retained_descriptor = {
+            use rustix::fs::{Mode, OFlags};
+
+            let descriptor = rustix::fs::open(
+                &path,
+                OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW,
+                Mode::empty(),
+            )
+            .map_err(|source| BenchError::ResolveRoot {
+                path: path.clone(),
+                source: source.into(),
+            })?;
+            Some(Arc::new(descriptor))
+        };
         Ok(Self {
             path,
             #[cfg(unix)]
-            retained_descriptor: None,
+            retained_descriptor,
         })
     }
 
@@ -57,6 +72,18 @@ impl RepoRoot {
     #[cfg(unix)]
     pub(crate) fn retained_descriptor(&self) -> Option<&OwnedFd> {
         self.retained_descriptor.as_deref()
+    }
+
+    pub(crate) fn process_working_dir(&self) -> PathBuf {
+        #[cfg(unix)]
+        if let Some(descriptor) = self.retained_descriptor() {
+            return PathBuf::from(format!(
+                "/proc/{}/fd/{}",
+                std::process::id(),
+                descriptor.as_raw_fd()
+            ));
+        }
+        self.path.clone()
     }
 
     pub(crate) fn manifest(&self) -> PathBuf {

@@ -46,6 +46,19 @@ pub(crate) fn atomic_create_repo_regular_file(
     }
 }
 
+pub(crate) fn write_benchmark_report_file(
+    root: &RepoRoot,
+    path: &Path,
+    bytes: &[u8],
+    create_new: bool,
+) -> Result<(), BenchError> {
+    if create_new {
+        atomic_create_repo_regular_file(root, path, bytes)
+    } else {
+        atomic_write_repo_regular_file(root, path, bytes)
+    }
+}
+
 pub(crate) fn read_repo_regular_file_bounded(
     root: &RepoRoot,
     path: &Path,
@@ -630,5 +643,30 @@ mod tests {
             })
             .count();
         assert_eq!(temporary_entries, 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_report_write_never_follows_an_existing_symlink() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        let outside = tempfile::tempdir().expect("outside directory");
+        let root = RepoRoot::resolve(directory.path()).expect("resolve root");
+        let target = outside.path().join("target.json");
+        std::fs::write(&target, b"sentinel\n").expect("write sentinel");
+        let report = directory.path().join("report.json");
+        std::os::unix::fs::symlink(&target, &report).expect("create report symlink");
+
+        write_benchmark_report_file(&root, &report, b"replacement\n", false)
+            .expect_err("reusable output must reject a symlink destination");
+        write_benchmark_report_file(&root, &report, b"replacement\n", true)
+            .expect_err("create-new output must reject a symlink destination");
+
+        assert_eq!(std::fs::read(&target).expect("read target"), b"sentinel\n");
+        assert!(
+            std::fs::symlink_metadata(&report)
+                .expect("read report metadata")
+                .file_type()
+                .is_symlink()
+        );
     }
 }

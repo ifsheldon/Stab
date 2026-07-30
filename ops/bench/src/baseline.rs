@@ -22,6 +22,7 @@ use crate::report::{
     StimMetadata, machine_metadata, render_markdown_report, unix_epoch_seconds,
 };
 use crate::root::RepoRoot;
+use crate::source_file::write_benchmark_report_file;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 mod batch_sinks;
@@ -160,17 +161,10 @@ pub(crate) fn run_baseline(
     };
     let json_path = out_dir.join("baseline.json");
     let json = serde_json::to_string_pretty(&report)?;
-    std::fs::write(&json_path, json).map_err(|source| BenchError::WriteOutput {
-        path: json_path.clone(),
-        source,
-    })?;
+    write_benchmark_report_file(root, &json_path, json.as_bytes(), options.new_output)?;
     let report_path = out_dir.join("report.md");
-    std::fs::write(&report_path, render_markdown_report(&report)).map_err(|source| {
-        BenchError::WriteOutput {
-            path: report_path.clone(),
-            source,
-        }
-    })?;
+    let markdown = render_markdown_report(&report);
+    write_benchmark_report_file(root, &report_path, markdown.as_bytes(), options.new_output)?;
     println!("[{PREFIX}] wrote {}", json_path.display());
     println!("[{PREFIX}] wrote {}", report_path.display());
     Ok(())
