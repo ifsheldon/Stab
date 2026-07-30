@@ -84,13 +84,7 @@ fn validate_reference_scratch_storage(sampling: &SamplingPlan) -> CircuitResult<
 }
 
 fn reference_scratch_storage_bytes(sampling: &SamplingPlan) -> u128 {
-    let qubits = sampling.qubit_count() as u128;
-    let measurements = sampling.measurement_width().get() as u128;
-    qubits
-        .saturating_mul(qubits)
-        .saturating_mul(4)
-        .saturating_add(qubits.saturating_mul(256))
-        .saturating_add(measurements)
+    sampling.estimated_reference_work_storage_bytes()
 }
 
 pub(super) fn validate_reference_sample_len(

@@ -146,15 +146,15 @@ impl StabilizerFrame {
         })
     }
 
-    pub(super) fn new_unknown(qubit_count: usize) -> Self {
-        Self {
+    pub(super) fn try_new_unknown(qubit_count: usize) -> Result<Self, FrameStorageError> {
+        Ok(Self {
             qubit_count,
             generators: Vec::new(),
-            observable_scratch: StabilizerGenerator::identity(qubit_count),
-            pivot_scratch: StabilizerGenerator::identity(qubit_count),
-            collapsed_scratch: StabilizerGenerator::identity(qubit_count),
-            span_scratch: SpanScratch::default(),
-        }
+            observable_scratch: StabilizerGenerator::try_identity(qubit_count)?,
+            pivot_scratch: StabilizerGenerator::try_identity(qubit_count)?,
+            collapsed_scratch: StabilizerGenerator::try_identity(qubit_count)?,
+            span_scratch: SpanScratch::try_new(qubit_count)?,
+        })
     }
 
     pub(super) fn reset_to_z_basis(&mut self) {

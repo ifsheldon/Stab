@@ -53,8 +53,18 @@ impl CompiledSampler {
         self.plan.count_determined_measurements(unknown_input)
     }
 
+    pub fn try_count_determined_measurements(&self, unknown_input: bool) -> CircuitResult<u64> {
+        self.plan
+            .try_count_determined_measurements(unknown_input)
+            .map_err(CircuitError::from)
+    }
+
     pub fn reference_sample(&self) -> Vec<bool> {
         self.plan.reference_sample()
+    }
+
+    pub fn try_reference_sample(&self) -> CircuitResult<Vec<bool>> {
+        self.plan.try_reference_sample().map_err(CircuitError::from)
     }
 
     #[cfg(test)]
@@ -81,7 +91,10 @@ impl CompiledSampler {
 }
 
 pub fn count_determined_measurements(circuit: &Circuit, unknown_input: bool) -> CircuitResult<u64> {
-    engine_sampling::count_determined_measurements(circuit, unknown_input)
+    SamplingCompiler::new()
+        .compile_allowing_sweep_for_core(circuit)
+        .map_err(CircuitError::from)?
+        .try_count_determined_measurements(unknown_input)
         .map_err(CircuitError::from)
 }
 

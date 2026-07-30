@@ -208,18 +208,39 @@ impl CompiledDetectionConverter {
         }
     }
 
+    /// Compatibility convenience for callers that cannot propagate allocation failures.
+    ///
+    /// # Panics
+    ///
+    /// Panics when reusable record storage cannot be allocated.
+    #[allow(
+        clippy::panic,
+        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reusable_detection_record"
+    )]
     pub fn reusable_detection_record(&self) -> DetectionEventRecord {
-        DetectionEventRecord {
-            detectors: vec![false; self.detector_count()],
-            observables: vec![false; self.observable_count()],
+        match self.try_reusable_detection_record() {
+            Ok(record) => record,
+            Err(error) => panic!("could not allocate reusable detection record: {error}"),
         }
     }
 
+    /// Compatibility convenience for callers that cannot propagate allocation failures.
+    ///
+    /// # Panics
+    ///
+    /// Panics when reusable reference storage cannot be allocated.
+    #[allow(
+        clippy::panic,
+        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reusable_reference_sample"
+    )]
     pub fn reusable_reference_sample(&self) -> Vec<bool> {
-        vec![false; self.measurement_count()]
+        match self.try_reusable_reference_sample() {
+            Ok(reference_sample) => reference_sample,
+            Err(error) => panic!("could not allocate reusable reference sample: {error}"),
+        }
     }
 
-    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
+    pub fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
         Ok(DetectionEventRecord {
             detectors: try_false_vec(
                 self.detector_count(),
@@ -232,7 +253,7 @@ impl CompiledDetectionConverter {
         })
     }
 
-    fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
+    pub fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
         try_false_vec(
             self.measurement_count(),
             "detection conversion reference sample",

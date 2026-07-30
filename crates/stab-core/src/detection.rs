@@ -112,8 +112,20 @@ impl CompiledDetectionConverter {
         self.inner.reusable_detection_record()
     }
 
+    pub fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
+        self.inner
+            .try_reusable_detection_record()
+            .map_err(Into::into)
+    }
+
     pub fn reusable_reference_sample(&self) -> Vec<bool> {
         self.inner.reusable_reference_sample()
+    }
+
+    pub fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
+        self.inner
+            .try_reusable_reference_sample()
+            .map_err(Into::into)
     }
 
     pub fn convert_record_with_sweep_into(

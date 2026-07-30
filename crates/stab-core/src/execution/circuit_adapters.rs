@@ -3,7 +3,7 @@ use crate::{Circuit, CircuitResult};
 
 /// Computes Stim's deterministic reference sample for a circuit.
 pub fn circuit_reference_sample(circuit: &Circuit) -> CircuitResult<Vec<bool>> {
-    Ok(CompiledSampler::compile_allowing_sweep(circuit)?.reference_sample())
+    CompiledSampler::compile_allowing_sweep(circuit)?.try_reference_sample()
 }
 
 /// Computes a reference-sample tree for a circuit.

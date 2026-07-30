@@ -1,14 +1,27 @@
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
+use super::api::SamplingPlanKind;
 use super::stabilizer_frame::StabilizerFrame;
-use super::{ExecutionMode, SamplingExecutionError, SamplingPlan};
+use super::{
+    ExecutionMode, SamplingExecutionError, SamplingPlan, validate_general_frame_work_storage,
+};
 
 #[derive(Debug)]
-pub(crate) struct ReferenceSampleScratch {
-    pub(super) rng: SmallRng,
-    pub(super) frame: StabilizerFrame,
-    pub(super) output: Vec<bool>,
+pub(crate) struct ReferenceSampleScratch(ReferenceSampleScratchKind);
+
+#[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "reference scratch stays inline so fallible frame admission is not followed by an infallible box allocation"
+)]
+enum ReferenceSampleScratchKind {
+    DirectZ,
+    General {
+        rng: SmallRng,
+        frame: StabilizerFrame,
+        output: Vec<bool>,
+    },
 }
 
 impl SamplingPlan {
@@ -28,6 +41,10 @@ impl SamplingPlan {
     pub(crate) fn try_reusable_reference_sample_scratch(
         &self,
     ) -> Result<ReferenceSampleScratch, SamplingExecutionError> {
+        if matches!(self.inner.kind, SamplingPlanKind::DirectZ(_)) {
+            return Ok(ReferenceSampleScratch(ReferenceSampleScratchKind::DirectZ));
+        }
+        validate_general_frame_work_storage(self.inner.qubit_count, self.inner.measurement_count)?;
         let frame = StabilizerFrame::try_new(self.inner.qubit_count).map_err(|error| {
             SamplingExecutionError::SessionStorageAllocation {
                 message: error.to_string(),
@@ -42,11 +59,13 @@ impl SamplingPlan {
                     self.inner.measurement_count
                 ),
             })?;
-        Ok(ReferenceSampleScratch {
-            rng: SmallRng::seed_from_u64(0),
-            frame,
-            output,
-        })
+        Ok(ReferenceSampleScratch(
+            ReferenceSampleScratchKind::General {
+                rng: SmallRng::seed_from_u64(0),
+                frame,
+                output,
+            },
+        ))
     }
 
     pub(crate) fn reference_measurement_record_with_sweep_and_scratch_into(
@@ -61,14 +80,39 @@ impl SamplingPlan {
                 actual: sweep_record.len(),
             });
         }
-        self.sample_shot_in_mode_into(
-            &mut scratch.rng,
-            ExecutionMode::ReferenceSample,
-            sweep_record,
-            &mut scratch.frame,
-            record,
-            &mut scratch.output,
-        );
+        if record.capacity() < self.inner.measurement_count {
+            record
+                .try_reserve_exact(self.inner.measurement_count - record.capacity())
+                .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
+                    message: format!(
+                        "reference measurement record capacity {}: {error}",
+                        self.inner.measurement_count
+                    ),
+                })?;
+        }
+        match (&self.inner.kind, &mut scratch.0) {
+            (SamplingPlanKind::DirectZ(direct), ReferenceSampleScratchKind::DirectZ) => {
+                record.clear();
+                record.push(direct.reference_bit());
+            }
+            (
+                SamplingPlanKind::SmallFrame | SamplingPlanKind::GeneralFrame,
+                ReferenceSampleScratchKind::General { rng, frame, output },
+            ) => self.sample_shot_in_mode_into(
+                rng,
+                ExecutionMode::ReferenceSample,
+                sweep_record,
+                frame,
+                record,
+                output,
+            ),
+            _ => {
+                return Err(SamplingExecutionError::InternalInvariant {
+                    message: "reference sample scratch does not match the sampling backend"
+                        .to_owned(),
+                });
+            }
+        }
         Ok(())
     }
 }

@@ -4657,6 +4657,166 @@
         "standalone": true
       },
       {
+        "id": "a6-engine-sparse-direct-z-resource-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sparse_direct_z_resources",
+            "maximum_id_direct_z_reference_operations_use_the_selected_backend",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The maximum Stim qubit identifier remains a one-bit Direct-Z workload for fallible reference sampling, determined-count analysis, and reference-tree construction instead of allocating qubit-id-proportional tableau storage."
+        },
+        "negative_axes": [
+          "selected-backend-bypass",
+          "sparse-qubit-id-allocation",
+          "unknown-input-count-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingPlan::try_reference_sample"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::SamplingPlan::try_count_determined_measurements"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-engine-fallible-detection-buffer-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-engine",
+            "--test",
+            "sparse_direct_z_resources",
+            "detection_reusable_buffers_have_fallible_constructors",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Fallible converter scratch constructors allocate exactly the declared detector, observable, and measurement widths and initialize every reusable bit to false."
+        },
+        "negative_axes": [
+          "infallible-allocation-only",
+          "width-mismatch",
+          "nonzero-scratch"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::try_reusable_detection_record"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompiledDetectionConverter::try_reusable_reference_sample"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-core-fallible-reference-adapter-contract",
+        "feature_id": "CQ-SAMPLING",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "sampling_plan_session",
+            "fallible_reference_helpers_preserve_sparse_direct_z_admission",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "The compatibility sampler exposes fallible reference and determined-count helpers without losing the maximum-id sparse Direct-Z backend admission."
+        },
+        "negative_axes": [
+          "facade-infallible-allocation",
+          "facade-backend-drift",
+          "unknown-input-count-drift"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::advanced::compat::CompiledSampler::try_reference_sample"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::advanced::compat::CompiledSampler::try_count_determined_measurements"
+          }
+        ],
+        "standalone": true
+      },
+      {
+        "id": "a6-core-fallible-detection-buffer-contract",
+        "feature_id": "CQ-DETECTION",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "detection_conversion_limits",
+            "fallible_reusable_buffers_preserve_facade_dimensions",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "The compatibility converter propagates fallible reusable-buffer construction while preserving exact detector, observable, and measurement dimensions."
+        },
+        "negative_axes": [
+          "facade-infallible-allocation",
+          "facade-width-drift",
+          "facade-nonzero-scratch"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::advanced::compat::CompiledDetectionConverter::try_reusable_detection_record"
+          },
+          {
+            "crate_name": "stab_core",
+            "owner_path": "stab_core::advanced::compat::CompiledDetectionConverter::try_reusable_reference_sample"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a6-engine-reference-tree-structure-contract",
         "feature_id": "CQ-SAMPLING",
         "comparator": "exact-value",

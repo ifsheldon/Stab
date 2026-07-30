@@ -99,6 +99,11 @@ fn extracted_detection_engine_keeps_detection_ownership() {
             "stab_engine::CompiledDetectionConverter::convert_record",
         ),
         (
+            "stab_engine",
+            "crates/stab-engine/src/detection/mod.rs",
+            "stab_engine::CompiledDetectionConverter::try_reusable_detection_record",
+        ),
+        (
             "stab_core",
             "crates/stab-core/src/lib.rs",
             "stab_core::execution::DetectionSamplingCompiler::compile",

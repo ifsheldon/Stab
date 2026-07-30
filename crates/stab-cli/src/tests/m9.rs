@@ -49,6 +49,22 @@ fn detect_basic_matches_m9_oracle_golden() {
 }
 
 #[test]
+fn detect_accepts_maximum_id_sparse_direct_z_circuit() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "detect", "--shots", "1"],
+        b"M 16777215\nDETECTOR rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0, "{}", String::from_utf8_lossy(&stderr));
+    assert_eq!(stdout, b"0\n");
+    assert!(stderr.is_empty(), "{}", String::from_utf8_lossy(&stderr));
+}
+
+#[test]
 fn detect_accepts_default_false_sweep_conditioned_sampling() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

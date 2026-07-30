@@ -25,7 +25,7 @@ use super::{
 use crate::CompilationRequestFingerprint;
 
 const MAX_BATCH_SHOTS: usize = 64;
-const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
+pub(super) const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
 const PLAN_FINGERPRINT_DOMAIN: &[u8] = b"stab:plan-fingerprint\0";
 const EXECUTABLE_CONTRACT_DOMAIN: &[u8] = b"stab:sampling-executable-contract\0";
 
@@ -451,14 +451,14 @@ pub(super) struct SamplingPlanInner {
     pub(super) measurement_count: usize,
     pub(super) sweep_bit_count: usize,
     pub(super) operations: Vec<SampleOperation>,
-    kind: SamplingPlanKind,
+    pub(super) kind: SamplingPlanKind,
     backend: SamplingBackend,
     request_fingerprint: CompilationRequestFingerprint,
     fingerprint: PlanFingerprint,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum SamplingPlanKind {
+pub(super) enum SamplingPlanKind {
     DirectZ(DirectZMeasurementPlan),
     SmallFrame,
     GeneralFrame,
@@ -1063,7 +1063,7 @@ pub(super) fn validate_legacy_adapter_plan(
     validate_session_storage(&plan.inner, ReferenceSampleMode::SkipReferenceSample)
 }
 
-fn try_bool_buffer(
+pub(super) fn try_bool_buffer(
     capacity: usize,
     label: &'static str,
 ) -> Result<Vec<bool>, SamplingExecutionError> {
@@ -1076,12 +1076,15 @@ fn try_bool_buffer(
     Ok(buffer)
 }
 
-fn compute_reference_sample(plan: &SamplingPlanInner) -> Result<Vec<bool>, SamplingExecutionError> {
+pub(super) fn compute_reference_sample(
+    plan: &SamplingPlanInner,
+) -> Result<Vec<bool>, SamplingExecutionError> {
     if let SamplingPlanKind::DirectZ(direct) = plan.kind {
         let mut output = try_bool_buffer(1, "direct reference sample")?;
         output.push(direct.reference_bit());
         return Ok(output);
     }
+    super::validate_general_frame_work_storage(plan.qubit_count, plan.measurement_count)?;
     let mut rng = SmallRng::seed_from_u64(0);
     let mut frame = StabilizerFrame::try_new(plan.qubit_count).map_err(|error| {
         SamplingExecutionError::SessionStorageAllocation {

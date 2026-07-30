@@ -29,6 +29,34 @@ fn parse_circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("test circuit should parse")
 }
 
+#[test]
+fn fallible_reusable_buffers_preserve_facade_dimensions() {
+    let circuit = parse_circuit(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n",
+    );
+    let converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile facade converter");
+
+    let record = converter
+        .try_reusable_detection_record()
+        .expect("allocate reusable detector record");
+    assert_eq!(record.detectors, vec![false]);
+    assert_eq!(record.observables, vec![false]);
+    assert_eq!(
+        converter
+            .try_reusable_reference_sample()
+            .expect("allocate reusable reference sample"),
+        vec![false]
+    );
+}
+
 fn nested_circuit(depth: usize, mut body: Circuit) -> Circuit {
     for _ in 0..depth {
         let mut outer = Circuit::new();

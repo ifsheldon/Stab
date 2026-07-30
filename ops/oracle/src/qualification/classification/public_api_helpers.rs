@@ -174,15 +174,16 @@ fn is_dem_sampling_resource_api(api_lower: &str) -> bool {
     ]
     .iter()
     .any(|item| api_path_mentions_item(api_lower, item))
-        || api_lower.rsplit("::").next().is_some_and(|method| {
-            [
-                "materialized_bytes_per_shot",
-                "replay_work_units_per_shot",
-                "try_reusable_detection_record",
-                "try_reusable_error_record",
-            ]
-            .contains(&method)
-        })
+        || (api_path_mentions_item(api_lower, "demsamplingplan")
+            && api_lower.rsplit("::").next().is_some_and(|method| {
+                [
+                    "materialized_bytes_per_shot",
+                    "replay_work_units_per_shot",
+                    "try_reusable_detection_record",
+                    "try_reusable_error_record",
+                ]
+                .contains(&method)
+            }))
 }
 
 fn is_extracted_dem_sampling_api(api_lower: &str) -> bool {

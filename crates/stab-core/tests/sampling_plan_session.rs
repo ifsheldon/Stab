@@ -93,6 +93,32 @@ fn noisy_plan() -> stab_core::SamplingPlan {
         .expect("compile sampling plan")
 }
 
+#[test]
+fn fallible_reference_helpers_preserve_sparse_direct_z_admission() {
+    let circuit =
+        Circuit::from_stim_str("M 16777215\n").expect("parse maximum-id sparse Direct-Z circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile facade sampler");
+
+    assert_eq!(
+        sampler
+            .try_reference_sample()
+            .expect("compute facade reference sample"),
+        vec![false]
+    );
+    assert_eq!(
+        sampler
+            .try_count_determined_measurements(false)
+            .expect("count known-input measurements"),
+        1
+    );
+    assert_eq!(
+        sampler
+            .try_count_determined_measurements(true)
+            .expect("count unknown-input measurements"),
+        0
+    );
+}
+
 fn collect(
     plan: &stab_core::SamplingPlan,
     seed: u64,

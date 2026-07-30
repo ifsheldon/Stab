@@ -2,6 +2,7 @@ use rand::{Rng, RngExt as _};
 
 use stab_algebra::PauliBasis;
 
+use super::measurement_flip;
 use super::operation::SampleOperation;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -59,6 +60,12 @@ pub(super) fn compile(
 impl DirectZMeasurementPlan {
     pub(super) const fn reference_bit(self) -> bool {
         self.inverted
+    }
+
+    pub(super) fn determined_measurement_count(self, unknown_input: bool) -> u64 {
+        u64::from(
+            !unknown_input && measurement_flip::is_deterministic(self.measurement_flip_probability),
+        )
     }
 
     #[inline(always)]

@@ -92,20 +92,71 @@ impl SamplingCompiler {
 }
 
 impl SamplingPlan {
-    pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {
+    /// Counts deterministic measurements after admitting and allocating bounded analysis storage.
+    pub fn try_count_determined_measurements(
+        &self,
+        unknown_input: bool,
+    ) -> Result<u64, SamplingExecutionError> {
+        if let api::SamplingPlanKind::DirectZ(direct) = self.inner.kind {
+            return Ok(direct.determined_measurement_count(unknown_input));
+        }
+        validate_general_frame_work_storage(self.inner.qubit_count, self.inner.measurement_count)?;
         let mut rng = SmallRng::seed_from_u64(0);
         let mut frame = if unknown_input {
-            StabilizerFrame::new_unknown(self.inner.qubit_count)
+            StabilizerFrame::try_new_unknown(self.inner.qubit_count)
         } else {
-            StabilizerFrame::new(self.inner.qubit_count)
-        };
-        let mut record = Vec::new();
-        count_determined_operations(&self.inner.operations, &mut frame, &mut record, &mut rng)
+            StabilizerFrame::try_new(self.inner.qubit_count)
+        }
+        .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
+            message: error.to_string(),
+        })?;
+        let mut record = api::try_bool_buffer(
+            self.inner.measurement_count,
+            "determined measurement record",
+        )?;
+        Ok(count_determined_operations(
+            &self.inner.operations,
+            &mut frame,
+            &mut record,
+            &mut rng,
+        ))
     }
 
+    /// Compatibility convenience for callers that cannot propagate execution-storage failures.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the analysis exceeds the bounded storage contract or storage allocation fails.
+    #[allow(
+        clippy::panic,
+        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_count_determined_measurements"
+    )]
+    pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {
+        match self.try_count_determined_measurements(unknown_input) {
+            Ok(count) => count,
+            Err(error) => panic!("could not count determined measurements: {error}"),
+        }
+    }
+
+    /// Computes the deterministic reference sample with bounded, fallible storage.
+    pub fn try_reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
+        api::compute_reference_sample(&self.inner)
+    }
+
+    /// Compatibility convenience for callers that cannot propagate execution-storage failures.
+    ///
+    /// # Panics
+    ///
+    /// Panics when reference sampling exceeds the bounded storage contract or allocation fails.
+    #[allow(
+        clippy::panic,
+        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reference_sample"
+    )]
     pub fn reference_sample(&self) -> Vec<bool> {
-        let mut rng = SmallRng::seed_from_u64(0);
-        self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample, &[])
+        match self.try_reference_sample() {
+            Ok(sample) => sample,
+            Err(error) => panic!("could not compute reference sample: {error}"),
+        }
     }
 
     /// Compatibility bridge for facade-owned reference-sampling adapters.
@@ -122,33 +173,17 @@ impl SamplingPlan {
         self.inner.sweep_bit_count
     }
 
+    pub(crate) fn estimated_reference_work_storage_bytes(&self) -> u128 {
+        if matches!(self.inner.kind, api::SamplingPlanKind::DirectZ(_)) {
+            return 1;
+        }
+        general_frame_work_storage_bytes(self.inner.qubit_count, self.inner.measurement_count)
+    }
+
     /// Temporary bridge for core detection during the facade migration.
     #[doc(hidden)]
     pub fn validate_legacy_adapter_storage_for_core(&self) -> Result<(), SamplingExecutionError> {
         api::validate_legacy_adapter_plan(self)
-    }
-
-    fn sample_shot_in_mode<R>(
-        &self,
-        rng: &mut R,
-        mode: ExecutionMode,
-        sweep_record: &[bool],
-    ) -> Vec<bool>
-    where
-        R: Rng,
-    {
-        let mut frame = StabilizerFrame::new(self.inner.qubit_count);
-        let mut record = Vec::with_capacity(self.inner.measurement_count);
-        let mut output = Vec::with_capacity(self.inner.measurement_count);
-        self.sample_shot_in_mode_into(
-            rng,
-            mode,
-            sweep_record,
-            &mut frame,
-            &mut record,
-            &mut output,
-        );
-        output
     }
 
     fn sample_shot_in_mode_into<R>(
@@ -180,6 +215,30 @@ impl SamplingPlan {
             sweep_record,
         );
     }
+}
+
+fn validate_general_frame_work_storage(
+    qubit_count: usize,
+    measurement_count: usize,
+) -> Result<(), SamplingExecutionError> {
+    let estimated_bytes = general_frame_work_storage_bytes(qubit_count, measurement_count);
+    if estimated_bytes > u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES) {
+        return Err(SamplingExecutionError::SessionStorageLimit {
+            estimated_bytes,
+            limit_bytes: api::MAX_SAMPLING_SESSION_STORAGE_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn general_frame_work_storage_bytes(qubit_count: usize, measurement_count: usize) -> u128 {
+    let qubits = qubit_count as u128;
+    let measurements = measurement_count as u128;
+    qubits
+        .saturating_mul(qubits)
+        .saturating_mul(4)
+        .saturating_add(qubits.saturating_mul(256))
+        .saturating_add(measurements)
 }
 
 pub fn count_determined_measurements(

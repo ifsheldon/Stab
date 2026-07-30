@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "899f9c18d7c1d1ec4c173b753aff00982d5c3dce5fa45bed10ef0adf7a4b9113",
-  "semantic_digest": "318793ecc479fd5330f650a02a0f287aaff813db4588b96b964d69bc343e9850",
+  "correctness_digest": "fe1b41c7f4efddf7ce0911c4171b93a89e7f93141fc4a60fcfef5ec0672a9c54",
+  "semantic_digest": "92262420f02ee89701a041b6257149c950ec40ad1143c6c0d5a58f3bdf8784f2",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -38619,6 +38619,28 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-45df54750ed8ce24",
+      "path": "stab_core::SamplingPlan::try_count_determined_measurements",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-94c00a5dec38c743",
+      "path": "stab_core::SamplingPlan::try_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-48127db22271ae3e",
       "path": "stab_core::SamplingRunProgress",
       "kind": "struct",
@@ -45062,6 +45084,28 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-5e9ae4176a8035b9",
+      "path": "stab_core::advanced::compat::CompiledDetectionConverter::try_reusable_detection_record",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5d86680f8939f244",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d462ea9c57f88807",
+      "path": "stab_core::advanced::compat::CompiledDetectionConverter::try_reusable_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-5d86680f8939f244",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-9a936c5d7226a561",
       "path": "stab_core::advanced::compat::CompiledSampler",
       "kind": "struct",
@@ -45273,12 +45317,34 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-04e48f92c80ba401",
+      "path": "stab_core::advanced::compat::CompiledSampler::try_count_determined_measurements",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-99d148a9128c02a7",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-cccf658797c599ca",
       "path": "stab_core::advanced::compat::CompiledSampler::try_for_each_sample_with_seed_and_reference_mode",
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-228dcace19fa73bd",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-57cb95c65e8cc1f5",
+      "path": "stab_core::advanced::compat::CompiledSampler::try_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-99d148a9128c02a7",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -56049,6 +56115,28 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-770d4bf04a830245",
+      "path": "stab_core::execution::SamplingPlan::try_count_determined_measurements",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1f6ad9e7e72d9cbd",
+      "path": "stab_core::execution::SamplingPlan::try_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-a22e19b7256831e6",
       "path": "stab_core::execution::SamplingRunProgress",
       "kind": "struct",
@@ -57845,6 +57933,28 @@
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-837a00606b090cf1",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-81dc5e55db0f5338",
+      "path": "stab_engine::CompiledDetectionConverter::try_reusable_detection_record",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-d17100686e8f4a68",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-ff28c5a806961d71",
+      "path": "stab_engine::CompiledDetectionConverter::try_reusable_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-DETECTION",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-d17100686e8f4a68",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64927,6 +65037,28 @@
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-7a95e8c67b4bda3f",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-9d8725a8ae775847",
+      "path": "stab_engine::SamplingPlan::try_count_determined_measurements",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-45f7234bc61e420c",
+      "path": "stab_engine::SamplingPlan::try_reference_sample",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
