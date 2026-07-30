@@ -9,24 +9,23 @@ use serde::{Deserialize, Serialize};
 use self::artifacts::{
     path_ends_with, read_bounded, valid_revision, validate_binding, verify_binding,
 };
+use self::policy::require_matrix_policies;
 use self::structure::validate_structure;
 use crate::comparability::ComparabilityClass;
-use crate::compare::reapply_profiler_notes;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::manifest::{
     BenchmarkManifest, BenchmarkRow, Milestone, Runner, ThresholdClass, is_safe_benchmark_id,
 };
-use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
 use crate::report::{
     BaselineReport, BaselineRowResult, COMPARE_REPORT_SCHEMA_VERSION, COMPARE_TIMING_BOUNDARY,
     CompareReport, CompareRowResult, Measurement,
 };
 use crate::root::RepoRoot;
-use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
 mod artifacts;
 mod measurement_contract;
+mod policy;
 mod publication;
 mod revision;
 mod structure;
@@ -38,11 +37,30 @@ const MAX_PHASES: usize = 256;
 const MAX_DIAGNOSTICS: usize = 128;
 const CROSSING_RATIO: f64 = 1.15;
 const RATIO_TOLERANCE: f64 = 1e-9;
+const A6_BASELINE_SCHEMA_VERSION: u32 = 3;
 const A6_BASELINE_TARGET_SECONDS: f64 = 0.01;
 const A6_BASELINE_CLI_ITERATIONS: u32 = 3;
+const MAX_POLICY_BYTES: usize = 8 << 20;
 const A6_MATRIX_FILTERS: [&str; 15] = [
     "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6",
     "PF7",
+];
+const A6_PRIMARY_PROFILER_NOTE_ROOT: &str = "benchmarks/profiler-notes/m12";
+const A6_PROFILER_NOTE_ROOTS: [&str; 2] = [
+    A6_PRIMARY_PROFILER_NOTE_ROOT,
+    "benchmarks/profiler-notes/pfm-b5",
+];
+const A6_SELECTED_PAIR_GATES: [(&str, &str, &str); 2] = [
+    (
+        "m5-simd-bits",
+        "simd_bits_xor_10K",
+        "stab_simd_bits_xor_10K",
+    ),
+    (
+        "m6-clifford-string",
+        "CliffordString_multiplication_10K",
+        "stab_clifford_string_multiplication_10K",
+    ),
 ];
 const INITIAL_SEED_PHASES: [(&str, &str); 19] = [
     ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8"),
@@ -400,11 +418,15 @@ fn verify_artifacts(
     ledger: &FocusedEvidenceLedger,
     matrix: &CompareReport,
 ) -> Result<(), BenchError> {
+    let mut verified_predecessor_commits = BTreeSet::new();
     for phase in &ledger.phases {
         if let (Some(binding), Some(expected)) =
             (&phase.predecessor_report, phase.predecessor_seconds)
         {
             let report = read_bound_report(root, binding)?;
+            if verified_predecessor_commits.insert(report.stab.commit.clone()) {
+                revision::validate_preserved_commit(root, &report.stab.commit)?;
+            }
             require_predecessor_contract(matrix, &report, phase, &binding.path)?;
             let measurement = find_measurement(&report, &phase.row_id, &phase.measurement)?;
             require_recorded_seconds(
@@ -439,9 +461,11 @@ fn require_baseline_contract(
         .iter()
         .map(String::as_str)
         .eq(A6_MATRIX_FILTERS);
-    if baseline.schema_version != 2
+    if baseline.schema_version != A6_BASELINE_SCHEMA_VERSION
         || baseline.generated_unix_epoch_seconds > matrix.generated_unix_epoch_seconds
         || baseline.machine != matrix.machine
+        || !matrix.machine.has_private_host_fingerprint()
+        || !matrix.stab.has_bound_executable()
         || baseline.stim != matrix.stim
         || baseline.stim.expected_tag != STIM_TAG
         || baseline.stim.actual_tag != STIM_TAG
@@ -489,17 +513,14 @@ fn require_matrix_contract(
         .iter()
         .map(String::as_str)
         .eq(A6_MATRIX_FILTERS);
-    let profiler_roots_match = report.command.profiler_notes_paths.len() == 2
+    let profiler_roots_match = report.command.profiler_notes_paths.len()
+        == A6_PROFILER_NOTE_ROOTS.len()
         && report
             .command
             .profiler_notes_paths
-            .first()
-            .is_some_and(|path| path_ends_with(path, "benchmarks/profiler-notes/m12"))
-        && report
-            .command
-            .profiler_notes_paths
-            .get(1)
-            .is_some_and(|path| path_ends_with(path, "benchmarks/profiler-notes/pfm-b5"));
+            .iter()
+            .zip(A6_PROFILER_NOTE_ROOTS)
+            .all(|(actual, expected)| path_ends_with(actual, expected));
     if report.schema_version != COMPARE_REPORT_SCHEMA_VERSION
         || report.stab.commit != revision
         || report.stab.local_modifications
@@ -552,65 +573,6 @@ fn require_matrix_contract(
     }
     measurement_contract.require_report(report)?;
     require_matrix_policies(root, report)?;
-    Ok(())
-}
-
-fn require_matrix_policies(root: &RepoRoot, report: &CompareReport) -> Result<(), BenchError> {
-    let thresholds = read_thresholds(&root.primary_thresholds())?;
-    let waivers = read_regression_waivers(&root.primary_regression_waivers())?;
-    let mut expected = report.rows.clone();
-    for row in &mut expected {
-        row.regression_threshold_status = "not-configured".to_string();
-        row.regression_threshold_max_ratio = None;
-        row.regression_threshold_waiver_reason = None;
-        row.regression_threshold_waiver_follow_up = None;
-        row.regression_threshold_error = None;
-        row.profiler_note_status.clear();
-        row.profiler_note_path = None;
-        row.profiler_note_error = None;
-    }
-    let threshold_findings = apply_regression_thresholds(&mut expected, &thresholds);
-    let waiver_findings = apply_regression_waivers(&mut expected, &waivers);
-    let profiler_roots = [
-        root.resolve_relative(PathBuf::from("benchmarks/profiler-notes/m12").as_path()),
-        root.resolve_relative(PathBuf::from("benchmarks/profiler-notes/pfm-b5").as_path()),
-    ];
-    let profiler_report_roots = [
-        PathBuf::from("benchmarks/profiler-notes/m12"),
-        PathBuf::from("benchmarks/profiler-notes/pfm-b5"),
-    ];
-    let profiler_dirs = profiler_roots
-        .into_iter()
-        .zip(profiler_report_roots)
-        .collect::<Vec<_>>();
-    let profiler_blockers = reapply_profiler_notes(&mut expected, &profiler_dirs);
-    let mut blockers = threshold_findings.blockers;
-    blockers.extend(waiver_findings.blockers);
-    blockers.extend(profiler_blockers);
-    if !blockers.is_empty() {
-        return Err(focused_error(format!(
-            "matrix source-owned policy replay failed:\n{}",
-            blockers.join("\n")
-        )));
-    }
-    for (actual, replayed) in report.rows.iter().zip(&expected) {
-        if actual.regression_threshold_status != replayed.regression_threshold_status
-            || actual.regression_threshold_max_ratio != replayed.regression_threshold_max_ratio
-            || actual.regression_threshold_waiver_reason
-                != replayed.regression_threshold_waiver_reason
-            || actual.regression_threshold_waiver_follow_up
-                != replayed.regression_threshold_waiver_follow_up
-            || actual.regression_threshold_error != replayed.regression_threshold_error
-            || actual.profiler_note_status != replayed.profiler_note_status
-            || actual.profiler_note_path != replayed.profiler_note_path
-            || actual.profiler_note_error != replayed.profiler_note_error
-        {
-            return Err(focused_error(format!(
-                "matrix policy result for {} differs from source-owned replay",
-                actual.id
-            )));
-        }
-    }
     Ok(())
 }
 
@@ -754,6 +716,7 @@ fn require_predecessor_contract(
 ) -> Result<(), BenchError> {
     if predecessor.schema_version != COMPARE_REPORT_SCHEMA_VERSION
         || predecessor.stab.local_modifications
+        || !predecessor.stab.has_bound_executable()
         || predecessor.stab.commit == matrix.stab.commit
         || !valid_revision(&predecessor.stab.commit)
         || predecessor.generated_unix_epoch_seconds > matrix.generated_unix_epoch_seconds
@@ -768,6 +731,9 @@ fn require_predecessor_contract(
         || predecessor.command.measurement_contract_path != matrix.command.measurement_contract_path
         || predecessor.command.measurement_contract_sha256
             != matrix.command.measurement_contract_sha256
+        || !predecessor.command.warmup
+        || predecessor.command.measurement_runs != 1
+        || !predecessor.command.strict
         || predecessor.command.track_allocations
         || !predecessor.command.new_output
     {
@@ -805,8 +771,8 @@ fn require_focused_contract(
     revision: &str,
 ) -> Result<(), BenchError> {
     if report.schema_version != COMPARE_REPORT_SCHEMA_VERSION
+        || report.stab != matrix.stab
         || report.stab.commit != revision
-        || report.stab.local_modifications
         || report.generated_unix_epoch_seconds < matrix.generated_unix_epoch_seconds
         || report.machine != matrix.machine
         || report.stim != matrix.stim
@@ -1069,6 +1035,9 @@ fn focused_error(message: impl Into<String>) -> BenchError {
         message.into()
     ))
 }
+
+#[cfg(test)]
+use policy::{require_a6_selected_pair_gates, require_raw_derived_fields};
 
 #[cfg(test)]
 mod tests;

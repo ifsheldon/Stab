@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn memory_gate_rejects_unsupported_baseline_schema() {
         let error = MemoryBaseline::from_report(MemoryBaselineReport {
-            schema_version: 4,
+            schema_version: 5,
             rows: Vec::new(),
         })
         .expect_err("reject unsupported schema");
@@ -380,7 +380,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("memory baseline schema_version=4 expected 1, 2, or 3")
+                .contains("memory baseline schema_version=5 expected 1, 2, or 4")
         );
     }
 

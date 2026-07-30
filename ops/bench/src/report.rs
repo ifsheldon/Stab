@@ -13,7 +13,7 @@ use crate::process::{check_success, run_process};
 use crate::root::RepoRoot;
 
 pub(crate) const BETA_GATE_MAX_RELATIVE_RATIO: f64 = 1.25;
-pub(crate) const COMPARE_REPORT_SCHEMA_VERSION: u32 = 3;
+pub(crate) const COMPARE_REPORT_SCHEMA_VERSION: u32 = 4;
 pub(crate) const COMPARE_TIMING_BOUNDARY: &str = "source-owned-row-native-v1";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -33,6 +33,8 @@ pub(crate) struct MachineMetadata {
     family: String,
     #[serde(default)]
     cpu_identity: String,
+    #[serde(default)]
+    pub(crate) host_fingerprint: String,
     available_parallelism: usize,
     rustc_version: String,
     cmake_version: String,
@@ -53,6 +55,26 @@ pub(crate) struct StabMetadata {
     pub(crate) local_modifications: bool,
     #[serde(default)]
     pub(crate) executable_sha256: String,
+}
+
+impl StabMetadata {
+    pub(crate) fn has_bound_executable(&self) -> bool {
+        self.executable_sha256.len() == 64
+            && self
+                .executable_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    }
+}
+
+impl MachineMetadata {
+    pub(crate) fn has_private_host_fingerprint(&self) -> bool {
+        self.host_fingerprint.len() == 64
+            && self
+                .host_fingerprint
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -296,10 +318,28 @@ pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, Bench
         arch: std::env::consts::ARCH.to_string(),
         family: std::env::consts::FAMILY.to_string(),
         cpu_identity: cpu_identity(),
+        host_fingerprint: host_fingerprint(),
         available_parallelism: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
         rustc_version: command_first_line("rustc", ["--version"], &root.process_working_dir())?,
         cmake_version: command_first_line("cmake", ["--version"], &root.process_working_dir())?,
     })
+}
+
+fn host_fingerprint() -> String {
+    let Ok(machine_id) = std::fs::read("/etc/machine-id") else {
+        return "unavailable".to_string();
+    };
+    let machine_id = machine_id
+        .into_iter()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect::<Vec<_>>();
+    if machine_id.is_empty() {
+        return "unavailable".to_string();
+    }
+    let mut digest = sha2::Sha256::new();
+    digest.update(b"stab-benchmark-host-v1\0");
+    digest.update(machine_id);
+    hex::encode(digest.finalize())
 }
 
 fn cpu_identity() -> String {

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::report::CompareRowResult;
 
-pub(super) const HOT_PATH_PROFILER_NOTE_RATIO: f64 = 1.5;
+pub(crate) const HOT_PATH_PROFILER_NOTE_RATIO: f64 = 1.5;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct ProfilerNoteFindings {
@@ -76,7 +76,7 @@ pub(super) fn profiler_note_report_metadata(paths: &[PathBuf]) -> (Option<String
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum ProfilerNoteError {
+pub(crate) enum ProfilerNoteError {
     Missing,
     Invalid(String),
 }
@@ -89,7 +89,7 @@ impl ProfilerNoteError {
         }
     }
 
-    fn message(&self) -> &str {
+    pub(crate) fn message(&self) -> &str {
         match self {
             Self::Missing => "profiler note is missing",
             Self::Invalid(message) => message,
@@ -148,7 +148,7 @@ fn read_and_validate_profiler_note(
     Ok(report_path.clone())
 }
 
-pub(super) fn validate_profiler_note_content(content: &str) -> Result<(), ProfilerNoteError> {
+pub(crate) fn validate_profiler_note_content(content: &str) -> Result<(), ProfilerNoteError> {
     if content.trim().is_empty() {
         return Err(ProfilerNoteError::Invalid(
             "profiler note is empty".to_string(),

@@ -1,4 +1,5 @@
 use super::*;
+use crate::compare::rebuild_compare_row_raw_evidence;
 use crate::report::RowCommandMetadata;
 
 fn binding(path: &str) -> ArtifactBinding {
@@ -190,6 +191,7 @@ fn compare_report(
             "os": "linux",
             "arch": "x86_64",
             "family": "unix",
+            "host_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "available_parallelism": 1,
             "rustc_version": "rustc test",
             "cmake_version": "cmake test"
@@ -203,7 +205,8 @@ fn compare_report(
         },
         "stab": {
             "commit": commit,
-            "local_modifications": false
+            "local_modifications": false,
+            "executable_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         },
         "command": {
             "baseline_path": "target/benchmarks/baseline/baseline.json",
@@ -533,6 +536,28 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
     )
     .expect("comparable predecessor");
 
+    let mut cold_predecessor = predecessor.clone();
+    cold_predecessor.command.warmup = false;
+    let error = require_predecessor_contract(
+        &matrix,
+        &cold_predecessor,
+        &phase,
+        "target/benchmarks/cold/compare.json",
+    )
+    .expect_err("cold predecessor is not comparable");
+    assert!(error.to_string().contains("not a clean non-instrumented"));
+
+    let mut aggregated_predecessor = predecessor.clone();
+    aggregated_predecessor.command.measurement_runs = 2;
+    let error = require_predecessor_contract(
+        &matrix,
+        &aggregated_predecessor,
+        &phase,
+        "target/benchmarks/aggregated/compare.json",
+    )
+    .expect_err("aggregated predecessor is not the source-owned run shape");
+    assert!(error.to_string().contains("not a clean non-instrumented"));
+
     let same_revision = compare_report(predecessor_row.clone(), &current_commit, 1);
     let error = require_predecessor_contract(
         &matrix,
@@ -569,6 +594,53 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
     )
     .expect_err("changed timing boundary");
     assert!(error.to_string().contains("not a clean non-instrumented"));
+}
+
+#[test]
+fn raw_derived_fields_reject_a_serialized_ratio_that_disagrees_with_measurements() {
+    let mut actual = measured_row();
+    actual.comparability = ComparabilityClass::DirectMatch;
+    actual.stim_measurements = vec![measurement("case", 1)];
+    actual.stab_measurements = vec![measurement("stab_case", 1)];
+    actual.stim_median_seconds = Some(1.0);
+    actual.stab_median_seconds = Some(1.0);
+    actual.relative_ratio = Some(0.25);
+    actual.pass_fail_status = "pass".to_string();
+
+    let mut rebuilt = actual.clone();
+    rebuild_compare_row_raw_evidence(&mut rebuilt);
+    let error = require_raw_derived_fields(&actual, &rebuilt)
+        .expect_err("serialized ratio must reconstruct from raw measurements");
+
+    assert!(error.to_string().contains("do not reconstruct"));
+    assert_eq!(rebuilt.relative_ratio, Some(1.0));
+}
+
+#[test]
+fn a6_selected_pair_gate_includes_the_m6_equal_width_measurement() {
+    let mut rows = Vec::new();
+    for (row_id, stim_name, stab_name) in A6_SELECTED_PAIR_GATES {
+        let mut row = measured_row();
+        row.id = row_id.to_string();
+        row.comparability = ComparabilityClass::DirectMatch;
+        let mut stim = measurement(stim_name, 1);
+        stim.seconds = 1.0;
+        let mut stab = measurement(stab_name, 1);
+        stab.seconds = if row_id == "m6-clifford-string" {
+            1.251
+        } else {
+            1.0
+        };
+        row.stim_measurements = vec![stim];
+        row.stab_measurements = vec![stab];
+        rebuild_compare_row_raw_evidence(&mut row);
+        rows.push(row);
+    }
+
+    let error =
+        require_a6_selected_pair_gates(&rows).expect_err("M6 must retain its A6 1.25x gate");
+    assert!(error.to_string().contains("m6-clifford-string"));
+    assert!(error.to_string().contains("above 1.25x"));
 }
 
 #[test]

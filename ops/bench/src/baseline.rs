@@ -79,7 +79,7 @@ const M6_TABLEAU_QUBITS: usize = 32;
 const M6_TABLEAU_ITER_QUBITS: usize = 2;
 const M6_STABILIZER_QUBITS: usize = 16;
 const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
-const BASELINE_SCHEMA_VERSION: u32 = 2;
+const BASELINE_SCHEMA_VERSION: u32 = 3;
 const M4_STIM_PARSE_DENSE_FIXTURE: &str = r#"
 H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 CNOT 4 5 6 7
@@ -187,9 +187,9 @@ fn selected_baseline_rows<'a>(
 
 pub(crate) fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError> {
     let mut details = Vec::new();
-    if !matches!(report.schema_version, 1 | BASELINE_SCHEMA_VERSION) {
+    if !matches!(report.schema_version, 1 | 2 | BASELINE_SCHEMA_VERSION) {
         details.push(format!(
-            "schema_version={} expected 1 or {}",
+            "schema_version={} expected 1, 2, or {}",
             report.schema_version, BASELINE_SCHEMA_VERSION
         ));
     }

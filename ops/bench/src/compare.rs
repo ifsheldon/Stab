@@ -10,7 +10,7 @@ use crate::baseline::{
     summarize_stab_measurements, validate_baseline_metadata,
 };
 use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
-use crate::compare_evidence::{aggregate_measurement_runs, paired_measurement_ratios};
+use crate::compare_evidence::aggregate_measurement_runs;
 use crate::config::PREFIX;
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
@@ -31,15 +31,9 @@ mod report_output;
 const MAX_COMPARE_SOURCE_BYTES: usize = 64 << 20;
 
 use options::validate_compare_options;
-use profiler_notes::{ProfilerNoteFindings, apply_profiler_notes};
+use profiler_notes::ProfilerNoteFindings;
+pub(crate) use profiler_notes::{HOT_PATH_PROFILER_NOTE_RATIO, validate_profiler_note_content};
 use report_output::{CompareReportWrite, write_compare_report};
-
-pub(crate) fn reapply_profiler_notes(
-    rows: &mut [CompareRowResult],
-    note_dirs: &[(PathBuf, PathBuf)],
-) -> Vec<String> {
-    apply_profiler_notes(rows, note_dirs).blockers
-}
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompareOptions {
@@ -504,35 +498,11 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
     } else {
         row.comparability
     };
-    let omit_mixed_median = comparability.omits_multi_measurement_median()
-        && (stim_measurements.len() > 1 || stab_measurements.len() > 1);
-    let stim_median_seconds = (!omit_mixed_median)
-        .then(|| median_seconds(&stim_measurements))
-        .flatten();
-    let stab_median_seconds = (!omit_mixed_median)
-        .then(|| median_seconds(&stab_measurements))
-        .flatten();
-    let median_relative_ratio = match (stim_median_seconds, stab_median_seconds) {
-        (Some(stim_seconds), Some(stab_seconds)) if stim_seconds > 0.0 => {
-            Some(stab_seconds / stim_seconds)
-        }
-        _ => None,
-    };
-    let measurement_ratios =
-        paired_measurement_ratios(&stim_measurements, &stab_measurements, comparability);
-    let worst_paired_relative_ratio = measurement_ratios
-        .iter()
-        .map(|ratio| ratio.relative_ratio)
-        .max_by(f64::total_cmp);
-    let relative_ratio = match (median_relative_ratio, worst_paired_relative_ratio) {
-        (_, Some(worst_paired)) if comparability.uses_paired_ratios_without_mixed_median() => {
-            Some(worst_paired)
-        }
-        (Some(median), Some(worst_paired)) => Some(median.max(worst_paired)),
-        (Some(median), None) => Some(median),
-        (None, Some(worst_paired)) => Some(worst_paired),
-        (None, None) => None,
-    };
+    let derived = crate::compare_evidence::derive_measurement_evidence(
+        &stim_measurements,
+        &stab_measurements,
+        comparability,
+    );
     let stab_allocation_count_max = max_stab_allocation_count(&stab_measurements);
     let stab_allocation_bytes_max = max_stab_allocation_bytes(&stab_measurements);
     let stab_resident_bytes_max = max_stab_resident_bytes(&stab_measurements);
@@ -552,15 +522,15 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         note,
         stim_measurements,
         stab_measurements,
-        stim_median_seconds,
-        stab_median_seconds,
-        relative_ratio,
-        measurement_ratios,
+        stim_median_seconds: derived.stim_median_seconds,
+        stab_median_seconds: derived.stab_median_seconds,
+        relative_ratio: derived.relative_ratio,
+        measurement_ratios: derived.measurement_ratios,
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         stab_resident_bytes_max,
         stab_resident_delta_bytes_max,
-        pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
+        pass_fail_status: compare_pass_fail_status(status, baseline_status, derived.relative_ratio),
         beta_gate_status: "not-checked".to_string(),
         beta_gate_waiver_reason: None,
         beta_gate_waiver_follow_up: None,
@@ -582,6 +552,27 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         profiler_note_path: None,
         profiler_note_error: None,
     }
+}
+
+pub(crate) fn rebuild_compare_row_raw_evidence(row: &mut CompareRowResult) {
+    let derived = crate::compare_evidence::derive_measurement_evidence(
+        &row.stim_measurements,
+        &row.stab_measurements,
+        row.comparability,
+    );
+    row.stim_median_seconds = derived.stim_median_seconds;
+    row.stab_median_seconds = derived.stab_median_seconds;
+    row.relative_ratio = derived.relative_ratio;
+    row.measurement_ratios = derived.measurement_ratios;
+    row.stab_allocation_count_max = max_stab_allocation_count(&row.stab_measurements);
+    row.stab_allocation_bytes_max = max_stab_allocation_bytes(&row.stab_measurements);
+    row.stab_resident_bytes_max = max_stab_resident_bytes(&row.stab_measurements);
+    row.stab_resident_delta_bytes_max = max_stab_resident_delta_bytes(&row.stab_measurements);
+    row.pass_fail_status = compare_pass_fail_status(
+        &row.status,
+        BaselineCompareStatus::Comparable,
+        row.relative_ratio,
+    );
 }
 
 fn max_stab_allocation_count(measurements: &[Measurement]) -> Option<u64> {
@@ -620,18 +611,6 @@ fn max_stab_resident_delta_bytes(measurements: &[Measurement]) -> Option<u64> {
         .iter()
         .filter_map(|measurement| measurement.resident_delta_bytes)
         .max()
-}
-
-fn median_seconds(measurements: &[Measurement]) -> Option<f64> {
-    if measurements.is_empty() {
-        return None;
-    }
-    let mut seconds = measurements
-        .iter()
-        .map(|measurement| measurement.seconds)
-        .collect::<Vec<_>>();
-    seconds.sort_by(f64::total_cmp);
-    seconds.get(seconds.len() / 2).copied()
 }
 
 fn compare_pass_fail_status(

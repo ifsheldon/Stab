@@ -4,6 +4,56 @@ use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
 use crate::report::{AllocationMeasurement, Measurement, MeasurementRatio};
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct DerivedMeasurementEvidence {
+    pub(crate) stim_median_seconds: Option<f64>,
+    pub(crate) stab_median_seconds: Option<f64>,
+    pub(crate) relative_ratio: Option<f64>,
+    pub(crate) measurement_ratios: Vec<MeasurementRatio>,
+}
+
+pub(crate) fn derive_measurement_evidence(
+    stim_measurements: &[Measurement],
+    stab_measurements: &[Measurement],
+    comparability: ComparabilityClass,
+) -> DerivedMeasurementEvidence {
+    let omit_mixed_median = comparability.omits_multi_measurement_median()
+        && (stim_measurements.len() > 1 || stab_measurements.len() > 1);
+    let stim_median_seconds = (!omit_mixed_median)
+        .then(|| median_seconds(stim_measurements))
+        .flatten();
+    let stab_median_seconds = (!omit_mixed_median)
+        .then(|| median_seconds(stab_measurements))
+        .flatten();
+    let median_relative_ratio = match (stim_median_seconds, stab_median_seconds) {
+        (Some(stim_seconds), Some(stab_seconds)) if stim_seconds > 0.0 => {
+            Some(stab_seconds / stim_seconds)
+        }
+        _ => None,
+    };
+    let measurement_ratios =
+        paired_measurement_ratios(stim_measurements, stab_measurements, comparability);
+    let worst_paired_relative_ratio = measurement_ratios
+        .iter()
+        .map(|ratio| ratio.relative_ratio)
+        .max_by(f64::total_cmp);
+    let relative_ratio = match (median_relative_ratio, worst_paired_relative_ratio) {
+        (_, Some(worst_paired)) if comparability.uses_paired_ratios_without_mixed_median() => {
+            Some(worst_paired)
+        }
+        (Some(median), Some(worst_paired)) => Some(median.max(worst_paired)),
+        (Some(median), None) => Some(median),
+        (None, Some(worst_paired)) => Some(worst_paired),
+        (None, None) => None,
+    };
+    DerivedMeasurementEvidence {
+        stim_median_seconds,
+        stab_median_seconds,
+        relative_ratio,
+        measurement_ratios,
+    }
+}
+
 pub(crate) fn aggregate_measurement_runs(
     row_id: &str,
     runs: Vec<Vec<Measurement>>,
@@ -189,6 +239,18 @@ fn measurement_ratio(stim: &Measurement, stab: &Measurement) -> Option<Measureme
         stab_seconds: stab.seconds,
         relative_ratio: stab.seconds / stim.seconds,
     })
+}
+
+fn median_seconds(measurements: &[Measurement]) -> Option<f64> {
+    if measurements.is_empty() {
+        return None;
+    }
+    let mut seconds = measurements
+        .iter()
+        .map(|measurement| measurement.seconds)
+        .collect::<Vec<_>>();
+    seconds.sort_by(f64::total_cmp);
+    seconds.get(seconds.len() / 2).copied()
 }
 
 fn normalized_measurement_name(name: &str) -> String {

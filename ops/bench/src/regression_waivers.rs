@@ -28,12 +28,18 @@ pub(crate) struct RegressionWaiverFindings {
 }
 
 pub(crate) fn read_regression_waivers(path: &Path) -> Result<RegressionWaivers, BenchError> {
-    let content =
-        std::fs::read_to_string(path).map_err(|source| BenchError::ReadRegressionWaivers {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    let waivers = serde_json::from_str::<RegressionWaivers>(&content).map_err(|source| {
+    let content = std::fs::read(path).map_err(|source| BenchError::ReadRegressionWaivers {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    parse_regression_waivers(path, &content)
+}
+
+pub(crate) fn parse_regression_waivers(
+    path: &Path,
+    content: &[u8],
+) -> Result<RegressionWaivers, BenchError> {
+    let waivers = serde_json::from_slice::<RegressionWaivers>(content).map_err(|source| {
         BenchError::ParseRegressionWaivers {
             path: path.to_path_buf(),
             source,

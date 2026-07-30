@@ -38,11 +38,18 @@ pub(crate) struct RegressionThresholdFindings {
 }
 
 pub(crate) fn read_thresholds(path: &Path) -> Result<BenchmarkThresholds, BenchError> {
-    let content = std::fs::read_to_string(path).map_err(|source| BenchError::ReadThresholds {
+    let content = std::fs::read(path).map_err(|source| BenchError::ReadThresholds {
         path: path.to_path_buf(),
         source,
     })?;
-    let thresholds = serde_json::from_str::<BenchmarkThresholds>(&content).map_err(|source| {
+    parse_thresholds(path, &content)
+}
+
+pub(crate) fn parse_thresholds(
+    path: &Path,
+    content: &[u8],
+) -> Result<BenchmarkThresholds, BenchError> {
+    let thresholds = serde_json::from_slice::<BenchmarkThresholds>(content).map_err(|source| {
         BenchError::ParseThresholds {
             path: path.to_path_buf(),
             source,
@@ -129,11 +136,6 @@ fn find_or_record_measurement_ratio(
     row: &mut CompareRowResult,
     threshold: &BenchmarkMeasurementThreshold,
 ) -> Option<MeasurementRatio> {
-    if let Some(ratio) = row.measurement_ratios.iter().find(|ratio| {
-        ratio.stim_name == threshold.stim_name && ratio.stab_name == threshold.stab_name
-    }) {
-        return Some(ratio.clone());
-    }
     let stim = row
         .stim_measurements
         .iter()
@@ -152,7 +154,13 @@ fn find_or_record_measurement_ratio(
         stab_seconds: stab.seconds,
         relative_ratio: stab.seconds / stim.seconds,
     };
-    row.measurement_ratios.push(ratio.clone());
+    if let Some(existing) = row.measurement_ratios.iter_mut().find(|existing| {
+        existing.stim_name == threshold.stim_name && existing.stab_name == threshold.stab_name
+    }) {
+        *existing = ratio.clone();
+    } else {
+        row.measurement_ratios.push(ratio.clone());
+    }
     Some(ratio)
 }
 
@@ -428,6 +436,45 @@ mod tests {
     }
 
     #[test]
+    fn regression_thresholds_replace_stale_serialized_pairs_from_raw_measurements() {
+        let thresholds = serde_json::from_str::<BenchmarkThresholds>(
+            r#"{
+                "schema_version": 2,
+                "rows": [{
+                    "id": "stale-pair-row",
+                    "measurement_thresholds": [{
+                        "stim_name": "stim_case",
+                        "stab_name": "stab_case",
+                        "max_relative_ratio": 1.25
+                    }]
+                }]
+            }"#,
+        )
+        .expect("parse thresholds");
+        let mut row = row_with_measurement_ratio("stale-pair-row", "stim_case", "stab_case", 0.5);
+        row.stim_measurements = vec![measurement("stim_case", 1.0)];
+        row.stab_measurements = vec![measurement("stab_case", 2.0)];
+        let mut rows = vec![row];
+
+        let findings = apply_regression_thresholds(&mut rows, &thresholds);
+
+        assert_eq!(
+            findings.blockers,
+            [
+                "stale-pair-row: measurement stim_case -> stab_case ratio 2.000x exceeds threshold 1.250x"
+            ]
+        );
+        assert_eq!(
+            rows.first()
+                .and_then(|row| row.measurement_ratios.first())
+                .expect("recomputed ratio")
+                .relative_ratio,
+            2.0,
+            "raw measurements must replace the stale serialized ratio"
+        );
+    }
+
+    #[test]
     fn regression_thresholds_refresh_row_status_from_explicit_measurement_pairs() {
         let thresholds = serde_json::from_str::<BenchmarkThresholds>(
             r#"{
@@ -633,6 +680,8 @@ mod tests {
         relative_ratio: f64,
     ) -> CompareRowResult {
         let mut row = row(id, None);
+        row.stim_measurements = vec![measurement(stim_name, 1.0)];
+        row.stab_measurements = vec![measurement(stab_name, relative_ratio)];
         row.measurement_ratios
             .push(crate::report::MeasurementRatio {
                 stim_name: stim_name.to_string(),
