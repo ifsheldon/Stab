@@ -38,7 +38,7 @@ stab-cli -> stab-core
 
 The policy reserves the future `stab-decoder` package name, but A6 does not claim that crate or an edge to it. A7 must add the implementation and update the graph from source-current Cargo metadata.
 
-Algebra moves before the model because its production implementation no longer imports `Gate`. Model syntax can then depend on algebra values without creating a reverse edge.
+Algebra moves before the model because its production implementation no longer imports `Gate`. Model syntax remains independent of algebra values, while analysis and engine code may project model syntax into algebra-owned semantics without creating a reverse edge.
 
 Model moves before analysis because transforms, search, generation, and semantic gate projections consume model values. Algorithmic inherent methods must leave model types before this step because Rust cannot add inherent methods to a type owned by another crate.
 

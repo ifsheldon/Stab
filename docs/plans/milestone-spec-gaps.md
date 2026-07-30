@@ -1432,3 +1432,30 @@ Current text: A6 required selected scalar pinned-Stim diagnostics without identi
 Gap: the broad wording could treat M6's Stab-only short-right-operand measurements or the separate scalar-versus-SIMD non-identity kernel report as if either had a pinned-Stim comparator.
 Proposed amendment: name the exact M5 XOR and M6 equal-width Clifford pairs, classify short-right-operand measurements as report-only, and keep non-identity scalar-versus-SIMD selection in its dedicated diagnostic.
 Resolution: the A6 plan and GOAL now bind selected scalar Stim continuity to `m5-simd-bits` / `stab_simd_bits_xor_10K` versus `simd_bits_xor_10K` and `m6-clifford-string` / `stab_clifford_string_multiplication_10K` versus `CliffordString_multiplication_10K`.
+
+## 2026-07-30 - A6: Row-Native Focused Timing Counts
+
+Status: Resolved
+Revealed by: post-evidence benchmark audit of the focused crossing artifacts.
+Current text: every focused diagnostic was required to retain 128 internal release-profile timings regardless of the selected row's normal benchmark contract.
+Gap: several expensive source-owned rows deliberately use smaller internal timing counts. Forcing 128 changes the workload contract, wastes substantial runtime, and makes the focused result less comparable to the complete matrix, while accepting arbitrary smaller counts leaves the evidence under-specified.
+Proposed amendment: require exactly one warmed outer run, retain the row's source-owned release-profile internal timing count with a minimum of eight, record the exact count, and prohibit result-driven count changes or aggregation across outer runs.
+Resolution: the A6 benchmark contract now uses row-native internal timing counts of at least eight and requires the final focused-evidence ledger to bind the count for every crossing.
+
+## 2026-07-30 - A6: Focused Artifact Identity
+
+Status: Resolved
+Revealed by: post-evidence audit of ignored `target/benchmarks` paths cited by the progress report.
+Current text: the progress report named focused artifact directories, but no checked source-owned object bound those mutable paths to their report bytes, predecessor evidence, selected measurements, sample counts, or source revision.
+Gap: a path citation alone cannot prove that the inspected artifact is the artifact reviewed for closure, and later cleanup or replacement could silently change the evidence behind the prose.
+Proposed amendment: check in a structurally validated focused-evidence ledger that binds report and predecessor SHA-256 digests, source revision, exact row and measurement identities, semantic witness, timing count, normalized ratios, profiling availability, and disposition.
+Resolution: A6 now requires that checked ledger from the final clean evidence round and rejects missing crossings, duplicate entries, stale identities, invalid digests, reused mutable paths, or ratios inconsistent with the bound reports.
+
+## 2026-07-30 - A6: Complete Canonical Owner-Package Evidence
+
+Status: Resolved
+Revealed by: post-evidence correctness inventory audit.
+Current text: the automated owner-package rule applied only to `stab-bits` and `stab-algebra`, although A6's architectural ownership principle applied to every extracted Stable component.
+Gap: model, records, analysis, and engine parents could remain green through facade selectors even when their canonical component package was not independently exercised. This made the generated inventory weaker than the physical crate graph it claimed to qualify.
+Proposed amendment: enforce direct owner-package execution for every wholly owned implemented parent and oracle fixture in all six Stable component crates, with a narrow checked exception ledger for genuine cross-component, circuit, CLI, or facade integration.
+Resolution: the A6 plan now applies canonical-package ownership to `stab-bits`, `stab-model`, `stab-records`, `stab-algebra`, `stab-analysis`, and `stab-engine`; every exception must name the integration behavior that prevents direct execution.
