@@ -49,12 +49,21 @@ fn comparable_phase(row_id: &str, measurement: &str) -> PhaseEvidence {
     }
 }
 
-fn diagnostic(ratio: f64, profile: ProfileStatus) -> FocusedDiagnostic {
+fn profile_receipt() -> ArtifactBinding {
+    ArtifactBinding {
+        path: "target/benchmarks/profile-aaaaaaaa/profile-receipt.json".to_string(),
+        sha256: "e".repeat(64),
+    }
+}
+
+fn diagnostic(ratio: f64, profile: ProfileDisposition) -> FocusedDiagnostic {
     let mut report = binding("target/benchmarks/focused-aaaaaaaa/compare.json");
     report.sha256 = "d".repeat(64);
     let outcome = match (&profile, ratio > CROSSING_RATIO) {
-        (ProfileStatus::Captured, true) => DiagnosticOutcome::ReproducedProfiled,
-        (ProfileStatus::Unavailable, true) => DiagnosticOutcome::ReproducedProfileUnavailable,
+        (ProfileDisposition::Captured { .. }, true) => DiagnosticOutcome::ReproducedProfiled,
+        (ProfileDisposition::Unavailable { .. }, true) => {
+            DiagnosticOutcome::ReproducedProfileUnavailable
+        }
         _ => DiagnosticOutcome::ResolvedWithinBoundary,
     };
     FocusedDiagnostic {
@@ -67,11 +76,7 @@ fn diagnostic(ratio: f64, profile: ProfileStatus) -> FocusedDiagnostic {
             focused_over_predecessor: ratio,
         }],
         outcome,
-        profile: ProfileDisposition {
-            status: profile,
-            detail: "source-owned disposition".to_string(),
-            artifact: None,
-        },
+        profile,
         owner_action: "retain after review".to_string(),
     }
 }
@@ -80,13 +85,14 @@ fn ledger(phase_ratio: f64, focused_ratio: f64) -> FocusedEvidenceLedger {
     FocusedEvidenceLedger {
         schema_version: SCHEMA_VERSION,
         source_revision: "a".repeat(40),
+        predecessor_registry_sha256: "f".repeat(64),
         baseline_report: ArtifactBinding {
             path: "target/benchmarks/baseline-aaaaaaaa/baseline.json".to_string(),
             sha256: "c".repeat(64),
         },
         matrix_report: binding("target/benchmarks/matrix-aaaaaaaa/compare.json"),
         phases: vec![phase(phase_ratio)],
-        diagnostics: vec![diagnostic(focused_ratio, ProfileStatus::NotRequired)],
+        diagnostics: vec![diagnostic(focused_ratio, ProfileDisposition::NotRequired)],
     }
 }
 
@@ -277,7 +283,9 @@ fn reproducing_crossing_requires_profile_disposition() {
         .diagnostics
         .first_mut()
         .expect("fixture has a diagnostic");
-    diagnostic.profile.status = ProfileStatus::Unavailable;
+    diagnostic.profile = ProfileDisposition::Unavailable {
+        receipt: profile_receipt(),
+    };
     diagnostic.outcome = DiagnosticOutcome::ReproducedProfileUnavailable;
     validate_structure(&unavailable).expect("explicit unavailable profile");
 }
@@ -314,6 +322,7 @@ fn phase_coverage_rejects_omitted_and_invented_phases() {
     let ledger = FocusedEvidenceLedger {
         schema_version: SCHEMA_VERSION,
         source_revision: "a".repeat(40),
+        predecessor_registry_sha256: "f".repeat(64),
         baseline_report: ArtifactBinding {
             path: "target/benchmarks/baseline-aaaaaaaa/baseline.json".to_string(),
             sha256: "c".repeat(64),
@@ -345,6 +354,7 @@ fn phase_coverage_rejects_wrong_seed_classification() {
     let ledger = FocusedEvidenceLedger {
         schema_version: SCHEMA_VERSION,
         source_revision: "a".repeat(40),
+        predecessor_registry_sha256: "f".repeat(64),
         baseline_report: ArtifactBinding {
             path: "target/benchmarks/baseline-aaaaaaaa/baseline.json".to_string(),
             sha256: "c".repeat(64),
@@ -490,7 +500,7 @@ fn focused_report_requires_exact_row_and_row_native_timing_count() {
     let mut focused_row = matrix_row;
     set_iterations(&mut focused_row, 8);
     let focused = compare_report(focused_row.clone(), &current_commit, 1);
-    let diagnostic = diagnostic(1.0, ProfileStatus::NotRequired);
+    let diagnostic = diagnostic(1.0, ProfileDisposition::NotRequired);
     require_focused_contract(&matrix, &focused, &diagnostic, &current_commit)
         .expect("exact focused report");
 
@@ -527,11 +537,17 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
     set_iterations(&mut predecessor_row, 8);
     let predecessor = compare_report(predecessor_row.clone(), &predecessor_commit, 1);
     let phase = phase(1.0);
+    let identity = predecessors::PredecessorIdentity {
+        historical_product_commit: "e".repeat(40),
+        instrumentation_backport_commit: predecessor_commit.clone(),
+        patch_sha256: "f".repeat(64),
+    };
     require_predecessor_contract(
         &matrix,
         &predecessor,
         &phase,
         "target/benchmarks/old/compare.json",
+        &identity,
     )
     .expect("comparable predecessor");
 
@@ -542,6 +558,7 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
         &cold_predecessor,
         &phase,
         "target/benchmarks/cold/compare.json",
+        &identity,
     )
     .expect_err("cold predecessor is not comparable");
     assert!(error.to_string().contains("not a clean non-instrumented"));
@@ -553,6 +570,7 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
         &aggregated_predecessor,
         &phase,
         "target/benchmarks/aggregated/compare.json",
+        &identity,
     )
     .expect_err("aggregated predecessor is not the source-owned run shape");
     assert!(error.to_string().contains("not a clean non-instrumented"));
@@ -563,6 +581,7 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
         &same_revision,
         &phase,
         "target/benchmarks/current/compare.json",
+        &identity,
     )
     .expect_err("current report is not a predecessor");
     assert!(error.to_string().contains("not a clean non-instrumented"));
@@ -575,6 +594,7 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
         &changed,
         &phase,
         "target/benchmarks/changed/compare.json",
+        &identity,
     )
     .expect_err("changed row contract");
     assert!(
@@ -590,6 +610,7 @@ fn predecessor_report_requires_distinct_clean_identity_and_same_row_contract() {
         &changed_boundary,
         &phase,
         "target/benchmarks/changed-boundary/compare.json",
+        &identity,
     )
     .expect_err("changed timing boundary");
     assert!(error.to_string().contains("not a clean non-instrumented"));
@@ -645,27 +666,25 @@ fn a6_selected_pair_gate_includes_the_m6_equal_width_measurement() {
 #[test]
 fn captured_profile_requires_unique_revision_bound_artifact() {
     let mut valid = ledger(1.2, 1.2);
-    let profile = ArtifactBinding {
-        path: "target/benchmarks/profile-aaaaaaaa/perf.data".to_string(),
-        sha256: "e".repeat(64),
-    };
     let diagnostic = valid.diagnostics.first_mut().expect("focused diagnostic");
-    diagnostic.profile.status = ProfileStatus::Captured;
+    diagnostic.profile = ProfileDisposition::Captured {
+        receipt: profile_receipt(),
+    };
     diagnostic.outcome = DiagnosticOutcome::ReproducedProfiled;
-    diagnostic.profile.artifact = Some(profile);
     validate_structure(&valid).expect("distinct captured profile");
 
     let diagnostic = valid.diagnostics.first_mut().expect("focused diagnostic");
-    diagnostic
-        .profile
-        .artifact
-        .as_mut()
-        .expect("profile artifact")
-        .sha256 = diagnostic.report.sha256.clone();
+    assert!(matches!(
+        diagnostic.profile,
+        ProfileDisposition::Captured { .. }
+    ));
+    if let ProfileDisposition::Captured { receipt } = &mut diagnostic.profile {
+        receipt.sha256 = diagnostic.report.sha256.clone();
+    }
     let error = validate_structure(&valid).expect_err("profile role collision");
     assert!(
         error
             .to_string()
-            .contains("profile artifact collides with another evidence role")
+            .contains("profile receipt collides with another evidence role")
     );
 }

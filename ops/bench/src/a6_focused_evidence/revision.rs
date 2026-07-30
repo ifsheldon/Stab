@@ -8,8 +8,7 @@ use crate::report::stab_metadata;
 use crate::root::RepoRoot;
 use crate::source_file::read_repo_regular_file_bounded;
 
-const ALLOWED_CLOSURE_PATHS: [&str; 3] = [
-    "benchmarks/a6-focused-evidence.json",
+const ALLOWED_STATUS_PATHS: [&str; 2] = [
     "docs/plans/GOAL.md",
     "docs/plans/agent-native-modular-qec-progress-report.md",
 ];
@@ -17,7 +16,22 @@ const ALLOWED_CLOSURE_PATHS: [&str; 3] = [
 pub(super) fn validate_source_revision(
     root: &RepoRoot,
     source_revision: &str,
+    evidence_path: Option<&Path>,
 ) -> Result<(), BenchError> {
+    if source_revision_is_current(root, source_revision, evidence_path)? {
+        Ok(())
+    } else {
+        Err(focused_error(format!(
+            "source_revision {source_revision} is not current for the selected A6 evidence object"
+        )))
+    }
+}
+
+pub(super) fn source_revision_is_current(
+    root: &RepoRoot,
+    source_revision: &str,
+    evidence_path: Option<&Path>,
+) -> Result<bool, BenchError> {
     let current = stab_metadata(root)?;
     if current.local_modifications {
         return Err(focused_error(
@@ -37,13 +51,14 @@ pub(super) fn validate_source_revision(
         true,
     )?;
     if ancestor.status != Some(0) {
-        return Err(focused_error(format!(
-            "source_revision {source_revision} is not an ancestor of HEAD"
-        )));
+        return Ok(false);
     }
     if current.commit == source_revision {
-        return Ok(());
+        return Ok(evidence_path.is_none());
     }
+    let Some(evidence_path) = evidence_path else {
+        return Ok(false);
+    };
     let changed = run_process(
         Path::new("git"),
         &[
@@ -64,7 +79,7 @@ pub(super) fn validate_source_revision(
     let text = std::str::from_utf8(&changed.stdout)
         .map_err(|error| focused_error(format!("Git changed-path output is not UTF-8: {error}")))?;
     let paths = text.lines().map(PathBuf::from).collect::<Vec<_>>();
-    validate_closure_paths(&paths)
+    Ok(validate_closure_paths(&paths, evidence_path).is_ok())
 }
 
 pub(super) fn validate_preserved_commit(root: &RepoRoot, revision: &str) -> Result<(), BenchError> {
@@ -148,13 +163,14 @@ pub(super) fn read_tracked_source_file(
     Ok(Some(working))
 }
 
-fn validate_closure_paths(paths: &[PathBuf]) -> Result<(), BenchError> {
+fn validate_closure_paths(paths: &[PathBuf], evidence_path: &Path) -> Result<(), BenchError> {
     let unexpected = paths
         .iter()
         .filter(|path| {
-            !ALLOWED_CLOSURE_PATHS
-                .iter()
-                .any(|allowed| path.as_path() == Path::new(allowed))
+            path.as_path() != evidence_path
+                && !ALLOWED_STATUS_PATHS
+                    .iter()
+                    .any(|allowed| path.as_path() == Path::new(allowed))
         })
         .map(|path| path.display().to_string())
         .collect::<Vec<_>>();
@@ -218,16 +234,28 @@ mod tests {
 
     #[test]
     fn closure_path_policy_allows_only_the_ledger_and_status_docs() {
+        let evidence = Path::new(
+            "benchmarks/a6-focused-evidence-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.json",
+        );
         validate_closure_paths(
-            &ALLOWED_CLOSURE_PATHS
+            &ALLOWED_STATUS_PATHS
                 .iter()
                 .map(PathBuf::from)
+                .chain(std::iter::once(evidence.to_path_buf()))
                 .collect::<Vec<_>>(),
+            evidence,
         )
         .expect("allowed closure paths");
 
-        let error = validate_closure_paths(&[PathBuf::from("ops/bench/src/compare.rs")])
+        let error = validate_closure_paths(&[PathBuf::from("ops/bench/src/compare.rs")], evidence)
             .expect_err("compiled source change must invalidate evidence");
+        assert!(error.to_string().contains("non-closure paths"));
+
+        let other_evidence = PathBuf::from(
+            "benchmarks/a6-focused-evidence-cccccccccccccccccccccccccccccccccccccccc-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.json",
+        );
+        let error = validate_closure_paths(&[other_evidence], evidence)
+            .expect_err("another evidence object must make the older object historical");
         assert!(error.to_string().contains("non-closure paths"));
     }
 
@@ -277,6 +305,81 @@ mod tests {
             read_tracked_source_file(&root, &revision, relative, 1 << 20)
                 .expect("inspect untracked policy"),
             None
+        );
+    }
+
+    #[test]
+    fn source_currency_allows_only_the_selected_object_and_status_docs() {
+        let (repository, root, source_revision) = initialized_repository();
+        let evidence = PathBuf::from(format!(
+            "benchmarks/a6-focused-evidence-{source_revision}-{}.json",
+            "b".repeat(64)
+        ));
+        std::fs::write(repository.path().join(&evidence), b"{}\n").expect("write evidence object");
+        test_git(repository.path(), &["add", "--all"]);
+        test_git(
+            repository.path(),
+            &["commit", "--quiet", "-m", "evidence object"],
+        );
+        assert!(
+            source_revision_is_current(&root, &source_revision, Some(&evidence))
+                .expect("source currency")
+        );
+
+        std::fs::create_dir_all(repository.path().join("docs/plans"))
+            .expect("create status directory");
+        std::fs::write(repository.path().join("docs/plans/GOAL.md"), b"# Goal\n")
+            .expect("write status");
+        test_git(repository.path(), &["add", "--all"]);
+        test_git(repository.path(), &["commit", "--quiet", "-m", "status"]);
+        assert!(
+            source_revision_is_current(&root, &source_revision, Some(&evidence))
+                .expect("status-only currency")
+        );
+
+        std::fs::write(repository.path().join("product.rs"), b"fn product() {}\n")
+            .expect("write product source");
+        test_git(repository.path(), &["add", "--all"]);
+        test_git(repository.path(), &["commit", "--quiet", "-m", "product"]);
+        assert!(
+            !source_revision_is_current(&root, &source_revision, Some(&evidence))
+                .expect("product change makes evidence historical")
+        );
+    }
+
+    #[test]
+    fn another_evidence_object_makes_the_older_object_historical() {
+        let (repository, root, source_revision) = initialized_repository();
+        let first = PathBuf::from(format!(
+            "benchmarks/a6-focused-evidence-{source_revision}-{}.json",
+            "b".repeat(64)
+        ));
+        std::fs::write(repository.path().join(&first), b"{}\n").expect("write first object");
+        test_git(repository.path(), &["add", "--all"]);
+        test_git(
+            repository.path(),
+            &["commit", "--quiet", "-m", "first object"],
+        );
+
+        let second_source = test_git(repository.path(), &["rev-parse", "HEAD"]);
+        let second = PathBuf::from(format!(
+            "benchmarks/a6-focused-evidence-{second_source}-{}.json",
+            "c".repeat(64)
+        ));
+        std::fs::write(repository.path().join(&second), b"{}\n").expect("write second object");
+        test_git(repository.path(), &["add", "--all"]);
+        test_git(
+            repository.path(),
+            &["commit", "--quiet", "-m", "second object"],
+        );
+
+        assert!(
+            !source_revision_is_current(&root, &source_revision, Some(&first))
+                .expect("old object is historical")
+        );
+        assert!(
+            source_revision_is_current(&root, &second_source, Some(&second))
+                .expect("new object is current")
         );
     }
 

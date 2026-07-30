@@ -6,19 +6,18 @@ use serde::Deserialize;
 use super::artifacts::{bind_artifact, normalize_repo_relative_path, validate_compare_report_path};
 use super::{
     ArtifactBinding, CROSSING_RATIO, DiagnosticOutcome, FocusedDiagnostic, FocusedEvidenceLedger,
-    FocusedMeasurement, INITIAL_SEED_PHASES, MAX_LEDGER_BYTES, MAX_REPORT_BYTES, PhaseEvidence,
-    ProfileDisposition, ProfileStatus, SCHEMA_VERSION, find_measurement, focused_error,
-    read_bound_baseline, read_bound_report, require_baseline_contract, require_focused_contract,
+    FocusedMeasurement, INITIAL_SEED_PHASES, MAX_DIAGNOSTICS, MAX_LEDGER_BYTES,
+    MAX_LEDGER_PROSE_BYTES, MAX_OWNER_ACTION_BYTES, MAX_PHASES, MAX_REPORT_BYTES, PhaseEvidence,
+    ProfileDisposition, SCHEMA_VERSION, find_measurement, focused_error, read_bound_baseline,
+    read_bound_report, require_baseline_contract, require_focused_contract,
     require_matrix_contract, require_predecessor_contract, validate_ledger,
 };
 use crate::error::BenchError;
 use crate::manifest::BenchmarkManifest;
 use crate::report::{CompareReport, stab_metadata};
 use crate::root::RepoRoot;
-use crate::source_file::atomic_create_repo_regular_file;
 
-const REQUEST_SCHEMA_VERSION: u32 = 1;
-const CHECKED_LEDGER_PATH: &str = "benchmarks/a6-focused-evidence.json";
+const REQUEST_SCHEMA_VERSION: u32 = 2;
 const INITIAL_SEED_REASON: &str =
     "No semantically identical clean predecessor exists in the source-owned A6 seed list.";
 
@@ -35,7 +34,6 @@ struct PublicationRequest {
 #[serde(deny_unknown_fields)]
 struct PredecessorSelection {
     report: PathBuf,
-    phases: Vec<PhaseSelector>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -50,28 +48,19 @@ struct PhaseSelector {
 struct DiagnosticSelection {
     row_id: String,
     report: PathBuf,
-    profile: ProfileSelection,
+    profile_receipt: Option<PathBuf>,
     owner_action: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ProfileSelection {
-    status: ProfileStatus,
-    detail: String,
-    artifact: Option<PathBuf>,
+struct ProfileEvidenceContext<'a> {
+    report_binding: &'a ArtifactBinding,
+    report: &'a CompareReport,
+    baseline_binding: &'a ArtifactBinding,
+    matrix_binding: &'a ArtifactBinding,
+    phases: &'a [PhaseEvidence],
 }
 
-pub(super) fn publish(
-    root: &RepoRoot,
-    ledger_path: &Path,
-    request_path: &Path,
-) -> Result<(), BenchError> {
-    if ledger_path != Path::new(CHECKED_LEDGER_PATH) {
-        return Err(focused_error(format!(
-            "publication output must be exactly {CHECKED_LEDGER_PATH}"
-        )));
-    }
+pub(super) fn publish(root: &RepoRoot, request_path: &Path) -> Result<(), BenchError> {
     let request_path = normalize_repo_relative_path(root, request_path)?;
     if !request_path.starts_with("target/benchmarks") {
         return Err(focused_error(
@@ -92,6 +81,7 @@ pub(super) fn publish(
             request.schema_version
         )));
     }
+    validate_request_metadata(&request)?;
 
     let repository_before = stab_metadata(root)?;
     if repository_before.local_modifications {
@@ -131,17 +121,31 @@ pub(super) fn publish(
     let baseline = read_bound_baseline(root, &baseline_binding)?;
     require_baseline_contract(&baseline, &matrix, &baseline_binding, &manifest)?;
 
-    let phases = derive_phases(root, &request, &matrix)?;
-    let diagnostics = derive_diagnostics(root, &request, &matrix, &phases)?;
+    let expected_predecessors = super::expected_predecessor_phases(&matrix)?;
+    let predecessor_registry = super::predecessors::read_and_validate(
+        root,
+        &repository_before.commit,
+        &expected_predecessors,
+    )?;
+    let phases = derive_phases(root, &request, &matrix, &predecessor_registry)?;
+    let diagnostics = derive_diagnostics(
+        root,
+        &request,
+        &matrix,
+        &phases,
+        &baseline_binding,
+        &matrix_binding,
+    )?;
     let ledger = FocusedEvidenceLedger {
         schema_version: SCHEMA_VERSION,
         source_revision: repository_before.commit.clone(),
+        predecessor_registry_sha256: predecessor_registry.source_sha256().to_string(),
         baseline_report: baseline_binding,
         matrix_report: matrix_binding,
         phases,
         diagnostics,
     };
-    validate_ledger(root, &ledger, true)?;
+    validate_ledger(root, &ledger, true, None)?;
 
     let repository_after = stab_metadata(root)?;
     if repository_after != repository_before || repository_after.local_modifications {
@@ -150,13 +154,11 @@ pub(super) fn publish(
         ));
     }
 
-    let mut bytes = serde_json::to_vec_pretty(&ledger)?;
-    bytes.push(b'\n');
-    let output = root.resolve_relative(ledger_path);
-    atomic_create_repo_regular_file(root, &output, &bytes)?;
+    let prepared = super::storage::prepare(&ledger.source_revision, &ledger)?;
+    let output = super::storage::publish(root, &prepared)?;
     println!(
-        "[stab-bench] published {} from clean revision {}",
-        ledger_path.display(),
+        "[stab-bench] published uncommitted A6 evidence candidate {} from clean revision {}; review and commit this exact object before validation",
+        output.display(),
         ledger.source_revision
     );
     Ok(())
@@ -166,6 +168,7 @@ fn derive_phases(
     root: &RepoRoot,
     request: &PublicationRequest,
     matrix: &CompareReport,
+    registry: &super::predecessors::ValidatedPredecessorRegistry,
 ) -> Result<Vec<PhaseEvidence>, BenchError> {
     let ordered = report_only_phases(matrix)?;
     let initial = INITIAL_SEED_PHASES
@@ -175,19 +178,9 @@ fn derive_phases(
             measurement: (*measurement).to_string(),
         })
         .collect::<BTreeSet<_>>();
-    let expected_predecessors = ordered
-        .iter()
-        .filter(|phase| !initial.contains(*phase))
-        .cloned()
-        .collect::<BTreeSet<_>>();
-
     let mut report_paths = BTreeSet::new();
     let mut reports = BTreeMap::new();
-    let mut selected = BTreeMap::new();
     for predecessor in &request.predecessors {
-        if predecessor.phases.is_empty() {
-            return Err(focused_error("predecessor selection has no phases"));
-        }
         let (binding, bytes) = bind_artifact(root, &predecessor.report, MAX_REPORT_BYTES)?;
         require_compare_path("predecessor report", &binding)?;
         if !report_paths.insert(binding.path.clone()) {
@@ -198,28 +191,34 @@ fn derive_phases(
         }
         let report: CompareReport = serde_json::from_slice(&bytes)
             .map_err(|error| focused_error(format!("failed to parse {}: {error}", binding.path)))?;
-        reports.insert(binding.path.clone(), (binding.clone(), report));
-        for phase in &predecessor.phases {
-            if selected
-                .insert(phase.clone(), binding.path.clone())
-                .is_some()
-            {
-                return Err(focused_error(format!(
-                    "publication request assigns predecessor more than once for {}/{}",
-                    phase.row_id, phase.measurement
-                )));
-            }
+        if reports
+            .insert(report.stab.commit.clone(), (binding.clone(), report))
+            .is_some()
+        {
+            return Err(focused_error(
+                "publication request selects more than one predecessor report for a registered backport commit",
+            ));
         }
     }
-    let actual = selected.keys().cloned().collect::<BTreeSet<_>>();
-    if actual != expected_predecessors {
+
+    let mut expected_commits = BTreeSet::new();
+    for phase in registry.phases() {
+        expected_commits.insert(
+            registry
+                .identity_for(phase)?
+                .instrumentation_backport_commit
+                .clone(),
+        );
+    }
+    let actual_commits = reports.keys().cloned().collect::<BTreeSet<_>>();
+    if actual_commits != expected_commits {
         return Err(focused_error(format!(
-            "publication predecessor phases differ from the source-owned set: missing={:?}, extra={:?}",
-            expected_predecessors
-                .difference(&actual)
+            "publication predecessor reports differ from registered backport commits: missing={:?}, extra={:?}",
+            expected_commits
+                .difference(&actual_commits)
                 .collect::<Vec<_>>(),
-            actual
-                .difference(&expected_predecessors)
+            actual_commits
+                .difference(&expected_commits)
                 .collect::<Vec<_>>()
         )));
     }
@@ -239,15 +238,17 @@ fn derive_phases(
             });
             continue;
         }
-        let report_path = selected.get(&selector).ok_or_else(|| {
-            focused_error(format!(
-                "missing predecessor for {}/{}",
-                selector.row_id, selector.measurement
-            ))
-        })?;
-        let (binding, report) = reports.get(report_path).ok_or_else(|| {
-            focused_error(format!("missing loaded predecessor report {report_path}"))
-        })?;
+        let phase_key = super::predecessors::PhaseKey::new(&selector.row_id, &selector.measurement);
+        let identity = registry.identity_for(&phase_key)?;
+        let (binding, report) = reports
+            .get(&identity.instrumentation_backport_commit)
+            .ok_or_else(|| {
+                focused_error(format!(
+                    "missing predecessor report for registered backport {}",
+                    identity.instrumentation_backport_commit
+                ))
+            })?;
+        registry.require_report_commit(&phase_key, &report.stab.commit)?;
         let provisional = PhaseEvidence {
             row_id: selector.row_id.clone(),
             measurement: selector.measurement.clone(),
@@ -257,7 +258,7 @@ fn derive_phases(
             source_over_predecessor: None,
             initial_seed_reason: None,
         };
-        require_predecessor_contract(matrix, report, &provisional, &binding.path)?;
+        require_predecessor_contract(matrix, report, &provisional, &binding.path, identity)?;
         let predecessor =
             find_measurement(report, &selector.row_id, &selector.measurement)?.seconds;
         phases.push(PhaseEvidence {
@@ -274,6 +275,8 @@ fn derive_diagnostics(
     request: &PublicationRequest,
     matrix: &CompareReport,
     phases: &[PhaseEvidence],
+    baseline_binding: &ArtifactBinding,
+    matrix_binding: &ArtifactBinding,
 ) -> Result<Vec<FocusedDiagnostic>, BenchError> {
     let mut crossings = BTreeMap::<String, Vec<&PhaseEvidence>>::new();
     for phase in phases {
@@ -317,12 +320,6 @@ fn derive_diagnostics(
         let (report_binding, _) = bind_artifact(root, &selection.report, MAX_REPORT_BYTES)?;
         require_compare_path("focused report", &report_binding)?;
         let report = read_bound_report(root, &report_binding)?;
-        let profile_artifact = selection
-            .profile
-            .artifact
-            .as_ref()
-            .map(|path| bind_artifact(root, path, MAX_REPORT_BYTES).map(|(binding, _)| binding))
-            .transpose()?;
 
         let mut timing_count = None;
         let mut measurements = Vec::with_capacity(row_phases.len());
@@ -355,18 +352,29 @@ fn derive_diagnostics(
                 focused_over_predecessor: focused.seconds / predecessor,
             });
         }
+        let row_reproduces = measurements
+            .iter()
+            .any(|measurement| measurement.focused_over_predecessor > CROSSING_RATIO);
+        let profile = derive_profile_disposition(
+            root,
+            selection,
+            row_reproduces,
+            ProfileEvidenceContext {
+                report_binding: &report_binding,
+                report: &report,
+                baseline_binding,
+                matrix_binding,
+                phases,
+            },
+        )?;
         let diagnostic = FocusedDiagnostic {
             row_id,
             report: report_binding,
             internal_timing_count: timing_count
                 .ok_or_else(|| focused_error("focused diagnostic has no measurements"))?,
-            outcome: diagnostic_outcome(&measurements, &selection.profile.status)?,
+            outcome: diagnostic_outcome(&measurements, &profile)?,
             measurements,
-            profile: ProfileDisposition {
-                status: selection.profile.status.clone(),
-                detail: selection.profile.detail.clone(),
-                artifact: profile_artifact,
-            },
+            profile,
             owner_action: selection.owner_action.clone(),
         };
         require_focused_contract(matrix, &report, &diagnostic, &matrix.stab.commit)?;
@@ -375,21 +383,122 @@ fn derive_diagnostics(
     Ok(diagnostics)
 }
 
+fn derive_profile_disposition(
+    root: &RepoRoot,
+    selection: &DiagnosticSelection,
+    row_reproduces: bool,
+    context: ProfileEvidenceContext<'_>,
+) -> Result<ProfileDisposition, BenchError> {
+    let Some(path) = &selection.profile_receipt else {
+        return if row_reproduces {
+            Err(focused_error(format!(
+                "{} reproduces the A6 crossing but has no typed profile receipt",
+                selection.row_id
+            )))
+        } else {
+            Ok(ProfileDisposition::NotRequired)
+        };
+    };
+    if !row_reproduces {
+        return Err(focused_error(format!(
+            "{} resolves within the A6 boundary and must not select a profile receipt",
+            selection.row_id
+        )));
+    }
+
+    let (binding, _) = bind_artifact(
+        root,
+        path,
+        super::profile_receipt::MAX_PROFILE_RECEIPT_BYTES,
+    )?;
+    let mut forbidden = vec![
+        context.baseline_binding.clone(),
+        context.matrix_binding.clone(),
+    ];
+    forbidden.extend(
+        context
+            .phases
+            .iter()
+            .filter_map(|phase| phase.predecessor_report.clone()),
+    );
+    let receipt = super::profile_receipt::read_and_validate(
+        root,
+        &binding,
+        context.report_binding,
+        context.report,
+        &forbidden,
+    )?;
+    match receipt.outcome() {
+        super::profile_receipt::ProfileOutcome::Captured { .. } => {
+            Ok(ProfileDisposition::Captured { receipt: binding })
+        }
+        super::profile_receipt::ProfileOutcome::Unavailable { .. } => {
+            Ok(ProfileDisposition::Unavailable { receipt: binding })
+        }
+    }
+}
+
 fn diagnostic_outcome(
     measurements: &[FocusedMeasurement],
-    profile_status: &ProfileStatus,
+    profile: &ProfileDisposition,
 ) -> Result<DiagnosticOutcome, BenchError> {
     let reproduces = measurements
         .iter()
         .any(|measurement| measurement.focused_over_predecessor > CROSSING_RATIO);
-    match (reproduces, profile_status) {
-        (false, ProfileStatus::NotRequired) => Ok(DiagnosticOutcome::ResolvedWithinBoundary),
-        (true, ProfileStatus::Captured) => Ok(DiagnosticOutcome::ReproducedProfiled),
-        (true, ProfileStatus::Unavailable) => Ok(DiagnosticOutcome::ReproducedProfileUnavailable),
+    match (reproduces, profile) {
+        (false, ProfileDisposition::NotRequired) => Ok(DiagnosticOutcome::ResolvedWithinBoundary),
+        (true, ProfileDisposition::Captured { .. }) => Ok(DiagnosticOutcome::ReproducedProfiled),
+        (true, ProfileDisposition::Unavailable { .. }) => {
+            Ok(DiagnosticOutcome::ReproducedProfileUnavailable)
+        }
         _ => Err(focused_error(format!(
-            "profile status {profile_status:?} is inconsistent with reproduced={reproduces}"
+            "profile disposition {profile:?} is inconsistent with reproduced={reproduces}"
         ))),
     }
+}
+
+fn validate_request_metadata(request: &PublicationRequest) -> Result<(), BenchError> {
+    if request.predecessors.len() > MAX_PHASES {
+        return Err(focused_error(format!(
+            "publication request selects {} predecessor reports, maximum is {MAX_PHASES}",
+            request.predecessors.len()
+        )));
+    }
+    if request.diagnostics.len() > MAX_DIAGNOSTICS {
+        return Err(focused_error(format!(
+            "publication request selects {} diagnostics, maximum is {MAX_DIAGNOSTICS}",
+            request.diagnostics.len()
+        )));
+    }
+    let mut total = 0usize;
+    for diagnostic in &request.diagnostics {
+        if !crate::manifest::is_safe_benchmark_id(&diagnostic.row_id) {
+            return Err(focused_error(format!(
+                "publication diagnostic row {:?} is not a safe benchmark id",
+                diagnostic.row_id
+            )));
+        }
+        let action = diagnostic.owner_action.as_bytes();
+        if action.is_empty()
+            || action.len() > MAX_OWNER_ACTION_BYTES
+            || action.contains(&0)
+            || diagnostic.owner_action.trim().is_empty()
+        {
+            return Err(focused_error(format!(
+                "{} owner_action must contain 1..={MAX_OWNER_ACTION_BYTES} bytes, non-whitespace text, and no NUL",
+                diagnostic.row_id
+            )));
+        }
+        total = total.checked_add(action.len()).ok_or_else(|| {
+            focused_error("publication request prose length overflows address space")
+        })?;
+    }
+    if total > MAX_LEDGER_PROSE_BYTES {
+        return Err(focused_error(format!(
+            "publication request contains {total} owner-action bytes, maximum is {MAX_LEDGER_PROSE_BYTES}"
+        )));
+    }
+    Ok(())
 }
 
 fn report_only_phases(matrix: &CompareReport) -> Result<Vec<PhaseSelector>, BenchError> {
@@ -430,6 +539,20 @@ fn require_compare_path(label: &str, binding: &ArtifactBinding) -> Result<(), Be
 mod tests {
     use super::*;
 
+    fn request_with_owner_action(owner_action: String) -> PublicationRequest {
+        PublicationRequest {
+            schema_version: REQUEST_SCHEMA_VERSION,
+            matrix_report: PathBuf::from("target/benchmarks/matrix/compare.json"),
+            predecessors: Vec::new(),
+            diagnostics: vec![DiagnosticSelection {
+                row_id: "row".to_string(),
+                report: PathBuf::from("target/benchmarks/focused/compare.json"),
+                profile_receipt: None,
+                owner_action,
+            }],
+        }
+    }
+
     fn focused_measurement(ratio: f64) -> FocusedMeasurement {
         FocusedMeasurement {
             measurement: "stab_work".to_string(),
@@ -440,35 +563,60 @@ mod tests {
 
     #[test]
     fn diagnostic_outcome_is_derived_from_evidence_and_profile_availability() {
+        let receipt = ArtifactBinding {
+            path: "target/benchmarks/profile-aaaaaaaa/profile-receipt.json".to_string(),
+            sha256: "a".repeat(64),
+        };
         assert_eq!(
-            diagnostic_outcome(&[focused_measurement(1.15)], &ProfileStatus::NotRequired)
-                .expect("resolved outcome"),
+            diagnostic_outcome(
+                &[focused_measurement(1.15)],
+                &ProfileDisposition::NotRequired
+            )
+            .expect("resolved outcome"),
             DiagnosticOutcome::ResolvedWithinBoundary
         );
         assert_eq!(
-            diagnostic_outcome(&[focused_measurement(1.151)], &ProfileStatus::Captured)
-                .expect("profiled outcome"),
+            diagnostic_outcome(
+                &[focused_measurement(1.151)],
+                &ProfileDisposition::Captured {
+                    receipt: receipt.clone()
+                }
+            )
+            .expect("profiled outcome"),
             DiagnosticOutcome::ReproducedProfiled
         );
         assert_eq!(
-            diagnostic_outcome(&[focused_measurement(1.151)], &ProfileStatus::Unavailable)
-                .expect("unavailable outcome"),
+            diagnostic_outcome(
+                &[focused_measurement(1.151)],
+                &ProfileDisposition::Unavailable { receipt }
+            )
+            .expect("unavailable outcome"),
             DiagnosticOutcome::ReproducedProfileUnavailable
         );
     }
 
     #[test]
     fn diagnostic_outcome_rejects_profile_labels_that_contradict_evidence() {
-        let error = diagnostic_outcome(&[focused_measurement(1.151)], &ProfileStatus::NotRequired)
-            .expect_err("reproduced crossing needs a profile disposition");
+        let receipt = ArtifactBinding {
+            path: "target/benchmarks/profile-aaaaaaaa/profile-receipt.json".to_string(),
+            sha256: "a".repeat(64),
+        };
+        let error = diagnostic_outcome(
+            &[focused_measurement(1.151)],
+            &ProfileDisposition::NotRequired,
+        )
+        .expect_err("reproduced crossing needs a profile disposition");
         assert!(
             error
                 .to_string()
                 .contains("inconsistent with reproduced=true")
         );
 
-        let error = diagnostic_outcome(&[focused_measurement(1.1)], &ProfileStatus::Captured)
-            .expect_err("resolved crossing cannot claim a captured profile");
+        let error = diagnostic_outcome(
+            &[focused_measurement(1.1)],
+            &ProfileDisposition::Captured { receipt },
+        )
+        .expect_err("resolved crossing cannot claim a captured profile");
         assert!(
             error
                 .to_string()
@@ -486,16 +634,67 @@ mod tests {
                 "row_id": "row",
                 "report": "target/benchmarks/focused/compare.json",
                 "semantic_witness_source": "ops/bench/src/baseline/m9.rs",
-                "profile": {
-                    "status": "not-required",
-                    "detail": "resolved",
-                    "artifact": null
-                },
+                "profile_receipt": null,
                 "owner_action": "retain"
             }]
         });
         let error = serde_json::from_value::<PublicationRequest>(value)
             .expect_err("source-path existence is not semantic evidence");
         assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn publication_request_rejects_manual_phase_and_profile_claims() {
+        let value = serde_json::json!({
+            "schema_version": REQUEST_SCHEMA_VERSION,
+            "matrix_report": "target/benchmarks/matrix/compare.json",
+            "predecessors": [{
+                "report": "target/benchmarks/predecessor/compare.json",
+                "phases": [{"row_id": "row", "measurement": "work"}]
+            }],
+            "diagnostics": [{
+                "row_id": "row",
+                "report": "target/benchmarks/focused/compare.json",
+                "profile": {
+                    "status": "unavailable",
+                    "detail": "operator claim",
+                    "artifact": null
+                },
+                "profile_receipt": null,
+                "owner_action": "retain"
+            }]
+        });
+        let error = serde_json::from_value::<PublicationRequest>(value)
+            .expect_err("manual phase and profile claims are not selections");
+        assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn publication_request_bounds_owner_prose_before_artifact_reads() {
+        validate_request_metadata(&request_with_owner_action("retain".to_string()))
+            .expect("bounded owner action");
+
+        let error = validate_request_metadata(&request_with_owner_action(
+            "x".repeat(MAX_OWNER_ACTION_BYTES + 1),
+        ))
+        .expect_err("oversized owner action");
+        assert!(error.to_string().contains("owner_action"));
+
+        let error =
+            validate_request_metadata(&request_with_owner_action("bad\0action".to_string()))
+                .expect_err("NUL owner action");
+        assert!(error.to_string().contains("no NUL"));
+
+        let mut request = request_with_owner_action("retain".to_string());
+        request.diagnostics = (0..=MAX_DIAGNOSTICS)
+            .map(|index| DiagnosticSelection {
+                row_id: format!("row-{index}"),
+                report: PathBuf::from("target/benchmarks/focused/compare.json"),
+                profile_receipt: None,
+                owner_action: "x".to_string(),
+            })
+            .collect();
+        let error = validate_request_metadata(&request).expect_err("too many diagnostics");
+        assert!(error.to_string().contains("maximum"));
     }
 }

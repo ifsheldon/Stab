@@ -173,43 +173,40 @@ After committing changes to worker sources, build inputs, or receipt policy, run
 Use `just bench::simd-compare --tier full --allow-unverified-host --out target/benchmarks/qualification/a6-simd-compare-REVISION` to compare explicit scalar and portable-SIMD builds over the medium and large dense-XOR and non-identity Clifford contracts. The fixed diagnostic uses exact shared inputs and output witnesses, three alternating warmup pairs, the tier's alternating retained pairs, `raw-work-v2`, and portable-over-scalar normalized ratios with deterministic bootstrap intervals. It reports a material benefit only when the complete interval is below `1.0`; it is not a Stim parity check, Stab self-regression check, release result, or sampling-backend benchmark.
 The A6 continuity baseline and compare commands use `--new-output`; they fail instead of opening an existing artifact directory. Pass `--measurement-contract benchmarks/a6-measurement-contract.json` to the A6 matrix and every regenerated predecessor or focused comparison. Unrelated compare runs omit this option and remain independent of the milestone-specific contract. Baseline schema version 3 and compare-report schema version 4 bind a private host fingerprint, the exact executing-binary digest, active Cargo features, the `source-owned-row-native-v1` timing boundary, the exact baseline SHA-256, and the selected measurement-contract path and SHA-256. `benchmarks/a6-measurement-contract.json` freezes 166 ordered rows and 309 ordered Stab measurement names. Its `gated-exact-output-v1` policy requires exact executable semantic preflights for the 65 threshold-owned rows plus `m6-clifford-string`; the remaining report-only rows establish workload continuity only and make no correctness claim. A6 validation reconstructs medians, paired and aggregate ratios, memory maxima, and pass/fail state from raw measurements before replaying tracked threshold, waiver, and profiler-note sources.
 
-Historical schema-version-1 through schema-version-3 compare reports are readable but cannot be A6 predecessors because they do not bind the complete host, executable, feature, timing, baseline, and measurement identities needed for an equal-contract comparison. Regenerate required predecessors before the current matrix on the same host from committed clean instrumentation-backport revisions: start from the historical product revision, apply only the reviewed schema-version-4 evidence harness and checked measurement contract, commit that state, run warmed strict create-new reports with one outer measurement run, and preserve the resulting revision and artifacts without merging the historical product tree into current source. Keep each backport commit reachable by a source-owned branch or tag; ledger validation rejects a predecessor whose recorded revision no longer resolves to a Git commit.
+Historical schema-version-1 through schema-version-3 compare reports are readable but cannot be A6 predecessors because they do not bind the complete host, executable, feature, timing, baseline, and measurement identities needed for an equal-contract comparison. Regenerate required predecessors before the current matrix on the same host from committed clean instrumentation-backport revisions: start from the historical product revision, apply only the reviewed schema-version-4 evidence harness and checked measurement contract, commit that state as a direct child of the historical product commit, and run one warmed strict create-new report with one outer measurement run. Record every accepted backport in `benchmarks/a6-predecessors.json` with its historical product commit, instrumentation backport commit, canonical `git diff-tree --raw -r -z --no-renames --abbrev=40` SHA-256, and exact owned phases. Tag it at `a6-predecessors/<backport-commit>`. Validation uses controlled Git, rejects merges and moved tags, requires exact registry coverage, and prohibits backports in current source ancestry.
 
-After the final A6 continuity matrix and focused diagnostics exist, write a selection-only request under `target/benchmarks` and run `just bench::a6-focused-evidence --publish-from <request>`. The publisher derives the baseline binding, all report and source digests, exact phase values, initial seeds, crossings, row-native timing counts, focused ratios, and typed outcomes; validates every artifact against the unchanged clean source revision; and atomically creates `benchmarks/a6-focused-evidence.json` without replacement. `just bench::a6-focused-evidence` always performs complete artifact verification. It rejects missing or extra crossings, policy drift, artifact reuse, source-revision drift, fewer than eight row-native internal timings, and profile states inconsistent with a measured reproduction. Exact semantic ownership comes from executable preflights required by the checked measurement contract, not from a selected or merely existing source-file path. The hidden legacy `--verify-artifacts` flag is accepted only for command compatibility and no longer changes validation strength.
+After the final A6 continuity matrix and focused diagnostics exist, write a selection-only request under `target/benchmarks` and run `just bench::a6-focused-evidence --publish-from <request>`. The publisher derives the baseline binding, predecessor phase ownership, all report and registry digests, exact phase values, initial seeds, crossings, row-native timing counts, focused ratios, and typed outcomes; validates every artifact against the unchanged clean source revision; and atomically creates `benchmarks/a6-focused-evidence-<source-revision>-<exact-bytes-sha256>.json` without replacement. It does not maintain a latest pointer or index. The fixed `benchmarks/a6-focused-evidence.json` path remains readable only when explicitly selected as historical legacy input. After committing the candidate, `just bench::a6-focused-evidence` discovers tracked objects and accepts exactly one source-current object. It always reopens every report, typed receipt, and nested profile capture, and rejects missing or extra crossings, policy drift, artifact reuse, source-revision drift, unbounded owner prose, fewer than eight row-native internal timings, and profile states inconsistent with a measured reproduction. Exact semantic ownership comes from executable preflights required by the checked measurement contract, not from a selected or merely existing source-file path. The hidden legacy `--verify-artifacts` flag is accepted only for command compatibility and no longer changes validation strength.
 
 The publication request contains choices only. Semantic-preflight ownership, hashes, timing values, ratios, measurement lists, initial seeds, and outcomes are derived from the checked contract and selected artifacts:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "matrix_report": "target/benchmarks/a6-matrix-REVISION/compare.json",
   "predecessors": [
     {
-      "report": "target/benchmarks/a6-predecessor-ROW-REVISION/compare.json",
-      "phases": [
-        {
-          "row_id": "ROW",
-          "measurement": "MEASUREMENT"
-        }
-      ]
+      "report": "target/benchmarks/a6-predecessor-BACKPORT/compare.json"
     }
   ],
   "diagnostics": [
     {
       "row_id": "ROW",
       "report": "target/benchmarks/a6-focused-ROW-REVISION/compare.json",
-      "profile": {
-        "status": "not-required",
-        "detail": "Focused evidence resolved every selected crossing at or below 1.15x.",
-        "artifact": null
-      },
+      "profile_receipt": null,
       "owner_action": "Retain the current implementation and preserve the focused report."
     }
   ]
 }
 ```
 
-Use profile status `captured` with an artifact under `target/benchmarks` when a reproduction was profiled, or `unavailable` without an artifact when host policy prevents profiling. The publisher rejects those statuses when they contradict the focused ratios.
+For a reproduced crossing, create an immutable typed receipt before publication:
+
+```sh
+just bench::a6-profile-receipt --focused-report target/benchmarks/a6-focused-ROW-REVISION/compare.json --out target/benchmarks/a6-profile-ROW-REVISION/profile-receipt.json captured --data target/benchmarks/a6-profile-ROW-REVISION/perf.data
+just bench::a6-profile-receipt --focused-report target/benchmarks/a6-focused-ROW-REVISION/compare.json --out target/benchmarks/a6-profile-ROW-REVISION/profile-receipt.json unavailable
+```
+
+The captured form validates the sibling `perf.data` through fixed `/usr/bin/perf report --header-only`, then binds its size, digest, PERF magic, focused report, source revision, executing binary, and host fingerprint. The unavailable form runs fixed `/usr/bin/perf stat --event cycles -- /usr/bin/true` and accepts only bounded diagnostics that identify a permission or perf-event policy denial with `perf_event_paranoid >= 2`. Neither form invokes `sudo` or changes host policy. Set `profile_receipt` to the resulting path. Leave it `null` only when the focused measurements resolve at or below `1.15x`; publication rejects a receipt that contradicts the measured outcome.
 Use `just bench::qualification-parity --input <report>` for the pinned-Stim `1.25x` check. Use `just bench::qualification-self-regression --full <rollup> --soak <rollup>` for architecture-specific deterioration from an accepted Stab baseline; the two conclusions are independent. Self-regression checks and baseline-candidate generation inspect sealed rollups read-only and may run from a newer clean review commit when inventory and recorded evidence identities still match; explicit rollup replay remains the operation that refreshes derived rollup files. `qualification-regression` remains only as a deprecated alias for the parity command.
 The active DEM completion contract uses rollup schema version 5 and completion schema version 2. It publishes one architecture/revision manifest from four rollups and their 36 source reports, then reconstructs that manifest with one offline replay. The schema-version-1 per-group completion producer is retired, while its parser remains available for historical evidence.
 Probe the transpose adapters with `just bench::qualification-probe --group pq2-bit-matrix-transpose-in-place-adapter-smoke` and `just bench::qualification-probe --group pq2-bit-matrix-transpose-allocating-adapter-smoke`; each probe validates exact deterministic output and rejects below-minimum, non-square, unaligned, over-cap, and semantic-work-overflow requests before invoking either worker.

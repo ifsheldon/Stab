@@ -75,6 +75,9 @@ enum Command {
     /// Validate the checked A6 report-only crossing and focused-diagnostic ledger.
     A6FocusedEvidence(a6_focused_evidence::A6FocusedEvidenceArgs),
 
+    /// Produce one typed A6 Linux-perf profile receipt.
+    A6ProfileReceipt(a6_focused_evidence::profile_receipt::A6ProfileReceiptArgs),
+
     /// Validate the comprehensive performance qualification ledger.
     QualificationCheck,
 
@@ -305,6 +308,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::A6FocusedEvidence(args) => {
             a6_focused_evidence::check(&root, args)?;
+        }
+        Command::A6ProfileReceipt(args) => {
+            a6_focused_evidence::profile_receipt::produce(&root, args)?;
         }
         Command::QualificationCheck => {
             let manifest = checked_manifest(&root)?;

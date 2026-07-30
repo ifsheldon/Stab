@@ -128,10 +128,13 @@ pub(super) fn validate_baseline_report_path(label: &str, value: &str, issues: &m
     }
 }
 
-pub(super) fn validate_profile_artifact_path(value: &str, issues: &mut Vec<String>) {
-    if !Path::new(value).starts_with("target/benchmarks") {
+pub(super) fn validate_profile_receipt_path(value: &str, issues: &mut Vec<String>) {
+    let path = Path::new(value);
+    if !path.starts_with("target/benchmarks")
+        || path.file_name() != Some("profile-receipt.json".as_ref())
+    {
         issues.push(format!(
-            "hardware profile artifact path {value:?} must be under target/benchmarks"
+            "hardware profile receipt path {value:?} must name target/benchmarks/.../profile-receipt.json"
         ));
     }
 }
@@ -153,7 +156,7 @@ pub(super) fn path_ends_with(value: &str, expected: &str) -> bool {
     Path::new(value).ends_with(expected)
 }
 
-fn valid_sha256(value: &str) -> bool {
+pub(super) fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()

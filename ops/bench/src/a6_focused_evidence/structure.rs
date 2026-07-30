@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::artifacts::{
-    validate_baseline_report_path, validate_binding, validate_compare_report_path,
-    validate_profile_artifact_path, validate_revision,
+    valid_sha256, validate_baseline_report_path, validate_binding, validate_compare_report_path,
+    validate_profile_receipt_path, validate_revision,
 };
 use super::{
-    CROSSING_RATIO, FocusedEvidenceLedger, MAX_DIAGNOSTICS, MAX_PHASES, SCHEMA_VERSION,
-    focused_error, validate_positive_seconds, validate_profile, validate_ratio,
-    validate_row_and_measurement,
+    CROSSING_RATIO, FocusedEvidenceLedger, MAX_DIAGNOSTICS, MAX_LEDGER_PROSE_BYTES,
+    MAX_OWNER_ACTION_BYTES, MAX_PHASES, SCHEMA_VERSION, focused_error, validate_positive_seconds,
+    validate_profile, validate_ratio, validate_row_and_measurement,
 };
 use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
@@ -21,6 +21,9 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
         ));
     }
     validate_revision(&ledger.source_revision, &mut issues);
+    if !valid_sha256(&ledger.predecessor_registry_sha256) {
+        issues.push("predecessor_registry_sha256 is not a lowercase SHA-256".to_string());
+    }
     validate_binding("baseline_report", &ledger.baseline_report, &mut issues);
     validate_baseline_report_path("baseline_report", &ledger.baseline_report.path, &mut issues);
     validate_binding("matrix_report", &ledger.matrix_report, &mut issues);
@@ -116,6 +119,7 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
 
     let mut diagnostic_rows = BTreeSet::new();
     let mut diagnostic_paths = BTreeSet::new();
+    let mut diagnostic_digests = BTreeSet::new();
     let predecessor_paths = ledger
         .phases
         .iter()
@@ -128,9 +132,10 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
         .filter_map(|phase| phase.predecessor_report.as_ref())
         .map(|binding| binding.sha256.as_str())
         .collect::<BTreeSet<_>>();
-    let mut profile_paths = BTreeSet::new();
-    let mut profile_digests = BTreeSet::new();
+    let mut profile_receipt_paths = BTreeSet::new();
+    let mut profile_receipt_digests = BTreeSet::new();
     let mut covered_crossings = BTreeSet::new();
+    let mut prose_bytes = 0usize;
     for diagnostic in &ledger.diagnostics {
         if !is_safe_benchmark_id(&diagnostic.row_id) {
             issues.push(format!(
@@ -150,6 +155,12 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
             issues.push(format!(
                 "focused report path {} is reused by multiple rows",
                 diagnostic.report.path
+            ));
+        }
+        if !diagnostic_digests.insert(diagnostic.report.sha256.clone()) {
+            issues.push(format!(
+                "focused report digest {} is reused by multiple rows",
+                diagnostic.report.sha256
             ));
         }
         if diagnostic.report.path == ledger.matrix_report.path
@@ -176,8 +187,17 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
                 diagnostic.row_id, diagnostic.internal_timing_count
             ));
         }
-        if diagnostic.owner_action.trim().is_empty() {
-            issues.push(format!("{} has an empty owner action", diagnostic.row_id));
+        let owner_action = diagnostic.owner_action.as_bytes();
+        prose_bytes = prose_bytes.saturating_add(owner_action.len());
+        if owner_action.is_empty()
+            || owner_action.len() > MAX_OWNER_ACTION_BYTES
+            || owner_action.contains(&0)
+            || diagnostic.owner_action.trim().is_empty()
+        {
+            issues.push(format!(
+                "{} owner_action must contain 1..={MAX_OWNER_ACTION_BYTES} bytes, non-whitespace text, and no NUL",
+                diagnostic.row_id
+            ));
         }
         if diagnostic.measurements.is_empty() {
             issues.push(format!("{} has no focused measurements", diagnostic.row_id));
@@ -221,37 +241,53 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
             row_reproduces |= measurement.focused_over_predecessor > CROSSING_RATIO;
         }
         validate_profile(diagnostic, row_reproduces, &mut issues);
-        if let Some(artifact) = &diagnostic.profile.artifact {
-            validate_profile_artifact_path(&artifact.path, &mut issues);
-            if !profile_paths.insert(artifact.path.as_str())
-                || !profile_digests.insert(artifact.sha256.as_str())
+        if let Some(receipt) = diagnostic.profile.receipt() {
+            validate_profile_receipt_path(&receipt.path, &mut issues);
+            if !profile_receipt_paths.insert(receipt.path.clone())
+                || !profile_receipt_digests.insert(receipt.sha256.clone())
             {
                 issues.push(format!(
-                    "{} reuses a hardware profile artifact",
+                    "{} reuses a hardware profile receipt",
                     diagnostic.row_id
                 ));
             }
-            if artifact.path == ledger.matrix_report.path
-                || artifact.sha256 == ledger.matrix_report.sha256
-                || artifact.path == ledger.baseline_report.path
-                || artifact.sha256 == ledger.baseline_report.sha256
-                || predecessor_paths.contains(artifact.path.as_str())
-                || predecessor_digests.contains(artifact.sha256.as_str())
-                || artifact.path == diagnostic.report.path
-                || artifact.sha256 == diagnostic.report.sha256
+            if receipt.path == ledger.matrix_report.path
+                || receipt.sha256 == ledger.matrix_report.sha256
+                || receipt.path == ledger.baseline_report.path
+                || receipt.sha256 == ledger.baseline_report.sha256
+                || predecessor_paths.contains(receipt.path.as_str())
+                || predecessor_digests.contains(receipt.sha256.as_str())
+                || receipt.path == diagnostic.report.path
+                || receipt.sha256 == diagnostic.report.sha256
             {
                 issues.push(format!(
-                    "{} profile artifact collides with another evidence role",
+                    "{} profile receipt collides with another evidence role",
                     diagnostic.row_id
                 ));
             }
-            if !artifact.path.contains(&revision_prefix) {
+            if !receipt.path.contains(&revision_prefix) {
                 issues.push(format!(
-                    "{} profile artifact path {} does not bind the source revision prefix",
-                    diagnostic.row_id, artifact.path
+                    "{} profile receipt path {} does not bind the source revision prefix",
+                    diagnostic.row_id, receipt.path
                 ));
             }
         }
+    }
+
+    for collision in profile_receipt_paths.intersection(&diagnostic_paths) {
+        issues.push(format!(
+            "profile receipt path {collision} collides with a focused report"
+        ));
+    }
+    for collision in profile_receipt_digests.intersection(&diagnostic_digests) {
+        issues.push(format!(
+            "profile receipt digest {collision} collides with a focused report"
+        ));
+    }
+    if prose_bytes > MAX_LEDGER_PROSE_BYTES {
+        issues.push(format!(
+            "diagnostic owner actions contain {prose_bytes} bytes, maximum is {MAX_LEDGER_PROSE_BYTES}"
+        ));
     }
 
     for missing in required_crossings.difference(&covered_crossings) {
