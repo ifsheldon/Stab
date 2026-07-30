@@ -113,6 +113,8 @@ Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. An
 
 `just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through bits, algebra, and core in each portable graph.
 
+`just architecture::docs-check` uses `pulldown-cmark` to recursively validate repository-owned Markdown links. It checks same-file and cross-file heading anchors, resolves local targets without permitting traversal outside the repository, reports all failures in deterministic source order, skips explicit external schemes, and excludes generated, build, vendor, and Git trees.
+
 ## Toolchain Boundary
 
 Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and complete scalar `stab-engine` packages build on that compiler. The optional raw SIMD crate and consumers that enable it require the pinned Nightly target.
@@ -183,6 +185,7 @@ An extension seam is accepted only after a separate crate uses it without privat
 - [A2 Resource Policy Inventory](a2-resource-policy-inventory.md)
 - [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md)
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
+- [ADR 0007: Product Dependency Graph](adr-0007-product-dependency-graph.md)
 
 ## Change Rules
 

@@ -2,7 +2,9 @@
 
 ## Status
 
-Active qualification contract as of 2026-07-23.
+Historical completed qualification contract as of 2026-07-23.
+
+The active execution contract moved to [the agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) and [GOAL.md](GOAL.md) on 2026-07-27. This document remains the normative historical record for the completed Q0 through Q8 qualification program and its evidence, but it does not define current work.
 
 This plan supersedes the R6 evidence-production procedure in [post-review-compatibility-evidence-repair.md](post-review-compatibility-evidence-repair.md) before formal repaired-contract evidence began. The R0 through R5 implementation remains accepted source work. Historical and failed artifacts retain their original schema, source revision, and status.
 

@@ -1,23 +1,22 @@
-# Goal: Close A6 Before Decoder Extraction
+# Goal: Close Modular Boundaries And A6 Evidence
 
 ## Objective
 
-Finish milestone A6 of [the agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) from one clean reviewed revision before restoring the parked A7 decoder work.
+Finish the remaining A0, A2, and A3 audit repairs, then close milestone A6 of [the agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) from one clean reviewed revision before implementing A7.
 
 ## Current State
 
-- A0 through A5 are complete, and the physical workspace split is committed: `stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, `stab-kernels-simd`, the `stab-core` facade, and `stab-cli`.
-- Historical `3a93719b` correctness, SIMD, matrix, and focused artifacts remain review-rejected diagnostics.
-- The checked A6 measurement contract owns exact executable preflights for 65 policy-gated rows plus the selected equal-width M6 row. Other report-only rows prove workload continuity only.
-- The replacement publication contract uses a checked predecessor registry, typed Linux-perf receipts, and append-only content-addressed evidence objects. No source-current object has been published.
-- `benchmarks/a6-predecessors.json` is intentionally empty while predecessor backports are pending, so publication must fail closed.
-- A7 changes remain parked in the named `a7-decoder-benchmark-wip` and `a7-decoder-interoperability-wip` stashes until A6 closes.
+- The physical workspace split is complete: `stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, `stab-kernels-simd`, the `stab-core` facade, and `stab-cli`.
+- A1, A4, and A5 are complete. A0, A2, and A3 have narrow audit repairs in progress around documentation governance, complete compiler discovery, and direct Stable record consumption.
+- The retrospective A6 attestation procedure is superseded. Historical complete matrices, focused reports, and publication designs remain historical diagnostics, not current acceptance evidence.
+- A6 now requires affected-path evidence: scalar-versus-SIMD XOR and Clifford reports, exact selected M5 and M6 Stim comparisons under the unchanged `1.25x` gate, direct owner-package qualification, local verification, and exact-revision CI.
+- The two A7 stashes are historical prototypes. They must not be restored wholesale because review found incorrect implementation placement, dynamic dispatch, weak resource admission and oracle gaps, and an incomplete benchmark scaffold.
 
 ## Sources Of Truth
 
-- [Architecture plan](agent-native-modular-qec-architecture-plan.md), milestone A6
+- [Architecture plan](agent-native-modular-qec-architecture-plan.md)
 - [A6 extraction map](../architecture/a6-component-extraction-map.md)
-- [Architecture graph](../architecture/README.md)
+- [Architecture graph and ADRs](../architecture/README.md)
 - [Append-only progress report](agent-native-modular-qec-progress-report.md)
 - [Specification-gap log](milestone-spec-gaps.md)
 
@@ -25,29 +24,26 @@ Stop and repair the owning source when Cargo metadata, architecture checks, gene
 
 ## Execution Sequence
 
-1. Commit the predecessor-registry, typed-profile, append-only-publication, tests, and documentation changes in focused commits.
-2. Run milestone-audit and full-code-review before timing. Fix every confirmed product, test, benchmark-contract, and documentation finding, then regenerate affected inventories.
-3. For every non-seed report-only phase, identify the reviewed historical product commit and create one clean schema-version-4 instrumentation backport as its direct child. The tree delta may contain only the evidence harness needed to execute the unchanged historical workload.
-4. Tag every backport at `a6-predecessors/<backport-commit>`, record its product commit, backport commit, raw-tree-delta SHA-256, and exact phases in `benchmarks/a6-predecessors.json`, and commit the complete registry before current evidence.
-5. On the same host, produce one warmed strict create-new predecessor report per registered backport with one outer run. Never reuse a failed path.
-6. From the resulting clean current revision, regenerate full-tier M5 and M6 correctness, the scalar-versus-portable SIMD diagnostic, one schema-version-3 baseline, and the complete schema-version-4 warmed three-run comparison under unchanged `1.25x` policies.
-7. Run one warmed focused report for every greater-than-`1.15x` predecessor crossing. For a reproduced crossing, create a typed receipt with `just bench::a6-profile-receipt`; do not lower kernel policy to manufacture profiler access.
-8. Publish request-schema-version-2 evidence with `just bench::a6-focused-evidence --publish-from <request>`. The request selects reports, optional profile receipts, and owner actions only.
-9. Review and commit the resulting `benchmarks/a6-focused-evidence-<source-revision>-<sha256>.json` object. Validation discovers only tracked objects and accepts only that object plus `GOAL.md` and the progress report after its source revision.
-10. Append the source-current checkpoint, rerun local verification, milestone-audit, full-code-review, and exact-revision GitHub CI. Fixing compiled source, policy, inventory, fixture, or workflow code invalidates the evidence and restarts steps 3 through 10.
+1. Finish complete engine compiler descriptors, Stable record-consumer evidence, local Markdown-link validation, dependency-graph ADR coverage, and migrated test selectors.
+2. Regenerate correctness, performance, and status artifacts; commit product, test, operational, and generated changes in focused commits.
+3. Run milestone-audit and full-code-review. Fix every confirmed product, test, benchmark-contract, and documentation finding before timing.
+4. From the resulting clean source commit, run Stable and Nightly architecture checks, direct owner-package suites, workspace verification, oracle checks, and benchmark smoke.
+5. Produce one source-current full scalar-versus-SIMD report for medium and large XOR and non-identity Clifford workloads using identical inputs and exact output witnesses.
+6. Produce fresh create-new pinned-Stim baselines and warmed three-run comparisons for `m5-simd-bits` and `m6-clifford-string`. Keep the exact named pairs and unchanged `1.25x` median and confidence-upper-bound gates.
+7. Rerun only A2, A4, and A5 diagnostics whose source package, feature selection, or executed call path changed. Preserve each existing comparator classification.
+8. Record host validity and unique artifact paths, restore swap exactly if timing changed it, synchronize the progress report and generated status, and require green CI on the exact closure revision.
+9. Mark A6 complete only after a final audit. Start A7 from the reviewed contract and conformance requirements, manually reusing sound ideas from the parked prototype rather than applying either stash.
 
 ## Nonnegotiable Contracts
 
 - Stable 1.97.1 owns model, bits, records, scalar algebra, pure analysis, and scalar engine code.
 - Only `stab-kernels-simd` contains direct portable-SIMD code, and it has no Stab dependency.
+- Runtime capabilities advertise every implemented compiler and explicitly report unavailable request fingerprints or backends.
 - `stab-core` remains the compatibility facade; canonical implementation and qualification ownership remain in component crates.
-- No comparator, `1.25x` threshold, waiver, preflight, feature choice, or timing boundary is relaxed to obtain closure.
-- Predecessor phase ownership comes only from the checked registry; report requests cannot assign phases.
-- Profile availability comes only from a typed receipt; prose cannot claim capture or unavailability.
-- Evidence objects are append-only and content-addressed. The fixed legacy path is never a current publication target.
-- Host-unverified timing is diagnostic only. A9 owns promotable controlled-host parity.
-- Historical, failed, and rejected artifacts remain immutable and are never reused.
+- No comparator, `1.25x` threshold, semantic witness, feature choice, or timing boundary is relaxed to obtain closure.
+- Optional profiles are diagnostic only and cannot relabel a failed timing result.
+- Historical, failed, and rejected artifacts remain immutable and are never promoted as source-current evidence.
 
 ## Done
 
-A6 is complete only when the component graph, direct owner-package evidence, source-current correctness, SIMD selection, complete matrix, predecessor provenance, focused evidence object, selected scalar checks, inventories, audits, local verification, and exact-revision CI all pass with no open finding. Then mark A6 complete and restore the two named A7 stashes.
+A6 is complete only when all narrow A0/A2/A3 repairs pass, component boundaries and direct ownership remain green, source-current SIMD and selected M5/M6 evidence pass, generated artifacts are synchronized, final audits find no blocker, local verification succeeds, exact-revision CI is green, swap is restored, and the worktree is clean.
