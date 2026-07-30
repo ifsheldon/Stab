@@ -93,6 +93,76 @@ pub struct CircuitTargetsInsideInstruction {
     pub targets_in_range: Vec<GateTargetWithCoords>,
 }
 
+/// Borrowed matched-error instruction context shared with compatibility facades.
+#[derive(Clone, Copy, Debug)]
+pub struct CircuitTargetsInsideInstructionView<'a> {
+    gate: Option<Gate>,
+    gate_tag: Option<&'a str>,
+    args: &'a [f64],
+    target_range_start: usize,
+    target_range_end: usize,
+    targets_in_range: &'a [GateTargetWithCoords],
+}
+
+impl<'a> CircuitTargetsInsideInstructionView<'a> {
+    pub const fn new(
+        gate: Option<Gate>,
+        gate_tag: Option<&'a str>,
+        args: &'a [f64],
+        target_range_start: usize,
+        target_range_end: usize,
+        targets_in_range: &'a [GateTargetWithCoords],
+    ) -> Self {
+        Self {
+            gate,
+            gate_tag,
+            args,
+            target_range_start,
+            target_range_end,
+            targets_in_range,
+        }
+    }
+}
+
+impl<'a> From<&'a CircuitTargetsInsideInstruction> for CircuitTargetsInsideInstructionView<'a> {
+    fn from(value: &'a CircuitTargetsInsideInstruction) -> Self {
+        Self::new(
+            value.gate,
+            value.gate_tag.as_deref(),
+            &value.args,
+            value.target_range_start,
+            value.target_range_end,
+            &value.targets_in_range,
+        )
+    }
+}
+
+impl Display for CircuitTargetsInsideInstructionView<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.gate {
+            Some(gate) => f.write_str(gate.canonical_name())?,
+            None => f.write_str("null")?,
+        }
+        if let Some(tag) = self.gate_tag.filter(|tag| !tag.is_empty()) {
+            f.write_str("[")?;
+            write_escaped_tag(f, tag)?;
+            f.write_str("]")?;
+        }
+        write_args(f, self.args)?;
+
+        let mut was_combiner = false;
+        for target in self.targets_in_range {
+            let is_combiner = target.gate_target.is_combiner();
+            if !is_combiner && !was_combiner {
+                f.write_str(" ")?;
+            }
+            was_combiner = is_combiner;
+            write!(f, "{target}")?;
+        }
+        Ok(())
+    }
+}
+
 impl CircuitTargetsInsideInstruction {
     pub fn fill_args_and_targets_in_range(
         &mut self,
@@ -140,27 +210,7 @@ impl CircuitTargetsInsideInstruction {
 
 impl Display for CircuitTargetsInsideInstruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.gate {
-            Some(gate) => f.write_str(gate.canonical_name())?,
-            None => f.write_str("null")?,
-        }
-        if let Some(tag) = self.gate_tag.as_deref().filter(|tag| !tag.is_empty()) {
-            f.write_str("[")?;
-            write_escaped_tag(f, tag)?;
-            f.write_str("]")?;
-        }
-        write_args(f, &self.args)?;
-
-        let mut was_combiner = false;
-        for target in &self.targets_in_range {
-            let is_combiner = target.gate_target.is_combiner();
-            if !is_combiner && !was_combiner {
-                f.write_str(" ")?;
-            }
-            was_combiner = is_combiner;
-            write!(f, "{target}")?;
-        }
-        Ok(())
+        Display::fmt(&CircuitTargetsInsideInstructionView::from(self), f)
     }
 }
 
@@ -174,6 +224,69 @@ pub struct CircuitErrorLocation {
     pub stack_frames: Vec<CircuitErrorLocationStackFrame>,
 }
 
+/// Borrowed matched-error location shared with compatibility facades.
+#[derive(Clone, Copy, Debug)]
+pub struct CircuitErrorLocationView<'a> {
+    noise_tag: Option<&'a str>,
+    tick_offset: u64,
+    flipped_pauli_product: &'a [GateTargetWithCoords],
+    flipped_measurement: &'a FlippedMeasurement,
+    instruction_targets: CircuitTargetsInsideInstructionView<'a>,
+    stack_frames: &'a [CircuitErrorLocationStackFrame],
+}
+
+impl<'a> CircuitErrorLocationView<'a> {
+    pub const fn new(
+        noise_tag: Option<&'a str>,
+        tick_offset: u64,
+        flipped_pauli_product: &'a [GateTargetWithCoords],
+        flipped_measurement: &'a FlippedMeasurement,
+        instruction_targets: CircuitTargetsInsideInstructionView<'a>,
+        stack_frames: &'a [CircuitErrorLocationStackFrame],
+    ) -> Self {
+        Self {
+            noise_tag,
+            tick_offset,
+            flipped_pauli_product,
+            flipped_measurement,
+            instruction_targets,
+            stack_frames,
+        }
+    }
+
+    pub fn is_simpler_than(self, other: Self) -> bool {
+        if self.flipped_measurement.measured_observable.len()
+            != other.flipped_measurement.measured_observable.len()
+        {
+            return self.flipped_measurement.measured_observable.len()
+                < other.flipped_measurement.measured_observable.len();
+        }
+        if self.flipped_pauli_product.len() != other.flipped_pauli_product.len() {
+            return self.flipped_pauli_product.len() < other.flipped_pauli_product.len();
+        }
+        compare_circuit_error_location_views(self, other) == Ordering::Less
+    }
+}
+
+impl<'a> From<&'a CircuitErrorLocation> for CircuitErrorLocationView<'a> {
+    fn from(value: &'a CircuitErrorLocation) -> Self {
+        Self::new(
+            value.noise_tag.as_deref(),
+            value.tick_offset,
+            &value.flipped_pauli_product,
+            &value.flipped_measurement,
+            CircuitTargetsInsideInstructionView::from(&value.instruction_targets),
+            &value.stack_frames,
+        )
+    }
+}
+
+impl Display for CircuitErrorLocationView<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write_circuit_error_location(f, *self, "")
+    }
+}
+
 impl CircuitErrorLocation {
     pub fn canonicalize(&mut self) {
         self.flipped_pauli_product
@@ -184,16 +297,7 @@ impl CircuitErrorLocation {
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
-        if self.flipped_measurement.measured_observable.len()
-            != other.flipped_measurement.measured_observable.len()
-        {
-            return self.flipped_measurement.measured_observable.len()
-                < other.flipped_measurement.measured_observable.len();
-        }
-        if self.flipped_pauli_product.len() != other.flipped_pauli_product.len() {
-            return self.flipped_pauli_product.len() < other.flipped_pauli_product.len();
-        }
-        compare_circuit_error_locations(self, other) == Ordering::Less
+        CircuitErrorLocationView::from(self).is_simpler_than(CircuitErrorLocationView::from(other))
     }
 }
 
@@ -209,7 +313,7 @@ impl PartialEq for CircuitErrorLocation {
 
 impl Display for CircuitErrorLocation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write_circuit_error_location(f, self, "")
+        Display::fmt(&CircuitErrorLocationView::from(self), f)
     }
 }
 
@@ -255,32 +359,48 @@ impl ExplainedError {
 
 impl Display for ExplainedError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("ExplainedError {\n")?;
-        f.write_str("    dem_error_terms: ")?;
-        write_joined(f, &self.dem_error_terms, " ")?;
-        if self.circuit_error_locations.is_empty() {
-            f.write_str("\n    [no single circuit error had these exact symptoms]")?;
-        }
-        for location in &self.circuit_error_locations {
-            f.write_str("\n")?;
-            write_circuit_error_location(f, location, "    ")?;
-        }
-        f.write_str("\n}")
+        write_explained_error(
+            f,
+            &self.dem_error_terms,
+            self.circuit_error_locations
+                .iter()
+                .map(CircuitErrorLocationView::from),
+        )
     }
+}
+
+/// Formats an explained error from borrowed canonical or facade-owned locations.
+pub fn write_explained_error<'a>(
+    f: &mut Formatter<'_>,
+    dem_error_terms: &[DemTargetWithCoords],
+    locations: impl IntoIterator<Item = CircuitErrorLocationView<'a>>,
+) -> std::fmt::Result {
+    let mut locations = locations.into_iter().peekable();
+    f.write_str("ExplainedError {\n")?;
+    f.write_str("    dem_error_terms: ")?;
+    write_joined(f, dem_error_terms, " ")?;
+    if locations.peek().is_none() {
+        f.write_str("\n    [no single circuit error had these exact symptoms]")?;
+    }
+    for location in locations {
+        f.write_str("\n")?;
+        write_circuit_error_location(f, location, "    ")?;
+    }
+    f.write_str("\n}")
 }
 
 fn write_circuit_error_location(
     f: &mut Formatter<'_>,
-    location: &CircuitErrorLocation,
+    location: CircuitErrorLocationView<'_>,
     indent: &str,
 ) -> std::fmt::Result {
     writeln!(f, "{indent}CircuitErrorLocation {{")?;
-    if let Some(tag) = location.noise_tag.as_deref().filter(|tag| !tag.is_empty()) {
+    if let Some(tag) = location.noise_tag.filter(|tag| !tag.is_empty()) {
         writeln!(f, "{indent}    noise_tag: {tag}")?;
     }
     if !location.flipped_pauli_product.is_empty() {
         write!(f, "{indent}    flipped_pauli_product: ")?;
-        write_pauli_product(f, &location.flipped_pauli_product)?;
+        write_pauli_product(f, location.flipped_pauli_product)?;
         f.write_str("\n")?;
     }
     if let Some(measurement_index) = location.flipped_measurement.measurement_record_index {
@@ -430,27 +550,33 @@ fn compare_circuit_error_locations(
     left: &CircuitErrorLocation,
     right: &CircuitErrorLocation,
 ) -> Ordering {
+    compare_circuit_error_location_views(
+        CircuitErrorLocationView::from(left),
+        CircuitErrorLocationView::from(right),
+    )
+}
+
+fn compare_circuit_error_location_views(
+    left: CircuitErrorLocationView<'_>,
+    right: CircuitErrorLocationView<'_>,
+) -> Ordering {
     left.tick_offset
         .cmp(&right.tick_offset)
         .then_with(|| {
             compare_slices_by(
-                &left.flipped_pauli_product,
-                &right.flipped_pauli_product,
+                left.flipped_pauli_product,
+                right.flipped_pauli_product,
                 compare_gate_targets_with_coords,
             )
         })
         .then_with(|| {
-            compare_flipped_measurements(&left.flipped_measurement, &right.flipped_measurement)
+            compare_flipped_measurements(left.flipped_measurement, right.flipped_measurement)
         })
         .then_with(|| {
-            compare_instruction_targets(&left.instruction_targets, &right.instruction_targets)
+            compare_instruction_target_views(left.instruction_targets, right.instruction_targets)
         })
         .then_with(|| {
-            compare_slices_by(
-                &left.stack_frames,
-                &right.stack_frames,
-                compare_stack_frames,
-            )
+            compare_slices_by(left.stack_frames, right.stack_frames, compare_stack_frames)
         })
 }
 
@@ -466,21 +592,21 @@ fn compare_flipped_measurements(left: &FlippedMeasurement, right: &FlippedMeasur
         })
 }
 
-fn compare_instruction_targets(
-    left: &CircuitTargetsInsideInstruction,
-    right: &CircuitTargetsInsideInstruction,
+fn compare_instruction_target_views(
+    left: CircuitTargetsInsideInstructionView<'_>,
+    right: CircuitTargetsInsideInstructionView<'_>,
 ) -> Ordering {
     left.target_range_start
         .cmp(&right.target_range_start)
         .then_with(|| left.target_range_end.cmp(&right.target_range_end))
         .then_with(|| {
             compare_slices_by(
-                &left.targets_in_range,
-                &right.targets_in_range,
+                left.targets_in_range,
+                right.targets_in_range,
                 compare_gate_targets_with_coords,
             )
         })
-        .then_with(|| compare_f64_slices(&left.args, &right.args))
+        .then_with(|| compare_f64_slices(left.args, right.args))
         .then_with(|| compare_optional_gate(left.gate, right.gate))
 }
 

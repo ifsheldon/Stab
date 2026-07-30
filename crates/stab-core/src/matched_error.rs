@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 
 use crate::{CircuitError, CircuitInstruction, CircuitResult, DemTarget, Gate};
+use stab_analysis::advanced::{
+    CircuitErrorLocationView, CircuitTargetsInsideInstructionView, write_explained_error,
+};
 
 pub use stab_analysis::{
     CircuitErrorLocationStackFrame, DemTargetWithCoords, FlippedMeasurement, GateTargetWithCoords,
@@ -52,11 +55,22 @@ impl CircuitTargetsInsideInstruction {
             targets_in_range: value.targets_in_range,
         }
     }
+
+    fn as_analysis_view(&self) -> CircuitTargetsInsideInstructionView<'_> {
+        CircuitTargetsInsideInstructionView::new(
+            self.gate,
+            self.gate_tag.as_deref(),
+            &self.args,
+            self.target_range_start,
+            self.target_range_end,
+            &self.targets_in_range,
+        )
+    }
 }
 
 impl Display for CircuitTargetsInsideInstruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.to_analysis(), f)
+        Display::fmt(&self.as_analysis_view(), f)
     }
 }
 
@@ -78,7 +92,8 @@ impl CircuitErrorLocation {
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
-        self.to_analysis().is_simpler_than(&other.to_analysis())
+        self.as_analysis_view()
+            .is_simpler_than(other.as_analysis_view())
     }
 
     fn to_analysis(&self) -> stab_analysis::CircuitErrorLocation {
@@ -104,6 +119,17 @@ impl CircuitErrorLocation {
             stack_frames: value.stack_frames,
         }
     }
+
+    fn as_analysis_view(&self) -> CircuitErrorLocationView<'_> {
+        CircuitErrorLocationView::new(
+            self.noise_tag.as_deref(),
+            self.tick_offset,
+            &self.flipped_pauli_product,
+            &self.flipped_measurement,
+            self.instruction_targets.as_analysis_view(),
+            &self.stack_frames,
+        )
+    }
 }
 
 impl PartialEq for CircuitErrorLocation {
@@ -118,7 +144,7 @@ impl PartialEq for CircuitErrorLocation {
 
 impl Display for CircuitErrorLocation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.to_analysis(), f)
+        Display::fmt(&self.as_analysis_view(), f)
     }
 }
 
@@ -170,7 +196,13 @@ impl ExplainedError {
 
 impl Display for ExplainedError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.to_analysis(), f)
+        write_explained_error(
+            f,
+            &self.dem_error_terms,
+            self.circuit_error_locations
+                .iter()
+                .map(CircuitErrorLocation::as_analysis_view),
+        )
     }
 }
 

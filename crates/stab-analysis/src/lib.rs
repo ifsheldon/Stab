@@ -89,6 +89,9 @@ pub mod advanced {
     pub use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
     pub use crate::circuit_flow::{check_unsigned_flows_with_sparse_tracker, flow_record_index};
     pub use crate::circuit_simplify::decomposed_single_instruction;
+    pub use crate::matched_error::{
+        CircuitErrorLocationView, CircuitTargetsInsideInstructionView, write_explained_error,
+    };
     pub use crate::sparse_rev_frame_tracker::{
         AnalyzerProbeBudget, ShiftedRecurrence, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
         search_shifted_recurrence,
