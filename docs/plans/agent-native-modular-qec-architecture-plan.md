@@ -111,7 +111,7 @@ stab-bits --portable-simd--> stab-kernels-simd
 stab-records -> stab-bits
 stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
-stab-model -> stab-algebra
+stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records

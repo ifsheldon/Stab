@@ -1,1 +1,1 @@
-pub use stab_engine::fingerprint::{CompilationOperation, CompilationRequestFingerprint};
+pub use stab_engine::{CompilationOperation, CompilationRequestFingerprint};

@@ -2,8 +2,8 @@
 
 mod dem_sampling;
 mod detection;
-pub mod fingerprint;
-pub mod probability;
+mod fingerprint;
+mod probability;
 mod reference_sample_tree;
 mod sampled_flow;
 mod sampling;

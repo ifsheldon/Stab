@@ -241,7 +241,7 @@ fn compilation_failures_keep_invalid_circuits_distinct_from_missing_backends() {
     let unavailable = SamplingCompiler::new()
         .backend(BackendPreference::PortableSimd)
         .compile(&ordinary)
-        .expect_err("portable SIMD is registered in A6");
+        .expect_err("portable SIMD sampling is not registered in A6");
     assert_eq!(
         unavailable.code(),
         SamplingCompileErrorCode::BackendUnavailable

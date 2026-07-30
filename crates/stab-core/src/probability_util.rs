@@ -1,1 +1,1 @@
-pub use stab_engine::probability::biased_randomize_bits;
+pub use stab_engine::biased_randomize_bits;

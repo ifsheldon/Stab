@@ -75,7 +75,7 @@ stab-cli -> stab-core
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-analysis -> stab-model + stab-algebra
-stab-model -> stab-algebra
+stab-model -> no Stab crate
 stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
@@ -89,7 +89,7 @@ stab-bits --portable-simd--> stab-kernels-simd
 stab-records -> stab-bits
 stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
-stab-model -> stab-algebra
+stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records

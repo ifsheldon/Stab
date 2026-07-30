@@ -11,11 +11,11 @@ fn extracted_engine_foundations_keep_sampling_ownership() {
         ),
         (
             "crates/stab-engine/src/fingerprint.rs",
-            "stab_engine::fingerprint::CompilationOperation::as_str",
+            "stab_engine::CompilationOperation::as_str",
         ),
         (
             "crates/stab-engine/src/probability.rs",
-            "stab_engine::probability::biased_randomize_bits",
+            "stab_engine::biased_randomize_bits",
         ),
     ] {
         assert_eq!(

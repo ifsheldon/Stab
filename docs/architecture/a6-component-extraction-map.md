@@ -29,7 +29,7 @@ stab-bits --portable-simd--> stab-kernels-simd
 stab-records -> stab-bits
 stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
-stab-model -> stab-algebra
+stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
@@ -126,7 +126,7 @@ Canonical Pauli, Clifford, Flow, Tableau, iterator, solver, resource, and unitar
 | `fingerprint.rs` | `fingerprint.rs` | Own schema-versioned structural circuit and DEM identities. |
 | Model portions of `diagnostics.rs`, `resources.rs`, and `error.rs` | `diagnostics.rs`, `resources.rs`, `error.rs` | Replace facade-coupled construction errors with stable model-owned errors and shared typed context. |
 
-The model crate depends only on `stab-algebra = { path = "../stab-algebra", version = "=0.2.0" }` among Stab crates.
+The model crate has no Stab dependency. Raw gate descriptors remain model values, while every algebra-valued projection belongs to `stab-analysis`.
 
 The following do not move into model:
 

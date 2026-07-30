@@ -81,7 +81,6 @@ fn diagnostic_group_id(path: &str) -> Option<&'static str> {
     match path {
         "stab_core::Circuit::fingerprint" => Some(A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID),
         "stab_engine::CompilationRequestFingerprint::for_sampling"
-        | "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling"
         | "stab_core::CompilationRequestFingerprint::for_sampling" => {
             Some(A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID)
         }
@@ -118,19 +117,12 @@ fn is_fixed_fingerprint_metadata(item: &CorrectnessApi) -> bool {
             | "stab_core::CompilationRequestFingerprint::digest"
             | "stab_core::CompilationRequestFingerprint::digest_hex"
             | "stab_engine::CompilationOperation::as_str"
-            | "stab_engine::fingerprint::CompilationOperation::as_str"
             | "stab_engine::CompilationRequestFingerprint::schema_version"
             | "stab_engine::CompilationRequestFingerprint::compiler_schema_version"
             | "stab_engine::CompilationRequestFingerprint::operation"
             | "stab_engine::CompilationRequestFingerprint::model_fingerprint"
             | "stab_engine::CompilationRequestFingerprint::digest"
             | "stab_engine::CompilationRequestFingerprint::digest_hex"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::schema_version"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::compiler_schema_version"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::operation"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::model_fingerprint"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::digest"
-            | "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex"
             | "stab_core::CapabilitySet::current"
             | "stab_core::CapabilitySet::dialects"
             | "stab_core::CapabilitySet::gates"
@@ -241,7 +233,6 @@ mod tests {
             "stab_engine::CompilationOperation::as_str",
             "stab_engine::CompilationRequestFingerprint::schema_version",
             "stab_engine::CompilationRequestFingerprint::model_fingerprint",
-            "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex",
             "stab_core::CapabilitySet::codecs",
             "stab_core::CompilationCapability::compiler_schema_version",
             "stab_core::RecordFormat::records_per_group",
@@ -260,7 +251,6 @@ mod tests {
         for (path, parent) in [
             "stab_core::Circuit::fingerprint",
             "stab_engine::CompilationRequestFingerprint::for_sampling",
-            "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
             "stab_core::CompilationRequestFingerprint::for_sampling",
             "stab_core::estimate_sampling_request",
             "stab_core::advanced::compat::CompiledSampler::compile",
@@ -268,7 +258,6 @@ mod tests {
         .into_iter()
         .zip([
             A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID,
-            A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
             A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
             A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
             A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID,

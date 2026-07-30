@@ -2293,7 +2293,6 @@ dependencies = [
  "hex",
  "sha2",
  "smallvec",
- "stab-algebra",
  "thiserror",
 ]
 

@@ -17,7 +17,6 @@
     { "from": "stab-records", "to": "stab-bits", "kind": "normal" },
     { "from": "stab-algebra", "to": "stab-bits", "kind": "normal" },
     { "from": "stab-algebra", "to": "stab-kernels-simd", "kind": "normal", "optional": true },
-    { "from": "stab-model", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-model", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-algebra", "kind": "normal" },
     { "from": "stab-engine", "to": "stab-model", "kind": "normal" },

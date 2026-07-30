@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "55c63ce8db4e36a4264481512338a28a1171e2629aa7ee596a96422a83a9a9ba",
-  "semantic_digest": "d1c23e90c4c5fbae8536d876b5c0119cd8212bc17b895ccb542489d31aec0401",
+  "correctness_digest": "e32b5b3e4939ed120c42193452fb85d6f73d72225412c2c8b2876739f38b6601",
+  "semantic_digest": "cff7389b76971b615485680573ea4a4390becd15ee665f6911915107dd1553b9",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2223,7 +2223,7 @@
     {
       "id": "PERFC-8ac4d4b2d32da162",
       "source_line": 129,
-      "anchor_digest": "66e8e733c22cf201a7a5c3950b89ebe1609499b0181275d09c2b1ec92f79febc",
+      "anchor_digest": "0c9ef23daa3177fbf3aec0e57183162776d0f8e930d7f1af3b81e7f238e81cc2",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Owned Pauli strings",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -3187,7 +3187,7 @@
     {
       "id": "PERFC-cfa671aed2cf20dc",
       "source_line": 133,
-      "anchor_digest": "af90d08388029ebbf1dccd2e757ef7a2601605f371a6bc45ff5f6a17020db8a1",
+      "anchor_digest": "1338d5342db54159382298e8c6baf4ca206aaa13f6cac15bad852cddff91fe25",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Algebra resource admission",
       "raw_status": "Done for current Rust algebra surface",
@@ -65592,316 +65592,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-0b066a7b19efc5f8",
-      "path": "stab_engine::fingerprint::CompilationOperation",
-      "kind": "enum",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-5cda3987a27fbe5d",
-      "path": "stab_engine::fingerprint::CompilationOperation as Clone for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-ecd19b7699bc742d",
-      "path": "stab_engine::fingerprint::CompilationOperation as Copy for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-752c43dfd2323a56",
-      "path": "stab_engine::fingerprint::CompilationOperation as Debug for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-a2a2f024bb5e2643",
-      "path": "stab_engine::fingerprint::CompilationOperation as Eq for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-9076b6c4e67dbbe6",
-      "path": "stab_engine::fingerprint::CompilationOperation as Hash for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-b7ac343b007bc380",
-      "path": "stab_engine::fingerprint::CompilationOperation as PartialEq for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-1521e85bb8343935",
-      "path": "stab_engine::fingerprint::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-48c53bb0a79ba486",
-      "path": "stab_engine::fingerprint::CompilationOperation::Sampling",
-      "kind": "variant",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-828dd166d392915b",
-      "path": "stab_engine::fingerprint::CompilationOperation::as_str",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-e896fca5a70add78",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint",
-      "kind": "struct",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-ccbe2d0306f7b96c",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Clone for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-5d6e12628b3605b5",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Copy for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-153837c43c55cac6",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Debug for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-a0113988f8b58cd6",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Eq for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-55e4528ef5e4551a",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as Hash for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-ff09629a5d09923c",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as PartialEq for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-137741751dd482e4",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint as StructuralPartialEq for@8bc40ad41b61",
-      "kind": "trait-impl",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-03169755b0909e83",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::ALGORITHM",
-      "kind": "constant",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-cfa0647d572b2baa",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
-      "kind": "constant",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-af9cba1093d282eb",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::SCHEMA_VERSION",
-      "kind": "constant",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-000caaad92eb3e9f",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::compiler_schema_version",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-80068b81e4db836b",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-35aef4efe1b40c2b",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::digest_hex",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-8beda9f23e19302a",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "covered-by-parent",
-      "parent_group_ids": [
-        "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT"
-      ],
-      "reason": "Behavioral operation is covered by the listed executable Stab-only product diagnostic."
-    },
-    {
-      "id": "cq-api-item-6ef7df6b378e05aa",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::model_fingerprint",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-eb411310bdad3b22",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::operation",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-479765258457e34b",
-      "path": "stab_engine::fingerprint::CompilationRequestFingerprint::schema_version",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
-    },
-    {
       "id": "cq-api-item-d2f1fc8b79253667",
       "path": "stab_engine::measurement_record_count",
       "kind": "function",
@@ -65919,17 +65609,6 @@
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-37741fb452e28c59",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-4fc74e99de9b56a7",
-      "path": "stab_engine::probability::biased_randomize_bits",
-      "kind": "function",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-09cfc17cfb412f99",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -84862,8 +84541,7 @@
       "checklist_child_ids": [],
       "public_api_items": [
         "stab_core::CompilationRequestFingerprint::for_sampling",
-        "stab_engine::CompilationRequestFingerprint::for_sampling",
-        "stab_engine::fingerprint::CompilationRequestFingerprint::for_sampling"
+        "stab_engine::CompilationRequestFingerprint::for_sampling"
       ],
       "disposition": "measured",
       "phase": "compile",
