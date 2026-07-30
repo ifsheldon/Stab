@@ -8,11 +8,11 @@ use super::{InventoryError, MAX_QUALIFICATION_CASES_BYTES, MAX_SOURCE_BYTES, sta
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::CargoTestSelector;
 use crate::qualification::model::{
-    ApiPath, CaseId, Comparator, EvidenceCase, EvidenceProvenance, EvidenceSelector, EvidenceState,
-    EvidenceStatus, FeatureId, PropertyExecutionMode, PropertyExecutionPlan,
-    PropertyPersistencePolicy, PropertyPlanRef, PropertyPlanSource, PublicApiAlias, PublicApiItem,
-    RelativeSourcePath, ResourceContract, SelectorKind, SemanticDigest, StableCaseDomain,
-    UpstreamCase, UpstreamDisposition,
+    ApiPath, CanonicalOwnerException, CaseId, Comparator, EvidenceCase, EvidenceProvenance,
+    EvidenceSelector, EvidenceState, EvidenceStatus, FeatureId, PropertyExecutionMode,
+    PropertyExecutionPlan, PropertyPersistencePolicy, PropertyPlanRef, PropertyPlanSource,
+    PublicApiAlias, PublicApiItem, RelativeSourcePath, ResourceContract, SelectorKind,
+    SemanticDigest, StableCaseDomain, UpstreamCase, UpstreamDisposition,
 };
 use crate::qualification::public_api::ResolvedExternalReexport;
 
@@ -22,7 +22,7 @@ mod owner_expansion;
 use external_owner::{ExternalAliasPolicy, resolve_direct_public_api_owner};
 use owner_expansion::{MAX_OWNERS_PER_CASE, OwnerEntryKind, expand_upstream_owners};
 
-const LEDGER_SCHEMA_VERSION: u32 = 3;
+const LEDGER_SCHEMA_VERSION: u32 = 4;
 const MAX_LEDGER_CASES: usize = 4_096;
 const MAX_PUBLIC_API_ALIASES: usize = 512;
 const MAX_LEDGER_TEXT_BYTES: usize = 2_048;
@@ -38,6 +38,8 @@ struct QualificationCaseLedger {
     existing_parent_mappings: Vec<ExistingParentMappingSpec>,
     #[serde(default)]
     public_api_aliases: Vec<PublicApiAliasSpec>,
+    #[serde(default)]
+    canonical_owner_exceptions: Vec<CanonicalOwnerException>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -135,7 +137,7 @@ pub(super) fn apply(
     public_api_items: &mut [PublicApiItem],
     evidence_cases: &mut Vec<EvidenceCase>,
     external_aliases: &[ResolvedExternalReexport],
-) -> Result<Vec<PublicApiAlias>, InventoryError> {
+) -> Result<(Vec<PublicApiAlias>, Vec<CanonicalOwnerException>), InventoryError> {
     let ledger = load(root)?;
     validate_header(&ledger, stim_version, stim_commit)?;
     let explicit_public_api_owners = ledger
@@ -372,7 +374,7 @@ pub(super) fn apply(
 
     evidence_cases.retain(|case| !claimed_evidence.contains(&case.id));
     evidence_cases.extend(qualification_cases);
-    Ok(ledger
+    let aliases = ledger
         .public_api_aliases
         .into_iter()
         .map(|alias| PublicApiAlias {
@@ -381,7 +383,10 @@ pub(super) fn apply(
             canonical_crate_name: None,
             canonical_path: alias.canonical_owner_path,
         })
-        .collect())
+        .collect();
+    let mut canonical_owner_exceptions = ledger.canonical_owner_exceptions;
+    canonical_owner_exceptions.sort();
+    Ok((aliases, canonical_owner_exceptions))
 }
 
 fn load(root: &RepoRoot) -> Result<QualificationCaseLedger, InventoryError> {

@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "cases": [
@@ -14,10 +14,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_target_value_and_parse_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_target_value_and_parse_contract",
           "--quiet",
           "--exact"
         ]
@@ -120,10 +120,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_instruction_value_validation_and_print_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_instruction_value_validation_print_contract",
           "--quiet",
           "--exact"
         ]
@@ -232,10 +232,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_instruction_target_groups_match_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_instruction_target_groups",
           "--quiet",
           "--exact"
         ]
@@ -272,10 +272,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_model_parse_print_tag_newline_contract",
           "--quiet",
           "--exact"
         ]
@@ -422,10 +422,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_model_value_mutation_and_repeat_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_model_value_mutation_repeat_contract",
           "--quiet",
           "--exact"
         ]
@@ -567,10 +567,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_counts_and_shift_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_counts_and_shifts_contract",
           "--quiet",
           "--exact"
         ]
@@ -638,10 +638,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_dem_format",
-          "cq2_dem_coordinate_query_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_dem_coordinate_query_contract",
           "--quiet",
           "--exact"
         ]
@@ -1061,10 +1061,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "stim_format",
-          "parses_and_prints_basic_m4_fixture",
+          "canonical_owner_evidence",
+          "cq2_stim_format_canonical_round_trip",
           "--quiet",
           "--exact"
         ]
@@ -1331,10 +1331,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "circuit_api",
-          "pf1_circuit_append_text_preserves_tags_repeats_and_fuses",
+          "canonical_owner_evidence",
+          "cq2_stim_format_append_text",
           "--quiet",
           "--exact"
         ]
@@ -1364,10 +1364,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "circuit_api",
-          "pf1_circuit_append_text_program_alias_appends",
+          "canonical_owner_evidence",
+          "cq2_stim_format_append_program_alias",
           "--quiet",
           "--exact"
         ]
@@ -1400,12 +1400,12 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
-        "--test",
-        "stim_format",
-        "measure_record_offset_enforces_negative_24_bit_boundary",
-        "--quiet",
-        "--exact"
+          "stab-model",
+          "--test",
+          "canonical_owner_evidence",
+          "cq2_stim_format_measure_record_offset",
+          "--quiet",
+          "--exact"
         ]
       },
       "resource_contract": {
@@ -1967,10 +1967,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_circuit_api",
-          "cq2_circuit_api_instruction_value_contract_matches_stim",
+          "canonical_owner_evidence",
+          "cq2_circuit_api_instruction_value",
           "--quiet",
           "--exact"
         ]
@@ -1986,7 +1986,7 @@
       "static_property_plan": {
         "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor including the f64/u64 observable boundary, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
         "case_count": 28,
-        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "upstream_owners": [
         {
@@ -2095,7 +2095,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_typed_ids_enforce_value_boundaries", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "value_boundaries", "typed_model_values_preserve_stim_boundaries", "--quiet", "--exact"]
       },
       "resource_contract": {
         "kind": "constant-scratch",
@@ -2105,7 +2105,7 @@
       "static_property_plan": {
         "generator_domain": "zero, maximum valid, and first-invalid typed circuit identifiers",
         "case_count": 10,
-        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/value_boundaries.rs"
       },
       "public_api_owners": [
         {"crate_name": "stab_core", "owner_path": "stab_core::QubitId"},
@@ -2129,7 +2129,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_value_items_and_repeat_blocks_are_independent", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_value_items_repeat_blocks", "--quiet", "--exact"]
       },
       "resource_contract": {
         "kind": "bounded-materialized",
@@ -2141,7 +2141,7 @@
       "static_property_plan": {
         "generator_domain": "empty, instruction, tagged instruction, nested target and argument inequality, repeat-block body/count/tag inequality, zero-count rejection, clone, and mutation-independence variants",
         "case_count": 21,
-        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.assignment_copies_operations"},
@@ -2172,7 +2172,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_append_items_preserve_tags_and_fuse", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_append_items", "--quiet", "--exact"]
       },
       "resource_contract": {
         "kind": "not-applicable",
@@ -2181,7 +2181,7 @@
       "static_property_plan": {
         "generator_domain": "tagged fusing instructions and one tagged repeat block",
         "case_count": 12,
-        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.append_op_fuse"},
@@ -2201,7 +2201,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_flattened_iterators_clone_without_sharing_position", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_flattened_iterator_values", "--quiet", "--exact"]
       },
       "resource_contract": {
         "kind": "not-applicable",
@@ -2210,7 +2210,7 @@
       "static_property_plan": {
         "generator_domain": "nested repeat forward and reverse iterator clone positions",
         "case_count": 2,
-        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "public_api_owners": [
         {"crate_name": "stab_model", "owner_path": "stab_model::CircuitFlattenedInstructionIter"},
@@ -2247,7 +2247,7 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_count_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_counts", "--quiet", "--exact"]
       },
       "resource_contract": {
         "kind": "bounded-materialized",
@@ -2257,7 +2257,7 @@
       "static_property_plan": {
         "generator_domain": "empty construction, append mutation, result-group counts, trillion-count folded repeats, and checked overflow",
         "case_count": 18,
-        "corpus_path": "crates/stab-core/tests/circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_sweep_bits"},
@@ -2285,14 +2285,14 @@
       "primary_selector": {
         "state": "existing",
         "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_qubit_count_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_qubit_count", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "bounded-materialized", "detail": "Qubit width returns one scalar while traversing nested 999,999-count repeats without materializing logical iterations."},
       "negative_axes": ["deep-huge-repeat-count", "measurement-pad-numeric-target"],
       "static_property_plan": {
         "generator_domain": "empty, plain, annotation, measurement-pad, and five-level huge-repeat qubit-width cases",
         "case_count": 5,
-        "corpus_path": "crates/stab-core/tests/circuit_api.rs"
+        "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"
       },
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_qubits"}
@@ -2307,11 +2307,11 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_final_coordinate_shift_matches_nested_upstream_case", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_final_coordinate_shift", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "bounded-materialized", "detail": "Nested billion-scale coordinate shifts use parsed-circuit nesting state instead of materializing logical repetitions and return one bounded coordinate vector."},
       "negative_axes": ["nested-billion-scale-repeat-expansion"],
-      "static_property_plan": {"generator_domain": "three nested coordinate-shift repeat dimensions", "case_count": 3, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "static_property_plan": {"generator_domain": "three nested coordinate-shift repeat dimensions", "case_count": 3, "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.final_coord_shift"}
       ],
@@ -2325,10 +2325,10 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_final_qubit_coordinates_apply_shifts_and_repeats", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_final_qubit_coordinates", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves final coordinates while a separate qualification case owns huge-repeat folding."},
-      "static_property_plan": {"generator_domain": "qubit coordinates before, within, and after repeated shifts", "case_count": 4, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "static_property_plan": {"generator_domain": "qubit coordinates before, within, and after repeated shifts", "case_count": 4, "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.get_final_qubit_coords"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_coords"}
@@ -2359,10 +2359,10 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_clear_resets_items_and_counts", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_clear", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves the empty post-clear invariant without a separate allocation claim."},
-      "static_property_plan": {"generator_domain": "instruction, measurement, and detector state cleared to empty", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "static_property_plan": {"generator_domain": "instruction, measurement, and detector state cleared to empty", "case_count": 5, "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_clear"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_clear"}
@@ -2377,11 +2377,11 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_repetition_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-model", "--test", "canonical_owner_evidence", "cq2_circuit_api_repetition", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "bounded-materialized", "detail": "Zero and one repetition use empty or cloned circuits, larger counts use one folded repeat block, and multiplication that overflows the repeat count rejects before expansion."},
       "negative_axes": ["large-repeat-count", "repeat-count-multiplication-overflow"],
-      "static_property_plan": {"generator_domain": "zero, one, folded two and three, nested fusion, 1.23e18 count, and overflow cases", "case_count": 8, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "static_property_plan": {"generator_domain": "zero, one, folded two and three, nested fusion, 1.23e18 count, and overflow cases", "case_count": 8, "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.multiplication_repeats"},
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.big_rep_count"}
@@ -2398,10 +2398,10 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_without_tags_is_recursive_and_non_mutating", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "gate_and_tag_contracts", "circuit_without_tags_is_recursive_non_mutating_and_preserves_boundaries", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves recursive tag removal and source independence without a separate allocation limit claim."},
-      "static_property_plan": {"generator_domain": "top-level, repeat, measurement, detector, record-target, and source-independence tag cases", "case_count": 6, "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"},
+      "static_property_plan": {"generator_domain": "top-level, repeat, measurement, detector, record-target, and source-independence tag cases", "case_count": 6, "corpus_path": "crates/stab-analysis/tests/gate_and_tag_contracts.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.without_tags"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_tags"}
@@ -2417,11 +2417,11 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_flattened_contract_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "canonical_owner_evidence", "cq2_circuit_api_flattened_transform", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "bounded-materialized", "detail": "The aggregate proves the one-million-instruction materialization admission boundary, folded shift-only huge repeats, and coordinate-overflow rejection in addition to exact flattened semantics."},
       "negative_axes": ["materialized-expansion-cap", "coordinate-overflow", "repeat-tag-removal"],
-      "static_property_plan": {"generator_domain": "basic, coordinate, tagged, flattened-operation, huge-repeat, cap-rejection, and overflow cases", "case_count": 7, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "static_property_plan": {"generator_domain": "basic, coordinate, tagged, flattened-operation, huge-repeat, cap-rejection, and overflow cases", "case_count": 7, "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.flattened"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_flattened"},
@@ -2442,10 +2442,10 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_without_noise_contract_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "canonical_owner_evidence", "cq2_circuit_api_without_noise_transform", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic aggregate proves ordinary and identity-error removal, measurement-noise stripping, heralded-result replacement, tag preservation, and annotation preservation without a separate size claim."},
-      "static_property_plan": {"generator_domain": "ordinary, measurement, heralded, identity-error, tagged, annotation, and record-preservation cases", "case_count": 8, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "static_property_plan": {"generator_domain": "ordinary, measurement, heralded, identity-error, tagged, annotation, and record-preservation cases", "case_count": 8, "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.noiseless_heralded_erase"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_noise"},
@@ -2463,10 +2463,10 @@
       "comparator": "property",
       "primary_selector": {
         "state": "existing", "kind": "cargo-test",
-        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_decomposed_contract_matches_stim", "--quiet", "--exact"]
+        "value": ["cargo", "test", "-p", "stab-analysis", "--test", "canonical_owner_evidence", "cq2_circuit_api_decomposed_transform", "--quiet", "--exact"]
       },
       "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic aggregate proves the selected ISWAP, MPP, SPP, pair-measurement, noise, annotation, tag, constant-product, and flow-preservation decomposition scope."},
-      "static_property_plan": {"generator_domain": "public example, tagged-noise, constant-product, anti-Hermitian, and measurement-rich flow cases", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "static_property_plan": {"generator_domain": "public example, tagged-noise, constant-product, anti-Hermitian, and measurement-rich flow cases", "case_count": 5, "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs"},
       "upstream_owners": [
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_decomposed"},
         {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_decomposed"}
@@ -3401,10 +3401,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "result_format_spans",
-            "result_format_diagnostic_value_contract_is_stable",
+            "parse_resources",
+            "byte_spans_reject_overflow_and_preserve_half_open_offsets",
             "--quiet",
             "--exact"
           ]
@@ -4202,10 +4202,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "agent_capabilities",
-            "sampling_request_estimate_counts_folded_and_expanded_work_without_execution",
+            "canonical_owner_evidence",
+            "a2_sampling_request_resource_estimate",
             "--quiet",
             "--exact"
           ]
@@ -4277,10 +4277,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "compiler_selects_only_registered_backends_and_fingerprints_the_plan",
+            "canonical_owner_evidence",
+            "a4_sampling_compiler_backend_contract",
             "--quiet",
             "--exact"
           ]
@@ -4320,10 +4320,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "plan_fingerprint_schema_one_has_an_independently_reconstructed_vector",
+            "canonical_owner_evidence",
+            "a4_sampling_plan_fingerprint_contract",
             "--quiet",
             "--exact"
           ]
@@ -4371,10 +4371,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "compilation_failures_keep_invalid_circuits_distinct_from_missing_backends",
+            "canonical_owner_evidence",
+            "a4_sampling_compile_diagnostic_contract",
             "--quiet",
             "--exact"
           ]
@@ -4408,10 +4408,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "plans_share_across_threads_while_sessions_keep_rng_state_isolated",
+            "canonical_owner_evidence",
+            "a4_sampling_plan_sharing_contract",
             "--quiet",
             "--exact"
           ]
@@ -4442,10 +4442,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "same_seeded_session_chunking_matches_one_combined_run",
+            "canonical_owner_evidence",
+            "a4_sampling_session_chunking_contract",
             "--quiet",
             "--exact"
           ]
@@ -5284,10 +5284,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "cancellation_stops_between_batches_and_leaves_the_session_resumable",
+            "canonical_owner_evidence",
+            "a4_sampling_session_cancellation_contract",
             "--quiet",
             "--exact"
           ]
@@ -5383,10 +5383,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "sampling_plan_session",
-            "sink_write_and_finish_errors_poison_with_exact_progress",
+            "canonical_owner_evidence",
+            "a4_sampling_session_failure_contract",
             "--quiet",
             "--exact"
           ]
@@ -7640,10 +7640,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "resource_policies",
-            "parse_limit_defaults_preserve_existing_boundaries",
+            "parse_resources",
+            "parse_limits_preserve_default_custom_and_hard_boundaries",
             "--quiet",
             "--exact"
           ]
@@ -7735,10 +7735,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "resource_policies",
-            "parse_estimate_classifies_only_cheaply_known_text_properties",
+            "parse_resources",
+            "parse_estimates_preserve_exact_line_and_byte_accounting",
             "--quiet",
             "--exact"
           ]
@@ -7874,10 +7874,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "resource_policies",
-            "circuit_parse_limits_accept_boundary_and_reject_first_excess_line",
+            "canonical_owner_evidence",
+            "a2_circuit_parse_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -7942,10 +7942,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "resource_policies",
-            "dem_parse_limits_accept_boundary_and_reject_first_excess_line",
+            "canonical_owner_evidence",
+            "a2_dem_parse_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -7978,10 +7978,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-model",
             "--test",
-            "resource_policies",
-            "circuit_and_dem_repeat_limits_reject_the_first_excess_level",
+            "canonical_owner_evidence",
+            "a2_parse_repeat_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -9743,10 +9743,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "record_width_is_admitted_at_the_limit_and_rejected_above_it",
+            "canonical_owner_evidence",
+            "a2_detection_record_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -9849,10 +9849,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "repeat_and_expanded_instruction_limits_are_independent",
+            "canonical_owner_evidence",
+            "a2_detection_work_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -9897,10 +9897,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "nested_repeat_iterations_are_bounded_in_aggregate",
+            "canonical_owner_evidence",
+            "a2_detection_repeat_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -10057,10 +10057,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "compiled_term_and_byte_budgets_preflight_wide_repeats",
+            "canonical_owner_evidence",
+            "a2_detection_compiled_plan_policy",
             "--quiet",
             "--exact"
           ]
@@ -10285,10 +10285,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "public_count_and_streaming_entry_points_apply_limits_before_work",
+            "canonical_owner_evidence",
+            "a2_detection_entry_policy_propagation",
             "--quiet",
             "--exact"
           ]
@@ -10341,10 +10341,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "detection_conversion_limits",
-            "frame_validation_and_sampling_apply_policy_before_materialization",
+            "canonical_owner_evidence",
+            "a2_detection_frame_policy_propagation",
             "--quiet",
             "--exact"
           ]
@@ -10385,10 +10385,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "dem_sampler_limits",
-            "custom_limits_accept_exact_sampled_work_maximum_and_reject_first_excess",
+            "canonical_owner_evidence",
+            "a2_dem_sampler_work_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -10433,10 +10433,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "dem_sampler_limits",
-            "replay_work_is_bounded_separately_from_returned_output",
+            "canonical_owner_evidence",
+            "a2_dem_sampler_replay_work_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -10576,10 +10576,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "dem_sampler_limits",
-            "custom_limits_accept_exact_materialized_unit_maximum_and_reject_first_excess",
+            "canonical_owner_evidence",
+            "a2_dem_sampler_unit_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -10620,10 +10620,10 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
+            "stab-engine",
             "--test",
-            "dem_sampler_limits",
-            "custom_limits_accept_exact_materialized_byte_maximum_and_reject_first_excess",
+            "canonical_owner_evidence",
+            "a2_dem_sampler_byte_policy_admission",
             "--quiet",
             "--exact"
           ]
@@ -11368,10 +11368,9 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "--test",
-            "logical_error_search_limits",
-            "public_search_entry_points_propagate_traversal_graph_and_frontier_limits",
+            "stab-analysis",
+            "--lib",
+            "dem::search::budget::tests::logical_error_search_defaults_are_production_identical",
             "--quiet",
             "--exact"
           ]
@@ -14210,10 +14209,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "stim_format",
-          "gates_table_matches_stim_v116_canonical_names_and_aliases",
+          "canonical_owner_evidence",
+          "cq2_gate_registry_contract",
           "--quiet",
           "--exact"
         ]
@@ -14286,10 +14285,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "stim_format",
-          "gate_lookup_accepts_canonical_alias_and_lowercase_names",
+          "canonical_owner_evidence",
+          "cq2_gate_name_lookup_contract",
           "--quiet",
           "--exact"
         ]
@@ -14367,10 +14366,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "gate_metadata",
-          "gate_unitary_matrix_metadata_matches_owned_gate_data",
+          "canonical_owner_evidence",
+          "cq2_gate_unitary_matrix_contract",
           "--quiet",
           "--exact"
         ]
@@ -14470,10 +14469,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-analysis",
           "--test",
-          "gate_metadata",
-          "gate_decomposition_metadata_matches_owned_gate_data",
+          "canonical_owner_evidence",
+          "cq2_gate_decomposition_metadata_contract",
           "--quiet",
           "--exact"
         ]
@@ -20664,6 +20663,50 @@
       "crate_name": "stab_core",
       "alias_owner_path": "stab_core::execution::sample_if_circuit_has_stabilizer_flows",
       "canonical_owner_path": "stab_core::sample_if_circuit_has_stabilizer_flows"
+    }
+  ],
+  "canonical_owner_exceptions": [
+    {
+      "crate_name": "stab_engine",
+      "owner_source_id": "a2-detection-materialization-policy-admission",
+      "evidence_package": "stab-core",
+      "reason": "Total-output materialization belongs to stab-core compatibility helpers, while canonical engine conversion sessions remain streaming and expose only the shared policy value."
+    },
+    {
+      "crate_name": "stab_engine",
+      "owner_source_id": "a2-runtime-capability-descriptors",
+      "evidence_package": "stab-core",
+      "reason": "CapabilitySet::current is the reviewed facade aggregation that combines canonical model dialect and engine compiler descriptors."
+    },
+    {
+      "crate_name": "stab_model",
+      "owner_source_id": "a2-runtime-capability-descriptors",
+      "evidence_package": "stab-core",
+      "reason": "CapabilitySet::current is the reviewed facade aggregation that combines canonical model dialect and engine compiler descriptors."
+    },
+    {
+      "crate_name": "stab_model",
+      "owner_source_id": "cq2-dem-flattened-iteration-contract",
+      "evidence_package": "stab-analysis",
+      "reason": "The direct analysis test compares materialized flattening with the model-owned lazy iterator over the same folded detector error model."
+    },
+    {
+      "crate_name": "stab_model",
+      "owner_source_id": "cq2-gate-decomposition-metadata-contract",
+      "evidence_package": "stab-analysis",
+      "reason": "The direct analysis test consumes model-owned decomposition descriptors and validates their canonical conversion into circuit semantics."
+    },
+    {
+      "crate_name": "stab_model",
+      "owner_source_id": "cq2-gate-unitary-matrix-contract",
+      "evidence_package": "stab-analysis",
+      "reason": "The direct analysis test consumes model-owned unitary rows and validates the canonical algebra-valued matrix projection."
+    },
+    {
+      "crate_name": "stab_model",
+      "owner_source_id": "pf1-gate-flow-metadata",
+      "evidence_package": "stab-analysis",
+      "reason": "The direct analysis test consumes model-owned flow descriptors and validates their canonical algebra-valued flow projection."
     }
   ],
   "existing_parent_mappings": [

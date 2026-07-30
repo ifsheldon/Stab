@@ -4,7 +4,8 @@ use serde_json::{Value, json};
 
 use super::*;
 use crate::qualification::model::{
-    ApiPath, CaseId, DeferredProduct, PropertyExecutionMode, SemanticDigest,
+    ApiPath, CanonicalOwnerException, CaseId, DeferredProduct, PropertyExecutionMode,
+    SemanticDigest,
 };
 
 static REPOSITORY_MANIFEST: OnceLock<QualificationManifest> = OnceLock::new();
@@ -130,6 +131,117 @@ fn validation_rejects_stale_public_api_owner() {
     refresh_digest(&mut manifest);
     let error = validate(&manifest, "UNFROZEN").expect_err("stale owner must fail");
     assert!(error.to_string().contains("references missing owner"));
+}
+
+#[test]
+fn validation_enforces_every_canonical_package_and_narrow_exceptions() {
+    const PACKAGES: [(&str, &str); 6] = [
+        ("stab_bits", "stab-bits"),
+        ("stab_records", "stab-records"),
+        ("stab_algebra", "stab-algebra"),
+        ("stab_model", "stab-model"),
+        ("stab_analysis", "stab-analysis"),
+        ("stab_engine", "stab-engine"),
+    ];
+
+    for (crate_name, expected_package) in PACKAGES {
+        let mut manifest = repository_manifest();
+        let owner_id = manifest
+            .public_api_items
+            .iter()
+            .filter(|item| item.crate_name == crate_name)
+            .find_map(|item| {
+                let owner = manifest
+                    .evidence_cases
+                    .iter()
+                    .find(|case| case.id == item.owner_case_id)?;
+                (owner.status == EvidenceStatus::Implemented
+                    && owner.primary_selector.value.get(3).map(String::as_str)
+                        == Some(expected_package)
+                    && !manifest.canonical_owner_exceptions.iter().any(|exception| {
+                        exception.crate_name == crate_name
+                            && exception.owner_source_id == owner.source_id
+                    }))
+                .then(|| owner.id.clone())
+            })
+            .expect("each canonical package has direct implemented evidence");
+        let owner = manifest
+            .evidence_cases
+            .iter_mut()
+            .find(|case| case.id == owner_id)
+            .expect("selected owner remains present");
+        *owner
+            .primary_selector
+            .value
+            .get_mut(3)
+            .expect("Cargo selector has a package") = "stab-core".to_string();
+        refresh_digest(&mut manifest);
+        let error = validate(&manifest, "UNFROZEN")
+            .expect_err("facade evidence cannot replace a canonical package selector");
+        assert!(
+            error.to_string().contains(expected_package),
+            "{crate_name} did not report its expected package: {error}"
+        );
+    }
+
+    let mut allowed = repository_manifest();
+    let (owner_id, owner_source_id) = allowed
+        .public_api_items
+        .iter()
+        .filter(|item| item.crate_name == "stab_model")
+        .find_map(|item| {
+            let owner = allowed
+                .evidence_cases
+                .iter()
+                .find(|case| case.id == item.owner_case_id)?;
+            (owner.status == EvidenceStatus::Implemented
+                && owner.primary_selector.value.get(3).map(String::as_str) == Some("stab-model")
+                && !allowed.canonical_owner_exceptions.iter().any(|exception| {
+                    exception.crate_name == "stab_model"
+                        && exception.owner_source_id == owner.source_id
+                }))
+            .then(|| (owner.id.clone(), owner.source_id.to_string()))
+        })
+        .expect("model package has unexcepted direct evidence");
+    let owner = allowed
+        .evidence_cases
+        .iter_mut()
+        .find(|case| case.id == owner_id)
+        .expect("selected owner remains present");
+    *owner
+        .primary_selector
+        .value
+        .get_mut(3)
+        .expect("Cargo selector has a package") = "stab-core".to_string();
+    allowed
+        .canonical_owner_exceptions
+        .push(CanonicalOwnerException {
+            crate_name: "stab_model".to_string(),
+            owner_source_id,
+            evidence_package: "stab-core".to_string(),
+            reason:
+                "The test fixture deliberately exercises a reviewed cross-component facade adapter."
+                    .to_string(),
+        });
+    allowed.canonical_owner_exceptions.sort();
+    refresh_digest(&mut allowed);
+    validate(&allowed, "UNFROZEN").expect("an exact source-owned exception is admitted");
+
+    let mut stale = repository_manifest();
+    stale
+        .canonical_owner_exceptions
+        .push(CanonicalOwnerException {
+        crate_name: "stab_model".to_string(),
+        owner_source_id: "unused-owner".to_string(),
+        evidence_package: "stab-core".to_string(),
+        reason:
+            "A stale exception must not survive merely because its prose is sufficiently detailed."
+                .to_string(),
+    });
+    stale.canonical_owner_exceptions.sort();
+    refresh_digest(&mut stale);
+    let error = validate(&stale, "UNFROZEN").expect_err("unused exception must fail");
+    assert!(error.to_string().contains("stale or owns no implemented"));
 }
 
 #[test]

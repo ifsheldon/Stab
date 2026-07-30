@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use serde::de::{Error as _, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub(super) const SCHEMA_VERSION: u32 = 5;
+pub(super) const SCHEMA_VERSION: u32 = 6;
 
 const MAX_CASE_ID_BYTES: usize = 128;
 const MAX_API_PATH_BYTES: usize = 1_024;
@@ -375,8 +375,23 @@ pub(super) struct QualificationManifest {
     pub(super) public_api_items: Vec<PublicApiItem>,
     #[serde(deserialize_with = "deserialize_vec_512")]
     pub(super) public_api_aliases: Vec<PublicApiAlias>,
+    #[serde(default, deserialize_with = "deserialize_vec_512")]
+    pub(super) canonical_owner_exceptions: Vec<CanonicalOwnerException>,
     #[serde(deserialize_with = "deserialize_vec_8192")]
     pub(super) evidence_cases: Vec<EvidenceCase>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CanonicalOwnerException {
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) crate_name: String,
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) owner_source_id: String,
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) evidence_package: String,
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) reason: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]

@@ -18,6 +18,7 @@ const PYTHON_AST_VERSION: &str = "3.14.6";
 const MAX_UPSTREAM_CASES: usize = 8_192;
 const MAX_PUBLIC_API_ITEMS: usize = 8_192;
 const MAX_PUBLIC_API_ALIASES: usize = 512;
+const MAX_CANONICAL_OWNER_EXCEPTIONS: usize = 512;
 const MAX_EVIDENCE_CASES: usize = 8_192;
 const MAX_TEXT_BYTES: usize = 2_048;
 const MAX_IDENTIFIER_BYTES: usize = 128;
@@ -128,6 +129,12 @@ fn validate_header(manifest: &QualificationManifest, violations: &mut Validation
         "public API aliases",
         manifest.public_api_aliases.len(),
         MAX_PUBLIC_API_ALIASES,
+        violations,
+    );
+    validate_limit(
+        "canonical owner exceptions",
+        manifest.canonical_owner_exceptions.len(),
+        MAX_CANONICAL_OWNER_EXCEPTIONS,
         violations,
     );
     validate_limit(

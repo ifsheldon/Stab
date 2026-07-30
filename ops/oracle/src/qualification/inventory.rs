@@ -271,7 +271,7 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         &mut blocker_evidence,
     )?);
     evidence_cases.extend(blocker_evidence);
-    let mut public_api_aliases = qualification_cases::apply(
+    let (mut public_api_aliases, canonical_owner_exceptions) = qualification_cases::apply(
         root,
         &stim.tag,
         &stim.commit,
@@ -331,6 +331,7 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         upstream_cases,
         public_api_items,
         public_api_aliases,
+        canonical_owner_exceptions,
         evidence_cases,
     };
     manifest.semantic_digest = semantic_digest(&manifest)?;

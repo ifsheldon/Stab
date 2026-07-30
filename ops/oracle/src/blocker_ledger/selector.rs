@@ -188,6 +188,10 @@ impl<'a> CargoTestSelector<'a> {
         self.exact && self.filter.is_some()
     }
 
+    pub(crate) fn package(self) -> &'a str {
+        self.package
+    }
+
     pub(crate) fn display(self) -> String {
         let exact = if self.exact { " --exact" } else { "" };
         let filter = self
