@@ -10,7 +10,10 @@ use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
-use super::measure_stab;
+use super::{batch_sinks::OutputWitness, measure_stab};
+
+#[cfg(test)]
+mod tests;
 
 const CLI_DISPATCH_ARGS: &[&str] = &[
     "stab",
@@ -37,6 +40,8 @@ const LEGACY_DISPATCH_ARGS: &[&str] = &[
 const CONVERT_STIM_ARGS: &[&str] = &["stab", "convert", "--in_format=stim", "--out_format=stim"];
 const CONVERT_STIM_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/parser_basic.stim");
+// Frozen from pinned Stim v1.16.0 for the exact LEGACY_DISPATCH_ARGS command.
+const LEGACY_DISPATCH_EXPECTED: OutputWitness = OutputWitness::new(757, 0xbd1f_30bb_8b3b_aa5d);
 
 pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     Ok(vec![measure_stab("stab_cli_dispatch_gen_d3_r3", || {
@@ -63,27 +68,47 @@ pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement
 }
 
 pub(super) fn run_legacy_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let preflight = run_legacy_dispatch_once(row)?;
+    ensure_legacy_dispatch_witness(&row.id, OutputWitness::from_bytes(&preflight))?;
+    black_box(preflight);
     Ok(vec![measure_stab("stab_pf7_cli_legacy_gen_d3_r3", || {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = stab_cli::run_from(
-            LEGACY_DISPATCH_ARGS,
-            std::io::empty(),
-            &mut stdout,
-            &mut stderr,
-        );
-        if status != 0 {
-            return Err(BenchError::StabRunner {
-                row_id: row.id.clone(),
-                message: format!(
-                    "stab-cli legacy dispatch failed with status {status}: {}",
-                    String::from_utf8_lossy(&stderr)
-                ),
-            });
-        }
+        let stdout = run_legacy_dispatch_once(row)?;
         black_box(stdout.len());
         Ok(())
     })?])
+}
+
+fn run_legacy_dispatch_once(row: &BenchmarkRow) -> Result<Vec<u8>, BenchError> {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(
+        LEGACY_DISPATCH_ARGS,
+        std::io::empty(),
+        &mut stdout,
+        &mut stderr,
+    );
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli legacy dispatch failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    Ok(stdout)
+}
+
+fn ensure_legacy_dispatch_witness(row_id: &str, actual: OutputWitness) -> Result<(), BenchError> {
+    if actual == LEGACY_DISPATCH_EXPECTED {
+        return Ok(());
+    }
+    Err(BenchError::StabRunner {
+        row_id: row_id.to_string(),
+        message: format!(
+            "legacy dispatch output changed from pinned Stim v1.16.0: expected {LEGACY_DISPATCH_EXPECTED:?}, got {actual:?}"
+        ),
+    })
 }
 
 pub(super) fn run_convert_stim_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

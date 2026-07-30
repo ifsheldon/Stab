@@ -28,6 +28,16 @@ use super::{
 mod detecting_region_rows;
 mod gate_semantic;
 mod missing_detector_rows;
+mod witness;
+#[cfg(test)]
+mod witness_tests;
+
+use witness::{
+    DetectSweepExpectation, M2dCliWitness, ensure_detect_sweep_witness, ensure_m2d_cli_witness,
+    m2d_feedback_inline_expected, m2d_sweep_01_expected, m2d_sweep_b8_expected,
+    m2d_sweep_obs_out_expected, m2d_sweep_ptb64_expected, run_m2d_cli_once,
+    sample_detect_sweep_witness,
+};
 
 const DETECT_BASIC_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/detect_basic.stim");
@@ -38,6 +48,8 @@ const M2D_SWEEP_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_sweep_measurements.01");
 const M2D_SWEEP_B8_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../benchmarks/fixtures/m9_m2d_sweep_b8_measurements.b8");
+const M2D_SWEEP_B8_SWEEP: &[u8] =
+    include_bytes!("../../../../benchmarks/fixtures/m9_m2d_sweep_b8_sweep.b8");
 const M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_ran_without_feedback_measurements.01");
 #[cfg(not(test))]
@@ -108,6 +120,7 @@ pub(super) fn run_detection_compare_row(
             m2d_sweep_args(root, false),
             M2D_SWEEP_MEASUREMENTS,
             None,
+            m2d_sweep_01_expected(),
         )
         .map(Some),
         "m9-m2d-sweep-b8-cli" => run_m2d_cli_row(
@@ -116,6 +129,7 @@ pub(super) fn run_detection_compare_row(
             m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
+            m2d_sweep_b8_expected(),
         )
         .map(Some),
         "m9-m2d-sweep-obs-out-cli" => run_m2d_cli_row(
@@ -124,6 +138,7 @@ pub(super) fn run_detection_compare_row(
             m2d_sweep_args(root, true),
             M2D_SWEEP_MEASUREMENTS,
             Some(obs_out_path(root)),
+            m2d_sweep_obs_out_expected(),
         )
         .map(Some),
         "m9-m2d-ran-without-feedback-cli" => run_m2d_cli_row(
@@ -132,6 +147,7 @@ pub(super) fn run_detection_compare_row(
             m2d_ran_without_feedback_args(root),
             M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
             None,
+            m2d_feedback_inline_expected(),
         )
         .map(Some),
         "m9-detecting-regions-basic-batch" => detecting_region_rows::run_basic_batch(row).map(Some),
@@ -160,6 +176,7 @@ pub(super) fn run_detection_compare_row(
             m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
+            m2d_sweep_b8_expected(),
         )
         .map(Some),
         "pf3-m2d-sweep-ptb64-input" => run_m2d_sweep_ptb64_cli_row(root, row).map(Some),
@@ -171,6 +188,7 @@ pub(super) fn run_detection_compare_row(
             m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
+            m2d_sweep_b8_expected(),
         )
         .map(Some),
         "pf7-cli-m2d-feedback-inline" => run_m2d_cli_row(
@@ -179,6 +197,7 @@ pub(super) fn run_detection_compare_row(
             m2d_ran_without_feedback_args(root),
             M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
             None,
+            m2d_feedback_inline_expected(),
         )
         .map(Some),
         _ => Ok(None),
@@ -489,6 +508,16 @@ fn run_feedback_inline_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>,
 fn run_detect_sweep_sampling_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let non_frame = parse_circuit(&row.id, DETECT_SWEEP_DEFAULT_FALSE)?;
     let frame = parse_circuit(&row.id, DETECT_FRAME_SWEEP_DEFAULT_FALSE)?;
+    ensure_detect_sweep_witness(
+        &row.id,
+        DetectSweepExpectation::FairDetector,
+        sample_detect_sweep_witness(&row.id, &non_frame)?,
+    )?;
+    ensure_detect_sweep_witness(
+        &row.id,
+        DetectSweepExpectation::DeterministicFalseObservable,
+        sample_detect_sweep_witness(&row.id, &frame)?,
+    )?;
     Ok(vec![
         measure_detect_sweep_sampling(row, &non_frame, "stab_detect_sweep_default_false")?,
         measure_detect_sweep_sampling(row, &frame, "stab_detect_frame_sweep_default_false")?,
@@ -523,69 +552,23 @@ fn run_m2d_cli_row(
     args: Vec<OsString>,
     input: &[u8],
     side_output: Option<PathBuf>,
+    expected: M2dCliWitness,
 ) -> Result<Vec<Measurement>, BenchError> {
     if let Some(path) = side_output.as_ref() {
         create_parent_dir(row, path)?;
     }
-    let expected = run_m2d_cli_once(row, &args, input, side_output.as_deref())?;
+    let preflight = run_m2d_cli_once(&row.id, &args, input, side_output.as_deref())?;
+    ensure_m2d_cli_witness(&row.id, expected, preflight)?;
+    black_box(preflight);
     Ok(vec![measure_stab_iterations(
         measurement_name,
         super::STAB_COMPARE_ITERATIONS,
         || {
-            let actual = run_m2d_cli_once(row, &args, input, side_output.as_deref())?;
-            if actual != expected {
-                return Err(stab_runner_error(
-                    &row.id,
-                    format!("m2d diagnostic output changed: expected {expected:?}, got {actual:?}"),
-                ));
-            }
+            let actual = run_m2d_cli_once(&row.id, &args, input, side_output.as_deref())?;
             black_box(actual);
             Ok(())
         },
     )?])
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct M2dCliWitness {
-    stdout: OutputWitness,
-    side_output: Option<OutputWitness>,
-}
-
-fn run_m2d_cli_once(
-    row: &BenchmarkRow,
-    args: &[OsString],
-    input: &[u8],
-    side_output: Option<&Path>,
-) -> Result<M2dCliWitness, BenchError> {
-    let mut stdout = ByteDigestWriter::default();
-    let mut stderr = Vec::new();
-    let status = stab_cli::run_from(args.iter().cloned(), input, &mut stdout, &mut stderr);
-    if status != 0 {
-        return Err(BenchError::StabRunner {
-            row_id: row.id.clone(),
-            message: format!(
-                "stab-cli m2d failed with status {status}: {}",
-                String::from_utf8_lossy(&stderr)
-            ),
-        });
-    }
-    let side_output = side_output
-        .map(|path| {
-            std::fs::read(path)
-                .map(|bytes| OutputWitness::from_bytes(&bytes))
-                .map_err(|source| BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: format!(
-                        "failed to read m2d side output {}: {source}",
-                        path.display()
-                    ),
-                })
-        })
-        .transpose()?;
-    Ok(M2dCliWitness {
-        stdout: stdout.witness(),
-        side_output,
-    })
 }
 
 fn run_m2d_sweep_ptb64_cli_row(
@@ -609,6 +592,7 @@ fn run_m2d_sweep_ptb64_cli_row(
         m2d_sweep_ptb64_args(root, &sweep_path),
         &measurement_input,
         None,
+        m2d_sweep_ptb64_expected(),
     )
 }
 

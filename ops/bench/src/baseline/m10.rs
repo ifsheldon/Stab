@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
+use sha2::{Digest, Sha256};
 use stab_analysis::{
     ErrorAnalyzerOptions, circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
     shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
@@ -23,6 +24,9 @@ use super::{
     STAB_COMPARE_ITERATIONS, TINY_DIRECT_COMPARE_REPETITIONS, duration_variance_seconds,
     measure_stab_iterations, stab_runner_error,
 };
+
+#[cfg(test)]
+mod tests;
 
 const DEM_PARSE_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_deterministic.dem");
@@ -67,6 +71,21 @@ const SPARSE_REVERSE_HIGH_IDLE_QUBITS: usize = 256;
 const SPARSE_REVERSE_SHIFTED_REPEAT_COUNT: u64 = 1025;
 #[cfg(test)]
 const SPARSE_REVERSE_SHIFTED_REPEAT_COUNT: u64 = 17;
+const ANALYZER_WITNESS_DOMAIN: &[u8] = b"stab-a6-analyzer-semantic-witness-v1\0";
+// Frozen from pinned Stim v1.16.0. The semantic digest quantizes probabilities
+// to 1e-15 while retaining every instruction kind, target, separator, and line.
+const PF7_ANALYZE_DECOMPOSE_EXPECTED: AnalyzerSemanticExpectation =
+    AnalyzerSemanticExpectation::new(
+        12,
+        1,
+        "760014a8babd8c8d3c26e480f3037258c9769b4667a17d1aa464a5ed30b0d67e",
+    );
+const PF7_ANALYZE_GENERATED_EXPECTED: AnalyzerSemanticExpectation =
+    AnalyzerSemanticExpectation::new(
+        12_937,
+        245,
+        "c7b3c87ffba478f880bd2e56bd598d104deda56aeeffa4cde1af7dbe3bd9e64c",
+    );
 
 pub(super) fn run_dem_compare_row(
     row: &BenchmarkRow,
@@ -269,6 +288,12 @@ fn run_analyze_decompose_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
         OsString::from("analyze_errors"),
         OsString::from("--decompose_errors"),
     ];
+    preflight_analyze_cli(
+        row,
+        &args,
+        ANALYZE_BASIC_FIXTURE.as_bytes(),
+        PF7_ANALYZE_DECOMPOSE_EXPECTED,
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_pf7_cli_analyze_errors_decompose",
         STAB_COMPARE_ITERATIONS,
@@ -300,6 +325,12 @@ fn run_analyze_generated_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     let circuit = error_analyzer_surface_code(&row.id)?;
     let circuit_text = circuit.to_stim_string();
     let args = vec![OsString::from("stab"), OsString::from("analyze_errors")];
+    preflight_analyze_cli(
+        row,
+        &args,
+        circuit_text.as_bytes(),
+        PF7_ANALYZE_GENERATED_EXPECTED,
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_pf7_cli_analyze_errors_generated",
         ERROR_ANALYZER_COMPARE_ITERATIONS,
@@ -325,6 +356,145 @@ fn run_analyze_generated_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
             Ok(())
         },
     )?])
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct AnalyzerSemanticExpectation {
+    bytes: usize,
+    records: usize,
+    digest: &'static str,
+}
+
+impl AnalyzerSemanticExpectation {
+    const fn new(bytes: usize, records: usize, digest: &'static str) -> Self {
+        Self {
+            bytes,
+            records,
+            digest,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct AnalyzerSemanticWitness {
+    bytes: usize,
+    records: usize,
+    digest: String,
+}
+
+fn preflight_analyze_cli(
+    row: &BenchmarkRow,
+    args: &[OsString],
+    input: &[u8],
+    expected: AnalyzerSemanticExpectation,
+) -> Result<(), BenchError> {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = stab_cli::run_from(args.iter().cloned(), input, &mut stdout, &mut stderr);
+    if status != 0 {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "stab-cli analyze_errors semantic preflight failed with status {status}: {}",
+                String::from_utf8_lossy(&stderr)
+            ),
+        });
+    }
+    let actual = analyzer_semantic_witness(&row.id, &stdout)?;
+    ensure_analyzer_semantic_witness(&row.id, expected, &actual)?;
+    black_box(actual);
+    Ok(())
+}
+
+fn analyzer_semantic_witness(
+    row_id: &str,
+    bytes: &[u8],
+) -> Result<AnalyzerSemanticWitness, BenchError> {
+    let text = std::str::from_utf8(bytes).map_err(|error| {
+        stab_runner_error(
+            row_id,
+            format!("analyze_errors output was not UTF-8: {error}"),
+        )
+    })?;
+    let mut digest = Sha256::new();
+    digest.update(ANALYZER_WITNESS_DOMAIN);
+    let mut records = 0usize;
+    for record in text.split_inclusive('\n') {
+        records += 1;
+        let (body, newline) = record
+            .strip_suffix('\n')
+            .map_or((record, ""), |body| (body, "\n"));
+        if let Some(error_body) = body.as_bytes().strip_prefix(b"error(") {
+            let close = error_body
+                .iter()
+                .position(|byte| *byte == b')')
+                .ok_or_else(|| {
+                    stab_runner_error(
+                        row_id,
+                        "analyze_errors output contained an open error argument",
+                    )
+                })?;
+            let probability_bytes = error_body.get(..close).ok_or_else(|| {
+                stab_runner_error(row_id, "analyze_errors probability span was invalid")
+            })?;
+            let probability_text = std::str::from_utf8(probability_bytes).map_err(|error| {
+                stab_runner_error(
+                    row_id,
+                    format!("analyze_errors probability was not UTF-8: {error}"),
+                )
+            })?;
+            let probability = probability_text.parse::<f64>().map_err(|error| {
+                stab_runner_error(
+                    row_id,
+                    format!("analyze_errors output probability was invalid: {error}"),
+                )
+            })?;
+            let scaled = probability * 1e15;
+            if !scaled.is_finite() || !(0.0..=1e15).contains(&scaled) {
+                return Err(stab_runner_error(
+                    row_id,
+                    "analyze_errors output probability was outside [0, 1]",
+                ));
+            }
+            digest.update(b"error(");
+            digest.update(format!("{scaled:.0}").as_bytes());
+            digest.update(b")");
+            let suffix = close
+                .checked_add(1)
+                .and_then(|start| error_body.get(start..))
+                .ok_or_else(|| {
+                    stab_runner_error(row_id, "analyze_errors target span was invalid")
+                })?;
+            digest.update(suffix);
+            digest.update(newline.as_bytes());
+        } else {
+            digest.update(record.as_bytes());
+        }
+    }
+    Ok(AnalyzerSemanticWitness {
+        bytes: bytes.len(),
+        records,
+        digest: hex::encode(digest.finalize()),
+    })
+}
+
+fn ensure_analyzer_semantic_witness(
+    row_id: &str,
+    expected: AnalyzerSemanticExpectation,
+    actual: &AnalyzerSemanticWitness,
+) -> Result<(), BenchError> {
+    if actual.bytes == expected.bytes
+        && actual.records == expected.records
+        && actual.digest == expected.digest
+    {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        row_id,
+        format!(
+            "analyze_errors output changed from the pinned Stim semantic witness: expected {expected:?}, got {actual:?}"
+        ),
+    ))
 }
 
 fn run_error_decomp_loop_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
