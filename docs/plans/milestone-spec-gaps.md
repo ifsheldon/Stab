@@ -1396,3 +1396,12 @@ Current text: A6 required physical component extraction and regenerated qualific
 Gap: `stab-bits` and `stab-algebra` APIs could appear correctly reexported while their implemented qualification parents still compiled and exercised `stab-core`, weakening both Stable-boundary proof and package independence.
 Proposed amendment: require implemented canonical bit and algebra API parents plus their owned oracle fixtures to execute the owning package directly, while preserving a narrow allowlist for genuine circuit or analysis integration.
 Resolution: M5 bit qualification moved to `stab-bits`; pure M6 Pauli, Clifford, Flow, Tableau, iterator, solver, resource, and unitary-conversion suites moved to `stab-algebra`; two circuit-to-Tableau resource cases remain in `stab-core`; and the oracle inventory now rejects any implemented `stab_bits` or `stab_algebra` API whose primary Cargo selector does not name its canonical package.
+
+## 2026-07-30 - A6: Cross-Milestone Profiler Notes And Metadata Strictness
+
+Status: Resolved
+Revealed by: execution of the complete 166-row A6 ownership-continuity comparison.
+Current text: the A6 contract required source-owned profiler notes and strict completion of every selected manifest row, but the compare CLI accepted only one profiler-note directory and treated the intentional `m7-perf-harness` baseline anchor as a missing runtime measurement.
+Gap: copying PF6 notes into the M12 directory would duplicate source ownership, while weakening strict mode globally would allow real executable contracts to disappear. The contract also did not state that the frozen 166 rows contain 165 runtime workloads and one metadata-only provenance row.
+Proposed amendment: permit multiple source-owned profiler-note roots with duplicate identities rejected, and exempt only the explicit `baseline-metadata` threshold class from the strict runtime-measurement requirement.
+Resolution: `--profiler-notes-dir` is repeatable, schema-version-2 reports retain the complete structured root list and the first legacy singular root while continuing to read schema-version-1 reports, required note validation rejects duplicate selected identities regardless of the current ratio, and strict comparison continues to require every non-metadata contract measurement. The A6 plan, extraction map, goal, benchmark documentation, and progress record now identify the exact 165-plus-one matrix.

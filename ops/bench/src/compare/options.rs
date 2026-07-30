@@ -69,7 +69,7 @@ mod tests {
             only: Vec::new(),
             report: None,
             require_profiler_notes: false,
-            profiler_notes_dir: None,
+            profiler_notes_dirs: Vec::new(),
             require_beta_gate: false,
             beta_waivers: None,
             require_memory_gate: false,

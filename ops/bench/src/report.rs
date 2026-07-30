@@ -148,8 +148,11 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline_path: Option<String>,
     pub(crate) thresholds_path: Option<String>,
+    /// Legacy singular source retained for historical compare reports.
     #[serde(default)]
     pub(crate) profiler_notes_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) profiler_notes_paths: Vec<String>,
     pub(crate) track_allocations: bool,
     #[serde(default)]
     pub(crate) warmup: bool,
@@ -405,8 +408,21 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             "- Regression waivers: {regression_waivers_path}\n"
         ));
     }
-    if let Some(profiler_notes_path) = &report.command.profiler_notes_path {
-        out.push_str(&format!("- Profiler notes: {profiler_notes_path}\n"));
+    let profiler_notes_paths = if report.command.profiler_notes_paths.is_empty() {
+        report
+            .command
+            .profiler_notes_path
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+    } else {
+        report.command.profiler_notes_paths.clone()
+    };
+    if !profiler_notes_paths.is_empty() {
+        out.push_str(&format!(
+            "- Profiler notes: {}\n",
+            profiler_notes_paths.join(", ")
+        ));
     }
     out.push_str(&format!("- Warmup: {}\n", report.command.warmup));
     out.push_str(&format!(
@@ -589,4 +605,84 @@ where
 
 fn default_measurement_runs() -> usize {
     1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CompareCommandMetadata;
+
+    #[test]
+    fn compare_command_metadata_keeps_legacy_profiler_note_reports_readable() {
+        let metadata: CompareCommandMetadata = serde_json::from_str(
+            r#"{
+                "baseline_path":"baseline.json",
+                "profile":"release",
+                "milestone":null,
+                "primary":false,
+                "filters":[],
+                "require_profiler_notes":true,
+                "require_beta_gate":false,
+                "require_memory_gate":false,
+                "memory_baseline_path":null,
+                "thresholds_path":null,
+                "profiler_notes_path":"benchmarks/profiler-notes/m12",
+                "track_allocations":false,
+                "warmup":true,
+                "measurement_runs":3,
+                "strict":true
+            }"#,
+        )
+        .expect("legacy metadata should deserialize");
+
+        assert_eq!(
+            metadata.profiler_notes_path.as_deref(),
+            Some("benchmarks/profiler-notes/m12")
+        );
+        assert!(metadata.profiler_notes_paths.is_empty());
+    }
+
+    #[test]
+    fn compare_command_metadata_serializes_structured_profiler_note_roots() {
+        let metadata = CompareCommandMetadata {
+            baseline_path: "baseline.json".to_string(),
+            profile: "release".to_string(),
+            milestone: None,
+            primary: false,
+            filters: Vec::new(),
+            require_profiler_notes: true,
+            require_beta_gate: false,
+            beta_waivers_path: None,
+            regression_waivers_path: None,
+            require_memory_gate: false,
+            memory_baseline_path: None,
+            thresholds_path: None,
+            profiler_notes_path: Some("benchmarks/profiler-notes/m12".to_string()),
+            profiler_notes_paths: vec![
+                "benchmarks/profiler-notes/m12".to_string(),
+                "benchmarks/profiler-notes/pfm-b5".to_string(),
+            ],
+            track_allocations: false,
+            warmup: true,
+            measurement_runs: 3,
+            strict: true,
+        };
+
+        let value = serde_json::to_value(metadata).expect("metadata should serialize");
+
+        assert_eq!(
+            value
+                .get("profiler_notes_path")
+                .expect("legacy profiler-note root"),
+            "benchmarks/profiler-notes/m12"
+        );
+        assert_eq!(
+            value
+                .get("profiler_notes_paths")
+                .expect("structured profiler-note roots"),
+            &serde_json::json!([
+                "benchmarks/profiler-notes/m12",
+                "benchmarks/profiler-notes/pfm-b5"
+            ])
+        );
+    }
 }

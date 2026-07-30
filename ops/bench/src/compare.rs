@@ -9,7 +9,7 @@ use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
 use crate::compare_evidence::{aggregate_measurement_runs, paired_measurement_ratios};
 use crate::config::PREFIX;
 use crate::error::BenchError;
-use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
+use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
 use crate::report::{
@@ -21,8 +21,10 @@ use crate::root::RepoRoot;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
 mod options;
+mod profiler_notes;
 
 use options::validate_compare_options;
+use profiler_notes::{ProfilerNoteFindings, apply_profiler_notes, profiler_note_report_metadata};
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompareOptions {
@@ -33,7 +35,7 @@ pub(crate) struct CompareOptions {
     pub(crate) only: Vec<String>,
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
-    pub(crate) profiler_notes_dir: Option<PathBuf>,
+    pub(crate) profiler_notes_dirs: Vec<PathBuf>,
     pub(crate) require_beta_gate: bool,
     pub(crate) beta_waivers: Option<PathBuf>,
     pub(crate) require_memory_gate: bool,
@@ -142,7 +144,9 @@ pub(crate) fn run_compare(
                         stim_summary,
                         printed_note
                     );
-                    contract_only_without_measurements.push(row.id.clone());
+                    if strict_requires_contract_measurement(row) {
+                        contract_only_without_measurements.push(row.id.clone());
+                    }
                     report_rows.push(build_compare_row_result(CompareRowBuild {
                         row,
                         status: "contract-only",
@@ -324,21 +328,23 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
         mut rows,
     } = input;
     let out_dir = root.create_benchmark_output_dir(report_dir)?;
-    let profiler_notes_read_dir = options.profiler_notes_dir.as_ref().map_or_else(
-        || out_dir.join("profiler-notes"),
-        |path| root.resolve_relative(path),
-    );
-    let profiler_notes_report_dir = options
-        .profiler_notes_dir
-        .as_deref()
-        .unwrap_or_else(|| Path::new("profiler-notes"));
-    let profiler_note_findings = apply_profiler_notes(
-        &mut rows,
-        &profiler_notes_read_dir,
-        profiler_notes_report_dir,
-    );
+    let profiler_note_dirs = if options.profiler_notes_dirs.is_empty() {
+        vec![(
+            out_dir.join("profiler-notes"),
+            PathBuf::from("profiler-notes"),
+        )]
+    } else {
+        options
+            .profiler_notes_dirs
+            .iter()
+            .map(|path| (root.resolve_relative(path), path.clone()))
+            .collect()
+    };
+    let profiler_note_findings = apply_profiler_notes(&mut rows, &profiler_note_dirs);
+    let (profiler_notes_path, profiler_notes_paths) =
+        profiler_note_report_metadata(&options.profiler_notes_dirs);
     let report = CompareReport {
-        schema_version: 1,
+        schema_version: 2,
         generated_unix_epoch_seconds: unix_epoch_seconds(),
         machine: machine_metadata(root)?,
         stim: baseline_report.stim.clone(),
@@ -356,10 +362,8 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
             require_memory_gate: options.require_memory_gate,
             memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
             thresholds_path: threshold_path.map(|path| path.display().to_string()),
-            profiler_notes_path: options
-                .profiler_notes_dir
-                .as_ref()
-                .map(|path| path.display().to_string()),
+            profiler_notes_path,
+            profiler_notes_paths,
             track_allocations: options.track_allocations,
             warmup: options.warmup,
             measurement_runs: options.measurement_runs,
@@ -454,13 +458,6 @@ pub(crate) struct CompareRowBuild<'a> {
     pub(crate) stab_measurements: Vec<Measurement>,
     pub(crate) baseline_status: BaselineCompareStatus,
 }
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct ProfilerNoteFindings {
-    blockers: Vec<String>,
-}
-
-const HOT_PATH_PROFILER_NOTE_RATIO: f64 = 1.5;
 
 pub(crate) fn summarize_baseline_row(
     report: &BaselineReport,
@@ -731,114 +728,26 @@ pub(crate) fn compare_incomplete_details(
     details.join("\n")
 }
 
-fn apply_profiler_notes(
-    rows: &mut [CompareRowResult],
-    notes_dir: &Path,
-    report_notes_dir: &Path,
-) -> ProfilerNoteFindings {
-    let mut findings = ProfilerNoteFindings::default();
-    for row in rows {
-        if !row
-            .relative_ratio
-            .is_some_and(|ratio| ratio > HOT_PATH_PROFILER_NOTE_RATIO)
-        {
-            row.profiler_note_status = "not-required".to_string();
-            continue;
-        }
-        let relative_path = report_notes_dir
-            .join(format!("{}.md", row.id))
-            .display()
-            .to_string();
-        let note_path = notes_dir.join(format!("{}.md", row.id));
-        row.profiler_note_path = Some(relative_path);
-        match read_and_validate_profiler_note(&note_path) {
-            Ok(()) => {
-                row.profiler_note_status = "present".to_string();
-            }
-            Err(error) => {
-                row.profiler_note_status = error.status().to_string();
-                row.profiler_note_error = Some(error.message().to_string());
-                findings
-                    .blockers
-                    .push(format!("{}: {}", row.id, error.message()));
-            }
-        }
-    }
-    findings
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum ProfilerNoteError {
-    Missing,
-    Invalid(String),
-}
-
-impl ProfilerNoteError {
-    fn status(&self) -> &'static str {
-        match self {
-            Self::Missing => "missing",
-            Self::Invalid(_) => "invalid",
-        }
-    }
-
-    fn message(&self) -> &str {
-        match self {
-            Self::Missing => "profiler note is missing",
-            Self::Invalid(message) => message,
-        }
-    }
-}
-
-fn read_and_validate_profiler_note(path: &Path) -> Result<(), ProfilerNoteError> {
-    let content = std::fs::read_to_string(path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            ProfilerNoteError::Missing
-        } else {
-            ProfilerNoteError::Invalid(format!("failed to read profiler note: {error}"))
-        }
-    })?;
-    validate_profiler_note_content(&content)
-}
-
-fn validate_profiler_note_content(content: &str) -> Result<(), ProfilerNoteError> {
-    if content.trim().is_empty() {
-        return Err(ProfilerNoteError::Invalid(
-            "profiler note is empty".to_string(),
-        ));
-    }
-    if !has_named_nonempty_field(content, "Dominant cost:") {
-        return Err(ProfilerNoteError::Invalid(
-            "profiler note must include `Dominant cost:`".to_string(),
-        ));
-    }
-    if !has_named_nonempty_field(content, "Next owner action:") {
-        return Err(ProfilerNoteError::Invalid(
-            "profiler note must include `Next owner action:`".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn has_named_nonempty_field(content: &str, field: &str) -> bool {
-    content.lines().any(|line| {
-        line.trim_start()
-            .strip_prefix(field)
-            .is_some_and(|value| !value.trim().is_empty())
-    })
+fn strict_requires_contract_measurement(row: &BenchmarkRow) -> bool {
+    row.runner == Runner::ContractOnly && row.threshold_class != ThresholdClass::BaselineMetadata
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::PathBuf;
 
     use tempfile::tempdir;
 
-    use super::{
-        BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes,
-        build_compare_row_result, mark_instrumented_timing_not_evaluated, run_warmup_rows,
+    use super::profiler_notes::{
+        HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes, profiler_note_report_metadata,
         validate_profiler_note_content,
     };
-    use crate::manifest::{BenchmarkRow, Milestone, Runner};
+    use super::{
+        BaselineCompareStatus, CompareRowBuild, build_compare_row_result,
+        mark_instrumented_timing_not_evaluated, run_warmup_rows,
+        strict_requires_contract_measurement,
+    };
+    use crate::manifest::{BenchmarkRow, Milestone, Runner, ThresholdClass};
     use crate::report::{AllocationMeasurement, Measurement};
 
     #[test]
@@ -854,11 +763,11 @@ mod tests {
         .expect("write note");
         let mut rows = vec![fast_row, slow_row.clone()];
 
-        let findings = apply_profiler_notes(
-            &mut rows,
-            notes.path(),
-            Path::new("benchmarks/profiler-notes/m12"),
-        );
+        let note_dirs = [(
+            notes.path().to_path_buf(),
+            PathBuf::from("benchmarks/profiler-notes/m12"),
+        )];
+        let findings = apply_profiler_notes(&mut rows, &note_dirs);
 
         assert!(findings.blockers.is_empty());
         let fast = rows.first().expect("fast row");
@@ -873,8 +782,11 @@ mod tests {
         slow_row.relative_ratio = Some(HOT_PATH_PROFILER_NOTE_RATIO + 0.2);
         let missing_notes = tempdir().expect("missing note dir");
         let mut rows = vec![slow_row];
-        let findings =
-            apply_profiler_notes(&mut rows, missing_notes.path(), Path::new("profiler-notes"));
+        let note_dirs = [(
+            missing_notes.path().to_path_buf(),
+            PathBuf::from("profiler-notes"),
+        )];
+        let findings = apply_profiler_notes(&mut rows, &note_dirs);
 
         let slow = rows.first().expect("slow row");
         assert_eq!(slow.profiler_note_status, "missing");
@@ -882,6 +794,77 @@ mod tests {
             findings.blockers,
             vec!["slow-row: profiler note is missing"]
         );
+    }
+
+    #[test]
+    fn profiler_notes_search_multiple_directories_without_ambiguity() {
+        let first = tempdir().expect("first note dir");
+        let second = tempdir().expect("second note dir");
+        let note = "Dominant cost: graph frontier\nNext owner action: intern states\n";
+        std::fs::write(second.path().join("slow-row.md"), note).expect("write second note");
+        let note_dirs = [
+            (
+                first.path().to_path_buf(),
+                PathBuf::from("benchmarks/profiler-notes/m12"),
+            ),
+            (
+                second.path().to_path_buf(),
+                PathBuf::from("benchmarks/profiler-notes/pfm-b5"),
+            ),
+        ];
+        let mut rows = vec![compare_row(
+            "slow-row",
+            Some(HOT_PATH_PROFILER_NOTE_RATIO + 0.1),
+        )];
+
+        let findings = apply_profiler_notes(&mut rows, &note_dirs);
+
+        assert!(findings.blockers.is_empty());
+        let row = rows.first().expect("slow row");
+        assert_eq!(
+            row.profiler_note_path.as_deref(),
+            Some("benchmarks/profiler-notes/pfm-b5/slow-row.md")
+        );
+
+        std::fs::write(first.path().join("slow-row.md"), note).expect("write duplicate note");
+        rows.first_mut().expect("slow row").relative_ratio = Some(1.0);
+        let findings = apply_profiler_notes(&mut rows, &note_dirs);
+        let row = rows.first().expect("slow row");
+        assert_eq!(row.profiler_note_status, "invalid");
+        assert_eq!(findings.blockers.len(), 1);
+        let blocker = findings.blockers.first().expect("duplicate blocker");
+        assert!(blocker.contains(&first.path().display().to_string()));
+        assert!(blocker.contains(&second.path().display().to_string()));
+    }
+
+    #[test]
+    fn profiler_note_report_metadata_keeps_a_legacy_first_root() {
+        let paths = [
+            PathBuf::from("benchmarks/profiler-notes/m12"),
+            PathBuf::from("benchmarks/profiler-notes/pfm-b5"),
+        ];
+
+        let (legacy, structured) = profiler_note_report_metadata(&paths);
+
+        assert_eq!(legacy.as_deref(), Some("benchmarks/profiler-notes/m12"));
+        assert_eq!(
+            structured,
+            [
+                "benchmarks/profiler-notes/m12",
+                "benchmarks/profiler-notes/pfm-b5"
+            ]
+        );
+    }
+
+    #[test]
+    fn strict_compare_allows_metadata_only_rows_without_runtime_measurements() {
+        let mut row = benchmark_row("metadata");
+        row.runner = Runner::ContractOnly;
+        row.threshold_class = ThresholdClass::BaselineMetadata;
+        assert!(!strict_requires_contract_measurement(&row));
+
+        row.threshold_class = ThresholdClass::ReportOnly;
+        assert!(strict_requires_contract_measurement(&row));
     }
 
     #[test]

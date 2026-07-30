@@ -608,7 +608,7 @@ const REQUIRED_BENCHMARK_IDS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::{BenchmarkManifest, Runner};
+    use super::{BenchmarkManifest, Milestone, Runner, ThresholdClass};
     use crate::baseline::compare_note;
     use crate::comparability::ComparabilityClass;
 
@@ -620,7 +620,7 @@ mod tests {
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
             .from_reader(MANIFEST_CSV.as_bytes());
-        let rows = reader
+        let rows: Vec<super::BenchmarkRow> = reader
             .deserialize()
             .collect::<Result<Vec<_>, _>>()
             .expect("parse manifest");
@@ -725,6 +725,36 @@ mod tests {
                 "{non_primary} should remain outside the primary matrix"
             );
         }
+    }
+
+    #[test]
+    fn a6_continuity_matrix_freezes_165_runtime_rows_and_one_metadata_anchor() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let rows: Vec<super::BenchmarkRow> = reader
+            .deserialize()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("parse manifest");
+        let selected = rows
+            .iter()
+            .filter(|row| row.milestone != Milestone::M12)
+            .collect::<Vec<_>>();
+
+        assert_eq!(selected.len(), 166);
+        let metadata = selected
+            .iter()
+            .filter(|row| row.threshold_class == ThresholdClass::BaselineMetadata)
+            .map(|row| row.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(metadata, ["m7-perf-harness"]);
+        assert_eq!(
+            selected
+                .iter()
+                .filter(|row| row.threshold_class != ThresholdClass::BaselineMetadata)
+                .count(),
+            165
+        );
     }
 
     #[test]

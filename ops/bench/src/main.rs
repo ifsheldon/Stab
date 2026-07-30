@@ -206,9 +206,9 @@ enum Command {
         #[arg(long)]
         require_profiler_notes: bool,
 
-        /// Directory containing profiler notes, defaulting to `report/profiler-notes`.
+        /// Directory containing profiler notes. Repeat to search multiple source-owned directories.
         #[arg(long)]
-        profiler_notes_dir: Option<PathBuf>,
+        profiler_notes_dir: Vec<PathBuf>,
 
         /// Fail when selected rows do not prove the 1.25x beta performance gate.
         #[arg(long)]
@@ -403,7 +403,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     only,
                     report,
                     require_profiler_notes,
-                    profiler_notes_dir,
+                    profiler_notes_dirs: profiler_notes_dir,
                     require_beta_gate,
                     beta_waivers,
                     require_memory_gate,
@@ -425,4 +425,44 @@ fn checked_manifest(root: &RepoRoot) -> Result<BenchmarkManifest, BenchError> {
     let manifest = BenchmarkManifest::read(root)?;
     manifest.check(root)?;
     Ok(manifest)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    fn profiler_note_directories(cli: Cli) -> Result<Vec<PathBuf>, &'static str> {
+        match cli.command {
+            Command::Compare {
+                profiler_notes_dir, ..
+            } => Ok(profiler_notes_dir),
+            _ => Err("expected compare command"),
+        }
+    }
+
+    #[test]
+    fn compare_collects_repeated_profiler_note_directories_in_order() {
+        let cli = Cli::try_parse_from([
+            "stab-bench",
+            "compare",
+            "--profiler-notes-dir",
+            "benchmarks/profiler-notes/m12",
+            "--profiler-notes-dir",
+            "benchmarks/profiler-notes/pfm-b5",
+        ])
+        .expect("repeated profiler-note roots should parse");
+
+        let profiler_notes_dir = profiler_note_directories(cli).expect("compare command");
+        assert_eq!(
+            profiler_notes_dir,
+            [
+                PathBuf::from("benchmarks/profiler-notes/m12"),
+                PathBuf::from("benchmarks/profiler-notes/pfm-b5"),
+            ]
+        );
+    }
 }
