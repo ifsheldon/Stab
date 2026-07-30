@@ -1,6 +1,7 @@
 #![allow(
     clippy::expect_used,
-    reason = "sampling facade tests use direct fixture parsing assertions for compact diagnostics"
+    clippy::panic,
+    reason = "sampling facade tests use direct fixture parsing and exhaustive error diagnostics"
 )]
 
 use super::*;
@@ -55,6 +56,86 @@ fn seeded_sample_bytes_match_seeded_record_samples() {
         sampler.sample_bytes_with_seed(32, SampleFormat::B8, Some(5)),
         crate::result_formats::write_records(&records, SampleFormat::B8)
     );
+}
+
+#[test]
+fn fallible_materialization_and_encoding_preserve_seeded_outputs() {
+    let deterministic = sampler("X 1\nM 0 1\n");
+    let sampler = sampler(
+        "H 0\n\
+         M 0\n\
+         CX rec[-1] 1\n\
+         M 1\n\
+         MPAD 0 1 0 1\n",
+    );
+    let records = sampler
+        .try_sample_zero_one_with_seed(65, Some(17))
+        .expect("fallible seeded materialization");
+    assert_eq!(
+        records,
+        sampler.sample_zero_one_with_seed(65, Some(17)),
+        "legacy materialization must delegate without changing seeded records"
+    );
+
+    for format in [
+        SampleFormat::ZeroOne,
+        SampleFormat::B8,
+        SampleFormat::R8,
+        SampleFormat::Hits,
+        SampleFormat::Dets,
+    ] {
+        let expected = crate::result_formats::write_records(&records, format);
+        let fallible = sampler
+            .try_sample_bytes_with_seed(65, format, Some(17))
+            .expect("fallible seeded encoding");
+        assert_eq!(fallible, expected, "{format:?}");
+        assert_eq!(
+            sampler.sample_bytes_with_seed(65, format, Some(17)),
+            expected,
+            "legacy {format:?} encoding must delegate without changing bytes"
+        );
+    }
+    assert_eq!(
+        deterministic
+            .try_sample_zero_one_bytes(3)
+            .expect("fallible 01 convenience adapter"),
+        deterministic.sample_zero_one_bytes(3)
+    );
+}
+
+#[test]
+fn fallible_materializers_reject_usize_max_before_execution() {
+    let sampler = sampler("M 0\n");
+
+    let records_error = sampler
+        .try_sample_zero_one_with_seed(usize::MAX, Some(1))
+        .expect_err("materialized record request must reject");
+    assert_zero_progress_storage_error(records_error, "record storage overflowed");
+
+    let bytes_error = sampler
+        .try_sample_bytes_with_seed(usize::MAX, SampleFormat::ZeroOne, Some(1))
+        .expect_err("encoded output request must reject");
+    assert_zero_progress_storage_error(bytes_error, "encoded output length overflowed");
+}
+
+fn assert_zero_progress_storage_error(
+    error: RunError<std::convert::Infallible>,
+    expected_message: &str,
+) {
+    match error {
+        RunError::Engine {
+            source: SamplingExecutionError::SessionStorageAllocation { message },
+            progress,
+        } => {
+            assert!(
+                message.contains(expected_message),
+                "unexpected preflight diagnostic: {message}"
+            );
+            assert_eq!(progress.committed_shots(), ShotCount::new(0));
+            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(0));
+        }
+        other => panic!("unexpected fallible materialization error: {other:?}"),
+    }
 }
 
 #[test]

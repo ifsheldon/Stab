@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use stab_model::{
-    DiagnosticSeverity, MeasureRecordOffset, ModelError, Probability, QubitId, RepeatCount, Target,
-    ValidationError, ValidationErrorCode,
+    CircuitTick, DiagnosticSeverity, MeasureRecordOffset, ModelError, Probability, QubitId,
+    RepeatCount, Target, ValidationError, ValidationErrorCode,
 };
 
 #[test]
@@ -30,6 +30,7 @@ fn typed_model_values_preserve_stim_boundaries() {
             }
         ))
     );
+    assert_eq!(CircuitTick::new(u64::MAX).get(), u64::MAX);
 }
 
 #[test]

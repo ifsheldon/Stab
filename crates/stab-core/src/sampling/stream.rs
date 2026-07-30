@@ -18,6 +18,10 @@ impl CompiledSampler {
         F: FnMut(&[bool]) -> Result<(), E>,
     {
         let zero_progress = SamplingRunProgress::default();
+        let shots = ShotCount::try_from(shots).map_err(|source| RunError::Engine {
+            source,
+            progress: zero_progress,
+        })?;
         let mut session = self
             .plan
             .session_with_reference_mode(
@@ -42,15 +46,18 @@ impl CompiledSampler {
                 progress: zero_progress,
             })?;
         let mut sink = CallbackMeasurementSink { visit, record };
-        let shots = ShotCount::try_from(shots).map_err(|source| RunError::Engine {
-            source,
-            progress: zero_progress,
-        })?;
         session
             .run(shots, &mut sink)
             .map_err(map_callback_run_error)
     }
 
+    /// Visits samples through the legacy callback contract.
+    ///
+    /// # Panics
+    ///
+    /// Panics when sampling execution or callback-record allocation fails because this
+    /// source-compatible signature can represent only visitor failures. Use
+    /// [`Self::try_for_each_sample_with_seed_and_reference_mode`] to preserve all failures.
     pub fn for_each_sample_with_seed_and_reference_mode<E, F>(
         &self,
         shots: usize,

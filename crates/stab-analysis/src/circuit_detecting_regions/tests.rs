@@ -11,13 +11,21 @@ fn detector(id: u64) -> DemDetectorId {
     DemDetectorId::try_new(id).unwrap()
 }
 
+fn tick(value: u64) -> CircuitTick {
+    CircuitTick::new(value)
+}
+
+fn ticks(values: &[u64]) -> Vec<CircuitTick> {
+    values.iter().copied().map(tick).collect()
+}
+
 fn regions(text: &str, detectors: Vec<DemDetectorId>, ticks: Vec<u64>) -> DetectingRegionMap {
     let circuit = Circuit::from_stim_str(text).unwrap();
     circuit_detecting_regions(
         &circuit,
         DetectingRegionOptions {
             detectors,
-            ticks,
+            ticks: ticks.into_iter().map(tick).collect(),
             ignore_anticommutation_errors: false,
         },
     )
@@ -37,8 +45,8 @@ fn detecting_regions_simple_h_cx_mxx() {
         vec![0, 1],
     );
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+X_");
-    assert_eq!(actual[&detector(0)][&1].to_string(), "+XX");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+X_");
+    assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+XX");
 }
 
 #[test]
@@ -65,9 +73,9 @@ fn detecting_regions_target_api_matches_mx_python_example() {
     .unwrap();
     let detector = DemTarget::relative_detector(0).unwrap();
 
-    assert_eq!(actual[&detector][&0].to_string(), "+Z_");
-    assert_eq!(actual[&detector][&1].to_string(), "+X_");
-    assert_eq!(actual[&detector][&2].to_string(), "+XX");
+    assert_eq!(actual[&detector][&tick(0)].to_string(), "+Z_");
+    assert_eq!(actual[&detector][&tick(1)].to_string(), "+X_");
+    assert_eq!(actual[&detector][&tick(2)].to_string(), "+XX");
 }
 
 #[test]
@@ -91,8 +99,8 @@ fn detecting_regions_target_api_supports_mzz_example() {
     .unwrap();
     let detector = DemTarget::relative_detector(0).unwrap();
 
-    assert_eq!(actual[&detector][&0].to_string(), "+__Z");
-    assert_eq!(actual[&detector][&1].to_string(), "+__Z");
+    assert_eq!(actual[&detector][&tick(0)].to_string(), "+__Z");
+    assert_eq!(actual[&detector][&tick(1)].to_string(), "+__Z");
 }
 
 #[test]
@@ -116,7 +124,7 @@ fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() 
     .unwrap();
     let detector = DemTarget::relative_detector(0).unwrap();
 
-    assert_eq!(actual[&detector][&0].to_string(), "+Z");
+    assert_eq!(actual[&detector][&tick(0)].to_string(), "+Z");
 }
 
 #[test]
@@ -141,7 +149,7 @@ fn detecting_regions_target_shape_ignores_non_record_noise_instructions() {
         vec![0],
     );
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+ZZ");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+ZZ");
 }
 
 #[test]
@@ -156,7 +164,11 @@ fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
     ];
     for (text, expected) in single_cases {
         let actual = regions(text, vec![detector(0)], vec![0]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{text}");
+        assert_eq!(
+            actual[&detector(0)][&tick(0)].to_string(),
+            expected,
+            "{text}"
+        );
     }
 
     let pair_cases = [
@@ -166,7 +178,11 @@ fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
     ];
     for (text, expected) in pair_cases {
         let actual = regions(text, vec![detector(0)], vec![0]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{text}");
+        assert_eq!(
+            actual[&detector(0)][&tick(0)].to_string(),
+            expected,
+            "{text}"
+        );
     }
 }
 
@@ -190,15 +206,15 @@ fn detecting_regions_target_shape_supports_pauli_product_measurements() {
         &circuit,
         DetectingRegionTargetOptions {
             targets: vec![detector_0, detector_1, observable],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
     .unwrap();
 
-    assert_eq!(actual[&detector_0][&0].to_string(), "+XYZ_");
-    assert_eq!(actual[&detector_1][&0].to_string(), "+___Z");
-    assert_eq!(actual[&observable][&0].to_string(), "+XYZZ");
+    assert_eq!(actual[&detector_0][&tick(0)].to_string(), "+XYZ_");
+    assert_eq!(actual[&detector_1][&tick(0)].to_string(), "+___Z");
+    assert_eq!(actual[&observable][&tick(0)].to_string(), "+XYZZ");
 }
 
 #[test]
@@ -217,15 +233,23 @@ fn detecting_regions_target_shape_supports_spp_unitary_products() {
         let observable = DemTarget::logical_observable(0).unwrap();
         let options = DetectingRegionTargetOptions {
             targets: vec![observable],
-            ticks: vec![0, 1],
+            ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
         };
         let actual = circuit_detecting_regions_for_targets(&circuit, options.clone()).unwrap();
         let expected = circuit_detecting_regions_for_targets(&decomposed, options).unwrap();
 
         assert_eq!(actual, expected, "{gate_name}");
-        assert_eq!(actual[&observable][&0].to_string(), "+YX_", "{gate_name}");
-        assert_eq!(actual[&observable][&1].to_string(), "+Z__", "{gate_name}");
+        assert_eq!(
+            actual[&observable][&tick(0)].to_string(),
+            "+YX_",
+            "{gate_name}"
+        );
+        assert_eq!(
+            actual[&observable][&tick(1)].to_string(),
+            "+Z__",
+            "{gate_name}"
+        );
     }
 }
 
@@ -266,7 +290,7 @@ fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
                     &circuit,
                     DetectingRegionOptions {
                         detectors: vec![detector(0)],
-                        ticks: vec![0],
+                        ticks: ticks(&[0]),
                         ignore_anticommutation_errors: false,
                     },
                 )
@@ -306,18 +330,18 @@ fn detecting_regions_target_api_supports_logical_observable_targets() {
                 DemTarget::logical_observable(1).unwrap(),
                 DemTarget::logical_observable(1).unwrap(),
             ],
-            ticks: vec![0, 1],
+            ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: false,
         },
     )
     .unwrap();
 
     assert_eq!(
-        actual[&DemTarget::logical_observable(0).unwrap()][&0].to_string(),
+        actual[&DemTarget::logical_observable(0).unwrap()][&tick(0)].to_string(),
         "+Z_"
     );
     assert_eq!(
-        actual[&DemTarget::logical_observable(1).unwrap()][&1].to_string(),
+        actual[&DemTarget::logical_observable(1).unwrap()][&tick(1)].to_string(),
         "+_Z"
     );
     assert_eq!(actual.len(), 2);
@@ -342,7 +366,7 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
             &circuit,
             DetectingRegionTargetOptions {
                 targets: vec![target],
-                ticks: vec![0],
+                ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
             },
         )
@@ -369,13 +393,13 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
         &circuit,
         DetectingRegionTargetOptions {
             targets: vec![detector_target, observable],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
     .unwrap();
 
-    assert_eq!(actual[&detector_target][&0].to_string(), "+Z");
+    assert_eq!(actual[&detector_target][&tick(0)].to_string(), "+Z");
     assert!(actual[&observable].is_empty());
 
     let all_pad_circuit =
@@ -385,7 +409,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
         &all_pad_circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0), detector(1)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -402,7 +426,7 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
         "R 0\nTICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0\nM 0\nDETECTOR rec[-2] rec[-1]\n",
     ] {
         let actual = regions(text, vec![detector(0)], vec![0]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), "+Z", "{text}");
+        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+Z", "{text}");
     }
 
     for text in [
@@ -410,8 +434,8 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
         "R 0 1\nTICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0 1\nM 0 1\nDETECTOR rec[-4] rec[-1]\nDETECTOR rec[-3] rec[-2]\n",
     ] {
         let actual = regions(text, vec![detector(0), detector(1)], vec![0]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), "+_Z", "{text}");
-        assert_eq!(actual[&detector(1)][&0].to_string(), "+Z_", "{text}");
+        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+_Z", "{text}");
+        assert_eq!(actual[&detector(1)][&tick(0)].to_string(), "+Z_", "{text}");
     }
 
     for text in [
@@ -423,7 +447,7 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
             &circuit,
             DetectingRegionTargetOptions {
                 targets: vec![DemTarget::relative_detector(0).unwrap()],
-                ticks: vec![0],
+                ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
             },
         )
@@ -445,7 +469,7 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
                     &circuit,
                     DetectingRegionTargetOptions {
                         targets: vec![DemTarget::relative_detector(0).unwrap()],
-                        ticks: vec![0],
+                        ticks: ticks(&[0]),
                         ignore_anticommutation_errors: false,
                     },
                 )
@@ -504,8 +528,8 @@ fn detecting_regions_clifford_supports_promoted_single_qubit_gates() {
     ];
     for (text, tick0, tick1) in cases {
         let actual = regions(text, vec![detector(0)], vec![0, 1]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), tick0, "{text}");
-        assert_eq!(actual[&detector(0)][&1].to_string(), tick1, "{text}");
+        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), tick0, "{text}");
+        assert_eq!(actual[&detector(0)][&tick(1)].to_string(), tick1, "{text}");
     }
 }
 
@@ -540,8 +564,8 @@ fn detecting_regions_clifford_supports_single_qubit_clifford_gate_set() {
     for (gate, reset, tick0) in cases {
         let text = format!("{reset} 0\nTICK\n{gate} 0\nTICK\nMX 0\nDETECTOR rec[-1]\n");
         let actual = regions(&text, vec![detector(0)], vec![0, 1]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), tick0, "{gate}");
-        assert_eq!(actual[&detector(0)][&1].to_string(), "+X", "{gate}");
+        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), tick0, "{gate}");
+        assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+X", "{gate}");
     }
 }
 
@@ -573,8 +597,8 @@ fn detecting_regions_clifford_supports_controlled_pauli_propagation() {
     ];
     for (text, tick0, tick1) in cases {
         let actual = regions(text, vec![detector(0)], vec![0, 1]);
-        assert_eq!(actual[&detector(0)][&0].to_string(), tick0, "{text}");
-        assert_eq!(actual[&detector(0)][&1].to_string(), tick1, "{text}");
+        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), tick0, "{text}");
+        assert_eq!(actual[&detector(0)][&tick(1)].to_string(), tick1, "{text}");
     }
 }
 
@@ -602,7 +626,7 @@ fn detecting_regions_rejects_unknown_detector() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(1)],
-            ticks: vec![],
+            ticks: ticks(&[]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -618,7 +642,7 @@ fn detecting_regions_rejects_out_of_range_tick() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![1],
+            ticks: ticks(&[1]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -634,31 +658,31 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0, 1],
+            ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
         },
     )
     .unwrap();
-    assert!(!actual[&detector(0)].contains_key(&0));
-    assert_eq!(actual[&detector(0)][&1].to_string(), "+X");
+    assert!(!actual[&detector(0)].contains_key(&tick(0)));
+    assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+X");
 
     let implicit_start = Circuit::from_stim_str("TICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
         &implicit_start,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: true,
         },
     )
     .unwrap();
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+X");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+X");
 
     let empty_ticks = circuit_detecting_regions(
         &implicit_start,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![],
+            ticks: ticks(&[]),
             ignore_anticommutation_errors: true,
         },
     )
@@ -669,7 +693,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
         &implicit_start,
         DetectingRegionOptions {
             detectors: vec![],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: true,
         },
     )
@@ -692,7 +716,7 @@ fn detecting_regions_anticommutation_rejects_false_mode() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -730,7 +754,7 @@ fn detecting_regions_anticommutation_rejects_product_measurement_start_state() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -742,7 +766,7 @@ fn detecting_regions_anticommutation_rejects_product_measurement_start_state() {
 #[test]
 fn detecting_regions_anticommutation_rejects_false_mode_with_empty_filters() {
     let circuit = Circuit::from_stim_str("TICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
-    for (detectors, ticks) in [(vec![detector(0)], vec![]), (vec![], vec![0])] {
+    for (detectors, ticks) in [(vec![detector(0)], Vec::new()), (vec![], ticks(&[0]))] {
         let error = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
@@ -765,19 +789,19 @@ fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0, 1],
+            ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
         },
     )
     .unwrap();
-    assert_eq!(ignored[&detector(0)][&0].to_string(), "+X");
-    assert_eq!(ignored[&detector(0)][&1].to_string(), "+X");
+    assert_eq!(ignored[&detector(0)][&tick(0)].to_string(), "+X");
+    assert_eq!(ignored[&detector(0)][&tick(1)].to_string(), "+X");
 
     let error = circuit_detecting_regions(
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0, 1],
+            ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: false,
         },
     )
@@ -798,8 +822,8 @@ fn detecting_regions_gauge_allows_product_measurement_cancellation() {
         vec![0, 1],
     );
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+XX");
-    assert_eq!(actual[&detector(0)][&1].to_string(), "+XX");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+XX");
+    assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+XX");
 }
 
 #[test]
@@ -834,9 +858,9 @@ fn detecting_regions_repeat_supports_bounded_ticks() {
         vec![0, 1, 2],
     );
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+X_");
-    assert_eq!(actual[&detector(0)][&1].to_string(), "+X_");
-    assert_eq!(actual[&detector(0)][&2].to_string(), "+XX");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+X_");
+    assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+X_");
+    assert_eq!(actual[&detector(0)][&tick(2)].to_string(), "+XX");
 }
 
 #[test]
@@ -846,13 +870,13 @@ fn detecting_regions_clifford_supports_swap_gate() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
     .unwrap();
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+_Z");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+_Z");
 }
 
 #[test]
@@ -863,13 +887,13 @@ fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )
     .unwrap();
 
-    assert_eq!(actual[&detector(0)][&0].to_string(), "+ZX");
+    assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+ZX");
 }
 
 #[test]
@@ -940,7 +964,11 @@ fn detecting_regions_target_shape_supports_measurement_record_feedback() {
     for (name, circuit, expected) in cases {
         let actual = regions(circuit, vec![detector(0)], vec![0]);
 
-        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{name}");
+        assert_eq!(
+            actual[&detector(0)][&tick(0)].to_string(),
+            expected,
+            "{name}"
+        );
     }
 }
 
@@ -960,7 +988,11 @@ fn detecting_regions_target_shape_supports_sweep_controlled_pauli_noops() {
             format!("{preparation}\nTICK\n{operation}\n{measurement}\nDETECTOR rec[-1]\n");
         let actual = regions(&circuit, vec![detector(0)], vec![0]);
 
-        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{name}");
+        assert_eq!(
+            actual[&detector(0)][&tick(0)].to_string(),
+            expected,
+            "{name}"
+        );
     }
 }
 
@@ -1004,7 +1036,7 @@ fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
             &circuit,
             DetectingRegionOptions {
                 detectors: vec![detector(0)],
-                ticks: vec![0],
+                ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
             },
         )
@@ -1052,7 +1084,7 @@ fn detecting_regions_target_shape_rejects_unpromoted_sweep_shapes() {
             &circuit,
             DetectingRegionOptions {
                 detectors: vec![detector(0)],
-                ticks: vec![0],
+                ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
             },
         )
@@ -1076,7 +1108,7 @@ fn detecting_regions_repeat_rejects_excessive_expansion() {
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
-            ticks: vec![0],
+            ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
         },
     )

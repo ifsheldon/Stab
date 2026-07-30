@@ -897,7 +897,7 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
     let tree = circuit_reference_sample_tree(&circuit).expect("reference sample tree");
 
     assert_eq!(
-        tree.decompress(),
+        tree.decompress().expect("decompress reference sample tree"),
         circuit_reference_sample(&circuit).expect("reference sample")
     );
     assert_eq!(tree.size(), 2);
@@ -916,7 +916,9 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
     .expect("parse repeated circuit");
     let repeated_tree = circuit_reference_sample_tree(&repeated).expect("reference sample tree");
     assert_eq!(
-        repeated_tree.decompress(),
+        repeated_tree
+            .decompress()
+            .expect("decompress repeated reference sample tree"),
         vec![false, true, false, true, false, true]
     );
     assert_eq!(repeated_tree.size(), 6);

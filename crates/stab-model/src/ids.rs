@@ -64,6 +64,20 @@ impl CircuitDetectorId {
     }
 }
 
+/// Zero-based index of a `TICK` boundary within a circuit.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CircuitTick(u64);
+
+impl CircuitTick {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct RepeatCount(u64);
 

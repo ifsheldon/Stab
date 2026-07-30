@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{FlexPauliString, PauliBasis};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemDetectorId, DemTarget, GateCategory, Target,
+    Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget, GateCategory,
+    Target,
 };
 
 use crate::{AnalysisError, AnalysisResult, sparse_rev_frame_tracker::SparseReverseFrameTracker};
@@ -15,19 +16,19 @@ const MAX_DETECTING_REGION_OBSERVABLE_TARGETS: u64 = u32::MAX as u64 + 1;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
     pub detectors: Vec<DemDetectorId>,
-    pub ticks: Vec<u64>,
+    pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectingRegionTargetOptions {
     pub targets: Vec<DemTarget>,
-    pub ticks: Vec<u64>,
+    pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
 }
 
-pub type DetectingRegionMap = BTreeMap<DemDetectorId, BTreeMap<u64, FlexPauliString>>;
-pub type DetectingRegionTargetMap = BTreeMap<DemTarget, BTreeMap<u64, FlexPauliString>>;
+pub type DetectingRegionMap = BTreeMap<DemDetectorId, BTreeMap<CircuitTick, FlexPauliString>>;
+pub type DetectingRegionTargetMap = BTreeMap<DemTarget, BTreeMap<CircuitTick, FlexPauliString>>;
 
 pub fn circuit_detecting_regions(
     circuit: &Circuit,
@@ -166,21 +167,21 @@ fn detecting_region_instruction_qubit_count(instruction: &CircuitInstruction) ->
         .unwrap_or(0)
 }
 
-pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<u64>> {
+pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
     let tick_count = tick_count(circuit)?;
     if tick_count > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
         return Err(AnalysisError::invalid_detector_error_model(format!(
             "detecting-region all-tick helper currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} ticks, got {tick_count}"
         )));
     }
-    Ok((0..tick_count).collect())
+    Ok((0..tick_count).map(CircuitTick::new).collect())
 }
 
 fn undo_circuit_with_snapshots(
     circuit: &Circuit,
     tracker: &mut SparseReverseFrameTracker,
     targets: &BTreeSet<DemTarget>,
-    ticks: &BTreeSet<u64>,
+    ticks: &BTreeSet<CircuitTick>,
     current_tick: &mut u64,
     regions: &mut DetectingRegionTargetMap,
 ) -> AnalysisResult<()> {
@@ -217,7 +218,7 @@ fn undo_instruction_with_snapshots(
     instruction: &CircuitInstruction,
     tracker: &mut SparseReverseFrameTracker,
     targets: &BTreeSet<DemTarget>,
-    ticks: &BTreeSet<u64>,
+    ticks: &BTreeSet<CircuitTick>,
     current_tick: &mut u64,
     regions: &mut DetectingRegionTargetMap,
 ) -> AnalysisResult<()> {
@@ -227,8 +228,9 @@ fn undo_instruction_with_snapshots(
                 "tick count underflowed while extracting detecting regions",
             )
         })?;
-        if ticks.contains(current_tick) {
-            snapshot_regions(*current_tick, tracker, targets, regions)?;
+        let tick = CircuitTick::new(*current_tick);
+        if ticks.contains(&tick) {
+            snapshot_regions(tick, tracker, targets, regions)?;
         }
     }
     undo_detecting_region_instruction(instruction, tracker)
@@ -275,7 +277,7 @@ fn undo_detecting_region_instruction(
 }
 
 fn snapshot_regions(
-    tick: u64,
+    tick: CircuitTick,
     tracker: &SparseReverseFrameTracker,
     targets: &BTreeSet<DemTarget>,
     regions: &mut DetectingRegionTargetMap,
@@ -736,11 +738,12 @@ fn validate_targets(
     Ok(())
 }
 
-fn validate_ticks(ticks: &BTreeSet<u64>, tick_count: u64) -> AnalysisResult<()> {
+fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisResult<()> {
     for tick in ticks {
-        if *tick >= tick_count {
+        if tick.get() >= tick_count {
             return Err(AnalysisError::invalid_detector_error_model(format!(
-                "requested tick {tick} but circuit only has {tick_count} tick layer(s)"
+                "requested tick {} but circuit only has {tick_count} tick layer(s)",
+                tick.get()
             )));
         }
     }

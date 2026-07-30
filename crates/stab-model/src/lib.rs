@@ -36,8 +36,8 @@ pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
 };
 pub use ids::{
-    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText, ObservableId,
-    Probability, QubitId, RepeatCount,
+    CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText,
+    ObservableId, Probability, QubitId, RepeatCount,
 };
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
 pub use resource_limit::{
