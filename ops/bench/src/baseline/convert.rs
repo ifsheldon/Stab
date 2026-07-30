@@ -8,7 +8,10 @@ use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 use crate::root::RepoRoot;
 
-use super::measure_stab;
+use super::{batch_sinks::OutputWitness, measure_stab};
+
+#[cfg(test)]
+mod tests;
 
 const CONVERT_RECORDS: f64 = 4096.0;
 const CONVERT_WIDE_BITS: f64 = 4096.0 * 2048.0;
@@ -24,6 +27,24 @@ const CONVERT_DETS_DL_72: &[u8] =
     include_bytes!("../../../../benchmarks/fixtures/convert_dets_dl_72.dets");
 const M2D_BASIC_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_basic_measurements.01");
+const CONVERT_01_TO_B8_EXPECTED: OutputWitness = OutputWitness::new(65_536, 0xee95_c585_e220_a325);
+const CONVERT_B8_TO_01_EXPECTED: OutputWitness = OutputWitness::new(528_384, 0x079c_4bb2_5755_a325);
+const CONVERT_B8_TO_B8_WIDE_EXPECTED: OutputWitness =
+    OutputWitness::new(1_048_576, 0x6fed_35d7_7a72_2325);
+const CONVERT_DETS_TO_B8_EXPECTED: OutputWitness =
+    OutputWitness::new(36_864, 0x41e0_4a82_b274_4925);
+const CONVERT_B8_TO_DETS_EXPECTED: OutputWitness =
+    OutputWitness::new(573_440, 0x218d_5172_2336_0325);
+const CONVERT_PTB64_TO_01_EXPECTED: OutputWitness =
+    OutputWitness::new(528_384, 0x8ff4_a10a_a589_a325);
+const CONVERT_CIRCUIT_DL_PRIMARY_EXPECTED: OutputWitness =
+    OutputWitness::new(524_288, 0xcb86_51d4_5eb2_e325);
+const CONVERT_CIRCUIT_DL_OBS_EXPECTED: OutputWitness =
+    OutputWitness::new(4_096, 0x5d7a_9595_30ef_3325);
+const CONVERT_DEM_DETS_TO_01_EXPECTED: OutputWitness =
+    OutputWitness::new(299_008, 0x0f49_eaeb_9635_7f25);
+const M9_MEASUREMENTS_TO_DETS_EXPECTED: OutputWitness =
+    OutputWitness::new(13, 0xc055_ff92_b82b_da60);
 
 pub(super) fn run_convert_compare_row(
     root: &RepoRoot,
@@ -66,6 +87,7 @@ fn run_convert_workload(
     row: &BenchmarkRow,
     workload: ConvertWorkload,
 ) -> Result<(), BenchError> {
+    workload.ensure_semantic_witness(root, row)?;
     let mut stdout = CountingWriter::default();
     let mut stderr = Vec::new();
     let side_output = workload.side_output(root);
@@ -254,6 +276,89 @@ impl ConvertWorkload {
         matches!(self, Self::CircuitDlObsOut).then(|| obs_out_path(root))
     }
 
+    fn expected_witness(self) -> Result<ConvertWitnessExpectation, BenchError> {
+        Ok(match self {
+            Self::ZeroOneToB8 => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_01_TO_B8_EXPECTED)
+            }
+            Self::B8ToZeroOne => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_B8_TO_01_EXPECTED)
+            }
+            Self::B8ToB8Wide => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_B8_TO_B8_WIDE_EXPECTED)
+            }
+            Self::DetsToB8 => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_DETS_TO_B8_EXPECTED)
+            }
+            Self::B8ToDets => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_B8_TO_DETS_EXPECTED)
+            }
+            Self::Ptb64ToZeroOne => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_PTB64_TO_01_EXPECTED)
+            }
+            Self::ZeroOneToPtb64 => ConvertWitnessExpectation::primary_bytes(
+                reference_ptb64_from_01(CONVERT_01_128, 128)?,
+            ),
+            Self::CircuitDlObsOut => ConvertWitnessExpectation {
+                primary: ConvertExpectedOutput::Witness(CONVERT_CIRCUIT_DL_PRIMARY_EXPECTED),
+                side: Some(ConvertExpectedOutput::Witness(
+                    CONVERT_CIRCUIT_DL_OBS_EXPECTED,
+                )),
+            },
+            Self::DemDetsToZeroOne => {
+                ConvertWitnessExpectation::primary_witness(CONVERT_DEM_DETS_TO_01_EXPECTED)
+            }
+            Self::M9MeasurementsToDets => {
+                ConvertWitnessExpectation::primary_witness(M9_MEASUREMENTS_TO_DETS_EXPECTED)
+            }
+        })
+    }
+
+    fn ensure_semantic_witness(
+        self,
+        root: &RepoRoot,
+        row: &BenchmarkRow,
+    ) -> Result<(), BenchError> {
+        let expected = self.expected_witness()?;
+        let actual = self.run_untimed(row, root)?;
+        ensure_convert_witness(&row.id, expected, actual)
+    }
+
+    fn run_untimed(self, row: &BenchmarkRow, root: &RepoRoot) -> Result<ConvertOutput, BenchError> {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let side_output = self.side_output(root);
+        if let Some(path) = side_output.as_ref() {
+            create_parent_dir(row, path)?;
+        }
+        let status = stab_cli::run_from(self.args(root), self.input(), &mut stdout, &mut stderr);
+        if status != 0 {
+            return Err(BenchError::StabRunner {
+                row_id: row.id.clone(),
+                message: format!(
+                    "stab-cli convert witness failed with status {status}: {}",
+                    String::from_utf8_lossy(&stderr)
+                ),
+            });
+        }
+        let side = side_output
+            .as_ref()
+            .map(|path| {
+                std::fs::read(path).map_err(|source| BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "failed to read convert side witness {}: {source}",
+                        path.display()
+                    ),
+                })
+            })
+            .transpose()?;
+        Ok(ConvertOutput {
+            primary: stdout,
+            side,
+        })
+    }
+
     fn compare_note(self) -> &'static str {
         match self {
             Self::Ptb64ToZeroOne => {
@@ -276,6 +381,189 @@ impl ConvertWorkload {
             }
         }
     }
+}
+
+#[derive(Debug)]
+struct ConvertOutput {
+    primary: Vec<u8>,
+    side: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct ConvertWitnessExpectation {
+    primary: ConvertExpectedOutput,
+    side: Option<ConvertExpectedOutput>,
+}
+
+impl ConvertWitnessExpectation {
+    fn primary_witness(primary: OutputWitness) -> Self {
+        Self {
+            primary: ConvertExpectedOutput::Witness(primary),
+            side: None,
+        }
+    }
+
+    fn primary_bytes(primary: Vec<u8>) -> Self {
+        Self {
+            primary: ConvertExpectedOutput::ExactBytes(primary),
+            side: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ConvertExpectedOutput {
+    Witness(OutputWitness),
+    ExactBytes(Vec<u8>),
+}
+
+fn ensure_convert_witness(
+    row_id: &str,
+    expected: ConvertWitnessExpectation,
+    actual: ConvertOutput,
+) -> Result<(), BenchError> {
+    ensure_convert_output(row_id, "primary", expected.primary, &actual.primary)?;
+    match (expected.side, actual.side.as_deref()) {
+        (Some(expected), Some(actual)) => {
+            ensure_convert_output(row_id, "observable", expected, actual)
+        }
+        (None, None) => Ok(()),
+        (Some(_), None) => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "convert witness expected observable side output but none was produced"
+                .to_string(),
+        }),
+        (None, Some(actual)) => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: format!(
+                "convert witness produced unexpected observable side output of {} bytes",
+                actual.len()
+            ),
+        }),
+    }
+}
+
+fn ensure_convert_output(
+    row_id: &str,
+    stream: &str,
+    expected: ConvertExpectedOutput,
+    actual: &[u8],
+) -> Result<(), BenchError> {
+    match expected {
+        ConvertExpectedOutput::Witness(expected) => {
+            let actual = OutputWitness::from_bytes(actual);
+            if actual == expected {
+                return Ok(());
+            }
+            Err(BenchError::StabRunner {
+                row_id: row_id.to_string(),
+                message: format!(
+                    "convert {stream} output changed from the pinned Stim semantic witness: expected {expected:?}, got {actual:?}"
+                ),
+            })
+        }
+        ConvertExpectedOutput::ExactBytes(expected) => {
+            if actual == expected {
+                return Ok(());
+            }
+            Err(BenchError::StabRunner {
+                row_id: row_id.to_string(),
+                message: format!(
+                    "convert {stream} output changed from the independent semantic reference: expected {} bytes with {:?}, got {} bytes with {:?}",
+                    expected.len(),
+                    OutputWitness::from_bytes(&expected),
+                    actual.len(),
+                    OutputWitness::from_bytes(actual)
+                ),
+            })
+        }
+    }
+}
+
+fn reference_ptb64_from_01(input: &[u8], bits_per_record: usize) -> Result<Vec<u8>, BenchError> {
+    if bits_per_record == 0 {
+        return Err(BenchError::StabRunner {
+            row_id: "m7-convert-01-to-ptb64".to_string(),
+            message: "ptb64 reference requires nonzero record width".to_string(),
+        });
+    }
+    let records = parse_01_records(input, bits_per_record)?;
+    if !records.len().is_multiple_of(64) {
+        return Err(BenchError::StabRunner {
+            row_id: "m7-convert-01-to-ptb64".to_string(),
+            message: format!(
+                "ptb64 reference expected records in groups of 64, got {}",
+                records.len()
+            ),
+        });
+    }
+    let bytes_per_group = bits_per_record
+        .checked_mul(8)
+        .ok_or_else(|| BenchError::StabRunner {
+            row_id: "m7-convert-01-to-ptb64".to_string(),
+            message: "ptb64 reference group size overflowed".to_string(),
+        })?;
+    let mut output = Vec::with_capacity(records.len() / 64 * bytes_per_group);
+    for group in records.chunks_exact(64) {
+        for bit_index in 0..bits_per_record {
+            let mut word = 0_u64;
+            for (shot_index, record) in group.iter().enumerate() {
+                let bit = record
+                    .get(bit_index)
+                    .copied()
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: "m7-convert-01-to-ptb64".to_string(),
+                        message: "ptb64 reference record width changed while packing".to_string(),
+                    })?;
+                if bit {
+                    word |= 1_u64 << shot_index;
+                }
+            }
+            output.extend_from_slice(&word.to_le_bytes());
+        }
+    }
+    Ok(output)
+}
+
+fn parse_01_records(input: &[u8], bits_per_record: usize) -> Result<Vec<Vec<bool>>, BenchError> {
+    let mut records = Vec::new();
+    for line in input.split_inclusive(|byte| *byte == b'\n') {
+        if !line.ends_with(b"\n") {
+            return Err(BenchError::StabRunner {
+                row_id: "m7-convert-01-to-ptb64".to_string(),
+                message: "01 reference input ended without a newline".to_string(),
+            });
+        }
+        let Some(record) = line.strip_suffix(b"\n") else {
+            return Err(BenchError::StabRunner {
+                row_id: "m7-convert-01-to-ptb64".to_string(),
+                message: "01 reference input ended without a newline".to_string(),
+            });
+        };
+        let record = record.strip_suffix(b"\r").unwrap_or(record);
+        if record.len() != bits_per_record {
+            return Err(BenchError::StabRunner {
+                row_id: "m7-convert-01-to-ptb64".to_string(),
+                message: format!(
+                    "01 reference record width mismatch: expected {bits_per_record}, got {}",
+                    record.len()
+                ),
+            });
+        }
+        let bits = record
+            .iter()
+            .map(|byte| match byte {
+                b'0' => Ok(false),
+                b'1' => Ok(true),
+                _ => Err(BenchError::StabRunner {
+                    row_id: "m7-convert-01-to-ptb64".to_string(),
+                    message: format!("01 reference input contained byte 0x{byte:02x}"),
+                }),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        records.push(bits);
+    }
+    Ok(records)
 }
 
 fn push_flags(args: &mut Vec<OsString>, in_format: &'static str, out_format: &'static str) {
