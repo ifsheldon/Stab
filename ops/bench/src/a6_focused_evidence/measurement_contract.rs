@@ -12,7 +12,10 @@ use crate::root::RepoRoot;
 use crate::source_file::read_repo_regular_file_bounded;
 
 const CONTRACT_PATH: &str = "benchmarks/a6-measurement-contract.json";
-const CONTRACT_SCHEMA_VERSION: u32 = 1;
+const THRESHOLD_PATH: &str = "benchmarks/m12-primary-thresholds.json";
+const CONTRACT_SCHEMA_VERSION: u32 = 2;
+const SEMANTIC_PREFLIGHT_CONTRACT: &str = "gated-exact-output-v1";
+const SELECTED_EXACT_PREFLIGHT_ROW: &str = "m6-clifford-string";
 const MAX_CONTRACT_BYTES: usize = 1 << 20;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -20,6 +23,8 @@ const MAX_CONTRACT_BYTES: usize = 1 << 20;
 pub(super) struct A6MeasurementContract {
     schema_version: u32,
     provenance: String,
+    semantic_preflight_contract: String,
+    exact_preflight_rows: Vec<String>,
     rows: Vec<MeasurementContractRow>,
     #[serde(skip)]
     source_sha256: String,
@@ -30,7 +35,6 @@ pub(super) struct A6MeasurementContract {
 struct MeasurementContractRow {
     id: String,
     measurements: Vec<String>,
-    witness_source: Option<String>,
 }
 
 impl A6MeasurementContract {
@@ -80,28 +84,6 @@ impl A6MeasurementContract {
         Ok(())
     }
 
-    pub(super) fn require_witness_source(
-        &self,
-        row_id: &str,
-        actual: &str,
-    ) -> Result<(), BenchError> {
-        let row = self
-            .rows
-            .iter()
-            .find(|row| row.id == row_id)
-            .ok_or_else(|| focused_error(format!("A6 contract omits row {row_id}")))?;
-        let expected = row.witness_source.as_deref().ok_or_else(|| {
-            focused_error(format!("A6 contract row {row_id} has no semantic witness"))
-        })?;
-        if actual == expected {
-            Ok(())
-        } else {
-            Err(focused_error(format!(
-                "semantic witness for {row_id} is {actual}, expected source-owned path {expected}"
-            )))
-        }
-    }
-
     fn validate(&self, root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {
         let expected = manifest
             .rows
@@ -117,6 +99,35 @@ impl A6MeasurementContract {
         }
         if self.provenance.trim().is_empty() {
             issues.push("measurement contract provenance is empty".to_string());
+        }
+        if self.semantic_preflight_contract != SEMANTIC_PREFLIGHT_CONTRACT {
+            issues.push(format!(
+                "measurement contract semantic_preflight_contract={} expected {SEMANTIC_PREFLIGHT_CONTRACT}",
+                self.semantic_preflight_contract
+            ));
+        }
+        let threshold_path = root.resolve_relative(Path::new(THRESHOLD_PATH));
+        let threshold_bytes =
+            read_repo_regular_file_bounded(root, &threshold_path, MAX_CONTRACT_BYTES)?;
+        let thresholds =
+            crate::thresholds::parse_thresholds(Path::new(THRESHOLD_PATH), &threshold_bytes)?;
+        let mut expected_preflight_rows = thresholds
+            .row_ids()
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        expected_preflight_rows.insert(SELECTED_EXACT_PREFLIGHT_ROW.to_string());
+        let actual_preflight_rows = self
+            .exact_preflight_rows
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if actual_preflight_rows.len() != self.exact_preflight_rows.len() {
+            issues.push("measurement contract repeats an exact_preflight_rows id".to_string());
+        }
+        if actual_preflight_rows != expected_preflight_rows {
+            issues.push(format!(
+                "measurement contract exact_preflight_rows differ from threshold-owned rows plus {SELECTED_EXACT_PREFLIGHT_ROW}"
+            ));
         }
         if self.rows.len() != expected.len() || expected.len() != 166 {
             issues.push(format!(
@@ -145,33 +156,11 @@ impl A6MeasurementContract {
                         actual.id
                     ));
                 }
-                if actual.witness_source.is_some() {
-                    issues.push(format!(
-                        "metadata row {} has a semantic witness source",
-                        actual.id
-                    ));
-                }
             } else if actual.measurements.is_empty() {
                 issues.push(format!(
                     "executable row {} has no measurement identities",
                     actual.id
                 ));
-            } else {
-                match actual.witness_source.as_deref() {
-                    Some(source) => {
-                        super::artifacts::validate_semantic_witness_path(source, &mut issues);
-                        if !root.resolve_relative(Path::new(source)).is_file() {
-                            issues.push(format!(
-                                "semantic witness source {source} for {} does not exist",
-                                actual.id
-                            ));
-                        }
-                    }
-                    None => issues.push(format!(
-                        "executable row {} has no semantic witness source",
-                        actual.id
-                    )),
-                }
             }
             let mut measurements = BTreeSet::new();
             for measurement in &actual.measurements {
@@ -247,11 +236,25 @@ mod tests {
     }
 
     #[test]
-    fn contract_rejects_a_witness_source_owned_by_another_row() {
-        let (_, _, contract) = repository_contract();
+    fn contract_rejects_a_stale_semantic_preflight_version() {
+        let (root, manifest, mut contract) = repository_contract();
+        contract.semantic_preflight_contract = "source-path-exists-v0".to_string();
         let error = contract
-            .require_witness_source("m4-gate-lookup", "ops/bench/src/baseline/m8.rs")
-            .expect_err("wrong witness source");
-        assert!(error.to_string().contains("source-owned path"));
+            .validate(&root, &manifest)
+            .expect_err("stale semantic preflight contract");
+        assert!(error.to_string().contains("semantic_preflight_contract"));
+    }
+
+    #[test]
+    fn contract_rejects_missing_or_extra_gated_preflight_rows() {
+        let (root, manifest, mut contract) = repository_contract();
+        contract.exact_preflight_rows.pop();
+        contract
+            .exact_preflight_rows
+            .push("report-only-not-gated".to_string());
+        let error = contract
+            .validate(&root, &manifest)
+            .expect_err("gated preflight set must be exact");
+        assert!(error.to_string().contains("exact_preflight_rows differ"));
     }
 }

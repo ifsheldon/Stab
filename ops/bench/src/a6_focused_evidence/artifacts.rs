@@ -128,18 +128,6 @@ pub(super) fn validate_baseline_report_path(label: &str, value: &str, issues: &m
     }
 }
 
-pub(super) fn validate_semantic_witness_path(value: &str, issues: &mut Vec<String>) {
-    let path = Path::new(value);
-    if !(path == Path::new("ops/bench/src/baseline.rs")
-        || path.starts_with("ops/bench/src/baseline"))
-        || path.extension().and_then(|extension| extension.to_str()) != Some("rs")
-    {
-        issues.push(format!(
-            "semantic witness source path {value:?} must be baseline.rs or a Rust source under ops/bench/src/baseline"
-        ));
-    }
-}
-
 pub(super) fn validate_profile_artifact_path(value: &str, issues: &mut Vec<String>) {
     if !Path::new(value).starts_with("target/benchmarks") {
         issues.push(format!(

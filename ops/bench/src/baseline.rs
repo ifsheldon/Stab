@@ -31,6 +31,7 @@ mod convert;
 mod m10;
 mod m11;
 mod m4;
+mod m5;
 mod m6;
 mod m7;
 mod m8;
@@ -43,6 +44,7 @@ mod pf5;
 mod pf6;
 mod rates;
 mod records;
+mod semantic_preflight;
 #[cfg(test)]
 mod tests;
 
@@ -85,7 +87,6 @@ H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 CNOT 4 5 6 7
 M 1 2 3 4 5 6 7 8 9 10 11
 "#;
-
 #[derive(Clone, Debug)]
 pub(crate) struct BaselineOptions {
     pub(crate) stim: PathBuf,
@@ -237,6 +238,25 @@ pub(crate) fn run_stab_compare_row_with_root(
         "m7-convert-stim-canonical" => Ok(Some(m7::run_convert_stim_row(row)?)),
         "m4-circuit-parse" => {
             let sparse_fixture = m4_stim_parse_sparse_fixture();
+            let sparse_expected = m4_stim_parse_sparse_expected();
+            let dense_expected = m4_stim_parse_dense_expected();
+            let dense_preflight = Circuit::from_stim_bytes(M4_STIM_PARSE_DENSE_FIXTURE.as_bytes())
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let dense_output = dense_preflight.to_stim_string();
+            semantic_preflight::require_exact(
+                &row.id,
+                "dense circuit parse",
+                dense_output.as_bytes(),
+                dense_expected.as_bytes(),
+            )?;
+            let sparse_preflight = Circuit::from_stim_bytes(sparse_fixture.as_bytes())
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            semantic_preflight::require_exact(
+                &row.id,
+                "sparse circuit parse",
+                &sparse_preflight.to_stim_string(),
+                &sparse_expected,
+            )?;
             Ok(Some(vec![
                 measure_stab("stab_circuit_parse", || {
                     let circuit = Circuit::from_stim_bytes(M4_STIM_PARSE_DENSE_FIXTURE.as_bytes())
@@ -267,6 +287,13 @@ pub(crate) fn run_stab_compare_row_with_root(
                     message: error.to_string(),
                 }
             })?;
+            let canonical_output = circuit.to_stim_string();
+            semantic_preflight::require_exact(
+                &row.id,
+                "canonical circuit print",
+                canonical_output.as_bytes(),
+                include_bytes!("../../../oracle/fixtures/expected/m4_parser_basic.stdout"),
+            )?;
             Ok(Some(vec![measure_stab("stab_print_parser_basic", || {
                 let text = circuit.to_stim_string();
                 black_box(text.len());
@@ -328,6 +355,7 @@ pub(crate) fn run_stab_compare_row_with_root(
             let right = m5_bitvec(M5_BITVEC_BITS, 0x51ab_51ab);
             let mask = m5_bitvec(M5_BITVEC_BITS, 0xf00d_f00d);
             let not_zero = m5_not_zero_bitvec(&row.id)?;
+            m5::validate_bitvec_preflight(&row.id, &left, &right, &mask, &not_zero)?;
             let mut xor_target = right.clone();
             Ok(Some(vec![
                 measure_stab_batched(
@@ -374,6 +402,7 @@ pub(crate) fn run_stab_compare_row_with_root(
         }
         "m5-simd-word" => {
             let mut bits = m5_bitvec(M5_POPCOUNT_BITS, 0x5151_5151);
+            m5::validate_popcount_preflight(&row.id, &bits, 300)?;
             Ok(Some(vec![measure_stab(
                 "stab_bitvec_popcount_262144",
                 || {
@@ -531,6 +560,21 @@ fn m4_stim_parse_sparse_fixture() -> String {
         text.push_str("H 0\nCNOT 1 2\nM 0\n");
     }
     text
+}
+
+fn m4_stim_parse_sparse_expected() -> String {
+    let mut text = String::new();
+    for _ in 0..1000 {
+        text.push_str("H 0\nCX 1 2\nM 0\n");
+    }
+    text
+}
+
+fn m4_stim_parse_dense_expected() -> String {
+    format!(
+        "H {}\nCX 4 5 6 7\nM 1 2 3 4 5 6 7 8 9 10 11\n",
+        vec!["0"; 54].join(" ")
+    )
 }
 
 fn m5_bitvec(bit_len: usize, seed: u64) -> BitVec {

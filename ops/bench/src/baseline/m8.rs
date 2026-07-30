@@ -8,14 +8,11 @@ use std::path::{Component, Path, PathBuf};
 
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
+use sha2::{Digest as _, Sha256};
 use stab_core::advanced::records::MeasurementCodecSink;
 use stab_core::{
     BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementSink, Probability, RecordFormat,
     SampleFormat,
-    advanced::records::{
-        for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record,
-    },
-    advanced::records::{write_ptb64_records_checked, write_records},
 };
 use stab_engine::{
     BackendPreference, RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan,
@@ -31,7 +28,18 @@ use crate::root::RepoRoot;
 
 use super::{
     TINY_DIRECT_COMPARE_REPETITIONS, measure_stab, measure_stab_batched, measure_stab_iterations,
-    stab_runner_error,
+    semantic_preflight, stab_runner_error,
+};
+
+mod readers;
+use readers::{
+    MeasureReaderMode, measure_reader_denominator_from_name, run_measure_reader_format_row,
+    run_measure_reader_ptb64_row,
+};
+#[cfg(test)]
+use readers::{
+    measure_reader_record, validate_measure_reader_input_digest, validate_measure_reader_preflight,
+    validate_ptb64_reader_preflight,
 };
 
 const SAMPLE_NOISY_FIXTURE: &str =
@@ -44,17 +52,44 @@ const PRIMARY_UNROTATED_SURFACE_FIXTURE: &str =
     include_str!("../../../../benchmarks/fixtures/m8_sample_primary_unrotated_surface_d3_r3.stim");
 const HIGH_REPEAT_CONTRACT_FIXTURE: &str =
     include_str!("../../../../benchmarks/fixtures/m8_sample_high_repeat_contract.stim");
-const MEASURE_READER_BITS: usize = 10_000;
 const PROBABILITY_UTIL_BITS: usize = 1024;
 const PROBABILITY_UTIL_WORDS: usize = PROBABILITY_UTIL_BITS / u64::BITS as usize;
-const PROBABILITY_UTIL_CASES: [(&str, f64); 7] = [
-    ("stab_biased_random_1024_0point1percent", 0.001),
-    ("stab_biased_random_1024_0point01percent", 0.0001),
-    ("stab_biased_random_1024_1percent", 0.01),
-    ("stab_biased_random_1024_40percent", 0.4),
-    ("stab_biased_random_1024_50percent", 0.5),
-    ("stab_biased_random_1024_90percent", 0.9),
-    ("stab_biased_random_1024_99percent", 0.99),
+const PROBABILITY_UTIL_CASES: [(&str, f64, &str); 7] = [
+    (
+        "stab_biased_random_1024_0point1percent",
+        0.001,
+        "287798dfb5c34fe880d81b021a9d155cb58a7eaac4310130230886fbb105012d",
+    ),
+    (
+        "stab_biased_random_1024_0point01percent",
+        0.0001,
+        "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca",
+    ),
+    (
+        "stab_biased_random_1024_1percent",
+        0.01,
+        "58cf9b1878d5132021123dcf38dcf1a28f683ad05138f4d57626782c4d84780f",
+    ),
+    (
+        "stab_biased_random_1024_40percent",
+        0.4,
+        "7fa3a32d6b3bcf7d266bcbf6f723e64b3bf4bc9e6b5d6a6a50dd6479f63363a8",
+    ),
+    (
+        "stab_biased_random_1024_50percent",
+        0.5,
+        "233443dcf8f9ae0a2b24276754d83826364bc05cfbb64728ddba5672c2224fd4",
+    ),
+    (
+        "stab_biased_random_1024_90percent",
+        0.9,
+        "a0f44b3dc11d0f0f8b8e510e9a1eff09c830f41925791be44dedc435810545fc",
+    ),
+    (
+        "stab_biased_random_1024_99percent",
+        0.99,
+        "7815492945e0f895d1bb1d0dc921aaf726ea8b9c401c0cfac5e57a0dbe8d22a2",
+    ),
 ];
 const FRAME_SIMULATOR_QUBITS: usize = 32;
 #[cfg(not(test))]
@@ -62,6 +97,7 @@ const FRAME_SIMULATOR_SHOTS: usize = 4;
 #[cfg(test)]
 const FRAME_SIMULATOR_SHOTS: usize = 2;
 const TABLEAU_SIMULATOR_QUBITS: usize = 16;
+const TABLEAU_SIMULATOR_OUTPUT: [u8; 2] = [0x4a, 0x0c];
 #[cfg(not(test))]
 const PRIMARY_MATRIX_SHOTS: usize = 64;
 #[cfg(test)]
@@ -84,12 +120,6 @@ const SAMPLE_CLI_PROCESS_LAUNCHES_PER_MEASUREMENT: usize = 1;
 const MILLION_SHOT_COMPARE_ITERATIONS: usize = 8;
 #[cfg(test)]
 const MILLION_SHOT_COMPARE_ITERATIONS: usize = 1;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum MeasureReaderMode {
-    Packed,
-    Sparse,
-}
 
 pub(super) fn run_sample_compare_row(
     root: &RepoRoot,
@@ -344,66 +374,13 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     }
 }
 
-fn run_measure_reader_format_row(
-    row: &BenchmarkRow,
-    format: SampleFormat,
-    cases: &[(&'static str, MeasureReaderMode, usize)],
-) -> Result<Vec<Measurement>, BenchError> {
-    cases
-        .iter()
-        .map(|(name, mode, denominator)| {
-            let source_record = measure_reader_record(*denominator);
-            let input = write_records(std::slice::from_ref(&source_record), format);
-            measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
-                let mut set_bits = 0usize;
-                match mode {
-                    MeasureReaderMode::Packed => {
-                        for_each_packed_record(&input, format, MEASURE_READER_BITS, |record| {
-                            set_bits += record.popcount();
-                            Ok(())
-                        })
-                    }
-                    MeasureReaderMode::Sparse => {
-                        for_each_sparse_record(&input, format, MEASURE_READER_BITS, |hits| {
-                            set_bits += hits.len();
-                            Ok(())
-                        })
-                    }
-                }
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(set_bits);
-                Ok(())
-            })
-        })
-        .collect()
-}
-
-fn run_measure_reader_ptb64_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let source_record = measure_reader_record(10);
-    let ptb64_records = (0..64).map(|_| source_record.clone()).collect::<Vec<_>>();
-    let ptb64_input = write_ptb64_records_checked(&ptb64_records)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab(
-        "stab_measure_reader_ptb64_64x10k_contract",
-        || {
-            let mut set_bits = 0usize;
-            for_each_ptb64_record_all(&ptb64_input, MEASURE_READER_BITS, |record| {
-                set_bits += record.iter().filter(|bit| **bit).count();
-                Ok(())
-            })
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(set_bits);
-            Ok(())
-        },
-    )?])
-}
-
 fn run_probability_util_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     PROBABILITY_UTIL_CASES
         .iter()
-        .map(|(name, probability)| {
+        .map(|(name, probability, expected_digest)| {
             let probability = Probability::try_new(*probability)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
+            validate_probability_util_preflight(&row.id, name, probability, expected_digest)?;
             let mut rng = SmallRng::seed_from_u64(0);
             let mut words = [0u64; PROBABILITY_UTIL_WORDS];
             measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
@@ -523,6 +500,8 @@ fn run_tableau_simulator_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Ben
     let fixture = tableau_simulator_fixture();
     let circuit = sample_circuit(&row.id, &fixture)?;
     let plan = compile_plan(&row.id, &circuit)?;
+    let preflight = sample_plan_b8_bytes(&row.id, &plan, 1, 5)?;
+    validate_tableau_simulator_preflight(&row.id, &preflight)?;
     Ok(vec![measure_stab_iterations(
         "stab_tableau_sample_cx_1shot",
         SIMULATOR_COMPARE_ITERATIONS,
@@ -831,6 +810,15 @@ fn sample_plan_b8(
     shots: usize,
     seed: u64,
 ) -> Result<usize, BenchError> {
+    sample_plan_b8_bytes(row_id, plan, shots, seed).map(|bytes| bytes.len())
+}
+
+fn sample_plan_b8_bytes(
+    row_id: &str,
+    plan: &SamplingPlan,
+    shots: usize,
+    seed: u64,
+) -> Result<Vec<u8>, BenchError> {
     let mut session = sampling_session(row_id, plan, seed)?;
     let mut sink = MeasurementCodecSink::try_new(RecordFormat::B8, plan.measurement_width())
         .map_err(|error| stab_runner_error(row_id, error))?;
@@ -838,8 +826,51 @@ fn sample_plan_b8(
         .run(shot_count(row_id, shots)?, &mut sink)
         .map_err(|error| stab_runner_error(row_id, error))?;
     sink.into_bytes()
-        .map(|bytes| bytes.len())
         .map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn probability_words_digest(words: &[u64]) -> String {
+    let mut digest = Sha256::new();
+    for word in words {
+        digest.update(word.to_le_bytes());
+    }
+    hex::encode(digest.finalize())
+}
+
+fn validate_probability_util_preflight(
+    row_id: &str,
+    name: &str,
+    probability: Probability,
+    expected_digest: &str,
+) -> Result<(), BenchError> {
+    let mut rng = SmallRng::seed_from_u64(0);
+    let mut words = [0_u64; PROBABILITY_UTIL_WORDS];
+    biased_randomize_bits(probability, &mut words, &mut rng);
+    validate_probability_words(row_id, name, &words, expected_digest)
+}
+
+fn validate_probability_words(
+    row_id: &str,
+    name: &str,
+    words: &[u64],
+    expected_digest: &str,
+) -> Result<(), BenchError> {
+    let actual_digest = probability_words_digest(words);
+    semantic_preflight::require_exact(
+        row_id,
+        &format!("{name} deterministic output"),
+        actual_digest.as_str(),
+        expected_digest,
+    )
+}
+
+fn validate_tableau_simulator_preflight(row_id: &str, output: &[u8]) -> Result<(), BenchError> {
+    semantic_preflight::require_exact(
+        row_id,
+        "tableau simulator B8 output",
+        output,
+        TABLEAU_SIMULATOR_OUTPUT.as_slice(),
+    )
 }
 
 #[cfg(test)]
@@ -1040,17 +1071,6 @@ impl Write for WitnessWriter {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
-}
-
-fn measure_reader_record(denominator: usize) -> Vec<bool> {
-    (0..MEASURE_READER_BITS)
-        .map(|index| (index * 17 + 3) % denominator == 0)
-        .collect()
-}
-
-fn measure_reader_denominator_from_name(name: &str) -> Option<usize> {
-    name.rsplit_once("_per")
-        .and_then(|(_, denominator)| denominator.parse::<usize>().ok())
 }
 
 fn frame_simulator_fixture() -> String {

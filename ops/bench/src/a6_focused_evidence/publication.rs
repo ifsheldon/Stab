@@ -3,10 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::artifacts::{
-    bind_artifact, normalize_repo_relative_path, validate_compare_report_path,
-    validate_semantic_witness_path,
-};
+use super::artifacts::{bind_artifact, normalize_repo_relative_path, validate_compare_report_path};
 use super::{
     ArtifactBinding, CROSSING_RATIO, DiagnosticOutcome, FocusedDiagnostic, FocusedEvidenceLedger,
     FocusedMeasurement, INITIAL_SEED_PHASES, MAX_LEDGER_BYTES, MAX_REPORT_BYTES, PhaseEvidence,
@@ -53,7 +50,6 @@ struct PhaseSelector {
 struct DiagnosticSelection {
     row_id: String,
     report: PathBuf,
-    semantic_witness_source: PathBuf,
     profile: ProfileSelection,
     owner_action: String,
 }
@@ -321,13 +317,6 @@ fn derive_diagnostics(
         let (report_binding, _) = bind_artifact(root, &selection.report, MAX_REPORT_BYTES)?;
         require_compare_path("focused report", &report_binding)?;
         let report = read_bound_report(root, &report_binding)?;
-        let (witness_binding, _) =
-            bind_artifact(root, &selection.semantic_witness_source, MAX_REPORT_BYTES)?;
-        let mut witness_issues = Vec::new();
-        validate_semantic_witness_path(&witness_binding.path, &mut witness_issues);
-        if !witness_issues.is_empty() {
-            return Err(focused_error(witness_issues.join("\n")));
-        }
         let profile_artifact = selection
             .profile
             .artifact
@@ -369,7 +358,6 @@ fn derive_diagnostics(
         let diagnostic = FocusedDiagnostic {
             row_id,
             report: report_binding,
-            semantic_witness_source: witness_binding,
             internal_timing_count: timing_count
                 .ok_or_else(|| focused_error("focused diagnostic has no measurements"))?,
             outcome: diagnostic_outcome(&measurements, &selection.profile.status)?,
@@ -486,5 +474,28 @@ mod tests {
                 .to_string()
                 .contains("inconsistent with reproduced=false")
         );
+    }
+
+    #[test]
+    fn publication_request_rejects_the_obsolete_source_path_surrogate() {
+        let value = serde_json::json!({
+            "schema_version": REQUEST_SCHEMA_VERSION,
+            "matrix_report": "target/benchmarks/matrix/compare.json",
+            "predecessors": [],
+            "diagnostics": [{
+                "row_id": "row",
+                "report": "target/benchmarks/focused/compare.json",
+                "semantic_witness_source": "ops/bench/src/baseline/m9.rs",
+                "profile": {
+                    "status": "not-required",
+                    "detail": "resolved",
+                    "artifact": null
+                },
+                "owner_action": "retain"
+            }]
+        });
+        let error = serde_json::from_value::<PublicationRequest>(value)
+            .expect_err("source-path existence is not semantic evidence");
+        assert!(error.to_string().contains("unknown field"));
     }
 }

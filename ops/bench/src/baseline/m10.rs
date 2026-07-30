@@ -22,7 +22,7 @@ use crate::report::Measurement;
 
 use super::{
     STAB_COMPARE_ITERATIONS, TINY_DIRECT_COMPARE_REPETITIONS, duration_variance_seconds,
-    measure_stab_iterations, stab_runner_error,
+    measure_stab_iterations, semantic_preflight::require_exact, stab_runner_error,
 };
 
 #[cfg(test)]
@@ -32,8 +32,12 @@ const DEM_PARSE_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_deterministic.dem");
 const ANALYZE_BASIC_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_basic.stim");
+const ANALYZE_BASIC_EXPECTED: &str =
+    include_str!("../../../../oracle/fixtures/expected/m10_analyze_errors_basic.stdout");
 const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_fold_repeat.stim");
+const ANALYZE_FOLD_REPEAT_EXPECTED: &str =
+    include_str!("../../../../oracle/fixtures/expected/m10_analyze_errors_fold_repeat.stdout");
 const ANALYZE_SWEEP_CONTROL_FIXTURE: &str = "X_ERROR(0.25) 0\n\
                                             CX sweep[0] 0\n\
                                             CY sweep[1] 0\n\
@@ -86,6 +90,22 @@ const PF7_ANALYZE_GENERATED_EXPECTED: AnalyzerSemanticExpectation =
         245,
         "c7b3c87ffba478f880bd2e56bd598d104deda56aeeffa4cde1af7dbe3bd9e64c",
     );
+const GRAPHLIKE_SEARCH_EXPECTED: ExactTextExpectation = ExactTextExpectation::new(
+    2_224,
+    129,
+    "10e2b58ca72dd8cbda68cefa941116221674cc71b3a29a07f67570af45b0868f",
+);
+const ERROR_DECOMP_INDEPENDENT_EXPECTED: ProbabilityTripleExpectation =
+    ProbabilityTripleExpectation::Values([0.11, 0.15, 0.23]);
+const ERROR_DECOMP_EXACT_EXPECTED: ProbabilityTripleExpectation =
+    ProbabilityTripleExpectation::Values([
+        0.091_751_709_536_136_93,
+        0.255_051_025_721_682_2,
+        0.193_813_782_152_102_7,
+    ]);
+const ERROR_DECOMP_NO_SOLUTION_EXPECTED: ProbabilityTripleExpectation =
+    ProbabilityTripleExpectation::NoSolution;
+const ERROR_DECOMP_WITNESS_TOLERANCE: f64 = 1e-14;
 
 pub(super) fn run_dem_compare_row(
     row: &BenchmarkRow,
@@ -243,6 +263,15 @@ fn run_dem_print_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError>
 fn run_analyze_fold_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = Circuit::from_stim_str(ANALYZE_FOLD_REPEAT_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    preflight_analyze_exact(
+        &row.id,
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+        ANALYZE_FOLD_REPEAT_EXPECTED,
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_analyze_errors_fold_repeat",
         STAB_COMPARE_ITERATIONS,
@@ -264,6 +293,15 @@ fn run_analyze_fold_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
 fn run_analyze_decompose_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = Circuit::from_stim_str(ANALYZE_BASIC_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    preflight_analyze_exact(
+        &row.id,
+        &circuit,
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+        ANALYZE_BASIC_EXPECTED,
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_analyze_errors_decompose_basic",
         STAB_COMPARE_ITERATIONS,
@@ -380,6 +418,36 @@ struct AnalyzerSemanticWitness {
     bytes: usize,
     records: usize,
     digest: String,
+}
+
+fn preflight_analyze_exact(
+    row_id: &str,
+    circuit: &Circuit,
+    options: ErrorAnalyzerOptions,
+    expected: &str,
+) -> Result<(), BenchError> {
+    let actual = circuit_to_detector_error_model(circuit, options)
+        .map_err(|error| stab_runner_error(row_id, error))?
+        .to_dem_string();
+    require_exact(
+        row_id,
+        "analyze_errors canonical DEM",
+        actual.as_bytes(),
+        expected.as_bytes(),
+    )
+}
+
+fn preflight_analyze_semantic(
+    row_id: &str,
+    circuit: &Circuit,
+    options: ErrorAnalyzerOptions,
+    expected: AnalyzerSemanticExpectation,
+) -> Result<(), BenchError> {
+    let actual = circuit_to_detector_error_model(circuit, options)
+        .map_err(|error| stab_runner_error(row_id, error))?
+        .to_dem_string();
+    let actual = analyzer_semantic_witness(row_id, actual.as_bytes())?;
+    ensure_analyzer_semantic_witness(row_id, expected, &actual)
 }
 
 fn preflight_analyze_cli(
@@ -674,6 +742,12 @@ impl Write for CountingWriter {
 
 fn run_error_analyzer_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = error_analyzer_surface_code(&row.id)?;
+    preflight_analyze_semantic(
+        &row.id,
+        &circuit,
+        ErrorAnalyzerOptions::default(),
+        PF7_ANALYZE_GENERATED_EXPECTED,
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_error_analyzer_surface_code",
         ERROR_ANALYZER_COMPARE_ITERATIONS,
@@ -688,6 +762,7 @@ fn run_error_analyzer_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchE
 
 fn run_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let model = graphlike_search_model(&row.id)?;
+    preflight_graphlike_search(&row.id, &model)?;
     Ok(vec![measure_stab_iterations(
         "stab_graphlike_search_chain",
         STAB_COMPARE_ITERATIONS,
@@ -710,6 +785,13 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
     let zero = benchmark_probability(&row.id, 0.0)?;
     let independent_cases = [[p10, p20, p30]];
     let exact_cases = [[p10, p20, p15]];
+    preflight_error_decomp(
+        &row.id,
+        independent_cases[0],
+        exact_cases[0],
+        [p10, p20, zero],
+        [p01, p02, zero],
+    )?;
     Ok(vec![
         measure_error_decomp_cases(
             "stab_independent_to_disjoint_xyz_errors",
@@ -764,6 +846,148 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
             },
         )?,
     ])
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ExactTextExpectation {
+    bytes: usize,
+    records: usize,
+    digest: &'static str,
+}
+
+impl ExactTextExpectation {
+    const fn new(bytes: usize, records: usize, digest: &'static str) -> Self {
+        Self {
+            bytes,
+            records,
+            digest,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ExactTextWitness {
+    bytes: usize,
+    records: usize,
+    digest: String,
+}
+
+fn exact_text_witness(bytes: &[u8]) -> ExactTextWitness {
+    ExactTextWitness {
+        bytes: bytes.len(),
+        records: bytes.iter().filter(|byte| **byte == b'\n').count(),
+        digest: hex::encode(Sha256::digest(bytes)),
+    }
+}
+
+fn ensure_exact_text_witness(
+    row_id: &str,
+    contract: &str,
+    expected: ExactTextExpectation,
+    actual: &ExactTextWitness,
+) -> Result<(), BenchError> {
+    if actual.bytes == expected.bytes
+        && actual.records == expected.records
+        && actual.digest == expected.digest
+    {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        row_id,
+        format!("{contract} changed: expected {expected:?}, got {actual:?}"),
+    ))
+}
+
+fn preflight_graphlike_search(row_id: &str, model: &DetectorErrorModel) -> Result<(), BenchError> {
+    let shortest = shortest_graphlike_undetectable_logical_error(model, false)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    let text = shortest.to_dem_string();
+    let actual = exact_text_witness(text.as_bytes());
+    ensure_exact_text_witness(
+        row_id,
+        "graphlike logical-error DEM",
+        GRAPHLIKE_SEARCH_EXPECTED,
+        &actual,
+    )
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ProbabilityTripleExpectation {
+    Values([f64; 3]),
+    NoSolution,
+}
+
+fn ensure_probability_triple(
+    row_id: &str,
+    contract: &str,
+    expected: ProbabilityTripleExpectation,
+    actual: Option<[f64; 3]>,
+) -> Result<(), BenchError> {
+    let matches = match (expected, actual) {
+        (ProbabilityTripleExpectation::NoSolution, None) => true,
+        (ProbabilityTripleExpectation::Values(expected), Some(actual)) => {
+            expected.into_iter().zip(actual).all(|(expected, actual)| {
+                actual.is_finite() && (actual - expected).abs() <= ERROR_DECOMP_WITNESS_TOLERANCE
+            })
+        }
+        _ => false,
+    };
+    if matches {
+        return Ok(());
+    }
+    Err(stab_runner_error(
+        row_id,
+        format!("{contract} changed: expected {expected:?}, got {actual:?}"),
+    ))
+}
+
+fn preflight_error_decomp(
+    row_id: &str,
+    independent_case: [Probability; 3],
+    exact_case: [Probability; 3],
+    p10_case: [Probability; 3],
+    p100_case: [Probability; 3],
+) -> Result<(), BenchError> {
+    let [x, y, z] = independent_case;
+    let actual = independent_to_disjoint_xyz_errors(x, y, z)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    ensure_probability_triple(
+        row_id,
+        "independent-to-disjoint XYZ conversion",
+        ERROR_DECOMP_INDEPENDENT_EXPECTED,
+        Some([actual.x().get(), actual.y().get(), actual.z().get()]),
+    )?;
+
+    for (contract, case, expected) in [
+        (
+            "exact disjoint-to-independent XYZ conversion",
+            exact_case,
+            ERROR_DECOMP_EXACT_EXPECTED,
+        ),
+        (
+            "p10 disjoint-to-independent XYZ no-solution result",
+            p10_case,
+            ERROR_DECOMP_NO_SOLUTION_EXPECTED,
+        ),
+        (
+            "p100 disjoint-to-independent XYZ no-solution result",
+            p100_case,
+            ERROR_DECOMP_NO_SOLUTION_EXPECTED,
+        ),
+    ] {
+        let [x, y, z] = case;
+        let actual = try_disjoint_to_independent_xyz_errors(x, y, z)
+            .map_err(|error| stab_runner_error(row_id, error))?
+            .map(|probabilities| {
+                [
+                    probabilities.x().get(),
+                    probabilities.y().get(),
+                    probabilities.z().get(),
+                ]
+            });
+        ensure_probability_triple(row_id, contract, expected, actual)?;
+    }
+    Ok(())
 }
 
 fn benchmark_probability(row_id: &str, value: f64) -> Result<Probability, BenchError> {

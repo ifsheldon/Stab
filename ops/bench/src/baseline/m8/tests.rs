@@ -7,9 +7,51 @@ use crate::report::Measurement;
 use crate::root::RepoRoot;
 
 use super::{
-    OutputWitness, compare_note, frozen_pre_a4_cli_witness, measurement_work,
-    run_sample_compare_row,
+    MeasureReaderMode, OutputWitness, PROBABILITY_UTIL_CASES, PROBABILITY_UTIL_WORDS,
+    TABLEAU_SIMULATOR_OUTPUT, compare_note, frozen_pre_a4_cli_witness, measure_reader_record,
+    measurement_work, run_sample_compare_row, validate_measure_reader_input_digest,
+    validate_measure_reader_preflight, validate_probability_words, validate_ptb64_reader_preflight,
+    validate_tableau_simulator_preflight,
 };
+use rand::SeedableRng as _;
+use rand::rngs::SmallRng;
+use stab_core::Probability;
+use stab_core::SampleFormat;
+use stab_core::advanced::records::{write_ptb64_records_checked, write_records};
+use stab_engine::biased_randomize_bits;
+
+#[test]
+fn probability_preflight_rejects_same_width_wrong_content() {
+    for (name, probability, expected_digest) in PROBABILITY_UTIL_CASES {
+        let probability = Probability::try_new(probability).expect("probability");
+        let mut rng = SmallRng::seed_from_u64(0);
+        let mut words = [0_u64; PROBABILITY_UTIL_WORDS];
+        biased_randomize_bits(probability, &mut words, &mut rng);
+        validate_probability_words("m8-probability-util", name, &words, expected_digest)
+            .expect("frozen probability output");
+
+        words[0] ^= 1;
+        let error =
+            validate_probability_words("m8-probability-util", name, &words, expected_digest)
+                .expect_err("same-width probability mutation must fail");
+        assert!(error.to_string().contains("wrong content"));
+    }
+}
+
+#[test]
+fn tableau_preflight_rejects_same_width_wrong_content() {
+    validate_tableau_simulator_preflight(
+        "m8-tableau-simulator",
+        TABLEAU_SIMULATOR_OUTPUT.as_slice(),
+    )
+    .expect("frozen tableau output");
+
+    let mut changed = TABLEAU_SIMULATOR_OUTPUT;
+    changed[0] ^= 1;
+    let error = validate_tableau_simulator_preflight("m8-tableau-simulator", &changed)
+        .expect_err("same-width tableau mutation must fail");
+    assert!(error.to_string().contains("wrong content"));
+}
 
 #[test]
 fn m8_benchmark_rows_have_stab_compare_runners() {
@@ -167,6 +209,75 @@ fn m8_benchmark_rows_have_stab_compare_runners() {
             );
         }
     }
+}
+
+#[test]
+fn measure_reader_preflights_reject_same_width_wrong_content() {
+    let expected = measure_reader_record(10);
+    let mut changed = expected.clone();
+    let first = changed.first_mut().expect("reader fixture bit");
+    *first = !*first;
+
+    for mode in [MeasureReaderMode::Packed, MeasureReaderMode::Sparse] {
+        let input = write_records(std::slice::from_ref(&changed), SampleFormat::ZeroOne);
+        let digest_error = validate_measure_reader_input_digest(
+            "m8-measure-reader-01",
+            &input,
+            SampleFormat::ZeroOne,
+            10,
+        )
+        .expect_err("same-width encoded mutation must change the frozen digest");
+        assert!(digest_error.to_string().contains("wrong content"));
+        let error = validate_measure_reader_preflight(
+            "m8-measure-reader-01",
+            &input,
+            SampleFormat::ZeroOne,
+            mode,
+            &expected,
+        )
+        .expect_err("same-width reader mutation must fail");
+        assert!(error.to_string().contains("wrong content"));
+    }
+}
+
+#[test]
+fn measure_reader_preflight_rejects_missing_and_extra_records() {
+    let expected = measure_reader_record(10);
+    let empty_error = validate_measure_reader_preflight(
+        "m8-measure-reader-01",
+        b"",
+        SampleFormat::ZeroOne,
+        MeasureReaderMode::Packed,
+        &expected,
+    )
+    .expect_err("missing record must fail");
+    assert!(empty_error.to_string().contains("wrong content"));
+
+    let input = write_records(&[expected.clone(), expected.clone()], SampleFormat::ZeroOne);
+    let extra_error = validate_measure_reader_preflight(
+        "m8-measure-reader-01",
+        &input,
+        SampleFormat::ZeroOne,
+        MeasureReaderMode::Sparse,
+        &expected,
+    )
+    .expect_err("extra record must fail");
+    assert!(extra_error.to_string().contains("wrong content"));
+}
+
+#[test]
+fn ptb64_reader_preflight_rejects_same_width_wrong_content() {
+    let expected = measure_reader_record(10);
+    let mut changed = expected.clone();
+    let first = changed.first_mut().expect("reader fixture bit");
+    *first = !*first;
+    let records = (0..64).map(|_| changed.clone()).collect::<Vec<_>>();
+    let input = write_ptb64_records_checked(&records).expect("PTB64 fixture");
+
+    let error =
+        validate_ptb64_reader_preflight("m8-measure-reader-ptb64-contract", &input, &expected)
+            .expect_err("same-width PTB64 mutation must fail");
+    assert!(error.to_string().contains("wrong content"));
 }
 
 #[test]

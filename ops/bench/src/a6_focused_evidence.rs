@@ -30,7 +30,7 @@ mod publication;
 mod revision;
 mod structure;
 
-const SCHEMA_VERSION: u32 = 2;
+const SCHEMA_VERSION: u32 = 3;
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_REPORT_BYTES: u64 = 64 << 20;
 const MAX_PHASES: usize = 256;
@@ -186,7 +186,6 @@ struct PhaseEvidence {
 struct FocusedDiagnostic {
     row_id: String,
     report: ArtifactBinding,
-    semantic_witness_source: ArtifactBinding,
     internal_timing_count: usize,
     measurements: Vec<FocusedMeasurement>,
     outcome: DiagnosticOutcome,
@@ -259,10 +258,6 @@ fn validate_ledger(
     manifest.check(root)?;
     let measurement_contract =
         measurement_contract::A6MeasurementContract::read_and_validate(root, &manifest)?;
-    for diagnostic in &ledger.diagnostics {
-        measurement_contract
-            .require_witness_source(&diagnostic.row_id, &diagnostic.semantic_witness_source.path)?;
-    }
     let matrix = read_bound_report(root, &ledger.matrix_report)?;
     require_matrix_contract(
         root,
@@ -438,7 +433,6 @@ fn verify_artifacts(
     }
 
     for diagnostic in &ledger.diagnostics {
-        verify_binding(root, &diagnostic.semantic_witness_source, MAX_REPORT_BYTES)?;
         if let Some(artifact) = &diagnostic.profile.artifact {
             verify_binding(root, artifact, MAX_REPORT_BYTES)?;
         }

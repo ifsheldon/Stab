@@ -60,7 +60,6 @@ fn diagnostic(ratio: f64, profile: ProfileStatus) -> FocusedDiagnostic {
     FocusedDiagnostic {
         row_id: "row".to_string(),
         report,
-        semantic_witness_source: binding("ops/bench/src/baseline/m9.rs"),
         internal_timing_count: 8,
         measurements: vec![FocusedMeasurement {
             measurement: "stab_measurement".to_string(),
@@ -662,7 +661,7 @@ fn captured_profile_requires_unique_revision_bound_artifact() {
         .artifact
         .as_mut()
         .expect("profile artifact")
-        .sha256 = diagnostic.semantic_witness_source.sha256.clone();
+        .sha256 = diagnostic.report.sha256.clone();
     let error = validate_structure(&valid).expect_err("profile role collision");
     assert!(
         error

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::artifacts::{
     validate_baseline_report_path, validate_binding, validate_compare_report_path,
-    validate_profile_artifact_path, validate_revision, validate_semantic_witness_path,
+    validate_profile_artifact_path, validate_revision,
 };
 use super::{
     CROSSING_RATIO, FocusedEvidenceLedger, MAX_DIAGNOSTICS, MAX_PHASES, SCHEMA_VERSION,
@@ -146,12 +146,6 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
         }
         validate_binding("focused report", &diagnostic.report, &mut issues);
         validate_compare_report_path("focused report", &diagnostic.report.path, &mut issues);
-        validate_binding(
-            "semantic witness source",
-            &diagnostic.semantic_witness_source,
-            &mut issues,
-        );
-        validate_semantic_witness_path(&diagnostic.semantic_witness_source.path, &mut issues);
         if !diagnostic_paths.insert(diagnostic.report.path.clone()) {
             issues.push(format!(
                 "focused report path {} is reused by multiple rows",
@@ -245,8 +239,6 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
                 || predecessor_digests.contains(artifact.sha256.as_str())
                 || artifact.path == diagnostic.report.path
                 || artifact.sha256 == diagnostic.report.sha256
-                || artifact.path == diagnostic.semantic_witness_source.path
-                || artifact.sha256 == diagnostic.semantic_witness_source.sha256
             {
                 issues.push(format!(
                     "{} profile artifact collides with another evidence role",
