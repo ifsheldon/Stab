@@ -1459,3 +1459,30 @@ Current text: the automated owner-package rule applied only to `stab-bits` and `
 Gap: model, records, analysis, and engine parents could remain green through facade selectors even when their canonical component package was not independently exercised. This made the generated inventory weaker than the physical crate graph it claimed to qualify.
 Proposed amendment: enforce direct owner-package execution for every wholly owned implemented parent and oracle fixture in all six Stable component crates, with a narrow checked exception ledger for genuine cross-component, circuit, CLI, or facade integration.
 Resolution: the A6 plan now applies canonical-package ownership to `stab-bits`, `stab-model`, `stab-records`, `stab-algebra`, `stab-analysis`, and `stab-engine`; every exception must name the integration behavior that prevents direct execution.
+
+## 2026-07-30 - A6: Complete Measurement And Policy Identity
+
+Status: Resolved
+Revealed by: pre-evidence review of the focused-ledger validator.
+Current text: the A6 matrix named 166 manifest rows and required unchanged thresholds and profiler notes, but the ledger validator trusted the measurement names and policy statuses recorded inside the report.
+Gap: a report could omit an unanticipated submeasurement or relabel a threshold, waiver, or profiler-note result without violating the ledger's structural phase coverage.
+Proposed amendment: check in the complete ordered Stab measurement set and semantic-witness owner for every row, bind its digest into the report, and replay all current threshold, waiver, and profiler-note sources during validation.
+Resolution: `benchmarks/a6-measurement-contract.json` freezes 166 rows, 309 Stab measurements, and exact source modules; schema-version-3 reports bind its digest, and A6 validation replays current policy sources before acceptance.
+
+## 2026-07-30 - A6: Historical Predecessor Comparability
+
+Status: Resolved
+Revealed by: audit of the clean historical extraction reports selected as A6 predecessors.
+Current text: report-only phases required equal feature selection and timing boundaries, but historical schema-version-1 and schema-version-2 reports did not serialize those identities.
+Gap: treating absent metadata as an inferred default would turn an unproved equality into acceptance evidence, while rejecting every historical report without a regeneration procedure would make the milestone impossible to execute.
+Proposed amendment: require schema-version-3 predecessors and define a clean instrumentation-backport procedure that preserves historical product behavior while adding only the reviewed evidence harness.
+Resolution: predecessor reports must be regenerated on the same host before the current matrix from committed historical product revisions carrying the schema-version-3 harness, exact measurement contract, explicit scalar features, row-native timing identity, and create-new output semantics.
+
+## 2026-07-30 - A6: Immutable Publication And Typed Diagnostic Outcome
+
+Status: Resolved
+Revealed by: audit of the hand-authored focused-evidence ledger design.
+Current text: the ledger bound hashes and a final disposition, but a person still supplied every derived number, could select an arbitrary Rust file beneath the benchmark directory as the witness, and could overwrite the checked path outside the validator.
+Gap: hand-entered derived values and free-form outcome prose invite transcription errors and contradictory claims, while structural path checks do not prove benchmark ownership or immutable publication.
+Proposed amendment: source-own every row-to-witness mapping, derive all evidence values from selected artifacts, represent the measured outcome as a closed enum, and atomically create the checked ledger without replacement after a clean-revision recheck.
+Resolution: the A6 publisher accepts a selection-only request under `target/benchmarks`, derives hashes, values, crossings, timing counts, and outcomes, verifies every artifact and the unchanged clean revision, and uses descriptor-safe no-replace publication for `benchmarks/a6-focused-evidence.json`.
