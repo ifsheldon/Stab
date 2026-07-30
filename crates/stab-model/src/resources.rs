@@ -45,7 +45,32 @@ pub struct ResourceEstimate {
     work_units: Estimate<usize>,
 }
 
+/// Builds a [`ResourceEstimate`] by naming only the quantities known to the caller.
+#[must_use = "resource estimate builders must be finished with build"]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct ResourceEstimateBuilder {
+    estimate: ResourceEstimate,
+}
+
 impl ResourceEstimate {
+    const UNKNOWN: Self = Self {
+        input_bytes: Estimate::Unknown,
+        input_items: Estimate::Unknown,
+        expanded_operations: Estimate::Unknown,
+        folded_traversal: Estimate::Unknown,
+        scratch_bytes: Estimate::Unknown,
+        resident_bytes: Estimate::Unknown,
+        output_bytes: Estimate::Unknown,
+        work_units: Estimate::Unknown,
+    };
+
+    /// Starts a domain-neutral estimate with every quantity classified as unknown.
+    pub const fn builder() -> ResourceEstimateBuilder {
+        ResourceEstimateBuilder {
+            estimate: Self::UNKNOWN,
+        }
+    }
+
     pub(crate) fn for_text_parse(input: &str) -> Self {
         Self::for_model_bytes(input.as_bytes())
     }
@@ -61,24 +86,6 @@ impl ResourceEstimate {
             input_bytes: Estimate::Exact(input.len()),
             input_items: Estimate::Exact(physical_lines),
             ..Self::default()
-        }
-    }
-
-    pub(crate) const fn for_sampling_request(
-        input_items: Estimate<usize>,
-        expanded_operations: Estimate<usize>,
-        folded_traversal: Estimate<usize>,
-        output_bytes: Estimate<usize>,
-    ) -> Self {
-        Self {
-            input_items,
-            expanded_operations,
-            folded_traversal,
-            output_bytes,
-            input_bytes: Estimate::Unknown,
-            scratch_bytes: Estimate::Unknown,
-            resident_bytes: Estimate::Unknown,
-            work_units: Estimate::Unknown,
         }
     }
 
@@ -112,5 +119,52 @@ impl ResourceEstimate {
 
     pub const fn work_units(&self) -> Estimate<usize> {
         self.work_units
+    }
+}
+
+impl ResourceEstimateBuilder {
+    pub const fn input_bytes(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.input_bytes = estimate;
+        self
+    }
+
+    pub const fn input_items(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.input_items = estimate;
+        self
+    }
+
+    pub const fn expanded_operations(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.expanded_operations = estimate;
+        self
+    }
+
+    pub const fn folded_traversal(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.folded_traversal = estimate;
+        self
+    }
+
+    pub const fn scratch_bytes(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.scratch_bytes = estimate;
+        self
+    }
+
+    pub const fn resident_bytes(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.resident_bytes = estimate;
+        self
+    }
+
+    pub const fn output_bytes(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.output_bytes = estimate;
+        self
+    }
+
+    pub const fn work_units(mut self, estimate: Estimate<usize>) -> Self {
+        self.estimate.work_units = estimate;
+        self
+    }
+
+    #[must_use]
+    pub const fn build(self) -> ResourceEstimate {
+        self.estimate
     }
 }

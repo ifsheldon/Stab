@@ -51,7 +51,7 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Purpose: own exact Stim circuit and DEM values plus syntax.
 - Inputs and outputs: bytes or text, typed models, gate and target values, IDs, parse or validation errors, and cheap resource estimates.
 - Invariants: closed Stim v1.16.0 dialect, canonical text and byte printing, opaque comment payloads, exact unescaped tag bytes, structural validity, typed indices and probabilities, exact byte spans, bounded diagnostic text, and honest estimate classifications.
-- Dependencies: algebra values needed by the closed Stim model, plus foundational standard-library and parsing support.
+- Dependencies: foundational standard-library, compact-storage, hashing, and error-reporting support; no other Stab product crate.
 - Forbidden: engine, records, CLI, ops.
 - Resource behavior: `ParseLimits` owns caller-selectable source-line admission and a caller-tightenable 256-level parsed-model repeat envelope. Programmatic models may exceed that parser envelope only for APIs with an established deeper contract; those consumers must be iterative or reject before recursive work. `DemFlattenLimits` belongs to the analysis adapter rather than the model.
 - Extension points: immutable typed circuit passes consume and return models.

@@ -43,7 +43,7 @@ pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError,
 pub use resource_limit::{
     ResourceKind, ResourceLimitContext, ResourceLimitError, ResourceOperation,
 };
-pub use resources::{Estimate, EstimateClass, ResourceEstimate};
+pub use resources::{Estimate, EstimateClass, ResourceEstimate, ResourceEstimateBuilder};
 pub use target::{Pauli, Target};
 pub use validation::{ValidationError, ValidationErrorCode};
 
@@ -53,9 +53,9 @@ pub mod advanced {
 
     use super::{
         ByteSpan, Circuit, CircuitInstruction, DemInstruction, DemInstructionKind, DemRepeatBlock,
-        DemTarget, DetectorErrorModel, Estimate, Gate, GateDecomposition, MeasureRecordOffset,
-        ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext,
-        Probability, RepeatBlock, RepeatCount, ResourceEstimate, ResourceLimitError, Target,
+        DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
+        ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability,
+        RepeatBlock, RepeatCount, ResourceLimitError, Target,
     };
     pub use crate::dem::MAX_DEM_REPEAT_NESTING;
     pub use crate::dem::advanced::{
@@ -218,21 +218,6 @@ pub mod advanced {
     /// Returns the schema-one fingerprint discriminator for a model dialect.
     pub const fn model_dialect_fingerprint_discriminator(dialect: ModelDialect) -> u8 {
         dialect.fingerprint_discriminator()
-    }
-
-    /// Assembles the resource vocabulary emitted by the current sampling facade.
-    pub const fn resource_estimate_for_sampling_request(
-        input_items: Estimate<usize>,
-        expanded_operations: Estimate<usize>,
-        folded_traversal: Estimate<usize>,
-        output_bytes: Estimate<usize>,
-    ) -> ResourceEstimate {
-        ResourceEstimate::for_sampling_request(
-            input_items,
-            expanded_operations,
-            folded_traversal,
-            output_bytes,
-        )
     }
 
     /// Constructs the circuit source-line admission failure used by the exact parser.

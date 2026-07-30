@@ -28,12 +28,12 @@ pub fn estimate_sampling_request(
             estimate_from_encoded(output_format.estimate_output_bytes(shots, measurements))
         });
 
-    stab_model::advanced::resource_estimate_for_sampling_request(
-        input_items.map_or(Estimate::Unknown, Estimate::Exact),
-        expanded_operations.map_or(Estimate::Unknown, Estimate::Exact),
-        input_items.map_or(Estimate::Unknown, Estimate::Exact),
-        output_bytes,
-    )
+    ResourceEstimate::builder()
+        .input_items(input_items.map_or(Estimate::Unknown, Estimate::Exact))
+        .expanded_operations(expanded_operations.map_or(Estimate::Unknown, Estimate::Exact))
+        .folded_traversal(input_items.map_or(Estimate::Unknown, Estimate::Exact))
+        .output_bytes(output_bytes)
+        .build()
 }
 
 fn estimate_from_encoded<T>(estimate: EncodedSizeEstimate<T>) -> Estimate<T> {

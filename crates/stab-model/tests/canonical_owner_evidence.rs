@@ -887,29 +887,37 @@ fn cq2_dem_instruction_value_validation_print_contract() {
 }
 
 #[test]
-fn a2_sampling_request_resource_estimate() {
-    let default_estimate = ResourceEstimate::default();
-    assert_eq!(default_estimate.input_bytes(), Estimate::Unknown);
-    assert_eq!(default_estimate.input_items(), Estimate::Unknown);
-    assert_eq!(default_estimate.expanded_operations(), Estimate::Unknown);
-    assert_eq!(default_estimate.folded_traversal(), Estimate::Unknown);
-    assert_eq!(default_estimate.scratch_bytes(), Estimate::Unknown);
-    assert_eq!(default_estimate.resident_bytes(), Estimate::Unknown);
-    assert_eq!(default_estimate.output_bytes(), Estimate::Unknown);
-    assert_eq!(default_estimate.work_units(), Estimate::Unknown);
-
-    let estimate = stab_model::advanced::resource_estimate_for_sampling_request(
-        Estimate::Exact(7),
-        Estimate::UpperBound(13),
-        Estimate::Exact(5),
-        Estimate::UpperBound(1024),
-    );
+fn a2_resource_estimate_builder_preserves_named_quantities() {
+    let estimate = ResourceEstimate::builder()
+        .input_bytes(Estimate::Exact(256))
+        .input_items(Estimate::Exact(7))
+        .expanded_operations(Estimate::UpperBound(13))
+        .folded_traversal(Estimate::Exact(5))
+        .scratch_bytes(Estimate::UpperBound(512))
+        .resident_bytes(Estimate::UpperBound(2048))
+        .output_bytes(Estimate::UpperBound(1024))
+        .work_units(Estimate::Exact(21))
+        .build();
+    assert_eq!(estimate.input_bytes(), Estimate::Exact(256));
     assert_eq!(estimate.input_items(), Estimate::Exact(7));
     assert_eq!(estimate.expanded_operations(), Estimate::UpperBound(13));
     assert_eq!(estimate.folded_traversal(), Estimate::Exact(5));
+    assert_eq!(estimate.scratch_bytes(), Estimate::UpperBound(512));
+    assert_eq!(estimate.resident_bytes(), Estimate::UpperBound(2048));
     assert_eq!(estimate.output_bytes(), Estimate::UpperBound(1024));
-    assert_eq!(estimate.input_bytes(), Estimate::Unknown);
-    assert_eq!(estimate.scratch_bytes(), Estimate::Unknown);
+    assert_eq!(estimate.work_units(), Estimate::Exact(21));
+
+    let partial = ResourceEstimate::builder()
+        .output_bytes(Estimate::Exact(64))
+        .build();
+    assert_eq!(partial.output_bytes(), Estimate::Exact(64));
+    assert_eq!(partial.input_bytes(), Estimate::Unknown);
+    assert_eq!(partial.input_items(), Estimate::Unknown);
+    assert_eq!(partial.expanded_operations(), Estimate::Unknown);
+    assert_eq!(partial.folded_traversal(), Estimate::Unknown);
+    assert_eq!(partial.scratch_bytes(), Estimate::Unknown);
+    assert_eq!(partial.resident_bytes(), Estimate::Unknown);
+    assert_eq!(partial.work_units(), Estimate::Unknown);
 }
 
 #[test]
