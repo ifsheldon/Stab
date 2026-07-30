@@ -467,7 +467,7 @@ struct CompilerReport {
     operation: &'static str,
     input_dialect: &'static str,
     compiler_schema_version: u16,
-    request_fingerprint_schema_version: u16,
+    request_fingerprint_schema_version: Option<u16>,
     configurable_limits: bool,
     backend_selection: bool,
 }

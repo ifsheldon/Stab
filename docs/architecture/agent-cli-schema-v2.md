@@ -115,7 +115,7 @@ The report contains:
 
 `portable-simd` remains absent from sampling capabilities until a later packed-frame milestone registers a distinct executable implementation. A6 build-time bit and Clifford acceleration does not change this runtime schema.
 
-Compiler entries report operation, input dialect, compiler schema, request-fingerprint schema, configurable-limit availability, and backend-selection availability.
+Compiler entries report operation, input dialect, compiler schema, nullable request-fingerprint schema, configurable-limit availability, and backend-selection availability. Sampling currently reports request-fingerprint schema `1`; `m2d`, `detect`, and `sample_dem` report `null` because those compiler families do not yet expose a public request-fingerprint identity.
 
 ## `stab inspect`
 

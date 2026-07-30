@@ -9,7 +9,7 @@ use stab_model::{
 use self::execute::{ExecutionBuffers, count_determined_operations, execute_operations};
 use self::operation::SampleOperation;
 use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
-use crate::{CompilationOperation, CompilationRequestFingerprint};
+use crate::{CompilationDescriptor, CompilationOperation, CompilationRequestFingerprint};
 
 mod api;
 mod direct_z_measurement;
@@ -33,52 +33,15 @@ pub(crate) use reference::ReferenceSampleScratch;
 /// Sampling backends registered by this build.
 pub const REGISTERED_BACKENDS: &[SamplingBackend] = &[SamplingBackend::Scalar];
 
-/// Backend-neutral descriptor for the sampling compiler registration.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct SamplingCompilationDescriptor {
-    operation: CompilationOperation,
-    input_dialect: ModelDialect,
-    compiler_schema_version: u16,
-    request_fingerprint_schema_version: u16,
-    configurable_limits: bool,
-    backend_selection: bool,
-}
-
-impl SamplingCompilationDescriptor {
-    pub const fn operation(self) -> CompilationOperation {
-        self.operation
-    }
-
-    pub const fn input_dialect(self) -> ModelDialect {
-        self.input_dialect
-    }
-
-    pub const fn compiler_schema_version(self) -> u16 {
-        self.compiler_schema_version
-    }
-
-    pub const fn request_fingerprint_schema_version(self) -> u16 {
-        self.request_fingerprint_schema_version
-    }
-
-    pub const fn has_configurable_limits(self) -> bool {
-        self.configurable_limits
-    }
-
-    pub const fn supports_backend_selection(self) -> bool {
-        self.backend_selection
-    }
-}
-
 /// Sampling compiler descriptor consumed by facade capability aggregation.
-pub const COMPILATION_DESCRIPTOR: SamplingCompilationDescriptor = SamplingCompilationDescriptor {
-    operation: CompilationOperation::Sampling,
-    input_dialect: ModelDialect::StimCircuit,
-    compiler_schema_version: CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
-    request_fingerprint_schema_version: CompilationRequestFingerprint::SCHEMA_VERSION,
-    configurable_limits: false,
-    backend_selection: true,
-};
+pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
+    CompilationOperation::Sampling,
+    ModelDialect::StimCircuit,
+    CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
+    Some(CompilationRequestFingerprint::SCHEMA_VERSION),
+    false,
+    true,
+);
 
 impl SamplingCompiler {
     /// Compatibility bridge for facade-owned reference-sampling adapters.

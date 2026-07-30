@@ -9,7 +9,7 @@ pub struct CompilationCapability {
     operation: CompilationOperation,
     input_dialect: ModelDialect,
     compiler_schema_version: u16,
-    request_fingerprint_schema_version: u16,
+    request_fingerprint_schema_version: Option<u16>,
     configurable_limits: bool,
     backend_selection: bool,
 }
@@ -19,7 +19,7 @@ impl CompilationCapability {
         operation: CompilationOperation,
         input_dialect: ModelDialect,
         compiler_schema_version: u16,
-        request_fingerprint_schema_version: u16,
+        request_fingerprint_schema_version: Option<u16>,
         configurable_limits: bool,
         backend_selection: bool,
     ) -> Self {
@@ -45,7 +45,7 @@ impl CompilationCapability {
         self.compiler_schema_version
     }
 
-    pub const fn request_fingerprint_schema_version(self) -> u16 {
+    pub const fn request_fingerprint_schema_version(self) -> Option<u16> {
         self.request_fingerprint_schema_version
     }
 
@@ -95,16 +95,19 @@ impl CapabilitySet {
     }
 
     pub fn compilation_operations(self) -> impl ExactSizeIterator<Item = CompilationCapability> {
-        let descriptor = stab_engine::COMPILATION_DESCRIPTOR;
-        [CompilationCapability::new(
-            descriptor.operation(),
-            descriptor.input_dialect(),
-            descriptor.compiler_schema_version(),
-            descriptor.request_fingerprint_schema_version(),
-            descriptor.has_configurable_limits(),
-            descriptor.supports_backend_selection(),
-        )]
-        .into_iter()
+        stab_engine::COMPILATION_DESCRIPTORS
+            .iter()
+            .copied()
+            .map(|descriptor| {
+                CompilationCapability::new(
+                    descriptor.operation(),
+                    descriptor.input_dialect(),
+                    descriptor.compiler_schema_version(),
+                    descriptor.request_fingerprint_schema_version(),
+                    descriptor.has_configurable_limits(),
+                    descriptor.supports_backend_selection(),
+                )
+            })
     }
 
     /// Selectable backend identifiers registered by current compilers.

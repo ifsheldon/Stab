@@ -3874,14 +3874,6 @@
         "public_api_owners": [
           {
             "crate_name": "stab_engine",
-            "owner_path": "stab_engine::CompilationOperation"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::CompilationOperation::as_str"
-          },
-          {
-            "crate_name": "stab_engine",
             "owner_path": "stab_engine::CompilationRequestFingerprint"
           },
           {
@@ -3983,7 +3975,7 @@
         },
         "resource_contract": {
           "kind": "constant-scratch",
-          "detail": "Runtime discovery iterates the closed gate table, records-owned codec registry, and sampling compiler registration directly. It reads no qualification inventory, allocates no capability manifest, and exposes no selectable backend before one exists."
+          "detail": "Runtime discovery iterates the closed gate table, records-owned codec registry, and all four engine compiler registrations directly. It reads no qualification inventory, allocates no capability manifest, and distinguishes unavailable request fingerprints from selectable execution backends."
         },
         "negative_axes": [
           "gate-registry-drift",
@@ -4110,7 +4102,7 @@
         "standalone": true
       },
       {
-        "id": "a6-engine-sampling-compilation-descriptor",
+        "id": "a6-engine-compilation-descriptors",
         "feature_id": "CQ-CIRCUIT-API",
         "comparator": "exact-value",
         "primary_selector": {
@@ -4123,14 +4115,14 @@
             "stab-engine",
             "--test",
             "canonical_owner_evidence",
-            "a6_sampling_compilation_descriptor_contract",
+            "a6_compilation_descriptors_are_complete_and_executable",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "constant-scratch",
-          "detail": "The engine-owned constant descriptor exposes the registered sampling operation, model dialect, compiler and request schema identities, limit configurability, and backend-selection capability without facade aggregation."
+          "detail": "The engine-owned fixed descriptor table exposes all four executable compiler families, their model dialects, compiler and optional request-fingerprint schemas, limit configurability, and backend-selection capability without facade aggregation or a manually synchronized capability manifest."
         },
         "negative_axes": [
           "operation-drift",
@@ -4138,40 +4130,70 @@
           "compiler-schema-drift",
           "request-schema-drift",
           "capability-flag-drift",
+          "missing-compiler-registration",
+          "nonexecutable-registration",
           "facade-owned-engine-descriptor"
         ],
         "public_api_owners": [
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationOperation"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationOperation::as_str"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::operation"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::input_dialect"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::compiler_schema_version"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::request_fingerprint_schema_version"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::has_configurable_limits"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CompilationDescriptor::supports_backend_selection"
+          },
           {
             "crate_name": "stab_engine",
             "owner_path": "stab_engine::SamplingCompilationDescriptor"
           },
           {
             "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::operation"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::input_dialect"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::compiler_schema_version"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::request_fingerprint_schema_version"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::has_configurable_limits"
-          },
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingCompilationDescriptor::supports_backend_selection"
-          },
-          {
-            "crate_name": "stab_engine",
             "owner_path": "stab_engine::COMPILATION_DESCRIPTOR"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::COMPILATION_DESCRIPTORS"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DETECTION_SAMPLING_COMPILATION_DESCRIPTOR"
+          },
+          {
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::DEM_SAMPLING_COMPILATION_DESCRIPTOR"
           }
         ],
         "standalone": true

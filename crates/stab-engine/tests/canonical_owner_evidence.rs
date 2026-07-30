@@ -10,10 +10,10 @@ use std::thread;
 
 use sha2::{Digest as _, Sha256};
 use stab_engine::{
-    BackendPreference, COMPILATION_DESCRIPTOR, CompilationOperation, CompilationRequestFingerprint,
-    CompiledDetectionConverter, DemError, DemResourceKind, DemSamplerLimits, DemSamplingCompiler,
-    DemSamplingExecutionError, DemSamplingRunError, DetectionCompileError,
-    DetectionConversionLimits, DetectionConversionOptions, DetectionError,
+    BackendPreference, COMPILATION_DESCRIPTOR, COMPILATION_DESCRIPTORS, CompilationOperation,
+    CompilationRequestFingerprint, CompiledDetectionConverter, DemError, DemResourceKind,
+    DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingRunError,
+    DetectionCompileError, DetectionConversionLimits, DetectionConversionOptions, DetectionError,
     DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
     DetectionSamplingCompiler, MeasurementToDetectionCompiler, PlanFingerprint, RandomPolicy,
     ReferenceSampleMode, RunError, SamplingBackend, SamplingCompilationDescriptor,
@@ -64,20 +64,79 @@ fn expect_detection_compile_resource(error: DetectionCompileError) -> DetectionR
 }
 
 #[test]
-fn a6_sampling_compilation_descriptor_contract() {
+fn a6_compilation_descriptors_are_complete_and_executable() {
     let descriptor: SamplingCompilationDescriptor = COMPILATION_DESCRIPTOR;
-    assert_eq!(descriptor.operation(), CompilationOperation::Sampling);
-    assert_eq!(descriptor.input_dialect(), ModelDialect::StimCircuit);
     assert_eq!(
-        descriptor.compiler_schema_version(),
-        CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION
+        COMPILATION_DESCRIPTORS,
+        &[
+            descriptor,
+            stab_engine::MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
+            stab_engine::DETECTION_SAMPLING_COMPILATION_DESCRIPTOR,
+            stab_engine::DEM_SAMPLING_COMPILATION_DESCRIPTOR,
+        ]
     );
+    let observed = COMPILATION_DESCRIPTORS
+        .iter()
+        .map(|descriptor| {
+            (
+                descriptor.operation(),
+                descriptor.input_dialect(),
+                descriptor.compiler_schema_version(),
+                descriptor.request_fingerprint_schema_version(),
+                descriptor.has_configurable_limits(),
+                descriptor.supports_backend_selection(),
+            )
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
-        descriptor.request_fingerprint_schema_version(),
-        CompilationRequestFingerprint::SCHEMA_VERSION
+        observed,
+        vec![
+            (
+                CompilationOperation::Sampling,
+                ModelDialect::StimCircuit,
+                CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
+                Some(CompilationRequestFingerprint::SCHEMA_VERSION),
+                false,
+                true,
+            ),
+            (
+                CompilationOperation::MeasurementToDetection,
+                ModelDialect::StimCircuit,
+                1,
+                None,
+                true,
+                false,
+            ),
+            (
+                CompilationOperation::DetectionSampling,
+                ModelDialect::StimCircuit,
+                1,
+                None,
+                true,
+                false,
+            ),
+            (
+                CompilationOperation::DemSampling,
+                ModelDialect::DetectorErrorModel,
+                1,
+                None,
+                false,
+                false,
+            ),
+        ]
     );
-    assert!(!descriptor.has_configurable_limits());
-    assert!(descriptor.supports_backend_selection());
+
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("registered sampling compiler");
+    MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("registered measurement-to-detection compiler");
+    DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("registered detection-sampling compiler");
+    dem_plan("error(0.125) D0\n");
 }
 
 #[derive(Default)]

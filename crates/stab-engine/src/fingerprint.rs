@@ -8,18 +8,27 @@ const COMPILATION_REQUEST_FINGERPRINT_DOMAIN: &[u8] = b"stab:compilation-request
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CompilationOperation {
     Sampling,
+    MeasurementToDetection,
+    DetectionSampling,
+    DemSampling,
 }
 
 impl CompilationOperation {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Sampling => "sample",
+            Self::MeasurementToDetection => "m2d",
+            Self::DetectionSampling => "detect",
+            Self::DemSampling => "sample_dem",
         }
     }
 
     const fn discriminator(self) -> u8 {
         match self {
             Self::Sampling => 1,
+            Self::MeasurementToDetection => 2,
+            Self::DetectionSampling => 3,
+            Self::DemSampling => 4,
         }
     }
 }

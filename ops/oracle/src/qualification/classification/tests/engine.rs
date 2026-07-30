@@ -10,10 +10,6 @@ fn extracted_engine_foundations_keep_sampling_ownership() {
             "stab_engine::CompilationRequestFingerprint::for_sampling",
         ),
         (
-            "crates/stab-engine/src/fingerprint.rs",
-            "stab_engine::CompilationOperation::as_str",
-        ),
-        (
             "crates/stab-engine/src/probability.rs",
             "stab_engine::biased_randomize_bits",
         ),
@@ -182,17 +178,32 @@ fn extracted_dem_engine_keeps_execution_and_resource_ownership() {
 }
 
 #[test]
-fn sampling_descriptor_keeps_capability_ownership() {
+fn compiler_descriptors_keep_capability_ownership() {
     for api in [
+        "stab_engine::CompilationDescriptor",
         "stab_engine::SamplingCompilationDescriptor",
+        "stab_engine::CompilationOperation::as_str",
         "stab_engine::COMPILATION_DESCRIPTOR",
+        "stab_engine::COMPILATION_DESCRIPTORS",
+        "stab_engine::MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR",
+        "stab_engine::DETECTION_SAMPLING_COMPILATION_DESCRIPTOR",
+        "stab_engine::DEM_SAMPLING_COMPILATION_DESCRIPTOR",
     ] {
+        let source = if api.contains("CompilationDescriptor")
+            && !api.contains("SamplingCompilationDescriptor")
+        {
+            "crates/stab-engine/src/descriptor.rs"
+        } else if api.contains("MEASUREMENT_TO_DETECTION") || api.contains("DETECTION_SAMPLING") {
+            "crates/stab-engine/src/detection/mod.rs"
+        } else if api.contains("DEM_SAMPLING") {
+            "crates/stab-engine/src/dem_sampling/mod.rs"
+        } else if api.contains("CompilationOperation") {
+            "crates/stab-engine/src/fingerprint.rs"
+        } else {
+            "crates/stab-engine/src/sampling/mod.rs"
+        };
         assert_eq!(
-            classify_public_api_source(
-                "stab_engine",
-                Path::new("crates/stab-engine/src/sampling/mod.rs"),
-                api,
-            ),
+            classify_public_api_source("stab_engine", Path::new(source), api),
             Some(FeatureId::CircuitApi),
             "{api}"
         );

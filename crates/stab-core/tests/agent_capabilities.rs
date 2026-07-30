@@ -66,21 +66,56 @@ fn capability_set_is_generated_from_current_product_descriptors() {
         vec!["scalar"]
     );
 
-    let mut operations = capabilities.compilation_operations().collect::<Vec<_>>();
-    assert_eq!(operations.len(), 1);
-    let sampling = operations.pop().expect("one sampling capability");
-    assert_eq!(sampling.operation(), CompilationOperation::Sampling);
-    assert_eq!(sampling.input_dialect(), ModelDialect::StimCircuit);
+    let operations = capabilities
+        .compilation_operations()
+        .map(|compiler| {
+            (
+                compiler.operation(),
+                compiler.input_dialect(),
+                compiler.compiler_schema_version(),
+                compiler.request_fingerprint_schema_version(),
+                compiler.has_configurable_limits(),
+                compiler.supports_backend_selection(),
+            )
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
-        sampling.compiler_schema_version(),
-        CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION
+        operations,
+        vec![
+            (
+                CompilationOperation::Sampling,
+                ModelDialect::StimCircuit,
+                CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
+                Some(CompilationRequestFingerprint::SCHEMA_VERSION),
+                false,
+                true,
+            ),
+            (
+                CompilationOperation::MeasurementToDetection,
+                ModelDialect::StimCircuit,
+                1,
+                None,
+                true,
+                false,
+            ),
+            (
+                CompilationOperation::DetectionSampling,
+                ModelDialect::StimCircuit,
+                1,
+                None,
+                true,
+                false,
+            ),
+            (
+                CompilationOperation::DemSampling,
+                ModelDialect::DetectorErrorModel,
+                1,
+                None,
+                false,
+                false,
+            ),
+        ]
     );
-    assert_eq!(
-        sampling.request_fingerprint_schema_version(),
-        CompilationRequestFingerprint::SCHEMA_VERSION
-    );
-    assert!(!sampling.has_configurable_limits());
-    assert!(sampling.supports_backend_selection());
     assert_eq!(
         capabilities.default_parse_limits(ModelDialect::StimCircuit),
         ParseLimits::default()

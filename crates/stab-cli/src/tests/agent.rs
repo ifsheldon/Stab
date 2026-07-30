@@ -304,7 +304,33 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             .map(RecordFormat::as_str)
             .collect::<Vec<_>>()
     );
-    assert_eq!(pointer(&report, "/compilers/0/operation"), "sample");
+    let compiler_operations = pointer(&report, "/compilers")
+        .as_array()
+        .expect("compilers are an array")
+        .iter()
+        .map(|compiler| {
+            pointer(compiler, "/operation")
+                .as_str()
+                .expect("compiler operation")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        compiler_operations,
+        vec!["sample", "m2d", "detect", "sample_dem"]
+    );
+    assert_eq!(
+        pointer(&report, "/compilers/0/request_fingerprint_schema_version"),
+        1
+    );
+    for index in 1..4 {
+        assert_eq!(
+            pointer(
+                &report,
+                &format!("/compilers/{index}/request_fingerprint_schema_version")
+            ),
+            &serde_json::Value::Null
+        );
+    }
     assert_eq!(
         pointer(&report, "/selectable_backends"),
         &serde_json::json!(["scalar"])

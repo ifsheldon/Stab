@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "b9370616a8c88caba5ca60a5acc1243064e910971784e2e20fed3746e9341647",
+  "semantic_digest": "8a5ff2a96856c957f018797e444b8a93c74890f1a2ce9d74ce69cf07afa1578b",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -72682,7 +72682,7 @@
       "path": "stab_core::CapabilitySet::default_parse_limits",
       "kind": "method",
       "source_path": "crates/stab-core/src/capabilities.rs",
-      "source_line": 118,
+      "source_line": 121,
       "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -72738,7 +72738,7 @@
       "path": "stab_core::CapabilitySet::selectable_backend_ids",
       "kind": "method",
       "source_path": "crates/stab-core/src/capabilities.rs",
-      "source_line": 111,
+      "source_line": 114,
       "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76760,132 +76760,184 @@
     },
     {
       "id": "cq-api-item-09684fadf239df53",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation",
       "kind": "enum",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-648851aff84f68dc",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Clone for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-75d76ba75c839a32",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Copy for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-c841621098adba28",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Debug for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-ad550de467a1c79d",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Eq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-4b06d62e3c897393",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as Hash for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-c18cde8d5cea5021",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as PartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-3dc751bbbe575e13",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-a9b35340b6323dcb",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::CompilationOperation::DemSampling",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 68,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-e72cd4354b35ad80",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::CompilationOperation::DetectionSampling",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 68,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-407126f8b8521612",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_core",
+      "path": "stab_core::CompilationOperation::MeasurementToDetection",
+      "kind": "variant",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 68,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-944195bdd34b6afd",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation::Sampling",
       "kind": "variant",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-ae75151c29885491",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CompilationOperation::as_str",
       "kind": "method",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -103240,7 +103292,7 @@
       "kind": "constant",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 40,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103390,196 +103442,14 @@
       ]
     },
     {
-      "id": "cq-api-item-4000a383bc1d3f53",
+      "id": "cq-api-item-dbb536fef2770950",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::advanced::backend::SamplingCompilationDescriptor",
-      "kind": "struct",
+      "kind": "type-alias",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e8415b48903ad1f9",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as Clone for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fecbee2a46d72a90",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as Copy for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-f72103b6ff9cb0f3",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as Debug for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-9ae43f0f2dbae4b2",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as Eq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-4cf64ec359d4e0aa",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as Hash for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-1751e02142ce4258",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as PartialEq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b063ee81f5847cf6",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor as StructuralPartialEq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-83caaca82f59ca03",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::compiler_schema_version",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fc2655f07f1bbd4f",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::has_configurable_limits",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a2050c676e301154",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::input_dialect",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-d9c0680e6dc8362b",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::operation",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fd94717cc5c1d925",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::request_fingerprint_schema_version",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-003494d370487aa7",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::backend::SamplingCompilationDescriptor::supports_backend_selection",
-      "kind": "method",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -118557,8 +118427,218 @@
       "path": "stab_engine::COMPILATION_DESCRIPTOR",
       "kind": "constant",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 74,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
+      "source_line": 37,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-b71fae6472e864c1",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::COMPILATION_DESCRIPTORS",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/lib.rs",
+      "source_line": 45,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-1aa25ca8de39dfc4",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor",
+      "kind": "struct",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 7,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-2e2798e2b8fb5d59",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as Clone for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7cfaa5784977ae17",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as Copy for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-12bf295741a67319",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as Debug for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-133dab3e805cff70",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as Eq for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-352edf4874342188",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as Hash for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-3f4588b99f1a0c6f",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as PartialEq for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-e655b9c0046a82b5",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor as StructuralPartialEq for@0b0422dcf03d",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 6,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-1c1d5d6bb6967470",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::compiler_schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 43,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-43bbacb5264a0668",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::has_configurable_limits",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 52,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-8f2d6857fd9a4278",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::input_dialect",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 39,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-97a104bc2142e28c",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::operation",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 35,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-4973ac7c38e3d449",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::request_fingerprint_schema_version",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 48,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-463a7c672f4ba56c",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationDescriptor::supports_backend_selection",
+      "kind": "method",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 56,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -118566,132 +118646,184 @@
     },
     {
       "id": "cq-api-item-d484eb1174a08bc5",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation",
       "kind": "enum",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 9,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-92ce1ce0fe2dddf9",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as Clone for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-7bd5721bf751fc2e",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as Copy for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-130b1ce9c3fc40cf",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as Debug for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-391b01e5d443027d",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as Eq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-f5bb2a410a9a7dfb",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as Hash for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-ddce1dd186965713",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as PartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-dab1f589f5bb86aa",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation as StructuralPartialEq for@ce4e1c639ba2",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-0bba4eba80d63b9b",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation::DemSampling",
+      "kind": "variant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 13,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-3beaf6fc30d1561d",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation::DetectionSampling",
+      "kind": "variant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 12,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-7aa940f597dc1b90",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::CompilationOperation::MeasurementToDetection",
+      "kind": "variant",
+      "source_path": "crates/stab-engine/src/fingerprint.rs",
+      "source_line": 11,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-f32a0f556f1d8e51",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation::Sampling",
       "kind": "variant",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
       "source_line": 10,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
       "id": "cq-api-item-3d8d5f365ce3a8e8",
-      "feature_id": "CQ-SAMPLING",
+      "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::CompilationOperation::as_str",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 14,
-      "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+      "source_line": 17,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
-        "PERF-SAMPLING"
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -118701,7 +118833,7 @@
       "path": "stab_engine::CompilationRequestFingerprint",
       "kind": "struct",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 37,
+      "source_line": 46,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118714,7 +118846,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as Clone for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118727,7 +118859,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as Copy for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118740,7 +118872,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as Debug for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118753,7 +118885,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as Eq for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118766,7 +118898,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as Hash for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118779,7 +118911,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as PartialEq for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118792,7 +118924,7 @@
       "path": "stab_engine::CompilationRequestFingerprint as StructuralPartialEq for@8bc40ad41b61",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 36,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118805,7 +118937,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::ALGORITHM",
       "kind": "constant",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 48,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118818,7 +118950,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION",
       "kind": "constant",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 47,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118831,7 +118963,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::SCHEMA_VERSION",
       "kind": "constant",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 46,
+      "source_line": 55,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118844,7 +118976,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::compiler_schema_version",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 83,
+      "source_line": 92,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118857,7 +118989,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::digest",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 95,
+      "source_line": 104,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118870,7 +119002,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::digest_hex",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 99,
+      "source_line": 108,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118883,7 +119015,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::for_sampling",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 50,
+      "source_line": 59,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118896,7 +119028,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::model_fingerprint",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 91,
+      "source_line": 100,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118909,7 +119041,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::operation",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 87,
+      "source_line": 96,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118922,7 +119054,7 @@
       "path": "stab_engine::CompilationRequestFingerprint::schema_version",
       "kind": "method",
       "source_path": "crates/stab-engine/src/fingerprint.rs",
-      "source_line": 79,
+      "source_line": 88,
       "owner_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -118935,7 +119067,7 @@
       "path": "stab_engine::CompiledDetectionConverter",
       "kind": "struct",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 56,
+      "source_line": 78,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -118948,7 +119080,7 @@
       "path": "stab_engine::CompiledDetectionConverter as Clone for@a8fd7c764471",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 55,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -118961,7 +119093,7 @@
       "path": "stab_engine::CompiledDetectionConverter as Debug for@a8fd7c764471",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 55,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -118974,7 +119106,7 @@
       "path": "stab_engine::CompiledDetectionConverter as PartialEq for@a8fd7c764471",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 55,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -118987,7 +119119,7 @@
       "path": "stab_engine::CompiledDetectionConverter as StructuralPartialEq for@a8fd7c764471",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 55,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119000,7 +119132,7 @@
       "path": "stab_engine::CompiledDetectionConverter::compile",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 62,
+      "source_line": 84,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119013,7 +119145,7 @@
       "path": "stab_engine::CompiledDetectionConverter::compile_with_limits",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 66,
+      "source_line": 88,
       "owner_case_id": "cq-evidence-qualification-49579f0900c0bc11",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -119026,7 +119158,7 @@
       "path": "stab_engine::CompiledDetectionConverter::convert_record",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 109,
+      "source_line": 131,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119039,7 +119171,7 @@
       "path": "stab_engine::CompiledDetectionConverter::convert_record_with_sweep_into",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 263,
+      "source_line": 285,
       "owner_case_id": "cq-evidence-qualification-837a00606b090cf1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119052,7 +119184,7 @@
       "path": "stab_engine::CompiledDetectionConverter::detector_count",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 101,
+      "source_line": 123,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119065,7 +119197,7 @@
       "path": "stab_engine::CompiledDetectionConverter::measurement_count",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 93,
+      "source_line": 115,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119078,7 +119210,7 @@
       "path": "stab_engine::CompiledDetectionConverter::observable_count",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 105,
+      "source_line": 127,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119091,7 +119223,7 @@
       "path": "stab_engine::CompiledDetectionConverter::reusable_detection_record",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 220,
+      "source_line": 242,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119104,7 +119236,7 @@
       "path": "stab_engine::CompiledDetectionConverter::reusable_reference_sample",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 236,
+      "source_line": 258,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119117,7 +119249,7 @@
       "path": "stab_engine::CompiledDetectionConverter::sweep_bit_count",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 97,
+      "source_line": 119,
       "owner_case_id": "cq-evidence-qualification-837a00606b090cf1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119130,7 +119262,7 @@
       "path": "stab_engine::CompiledDetectionConverter::try_for_each_detection_event",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 126,
+      "source_line": 148,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119143,7 +119275,7 @@
       "path": "stab_engine::CompiledDetectionConverter::try_for_each_detection_event_with_sweep",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 158,
+      "source_line": 180,
       "owner_case_id": "cq-evidence-qualification-837a00606b090cf1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119156,7 +119288,7 @@
       "path": "stab_engine::CompiledDetectionConverter::try_reusable_detection_record",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 243,
+      "source_line": 265,
       "owner_case_id": "cq-evidence-qualification-d17100686e8f4a68",
       "performance_groups": [
         "PERF-DETECTION"
@@ -119169,10 +119301,38 @@
       "path": "stab_engine::CompiledDetectionConverter::try_reusable_reference_sample",
       "kind": "method",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 256,
+      "source_line": 278,
       "owner_case_id": "cq-evidence-qualification-d17100686e8f4a68",
       "performance_groups": [
         "PERF-DETECTION"
+      ]
+    },
+    {
+      "id": "cq-api-item-b683f867d43c07b6",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::DEM_SAMPLING_COMPILATION_DESCRIPTOR",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/dem_sampling/mod.rs",
+      "source_line": 22,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ]
+    },
+    {
+      "id": "cq-api-item-ac038a636759f0c1",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::DETECTION_SAMPLING_COMPILATION_DESCRIPTOR",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/detection/mod.rs",
+      "source_line": 56,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -122055,7 +122215,7 @@
       "path": "stab_engine::DetectionConversionOptions",
       "kind": "struct",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 45,
+      "source_line": 67,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122068,7 +122228,7 @@
       "path": "stab_engine::DetectionConversionOptions as Clone for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122081,7 +122241,7 @@
       "path": "stab_engine::DetectionConversionOptions as Copy for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122094,7 +122254,7 @@
       "path": "stab_engine::DetectionConversionOptions as Debug for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122107,7 +122267,7 @@
       "path": "stab_engine::DetectionConversionOptions as Eq for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122120,7 +122280,7 @@
       "path": "stab_engine::DetectionConversionOptions as PartialEq for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122133,7 +122293,7 @@
       "path": "stab_engine::DetectionConversionOptions as StructuralPartialEq for@cceffc0d2f87",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 44,
+      "source_line": 66,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122146,7 +122306,7 @@
       "path": "stab_engine::DetectionConversionOptions::skip_reference_sample",
       "kind": "field",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 46,
+      "source_line": 68,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122458,7 +122618,7 @@
       "path": "stab_engine::DetectionEventRecord",
       "kind": "struct",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 50,
+      "source_line": 72,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122471,7 +122631,7 @@
       "path": "stab_engine::DetectionEventRecord as Clone for@a4296558b502",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 49,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122484,7 +122644,7 @@
       "path": "stab_engine::DetectionEventRecord as Debug for@a4296558b502",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 49,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122497,7 +122657,7 @@
       "path": "stab_engine::DetectionEventRecord as Eq for@a4296558b502",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 49,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122510,7 +122670,7 @@
       "path": "stab_engine::DetectionEventRecord as PartialEq for@a4296558b502",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 49,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122523,7 +122683,7 @@
       "path": "stab_engine::DetectionEventRecord as StructuralPartialEq for@a4296558b502",
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 49,
+      "source_line": 71,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122536,7 +122696,7 @@
       "path": "stab_engine::DetectionEventRecord::detectors",
       "kind": "field",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 51,
+      "source_line": 73,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -122549,7 +122709,7 @@
       "path": "stab_engine::DetectionEventRecord::observables",
       "kind": "field",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 52,
+      "source_line": 74,
       "owner_case_id": "cq-evidence-qualification-2fc964ad0407c392",
       "performance_groups": [
         "PERF-DETECTION"
@@ -124256,6 +124416,20 @@
       "owner_case_id": "cq-evidence-qualification-83b62ab37799656e",
       "performance_groups": [
         "PERF-DETECTION"
+      ]
+    },
+    {
+      "id": "cq-api-item-fff2997a0a5bee36",
+      "feature_id": "CQ-CIRCUIT-API",
+      "crate_name": "stab_engine",
+      "path": "stab_engine::MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR",
+      "kind": "constant",
+      "source_path": "crates/stab-engine/src/detection/mod.rs",
+      "source_line": 45,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
     },
     {
@@ -126345,196 +126519,14 @@
       ]
     },
     {
-      "id": "cq-api-item-1c5bcb1ad413303a",
+      "id": "cq-api-item-51bc414335b1cb35",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_engine",
       "path": "stab_engine::SamplingCompilationDescriptor",
-      "kind": "struct",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 38,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fe2cf2d8ad161f9c",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as Clone for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-6dbb3f01415f6672",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as Copy for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-5842c4f32cbde300",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as Debug for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-395f680b2bfef3ec",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as Eq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-c5f0c714aeb46d71",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as Hash for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a2ab886a17fcec24",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as PartialEq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-32690027f31f9620",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor as StructuralPartialEq for@1f3b2d5a315d",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-48d2e8f3e1cdd885",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::compiler_schema_version",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 56,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-12d1a769e9d4f9f0",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::has_configurable_limits",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 64,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b38345d047b49781",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::input_dialect",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 52,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-092f1fa8987b37dd",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::operation",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 48,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e0643ab93c79f3c8",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::request_fingerprint_schema_version",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 60,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-017b516454173ffc",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_engine",
-      "path": "stab_engine::SamplingCompilationDescriptor::supports_backend_selection",
-      "kind": "method",
-      "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
+      "kind": "type-alias",
+      "source_path": "crates/stab-engine/src/descriptor.rs",
+      "source_line": 62,
+      "owner_case_id": "cq-evidence-qualification-b2499b1fd65dfe17",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -127418,7 +127410,7 @@
       "path": "stab_engine::SamplingPlan::count_determined_measurements",
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 134,
+      "source_line": 97,
       "owner_case_id": "cq-evidence-qualification-50e4920d62b07b9f",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -127470,7 +127462,7 @@
       "path": "stab_engine::SamplingPlan::reference_sample",
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 155,
+      "source_line": 118,
       "owner_case_id": "cq-evidence-qualification-f4d50e7d38ced074",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -127522,7 +127514,7 @@
       "path": "stab_engine::SamplingPlan::try_count_determined_measurements",
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 96,
+      "source_line": 59,
       "owner_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -127535,7 +127527,7 @@
       "path": "stab_engine::SamplingPlan::try_reference_sample",
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 142,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-8f6e3a5b8f63ce4b",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -128497,7 +128489,7 @@
       "path": "stab_engine::count_determined_measurements",
       "kind": "function",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
-      "source_line": 244,
+      "source_line": 207,
       "owner_case_id": "cq-evidence-qualification-50e4920d62b07b9f",
       "performance_groups": [
         "PERF-SAMPLING"
@@ -128510,7 +128502,7 @@
       "path": "stab_engine::detection_record_width",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 372,
+      "source_line": 394,
       "owner_case_id": "cq-evidence-qualification-18787778710c986b",
       "performance_groups": [
         "PERF-DETECTION"
@@ -128523,7 +128515,7 @@
       "path": "stab_engine::detection_record_width_with_limits",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 376,
+      "source_line": 398,
       "owner_case_id": "cq-evidence-qualification-37741fb452e28c59",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -128536,7 +128528,7 @@
       "path": "stab_engine::measurement_record_count",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 361,
+      "source_line": 383,
       "owner_case_id": "cq-evidence-qualification-0a3cf0fbf19dfe57",
       "performance_groups": [
         "PERF-DETECTION"
@@ -128549,7 +128541,7 @@
       "path": "stab_engine::measurement_record_count_with_limits",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 365,
+      "source_line": 387,
       "owner_case_id": "cq-evidence-qualification-37741fb452e28c59",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -128575,7 +128567,7 @@
       "path": "stab_engine::validate_detection_sampling_circuit",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 383,
+      "source_line": 405,
       "owner_case_id": "cq-evidence-qualification-18787778710c986b",
       "performance_groups": [
         "PERF-DETECTION"
@@ -128588,7 +128580,7 @@
       "path": "stab_engine::validate_detection_sampling_circuit_with_limits",
       "kind": "function",
       "source_path": "crates/stab-engine/src/detection/mod.rs",
-      "source_line": 387,
+      "source_line": 409,
       "owner_case_id": "cq-evidence-qualification-6ae1db63ed89cbcd",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -192025,7 +192017,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "Runtime discovery iterates the closed gate table, records-owned codec registry, and sampling compiler registration directly. It reads no qualification inventory, allocates no capability manifest, and exposes no selectable backend before one exists."
+        "detail": "Runtime discovery iterates the closed gate table, records-owned codec registry, and all four engine compiler registrations directly. It reads no qualification inventory, allocates no capability manifest, and distinguishes unavailable request fingerprints from selectable execution backends."
       },
       "negative_axes": [
         "gate-registry-drift",
@@ -204522,6 +204514,63 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-b2499b1fd65dfe17",
+      "feature_id": "CQ-CIRCUIT-API",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-engine-compilation-descriptors",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-engine",
+          "--test",
+          "canonical_owner_evidence",
+          "a6_compilation_descriptors_are_complete_and_executable",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The engine-owned fixed descriptor table exposes all four executable compiler families, their model dialects, compiler and optional request-fingerprint schemas, limit configurability, and backend-selection capability without facade aggregation or a manually synchronized capability manifest."
+      },
+      "negative_axes": [
+        "operation-drift",
+        "input-dialect-drift",
+        "compiler-schema-drift",
+        "request-schema-drift",
+        "capability-flag-drift",
+        "missing-compiler-registration",
+        "nonexecutable-registration",
+        "facade-owned-engine-descriptor"
+      ],
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-b30ab1c332126214",
       "feature_id": "CQ-RESULT-FORMATS",
       "behavioral_surface": "file-format",
@@ -209661,61 +209710,6 @@
       ],
       "performance_groups": [
         "PERF-SAMPLING"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "cq-evidence-qualification-df0677fb6f52ed05",
-      "feature_id": "CQ-CIRCUIT-API",
-      "behavioral_surface": "engine",
-      "provenance": "qualification-plan",
-      "source_id": "a6-engine-sampling-compilation-descriptor",
-      "comparator": "exact-value",
-      "execution": {
-        "tiers": [
-          "pr",
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-engine",
-          "--test",
-          "canonical_owner_evidence",
-          "a6_sampling_compilation_descriptor_contract",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "The engine-owned constant descriptor exposes the registered sampling operation, model dialect, compiler and request schema identities, limit configurability, and backend-selection capability without facade aggregation."
-      },
-      "negative_axes": [
-        "operation-drift",
-        "input-dialect-drift",
-        "compiler-schema-drift",
-        "request-schema-drift",
-        "capability-flag-drift",
-        "facade-owned-engine-descriptor"
-      ],
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "implemented"
     },

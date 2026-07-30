@@ -28,8 +28,8 @@ use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatBlock, RepeatNestingLimit,
 };
 
-use crate::SamplingCompiler;
 use crate::sampling::ReferenceSampleScratch;
+use crate::{CompilationDescriptor, CompilationOperation, SamplingCompiler};
 
 use self::error::{
     DetectionError as CircuitError, DetectionResourceLimitError as ResourceLimitError,
@@ -40,6 +40,28 @@ mod test_support;
 
 const UNSUPPORTED_SWEEP_DETECTION_MESSAGE: &str =
     "sweep-conditioned detection conversion requires sweep input support";
+
+/// Measurement-to-detection compiler registration.
+pub const MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR: CompilationDescriptor =
+    CompilationDescriptor::new(
+        CompilationOperation::MeasurementToDetection,
+        stab_model::ModelDialect::StimCircuit,
+        1,
+        None,
+        true,
+        false,
+    );
+
+/// Circuit detection-sampling compiler registration.
+pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
+    CompilationDescriptor::new(
+        CompilationOperation::DetectionSampling,
+        stab_model::ModelDialect::StimCircuit,
+        1,
+        None,
+        true,
+        false,
+    );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DetectionConversionOptions {

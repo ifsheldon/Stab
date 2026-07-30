@@ -16,5 +16,17 @@ pub use session::{
 
 pub(crate) use error::DemResult;
 
+use crate::{CompilationDescriptor, CompilationOperation};
+
+/// Detector-error-model sampling compiler registration.
+pub const DEM_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
+    CompilationOperation::DemSampling,
+    stab_model::ModelDialect::DetectorErrorModel,
+    1,
+    None,
+    false,
+    false,
+);
+
 #[cfg(test)]
 mod tests;
