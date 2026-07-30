@@ -1495,3 +1495,30 @@ Current text: every executable benchmark row named a Rust source module as its s
 Gap: the existence and digest of a source file prove neither that a benchmark executes a semantic check nor that the check rejects same-shape wrong content. Requiring exact frozen outputs for all 165 executable rows would instead duplicate the correctness qualification program and turn report-only diagnostics into implicit compatibility claims.
 Proposed amendment: require exact executable preflights for all policy-gated rows and the selected equal-width M6 continuity row, keep those checks outside timed regions, require same-shape mutation failures, and explicitly limit the other report-only rows to workload continuity.
 Resolution: measurement-contract schema version 2 uses `gated-exact-output-v1` and derives exactly 65 threshold-owned rows plus `m6-clifford-string`. The weak gated M4, M5, M6, M8, M10, and M11 rows now validate complete outputs or independently reconstructed semantic results before timing. Remaining report-only rows have no promoted correctness claim, and the focused ledger no longer serializes or validates source-path witnesses.
+
+## 2026-07-30 - A6: Reviewed Predecessor Provenance
+
+Status: Resolved
+Revealed by: pre-evidence review of the instrumentation-backport procedure.
+Current text: an A6 predecessor had to name a preserved clean schema-version-4 commit, but a request could assign phases to any selected report and preservation could use an unspecified branch or tag.
+Gap: commit reachability does not prove which historical product tree received the evidence harness, whether the backport was a merge, whether its tree delta was reviewed, or whether a request attached a favorable phase to an unrelated report.
+Proposed amendment: source-own the exact product commit, direct-child instrumentation commit, canonical tree-delta digest, deterministic preservation tag, and phase set, then derive report ownership from that registry.
+Resolution: `benchmarks/a6-predecessors.json` uses `git-raw-tree-delta-sha256-v1`; controlled Git validation requires a non-merge direct child of the registered product commit, verifies the raw tree delta, resolves `refs/tags/a6-predecessors/<backport-commit>`, rejects backports in current ancestry, and requires exact non-seed phase coverage. Publication request schema version 2 selects reports only and matches their recorded commits to the registry.
+
+## 2026-07-30 - A6: Typed Profiler Availability
+
+Status: Resolved
+Revealed by: pre-evidence review of focused-diagnostic dispositions.
+Current text: a publication request supplied profile status, explanatory detail, and an optional arbitrary artifact path.
+Gap: free-form status could claim profiling or unavailability without binding the exact focused row, executable, host, raw capture, or actual kernel-policy denial.
+Proposed amendment: replace status prose with one typed receipt that binds the focused report identity and either a validated Linux perf-record capture or a fixed failed capability probe.
+Resolution: `just bench::a6-profile-receipt` atomically creates schema-version-1 receipts. Captured receipts bind and reopen a sibling `perf.data` file after fixed `/usr/bin/perf report --header-only` validation. Unavailable receipts run fixed `/usr/bin/perf stat --event cycles -- /usr/bin/true` and require bounded permission diagnostics plus `perf_event_paranoid >= 2`. Publication derives the ledger outcome from the receipt and measurements; owner prose cannot change it.
+
+## 2026-07-30 - A6: Append-Only Focused Evidence
+
+Status: Resolved
+Revealed by: pre-evidence review of the singleton checked-ledger path.
+Current text: publication atomically created `benchmarks/a6-focused-evidence.json` without replacement.
+Gap: a fixed singleton cannot preserve more than one historical evidence generation without renaming or deleting the previous object, and an untracked file at that path could be mistaken for source-owned evidence.
+Proposed amendment: name each immutable object by source revision and exact serialized digest, discover only tracked Git objects, and define the narrow post-evidence closure path set without adding a latest pointer or index.
+Resolution: schema-version-4 objects use `benchmarks/a6-focused-evidence-<source-revision>-<sha256>.json`; publication is descriptor-safe and no-replace, ordinary discovery ignores untracked candidates, and validation requires exactly one source-current tracked object. The fixed path is explicit legacy input only. A later object or any non-status source change makes the older object historical.
