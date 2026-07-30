@@ -1466,17 +1466,17 @@ Status: Resolved
 Revealed by: pre-evidence review of the focused-ledger validator.
 Current text: the A6 matrix named 166 manifest rows and required unchanged thresholds and profiler notes, but the ledger validator trusted the measurement names and policy statuses recorded inside the report.
 Gap: a report could omit an unanticipated submeasurement or relabel a threshold, waiver, or profiler-note result without violating the ledger's structural phase coverage.
-Proposed amendment: check in the complete ordered Stab measurement set and semantic-witness owner for every row, bind its digest into the report, and replay all current threshold, waiver, and profiler-note sources during validation.
-Resolution: `benchmarks/a6-measurement-contract.json` freezes 166 rows, 309 Stab measurements, and exact source modules; schema-version-3 reports bind its digest, and A6 validation replays current policy sources before acceptance.
+Proposed amendment: check in the complete ordered Stab measurement set and exact executable-preflight policy for gated rows, bind its digest into the report, and replay all current threshold, waiver, and profiler-note sources during validation.
+Resolution: `benchmarks/a6-measurement-contract.json` freezes 166 rows, 309 Stab measurements, and the exact 66-row executable-preflight set derived from threshold ownership plus the selected M6 row; schema-version-4 reports bind its digest, private host fingerprint, and executing-binary digest. A6 validation reconstructs derived timing and memory fields from raw measurements, reads policy bytes from the report's tracked source revision, and replays those policies before acceptance. Report-only rows outside the executable-preflight set establish workload continuity only and make no correctness claim.
 
 ## 2026-07-30 - A6: Historical Predecessor Comparability
 
 Status: Resolved
 Revealed by: audit of the clean historical extraction reports selected as A6 predecessors.
-Current text: report-only phases required equal feature selection and timing boundaries, but historical schema-version-1 and schema-version-2 reports did not serialize those identities.
+Current text: report-only phases required equal feature selection and timing boundaries, but historical schema-version-1 through schema-version-3 reports did not serialize every host and executable identity needed by the final contract.
 Gap: treating absent metadata as an inferred default would turn an unproved equality into acceptance evidence, while rejecting every historical report without a regeneration procedure would make the milestone impossible to execute.
-Proposed amendment: require schema-version-3 predecessors and define a clean instrumentation-backport procedure that preserves historical product behavior while adding only the reviewed evidence harness.
-Resolution: predecessor reports must be regenerated on the same host before the current matrix from committed historical product revisions carrying the schema-version-3 harness, exact measurement contract, explicit scalar features, row-native timing identity, and create-new output semantics.
+Proposed amendment: require schema-version-4 predecessors and define a clean instrumentation-backport procedure that preserves historical product behavior while adding only the reviewed evidence harness.
+Resolution: predecessor reports must be regenerated on the same host before the current matrix from committed historical product revisions carrying the schema-version-4 harness, exact measurement contract, private host fingerprint, executing-binary digest, explicit scalar features, row-native timing identity, warmed strict single-outer-run execution, and create-new output semantics. Each backport revision remains reachable through a source-owned branch or tag, and ledger validation rejects predecessor revisions that no longer resolve to Git commit objects.
 
 ## 2026-07-30 - A6: Immutable Publication And Typed Diagnostic Outcome
 
@@ -1484,5 +1484,14 @@ Status: Resolved
 Revealed by: audit of the hand-authored focused-evidence ledger design.
 Current text: the ledger bound hashes and a final disposition, but a person still supplied every derived number, could select an arbitrary Rust file beneath the benchmark directory as the witness, and could overwrite the checked path outside the validator.
 Gap: hand-entered derived values and free-form outcome prose invite transcription errors and contradictory claims, while structural path checks do not prove benchmark ownership or immutable publication.
-Proposed amendment: source-own every row-to-witness mapping, derive all evidence values from selected artifacts, represent the measured outcome as a closed enum, and atomically create the checked ledger without replacement after a clean-revision recheck.
-Resolution: the A6 publisher accepts a selection-only request under `target/benchmarks`, derives hashes, values, crossings, timing counts, and outcomes, verifies every artifact and the unchanged clean revision, and uses descriptor-safe no-replace publication for `benchmarks/a6-focused-evidence.json`.
+Proposed amendment: source-own the exact executable-preflight policy, derive all evidence values from selected artifacts, represent the measured outcome as a closed enum, and atomically create the checked ledger without replacement after a clean-revision recheck.
+Resolution: the A6 publisher accepts a selection-only request under `target/benchmarks`, validates the checked executable-preflight contract, derives hashes, values, crossings, timing counts, and outcomes, verifies every artifact and the unchanged clean revision, and uses descriptor-safe no-replace publication for `benchmarks/a6-focused-evidence.json`. A Rust source path is no longer accepted as a semantic witness.
+
+## 2026-07-30 - A6: Source Paths Are Not Semantic Evidence
+
+Status: Resolved
+Revealed by: full review of the pre-evidence A6 measurement contract.
+Current text: every executable benchmark row named a Rust source module as its semantic-witness owner.
+Gap: the existence and digest of a source file prove neither that a benchmark executes a semantic check nor that the check rejects same-shape wrong content. Requiring exact frozen outputs for all 165 executable rows would instead duplicate the correctness qualification program and turn report-only diagnostics into implicit compatibility claims.
+Proposed amendment: require exact executable preflights for all policy-gated rows and the selected equal-width M6 continuity row, keep those checks outside timed regions, require same-shape mutation failures, and explicitly limit the other report-only rows to workload continuity.
+Resolution: measurement-contract schema version 2 uses `gated-exact-output-v1` and derives exactly 65 threshold-owned rows plus `m6-clifford-string`. The weak gated M4, M5, M6, M8, M10, and M11 rows now validate complete outputs or independently reconstructed semantic results before timing. Remaining report-only rows have no promoted correctness claim, and the focused ledger no longer serializes or validates source-path witnesses.

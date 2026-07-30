@@ -27,10 +27,10 @@ Stop and repair the owner when Cargo metadata, architecture checks, generated in
 
 1. Run milestone-audit and full-code-review against the committed repaired source and qualification contracts before timing.
 2. Fix every confirmed source, test, benchmark-contract, and documentation finding in focused commits; regenerate inventories after any identity change.
-3. Before current timing, regenerate each comparable historical predecessor from a clean committed schema-version-3 instrumentation backport on the same host. Do not promote schema-version-1 or schema-version-2 reports.
-4. From the resulting clean current commit, regenerate exact full-tier M5 and M6 correctness, scalar-versus-portable SIMD diagnostics, a create-new schema-version-2 baseline, and the complete create-new schema-version-3 warmed comparison with unchanged comparator and threshold policies.
+3. Before current timing, regenerate each comparable historical predecessor from a clean committed schema-version-4 instrumentation backport on the same host. Do not promote schema-version-1 through schema-version-3 reports.
+4. From the resulting clean current commit, regenerate exact full-tier M5 and M6 correctness, scalar-versus-portable SIMD diagnostics, a create-new schema-version-3 baseline, and the complete create-new schema-version-4 warmed comparison with unchanged comparator and threshold policies.
 5. Recompute every greater-than-15-percent crossing. Run one warmed outer diagnostic per crossing with the source-owned internal timing count of at least eight. Profile reproductions when host policy permits and record restrictions otherwise.
-6. Publish `benchmarks/a6-focused-evidence.json` from a selection-only request. Require exact checked measurement and witness ownership, immutable report and predecessor digests, typed measured outcomes, mandatory artifact revalidation, and atomic no-replace publication.
+6. Publish `benchmarks/a6-focused-evidence.json` from a selection-only request. Require the checked 66-row executable-preflight contract, exact measurement ownership, immutable report and predecessor digests, typed measured outcomes, mandatory artifact revalidation, and atomic no-replace publication.
 7. Append the source-current evidence checkpoint without rewriting historical rejected artifacts.
 8. Run the complete local verification matrix, repeat milestone-audit and full-code-review, and obtain green GitHub CI for the exact closure revision.
 
