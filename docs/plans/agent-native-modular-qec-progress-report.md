@@ -823,3 +823,70 @@ The full scalar-versus-portable diagnostic at `target/benchmarks/qualification/a
 The exact baseline at `target/benchmarks/a6-continuity-baseline-b33b0060` contained all 166 frozen rows. The first complete compare at `target/benchmarks/a6-continuity-compare-b33b0060` executed every row but exposed that the CLI could search only `benchmarks/profiler-notes/m12`, while the two generated-graph PF6 notes remained correctly owned by `benchmarks/profiler-notes/pfm-b5`. A focused merged-view validation proved both notes valid without changing them. A second complete run at `target/benchmarks/a6-continuity-compare-b33b0060-v2` produced 165 measurements and the intentional `m7-perf-harness` contract-only anchor; all 65 configured thresholds passed, three no-ratio rows matched their existing waivers, 98 rows remained not configured, and both required profiler notes were present. Its final strict status nevertheless failed because the harness required a runtime measurement from the explicit `baseline-metadata` row.
 
 This execution revealed a contract defect, not a product regression. The compare CLI now accepts repeated source-owned profiler-note roots, and required note validation rejects duplicate selected identities regardless of the current ratio. Strict mode exempts only the `BaselineMetadata` class from runtime measurement while retaining every other pending, missing, invalid, contract-only, threshold, waiver, and semantic-witness failure. Schema-version-2 compare reports record a structured profiler-root list, preserve the first root for legacy consumers, and continue to deserialize historical schema-version-1 singular metadata. Because this change affects compiled benchmark and workflow source, every `b33b0060` artifact remains historical; the final A6 evidence must be regenerated from the later clean committed revision.
+
+## A6 Historical Complete-Matrix Evidence
+
+Clean revision `2089fab4e69f2a6d87ba1696643770c902072d27` supplied the repaired complete-matrix candidate before the final boundary review. Exact full-tier M5 correctness passed both selected parents at `target/qualification/a6-m5-full-2089fab4` under request SHA-256 `4265d7b4ed5c30f41c6cad25f8becd1d15e89b9b94c7bb7506482ede15cf81fd`, report SHA-256 `e7e1342c7ffb3a34d1aa4f47f22e138e38826aebced5572f40bfb754a6a0a22a`, and completion SHA-256 `f2a79562a4023f16bad7c0def58ec0519f4534457516a2fde7fe6c6de078b054`. Exact full-tier M6 correctness passed all three selected parents at `target/qualification/a6-m6-full-2089fab4` under request SHA-256 `5fb0f428f94cafc3dda4c11676cfb720f09f541a0e0a70f5ac1e4d1c0fd6995d`, report SHA-256 `2209df31f8d3245260ecf73e528fc2fd068f6997f93aa5a8e4e1fb03d454b62a`, and completion SHA-256 `054e43c6404e1a9e9be11490767418b537891847e302d5472678232a15d34b28`.
+
+The scalar-versus-portable diagnostic at `target/benchmarks/qualification/a6-simd-compare-full-2089fab4` replayed exactly. Dense XOR recorded `1.005940x` medium and `1.007927x` large portable-over-scalar medians. Non-identity Clifford composition recorded `1.346985x` medium and `1.356089x` large. Load declined from `7.88` to `2.21` and remained below the policy maximum of `10`; the host was unverified because swap-in counters changed and two thermal zones reached 87.3 degrees Celsius. The report remains an architecture diagnostic and leaves scalar selected by default without making an A9 parity claim.
+
+The fresh pinned-Stim baseline at `target/benchmarks/a6-continuity-baseline-2089fab4` and comparison at `target/benchmarks/a6-continuity-compare-2089fab4` cover exactly 166 frozen rows. All 165 executable rows produced measurements, the `m7-perf-harness` baseline-metadata anchor was validated without a fabricated runtime measurement, all 65 configured thresholds passed, all three no-ratio rows matched their existing waivers, all 98 unconfigured rows remained visible, and both required profiler notes were found through their source-owned roots. The strict command exited successfully with no semantic-witness, runner, note, threshold, or waiver failure.
+
+The report contains 126 report-only Stab phases. Clean per-extraction evidence exists for 107 of them; 19 newly added or previously dirty-only phases have no clean per-extraction median and therefore cannot cross the comparison threshold. Of the 107 comparable phases, the 42 below were more than 15% slower than their latest clean per-extraction median. The adjacent clean complete-matrix report `target/benchmarks/a6-continuity-compare-b33b0060-v2` provides an equal-context repeat for every crossing. Forty-one phases are within 3.3% of that repeat, showing that their extraction delta comes from isolated-run context and host variance instead of a source-current product regression.
+
+The remaining generated-QEC hypergraph phase was also 23.0% slower than the adjacent complete-matrix repeat. A dedicated warmup plus nine-run comparison at `target/benchmarks/a6-focused-pfm-b5-hypergraph-search-generated-qec-2089fab4` measured `0.036311379` seconds, which is `0.960x` its extraction median and resolves the apparent deterioration as transient host noise. Hardware-counter profiling was attempted but unavailable because this host sets `kernel.perf_event_paranoid=4`; no system security policy was changed. Focused row reruns were also retained for 17 other affected rows. Microsecond rows remained sensitive to quantization, while substantive rows agreed with the adjacent complete-matrix repeat. No product fix, comparator change, threshold change, or waiver is justified by this diagnostic evidence.
+
+| Row | Measurement | Current/extraction | Current/adjacent | Disposition |
+|---|---|---:|---:|---|
+| `m6-tableau-iter` | `stab_tableau_iter_unsigned_2q` | 1.683x | 1.017x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_flow_generation` | 1.598x | 0.970x | Equal-context repeat stable; no product change. |
+| `pf5-flow-solve-measurement-rich` | `stab_pf5_flow_solve_measurement_cases` | 1.534x | 0.991x | Equal-context repeat stable; no product change. |
+| `pf5-flow-solve-measurement-rich` | `stab_pf5_flow_solve_measurement_queries` | 1.534x | 0.990x | Equal-context repeat stable; no product change. |
+| `pf5-flow-generators-measurement-rich` | `stab_pf5_flow_generators_measurement_flows` | 1.516x | 0.985x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_converter_compilation` | 1.514x | 0.991x | Equal-context repeat stable; no product change. |
+| `pf5-flow-generators-measurement-rich` | `stab_pf5_flow_generators_measurement_cases` | 1.513x | 0.984x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_detection_sampling` | 1.475x | 0.977x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_detector_frame_sampling` | 1.469x | 0.995x | Equal-context repeat stable; no product change. |
+| `pf5-flow-generators-measurement-python` | `stab_pf5_flow_generators_measurement_python_cases` | 1.428x | 1.006x | Equal-context repeat stable; no product change. |
+| `pf5-flow-generators-measurement-python` | `stab_pf5_flow_generators_measurement_python_flows` | 1.428x | 1.004x | Equal-context repeat stable; no product change. |
+| `pfm-b5-wcnf-direct-dem` | `stab_pfm_b5_wcnf_shortest_direct` | 1.384x | 0.994x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_sampler_execution` | 1.344x | 0.972x | Equal-context repeat stable; no product change. |
+| `pf5-detecting-regions-generated-repetition` | `stab_pf5_detecting_regions_generated_repetition` | 1.339x | 0.988x | Equal-context repeat stable; no product change. |
+| `pf5-flow-solve-measurement-python` | `stab_pf5_flow_solve_measurement_python_queries` | 1.339x | 0.973x | Equal-context repeat stable; no product change. |
+| `pfm-b5-wcnf-generated-qec` | `stab_pfm_b5_wcnf_shortest_generated` | 1.339x | 1.005x | Equal-context repeat stable; no product change. |
+| `pf5-flow-solve-measurement-python` | `stab_pf5_flow_solve_measurement_python_cases` | 1.324x | 0.990x | Equal-context repeat stable; no product change. |
+| `pf5-detecting-regions-clifford` | `stab_pf5_detecting_regions_clifford_gates` | 1.283x | 0.974x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d9-r9` | `stab_gen_repetition` | 1.268x | 1.008x | Equal-context repeat stable; no product change. |
+| `pfm-b5-wcnf-direct-dem` | `stab_pfm_b5_wcnf_likeliest_direct` | 1.262x | 0.985x | Equal-context repeat stable; no product change. |
+| `pfm-b5-wcnf-generated-qec` | `stab_pfm_b5_wcnf_likeliest_generated` | 1.257x | 0.981x | Equal-context repeat stable; no product change. |
+| `pfm-b5-hypergraph-search-generated-qec` | `stab_pfm_b5_hypergraph_generated_qec` | 1.255x | 1.230x | Focused nine-run result is 0.960x extraction; transient noise, no product change. |
+| `m7-gen-repetition-d9-r90` | `stab_gen_repetition` | 1.249x | 1.020x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d5-r50` | `stab_gen_repetition` | 1.248x | 0.993x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d17-r17` | `stab_gen_repetition` | 1.238x | 1.012x | Equal-context repeat stable; no product change. |
+| `m6-stabilizers-to-tableau` | `stab_stabilizers_to_inverse_tableau_16q` | 1.236x | 0.974x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d5-r5` | `stab_gen_repetition` | 1.233x | 0.947x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d17-r170` | `stab_gen_repetition` | 1.227x | 1.000x | Equal-context repeat stable; no product change. |
+| `pf5-detecting-regions-targets` | `stab_pf5_detecting_regions_target_filters` | 1.218x | 0.959x | Equal-context repeat stable; no product change. |
+| `m6-tableau` | `stab_tableau_from_circuit_32q` | 1.214x | 1.026x | Equal-context repeat stable; no product change. |
+| `pf5-has-all-flows-batch` | `stab_pf5_has_flows_batch_cases` | 1.208x | 0.989x | Equal-context repeat stable; no product change. |
+| `pf6-sparse-rev-frame-loop` | `stab_pf6_sparse_rev_unitary_repeat_flow` | 1.206x | 1.009x | Equal-context repeat stable; no product change. |
+| `pf5-has-all-flows-batch` | `stab_pf5_has_flows_batch_flows` | 1.202x | 0.998x | Equal-context repeat stable; no product change. |
+| `m6-stabilizers-to-tableau` | `stab_stabilizers_to_tableau_16q` | 1.201x | 0.974x | Equal-context repeat stable; no product change. |
+| `pf5-missing-detectors-mpp` | `stab_pf5_missing_detectors_mpp_cases` | 1.201x | 0.991x | Equal-context repeat stable; no product change. |
+| `pf5-missing-detectors-mpp` | `stab_pf5_missing_detectors_mpp_suggestions` | 1.196x | 0.992x | Equal-context repeat stable; no product change. |
+| `m6-tableau` | `stab_tableau_inverse_32q` | 1.190x | 1.033x | Equal-context repeat stable; no product change. |
+| `m8-reference-sample-tree` | `stab_reference_sample_tree_flat_20x20` | 1.184x | 1.009x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d3-r3` | `stab_gen_repetition` | 1.179x | 1.011x | Equal-context repeat stable; no product change. |
+| `m6-tableau` | `stab_tableau_apply_32q` | 1.173x | 1.013x | Equal-context repeat stable; no product change. |
+| `pf3-gate-semantic-wide` | `stab_pf3_gate_error_analysis` | 1.169x | 0.987x | Equal-context repeat stable; no product change. |
+| `m7-gen-repetition-d3-r30` | `stab_gen_repetition` | 1.167x | 1.011x | Equal-context repeat stable; no product change. |
+
+A6 remains open after this evidence. The final audit found an accidental `stab-model` dependency on `stab-algebra`, duplicate public `stab-engine` namespace aliases, nineteen report-only phases without clean predecessors, fifteen threshold-crossing phases without the required focused diagnostics, and ambiguous selected scalar evidence ownership. Commit `95df87ee` repairs the component boundaries and regenerates the affected inventories, so every `2089fab4` artifact is historical and cannot close the source-current graph.
+
+## A6 Final Boundary And Evidence Review
+
+Commit `95df87ee` makes `stab-model` independent of every Stab crate and leaves the `stab-engine` crate root as the sole canonical public execution namespace. It removes qualification aliases that could let duplicate module paths appear independently owned, updates architecture enforcement and consumer fixtures, and regenerates the checked inventories. The source-current correctness digest is `e32b5b3e4939ed120c42193452fb85d6f73d72225412c2c8b2876739f38b6601`; the source-current performance digest is `cff7389b76971b615485680573ea4a4390becd15ee665f6911915107dd1553b9`.
+
+The audit also revealed three specification gaps now resolved in the active plan and [milestone log](milestone-spec-gaps.md). The nineteen phases without a clean predecessor become explicit initial seeds and make no retrospective regression claim. A focused diagnostic now means one isolated source-owned row, its exact semantic witness, a warmup, and one outer run retaining the legacy runner's 128 internal release-profile timings; hardware profiling is required only when the deterioration reproduces and host policy permits it. Selected scalar Stim continuity is owned only by the exact M5 XOR and M6 equal-width Clifford pairs in the complete matrix, while M6 short-right-operand and non-identity scalar-versus-SIMD measurements remain distinct report-only diagnostics.
+
+Fresh evidence must be produced from the clean committed contract revision after this documentation amendment. The parked A7 decoder and decoder-benchmark work remains preserved in named stashes and is not admitted into the workspace until A6 has source-current local evidence, post-evidence audits, and green exact-revision CI.

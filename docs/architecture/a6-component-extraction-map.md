@@ -330,9 +330,12 @@ Only the workloads that execute an extracted optional kernel are SIMD evidence:
 
 - M5 dense packed-bit XOR;
 - M6 non-identity Clifford right multiplication;
-- selected M5 and M6 scalar-versus-Stim continuity rows after the scalar-versus-SIMD decision.
+- selected scalar M5 `stab_simd_bits_xor_10K` versus Stim `simd_bits_xor_10K`;
+- selected scalar M6 `stab_clifford_string_multiplication_10K` versus Stim `CliffordString_multiplication_10K`.
 
 Parser, records, sampling, conversion, DEM, and analysis rows are not SIMD evidence merely because their owning crates were extracted.
+
+The M6 short-right-operand measurements have no equivalent Stim workload and remain report-only extraction diagnostics. They do not substitute for either the equal-width Stim pair or the separate scalar-versus-SIMD non-identity kernel report.
 
 ### Extraction Continuity
 
@@ -351,7 +354,9 @@ Measurements remain phase-specific. A facade call-path move is not evidence for 
 
 All output-producing rows keep their independent semantic witness. Compile-and-release rows keep source-owned plan dimensions or fingerprints outside the timed region.
 
-The final A6 ownership-continuity matrix is the complete 166-row pre-M12 manifest: M4 through M11 and PF1 through PF7. It contains 165 executable timing rows and the intentional `m7-perf-harness` `baseline-metadata` anchor, which validates pinned baseline provenance and is not a runtime workload. This deliberately includes adjacent unchanged rows so the source-current report cannot hide a moved path behind a hand-selected subset. The final comparison uses one fresh pinned-Stim baseline, a warmup, and three recorded Stab runs. Strict comparison requires every non-metadata contract to produce its Stab measurement and accepts the metadata anchor only in its declared class. Existing comparator classes, thresholds, and waivers do not change. Source-owned profiler notes are read from their owning milestone directories through repeated `--profiler-notes-dir` options; required note validation rejects duplicate selected identities even below the profiler-note threshold. A report-only phase whose median is more than 15% worse than its latest clean per-extraction report must be profiled and either repaired or explained in the progress report before closure.
+The final A6 ownership-continuity matrix is the complete 166-row pre-M12 manifest: M4 through M11 and PF1 through PF7. It contains 165 executable timing rows and the intentional `m7-perf-harness` `baseline-metadata` anchor, which validates pinned baseline provenance and is not a runtime workload. This deliberately includes adjacent unchanged rows so the source-current report cannot hide a moved path behind a hand-selected subset. The final comparison uses one fresh pinned-Stim baseline, a warmup, and three recorded Stab runs. Strict comparison requires every non-metadata contract to produce its Stab measurement and accepts the metadata anchor only in its declared class. Existing comparator classes, thresholds, and waivers do not change. Source-owned profiler notes are read from their owning milestone directories through repeated `--profiler-notes-dir` options; required note validation rejects duplicate selected identities even below the profiler-note threshold.
+
+Report-only comparisons require identical row, measurement, workload, implementation, build profile, feature selection, and timing-boundary identities. The 19 phases enumerated in the A6 plan have no clean predecessors and become initial seeds without retrospective regression claims. A comparable phase more than 15% slower than its clean extraction report requires one isolated source-owned row, its semantic witness, a warmup, and one outer run retaining the legacy runner's 128 internal release-profile timings. A reproducing deterioration requires hardware or CPU profiling when host policy permits; when it does not, the progress report records the restriction and may use focused non-reproduction plus an adjacent clean complete-matrix repeat to support a host-variance disposition.
 
 ## Acceptance Matrix
 
@@ -366,7 +371,7 @@ The final A6 ownership-continuity matrix is the complete 166-row pre-M12 manifes
 | Facade preserves intended compatibility | API migration inventory, facade tests, CLI oracle, and implemented-only oracle |
 | Canonical semantics do not depend on the facade | Generated API ownership plus direct-package selector guards for every implemented `stab_bits` and `stab_algebra` item |
 | Product graph has no qualification exports | All-features rustdoc inventory and source scan |
-| Moved paths have no unexplained regression | Source-current phase reports tied to exact moved rows |
+| Moved paths have no unexplained regression | Source-current phase reports tied to exact moved rows, explicit initial seeds, and focused diagnostics for every comparable crossing |
 | Documentation matches physical state | Generated API/status checks and architecture link checks |
 
 ## Known Risks

@@ -1405,3 +1405,30 @@ Current text: the A6 contract required source-owned profiler notes and strict co
 Gap: copying PF6 notes into the M12 directory would duplicate source ownership, while weakening strict mode globally would allow real executable contracts to disappear. The contract also did not state that the frozen 166 rows contain 165 runtime workloads and one metadata-only provenance row.
 Proposed amendment: permit multiple source-owned profiler-note roots with duplicate identities rejected, and exempt only the explicit `baseline-metadata` threshold class from the strict runtime-measurement requirement.
 Resolution: `--profiler-notes-dir` is repeatable, schema-version-2 reports retain the complete structured root list and the first legacy singular root while continuing to read schema-version-1 reports, required note validation rejects duplicate selected identities regardless of the current ratio, and strict comparison continues to require every non-metadata contract measurement. The A6 plan, extraction map, goal, benchmark documentation, and progress record now identify the exact 165-plus-one matrix.
+
+## 2026-07-30 - A6: Report-Only Phases Without Clean Predecessors
+
+Status: Resolved
+Revealed by: milestone audit of the `2089fab4` complete-matrix report.
+Current text: A6 required every report-only phase to compare against its latest clean per-extraction report.
+Gap: nineteen source-owned phases were added after their extraction checkpoint or previously existed only in dirty diagnostics, so no semantically identical clean predecessor exists. The literal rule made acceptance impossible or invited an unlike retrospective comparison.
+Proposed amendment: enumerate the nineteen phases, require their current semantic witnesses and measurements to pass, accept the first clean complete-matrix result as the initial seed, and prohibit a retrospective self-regression claim.
+Resolution: the A6 benchmark contract now names every initial-seed row and measurement family. Later revisions may compare against the accepted clean seed only when row, measurement, workload, implementation, profile, feature selection, and timing boundary identities match.
+
+## 2026-07-30 - A6: Focused Diagnostic Meaning
+
+Status: Resolved
+Revealed by: milestone audit of report-only phases above the 15 percent review boundary.
+Current text: a crossing required a focused profile, but the plan did not define isolation, warmup, retained sample count, or what to do when hardware counters are unavailable.
+Gap: an ordinary repeated benchmark could be mislabeled profiling, while requiring unavailable hardware counters would make closure depend on changing host security policy.
+Proposed amendment: isolate the exact row and witness, warm it up, retain one outer run containing the legacy runner's 128 internal release-profile timings, require hardware or CPU profiling only when a slowdown reproduces and host policy permits it, and allow a focused non-reproduction plus adjacent complete-matrix repeat to support a documented host-variance explanation.
+Resolution: the A6 benchmark and done-criteria text now defines this protocol and enumerates the eight review-identified rows still missing focused diagnostics. The project does not lower `kernel.perf_event_paranoid` to manufacture hardware-profile availability.
+
+## 2026-07-30 - A6: Selected Scalar Stim Evidence Ownership
+
+Status: Resolved
+Revealed by: milestone audit of the scalar-selection evidence.
+Current text: A6 required selected scalar pinned-Stim diagnostics without identifying which complete-matrix measurements owned that claim.
+Gap: the broad wording could treat M6's Stab-only short-right-operand measurements or the separate scalar-versus-SIMD non-identity kernel report as if either had a pinned-Stim comparator.
+Proposed amendment: name the exact M5 XOR and M6 equal-width Clifford pairs, classify short-right-operand measurements as report-only, and keep non-identity scalar-versus-SIMD selection in its dedicated diagnostic.
+Resolution: the A6 plan and GOAL now bind selected scalar Stim continuity to `m5-simd-bits` / `stab_simd_bits_xor_10K` versus `simd_bits_xor_10K` and `m6-clifford-string` / `stab_clifford_string_multiplication_10K` versus `CliffordString_multiplication_10K`.
