@@ -330,33 +330,42 @@ Only the workloads that execute an extracted optional kernel are SIMD evidence:
 
 - M5 dense packed-bit XOR;
 - M6 non-identity Clifford right multiplication;
-- selected scalar M5 `stab_simd_bits_xor_10K` versus Stim `simd_bits_xor_10K`;
-- selected scalar M6 `stab_clifford_string_multiplication_10K` versus Stim `CliffordString_multiplication_10K`.
+- selected scalar `PERFQ-M5-SIMD-BITS` / `xor-complete-vector` at the `small` scale;
+- selected scalar `PERFQ-M6-CLIFFORD-STRING` / `right-multiply-identity` at the `small` scale.
 
 Parser, records, sampling, conversion, DEM, and analysis rows are not SIMD evidence merely because their owning crates were extracted.
 
-The M6 short-right-operand measurements have no equivalent Stim workload and remain report-only extraction diagnostics. They do not substitute for either the equal-width Stim pair or the separate scalar-versus-SIMD non-identity kernel report.
+The M6 short-right-operand measurements have no equivalent Stim workload and remain report-only extraction diagnostics. They do not substitute for either the paired identity qualification measurement or the separate scalar-versus-SIMD non-identity kernel report.
 
 ### Extraction Continuity
 
-Retarget or rerun the following existing rows only when physical ownership or a moved implementation changes their executed call path:
+The final A6 closure set is finite. Every selected row retains its existing timing boundary, semantic witness, and comparator classification.
 
-- M7 record conversion paths affected by feature forwarding;
-- M8 sampling compilation, session construction, execution, typed batch consumption, encoding, and CLI sampling;
-- M9 measurement-to-detection compilation, conversion, fused detection sampling, replay, routing, and CLI paths;
-- M10 DEM parsing, printing, analysis, decomposition, search, compilation, sampling, and replay;
-- PF analysis and query rows whose owner changes;
-- A2, A4, and A5 phase diagnostics whose source paths or crate identities change.
+| Owner | Group or row | Exact measurements and scales | Inclusion reason |
+| --- | --- | --- | --- |
+| A2 | `PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT` | `fingerprint`; all three scales | Circuit model and canonical gate ownership moved to `stab-model`. |
+| A2 | `PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT` | `fingerprint-inclusive`; all three scales | Sampling request identity moved to the public engine boundary. |
+| A2 | `PERFQ-A2-SAMPLING-REQUEST-ESTIMATE` | `estimate`; all three scales | Resource estimation now crosses the extracted model and engine packages. |
+| A2 | `PERFQ-A2-SAMPLER-COMPILE` | `compile-and-release`; all three scales | Sampling compilation moved to `stab-engine`. |
+| A2 | `m4-circuit-parse` | `stab_circuit_parse`, `stab_circuit_parse_sparse`, and their row-owned Stim filters | The parser and model allocation owner moved to `stab-model`. |
+| A4 | `m8-sample-analysis-1shot` | `stab_sample_compile_plan_auto_noisy_1q`, `stab_sample_compile_plan_scalar_noisy_1q`, `stab_sample_construct_session_noisy_1q`, `stab_sample_execute_witness_sink_64_continuous_session`, `stab_sample_consume_typed_batch_64`, `stab_sample_encode_b8_64`, `stab_sample_repeated_session_16x4_continuous_session` | Compilation, session execution, typed delivery, and codec ownership now cross explicit engine and records packages. |
+| A4 | `m8-sample-throughput-1024` | `stab_sample_1024_zero_one` and its row-owned Stim command measurement | The public sampling CLI now traverses the extracted facade-to-engine path. |
+| A4 | `m8-sample-throughput-1000000` | `stab_sample_1000000_zero_one` and its row-owned Stim command measurement | The production-scale public sampling path proves the extraction did not add shot-count scaling overhead. |
+| A5 | `m9-detection-batch-phases` | `stab_detection_plan_compile_and_release_basic`, `stab_detection_session_sample_to_detection`, `stab_detect_ptb64_routing` | Detection compilation, fused execution, and records routing moved across engine and records boundaries. |
+| A5 | `m9-m2d-batch-phases` | `stab_m2d_plan_compile_and_release_basic`, `stab_m2d_session_convert_batch` | Measurement-to-detection compilation and bounded conversion moved to `stab-engine`. |
+| A5 | `m11-dem-batch-phases` | `stab_dem_plan_compile_and_release_surface_like`, `stab_dem_session_detector_only`, `stab_dem_session_with_sampled_errors`, `stab_dem_session_replay`, `stab_sample_dem_cli_ptb64_routing` | DEM compilation, execution, replay, and records routing moved across engine and records boundaries. |
+
+M7 conversion rows, unrelated M8 simulators and readers, M9 analysis utilities, M10 parser and analysis families, PF rows, and other inherited rows are deliberately excluded because A6 did not change their selected feature, timed algorithm, or public process path. Their moved semantic owners are covered by direct Stable package tests and generated ownership rather than duplicate timing. A later executable-path change must add or replace an exact entry through the milestone specification-gap process instead of interpreting a broad category during execution.
 
 These continuity rows prove owner migration and unchanged workload behavior. They do not become evidence for the optional SIMD kernels unless the selected feature changes the timed implementation.
 
 Measurements remain phase-specific. A facade call-path move is not evidence for a parser, compiler, session, or codec phase unless that exact phase is the timed boundary.
 
-The exact selected M5 and M6 scalar comparisons execute their source-owned semantic preflights before timing. The M5 row compares `stab_simd_bits_xor_10K` with Stim `simd_bits_xor_10K`; the M6 row compares `stab_clifford_string_multiplication_10K` with Stim `CliffordString_multiplication_10K`. Both use fresh create-new baselines, warmed three-run comparisons, the scalar feature set, the existing row-native timing boundary, and the unchanged `1.25x` median and confidence-upper-bound gate.
+The selected M5 and M6 scalar diagnostics execute their source-owned correctness prerequisites and semantic preflights before timing. They use the current paired qualification groups at the `small` scale, the scalar feature set, `raw-work-v2`, full-tier alternating samples, and the unchanged `1.25x` median and confidence-upper-bound policy. Host-unverified reports may establish A6 diagnostic continuity but are not promotable parity evidence; A9 owns controlled-host full and soak qualification across every scale. The migrated legacy M6 threshold remains retired.
 
 The separate scalar-versus-SIMD report uses identical inputs and exact output witnesses at medium and large scales for dense XOR and non-identity Clifford right multiplication. It decides whether the optional kernel has a material benefit; it is not a Stim-relative comparison.
 
-Only A2, A4, and A5 diagnostics whose source package, feature selection, or executed call path changed are rerun for A6 continuity. Their existing semantic witnesses and comparator classifications remain authoritative. The complete historical 166-row matrices, predecessor-backport design, focused reports, typed profile receipts, and publication attempts are preserved as historical diagnostics but are not A6 closure requirements. Optional profiling may investigate a result, but an externally supplied profile cannot prove workload provenance or relabel a failed gate.
+Only the exact A2, A4, and A5 entries in the table above are rerun for A6 continuity. Their existing semantic witnesses and comparator classifications remain authoritative. The complete historical 166-row matrices, predecessor-backport design, focused reports, typed profile receipts, and publication attempts are preserved as historical diagnostics but are not A6 closure requirements. Optional profiling may investigate a result, but an externally supplied profile cannot prove workload provenance or relabel a failed gate.
 
 ## Acceptance Matrix
 
@@ -371,7 +380,7 @@ Only A2, A4, and A5 diagnostics whose source package, feature selection, or exec
 | Facade preserves intended compatibility | API migration inventory, facade tests, CLI oracle, and implemented-only oracle |
 | Canonical semantics do not depend on the facade | Generated API ownership plus direct-package selector guards for every wholly owned implemented item in all six Stable component crates and a checked narrow integration-exception ledger |
 | Product graph has no qualification exports | All-features rustdoc inventory and source scan |
-| Moved paths have no unexplained regression | Source-current selected M5/M6 comparisons plus affected-path diagnostics under their existing semantic and regression policies |
+| Moved paths have no unexplained regression | Source-current selected M5/M6 paired diagnostics plus affected-path diagnostics under their existing semantic, noise, and comparator policies |
 | Documentation matches physical state | Generated API/status checks and architecture link checks |
 
 ## Known Risks

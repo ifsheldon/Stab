@@ -1531,3 +1531,30 @@ Current text: A6 said unrelated rows were continuity checks only when extraction
 Gap: the complete-matrix and retrospective-publication requirements contradicted the affected-path scope, duplicated the broader A9 qualification program, and made unrelated historical timing a blocker for proving crate extraction and Nightly isolation. The typed profiler design also accepted an existing valid `perf.data` after header validation, so it could not prove that the capture originated from the focused row it certified.
 Proposed amendment: keep direct owner-package qualification, scalar-versus-SIMD XOR and Clifford evidence, exact selected M5 and M6 Stim comparisons under the unchanged `1.25x` gate, affected-path diagnostics, and exact-revision CI; remove the complete matrix, predecessor reconstruction, mandatory profiling, and focused publication object from A6 acceptance.
 Resolution: the A6 plan, extraction map, and GOAL now use the affected-path contract. Historical matrices, focused reports, predecessor designs, receipts, and publication work remain documented historical diagnostics. Profiles are optional investigation artifacts and cannot relabel a failed gate. A9 continues to own broad release qualification.
+
+## 2026-07-30 - A6: Retired Legacy Rows Cannot Own Confidence Bounds
+
+Status: Resolved
+Revealed by: final benchmark-contract audit before A6 timing
+Current text: A6 required fresh legacy `m5-simd-bits` and `m6-clifford-string` comparisons to pass both a median and confidence-upper-bound `1.25x` gate.
+Gap: the legacy compare harness reports point ratios rather than deterministic bootstrap intervals, and the M6 timing threshold was deliberately retired after migration to `PERFQ-M6-CLIFFORD-STRING`. Reopening that threshold would violate the migration contract, while citing the legacy report for an upper bound would claim evidence it cannot produce.
+Proposed amendment: use the current paired qualification groups and source-owned measurements for the numeric A6 diagnostic, keep legacy rows as optional historical continuity only, and distinguish host-unverified diagnostic outcomes from A9's promotable controlled-host parity evidence.
+Resolution: A6 now uses `PERFQ-M5-SIMD-BITS` / `xor-complete-vector` and `PERFQ-M6-CLIFFORD-STRING` / `right-multiply-identity` at their `small` scales with exact semantic preflight, full-tier alternating samples, noise validation, paired medians, and deterministic confidence intervals. Numeric A6 acceptance remains at `1.25x`, but host-unverified evidence is explicitly non-promotable and the retired M6 threshold stays retired.
+
+## 2026-07-30 - A6: Evidence Revision And Closure Commit
+
+Status: Resolved
+Revealed by: final benchmark-contract audit before A6 timing
+Current text: A6 required evidence from the final clean source revision, synchronized progress documentation, and exact-revision CI.
+Gap: committing the measured outcomes to the append-only progress report necessarily changes `HEAD`, while the SIMD replay correctly rejects a report after source-revision drift. Requiring replay against the documentation descendant would make honest closure circular or encourage treating a later commit as the measured source.
+Proposed amendment: bind timing and CI to one clean measured source commit, then permit one narrowly scoped closure descendant that changes only status documentation and generated qualification status. Any executable, contract, fixture, workflow, or substantive documentation change must invalidate the timing.
+Resolution: the plan now names the measured source commit as the exact timing and CI identity and allows only the append-only progress report, generated qualification status, specification-gap log, and directly linked plan status prose in a later closure commit. Evidence remains attributed to its recorded source parent and is never replayed as though produced by the descendant.
+
+## 2026-07-30 - A6: Finite Affected-Path Diagnostics
+
+Status: Resolved
+Revealed by: milestone audit before A6 timing
+Current text: A6 required every affected A2, A4, and A5 diagnostic while naming only broad feature and phase categories.
+Gap: an agent could omit an inconvenient changed path or expand A6 back into the superseded complete matrix, and an independent reviewer could not reproduce the selected scope.
+Proposed amendment: freeze one small table of exact group or row IDs, measurement IDs, scales, inclusion reasons, and deliberate exclusions. Require a recorded specification amendment before changing that set.
+Resolution: the A6 extraction map now freezes four A2 product-diagnostic groups, one parser row, three A4 sampling rows, and three A5 phase rows with exact measurements. It explicitly excludes unrelated M7, M8, M9, M10, PF, and inherited rows whose timed algorithm or public process path did not change, while direct Stable package tests and generated ownership retain their semantic coverage.

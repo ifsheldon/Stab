@@ -3,16 +3,6 @@
 smoke *args:
     cargo run -q -p stab-bench -- smoke {{args}}
 
-# Validate the checked A6 report-only crossing and focused-diagnostic ledger.
-[working-directory: '..']
-a6-focused-evidence *args:
-    cargo run -q -p stab-bench -- a6-focused-evidence {{args}}
-
-# Produce one immutable A6 Linux-perf profile receipt.
-[working-directory: '..']
-a6-profile-receipt *args:
-    cargo run -q -p stab-bench -- a6-profile-receipt {{args}}
-
 # Print planned benchmark contracts grouped by milestone and threshold class.
 [working-directory: '..']
 list *args:

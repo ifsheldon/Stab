@@ -72,10 +72,12 @@ enum Command {
     /// Validate benchmark contracts without running long benchmark workloads.
     Smoke,
 
-    /// Validate the checked A6 report-only crossing and focused-diagnostic ledger.
+    /// Read or validate historical A6 focused-attestation artifacts.
+    #[command(hide = true)]
     A6FocusedEvidence(a6_focused_evidence::A6FocusedEvidenceArgs),
 
-    /// Produce one typed A6 Linux-perf profile receipt.
+    /// Read or reproduce a historical A6 Linux-perf receipt.
+    #[command(hide = true)]
     A6ProfileReceipt(a6_focused_evidence::profile_receipt::A6ProfileReceiptArgs),
 
     /// Validate the comprehensive performance qualification ledger.
