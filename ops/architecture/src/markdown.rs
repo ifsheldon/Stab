@@ -1,4 +1,4 @@
-//! Parser-backed validation for repository-owned Markdown links.
+//! GitHub Flavored Markdown validation for repository-owned links and heading anchors.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
@@ -7,6 +7,7 @@ use std::path::{Component, Path, PathBuf};
 
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use thiserror::Error;
+use unicode_general_category::{GeneralCategory, get_general_category};
 
 const PREFIX: &str = "stab-architecture";
 const EXCLUDED_DIRECTORIES: &[&str] = &[
@@ -95,7 +96,6 @@ struct MarkdownLink {
 
 #[derive(Debug)]
 struct Heading {
-    explicit_id: Option<String>,
     text: String,
 }
 
@@ -307,8 +307,7 @@ fn read_document(root: &Path, relative_path: &Path) -> Result<MarkdownDocument, 
 }
 
 fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
-    let options = Options::ENABLE_HEADING_ATTRIBUTES;
-    let parser = Parser::new_ext(source, options).into_offset_iter();
+    let parser = Parser::new_ext(source, gfm_options()).into_offset_iter();
     let mut links = Vec::new();
     let mut anchors = BTreeSet::new();
     let mut used_anchors = BTreeSet::new();
@@ -316,17 +315,14 @@ fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
 
     for (event, range) in parser {
         match event {
-            Event::Start(Tag::Heading { id, .. }) => {
+            Event::Start(Tag::Heading { .. }) => {
                 heading = Some(Heading {
-                    explicit_id: id.map(|id| id.into_string()),
                     text: String::new(),
                 });
             }
             Event::End(TagEnd::Heading(_)) => {
                 if let Some(heading) = heading.take() {
-                    let base = heading
-                        .explicit_id
-                        .unwrap_or_else(|| github_heading_slug(&heading.text));
+                    let base = github_heading_slug(&heading.text);
                     anchors.insert(unique_anchor(base, &mut used_anchors));
                 }
             }
@@ -352,18 +348,47 @@ fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
     (anchors, links)
 }
 
+fn gfm_options() -> Options {
+    Options::ENABLE_GFM
+        | Options::ENABLE_TABLES
+        | Options::ENABLE_FOOTNOTES
+        | Options::ENABLE_STRIKETHROUGH
+        | Options::ENABLE_TASKLISTS
+}
+
+/// Mirrors GitHub's section-link category policy.
+///
+/// GitHub lowercases heading text, replaces only U+0020 with `-`, and strips
+/// selected Unicode general categories. Alphabetic symbols are retained. This
+/// intentionally does not normalize or transliterate Unicode text.
 fn github_heading_slug(text: &str) -> String {
-    text.chars()
-        .flat_map(char::to_lowercase)
-        .filter(|character| !character.is_ascii_punctuation() || matches!(character, '-' | '_'))
-        .map(|character| {
-            if character.is_whitespace() {
-                '-'
-            } else {
-                character
-            }
-        })
-        .collect()
+    let mut slug = String::with_capacity(text.len());
+    for character in text.chars().flat_map(char::to_lowercase) {
+        if character == ' ' {
+            slug.push('-');
+        } else if !github_strips_from_heading_slug(character) {
+            slug.push(character);
+        }
+    }
+    slug
+}
+
+fn github_strips_from_heading_slug(character: char) -> bool {
+    use GeneralCategory::{
+        ClosePunctuation, Control, CurrencySymbol, DashPunctuation, FinalPunctuation, Format,
+        InitialPunctuation, LineSeparator, MathSymbol, ModifierSymbol, OpenPunctuation,
+        OtherNumber, OtherPunctuation, OtherSymbol, ParagraphSeparator, PrivateUse, SpaceSeparator,
+        Surrogate, Unassigned,
+    };
+
+    match get_general_category(character) {
+        OtherNumber | ClosePunctuation | FinalPunctuation | InitialPunctuation
+        | OpenPunctuation | OtherPunctuation | Control | PrivateUse | Format | Unassigned
+        | Surrogate | LineSeparator | ParagraphSeparator | SpaceSeparator => true,
+        DashPunctuation => character != '-',
+        CurrencySymbol | MathSymbol | ModifierSymbol | OtherSymbol => !character.is_alphabetic(),
+        _ => false,
+    }
 }
 
 fn unique_anchor(base: String, used: &mut BTreeSet<String>) -> String {
@@ -621,7 +646,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::{DocsCheckReport, check_markdown_docs};
+    use super::{DocsCheckReport, check_markdown_docs, github_heading_slug};
 
     fn repository(files: &[(&str, &str)]) -> TempDir {
         let root = tempfile::tempdir().expect("fixture repository should be created");
@@ -707,7 +732,7 @@ mod tests {
     fn disambiguates_duplicate_heading_anchors() {
         let root = repository(&[(
             "README.md",
-            "# Repeated\n\n# Repeated\n\n[first](#repeated)\n[second](#repeated-1)\n[third](#repeated-2)\n",
+            "# Echo\n\n# Echo\n\n# Echo 1\n\n# Echo-1\n\n# Echo\n\n[first](#echo)\n[second](#echo-1)\n[derived](#echo-1-1)\n[collision](#echo-1-2)\n[last](#echo-2)\n[missing](#echo-3)\n",
         )]);
 
         let report = report(root.path());
@@ -719,8 +744,37 @@ mod tests {
                 .first()
                 .expect("missing-anchor violation should exist")
                 .destination,
-            "#repeated-2"
+            "#echo-3"
         );
+    }
+
+    #[test]
+    fn treats_heading_attribute_syntax_as_gfm_text() {
+        let root = repository(&[(
+            "README.md",
+            "# Section {#custom}\n\n[rendered heading](#section-custom)\n[not a custom id](#custom)\n",
+        )]);
+
+        let report = report(root.path());
+
+        assert_eq!(codes(&report), vec!["markdown-missing-anchor"]);
+        assert_eq!(
+            report
+                .violations
+                .first()
+                .expect("missing-anchor violation should exist")
+                .destination,
+            "#custom"
+        );
+    }
+
+    #[test]
+    fn matches_github_unicode_heading_slug_rules() {
+        assert_eq!(github_heading_slug("What’s new?"), "whats-new");
+        assert_eq!(github_heading_slug("I ♥ Unicode"), "i--unicode");
+        assert_eq!(github_heading_slug("Greek Θ"), "greek-θ");
+        assert_eq!(github_heading_slug("alpha\tbeta\u{200e}"), "alphabeta");
+        assert_eq!(github_heading_slug("alpha\u{a0}beta"), "alphabeta");
     }
 
     #[test]
