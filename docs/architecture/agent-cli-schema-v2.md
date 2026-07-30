@@ -1,10 +1,12 @@
 # Agent CLI Schema Version 2
 
-This document defines the current successful machine-output contract for the Stab-native `capabilities`, `inspect`, and `plan sample` commands.
+This document defines the current successful machine-output contract for the Stab-native `inspect` and `plan sample` commands and preserves the historical schema-version-2 contract for `capabilities`.
 
 These commands are additive Stab extensions and do not claim matching Stim v1.16.0 command names or output bytes.
 
 Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md).
+
+`stab capabilities` now emits [capabilities schema version 3](agent-cli-capabilities-schema-v3.md). That change does not alter the schema version emitted by `inspect` or `plan sample`.
 
 ## Invocation And Streams
 
@@ -12,7 +14,9 @@ Each command uses `--format=human|json`.
 
 Human output is the default.
 
-JSON mode writes one complete schema-version-2 JSON document followed by LF to stdout.
+JSON mode for `inspect` and `plan sample` writes one complete schema-version-2 JSON document followed by LF to stdout.
+
+The historical schema-version-2 `capabilities` command used the same framing.
 
 Warnings and failures continue to use the independent global `--error-format=human|json` contract.
 
@@ -97,7 +101,7 @@ Unknown values must not be interpreted as zero.
 
 Resource reports use `input_bytes`, `input_items`, `expanded_operations`, `folded_traversal`, `scratch_bytes`, `resident_bytes`, `output_bytes`, and `work_units`.
 
-## `stab capabilities`
+## `stab capabilities` (Historical)
 
 The command shape is:
 
@@ -105,7 +109,7 @@ The command shape is:
 stab capabilities [--format=human|json]
 ```
 
-The report contains:
+The schema-version-2 report contained:
 
 - `schema_version`, fixed to `2`;
 - `stab_version`;
@@ -113,9 +117,11 @@ The report contains:
 - descriptor-derived `commands`, `dialects`, `gates`, `codecs`, and `compilers`;
 - `selectable_backends`, currently containing only `scalar`.
 
-`portable-simd` remains absent from sampling capabilities until a later packed-frame milestone registers a distinct executable implementation. A6 build-time bit and Clifford acceleration does not change this runtime schema.
+`portable-simd` was absent from schema-version-2 sampling capabilities because A6 build-time bit and Clifford acceleration did not register a caller-selectable runtime backend.
 
-Compiler entries report operation, input dialect, compiler schema, nullable request-fingerprint schema, configurable-limit availability, and backend-selection availability. Sampling currently reports request-fingerprint schema `1`; `m2d`, `detect`, and `sample_dem` report `null` because those compiler families do not yet expose a public request-fingerprint identity.
+The `compilers` array contained exactly one `sample` entry for the `stim-circuit` dialect. Its `compiler_schema_version` and `request_fingerprint_schema_version` were both unsigned integers fixed to `1`, `configurable_limits` was `false`, and `backend_selection` was `true`.
+
+Schema version 2 did not advertise the `m2d`, `detect`, or `sample_dem` compiler families, and `request_fingerprint_schema_version` was not nullable.
 
 ## `stab inspect`
 
@@ -195,5 +201,7 @@ Adding or removing a field, changing a field meaning, changing enum spelling, ch
 Changes to any fingerprint digest bytes require the corresponding fingerprint schema increment even when this JSON schema remains unchanged.
 
 Adding a genuinely registered backend changes capability values but not the JSON shape. It must also produce a distinct plan fingerprint under the plan-fingerprint contract.
+
+Capabilities schema version 3 changed `request_fingerprint_schema_version` from an unsigned integer to an unsigned integer or `null` and added three compiler families. `inspect` and `plan sample` remain on schema version 2 because their machine-output contracts did not change.
 
 Human output is structural documentation, not a byte-stable compatibility format.

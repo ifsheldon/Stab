@@ -16,7 +16,7 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contract for Stab-native discovery, inspection, and planning commands is defined by [agent CLI schema version 2](agent-cli-schema-v2.md). [Schema version 1](agent-cli-schema-v1.md) remains historical.
+The current successful machine-output contract for `stab capabilities` is defined by [capabilities schema version 3](agent-cli-capabilities-schema-v3.md). `stab inspect` and `stab plan sample` continue to use [agent CLI schema version 2](agent-cli-schema-v2.md), while [schema version 1](agent-cli-schema-v1.md) remains historical.
 
 The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
 

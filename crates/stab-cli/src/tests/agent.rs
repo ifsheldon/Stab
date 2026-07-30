@@ -248,7 +248,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
-    assert_eq!(pointer(&report, "/schema_version"), 2);
+    assert_eq!(pointer(&report, "/schema_version"), 3);
     assert_eq!(
         pointer(&report, "/stim_compatibility_version"),
         CapabilitySet::STIM_COMPATIBILITY_VERSION
@@ -304,33 +304,43 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             .map(RecordFormat::as_str)
             .collect::<Vec<_>>()
     );
-    let compiler_operations = pointer(&report, "/compilers")
-        .as_array()
-        .expect("compilers are an array")
-        .iter()
-        .map(|compiler| {
-            pointer(compiler, "/operation")
-                .as_str()
-                .expect("compiler operation")
-        })
-        .collect::<Vec<_>>();
     assert_eq!(
-        compiler_operations,
-        vec!["sample", "m2d", "detect", "sample_dem"]
+        pointer(&report, "/compilers"),
+        &serde_json::json!([
+            {
+                "operation": "sample",
+                "input_dialect": "stim-circuit",
+                "compiler_schema_version": 1,
+                "request_fingerprint_schema_version": 1,
+                "configurable_limits": false,
+                "backend_selection": true
+            },
+            {
+                "operation": "m2d",
+                "input_dialect": "stim-circuit",
+                "compiler_schema_version": 1,
+                "request_fingerprint_schema_version": null,
+                "configurable_limits": true,
+                "backend_selection": false
+            },
+            {
+                "operation": "detect",
+                "input_dialect": "stim-circuit",
+                "compiler_schema_version": 1,
+                "request_fingerprint_schema_version": null,
+                "configurable_limits": true,
+                "backend_selection": false
+            },
+            {
+                "operation": "sample_dem",
+                "input_dialect": "detector-error-model",
+                "compiler_schema_version": 1,
+                "request_fingerprint_schema_version": null,
+                "configurable_limits": false,
+                "backend_selection": false
+            }
+        ])
     );
-    assert_eq!(
-        pointer(&report, "/compilers/0/request_fingerprint_schema_version"),
-        1
-    );
-    for index in 1..4 {
-        assert_eq!(
-            pointer(
-                &report,
-                &format!("/compilers/{index}/request_fingerprint_schema_version")
-            ),
-            &serde_json::Value::Null
-        );
-    }
     assert_eq!(
         pointer(&report, "/selectable_backends"),
         &serde_json::json!(["scalar"])
@@ -362,6 +372,7 @@ fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
     let report = json_stdout(&stdout);
+    assert_eq!(pointer(&report, "/schema_version"), 2);
     assert_eq!(pointer(&report, "/executes"), false);
     assert_eq!(pointer(&report, "/source/bytes"), circuit.len());
     assert_eq!(pointer(&report, "/source/physical_lines"), 3);
@@ -586,6 +597,8 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     let second = json_stdout(&second_stdout);
     assert_sample_plan_schema(&first);
     assert_sample_plan_schema(&second);
+    assert_eq!(pointer(&first, "/schema_version"), 2);
+    assert_eq!(pointer(&second, "/schema_version"), 2);
 
     assert_eq!(
         pointer(&first, "/compilation/request_fingerprint/digest"),

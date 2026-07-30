@@ -16,7 +16,8 @@ use crate::{
     read_limited_input_file, read_limited_stdin,
 };
 
-const AGENT_OUTPUT_SCHEMA_VERSION: u16 = 2;
+const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 3;
+const INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
 pub(crate) enum AgentOutputFormatArg {
@@ -27,7 +28,7 @@ pub(crate) enum AgentOutputFormatArg {
 
 #[derive(Debug, Args)]
 pub(crate) struct CapabilitiesArgs {
-    /// Selects concise human text or schema-version-2 JSON.
+    /// Selects concise human text or schema-version-3 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -192,7 +193,7 @@ where
     }
 
     let report = SamplePlanReport {
-        schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
+        schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
         operation: "sample",
         executes: false,
         source: SourceReport::new(&input),
@@ -326,7 +327,7 @@ impl CapabilitiesReport {
     fn current() -> Self {
         let capabilities = CapabilitySet::current();
         Self {
-            schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
+            schema_version: CAPABILITIES_OUTPUT_SCHEMA_VERSION,
             stab_version: env!("CARGO_PKG_VERSION"),
             stim_compatibility_version: CapabilitySet::STIM_COMPATIBILITY_VERSION,
             commands: command_descriptions()
@@ -485,7 +486,7 @@ impl InspectReport {
     fn for_circuit(input: &[u8]) -> Result<Self, CliError> {
         let circuit = Circuit::from_stim_bytes(input)?;
         Ok(Self {
-            schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
+            schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
             executes: false,
             source: SourceReport::new(input),
             parse_estimate: ResourceEstimateReport::from(
@@ -506,7 +507,7 @@ impl InspectReport {
     fn for_dem(input: &[u8]) -> Result<Self, CliError> {
         let model = DetectorErrorModel::from_dem_bytes(input)?;
         Ok(Self {
-            schema_version: AGENT_OUTPUT_SCHEMA_VERSION,
+            schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
             executes: false,
             source: SourceReport::new(input),
             parse_estimate: ResourceEstimateReport::from(
