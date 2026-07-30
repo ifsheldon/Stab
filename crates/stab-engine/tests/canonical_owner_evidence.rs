@@ -10,17 +10,19 @@ use std::thread;
 
 use sha2::{Digest as _, Sha256};
 use stab_engine::{
-    BackendPreference, CompiledDetectionConverter, DemError, DemResourceKind, DemSamplerLimits,
-    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingRunError, DetectionCompileError,
+    BackendPreference, COMPILATION_DESCRIPTOR, CompilationOperation, CompilationRequestFingerprint,
+    CompiledDetectionConverter, DemError, DemResourceKind, DemSamplerLimits, DemSamplingCompiler,
+    DemSamplingExecutionError, DemSamplingRunError, DetectionCompileError,
     DetectionConversionLimits, DetectionConversionOptions, DetectionError,
     DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
     DetectionSamplingCompiler, MeasurementToDetectionCompiler, PlanFingerprint, RandomPolicy,
-    ReferenceSampleMode, RunError, SamplingBackend, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunStatus, Seed, ShotCount,
-    SinkFailurePhase, detection_record_width_with_limits, measurement_record_count_with_limits,
+    ReferenceSampleMode, RunError, SamplingBackend, SamplingCompilationDescriptor,
+    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    detection_record_width_with_limits, measurement_record_count_with_limits,
     validate_detection_sampling_circuit_with_limits,
 };
-use stab_model::{Circuit, DetectorErrorModel};
+use stab_model::{Circuit, DetectorErrorModel, ModelDialect};
 use stab_records::{DemSampleBatchView, DemSampleSink, MeasurementBatchView, MeasurementSink};
 
 fn circuit(text: &str) -> Circuit {
@@ -59,6 +61,23 @@ fn expect_detection_compile_resource(error: DetectionCompileError) -> DetectionR
         DetectionCompileError::InvalidCircuit(DetectionError::ResourceLimit(resource)) => resource,
         other => panic!("expected detection compile resource-limit error, got {other:?}"),
     }
+}
+
+#[test]
+fn a6_sampling_compilation_descriptor_contract() {
+    let descriptor: SamplingCompilationDescriptor = COMPILATION_DESCRIPTOR;
+    assert_eq!(descriptor.operation(), CompilationOperation::Sampling);
+    assert_eq!(descriptor.input_dialect(), ModelDialect::StimCircuit);
+    assert_eq!(
+        descriptor.compiler_schema_version(),
+        CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION
+    );
+    assert_eq!(
+        descriptor.request_fingerprint_schema_version(),
+        CompilationRequestFingerprint::SCHEMA_VERSION
+    );
+    assert!(!descriptor.has_configurable_limits());
+    assert!(descriptor.supports_backend_selection());
 }
 
 #[derive(Default)]

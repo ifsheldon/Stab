@@ -861,6 +861,7 @@ fn oracle_feature_override(id: &str) -> Option<FeatureId> {
         | "pf1-circuit-detector-coordinates"
         | "pf1-circuit-insert-pop"
         | "pf1-circuit-iterators" => Some(FeatureId::CircuitApi),
+        "pf1-circuit-append-text" => Some(FeatureId::StimFormat),
         _ => None,
     }
 }

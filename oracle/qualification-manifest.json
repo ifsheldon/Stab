@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "fe1b41c7f4efddf7ce0911c4171b93a89e7f93141fc4a60fcfef5ec0672a9c54",
+  "semantic_digest": "589250ea4b300f0768aa5085a6aa8c6584e1c19afbc65e7d4414da390a714012",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -87276,7 +87276,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/lib.rs",
       "source_line": 132,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-c48ceade033b895d",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -102977,7 +102977,7 @@
       "kind": "constant",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 40,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103134,7 +103134,7 @@
       "kind": "struct",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103148,7 +103148,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103162,7 +103162,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103176,7 +103176,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103190,7 +103190,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103204,7 +103204,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103218,7 +103218,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103232,7 +103232,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103246,7 +103246,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103260,7 +103260,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103274,7 +103274,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103288,7 +103288,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103302,7 +103302,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -103316,7 +103316,7 @@
       "kind": "method",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -118177,7 +118177,7 @@
       "kind": "constant",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 74,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -125971,7 +125971,7 @@
       "kind": "struct",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 38,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -125985,7 +125985,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -125999,7 +125999,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126013,7 +126013,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126027,7 +126027,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126041,7 +126041,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126055,7 +126055,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126069,7 +126069,7 @@
       "kind": "trait-impl",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126083,7 +126083,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 56,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126097,7 +126097,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 64,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126111,7 +126111,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 52,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126125,7 +126125,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 48,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126139,7 +126139,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 60,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -126153,7 +126153,7 @@
       "kind": "method",
       "source_path": "crates/stab-engine/src/sampling/mod.rs",
       "source_line": 68,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -134482,7 +134482,7 @@
       "kind": "method",
       "source_path": "crates/stab-model/src/dialect.rs",
       "source_line": 12,
-      "owner_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "owner_case_id": "cq-evidence-qualification-c48ceade033b895d",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
@@ -141559,7 +141559,7 @@
       "kind": "function",
       "source_path": "crates/stab-model/src/lib.rs",
       "source_line": 224,
-      "owner_case_id": "cq-evidence-qualification-d65b079751fe7119",
+      "owner_case_id": "cq-evidence-qualification-4e8cae7503a9a4e6",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
       ]
@@ -150270,18 +150270,6 @@
       "owner_source_id": "a2-detection-materialization-policy-admission",
       "evidence_package": "stab-core",
       "reason": "Total-output materialization belongs to stab-core compatibility helpers, while canonical engine conversion sessions remain streaming and expose only the shared policy value."
-    },
-    {
-      "crate_name": "stab_engine",
-      "owner_source_id": "a2-runtime-capability-descriptors",
-      "evidence_package": "stab-core",
-      "reason": "CapabilitySet::current is the reviewed facade aggregation that combines canonical model dialect and engine compiler descriptors."
-    },
-    {
-      "crate_name": "stab_model",
-      "owner_source_id": "a2-runtime-capability-descriptors",
-      "evidence_package": "stab-core",
-      "reason": "CapabilitySet::current is the reviewed facade aggregation that combines canonical model dialect and engine compiler descriptors."
     },
     {
       "crate_name": "stab_model",
@@ -178475,8 +178463,8 @@
           "-p",
           "stab-analysis",
           "--test",
-          "gate_and_tag_contracts",
-          "gate_semantics_bridge_model_metadata_into_algebra_values",
+          "canonical_owner_evidence",
+          "cq2_gate_flow_metadata_contract",
           "--quiet",
           "--exact"
         ]
@@ -189899,7 +189887,7 @@
           "seeds": [],
           "case_count": 8,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -190144,7 +190132,7 @@
           "seeds": [],
           "case_count": 3,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -190411,7 +190399,7 @@
           "seeds": [],
           "case_count": 4,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -192579,7 +192567,7 @@
           "seeds": [],
           "case_count": 5,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -192644,7 +192632,7 @@
           "seeds": [],
           "case_count": 5,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -195908,6 +195896,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-4e8cae7503a9a4e6",
+      "feature_id": "CQ-RESOURCE",
+      "behavioral_surface": "resource-boundary",
+      "provenance": "qualification-plan",
+      "source_id": "a6-model-resource-estimate-constructor-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "canonical_owner_evidence",
+          "a2_sampling_request_resource_estimate",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The model-owned constructor stores the supplied structural and work estimates in one fixed-size value while leaving unspecified scratch, resident, and output estimates explicitly unknown."
+      },
+      "negative_axes": [
+        "constructor-field-drift",
+        "default-known-overclaim",
+        "separate-allocation"
+      ],
+      "performance_groups": [
+        "PERF-RESOURCE-BOUNDARIES"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-4e97d7704d15fcf2",
       "feature_id": "CQ-CLI",
       "behavioral_surface": "cli",
@@ -196606,7 +196645,7 @@
           "seeds": [],
           "case_count": 7,
           "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "296072f6549133ee6e2ecbfbe185b32218c955e940589b74d3323fd8deea74d9",
+          "corpus_sha256": "9b24d0a2108b9d68a7b12df0cce91666f259e24109881d7909c6cd5864c95d27",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -198111,7 +198150,7 @@
           "seeds": [],
           "case_count": 2,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -199385,7 +199424,7 @@
           "seeds": [],
           "case_count": 28,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -202037,7 +202076,7 @@
           "seeds": [],
           "case_count": 18,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -203268,7 +203307,7 @@
           "seeds": [],
           "case_count": 8,
           "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "296072f6549133ee6e2ecbfbe185b32218c955e940589b74d3323fd8deea74d9",
+          "corpus_sha256": "9b24d0a2108b9d68a7b12df0cce91666f259e24109881d7909c6cd5864c95d27",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -203833,7 +203872,7 @@
           "seeds": [],
           "case_count": 21,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -204534,7 +204573,7 @@
           "seeds": [],
           "case_count": 12,
           "corpus_path": "crates/stab-model/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "8ffeb3effceaa5394fac90c8dd296b11edef3c44252fbc85f911b0a77c378fbf",
+          "corpus_sha256": "3f1bf21a0b7374dab34b671f79515fd8c1e165625997df73d94ca62157511cac",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -205803,6 +205842,58 @@
       ],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-c48ceade033b895d",
+      "feature_id": "CQ-CIRCUIT-API",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-model-dialect-descriptor-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "parse_resources",
+          "model_dialects_preserve_the_frozen_names_and_order",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The closed two-dialect registry is returned by a fixed-size iterator and preserves its frozen order and public names without consulting facade or qualification state."
+      },
+      "negative_axes": [
+        "dialect-order-drift",
+        "dialect-name-drift",
+        "facade-owned-model-registry"
+      ],
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "implemented"
     },
@@ -207790,10 +207881,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-model",
+          "stab-core",
           "--test",
-          "canonical_owner_evidence",
-          "a2_sampling_request_resource_estimate",
+          "agent_capabilities",
+          "sampling_request_estimate_counts_folded_and_expanded_work_without_execution",
           "--quiet",
           "--exact"
         ]
@@ -208789,6 +208880,61 @@
       ],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-df0677fb6f52ed05",
+      "feature_id": "CQ-CIRCUIT-API",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a6-engine-sampling-compilation-descriptor",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-engine",
+          "--test",
+          "canonical_owner_evidence",
+          "a6_sampling_compilation_descriptor_contract",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The engine-owned constant descriptor exposes the registered sampling operation, model dialect, compiler and request schema identities, limit configurability, and backend-selection capability without facade aggregation."
+      },
+      "negative_axes": [
+        "operation-drift",
+        "input-dialect-drift",
+        "compiler-schema-drift",
+        "request-schema-drift",
+        "capability-flag-drift",
+        "facade-owned-engine-descriptor"
+      ],
+      "performance_groups": [
+        "PERF-CIRCUIT-MODEL",
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "implemented"
     },
@@ -209910,7 +210056,7 @@
           "seeds": [],
           "case_count": 5,
           "corpus_path": "crates/stab-analysis/tests/canonical_owner_evidence.rs",
-          "corpus_sha256": "296072f6549133ee6e2ecbfbe185b32218c955e940589b74d3323fd8deea74d9",
+          "corpus_sha256": "9b24d0a2108b9d68a7b12df0cce91666f259e24109881d7909c6cd5864c95d27",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }

@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "fe1b41c7f4efddf7ce0911c4171b93a89e7f93141fc4a60fcfef5ec0672a9c54",
-  "semantic_digest": "92262420f02ee89701a041b6257149c950ec40ad1143c6c0d5a58f3bdf8784f2",
+  "correctness_digest": "589250ea4b300f0768aa5085a6aa8c6584e1c19afbc65e7d4414da390a714012",
+  "semantic_digest": "1f709237b11c10d6759e03846568b8a1e13c4a8841ea6f53691ca7b29233f302",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -30636,7 +30636,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-c48ceade033b895d",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44291,7 +44291,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44425,7 +44425,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44438,7 +44438,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44451,7 +44451,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44464,7 +44464,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44477,7 +44477,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44490,7 +44490,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44503,7 +44503,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44516,7 +44516,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -44529,7 +44529,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -44542,7 +44542,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -44555,7 +44555,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -44568,7 +44568,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -44581,7 +44581,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -44594,7 +44594,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -57435,7 +57435,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64040,7 +64040,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64053,7 +64053,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64066,7 +64066,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64079,7 +64079,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64092,7 +64092,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64105,7 +64105,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64118,7 +64118,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64131,7 +64131,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
@@ -64144,7 +64144,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64157,7 +64157,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64170,7 +64170,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64183,7 +64183,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64196,7 +64196,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -64209,7 +64209,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-df0677fb6f52ed05",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -71571,7 +71571,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-qualification-1e47b984340b1138",
+      "correctness_case_id": "cq-evidence-qualification-c48ceade033b895d",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -77854,7 +77854,7 @@
       "kind": "function",
       "performance_feature": "PERF-RESOURCE-BOUNDARIES",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d65b079751fe7119",
+      "correctness_case_id": "cq-evidence-qualification-4e8cae7503a9a4e6",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

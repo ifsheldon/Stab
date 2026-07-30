@@ -28,6 +28,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-parser-diagnostic-bounded-storage",
     "a2-parser-diagnostic-bounded-allocation",
     "a2-sampling-request-resource-estimate",
+    "a6-model-resource-estimate-constructor-contract",
     "a2-cli-sampling-plan-folded-herald-count",
     "a2-byte-parse-policy-admission",
     "a2-byte-parse-rejected-line-bounded-work",

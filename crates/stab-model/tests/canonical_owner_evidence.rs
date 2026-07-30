@@ -13,7 +13,7 @@ use stab_model::{
     Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction,
     DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget,
     DetectorErrorModel, Estimate, Gate, MeasureRecordOffset, ParseLimits, Probability, QubitId,
-    RepeatBlock, RepeatCount, RepeatNestingLimit, SourceLineLimit, Target,
+    RepeatBlock, RepeatCount, RepeatNestingLimit, ResourceEstimate, SourceLineLimit, Target,
 };
 
 fn circuit(text: &str) -> Circuit {
@@ -291,12 +291,20 @@ fn cq2_circuit_api_final_qubit_coordinates() {
 fn cq2_circuit_api_qubit_count() {
     assert_eq!(Circuit::new().count_qubits(), 0);
     assert_eq!(circuit("H 5\nMPAD 1\n").count_qubits(), 6);
+    assert_eq!(circuit("H 16777215\n").count_qubits(), 1 << 24);
+    assert!(Circuit::from_stim_str("H 16777216\n").is_err());
     let folded = circuit(
-        "REPEAT 999999 {\n\
+        "H 0\n\
+         REPEAT 999999 {\n\
              REPEAT 999999 {\n\
-                 X 1\n\
                  REPEAT 999999 {\n\
-                     Y 2\n\
+                     REPEAT 999999 {\n\
+                         X 1\n\
+                         REPEAT 999999 {\n\
+                             Y 2\n\
+                             M 2\n\
+                         }\n\
+                     }\n\
                  }\n\
              }\n\
          }\n",
@@ -443,6 +451,12 @@ fn cq2_circuit_api_flattened_iterator_values() {
 
 #[test]
 fn cq2_circuit_api_instruction_value() {
+    let q0 = Target::qubit(QubitId::new(0).expect("q0"), false);
+    let q1 = Target::qubit(QubitId::new(1).expect("q1"), false);
+    let q2 = Target::qubit(QubitId::new(2).expect("q2"), false);
+    let q3 = Target::qubit(QubitId::new(3).expect("q3"), false);
+    let rec = Target::measurement_record(MeasureRecordOffset::try_new(-1).expect("rec[-1]"));
+
     let instruction = CircuitInstruction::new(
         Gate::from_name("M").expect("M"),
         vec![0.125],
@@ -465,6 +479,101 @@ fn cq2_circuit_api_instruction_value() {
         Some(0.125)
     );
     assert_eq!(instruction.target_groups().len(), 2);
+
+    let pair_measurement = CircuitInstruction::new(
+        Gate::from_name("MXX").expect("MXX"),
+        Vec::new(),
+        vec![q0.clone(), q1.clone(), q2.clone(), q3.clone()],
+        None,
+    )
+    .expect("valid pair measurement");
+    assert_eq!(
+        pair_measurement
+            .target_groups()
+            .into_iter()
+            .map(<[Target]>::to_vec)
+            .collect::<Vec<_>>(),
+        [vec![q0.clone(), q1.clone()], vec![q2.clone(), q3.clone()]]
+    );
+
+    for invalid_targets in [
+        vec![q0.clone()],
+        vec![q0.clone(), q0.clone()],
+        vec![q0.clone(), rec.clone()],
+    ] {
+        assert!(
+            CircuitInstruction::new(
+                Gate::from_name("MXX").expect("MXX"),
+                Vec::new(),
+                invalid_targets,
+                None,
+            )
+            .is_err()
+        );
+    }
+    for invalid_targets in [
+        vec![q0.clone()],
+        vec![q0.clone(), q0.clone()],
+        vec![
+            Target::qubit(QubitId::new(0).expect("q0"), true),
+            q1.clone(),
+        ],
+    ] {
+        assert!(
+            CircuitInstruction::new(
+                Gate::from_name("CX").expect("CX"),
+                Vec::new(),
+                invalid_targets,
+                None,
+            )
+            .is_err()
+        );
+    }
+
+    let largest_observable_id_below_two_to_64 = 18_446_744_073_709_549_568_u64;
+    let near_boundary_arg = f64::from_bits(0x43ef_ffff_ffff_ffff);
+    let observable_include = CircuitInstruction::new(
+        Gate::from_name("OBSERVABLE_INCLUDE").expect("OBSERVABLE_INCLUDE"),
+        vec![near_boundary_arg],
+        vec![rec.clone()],
+        None,
+    )
+    .expect("largest exactly representable observable id below 2^64");
+    assert_eq!(
+        observable_include
+            .observable_id_argument()
+            .expect("observable argument")
+            .expect("observable id")
+            .get(),
+        largest_observable_id_below_two_to_64
+    );
+    let too_large_observable_include = CircuitInstruction::new(
+        Gate::from_name("OBSERVABLE_INCLUDE").expect("OBSERVABLE_INCLUDE"),
+        vec![f64::from_bits(0x43f0_0000_0000_0000)],
+        vec![rec.clone()],
+        None,
+    )
+    .expect("unsigned integer argument shape");
+    assert!(
+        too_large_observable_include
+            .observable_id_argument()
+            .is_err()
+    );
+    assert_eq!(
+        circuit(&format!(
+            "OBSERVABLE_INCLUDE({largest_observable_id_below_two_to_64}) rec[-1]\n"
+        ))
+        .count_observables()
+        .expect("observable count"),
+        largest_observable_id_below_two_to_64 + 1
+    );
+    assert!(
+        Circuit::from_stim_str("OBSERVABLE_INCLUDE(18446744073709551616) rec[-1]\n")
+            .expect("parse unsigned integer-shaped observable id")
+            .count_observables()
+            .is_err()
+    );
+
     assert!(
         CircuitInstruction::new(
             Gate::from_name("H").expect("H"),
@@ -514,7 +623,7 @@ fn a2_dem_parse_policy_admission() {
 
 #[test]
 fn cq2_circuit_api_counts() {
-    let circuit = circuit(
+    let stats_circuit = circuit(
         "M 0 1\n\
          REPEAT 100 {\n\
              TICK\n\
@@ -524,13 +633,112 @@ fn cq2_circuit_api_counts() {
              CY sweep[77] 3\n\
          }\n",
     );
-    assert_eq!(circuit.len(), 2);
-    assert_eq!(circuit.count_qubits(), 4);
-    assert_eq!(circuit.count_measurements().expect("measurements"), 102);
-    assert_eq!(circuit.count_detectors().expect("detectors"), 100);
-    assert_eq!(circuit.count_observables().expect("observables"), 3);
-    assert_eq!(circuit.count_ticks().expect("ticks"), 100);
-    assert_eq!(circuit.count_sweep_bits().expect("sweep bits"), 78);
+    assert_eq!(stats_circuit.len(), 2);
+    assert_eq!(stats_circuit.count_qubits(), 4);
+    assert_eq!(
+        stats_circuit.count_measurements().expect("measurements"),
+        102
+    );
+    assert_eq!(stats_circuit.count_detectors().expect("detectors"), 100);
+    assert_eq!(stats_circuit.count_observables().expect("observables"), 3);
+    assert_eq!(stats_circuit.count_ticks().expect("ticks"), 100);
+    assert_eq!(stats_circuit.count_sweep_bits().expect("sweep bits"), 78);
+
+    let result_groups = circuit(
+        "MPP X0*X1 Y2*Y3 Z4\n\
+         MXX 5 6 7 8\n\
+         HERALDED_ERASE(0.25) 9 10\n\
+         MPAD 0 1 0\n",
+    );
+    assert_eq!(
+        result_groups
+            .count_measurements()
+            .expect("result-group measurements"),
+        10
+    );
+
+    let trillion_scale = circuit(
+        "REPEAT 1000000 {\n\
+             REPEAT 1000000 {\n\
+                 M 0\n\
+                 DETECTOR rec[-1]\n\
+                 OBSERVABLE_INCLUDE(4) rec[-1]\n\
+             }\n\
+         }\n",
+    );
+    assert_eq!(
+        trillion_scale
+            .count_measurements()
+            .expect("folded trillion-scale measurements"),
+        1_000_000_000_000
+    );
+    assert_eq!(
+        trillion_scale
+            .count_detectors()
+            .expect("folded trillion-scale detectors"),
+        1_000_000_000_000
+    );
+    assert_eq!(
+        trillion_scale
+            .count_observables()
+            .expect("folded observables"),
+        5
+    );
+
+    let mut exact_boundary = Circuit::new();
+    exact_boundary.append_repeat_block(RepeatBlock::new(
+        RepeatCount::try_new(u64::MAX).expect("maximum repeat count"),
+        circuit("M 0\nDETECTOR rec[-1]\nTICK\n"),
+        None,
+    ));
+    exact_boundary.append_instruction(
+        CircuitInstruction::new(
+            Gate::from_name("CX").expect("CX"),
+            Vec::new(),
+            vec![
+                Target::sweep_bit(u32::MAX),
+                Target::qubit(QubitId::new(0).expect("q0"), false),
+            ],
+            None,
+        )
+        .expect("maximum sweep id instruction"),
+    );
+    assert_eq!(
+        exact_boundary
+            .count_measurements()
+            .expect("u64::MAX measurements"),
+        u64::MAX
+    );
+    assert_eq!(
+        exact_boundary
+            .count_detectors()
+            .expect("u64::MAX detectors"),
+        u64::MAX
+    );
+    assert_eq!(
+        exact_boundary.count_ticks().expect("u64::MAX ticks"),
+        u64::MAX
+    );
+    assert_eq!(
+        exact_boundary
+            .count_sweep_bits()
+            .expect("maximum sweep count"),
+        u64::from(u32::MAX) + 1
+    );
+
+    let mut measurement_overflow = Circuit::new();
+    measurement_overflow.append_repeat_block(RepeatBlock::new(
+        RepeatCount::try_new(u64::MAX).expect("maximum repeat count"),
+        circuit("M 0 1\n"),
+        None,
+    ));
+    let error = measurement_overflow
+        .count_measurements()
+        .expect_err("reject measurement count overflow");
+    assert!(
+        error.to_string().contains("circuit count overflowed"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -630,13 +838,11 @@ fn a2_parse_repeat_policy_admission() {
             assert!(DetectorErrorModel::from_dem_str_with_limits(accepted, limits).is_ok());
         }
     }
-    assert!(
-        Circuit::from_stim_str_with_limits(
-            "REPEAT 2 {\n    REPEAT 2 {\n        REPEAT 2 {\n            H 0\n        }\n    }\n}\n",
-            limits,
-        )
-        .is_err()
-    );
+    assert!(Circuit::from_stim_str_with_limits(
+        "REPEAT 2 {\n    REPEAT 2 {\n        REPEAT 2 {\n            H 0\n        }\n    }\n}\n",
+        limits,
+    )
+    .is_err());
 }
 
 #[test]
@@ -682,6 +888,16 @@ fn cq2_dem_instruction_value_validation_print_contract() {
 
 #[test]
 fn a2_sampling_request_resource_estimate() {
+    let default_estimate = ResourceEstimate::default();
+    assert_eq!(default_estimate.input_bytes(), Estimate::Unknown);
+    assert_eq!(default_estimate.input_items(), Estimate::Unknown);
+    assert_eq!(default_estimate.expanded_operations(), Estimate::Unknown);
+    assert_eq!(default_estimate.folded_traversal(), Estimate::Unknown);
+    assert_eq!(default_estimate.scratch_bytes(), Estimate::Unknown);
+    assert_eq!(default_estimate.resident_bytes(), Estimate::Unknown);
+    assert_eq!(default_estimate.output_bytes(), Estimate::Unknown);
+    assert_eq!(default_estimate.work_units(), Estimate::Unknown);
+
     let estimate = stab_model::advanced::resource_estimate_for_sampling_request(
         Estimate::Exact(7),
         Estimate::UpperBound(13),

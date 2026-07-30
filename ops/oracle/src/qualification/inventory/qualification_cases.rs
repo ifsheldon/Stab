@@ -1031,6 +1031,7 @@ fn claim_oracle_fixture_evidence(
                 mapping_id, evidence_id
             ))
         })?;
+    validate_oracle_fixture_package(mapping_id, primary_selector, case)?;
     if case.status == EvidenceStatus::Planned {
         return claim_planned_evidence(
             mapping_id,
@@ -1061,6 +1062,41 @@ fn claim_oracle_fixture_evidence(
             "qualification case {:?} repeats or steals oracle evidence {}",
             mapping_id, evidence_id
         ));
+    }
+    Ok(())
+}
+
+fn validate_oracle_fixture_package(
+    mapping_id: &str,
+    primary_selector: &EvidenceSelector,
+    fixture: &EvidenceCase,
+) -> Result<(), InventoryError> {
+    if primary_selector.kind != SelectorKind::CargoTest {
+        return Ok(());
+    }
+    let owner = CargoTestSelector::parse(&primary_selector.value).map_err(|reason| {
+        InventoryError::InvalidQualificationCases(format!(
+            "qualification case {mapping_id:?} has an invalid primary Cargo selector: {reason}"
+        ))
+    })?;
+    for selector in std::iter::once(&fixture.primary_selector)
+        .chain(fixture.supporting_selectors.iter())
+        .filter(|selector| selector.kind == SelectorKind::CargoTest)
+    {
+        let fixture_selector = CargoTestSelector::parse(&selector.value).map_err(|reason| {
+            InventoryError::InvalidQualificationCases(format!(
+                "qualification case {mapping_id:?} oracle fixture {:?} has an invalid Cargo selector: {reason}",
+                fixture.source_id
+            ))
+        })?;
+        if fixture_selector.package() != owner.package() {
+            return invalid(format!(
+                "qualification case {mapping_id:?} executes package {:?}, but owned oracle fixture {:?} executes package {:?}",
+                owner.package(),
+                fixture.source_id,
+                fixture_selector.package()
+            ));
+        }
     }
     Ok(())
 }

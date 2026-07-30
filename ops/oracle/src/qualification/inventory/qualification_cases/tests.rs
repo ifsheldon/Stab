@@ -152,6 +152,68 @@ fn claiming_exact_oracle_fixture_requires_the_same_primary_selector() {
 }
 
 #[test]
+fn claiming_oracle_fixture_rejects_a_different_cargo_package() {
+    let mut spec = test_spec();
+    spec.primary_selector
+        .value
+        .get_mut(3)
+        .expect("package position")
+        .clone_from(&"stab-model".to_string());
+    let id = CaseId::try_new("cq-evidence-oracle-package-test".to_string()).expect("case id");
+    let fixture = EvidenceCase {
+        id: id.clone(),
+        feature_id: spec.feature_id,
+        behavioral_surface: BehavioralSurface::FileFormat,
+        provenance: EvidenceProvenance::OracleFixture,
+        source_id: "fixture-package-drift".to_string(),
+        comparator: Comparator::Structural,
+        execution: super::super::super::execution_contract::for_status(EvidenceStatus::Planned),
+        statistical_plan: None,
+        property_plan: None,
+        primary_selector: EvidenceSelector {
+            state: EvidenceState::Planned,
+            kind: SelectorKind::OracleFixture,
+            value: vec!["fixture-package-drift".to_string()],
+        },
+        supporting_selectors: vec![EvidenceSelector {
+            state: EvidenceState::Existing,
+            kind: SelectorKind::CargoTest,
+            value: vec![
+                "cargo".to_string(),
+                "test".to_string(),
+                "-p".to_string(),
+                "stab-core".to_string(),
+                "--test".to_string(),
+                "circuit_api".to_string(),
+                "pf1_circuit".to_string(),
+                "--quiet".to_string(),
+            ],
+        }],
+        resource_contract: super::super::evidence::semantic_only_resource_contract(),
+        negative_axes: Vec::new(),
+        performance_groups: vec!["PERF-CIRCUIT-MODEL".to_string()],
+        deferred_product: None,
+        status: EvidenceStatus::Planned,
+    };
+
+    let error = claim_oracle_fixture_evidence(
+        &spec.id,
+        spec.feature_id,
+        &id,
+        &spec.primary_selector,
+        std::slice::from_ref(&fixture),
+        &mut BTreeSet::new(),
+    )
+    .expect_err("component-owned fixtures must execute the owner package");
+    assert!(
+        error.to_string().contains("stab-core")
+            && error.to_string().contains("stab-model")
+            && error.to_string().contains("fixture-package-drift"),
+        "{error}"
+    );
+}
+
+#[test]
 fn existing_parent_mapping_shape_requires_owned_supported_parent_kind() {
     let mapping = ExistingParentMappingSpec {
         id: "cq2-existing-parent-map".to_string(),
