@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 
-use super::plan::DemSamplingPlan;
-use super::session::DemSamplingRunError;
 use crate::{CircuitError, CircuitResult, DemSampleBatchView, DemSampleSink, DetectionEventRecord};
+use stab_engine::{DemSamplingPlan, DemSamplingRunError};
 
 pub(super) struct DetectionVisitorSink<E, F> {
     visit: F,
@@ -104,7 +103,7 @@ where
     E: From<CircuitError>,
 {
     match error {
-        DemSamplingRunError::Engine { source, .. } => E::from(source.into_circuit_error()),
+        DemSamplingRunError::Engine { source, .. } => E::from(CircuitError::from(source)),
         DemSamplingRunError::Sink { source, .. } => source,
     }
 }

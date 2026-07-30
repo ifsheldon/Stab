@@ -1,13 +1,10 @@
-use stab_records::{DetectionBatchView, DetectionSink};
-
-use super::{
-    DetectionExecutionError, DetectionRunError, DetectionSamplingCompiler, DetectionSamplingPlan,
-};
 use crate::resources::DetectionBufferLimitSubject;
 use crate::{
     Circuit, CircuitError, CircuitResult, DetectionConversionLimits, DetectionConversionOutput,
     DetectionEventRecord, RandomPolicy, Seed, ShotCount,
 };
+use stab_engine::{DetectionRunError, DetectionSamplingCompiler, DetectionSamplingPlan};
+use stab_records::{DetectionBatchView, DetectionSink};
 
 use crate::detection::{try_false_vec, try_reserve_detection_record_slots, validate_buffer_bits};
 
@@ -20,7 +17,7 @@ pub(in crate::detection) fn sample_materialized(
     let plan = DetectionSamplingCompiler::new()
         .limits(limits)
         .compile(circuit)
-        .map_err(|error| error.into_circuit_error())?;
+        .map_err(CircuitError::from)?;
     let output_width = plan
         .detector_width()
         .get()
@@ -35,7 +32,7 @@ pub(in crate::detection) fn sample_materialized(
     let mut sink = MaterializingSink::new(shots)?;
     let mut session = plan
         .session(random_policy(seed))
-        .map_err(DetectionExecutionError::into_circuit_error)?;
+        .map_err(CircuitError::from)?;
     session
         .run(shot_count(shots)?, &mut sink)
         .map_err(map_circuit_run_error)?;
@@ -60,10 +57,10 @@ where
     let plan = DetectionSamplingCompiler::new()
         .limits(limits)
         .compile(circuit)
-        .map_err(|error| E::from(error.into_circuit_error()))?;
+        .map_err(|error| E::from(CircuitError::from(error)))?;
     let mut session = plan
         .session(random_policy(seed))
-        .map_err(|error| E::from(error.into_circuit_error()))?;
+        .map_err(|error| E::from(CircuitError::from(error)))?;
     let mut sink = CallbackSink::new(&plan, visit).map_err(E::from)?;
     session
         .run(shot_count(shots).map_err(E::from)?, &mut sink)
@@ -207,7 +204,7 @@ fn shot_count(shots: usize) -> CircuitResult<ShotCount> {
 
 fn map_circuit_run_error(error: DetectionRunError<CircuitError>) -> CircuitError {
     match error {
-        DetectionRunError::Engine { source, .. } => source.into_circuit_error(),
+        DetectionRunError::Engine { source, .. } => source.into(),
         DetectionRunError::Sink { source, .. } => source,
     }
 }
@@ -217,7 +214,7 @@ where
     E: From<CircuitError>,
 {
     match error {
-        DetectionRunError::Engine { source, .. } => E::from(source.into_circuit_error()),
+        DetectionRunError::Engine { source, .. } => E::from(CircuitError::from(source)),
         DetectionRunError::Sink {
             source: CallbackError::Engine(source),
             ..

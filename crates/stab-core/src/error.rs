@@ -196,6 +196,24 @@ impl From<stab_engine::DetectionError> for CircuitError {
     }
 }
 
+impl From<stab_engine::DetectionCompileError> for CircuitError {
+    fn from(error: stab_engine::DetectionCompileError) -> Self {
+        match error {
+            stab_engine::DetectionCompileError::InvalidCircuit(error) => error.into(),
+        }
+    }
+}
+
+impl From<stab_engine::DetectionExecutionError> for CircuitError {
+    fn from(error: stab_engine::DetectionExecutionError) -> Self {
+        match error {
+            stab_engine::DetectionExecutionError::Conversion(error) => error.into(),
+            stab_engine::DetectionExecutionError::Sampling(error) => error.into(),
+            other => Self::invalid_sampler_compilation(other.to_string()),
+        }
+    }
+}
+
 impl From<stab_engine::DemError> for CircuitError {
     fn from(error: stab_engine::DemError) -> Self {
         match error {
@@ -209,6 +227,15 @@ impl From<stab_engine::DemError> for CircuitError {
             stab_engine::DemError::ResourceLimit(error) => {
                 Self::ResourceLimit(ResourceLimitError::from(error))
             }
+        }
+    }
+}
+
+impl From<stab_engine::DemSamplingExecutionError> for CircuitError {
+    fn from(error: stab_engine::DemSamplingExecutionError) -> Self {
+        match error {
+            stab_engine::DemSamplingExecutionError::InvalidRequest(error) => error.into(),
+            other => Self::invalid_sampler_compilation(other.to_string()),
         }
     }
 }

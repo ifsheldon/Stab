@@ -160,10 +160,13 @@ where
         read_limited_stdin(input, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
     };
     let dem = parse_dem_bytes(&input_bytes)?;
-    let plan = DemSamplingCompiler::new().compile(&dem)?;
+    let plan = DemSamplingCompiler::new()
+        .compile(&dem)
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     let shots = dem_shot_count(args.shots)?;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
-        plan.validate_replay(shots)?;
+        plan.validate_replay(shots)
+            .map_err(|error| CliError::from(CircuitError::from(error)))?;
         validate_replay_prefix(
             replay_input,
             args.replay_err_in_format,
@@ -187,7 +190,7 @@ where
     )?;
     let mut session = plan
         .session(dem_random_policy(args.seed))
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     let mut io = io.with_outputs(output_roles)?;
     let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
     let mut outputs = io.activate()?;
@@ -281,7 +284,7 @@ where
 
 fn map_dem_run_error(error: DemSamplingRunError<CliError>) -> CliError {
     match error {
-        DemSamplingRunError::Engine { source, .. } => CliError::from(source.into_circuit_error()),
+        DemSamplingRunError::Engine { source, .. } => CliError::from(CircuitError::from(source)),
         DemSamplingRunError::Sink { source, .. } => source,
     }
 }

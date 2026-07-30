@@ -7,8 +7,8 @@ use std::convert::Infallible;
 
 use stab_core::advanced::compat::CompiledDemSampler;
 use stab_core::{
-    DemSampleBatchView, DemSampleSink, DemSamplerLimits, DetectorErrorModel, RandomPolicy,
-    ResourceKind, ResourceOperation, Seed, ShotCount,
+    DemSampleBatchView, DemSampleSink, DemSamplerLimits, DetectorErrorModel, RandomPolicy, Seed,
+    ShotCount,
 };
 
 #[derive(Default)]
@@ -126,14 +126,16 @@ fn facade_preserves_typed_dem_resource_context() {
             DemSamplerLimits::default().with_max_replay_work_units(1),
         )
         .expect_err("reject replay work");
-    let resource = error
-        .resource_limit_error()
-        .expect("facade error retains resource details");
-    assert_eq!(
-        resource.operation(),
-        ResourceOperation::DetectorErrorModelSampling
+    assert!(
+        matches!(&error, stab_engine::DemError::ResourceLimit(_)),
+        "canonical plan must retain its engine resource error"
     );
-    assert_eq!(resource.resource(), ResourceKind::ReplayWorkUnits);
-    assert_eq!(resource.actual(), 4);
-    assert_eq!(resource.limit(), 1);
+    if let stab_engine::DemError::ResourceLimit(resource) = error {
+        assert_eq!(
+            resource.kind(),
+            stab_engine::DemResourceKind::ReplayWorkUnits
+        );
+        assert_eq!(resource.actual(), 4);
+        assert_eq!(resource.limit(), 1);
+    }
 }

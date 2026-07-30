@@ -1,13 +1,7 @@
-mod api;
 mod buffers;
+mod compat;
 mod output;
 
-pub use api::{
-    DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
-    DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
-    DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
-    MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter,
-};
 pub use output::{
     write_detection_records, write_observable_records, write_ptb64_detection_records,
     write_ptb64_observable_records,
@@ -310,7 +304,7 @@ pub fn sample_detection_events_with_limits(
     seed: Option<u64>,
     limits: DetectionConversionLimits,
 ) -> CircuitResult<DetectionConversionOutput> {
-    api::sample_materialized(circuit, shots, seed, limits)
+    compat::sample_materialized(circuit, shots, seed, limits)
 }
 
 pub fn try_for_each_sampled_detection_event<E, F>(
@@ -343,7 +337,7 @@ where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    api::try_for_each(circuit, shots, seed, limits, visit)
+    compat::try_for_each(circuit, shots, seed, limits, visit)
 }
 
 pub fn measurement_record_count(circuit: &Circuit) -> CircuitResult<usize> {

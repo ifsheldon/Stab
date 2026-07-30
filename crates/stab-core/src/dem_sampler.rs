@@ -5,18 +5,13 @@ use crate::{
 
 mod buffers;
 mod compat_sink;
-mod plan;
-mod session;
 
 use buffers::{try_clone_bool_slice, try_clone_detection_record, try_vec_with_capacity};
 use compat_sink::{DetectionAndErrorVisitorSink, DetectionVisitorSink, map_run_error};
-pub use plan::{DemSamplingCompiler, DemSamplingPlan};
-pub use session::{
-    DemReplayBatchStatus, DemReplaySession, DemSamplingCancellation, DemSamplingExecutionError,
-    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
-    DemSamplingSession,
-};
 pub use stab_engine::DemSamplerLimits;
+use stab_engine::{
+    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingSession,
+};
 
 /// Compatibility materializer over the engine-owned DEM sampling plan and sessions.
 #[derive(Clone, Debug, PartialEq)]
@@ -27,7 +22,9 @@ pub struct CompiledDemSampler {
 impl CompiledDemSampler {
     pub fn compile(model: &DetectorErrorModel) -> CircuitResult<Self> {
         Ok(Self {
-            plan: DemSamplingCompiler::new().compile(model)?,
+            plan: DemSamplingCompiler::new()
+                .compile(model)
+                .map_err(CircuitError::from)?,
         })
     }
 
@@ -109,6 +106,7 @@ impl CompiledDemSampler {
     ) -> CircuitResult<()> {
         self.plan
             .validate_sample_buffer_units_with_limits(shots, include_error_records, limits)
+            .map_err(CircuitError::from)
     }
 
     fn validate_materialized_bytes_with_limits(
@@ -119,6 +117,7 @@ impl CompiledDemSampler {
     ) -> CircuitResult<()> {
         self.plan
             .validate_materialized_bytes_with_limits(shots, include_error_records, limits)
+            .map_err(CircuitError::from)
     }
 
     pub fn validate_replay_work_units(&self, shots: usize) -> CircuitResult<()> {
@@ -132,10 +131,13 @@ impl CompiledDemSampler {
     ) -> CircuitResult<()> {
         self.plan
             .validate_replay_work_units_with_limits(shots, limits)
+            .map_err(CircuitError::from)
     }
 
     fn replay_work_units_per_shot(&self) -> CircuitResult<usize> {
-        self.plan.replay_work_units_per_shot()
+        self.plan
+            .replay_work_units_per_shot()
+            .map_err(CircuitError::from)
     }
 
     fn validate_detector_sample_work_units_with_limits(
@@ -145,6 +147,7 @@ impl CompiledDemSampler {
     ) -> CircuitResult<()> {
         self.plan
             .validate_detector_sample_work_units_with_limits(shots, limits)
+            .map_err(CircuitError::from)
     }
 
     fn validate_sampled_error_work_units_with_limits(
@@ -154,6 +157,7 @@ impl CompiledDemSampler {
     ) -> CircuitResult<()> {
         self.plan
             .validate_sampled_error_work_units_with_limits(shots, limits)
+            .map_err(CircuitError::from)
     }
 
     pub fn sample_detection_events_and_errors_with_seed(
@@ -228,7 +232,7 @@ impl CompiledDemSampler {
                 observable_count: self.plan.observable_count(),
             });
         }
-        let session_limits = self.plan.limits_after_compatibility_sink(true, limits)?;
+        let session_limits = limits_after_compatibility_sink(&self.plan, true, limits)?;
         let mut sink = DetectionAndErrorVisitorSink::<CircuitError, _>::try_new(
             &self.plan,
             |record: &DetectionEventRecord, _error_record: &[bool]| {
@@ -239,7 +243,7 @@ impl CompiledDemSampler {
         let mut session = self
             .plan
             .session_with_limits(RandomPolicy::Seeded(Seed::new(0)), session_limits)
-            .map_err(DemSamplingExecutionError::into_circuit_error)?;
+            .map_err(CircuitError::from)?;
         session
             .replay(error_records, &mut sink)
             .map_err(map_run_error)?;
@@ -285,12 +289,12 @@ impl CompiledDemSampler {
         }
         self.validate_detector_sample_work_units_with_limits(shots, limits)?;
         self.validate_sample_buffer_units_with_limits(1, false, limits)?;
-        let session_limits = self.plan.limits_after_compatibility_sink(false, limits)?;
+        let session_limits = limits_after_compatibility_sink(&self.plan, false, limits)?;
         let mut sink = DetectionVisitorSink::<E, F>::try_new(&self.plan, visit)?;
         let mut session = self
             .plan
             .session_with_limits(random_policy(seed), session_limits)
-            .map_err(|source| E::from(source.into_circuit_error()))?;
+            .map_err(|source| E::from(CircuitError::from(source)))?;
         let shots = shot_count_from_usize(shots).map_err(E::from)?;
         session.run(shots, &mut sink).map_err(map_run_error)?;
         Ok(())
@@ -330,12 +334,12 @@ impl CompiledDemSampler {
         }
         self.validate_sample_buffer_units_with_limits(1, true, limits)?;
         self.validate_sampled_error_work_units_with_limits(shots, limits)?;
-        let session_limits = self.plan.limits_after_compatibility_sink(true, limits)?;
+        let session_limits = limits_after_compatibility_sink(&self.plan, true, limits)?;
         let mut sink = DetectionAndErrorVisitorSink::<E, F>::try_new(&self.plan, visit)?;
         let mut session = self
             .plan
             .session_with_limits(random_policy(seed), session_limits)
-            .map_err(|source| E::from(source.into_circuit_error()))?;
+            .map_err(|source| E::from(CircuitError::from(source)))?;
         let shots = shot_count_from_usize(shots).map_err(E::from)?;
         session
             .run_with_sampled_errors(shots, &mut sink)
@@ -376,7 +380,8 @@ impl CompiledDemSampler {
         let mut record = None;
         for (shot_index, error_record) in error_records.into_iter().enumerate() {
             self.plan
-                .validate_error_record_width(error_record, Some(shot_index))?;
+                .validate_error_record_width(error_record, Some(shot_index))
+                .map_err(|source| E::from(CircuitError::from(source)))?;
             replay_work_units = replay_work_units
                 .checked_add(units_per_shot)
                 .ok_or_else(|| {
@@ -395,7 +400,11 @@ impl CompiledDemSampler {
             }
             if record.is_none() {
                 self.validate_sample_buffer_units_with_limits(1, false, limits)?;
-                record = Some(self.plan.try_reusable_detection_record()?);
+                record = Some(
+                    self.plan
+                        .try_reusable_detection_record()
+                        .map_err(|source| E::from(CircuitError::from(source)))?,
+                );
             }
             let Some(record) = record.as_mut() else {
                 return Err(E::from(CircuitError::invalid_sampler_compilation(
@@ -403,7 +412,8 @@ impl CompiledDemSampler {
                 )));
             };
             self.plan
-                .detection_record_from_error_record_into(error_record, record)?;
+                .detection_record_from_error_record_into(error_record, record)
+                .map_err(|source| E::from(CircuitError::from(source)))?;
             visit(record, error_record)?;
         }
         Ok(())
@@ -414,6 +424,24 @@ fn random_policy(seed: Option<u64>) -> RandomPolicy {
     seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     })
+}
+
+fn limits_after_compatibility_sink(
+    plan: &DemSamplingPlan,
+    include_error_records: bool,
+    limits: DemSamplerLimits,
+) -> CircuitResult<DemSamplerLimits> {
+    let reserved_bytes = plan
+        .materialized_bytes_per_shot(include_error_records)
+        .map_err(CircuitError::from)?;
+    if reserved_bytes > limits.max_materialized_bytes() {
+        return Err(ResourceLimitError::dem_materialized_bytes(
+            reserved_bytes,
+            limits.max_materialized_bytes(),
+        )
+        .into());
+    }
+    Ok(limits.with_max_materialized_bytes(limits.max_materialized_bytes() - reserved_bytes))
 }
 
 fn shot_count_from_usize(shots: usize) -> CircuitResult<ShotCount> {

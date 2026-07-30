@@ -164,7 +164,7 @@ where
     let observable_mode = detect_observable_output_mode(&args);
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -181,7 +181,7 @@ where
     };
     let mut session = plan
         .session(random_policy(args.seed))
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     session
         .run(shot_count(args.shots)?, &mut sink)
         .map(|_| ())
@@ -227,10 +227,10 @@ where
     let plan = MeasurementToDetectionCompiler::new()
         .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
         .compile(&circuit)
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     let mut session = plan
         .session()
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -274,7 +274,7 @@ where
     };
     let mut delivery = session
         .start_delivery(&mut sink)
-        .map_err(|error| CliError::from(error.into_circuit_error()))?;
+        .map_err(|error| CliError::from(CircuitError::from(error)))?;
     if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
@@ -414,7 +414,7 @@ where
 
 fn map_detection_run_error(error: DetectionRunError<CliError>) -> CliError {
     match error {
-        DetectionRunError::Engine { source, .. } => CliError::from(source.into_circuit_error()),
+        DetectionRunError::Engine { source, .. } => CliError::from(CircuitError::from(source)),
         DetectionRunError::Sink { source, .. } => source,
     }
 }

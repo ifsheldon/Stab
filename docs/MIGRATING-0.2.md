@@ -60,6 +60,8 @@ The supported `analysis` and `execution` namespaces remain because they describe
 
 Common model, algebra-value, plan, session, batch, diagnostic, and policy names remain available from the facade root.
 
+Execution compilers, plans, sessions, progress values, summaries, and run errors exposed through `stab_core::execution` are direct reexports of their `stab_engine` owners. Values can move between those paths without wrapper conversion. Code that previously called a facade-only `into_circuit_error` method on a detection or DEM execution error should use `CircuitError::from(error)` when it needs the aggregate facade diagnostic.
+
 ## Feature Selection
 
 Scalar behavior is the default for every product crate. Portable SIMD remains additive and opt-in:
