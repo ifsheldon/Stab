@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Progress Report
 
-Current as of 2026-07-29.
+Current as of 2026-07-30.
 
 ## Status
 
@@ -943,3 +943,24 @@ Forty-one report-only phases remain more than 15% above their latest semanticall
 The original disposition claimed that every crossing had failed to reproduce. Audit rejected that statement: the reused focused artifacts for `m7-gen-repetition-d17-r17`, `m7-gen-repetition-d3-r30`, `m8-reference-sample-tree`, and the PF3 sampler-execution phase remained above the `1.15x` predecessor boundary, and several new heavy-row diagnostics used 8 or 16 internal timings rather than the then-written 128-timing contract. These results do not justify a threshold, waiver, comparator, or scalar-default change, but they require fresh source-current diagnostics and explicit dispositions under the corrected row-native timing contract. Hardware counters remain unavailable on this host because `kernel.perf_event_paranoid=4`; the project does not change that policy for diagnostic evidence.
 
 A6 remains open for product API repair, canonical owner-package evidence, independent semantic witnesses, replacement clean-revision evidence, a checked focused-evidence ledger, repeated audits, complete local verification, and green GitHub CI on the exact closure revision. The decoder stashes remain parked until those gates close.
+
+## A6 Repaired Source Checkpoint
+
+The review-rejected evidence above remains historical. The following focused commits repair its source and qualification defects before any replacement timing is attempted:
+
+| Commit | Repair |
+| --- | --- |
+| `59b0f8cf` | Make `ReferenceSampleTree` checked, bounded, private in structure, and fallibly materializable; add fallible sampler compatibility adapters; use model-owned `CircuitTick` in the canonical analysis API. |
+| `0dbc685c` | Replace self-derived and width-only benchmark witnesses with pinned-Stim or independently fixed semantic expectations and same-width wrong-content rejection tests. |
+| `66eca557` | Add the checked A6 focused-evidence ledger command and validate report identities, immutable artifact digests, sample counts, ratios, and dispositions. |
+| `564da37b` | Enforce direct package evidence for all six Stable component crates, add semantic owner suites for model, analysis, and engine, and retain only seven exact cross-component exceptions. |
+
+The regenerated correctness inventory contains 2,886 upstream cases, 6,860 public API items, and 2,110 evidence parents: 859 implemented, 17 evidence-close, and 1,234 planned. Its digest is `899f9c18d7c1d1ec4c173b753aff00982d5c3dce5fa45bed10ef0adf7a4b9113`.
+
+The regenerated performance inventory contains 127 checklist rows, 6,860 public API items, 179 groups, and 167 inherited manifest decisions. It has 23 measured groups and 156 future candidates, and its digest is `318793ecc479fd5330f650a02a0f287aaff813db4588b96b964d69bc343e9850`.
+
+Direct canonical-owner coverage now includes 31 `stab-model`, six `stab-analysis`, and 17 `stab-engine` semantic tests in addition to existing direct `stab-bits`, `stab-records`, and `stab-algebra` evidence. The validator mutation test proves that every canonical package is enforced, exact reviewed exceptions are admitted, and stale exceptions fail.
+
+At this checkpoint, the three direct owner suites, the PF1 structural oracle, the 313-row oracle matrix check, correctness check and clean regeneration, performance check and clean regeneration, generated-status check, and warnings-denied Clippy for the affected product and qualification packages pass.
+
+Fresh A6 evidence has not started for these identities. The next gate is milestone-audit and full-code-review against this committed source; any resulting repair changes the clean evidence revision. The parked A7 decoder stashes remain untouched.

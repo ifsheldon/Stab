@@ -7,8 +7,10 @@ Finish milestone A6 of [agent-native-modular-qec-architecture-plan.md](agent-nat
 ## Current State
 
 - A0 through A5 are complete, and the physical component split is committed.
-- The `3a93719b` correctness, SIMD, matrix, and focused artifacts are preserved but review-rejected. They do not close A6 because direct owner-package coverage was incomplete, several benchmark witnesses were not independently fixed, focused timing counts did not follow one valid contract, and no checked ledger bound the focused artifacts.
-- Product review also requires checked `ReferenceSampleTree` construction and fallible legacy sampler materialization before evidence can be regenerated.
+- The `3a93719b` correctness, SIMD, matrix, and focused artifacts are preserved but review-rejected and cannot close A6.
+- Product/API repair is committed at `59b0f8cf`, independent benchmark witnesses at `0dbc685c`, focused-evidence validation at `66eca557`, and direct six-component qualification ownership at `564da37b`.
+- The source-current correctness inventory has digest `899f9c18d7c1d1ec4c173b753aff00982d5c3dce5fa45bed10ef0adf7a4b9113`; the performance inventory has digest `318793ecc479fd5330f650a02a0f287aaff813db4588b96b964d69bc343e9850`.
+- Fresh replacement evidence has not started. A6 is waiting on pre-evidence audits, any resulting source repairs, and one clean-revision evidence run.
 - `stab-decoder` source and benchmark work remains preserved in named stashes and must stay parked until A6 closes.
 
 ## Sources Of Truth
@@ -23,15 +25,13 @@ Stop and repair the owner when Cargo metadata, architecture checks, generated in
 
 ## Execution Sequence
 
-1. Commit the audit-corrected contract before replacement evidence.
-2. Make `ReferenceSampleTree` construction, traversal, and materialization resource-bounded and fallible; add fallible legacy sampler materializers while preserving documented compatibility shims.
-3. Enforce direct canonical package evidence for all six Stable components. Retarget wholly owned selectors and record only narrow, reviewed cross-component or facade exceptions.
-4. Replace self-derived or width-only benchmark witnesses with independently fixed semantic expectations.
-5. Commit source and regenerated inventories, then run milestone-audit and full-code-review before timing.
-6. From that clean commit, regenerate exact full-tier M5 and M6 correctness, scalar-versus-portable SIMD diagnostics, and the complete 166-row warmed comparison with unchanged comparator and threshold policies.
-7. Recompute every greater-than-15-percent crossing. Run one warmed outer diagnostic per crossing with the source-owned internal timing count of at least eight. Profile reproductions when host policy permits and record restrictions otherwise.
-8. Generate and validate the checked focused-evidence ledger, including report and predecessor digests, exact measurements, sample counts, ratios, and dispositions.
-9. Run the complete local verification matrix, repeat milestone-audit and full-code-review, and obtain green GitHub CI for the exact closure revision.
+1. Run milestone-audit and full-code-review against the committed repaired source and qualification contracts before timing.
+2. Fix every confirmed source, test, benchmark-contract, and documentation finding in focused commits; regenerate inventories after any identity change.
+3. From the resulting clean commit, regenerate exact full-tier M5 and M6 correctness, scalar-versus-portable SIMD diagnostics, and the complete 166-row warmed comparison with unchanged comparator and threshold policies.
+4. Recompute every greater-than-15-percent crossing. Run one warmed outer diagnostic per crossing with the source-owned internal timing count of at least eight. Profile reproductions when host policy permits and record restrictions otherwise.
+5. Generate and validate `benchmarks/a6-focused-evidence.json`, including immutable report and predecessor digests, exact measurements, sample counts, ratios, and dispositions.
+6. Append the source-current evidence checkpoint without rewriting historical rejected artifacts.
+7. Run the complete local verification matrix, repeat milestone-audit and full-code-review, and obtain green GitHub CI for the exact closure revision.
 
 ## Nonnegotiable Contracts
 
