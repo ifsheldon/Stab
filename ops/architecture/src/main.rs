@@ -21,7 +21,7 @@ struct Cli {
 enum Command {
     /// Validate the current workspace against the target product architecture.
     Check,
-    /// Compile external Stable, Nightly, and mixed feature consumers.
+    /// Validate external Stable, Nightly, and mixed feature consumers.
     ConsumerCheck,
     /// Validate repository-owned Markdown links and heading anchors.
     DocsCheck,

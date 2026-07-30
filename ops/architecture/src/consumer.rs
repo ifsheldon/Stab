@@ -45,6 +45,7 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "stable",
         relative_manifest: "test-support/consumers/stable/Cargo.toml",
         toolchain: Some(STABLE_TOOLCHAIN),
+        cargo_subcommand: "test",
         portable: false,
         requires_core: false,
     },
@@ -52,6 +53,7 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "scalar-facade",
         relative_manifest: "test-support/consumers/scalar-facade/Cargo.toml",
         toolchain: None,
+        cargo_subcommand: "check",
         portable: false,
         requires_core: true,
     },
@@ -59,6 +61,7 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "nightly-facade",
         relative_manifest: "test-support/consumers/nightly-facade/Cargo.toml",
         toolchain: None,
+        cargo_subcommand: "check",
         portable: true,
         requires_core: true,
     },
@@ -66,6 +69,7 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "mixed",
         relative_manifest: "test-support/consumers/mixed/Cargo.toml",
         toolchain: None,
+        cargo_subcommand: "check",
         portable: true,
         requires_core: true,
     },
@@ -76,6 +80,7 @@ struct ConsumerFixture {
     id: &'static str,
     relative_manifest: &'static str,
     toolchain: Option<&'static str>,
+    cargo_subcommand: &'static str,
     portable: bool,
     requires_core: bool,
 }
@@ -116,7 +121,7 @@ pub enum ConsumerCheckError {
         source: std::io::Error,
     },
 
-    #[error("external consumer {fixture} failed to compile with status {status}")]
+    #[error("external consumer {fixture} failed its Cargo validation with status {status}")]
     CargoFailed {
         fixture: &'static str,
         status: std::process::ExitStatus,
@@ -183,7 +188,7 @@ pub fn check_external_consumers(root: &Path) -> Result<ConsumerCheckSummary, Con
     })?;
     validate_workspace_feature_intent(&root)?;
     for fixture in FIXTURES {
-        compile_fixture(&root, fixture)?;
+        validate_fixture_execution(&root, fixture)?;
         validate_fixture_metadata(&root, fixture)?;
     }
     Ok(ConsumerCheckSummary {
@@ -249,7 +254,10 @@ fn require_feature_declaration(
     Ok(())
 }
 
-fn compile_fixture(root: &Path, fixture: ConsumerFixture) -> Result<(), ConsumerCheckError> {
+fn validate_fixture_execution(
+    root: &Path,
+    fixture: ConsumerFixture,
+) -> Result<(), ConsumerCheckError> {
     let manifest = root.join(fixture.relative_manifest);
     let target = root
         .join("target")
@@ -260,7 +268,8 @@ fn compile_fixture(root: &Path, fixture: ConsumerFixture) -> Result<(), Consumer
         command.arg(toolchain);
     }
     let status = command
-        .args(["check", "--locked", "--manifest-path"])
+        .arg(fixture.cargo_subcommand)
+        .args(["--locked", "--manifest-path"])
         .arg(manifest)
         .arg("--target-dir")
         .arg(target)
