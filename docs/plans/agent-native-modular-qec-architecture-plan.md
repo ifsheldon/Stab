@@ -741,7 +741,7 @@ The caller byte policy accounts for width-dependent heap capacity retained by re
 
 ## Milestone A6: Physical Component Extraction And Nightly Isolation
 
-Status: Active.
+Status: Complete. Closure is recorded against measured source revision `adae364500744c33f98f7777901ff50a28cbfdf6`; the later status-only closure commit does not replace that evidence identity.
 
 ### Tasks
 
@@ -797,6 +797,8 @@ Status: Active.
 - The measured A6 source revision has green local verification and exact-revision CI. A later closure commit may change only the append-only A6 progress report, generated qualification status, milestone specification-gap log, and directly linked architecture-plan status prose; the report remains evidence for its recorded parent source revision and is not replayed as though produced from the closure commit. Any product, test, benchmark, policy, fixture, workflow, or non-status documentation change requires new timing. Historical evidence remains bound to its original source and cannot become current merely because the closure procedure was simplified.
 
 ## Milestone A7: Decoder Interoperability And Reference Decoder
+
+Status: Next.
 
 ### Tasks
 
