@@ -20891,6 +20891,238 @@
         }
       ],
       "standalone": true
+    },
+    {
+      "id": "a7-record-prediction-prefix-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "prediction_batch_views",
+          "mutable_prediction_prefix_updates_only_admitted_records",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Immutable and mutable observable-prediction views expose exactly the admitted shot prefix at the declared correction width; checked updates cannot reach suffix storage, and repeated prefix borrowing allocates nothing."
+      },
+      "negative_axes": [
+        "prefix-beyond-storage",
+        "suffix-mutation",
+        "prediction-width-mismatch",
+        "zero-width-prefix",
+        "record-count-allocation-growth"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatch::view_prefix"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatch::view_prefix_mut"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::copy_shot_from_bools"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::correction_width"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::get"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::set"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::shot_count"
+        },
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::ObservablePredictionBatchViewMut::view"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "mechanism_traversal_preserves_absolute_targets_duplicates_and_separators",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The model traverses represented DEM error mechanisms through borrowed views and an absolute typed target iterator without allocating one target vector per represented mechanism."
+      },
+      "negative_axes": [
+        "detector-shift-drift",
+        "nested-repeat-shift-drift",
+        "duplicate-target-loss",
+        "separator-loss",
+        "tag-loss",
+        "visitor-error-erasure"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DetectorErrorModel::try_visit_error_mechanisms"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismView"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismView::tag_bytes"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismView::targets"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismVisitor"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismVisitor::Error"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismVisitor::visit_error_mechanism"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorTarget"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorTargetIter"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-probability-contract",
+      "feature_id": "CQ-SAMPLING",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "nested_error_bearing_repeats_apply_each_detector_shift_once",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The borrowed mechanism view exposes each represented DEM error probability exactly, including probabilities carried through shifted and repeated model structure, without per-mechanism allocation."
+      },
+      "negative_axes": [
+        "probability-drift",
+        "repeat-probability-loss",
+        "per-mechanism-allocation"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismView::probability"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-resource-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "mechanism_count_is_admitted_before_callbacks_and_visitor_stop_is_immediate",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The model admits the exact represented mechanism count before callbacks, independently bounds represented instruction visits, skips error-free repeat expansion, and preserves typed model and visitor failures."
+      },
+      "negative_axes": [
+        "callback-before-admission",
+        "mechanism-limit-off-by-one",
+        "instruction-limit-off-by-one",
+        "error-free-repeat-expansion",
+        "per-mechanism-allocation",
+        "late-visitor-stop"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismTraversalLimits"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismTraversalLimits::new"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismTraversalLimits::max_instruction_visits"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismTraversalLimits::max_mechanisms"
+        },
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismVisitError"
+        }
+      ],
+      "standalone": true
     }
   ],
   "public_api_aliases": [
