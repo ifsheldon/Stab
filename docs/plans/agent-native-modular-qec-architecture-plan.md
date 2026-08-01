@@ -798,7 +798,76 @@ Status: Complete. Closure is recorded against measured source revision `adae3645
 
 ## Milestone A7: Decoder Interoperability And Reference Decoder
 
-Status: Next.
+Status: Active.
+
+### Rationale And Boundary Decisions
+
+- A7 proves static Rust composition through one real external decoder instead of designing a registry for hypothetical decoder families.
+- `stab-decoder` owns interoperability contracts only. Decoder compilation remains implementation-specific because exact maximum-likelihood tables, matching graphs, tensor networks, and learned models do not share an earned compiler abstraction in 0.2.
+- The public hot path uses generic static dispatch. `DecoderSession` is not object-safe, no `dyn DecoderSession` or per-shot callback enters decoding, and no Rust dynamic-library ABI is introduced.
+- Decoder inputs expose detector records but deliberately hide true observable outcomes. The experiment adapter may compare predictions with truth after decoding, but an implementation cannot accidentally train on or read answers through the decoder input type.
+- Caller-owned observable-prediction storage is borrowed through a checked mutable prefix view. All detector width, correction width, and shot-count checks happen before session code can mutate output.
+- Cancellation is a concrete cloneable atomic token checked at record boundaries. A completed prefix is committed, the suffix remains untouched, and one record does not carry a wall-clock cancellation guarantee.
+- The model owns a narrow bounded error-mechanism traversal because shifts, repeats, separators, and absolute detector identities are DEM semantics. External decoders must not reproduce those semantics by flattening the model independently or depend on the advanced folded execution cursor.
+- The reference implementation lives in an unpublished `test-support` crate and depends only on public Stable component APIs. It is intentionally not part of the simulator core or the CLI.
+- Decoder compilation, reused batch decoding, and the complete experiment pipeline are distinct performance phases. They use Stab self-regression only because Stim v1.16.0 has no faithful decoder comparator; no synthetic Stim ratio or `1.25x` parity claim is invented.
+- Bounded retained storage and allocation-free reused decoding are semantic resource tests and memory evidence attached to the decoder workloads, not a fourth timing group.
+
+### A7.0 Contract Freeze
+
+- Add `DecoderLayout` and a borrowed `DecoderModelView` containing the exact DEM, detector and observable widths, and model fingerprint.
+- Add `DecoderInputBatchView`, which can be constructed from detector storage or a `DetectionBatchView` while dropping observable truth.
+- Add `DecodeCancellation`, `DecodeBatchStatus`, `DecodeBatchSummary`, typed preflight failures, and implementation-failure progress.
+- Add a canonical generic `decode_batch` function that validates dimensions before constructing a non-forgeable validated batch for a `DecoderSession` implementation.
+- Keep the session trait `Sized` and statically dispatched. The trait receives only validated input/output views and the concrete cancellation token.
+- Freeze the trait only after both the exact-ML session and an independent conformance fixture satisfy width, mutation, progress, cancellation, and partitioning tests.
+
+### A7.1 Record And Model Interoperability
+
+- Add `ObservablePredictionBatchViewMut` plus checked immutable and mutable prefix borrowing to `stab-records` so one 64-shot prediction allocation can be reused for smaller engine batches.
+- Keep the mutable view correction-typed and prefix-bounded; it exposes checked bit or complete-record replacement without exposing unrelated storage capacity.
+- Add a model-owned `DemErrorMechanismView`, absolute typed target iterator, visitor, traversal limits, and visit errors.
+- Preflight the exact represented mechanism count before callbacks, skip repeat bodies with no errors, bound represented instruction visits, preserve separator order, and apply detector shifts without allocating a target vector per mechanism.
+- Prove nested repeats, zero-count repeats, shifted detectors, duplicate target parity, logical-observable targets, early visitor stop, and both resource limits.
+
+### A7.2 Stable Decoder Crate
+
+- Add publishable Stable Rust 1.97.1 `stab-decoder` with normal dependencies only on `stab-model` and `stab-records`.
+- Reexport its common contracts through the curated `stab-core` facade without creating facade-owned wrapper identities.
+- Add it to the Stable external consumer, architecture graph, component contract, migration inventory, API documentation, and CI Stable lane.
+- Add the previously queued portable-SIMD warnings-denied Clippy lane while changing CI for A7.
+
+### A7.3 Bounded Exact Maximum-Likelihood Reference
+
+- Add unpublished `stab-reference-decoder` under `test-support` and forbid dependencies on `stab-core`, CLI, ops, private modules, or Nightly features.
+- Compile each independent DEM error mechanism into one detector-plus-observable effect mask and run an in-place log-domain dynamic program over joint states.
+- Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, `2^21` joint states, 16 MiB of temporary probability workspace, and `2^28` pair transitions.
+- Retain exactly one byte per detector syndrome after compilation. Ties choose observable prediction zero, zero-observable models are valid, and impossible syndromes produce a typed error before the batch output is mutated.
+- Use checked allocation and arithmetic throughout. Reused decoding performs no allocation and updates only a completed prefix when cancellation is observed.
+
+### A7.4 Independent Correctness And Experiment Tests
+
+- Compare the log-domain joint distribution against direct subset enumeration for exhaustive small mechanisms, including probabilities zero and one, duplicate targets, zero-effect mechanisms, ties, and impossible syndromes.
+- Generate noisy distance-3 and distance-5 repetition circuits through `stab-analysis`, lower them to DEMs, compile the reference decoder, and compare every bounded syndrome prediction with an independent brute-force oracle.
+- Test detector, observable, prediction, and shot-count mismatches before mutation; every exact resource boundary and first rejection; session reuse; whole-versus-partitioned batches; pre-cancellation; mid-batch cancellation through the conformance fixture; failure progress; and zero-shot behavior.
+- Build one external end-to-end experiment using only public `stab-analysis`, `stab-engine`, `stab-model`, `stab-records`, and `stab-decoder` APIs: generate a repetition circuit, compile sampling and measurement-to-detection plans, stream typed detection batches into the reference session, and count logical failures after predictions are produced.
+- Prove exact seeded repetition of the experiment and equivalent results when one sampling session is partitioned across calls.
+
+### A7.5 Qualification And Benchmarks
+
+- Add exact correctness ownership for the record prefix view, bounded mechanism traversal, decoder model and session contracts, exact-ML compiler, and external experiment. Round trips or broad workspace commands cannot be their sole owners.
+- Add no more than three release-candidate runtime groups: exact-ML compilation, reused batch decode, and sample-to-detect-to-decode execution.
+- Give each group deterministic generators, exact semantic witnesses outside timing, small, medium, and large scales, phase-specific work units, profiler notes, correctness prerequisites, and executable worker contracts.
+- Mark all three groups as Stab-only self-regression workloads. They have no Stim parity policy entry and remain `unseeded` until controlled full and soak evidence can produce an accepted architecture-specific baseline under A9.
+- Attach retained-byte, zero-allocation reuse, bounded session growth, and accepted-maximum memory checks to the owning workloads instead of adding a standalone memory timing group.
+- Keep the release matrix below 40 groups and diagnostics below 60; consolidate an existing group before exceeding either cap.
+
+### A7.6 Documentation, Audit, And Closure
+
+- Synchronize the architecture graph and ADR, component contracts, facade tiers, migration inventory, README, feature checklist, qualification inventories, benchmark policies, generated status, and append-only progress report.
+- Run `milestone-audit` against every A7 task, test, benchmark, resource boundary, and done criterion; fix implementation defects and log only genuine under-specification.
+- Run `full-code-review` across the new public API, DEM semantics, exact-ML arithmetic, cancellation and mutation guarantees, external composition, benchmark comparability, and documentation.
+- Commit fixes before source-current A7 correctness and diagnostic timing. Preserve failed artifact paths and do not promote shared-host timing as A9 evidence.
 
 ### Tasks
 
@@ -832,6 +901,8 @@ Status: Next.
 
 - The decoder crate depends only on public stable component APIs.
 - One real end-to-end QEC experiment runs without `stab-core`, private APIs, or ops features.
+- Decoder width and shot-count failures leave prediction storage unchanged, cancellation commits only a documented prefix, and reused exact-ML decoding allocates no memory.
+- The three decoder phases have executable self-regression contracts without a fabricated Stim comparator, and every source-owned correctness and benchmark contract regenerates cleanly.
 
 ## Milestone A8: Circuit Pass And Backend Extension Seams
 
