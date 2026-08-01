@@ -1,20 +1,40 @@
-# Goal: A8 Circuit Pass And Backend Extension Seams
+# Goal: Close A8 Circuit Pass And Backend Extension Seams
 
-Status: Active.
+Status: Active. Local source, correctness, diagnostic, and audit work is complete; exact-revision GitHub CI is the remaining blocker.
 
 ## Objective
 
-Finish Milestone A8 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) by proving one meaningful built-in circuit transform and one external Stable transform can use a small typed pass contract, while backend discovery and explicit selection remain consistent with executable engine capabilities.
+Close Milestone A8 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) without expanding the earned extension boundary. The common typed circuit-pass executor, built-in without-noise adapter, external Stable noise pass, and sampling-backend selection surface must remain source-current and evidence-backed.
 
-## Current State
+## Measured Source
 
-- A0 through A7 are complete. A7 evidence is bound to measured source revision `38160da59e6a55b1e4efd753d2aee8b8eb18f2b0`; later A8 work must not replay or promote that evidence under a descendant.
-- The source-current dirty worktree contains the typed `stab-analysis` pass executor, the adapted built-in without-noise pass, and a Stable external noise-pass proof crate; completed audit repairs add projected logical-payload admission before proportional lowering allocation and typed input/projection/output rejection stages, while the legacy compatibility function retains its previous direct resource policy.
-- `stab plan sample` accepts typed auto, scalar, and portable-SIMD backend requests through the existing resolver; unavailable portable SIMD fails explicitly and does not fall back.
-- Pre-audit dirty development probes exist for the external pass and built-in continuity row, but the projection-contract repair makes them stale as well as non-promotable; fresh diagnostics wait for committed source.
-- The regenerated dirty-source identities are correctness `afec1b7090cc1254d6414ec4e10333e3d43976bbb5cc680822797ef231f4c676` and performance `5d35927f8518a6df5de141b674af8d38858b16338437f1e033897b0419090f20`; they become eligible for evidence only after the exact source is committed and all checks pass.
-- A8 does not add dynamic Rust plugins, a GPU placeholder, a public execution IR, or external-process decoder transport.
-- A9 owns controlled release evidence, reviewed self-regression baseline seeding, and the Stab 0.2.0 release.
+- Product and qualification source revision: `c797ebc908ce1b81675e479031c39f71740058ae`.
+- Correctness inventory identity: `afec1b7090cc1254d6414ec4e10333e3d43976bbb5cc680822797ef231f4c676`.
+- Performance inventory identity: `5d35927f8518a6df5de141b674af8d38858b16338437f1e033897b0419090f20`.
+- The measured worktree was clean, the pinned Stim revision remained `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, and no failed artifact path was reused.
+
+## Completed Evidence
+
+- Exact A8 correctness selection: 17 source-owned parents, including the repaired analysis resource-identifier owner.
+- PR: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-pr-r2`.
+- Full: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-full`.
+- Soak: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-soak`.
+- Controlled external-pass diagnostic: `target/benchmarks/qualification/a8-c797ebc9-external-noise-pass-controlled-pr`, verified host, report SHA-256 `76c9184f3bc5bdc8e3d04bfd230486ff0e70480b6eb3104432b34ac503a6ab15`.
+- External-pass medians: `94.108`, `92.936`, and `98.992` ns per represented input instruction at small, medium, and large scales.
+- Built-in continuity: current `0.000229623` seconds versus predecessor `0.000232035` seconds, a `0.989605x` ratio. This is report-only continuity evidence, not a Stim parity or self-regression gate.
+- Final milestone-audit and full-code-review found no unresolved implementation defect or specification loophole. Existing files near 1200 lines remain a watch list, but A8 introduced no source file over policy.
+- `/swap.img` is active with its original size `137438949376` bytes and priority `-2`; no benchmark or qualification process and no A8 temporary worktree remains.
+
+## Remaining Blocker
+
+GitHub still reports `origin/main` at A7 revision `da276e4933aa8ebced4279b77a790b0cb11998a5`. The A8 commits are therefore not present on the remote and no workflow has tested the A8 source. Do not mark A8 complete or relabel the local diagnostics as release evidence until a pushed revision containing `c797ebc9` passes both CI jobs.
+
+## Next Actions
+
+1. Push local `main` to `origin/main` and verify the remote contains `c797ebc9` unchanged as the measured product ancestor.
+2. Watch the resulting GitHub Actions run and repair any source-current failure instead of weakening a contract.
+3. After both `Rust` and `Qualification Contracts` pass, append the run ID and exact tested revision to the progress report.
+4. In one status-only closure commit, mark A8 complete in the architecture plan and feature checklist, then make A9 the active goal.
 
 ## Sources Of Truth
 
@@ -26,29 +46,13 @@ Finish Milestone A8 of the [agent-native modular QEC architecture plan](agent-na
 - [Performance qualification contract](comprehensive-stim-performance-qualification-plan.md)
 - [Specification-gap log](milestone-spec-gaps.md)
 
-Stop and repair the owning source when the plan, component graph, Stable boundary, pass API, backend resolver, CLI plan output, tests, inventories, or benchmark contracts disagree.
+## Nonnegotiable Closure Rules
 
-## Execution Sequence
-
-1. Freeze the smallest pass contract earned by the existing without-noise transform and one external noise-insertion transform. Record typed options, context, limits, report, and diagnostics before implementation.
-2. Adapt the built-in transform without changing its canonical output, preservation behavior, resource policy, or public compatibility path.
-3. Add an unpublished Stable external-pass fixture crate that depends only on permitted public component APIs and inserts deterministic noise without changing the gate table or execution IR.
-4. Admit input before dispatch, admit conservative projected output before proportional allocation, validate the actual Stim-compatible result, and prove determinism, preservation, projection-underestimate rejection, typed diagnostics, and closed-model unknown-gate rejection as separate contracts.
-5. Expose backend availability and explicit selection through the existing resolver, capabilities, and `plan sample`; prove auto, scalar, and unavailable selections report one consistent result.
-6. Document external-process decoder protocol requirements without implementing transport or promising an ABI.
-7. Add exact qualification ownership and only the earned diagnostics: built-in adaptation continuity and one external-pass throughput row. Reuse existing backend compilation diagnostics unless a measured selection-overhead risk justifies a new row.
-8. Regenerate contracts, run focused Stable and Nightly checks, benchmark smoke and diagnostics, then run milestone-audit and full-code-review and fix every confirmed finding before closure.
-
-## Nonnegotiable Contracts
-
-- Passes operate on public typed circuit models and return validated circuits; they do not mutate the Stim gate registry or expose private execution internals.
-- Every implementation declares a checked conservative folded-output projection without allocating in proportion to it. The executor admits that projection before lowering, admits the actual output, exposes the typed rejection stage, and rejects underestimation before release. Projected payload bytes exclude allocator metadata and spare capacity and make no exact resident-memory claim.
-- Per-pass options remain typed. Common context, limits, report, and diagnostics contain only behavior proven common by both implementations.
-- External pass code compiles on Stable Rust 1.97.1 and cannot depend on `stab-core`, CLI, ops, private modules, Nightly, or portable SIMD.
-- Backend requests use the existing typed resolver. Explicit unavailable backends fail clearly, and capabilities, plan summaries, and execution cannot disagree.
-- Benchmarks measure complete public operations with source-owned semantic witnesses. Existing compile and execution diagnostics remain sufficient for a single executable backend, so no synthetic Stim comparator or placeholder backend microbenchmark is added.
-- Historical evidence and failed artifact paths remain immutable.
+- The pass seam stays closed over public typed circuit models; no dynamic plugin ABI, runtime gate registration, public execution IR, external decoder transport, GPU placeholder, or fabricated comparator is added.
+- The external-pass diagnostic remains Stab-only. It proves bounded source-current throughput and semantic witnesses, not Stim parity, current self-regression, or release qualification.
+- Historical, unverified, failed, and predecessor artifacts keep their original identities and claims.
+- Any product, test, benchmark-contract, inventory, fixture, workflow, or substantive normative change after `c797ebc9` invalidates this checkpoint and requires fresh affected evidence.
 
 ## Done
 
-A8 is complete only when the built-in and external passes share the earned typed seam, all pass outputs and backend selections have direct source-current behavioral evidence, the external Stable consumer compiles and runs, affected benchmark contracts and diagnostics pass, both final audits have no unresolved implementation finding, exact-revision CI is green, and the worktree is clean.
+A8 is complete only after exact-revision CI is green and the status-only closure records that run without changing the measured product or evidence contracts.

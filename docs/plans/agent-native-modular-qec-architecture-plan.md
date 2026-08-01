@@ -908,7 +908,7 @@ Status: Complete. Closure is recorded against measured source revision `38160da5
 
 ## Milestone A8: Circuit Pass And Backend Extension Seams
 
-Status: Active.
+Status: Active. Source-current local evidence is complete; exact-revision GitHub CI remains pending.
 
 ### Tasks
 
