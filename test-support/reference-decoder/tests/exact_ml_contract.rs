@@ -21,6 +21,19 @@ fn predictions(batch: &ObservablePredictionBatch) -> Vec<Vec<bool>> {
     batch.records().to_records().expect("predictions")
 }
 
+fn compile_with_retained_allocation(
+    model: &DetectorErrorModel,
+) -> (ExactMlDecoderSession, allocation_counter::AllocationInfo) {
+    let mut compiled = None;
+    let allocation = allocation_counter::measure(|| {
+        compiled = Some(ExactMlDecoderSession::try_compile_model(model));
+    });
+    let session = compiled
+        .expect("allocation measurement ran")
+        .expect("compile model");
+    (session, allocation)
+}
+
 #[test]
 fn exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models() {
     let correlated = DetectorErrorModel::from_dem_str("error(0.75) D0 L0\n").expect("DEM");
@@ -302,9 +315,15 @@ fn retained_table_is_exactly_one_byte_per_detector_syndrome() {
             DetectorErrorModel::from_dem_str(&format!("error(0.25) D{} L0\n", detector_count - 1))
                 .expect("detector DEM")
         };
-        let session = ExactMlDecoderSession::try_compile_model(&model).expect("compile");
+        let (session, allocation) = compile_with_retained_allocation(&model);
         assert_eq!(session.syndrome_count(), 1 << detector_count);
         assert_eq!(session.retained_prediction_bytes(), 1 << detector_count);
+        assert_eq!(allocation.count_current, 1, "{allocation:?}");
+        assert_eq!(
+            allocation.bytes_current,
+            1 << detector_count,
+            "{allocation:?}"
+        );
     }
 }
 
@@ -316,9 +335,11 @@ fn all_finite_syndromes_can_be_exact_ties_without_unbounded_ambiguity_storage() 
     }
     dem.push_str("error(0.5) L0\n");
     let model = DetectorErrorModel::from_dem_str(&dem).expect("all-tied DEM");
-    let session = ExactMlDecoderSession::try_compile_model(&model).expect("compile all ties");
+    let (session, allocation) = compile_with_retained_allocation(&model);
 
     assert_eq!(session.syndrome_count(), 1 << 12);
+    assert_eq!(allocation.count_current, 1, "{allocation:?}");
+    assert_eq!(allocation.bytes_current, 1 << 12, "{allocation:?}");
     for syndrome in 0..(1 << 12) {
         assert!(
             !session
@@ -357,6 +378,25 @@ fn exact_tie_resolution_rejects_the_first_workspace_excess() {
         }) if actual_at_least == expected_bytes
             && actual_at_least == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES + 32
             && limit == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES
+    ));
+}
+
+#[test]
+fn exact_limb_work_limit_rejects_before_exact_allocation() {
+    let mut dem = String::from("error(0) D8\n");
+    for _ in 0..177 {
+        dem.push_str("error(5e-324) D0\n");
+    }
+    dem.push_str("error(0.5) L0\n");
+    let model = DetectorErrorModel::from_dem_str(&dem).expect("limb-heavy tied DEM");
+
+    assert!(matches!(
+        ExactMlDecoderSession::try_compile_model(&model),
+        Err(ExactMlCompileError::ExactWorkLimit {
+            actual_at_least: 270_765_056,
+            limit,
+        }) if limit == ExactMlDecoderSession::MAX_EXACT_LIMB_TRANSITIONS
+            && limit == (1 << 28)
     ));
 }
 

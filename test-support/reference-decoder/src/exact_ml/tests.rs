@@ -5,11 +5,30 @@
 )]
 
 use super::{
-    ExactDyadicDistribution, ExactProbability, Mechanism, exact_compare, exact_shift_left,
-    interval_joint_distribution,
+    ExactDyadicDistribution, ExactMlCompileError, ExactProbability, MAX_EXACT_LIMB_TRANSITIONS,
+    Mechanism, admit_exact_limb_work, exact_compare, exact_shift_left, interval_joint_distribution,
 };
 
 const PROBABILITIES: [f64; 4] = [0.0, 0.25, 0.5, 1.0];
+
+#[test]
+fn exact_limb_work_admission_accepts_maximum_and_rejects_first_excess() {
+    assert_eq!(admit_exact_limb_work(MAX_EXACT_LIMB_TRANSITIONS, 1), Ok(()));
+    assert_eq!(
+        admit_exact_limb_work(MAX_EXACT_LIMB_TRANSITIONS + 1, 1),
+        Err(ExactMlCompileError::ExactWorkLimit {
+            actual_at_least: MAX_EXACT_LIMB_TRANSITIONS + 1,
+            limit: MAX_EXACT_LIMB_TRANSITIONS,
+        })
+    );
+    assert_eq!(
+        admit_exact_limb_work(u128::MAX, 2),
+        Err(ExactMlCompileError::ExactWorkLimit {
+            actual_at_least: u128::MAX,
+            limit: MAX_EXACT_LIMB_TRANSITIONS,
+        })
+    );
+}
 
 #[test]
 fn directed_intervals_and_exact_dyadics_match_exhaustive_subset_enumeration() {

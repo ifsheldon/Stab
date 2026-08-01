@@ -22,6 +22,7 @@ const MAX_TIE_WORKSPACE_BYTES: u128 = 32 * 1024 * 1024;
 const MAX_PEAK_WORKSPACE_BYTES: u128 = MAX_TIE_WORKSPACE_BYTES;
 const MAX_PAIR_TRANSITIONS_PER_PASS: u128 = 1 << 28;
 const MAX_TOTAL_PAIR_TRANSITIONS: u128 = 1 << 29;
+const MAX_EXACT_LIMB_TRANSITIONS: u128 = 1 << 28;
 
 const _: () = assert!(
     (MAX_JOINT_STATES as u128) * (size_of::<ProbabilityInterval>() as u128)
@@ -55,6 +56,7 @@ impl ExactMlDecoderSession {
     pub const MAX_PEAK_WORKSPACE_BYTES: u128 = MAX_PEAK_WORKSPACE_BYTES;
     pub const MAX_PAIR_TRANSITIONS_PER_PASS: u128 = MAX_PAIR_TRANSITIONS_PER_PASS;
     pub const MAX_TOTAL_PAIR_TRANSITIONS: u128 = MAX_TOTAL_PAIR_TRANSITIONS;
+    pub const MAX_EXACT_LIMB_TRANSITIONS: u128 = MAX_EXACT_LIMB_TRANSITIONS;
 
     pub fn try_compile_model(
         model: &stab_model::DetectorErrorModel,
@@ -240,6 +242,11 @@ pub enum ExactMlCompileError {
         "exact ML tie resolution needs at least {actual_at_least} bytes, exceeding the {limit}-byte workspace limit"
     )]
     ExactWorkspaceLimit { actual_at_least: u128, limit: u128 },
+
+    #[error(
+        "exact ML tie resolution needs at least {actual_at_least} limb transitions, exceeding the {limit}-transition work limit"
+    )]
+    ExactWorkLimit { actual_at_least: u128, limit: u128 },
 
     #[error("invalid detector-error model during exact ML traversal: {0}")]
     ModelTraversal(#[source] ModelError),
@@ -744,10 +751,18 @@ impl ExactDyadicDistribution {
         mechanisms: &[Mechanism],
     ) -> Result<Self, ExactMlCompileError> {
         let mut denominator_exponent = 0_usize;
+        let mut active_mechanisms = 0_u128;
         for mechanism in mechanisms {
             if mechanism.effect == 0 || mechanism.probability == 0.0 {
                 continue;
             }
+            active_mechanisms =
+                active_mechanisms
+                    .checked_add(1)
+                    .ok_or(ExactMlCompileError::ExactWorkLimit {
+                        actual_at_least: u128::MAX,
+                        limit: MAX_EXACT_LIMB_TRANSITIONS,
+                    })?;
             denominator_exponent = denominator_exponent
                 .checked_add(
                     ExactProbability::from_f64(mechanism.probability)?.denominator_exponent,
@@ -797,6 +812,8 @@ impl ExactDyadicDistribution {
                 limit: MAX_TIE_WORKSPACE_BYTES,
             });
         }
+        let pair_transitions = (state_count as u128 / 2).saturating_mul(active_mechanisms);
+        admit_exact_limb_work(pair_transitions, limbs_per_state)?;
         let mut words = Vec::new();
         words
             .try_reserve_exact(total_words)
@@ -891,6 +908,20 @@ impl ExactDyadicDistribution {
                 message: "exact state escaped allocated workspace".to_owned(),
             })
     }
+}
+
+fn admit_exact_limb_work(
+    pair_transitions: u128,
+    limbs_per_state: usize,
+) -> Result<(), ExactMlCompileError> {
+    let limb_transitions = pair_transitions.saturating_mul(limbs_per_state as u128);
+    if limb_transitions > MAX_EXACT_LIMB_TRANSITIONS {
+        return Err(ExactMlCompileError::ExactWorkLimit {
+            actual_at_least: limb_transitions,
+            limit: MAX_EXACT_LIMB_TRANSITIONS,
+        });
+    }
+    Ok(())
 }
 
 fn exact_state_pair_mut(
