@@ -32,7 +32,7 @@ Stop and repair the owning source when the plan, Cargo metadata, architecture ch
 1. Freeze the static decoder contract and rationales before source edits. Keep compilation implementation-specific and reject dynamic Rust plugins or per-shot dynamic dispatch.
 2. Add correction-typed mutable prediction-prefix views and a bounded model-owned DEM error-mechanism visitor, with focused semantic and resource tests first.
 3. Add Stable `stab-decoder`, canonical facade reexports, external Stable-consumer behavior, architecture enforcement, API docs, and the portable-SIMD Clippy CI lane.
-4. Add unpublished `stab-reference-decoder` with the exact A7 limits, log-domain dynamic program, impossible-syndrome behavior, reusable session, and independent exhaustive oracle.
+4. Add unpublished `stab-reference-decoder` with the exact A7 limits, directed-interval probability program, exact-dyadic posterior fallback, impossible-syndrome behavior, reusable session, and independent exhaustive oracle.
 5. Prove distance-3 and distance-5 generated repetition models and one real public-only sampling, conversion, decoding, and logical-error experiment with seeded and partitioned execution.
 6. Add exact correctness ownership and exactly three executable Stab-only product diagnostics for compilation, reused decode, and the full pipeline. Freeze future regression identities without creating a Stim ratio or claiming a current self-regression result.
 7. Regenerate correctness, performance, and status artifacts; run focused Stable and Nightly checks, source-current correctness tiers, benchmark smoke, and diagnostic measurements at unique paths.

@@ -840,14 +840,14 @@ Status: Active.
 ### A7.3 Bounded Exact Maximum-Likelihood Reference
 
 - Add unpublished `stab-reference-decoder` under `test-support` and forbid dependencies on `stab-core`, CLI, ops, private modules, or Nightly features.
-- Compile each independent DEM error mechanism into one detector-plus-observable effect mask and run an in-place log-domain dynamic program over joint states.
+- Compile each independent DEM error mechanism into one detector-plus-observable effect mask and run an in-place directed-interval probability dynamic program over joint states, followed only when needed by exact-dyadic posterior certification.
 - Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, and `2^21` joint states. The primary directed-interval pass uses at most 32 MiB and certifies disjoint posterior bounds. An unresolved comparison drops that buffer before a mutually exclusive exact-dyadic pass using at most 32 MiB; models whose exact limb table would exceed that cap fail with a typed resource error instead of guessing. Peak probability workspace is therefore 32 MiB. Each pass performs at most `2^28` pair updates and the optional two-pass path performs at most `2^29` total pair updates.
 - Retain exactly one byte per detector syndrome after compilation. Ties choose observable prediction zero, zero-observable models are valid, and impossible syndromes produce a typed error before the batch output is mutated.
 - Use checked allocation and arithmetic throughout. Exact ties choose observable prediction zero, while arbitrarily small strict majorities retain their mathematical sign. Reused decoding performs no allocation and updates only a completed prefix when cancellation is observed.
 
 ### A7.4 Independent Correctness And Experiment Tests
 
-- Compare the log-domain joint distribution against direct subset enumeration for exhaustive small mechanisms, including probabilities zero and one, duplicate targets, zero-effect mechanisms, ties, and impossible syndromes.
+- Compare the directed-interval distribution and exact-dyadic fallback against direct subset enumeration for exhaustive small mechanisms, including probabilities zero and one, duplicate targets, zero-effect mechanisms, ties, strict near-ties, and impossible syndromes.
 - Generate noisy distance-3 and distance-5 repetition circuits through `stab-analysis`, lower them to DEMs, compile the reference decoder, and compare every bounded syndrome prediction with an independent probability-domain oracle. Apply the same independent oracle to every exact-ML compile and reused-decode diagnostic model.
 - Test detector, observable, prediction, and shot-count mismatches before mutation; every exact resource boundary and first rejection; session reuse; whole-versus-partitioned batches; pre-cancellation; mid-batch cancellation through the conformance fixture; failure progress; and zero-shot behavior.
 - Build one external end-to-end experiment using only public `stab-analysis`, `stab-engine`, `stab-model`, `stab-records`, and `stab-decoder` APIs: generate a repetition circuit, compile sampling and measurement-to-detection plans, stream typed detection batches into the reference session, and count logical failures after predictions are produced.
@@ -869,6 +869,7 @@ Status: Active.
 - Run `milestone-audit` against every A7 task, test, benchmark, resource boundary, and done criterion; fix implementation defects and log only genuine under-specification.
 - Run `full-code-review` across the new public API, DEM semantics, exact-ML arithmetic, cancellation and mutation guarantees, external composition, benchmark comparability, and documentation.
 - Commit fixes before source-current A7 correctness and diagnostic timing. Preserve failed artifact paths and do not promote shared-host timing as A9 evidence.
+- Bind correctness, diagnostic timing, and exact-revision CI to one clean measured source commit. A later status-only closure commit may change only the append-only progress report, generated qualification status and inventories required by the checklist status, `GOAL.md`, the A7 status line, and directly linked closure prose. It records the measured source identity and must not replay or relabel that evidence under the descendant; any executable, fixture, workflow, benchmark contract, qualification case, or substantive normative change invalidates the measurements.
 
 ### Tasks
 
