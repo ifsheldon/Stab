@@ -11,6 +11,7 @@ mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
 mod circuit_missing_detectors;
+mod circuit_pass;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_to_dem;
@@ -49,6 +50,10 @@ pub use circuit_inverse::{
     circuit_time_reversed_for_flows_with_options,
 };
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
+pub use circuit_pass::{
+    CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassLimits,
+    CircuitPassOutput, CircuitPassProjectionError, CircuitPassResources, run_circuit_pass,
+};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
 pub use circuit_to_dem::{
@@ -57,7 +62,8 @@ pub use circuit_to_dem::{
     try_disjoint_to_independent_xyz_errors,
 };
 pub use circuit_transforms::{
-    CircuitFlattenLimits, circuit_without_noise, flattened_circuit, flattened_circuit_operations,
+    CircuitFlattenLimits, WithoutNoiseOptions, WithoutNoisePass, WithoutNoiseReport,
+    circuit_without_noise, flattened_circuit, flattened_circuit_operations,
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
 pub use dem::{
@@ -82,7 +88,7 @@ pub use matched_error::{
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
-pub use resources::{ResourceKind, ResourceLimitError, ResourceOperation};
+pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, ResourceOperation};
 
 /// Low-level lowering operations shared with compilation engines.
 pub mod advanced {

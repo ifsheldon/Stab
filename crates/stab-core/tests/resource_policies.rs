@@ -82,6 +82,7 @@ fn resource_identifiers_are_stable() {
             "detector-error-model-parse",
         ),
         (ResourceOperation::CircuitFlatten, "circuit-flatten"),
+        (ResourceOperation::CircuitPass, "circuit-pass"),
         (
             ResourceOperation::DetectionConversion,
             "detection-conversion",
@@ -106,6 +107,7 @@ fn resource_identifiers_are_stable() {
     for (resource, code) in [
         (ResourceKind::SourceLines, "source-lines"),
         (ResourceKind::RepeatNesting, "repeat-nesting"),
+        (ResourceKind::RepresentedItems, "represented-items"),
         (ResourceKind::ExpandedOperations, "expanded-operations"),
         (ResourceKind::RecordBits, "record-bits"),
         (ResourceKind::MaterializedBits, "materialized-bits"),
@@ -113,6 +115,10 @@ fn resource_identifiers_are_stable() {
         (ResourceKind::RepeatIterations, "repeat-iterations"),
         (ResourceKind::MaterializedUnits, "materialized-units"),
         (ResourceKind::MaterializedBytes, "materialized-bytes"),
+        (
+            ResourceKind::ProjectedPayloadBytes,
+            "projected-payload-bytes",
+        ),
         (
             ResourceKind::SampledErrorApplications,
             "sampled-error-applications",

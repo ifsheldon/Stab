@@ -36,5 +36,6 @@ stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 stab-reference-decoder = { path = "../../test-support/reference-decoder" }
+stab-reference-noise-pass = { path = "../../test-support/reference-noise-pass" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

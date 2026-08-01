@@ -3,7 +3,10 @@ use stab_model::{
     advanced::CircuitBuilder,
 };
 
-use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
+use crate::{
+    AnalysisError, AnalysisResult, CircuitPass, CircuitPassInput, CircuitPassOutput,
+    CircuitPassResources, ResourceLimitError,
+};
 
 const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
 const MAX_MATERIALIZED_FLATTENED_TARGETS: u64 = 32_000_000;
@@ -176,14 +179,116 @@ fn validate_materialized_instruction_capacity(count: u64) -> AnalysisResult<usiz
 /// heralded noise instructions become deterministic zero `MPAD` results so measurement-record
 /// indexing stays unchanged.
 pub fn circuit_without_noise(circuit: &Circuit) -> AnalysisResult<Circuit> {
+    circuit_without_noise_impl(circuit, &mut ())
+}
+
+/// Built-in pass that removes noisy behavior while preserving measurement records.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WithoutNoisePass;
+
+/// Options for [`WithoutNoisePass`].
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct WithoutNoiseOptions;
+
+/// Represented structural changes made by [`WithoutNoisePass`].
+///
+/// Instructions inside a folded repeat body are counted once, independently of the repeat count.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct WithoutNoiseReport {
+    removed_noise_instructions: u64,
+    stripped_measurement_probabilities: u64,
+    replaced_heralded_noise_instructions: u64,
+}
+
+impl WithoutNoiseReport {
+    pub const fn removed_noise_instructions(self) -> u64 {
+        self.removed_noise_instructions
+    }
+
+    pub const fn stripped_measurement_probabilities(self) -> u64 {
+        self.stripped_measurement_probabilities
+    }
+
+    pub const fn replaced_heralded_noise_instructions(self) -> u64 {
+        self.replaced_heralded_noise_instructions
+    }
+}
+
+#[derive(Clone, Copy)]
+enum WithoutNoiseChange {
+    RemovedNoise,
+    StrippedMeasurementProbability,
+    ReplacedHeraldedNoise,
+}
+
+trait WithoutNoiseRecorder {
+    fn record(&mut self, change: WithoutNoiseChange) -> AnalysisResult<()>;
+}
+
+impl WithoutNoiseRecorder for () {
+    #[inline(always)]
+    fn record(&mut self, _change: WithoutNoiseChange) -> AnalysisResult<()> {
+        Ok(())
+    }
+}
+
+impl WithoutNoiseRecorder for WithoutNoiseReport {
+    fn record(&mut self, change: WithoutNoiseChange) -> AnalysisResult<()> {
+        let (counter, kind) = match change {
+            WithoutNoiseChange::RemovedNoise => (
+                &mut self.removed_noise_instructions,
+                "removed noise instruction count",
+            ),
+            WithoutNoiseChange::StrippedMeasurementProbability => (
+                &mut self.stripped_measurement_probabilities,
+                "stripped measurement-probability count",
+            ),
+            WithoutNoiseChange::ReplacedHeraldedNoise => (
+                &mut self.replaced_heralded_noise_instructions,
+                "replaced heralded-noise instruction count",
+            ),
+        };
+        increment_pass_report_counter(counter, kind)
+    }
+}
+
+impl CircuitPass for WithoutNoisePass {
+    type Options = WithoutNoiseOptions;
+    type Report = WithoutNoiseReport;
+    type Diagnostic = AnalysisError;
+
+    fn project_output_resources(
+        &self,
+        input: CircuitPassInput<'_>,
+        _options: &Self::Options,
+    ) -> Result<CircuitPassResources, Self::Diagnostic> {
+        // Removing noise never increases any retained resource dimension.
+        Ok(input.resources())
+    }
+
+    fn run(
+        &self,
+        input: CircuitPassInput<'_>,
+        _options: &Self::Options,
+    ) -> Result<CircuitPassOutput<Self::Report>, Self::Diagnostic> {
+        let mut report = WithoutNoiseReport::default();
+        let circuit = circuit_without_noise_impl(input.circuit(), &mut report)?;
+        Ok(CircuitPassOutput::new(circuit, report))
+    }
+}
+
+fn circuit_without_noise_impl<R: WithoutNoiseRecorder>(
+    circuit: &Circuit,
+    recorder: &mut R,
+) -> AnalysisResult<Circuit> {
     let mut result = Circuit::new();
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                append_noiseless_instruction(&mut result, instruction)?
+                append_noiseless_instruction(&mut result, instruction, recorder)?
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let body = circuit_without_noise(repeat.body())?;
+                let body = circuit_without_noise_impl(repeat.body(), recorder)?;
                 result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     body,
@@ -451,13 +556,15 @@ fn visit_flattened_instruction(
     Ok(())
 }
 
-fn append_noiseless_instruction(
+fn append_noiseless_instruction<R: WithoutNoiseRecorder>(
     result: &mut Circuit,
     instruction: &CircuitInstruction,
+    recorder: &mut R,
 ) -> AnalysisResult<()> {
     let gate = instruction.gate();
     if gate.produces_measurements() {
         let noiseless = if is_heralded_noise(gate) {
+            recorder.record(WithoutNoiseChange::ReplacedHeraldedNoise)?;
             stab_model::advanced::circuit_instruction_with_tag_bytes(
                 Gate::from_name("MPAD")?,
                 Vec::new(),
@@ -465,6 +572,9 @@ fn append_noiseless_instruction(
                 instruction.tag_bytes(),
             )?
         } else {
+            if !instruction.args().is_empty() {
+                recorder.record(WithoutNoiseChange::StrippedMeasurementProbability)?;
+            }
             clone_instruction_with_args(instruction, Vec::new())?
         };
         result.append_instruction(noiseless);
@@ -473,7 +583,16 @@ fn append_noiseless_instruction(
             instruction,
             instruction.args().to_vec(),
         )?);
+    } else {
+        recorder.record(WithoutNoiseChange::RemovedNoise)?;
     }
+    Ok(())
+}
+
+fn increment_pass_report_counter(counter: &mut u64, kind: &'static str) -> AnalysisResult<()> {
+    *counter = counter
+        .checked_add(1)
+        .ok_or_else(|| AnalysisError::invalid_domain_value(kind, "overflowed"))?;
     Ok(())
 }
 

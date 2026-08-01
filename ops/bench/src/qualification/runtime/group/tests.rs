@@ -250,6 +250,11 @@ fn valid_contract_file() -> GroupContractFile {
             "sample-detect-decode-pipeline",
             "sample-detect-decode",
         ),
+        product_diagnostic_contract(
+            super::super::invocation::A8_EXTERNAL_NOISE_PASS_GROUP_ID,
+            "external-noise-pass",
+            "run-and-release",
+        ),
     ]);
     let product_diagnostic_policies = groups
         .iter()
@@ -553,6 +558,77 @@ fn a7_decoder_diagnostics_are_executable_stab_only_contracts() {
             &wrong_measurement
         ));
     }
+}
+
+#[test]
+fn a8_external_pass_is_an_exact_stab_only_diagnostic_contract() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+    let contract = file
+        .groups
+        .iter()
+        .find(|contract| {
+            contract.id.to_string() == super::super::invocation::A8_EXTERNAL_NOISE_PASS_GROUP_ID
+        })
+        .expect("A8 external-pass diagnostic contract");
+
+    assert_eq!(contract.claim_class, ClaimClass::ProductDiagnostic);
+    assert_eq!(contract.parity_eligibility, ParityEligibility::ReportOnly);
+    assert_eq!(contract.workload_id.to_string(), "external-noise-pass");
+    assert_eq!(
+        contract
+            .measurement_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["run-and-release"]
+    );
+    assert_eq!(
+        contract
+            .scales
+            .iter()
+            .map(|scale| scale.work_items.get())
+            .collect::<Vec<_>>(),
+        [64, 4_096, 65_536]
+    );
+    assert_eq!(
+        contract.correctness_case_ids,
+        [
+            "cq-evidence-qualification-0b7d994f36856b37",
+            "cq-evidence-qualification-462e13db123d5041",
+            "cq-evidence-qualification-63d794137c5e40e8",
+            "cq-evidence-qualification-7164c6c57e8187cf",
+            "cq-evidence-qualification-7a01f0caf77063a0",
+            "cq-evidence-qualification-8034f3ff6932ff5e",
+            "cq-evidence-qualification-88972b4df64c8539",
+            "cq-evidence-qualification-9271cf708f696d42",
+            "cq-evidence-qualification-da7f35283dd1c657",
+        ]
+    );
+    assert!(contract.comparator_sources.is_empty());
+    assert!(contract.profiler_note.is_none());
+    assert!(super::super::invocation::supports_group(contract));
+
+    let policy = file
+        .product_diagnostic_policies
+        .iter()
+        .find(|policy| policy.group_id == contract.id)
+        .expect("A8 source-owned diagnostic policy");
+    assert_eq!(policy.scales.len(), 3);
+    assert!(policy.scales.iter().all(|scale| {
+        scale.batch_policy == ProductDiagnosticBatchPolicy::CalibratedRepeat
+            && scale.witness_case_id == "cq-evidence-qualification-7a01f0caf77063a0"
+            && scale.max_worker_peak_rss_bytes.is_none()
+    }));
+
+    let mut wrong_measurement = contract.clone();
+    wrong_measurement.measurement_ids =
+        vec![ProtocolId::try_new("wrong-measurement").expect("measurement id")];
+    assert!(!super::super::invocation::supports_group(
+        &wrong_measurement
+    ));
 }
 
 #[test]

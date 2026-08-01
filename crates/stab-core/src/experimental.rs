@@ -1,4 +1,10 @@
 //! Reserved for implemented extension contracts that may change before Stab 1.0.
 //!
-//! This namespace is intentionally empty in Stab 0.2. A pass, decoder, or backend seam will only
-//! appear here after an external implementation proves that the contract is useful.
+//! Circuit-pass contracts appear here after a built-in transform and an external Stable crate
+//! prove the common seam. Dynamic Rust plugins and runtime gate registration remain unsupported.
+
+pub use stab_analysis::{
+    CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassLimits,
+    CircuitPassOutput, CircuitPassProjectionError, CircuitPassResources, CircuitPassStage,
+    WithoutNoiseOptions, WithoutNoisePass, WithoutNoiseReport, run_circuit_pass,
+};

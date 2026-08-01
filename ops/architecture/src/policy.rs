@@ -43,7 +43,8 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
     ProductPackageContract::stable("stab-model", &[]),
     ProductPackageContract::stable("stab-records", &["stab-bits"]),
 ];
-const STABLE_TEST_SUPPORT_PACKAGES: &[&str] = &["stab-reference-decoder"];
+const STABLE_TEST_SUPPORT_PACKAGES: &[&str] =
+    &["stab-reference-decoder", "stab-reference-noise-pass"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ProductPackageContract {
@@ -416,20 +417,27 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
 }
 
 fn is_permitted_test_support_component_edge(edge: &WorkspaceEdge) -> bool {
-    if edge.from != "stab-reference-decoder" || edge.optional {
+    if edge.optional {
         return false;
     }
-    match edge.kind {
-        DependencyKind::Normal => {
-            matches!(
-                edge.to.as_str(),
-                "stab-decoder" | "stab-model" | "stab-records"
-            )
+    match edge.from.as_str() {
+        "stab-reference-decoder" => match edge.kind {
+            DependencyKind::Normal => {
+                matches!(
+                    edge.to.as_str(),
+                    "stab-decoder" | "stab-model" | "stab-records"
+                )
+            }
+            DependencyKind::Development => {
+                matches!(edge.to.as_str(), "stab-analysis" | "stab-engine")
+            }
+            DependencyKind::Build | DependencyKind::Unknown => false,
+        },
+        "stab-reference-noise-pass" => {
+            edge.kind == DependencyKind::Normal
+                && matches!(edge.to.as_str(), "stab-analysis" | "stab-model")
         }
-        DependencyKind::Development => {
-            matches!(edge.to.as_str(), "stab-analysis" | "stab-engine")
-        }
-        DependencyKind::Build | DependencyKind::Unknown => false,
+        _ => false,
     }
 }
 
@@ -750,6 +758,65 @@ mod tests {
     }
 
     #[test]
+    fn reference_noise_pass_has_only_its_earned_component_edges() {
+        let packages = vec![
+            package("stab-reference-noise-pass", "test-support"),
+            package("stab-analysis", "crates"),
+            package("stab-model", "crates"),
+            package("stab-core", "crates"),
+            package("stab-engine", "crates"),
+            package("stab-bench", "ops"),
+        ];
+        let permitted = WorkspaceGraph {
+            packages: packages.clone(),
+            edges: vec![
+                WorkspaceEdge {
+                    from: "stab-reference-noise-pass".to_owned(),
+                    to: "stab-analysis".to_owned(),
+                    kind: DependencyKind::Normal,
+                    optional: false,
+                },
+                WorkspaceEdge {
+                    from: "stab-reference-noise-pass".to_owned(),
+                    to: "stab-model".to_owned(),
+                    kind: DependencyKind::Normal,
+                    optional: false,
+                },
+            ],
+            declared_path_dependencies: Vec::new(),
+            resolved_dependencies: Vec::new(),
+        };
+        assert!(validate_graph(&permitted).violations.is_empty());
+
+        for (target, kind, optional) in [
+            ("stab-core", DependencyKind::Normal, false),
+            ("stab-engine", DependencyKind::Development, false),
+            ("stab-bench", DependencyKind::Development, false),
+            ("stab-model", DependencyKind::Development, false),
+            ("stab-analysis", DependencyKind::Normal, true),
+        ] {
+            let forbidden = WorkspaceGraph {
+                edges: vec![WorkspaceEdge {
+                    from: "stab-reference-noise-pass".to_owned(),
+                    to: target.to_owned(),
+                    kind,
+                    optional,
+                }],
+                ..permitted.clone()
+            };
+            assert_eq!(
+                validate_graph(&forbidden)
+                    .violations
+                    .first()
+                    .expect("forbidden reference edge")
+                    .code,
+                "test-support-upward-dependency",
+                "{kind:?} reference edge to {target} optional={optional}"
+            );
+        }
+    }
+
+    #[test]
     fn new_product_packages_require_an_explicit_role() {
         let graph = graph(vec![package("stab-plugin", "crates")]);
         let report = validate_graph(&graph);
@@ -813,35 +880,37 @@ mod tests {
     }
 
     #[test]
-    fn stable_reference_proof_requires_exact_msrv_and_scalar_defaults() {
-        let valid = graph(vec![package("stab-reference-decoder", "test-support")]);
-        assert!(validate_graph(&valid).violations.is_empty());
+    fn stable_reference_proofs_require_exact_msrv_and_scalar_defaults() {
+        for proof_package in STABLE_TEST_SUPPORT_PACKAGES {
+            let valid = graph(vec![package(proof_package, "test-support")]);
+            assert!(validate_graph(&valid).violations.is_empty());
 
-        for actual in [None, Some(Version::new(1, 97, 0))] {
-            let mut invalid = valid.clone();
-            invalid
+            for actual in [None, Some(Version::new(1, 97, 0))] {
+                let mut invalid = valid.clone();
+                invalid
+                    .packages
+                    .first_mut()
+                    .expect("reference package")
+                    .rust_version = actual;
+                assert!(validate_graph(&invalid).violations.iter().any(|violation| {
+                    violation.code == "stable-component-rust-version"
+                        && violation.message.contains(proof_package)
+                }));
+            }
+
+            let mut nightly_default = valid;
+            nightly_default
                 .packages
                 .first_mut()
                 .expect("reference package")
-                .rust_version = actual;
-            assert!(validate_graph(&invalid).violations.iter().any(|violation| {
-                violation.code == "stable-component-rust-version"
-                    && violation.message.contains("stab-reference-decoder")
-            }));
+                .default_features = vec!["portable-simd".to_owned()];
+            assert!(
+                validate_graph(&nightly_default)
+                    .violations
+                    .iter()
+                    .any(|violation| violation.code == "stable-default-reaches-nightly")
+            );
         }
-
-        let mut nightly_default = valid;
-        nightly_default
-            .packages
-            .first_mut()
-            .expect("reference package")
-            .default_features = vec!["portable-simd".to_owned()];
-        assert!(
-            validate_graph(&nightly_default)
-                .violations
-                .iter()
-                .any(|violation| violation.code == "stable-default-reaches-nightly")
-        );
     }
 
     #[test]

@@ -14,6 +14,13 @@ pub(crate) enum WorkerError {
     #[error(transparent)]
     SamplingCompile(#[from] stab_core::SamplingCompileError),
     #[error(transparent)]
+    NoisePass(
+        #[from]
+        stab_analysis::CircuitPassError<
+            stab_reference_noise_pass::XErrorAfterSingleQubitUnitariesDiagnostic,
+        >,
+    ),
+    #[error(transparent)]
     DecoderDiagnostic(Box<super::decoder_diagnostic::DecoderDiagnosticError>),
     #[error(transparent)]
     Bits(#[from] BitError),
@@ -33,6 +40,24 @@ pub(crate) enum WorkerError {
     AgentDiagnosticMissingOutput,
     #[error("agent diagnostic workload {0} differed from its untimed typed witness")]
     AgentDiagnosticWitness(&'static str),
+    #[error("external noise-pass input must contain at least one represented instruction")]
+    NoisePassInputMinimum,
+    #[error("external noise-pass input has {actual} represented instructions, maximum {maximum}")]
+    NoisePassInputLimit { actual: u64, maximum: u64 },
+    #[error("external noise-pass input count {0} cannot be represented on this host")]
+    NoisePassInputRange(u64),
+    #[error("external noise-pass fixture capacity overflows usize")]
+    NoisePassFixtureOverflow,
+    #[error("external noise-pass fixture allocation failed: {0}")]
+    NoisePassFixtureAllocation(std::collections::TryReserveError),
+    #[error("external noise-pass insertion count overflowed u64")]
+    NoisePassInsertionOverflow,
+    #[error("external noise-pass fixture has {actual} represented items, expected {expected}")]
+    NoisePassRepresentedItems { actual: u64, expected: u64 },
+    #[error("external noise-pass workload returned no output")]
+    NoisePassMissingOutput,
+    #[error("external noise-pass {0} differed from its untimed exact witness")]
+    NoisePassWitness(&'static str),
     #[error("DEM model work count {actual} is not a positive multiple of {cycle}")]
     DemItemShape { actual: u64, cycle: u64 },
     #[error("DEM model work count {actual} exceeds maximum {maximum}")]

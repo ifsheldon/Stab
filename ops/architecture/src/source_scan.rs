@@ -10,6 +10,21 @@ use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
 const FACADE_ROOT_MODULES: [&str; 4] = ["advanced", "analysis", "execution", "experimental"];
+const FACADE_EXPERIMENTAL_REEXPORTS: [&str; 13] = [
+    "CircuitPass",
+    "CircuitPassContext",
+    "CircuitPassError",
+    "CircuitPassInput",
+    "CircuitPassLimits",
+    "CircuitPassOutput",
+    "CircuitPassProjectionError",
+    "CircuitPassResources",
+    "CircuitPassStage",
+    "WithoutNoiseOptions",
+    "WithoutNoisePass",
+    "WithoutNoiseReport",
+    "run_circuit_pass",
+];
 const FACADE_ADVANCED_MODULES: [&str; 6] = [
     "storage",
     "algebra",
@@ -248,16 +263,32 @@ fn facade_tier_violations(
         violations.push(Violation::new(
             "facade-experimental-module",
             format!(
-                "{} publicly declares experimental module `{module}` before A8 defines an allowlist",
+                "{} publicly declares unassigned experimental module `{module}`",
                 experimental.path.display()
             ),
         ));
     }
-    for reexport in &experimental_surface.reexports {
+    let expected_experimental_reexports = FACADE_EXPERIMENTAL_REEXPORTS
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    for missing in expected_experimental_reexports.difference(&experimental_surface.reexports) {
         violations.push(Violation::new(
-            "facade-experimental-reexport",
+            "facade-experimental-reexport-missing",
             format!(
-                "{} publicly reexports experimental item `{reexport}` before A8 defines an allowlist",
+                "{} must publicly reexport assigned experimental item `{missing}`",
+                experimental.path.display()
+            ),
+        ));
+    }
+    for unexpected in experimental_surface
+        .reexports
+        .difference(&expected_experimental_reexports)
+    {
+        violations.push(Violation::new(
+            "facade-experimental-reexport-unassigned",
+            format!(
+                "{} publicly reexports unassigned experimental item `{unexpected}`",
                 experimental.path.display()
             ),
         ));
@@ -680,6 +711,13 @@ fn package_for_source<'a>(
 mod tests {
     use super::*;
 
+    fn assigned_experimental_surface() -> FacadeSource<'static> {
+        FacadeSource::new(
+            Path::new("experimental.rs"),
+            include_str!("../../../crates/stab-core/src/experimental.rs"),
+        )
+    }
+
     #[test]
     fn kernel_package_owns_direct_simd() {
         let package = PackageSpec {
@@ -735,7 +773,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
 
@@ -757,7 +795,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
         let codes = violations
@@ -781,7 +819,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
         let codes = violations
@@ -831,7 +869,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
         );
         let unexpected = violations
@@ -864,7 +902,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
         );
         let codes = violations
@@ -889,7 +927,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 "pub mod algebra {}\npub mod backend {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
-            FacadeSource::new(Path::new("experimental.rs"), ""),
+            assigned_experimental_surface(),
             FacadeSource::new(
                 Path::new("root-reexports.txt"),
                 "Circuit\nCircuit\nnot-valid\n",
@@ -920,10 +958,7 @@ mod tests {
                 Path::new("advanced.rs"),
                 include_str!("../../../crates/stab-core/src/advanced.rs"),
             ),
-            FacadeSource::new(
-                Path::new("experimental.rs"),
-                include_str!("../../../crates/stab-core/src/experimental.rs"),
-            ),
+            assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
 
@@ -931,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn facade_tier_contract_rejects_advanced_and_experimental_exports() {
+    fn facade_tier_contract_rejects_unassigned_advanced_and_experimental_exports() {
         let violations = facade_tier_violations(
             FacadeSource::new(
                 Path::new("lib.rs"),
@@ -959,7 +994,8 @@ mod tests {
                 "facade-advanced-reexport",
                 "facade-experimental-direct-item",
                 "facade-experimental-module",
-                "facade-experimental-reexport",
+                "facade-experimental-reexport-missing",
+                "facade-experimental-reexport-unassigned",
             ])
         );
     }

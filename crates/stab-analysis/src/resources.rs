@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 /// Analysis operation whose configurable resource budget was exceeded.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ResourceOperation {
+    CircuitPass,
     CircuitFlatten,
     DetectorErrorModelFlatten,
     LogicalErrorSearch,
@@ -12,6 +13,7 @@ pub enum ResourceOperation {
 impl ResourceOperation {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::CircuitPass => "circuit-pass",
             Self::CircuitFlatten => "circuit-flatten",
             Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
             Self::LogicalErrorSearch => "logical-error-search",
@@ -24,11 +26,13 @@ impl ResourceOperation {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ResourceKind {
     RepeatNesting,
+    RepresentedItems,
     ExpandedOperations,
     RepeatCount,
     RepeatIterations,
     MaterializedUnits,
     MaterializedBytes,
+    ProjectedPayloadBytes,
     TargetOccurrences,
     ArgumentValues,
     ErrorMechanisms,
@@ -53,11 +57,13 @@ impl ResourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::RepeatNesting => "repeat-nesting",
+            Self::RepresentedItems => "represented-items",
             Self::ExpandedOperations => "expanded-operations",
             Self::RepeatCount => "repeat-count",
             Self::RepeatIterations => "repeat-iterations",
             Self::MaterializedUnits => "materialized-units",
             Self::MaterializedBytes => "materialized-bytes",
+            Self::ProjectedPayloadBytes => "projected-payload-bytes",
             Self::TargetOccurrences => "target-occurrences",
             Self::ArgumentValues => "argument-values",
             Self::ErrorMechanisms => "error-mechanisms",
@@ -111,6 +117,10 @@ pub(crate) enum LogicalErrorSearchResource {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
+    CircuitPass {
+        stage: CircuitPassStage,
+        resource: ResourceKind,
+    },
     CircuitFlattenRepeatNesting,
     CircuitFlattenExpandedOperations,
     CircuitFlattenTargetOccurrences,
@@ -139,6 +149,28 @@ enum ResourceLimitCause {
     },
 }
 
+/// Framework phase that rejected circuit-pass resources.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum CircuitPassStage {
+    /// The source circuit was rejected before pass dispatch.
+    Input,
+    /// The declared output projection was rejected before output-producing lowering.
+    OutputProjection,
+    /// The actual returned circuit was rejected after lowering and before release.
+    Output,
+}
+
+impl CircuitPassStage {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::OutputProjection => "projected-output",
+            Self::Output => "output",
+        }
+    }
+}
+
 /// Typed resource-admission failure produced by pure analysis operations.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ResourceLimitError {
@@ -148,6 +180,19 @@ pub struct ResourceLimitError {
 }
 
 impl ResourceLimitError {
+    pub(crate) const fn circuit_pass(
+        stage: CircuitPassStage,
+        resource: ResourceKind,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::CircuitPass { stage, resource },
+            actual,
+            limit,
+        }
+    }
+
     pub(crate) const fn circuit_flatten_expanded_operations(actual: u64, limit: u64) -> Self {
         Self {
             cause: ResourceLimitCause::CircuitFlattenExpandedOperations,
@@ -307,6 +352,7 @@ impl ResourceLimitError {
 
     pub const fn operation(self) -> ResourceOperation {
         match self.cause {
+            ResourceLimitCause::CircuitPass { .. } => ResourceOperation::CircuitPass,
             ResourceLimitCause::CircuitFlattenRepeatNesting
             | ResourceLimitCause::CircuitFlattenExpandedOperations
             | ResourceLimitCause::CircuitFlattenTargetOccurrences
@@ -337,6 +383,7 @@ impl ResourceLimitError {
 
     pub const fn resource(self) -> ResourceKind {
         match self.cause {
+            ResourceLimitCause::CircuitPass { resource, .. } => resource,
             ResourceLimitCause::CircuitFlattenRepeatNesting => ResourceKind::RepeatNesting,
             ResourceLimitCause::CircuitFlattenExpandedOperations => {
                 ResourceKind::ExpandedOperations
@@ -407,11 +454,26 @@ impl ResourceLimitError {
     pub const fn limit(self) -> u64 {
         self.limit
     }
+
+    pub(crate) const fn circuit_pass_stage(self) -> Option<CircuitPassStage> {
+        match self.cause {
+            ResourceLimitCause::CircuitPass { stage, .. } => Some(stage),
+            _ => None,
+        }
+    }
 }
 
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.cause {
+            ResourceLimitCause::CircuitPass { stage, resource } => write!(
+                formatter,
+                "circuit pass {} {} value {} exceeds current limit {}",
+                stage.as_str(),
+                resource.as_str(),
+                self.actual,
+                self.limit
+            ),
             ResourceLimitCause::CircuitFlattenRepeatNesting => write!(
                 formatter,
                 "invalid flattened circuit repeat nesting value {} exceeds fixed safety limit {}",

@@ -10,6 +10,7 @@ pub enum ResourceOperation {
     CircuitParse,
     DetectorErrorModelParse,
     CircuitFlatten,
+    CircuitPass,
     DetectionConversion,
     DetectorErrorModelFlatten,
     DetectorErrorModelSampling,
@@ -23,6 +24,7 @@ impl ResourceOperation {
             Self::CircuitParse => "circuit-parse",
             Self::DetectorErrorModelParse => "detector-error-model-parse",
             Self::CircuitFlatten => "circuit-flatten",
+            Self::CircuitPass => "circuit-pass",
             Self::DetectionConversion => "detection-conversion",
             Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
             Self::DetectorErrorModelSampling => "detector-error-model-sampling",
@@ -38,6 +40,7 @@ impl ResourceOperation {
 pub enum ResourceKind {
     SourceLines,
     RepeatNesting,
+    RepresentedItems,
     ExpandedOperations,
     RecordBits,
     MaterializedBits,
@@ -45,6 +48,7 @@ pub enum ResourceKind {
     RepeatIterations,
     MaterializedUnits,
     MaterializedBytes,
+    ProjectedPayloadBytes,
     SampledErrorApplications,
     ReplayWorkUnits,
     CompiledTerms,
@@ -73,6 +77,7 @@ impl ResourceKind {
         match self {
             Self::SourceLines => "source-lines",
             Self::RepeatNesting => "repeat-nesting",
+            Self::RepresentedItems => "represented-items",
             Self::ExpandedOperations => "expanded-operations",
             Self::RecordBits => "record-bits",
             Self::MaterializedBits => "materialized-bits",
@@ -80,6 +85,7 @@ impl ResourceKind {
             Self::RepeatIterations => "repeat-iterations",
             Self::MaterializedUnits => "materialized-units",
             Self::MaterializedBytes => "materialized-bytes",
+            Self::ProjectedPayloadBytes => "projected-payload-bytes",
             Self::SampledErrorApplications => "sampled-error-applications",
             Self::ReplayWorkUnits => "replay-work-units",
             Self::CompiledTerms => "compiled-terms",
@@ -315,6 +321,7 @@ impl ResourceLimitError {
                 stab_analysis::ResourceOperation::CircuitFlatten => {
                     ResourceOperation::CircuitFlatten
                 }
+                stab_analysis::ResourceOperation::CircuitPass => ResourceOperation::CircuitPass,
                 stab_analysis::ResourceOperation::DetectorErrorModelFlatten => {
                     ResourceOperation::DetectorErrorModelFlatten
                 }
@@ -352,11 +359,15 @@ impl ResourceLimitError {
         match self.cause {
             ResourceLimitCause::Analysis(error) => match error.resource() {
                 stab_analysis::ResourceKind::RepeatNesting => ResourceKind::RepeatNesting,
+                stab_analysis::ResourceKind::RepresentedItems => ResourceKind::RepresentedItems,
                 stab_analysis::ResourceKind::ExpandedOperations => ResourceKind::ExpandedOperations,
                 stab_analysis::ResourceKind::RepeatCount => ResourceKind::RepeatCount,
                 stab_analysis::ResourceKind::RepeatIterations => ResourceKind::RepeatIterations,
                 stab_analysis::ResourceKind::MaterializedUnits => ResourceKind::MaterializedUnits,
                 stab_analysis::ResourceKind::MaterializedBytes => ResourceKind::MaterializedBytes,
+                stab_analysis::ResourceKind::ProjectedPayloadBytes => {
+                    ResourceKind::ProjectedPayloadBytes
+                }
                 stab_analysis::ResourceKind::TargetOccurrences => ResourceKind::TargetOccurrences,
                 stab_analysis::ResourceKind::ArgumentValues => ResourceKind::ArgumentValues,
                 stab_analysis::ResourceKind::ErrorMechanisms => ResourceKind::ErrorMechanisms,

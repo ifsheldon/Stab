@@ -17,6 +17,7 @@ members = [
     "ops/pre-commit",
     "test-support/compat-corpus",
     "test-support/reference-decoder",
+    "test-support/reference-noise-pass",
 ]
 default-members = [
     "crates/stab-core",

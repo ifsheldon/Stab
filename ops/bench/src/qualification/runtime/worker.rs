@@ -19,6 +19,7 @@ pub(super) mod clifford_string;
 mod decoder_diagnostic;
 pub(in crate::qualification::runtime) mod dem_model;
 mod error;
+mod noise_pass;
 mod not_zero;
 mod pauli;
 mod pauli_iter;
@@ -42,7 +43,7 @@ use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use prepared::PreparedWorkload;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 15] = [
+const WORKER_SOURCES: [(&str, &[u8]); 16] = [
     ("worker.rs", include_bytes!("worker.rs")),
     (
         "worker/agent_diagnostic.rs",
@@ -59,6 +60,10 @@ const WORKER_SOURCES: [(&str, &[u8]); 15] = [
     ),
     ("worker/dem_model.rs", include_bytes!("worker/dem_model.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
+    (
+        "worker/noise_pass.rs",
+        include_bytes!("worker/noise_pass.rs"),
+    ),
     ("worker/pauli.rs", include_bytes!("worker/pauli.rs")),
     (
         "worker/pauli_iter.rs",
@@ -293,6 +298,7 @@ enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
     AgentDiagnostic(agent_diagnostic::AgentDiagnosticOutput),
     DecoderDiagnostic(decoder_diagnostic::DecoderDiagnosticOutput),
+    NoisePass(noise_pass::NoisePassOutput),
     DemParsed(stab_core::DetectorErrorModel),
     DemSerialized(String),
     PopcountChecksum(u64),
@@ -644,6 +650,34 @@ mod tests {
                 64,
             ),
             Err(WorkerError::UnexpectedDemFamily)
+        ));
+        assert!(matches!(
+            PreparedWorkload::prepare(
+                WorkerWorkload::ExternalNoisePass,
+                None,
+                Some(dem_model::DemFamily::FlatErrors),
+                1,
+                64,
+                64,
+            ),
+            Err(WorkerError::UnexpectedDemFamily)
+        ));
+    }
+
+    #[test]
+    fn external_noise_pass_rejects_unrelated_clifford_descriptors() {
+        let descriptor =
+            CliffordDescriptor::canonical(clifford_string::CliffordWorkloadKind::Identity, 64);
+        assert!(matches!(
+            PreparedWorkload::prepare(
+                WorkerWorkload::ExternalNoisePass,
+                Some(descriptor),
+                None,
+                1,
+                64,
+                64,
+            ),
+            Err(WorkerError::UnexpectedCliffordDescriptor)
         ));
     }
 

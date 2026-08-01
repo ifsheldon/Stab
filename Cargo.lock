@@ -2222,6 +2222,7 @@ dependencies = [
  "stab-model",
  "stab-records",
  "stab-reference-decoder",
+ "stab-reference-noise-pass",
  "tempfile",
  "thiserror",
 ]
@@ -2374,6 +2375,15 @@ dependencies = [
  "stab-model",
  "stab-records",
  "thiserror",
+]
+
+[[package]]
+name = "stab-reference-noise-pass"
+version = "0.2.0"
+dependencies = [
+ "allocation-counter",
+ "stab-analysis",
+ "stab-model",
 ]
 
 [[package]]

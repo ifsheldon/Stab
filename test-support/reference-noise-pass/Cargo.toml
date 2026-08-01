@@ -1,0 +1,20 @@
+[package]
+name = "stab-reference-noise-pass"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+description = "External Stable-Rust circuit-pass proof for Stab's public analysis seam."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+stab-analysis = { workspace = true }
+stab-model = { workspace = true }
+
+[dev-dependencies]
+allocation-counter = { workspace = true }
