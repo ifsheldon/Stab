@@ -5,6 +5,10 @@ use crate::{
     ObservableWidth, RecordResult, SampledErrorWidth,
 };
 
+mod prediction_view;
+
+pub use prediction_view::ObservablePredictionBatchViewMut;
+
 /// Owned shot-major packed records.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackedShotBatch {

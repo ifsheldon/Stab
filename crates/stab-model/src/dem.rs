@@ -7,11 +7,16 @@ use smallvec::SmallVec;
 mod api;
 mod coordinate_scan;
 mod drop_impl;
+mod error_mechanisms;
 mod parser;
 mod tag;
 mod traversal;
 
 pub use api::DemFlattenedInstructionIter;
+pub use error_mechanisms::{
+    DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitError,
+    DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
+};
 
 /// Advanced borrowed boundary for traversing compact DEM structure.
 ///

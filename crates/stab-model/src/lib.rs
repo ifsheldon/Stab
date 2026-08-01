@@ -23,8 +23,10 @@ pub use circuit::{
     CircuitInstruction, CircuitItem, RepeatBlock,
 };
 pub use dem::{
-    DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
-    DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
+    DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
+    DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
+    DemRepeatBlock, DemTarget, DetectorErrorModel,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,

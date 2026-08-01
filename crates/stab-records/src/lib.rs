@@ -12,7 +12,8 @@ mod widths;
 
 pub use batches::{
     BitPlane64Batch, BitPlane64BatchView, DemSampleBatchView, DetectionBatchView,
-    MeasurementBatchView, ObservablePredictionBatch, PackedShotBatch, PackedShotBatchView,
+    MeasurementBatchView, ObservablePredictionBatch, ObservablePredictionBatchViewMut,
+    PackedShotBatch, PackedShotBatchView,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
