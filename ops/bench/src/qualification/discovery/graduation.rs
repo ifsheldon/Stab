@@ -12,6 +12,7 @@ mod curated;
 mod derived;
 
 pub(super) use curated::agent_diagnostic_groups;
+pub(super) use curated::decoder_diagnostic_groups;
 pub(super) use curated::groups as curated_api_groups;
 pub(super) use derived::additional_groups;
 use derived::apply_sparse_xor;

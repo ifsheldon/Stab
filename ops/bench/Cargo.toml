@@ -31,8 +31,10 @@ signal-hook = { workspace = true }
 stab-analysis = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli", default-features = false }
 stab-core = { path = "../../crates/stab-core", default-features = false }
+stab-decoder = { workspace = true }
 stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
+stab-reference-decoder = { path = "../../test-support/reference-decoder" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

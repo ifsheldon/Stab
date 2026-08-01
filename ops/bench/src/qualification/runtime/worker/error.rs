@@ -14,6 +14,8 @@ pub(crate) enum WorkerError {
     #[error(transparent)]
     SamplingCompile(#[from] stab_core::SamplingCompileError),
     #[error(transparent)]
+    DecoderDiagnostic(Box<super::decoder_diagnostic::DecoderDiagnosticError>),
+    #[error(transparent)]
     Bits(#[from] BitError),
     #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
     MeasurementMismatch {
@@ -288,4 +290,10 @@ pub(crate) enum WorkerError {
     Serialize(serde_json::Error),
     #[error("failed to write qualification worker output: {0}")]
     Write(std::io::Error),
+}
+
+impl From<super::decoder_diagnostic::DecoderDiagnosticError> for WorkerError {
+    fn from(error: super::decoder_diagnostic::DecoderDiagnosticError) -> Self {
+        Self::DecoderDiagnostic(Box::new(error))
+    }
 }

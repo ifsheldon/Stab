@@ -985,7 +985,7 @@ fn generated_inventory_has_a_finite_executable_matrix() {
         .count();
 
     assert_eq!(release, 19);
-    assert_eq!(diagnostics, 4);
+    assert_eq!(diagnostics, 7);
     assert!(release <= MAX_RELEASE_GROUPS);
     assert!(diagnostics <= MAX_DIAGNOSTIC_GROUPS);
     assert!(
@@ -995,7 +995,7 @@ fn generated_inventory_has_a_finite_executable_matrix() {
             .filter(|group| group.runner_fidelity == RunnerFidelity::StabReportOnly)
             .all(|group| {
                 group.correctness_binding == CorrectnessBinding::ExactCases
-                    && group.correctness_cases.len() == 1
+                    && !group.correctness_cases.is_empty()
                     && group.output_contract.comparator_sources.is_empty()
                     && group.threshold_policy == ThresholdPolicy::ReportOnly
                     && group.timing_policy.timeout_seconds == 600

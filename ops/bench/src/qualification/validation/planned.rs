@@ -226,15 +226,14 @@ fn validate_product_diagnostic(group: &QualificationGroup, issues: &mut Issues) 
         .collect::<Vec<_>>();
     let valid_parameters = group.workload_family.scales.iter().all(|scale| {
         parameter_map(&group.id, &scale.parameters, issues).is_some_and(|parameters| {
-            parameters.get("generator") == Some(&"circuit-parse-cycle-v1")
-                && parameters.values().all(|value| !is_placeholder(value))
+            !parameters.is_empty() && parameters.values().all(|value| !is_placeholder(value))
         })
     });
     if actual_scale_ids != expected_scale_ids
         || !valid_parameters
         || group.disposition != crate::qualification::model::PerformanceDisposition::Measured
         || group.correctness_binding != CorrectnessBinding::ExactCases
-        || group.correctness_cases.len() != 1
+        || group.correctness_cases.is_empty()
         || group.planned_correctness_case_id.is_some()
         || group.output_contract.digest_state != EvidenceState::Existing
         || !group.output_contract.comparator_sources.is_empty()

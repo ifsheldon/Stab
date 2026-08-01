@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5",
-  "semantic_digest": "86919fb66368f870c8a5062a13958f74761e291779fa7067af5c0e7950506e4a",
+  "semantic_digest": "01844149cde46789822d116ff9c2c0f880e12b2e4970a6f0f20a323e5a36e9e4",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -122,8 +122,12 @@
         "CQ-GATE-CONTRACT",
         "CQ-DETECTION"
       ],
-      "disposition": "future-candidate",
-      "group_ids": [],
+      "disposition": "measured",
+      "group_ids": [
+        "PERFQ-A7-EXACT-ML-COMPILE",
+        "PERFQ-A7-EXACT-ML-REUSED-DECODE",
+        "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE"
+      ],
       "reason": "Only curated executable release workloads are measured; other relevant operations remain visible as future candidates."
     },
     {
@@ -53310,9 +53314,11 @@
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-9d8d2046dac8054b",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-A7-EXACT-ML-REUSED-DECODE"
+      ],
+      "reason": "Behavioral operation is covered by the listed executable Stab-only product diagnostic."
     },
     {
       "id": "cq-api-item-1f55817c9dfe719c",
@@ -60812,9 +60818,11 @@
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-9d8d2046dac8054b",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-A7-EXACT-ML-REUSED-DECODE"
+      ],
+      "reason": "Behavioral operation is covered by the listed executable Stab-only product diagnostic."
     },
     {
       "id": "cq-api-item-7d77c4d920caf9ae",
@@ -89740,6 +89748,283 @@
       "threshold_policy": "report-only",
       "reason": "Measures the inclusive CompilationRequestFingerprint::for_sampling call, including its model fingerprint, over a pre-parsed deterministic circuit.",
       "owner": "stab-engine/compilation-request",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-A7-EXACT-ML-COMPILE",
+      "manifest_row": "perfq-a7-exact-ml-compile",
+      "row_origin": "planned",
+      "performance_feature": "PERF-DETECTION",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "compile",
+      "runner_fidelity": "stab-report-only",
+      "correctness_cases": [
+        "cq-evidence-qualification-3a9a1dd7ddabd7b1",
+        "cq-evidence-qualification-7179fce5697cce0d",
+        "cq-evidence-qualification-93951fde964ca94d",
+        "cq-evidence-qualification-b4fefe4518cc5c2d"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "a7-exact-ml-compile-v1"
+        },
+        "source": "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        "deterministic_seed": "a7-exact-ml-compile-v1",
+        "scales": [
+          {
+            "id": "small",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "detectors=6; observables=1; mechanisms=12; joint_states=128",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 615
+            },
+            "semantic_work": 1536,
+            "input_digest": "d76af5f2acbbabce017a7a4c59ba005b444175d242d64369d189baca9ab3876c"
+          },
+          {
+            "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
+            "parameters": "detectors=10; observables=1; mechanisms=32; joint_states=2048",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1630
+            },
+            "semantic_work": 65536,
+            "input_digest": "8b6d49a6d56cfcda62d7a1147f5f79bf1b7c271a3497d7e43f6fc3c8272bc6b8"
+          },
+          {
+            "id": "large",
+            "family_id": "default",
+            "size_class": "large",
+            "parameters": "detectors=14; observables=1; mechanisms=64; joint_states=32768",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 3296
+            },
+            "semantic_work": 2097152,
+            "input_digest": "6315c451daf2b510c69d33912bb85b1356078770ed9e3e384f832c1d97998cc8"
+          }
+        ]
+      },
+      "work_unit": "joint-state mechanism transitions",
+      "output_contract": {
+        "expected_shape": "One completed compile-and-release count per invocation plus an untimed exact witness over model identity, dimensions, retained bytes, and every syndrome prediction.",
+        "digest_state": "existing",
+        "sink_policy": "DEM generation and one witness compilation occur before timing. The worker times only complete ExactMlDecoderSession compilation and release, then recompiles and validates the exact typed witness outside raw-work-v2."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median Stab batch seconds and normalized seconds per semantic work item, reported independently per operation and scale"
+      },
+      "memory_policy": {
+        "method": "not-applicable",
+        "scale_ids": [],
+        "expected_growth": "Retained prediction bytes and allocation-free reuse are exact focused-test contracts. Setup and peak process RSS remain in every diagnostic receipt, including the largest source-owned scale, without creating a fourth timing group."
+      },
+      "threshold_policy": "report-only",
+      "reason": "Measures the bounded exact-ML compiler at three admitted joint-state transition scales. This is Stab-only because pinned Stim v1.16.0 provides no faithful external-decoder compiler comparator.",
+      "owner": "stab-reference-decoder/exact-ml-compiler",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-A7-EXACT-ML-REUSED-DECODE",
+      "manifest_row": "perfq-a7-exact-ml-reused-decode",
+      "row_origin": "planned",
+      "performance_feature": "PERF-DETECTION",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::decode_batch",
+        "stab_decoder::decode_batch"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "stab-report-only",
+      "correctness_cases": [
+        "cq-evidence-qualification-3add8f2f8632a7fb",
+        "cq-evidence-qualification-889f3fecd9d3e6da",
+        "cq-evidence-qualification-93951fde964ca94d",
+        "cq-evidence-qualification-9d8d2046dac8054b",
+        "cq-evidence-qualification-d1877c09db8c3c35"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "a7-exact-ml-reused-decode-v1"
+        },
+        "source": "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        "deterministic_seed": "a7-exact-ml-reused-decode-v1",
+        "scales": [
+          {
+            "id": "small",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "shots=1024; detectors=14; observables=1",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 11526
+            },
+            "semantic_work": 1024,
+            "input_digest": "3e11e8b3ac52c11a09dfc97615ef5b0f059209fe3f1ace2599e96d40a2c81055"
+          },
+          {
+            "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
+            "parameters": "shots=65536; detectors=14; observables=1",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 527622
+            },
+            "semantic_work": 65536,
+            "input_digest": "b2ddb9e0081df66c939959e66ab26cffa9b5672f5657769de6dd6435d01aecb1"
+          },
+          {
+            "id": "large",
+            "family_id": "default",
+            "size_class": "large",
+            "parameters": "shots=262144; detectors=14; observables=1",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 2100486
+            },
+            "semantic_work": 262144,
+            "input_digest": "0a541c73465194737db84d2051c834a678c0cacff1e58a5a8c5788fb693c9e30"
+          }
+        ]
+      },
+      "work_unit": "decoded shots",
+      "output_contract": {
+        "expected_shape": "Exact completed shot count and prediction digest from one precompiled session over a deterministic packed syndrome batch.",
+        "digest_state": "existing",
+        "sink_policy": "Model compilation, detector input construction, prediction allocation, and cancellation-token construction occur before timing. The worker times only repeated decode_batch calls and validates the complete caller-owned prediction buffer outside raw-work-v2."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median Stab batch seconds and normalized seconds per semantic work item, reported independently per operation and scale"
+      },
+      "memory_policy": {
+        "method": "not-applicable",
+        "scale_ids": [],
+        "expected_growth": "Retained prediction bytes and allocation-free reuse are exact focused-test contracts. Setup and peak process RSS remain in every diagnostic receipt, including the largest source-owned scale, without creating a fourth timing group."
+      },
+      "threshold_policy": "report-only",
+      "reason": "Measures allocation-free reuse of one exact-ML session and caller-owned output across deterministic small, medium, and accepted-maximum batches without inventing a Stim ratio.",
+      "owner": "stab-decoder/reused-batch-decode",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE",
+      "manifest_row": "perfq-a7-sample-detect-decode-pipeline",
+      "row_origin": "planned",
+      "performance_feature": "PERF-DETECTION",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "end-to-end",
+      "runner_fidelity": "stab-report-only",
+      "correctness_cases": [
+        "cq-evidence-qualification-278e629a855d3c41",
+        "cq-evidence-qualification-7d5fce18cc43d73d",
+        "cq-evidence-qualification-93951fde964ca94d",
+        "cq-evidence-qualification-c61285e1ce0e88e8"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "a7-sample-detect-decode-v1"
+        },
+        "source": "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        "deterministic_seed": "a7-sample-detect-decode-v1",
+        "scales": [
+          {
+            "id": "small",
+            "family_id": "default",
+            "size_class": "small",
+            "parameters": "shots=1024; distance=3; rounds=3; seed=0xA7D3C0DE",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 776
+            },
+            "semantic_work": 1024,
+            "input_digest": "727aaea332dc3b6655f5233cec7ed4d5ba47fba1a8f70316e496a4165df7e518"
+          },
+          {
+            "id": "medium",
+            "family_id": "default",
+            "size_class": "medium",
+            "parameters": "shots=16384; distance=3; rounds=3; seed=0xA7D3C0DE",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 776
+            },
+            "semantic_work": 16384,
+            "input_digest": "d0e7b29774458576150c08bace932ebd9cadbc17ec3efd6a880e88b46831b044"
+          },
+          {
+            "id": "large",
+            "family_id": "default",
+            "size_class": "large",
+            "parameters": "shots=65536; distance=3; rounds=3; seed=0xA7D3C0DE",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 776
+            },
+            "semantic_work": 65536,
+            "input_digest": "f01d9efb4acadf4f36b4ba8cbe0f67db1669697624723b3763e6e7bb4764e645"
+          }
+        ]
+      },
+      "work_unit": "pipeline shots",
+      "output_contract": {
+        "expected_shape": "Exact seeded shot and logical-failure counts from the public sample-to-detection-to-decoder composition.",
+        "digest_state": "existing",
+        "sink_policy": "Circuit generation, DEM lowering, plan compilation, session construction, and an independent seeded expected run occur before timing. Raw-work-v2 measures reusable sampling, typed detection conversion, exact decoding, and logical-failure counting; report comparison and digesting occur afterward."
+      },
+      "timing_policy": {
+        "batch_policy": "common-iterations",
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median Stab batch seconds and normalized seconds per semantic work item, reported independently per operation and scale"
+      },
+      "memory_policy": {
+        "method": "not-applicable",
+        "scale_ids": [],
+        "expected_growth": "Retained prediction bytes and allocation-free reuse are exact focused-test contracts. Setup and peak process RSS remain in every diagnostic receipt, including the largest source-owned scale, without creating a fourth timing group."
+      },
+      "threshold_policy": "report-only",
+      "reason": "Measures the complete public A7 experiment at calibrated bounded shot scales. It remains a Stab-only baseline candidate because Stim has no equivalent external-decoder composition contract.",
+      "owner": "stab-engine/sample-detect-decode-composition",
       "status": "implemented"
     },
     {

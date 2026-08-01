@@ -17,6 +17,12 @@ pub(in crate::qualification::discovery) const A2_SAMPLING_REQUEST_ESTIMATE_GROUP
     "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE";
 pub(in crate::qualification::discovery) const A2_SAMPLER_COMPILE_GROUP_ID: &str =
     "PERFQ-A2-SAMPLER-COMPILE";
+pub(in crate::qualification::discovery) const A7_EXACT_ML_COMPILE_GROUP_ID: &str =
+    "PERFQ-A7-EXACT-ML-COMPILE";
+pub(in crate::qualification::discovery) const A7_EXACT_ML_REUSED_DECODE_GROUP_ID: &str =
+    "PERFQ-A7-EXACT-ML-REUSED-DECODE";
+pub(in crate::qualification::discovery) const A7_PIPELINE_GROUP_ID: &str =
+    "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE";
 
 pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     let performance_feature = item
@@ -104,6 +110,9 @@ fn diagnostic_group_id(path: &str) -> Option<&'static str> {
         | "stab_core::execution::SamplingCompiler::compile"
         | "stab_core::advanced::compat::CompiledSampler::compile" => {
             Some(A2_SAMPLER_COMPILE_GROUP_ID)
+        }
+        "stab_decoder::decode_batch" | "stab_core::decode_batch" => {
+            Some(A7_EXACT_ML_REUSED_DECODE_GROUP_ID)
         }
         _ => None,
     }
@@ -325,10 +334,14 @@ mod tests {
             let disposition = make_disposition(&api(path, "function"));
             assert_eq!(
                 disposition.disposition,
-                PerformanceDisposition::FutureCandidate,
+                PerformanceDisposition::CoveredByParent,
                 "{path}"
             );
-            assert!(disposition.parent_group_ids.is_empty(), "{path}");
+            assert_eq!(
+                disposition.parent_group_ids,
+                [A7_EXACT_ML_REUSED_DECODE_GROUP_ID],
+                "{path}"
+            );
         }
     }
 

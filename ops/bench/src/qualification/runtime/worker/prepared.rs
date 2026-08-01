@@ -3,6 +3,7 @@ use std::time::Instant;
 use super::agent_diagnostic::AgentDiagnosticFixture;
 use super::bits::{DenseXorFixture, PopcountFixture};
 use super::clifford_string::{CliffordDescriptor, CliffordStringFixture};
+use super::decoder_diagnostic::DecoderDiagnosticFixture;
 use super::dem_model::{self, DemFamily, DemFixture};
 use super::not_zero::NotZeroFixture;
 use super::pauli::PauliMultiplyFixture;
@@ -32,6 +33,7 @@ enum PreparedState {
         circuit: stab_model::Circuit,
     },
     AgentDiagnostic(AgentDiagnosticFixture),
+    DecoderDiagnostic(DecoderDiagnosticFixture),
     DemParse(DemFixture),
     DemCanonicalPrint {
         fixture: DemFixture,
@@ -95,6 +97,11 @@ impl PreparedWorkload {
             | WorkerWorkload::SamplingRequestEstimate
             | WorkerWorkload::SamplerCompile => PreparedState::AgentDiagnostic(
                 AgentDiagnosticFixture::prepare(workload, work_items)?,
+            ),
+            WorkerWorkload::ExactMlCompile
+            | WorkerWorkload::ExactMlReusedDecode
+            | WorkerWorkload::SampleDetectDecodePipeline => PreparedState::DecoderDiagnostic(
+                DecoderDiagnosticFixture::prepare(workload, iterations, work_items)?,
             ),
             WorkerWorkload::DemParse => PreparedState::DemParse(DemFixture::prepare(
                 family.ok_or(WorkerError::MissingDemFamily)?,
@@ -235,6 +242,14 @@ impl PreparedWorkload {
                     measured.elapsed_seconds,
                 ))
             }
+            PreparedState::DecoderDiagnostic(fixture) => {
+                let measured =
+                    measure_output(clock, || Ok(fixture.execute(iterations, work_items)?))?;
+                Ok((
+                    TimedWorkloadOutput::DecoderDiagnostic(measured.output),
+                    measured.elapsed_seconds,
+                ))
+            }
             PreparedState::DemParse(fixture) => {
                 let measured = measure_output(clock, || dem_model::parse(iterations, fixture))?;
                 Ok((
@@ -332,6 +347,12 @@ impl PreparedWorkload {
                 TimedWorkloadOutput::AgentDiagnostic(output),
                 PreparedState::AgentDiagnostic(fixture),
             ) => fixture.validate(output, iterations, work_items),
+            (
+                TimedWorkloadOutput::DecoderDiagnostic(output),
+                PreparedState::DecoderDiagnostic(fixture),
+            ) => fixture
+                .validate(output, iterations, work_items)
+                .map_err(WorkerError::from),
             (TimedWorkloadOutput::DemParsed(model), PreparedState::DemParse(fixture)) => {
                 fixture.validate_canonical(&dem_model::serialize(1, &model))
             }
@@ -451,6 +472,9 @@ fn input_evidence(state: &PreparedState) -> Result<(u64, InputDigest), WorkerErr
             u64::try_from(fixture.input().len()).map_err(|_| WorkerError::InputSizeRange)?,
             semantic_digest(byte_digest(fixture.input().as_bytes())),
         ),
+        PreparedState::DecoderDiagnostic(fixture) => {
+            (fixture.input_bytes()?, fixture.input_digest())
+        }
         PreparedState::DemParse(fixture) | PreparedState::DemCanonicalPrint { fixture, .. } => {
             (fixture.input_bytes()?, fixture.input_digest())
         }

@@ -2217,9 +2217,11 @@ dependencies = [
  "stab-analysis",
  "stab-cli",
  "stab-core",
+ "stab-decoder",
  "stab-engine",
  "stab-model",
  "stab-records",
+ "stab-reference-decoder",
  "tempfile",
  "thiserror",
 ]

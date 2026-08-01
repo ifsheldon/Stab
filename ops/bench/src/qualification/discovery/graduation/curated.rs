@@ -6,11 +6,13 @@ use crate::error::BenchError;
 use crate::qualification::discovery::api::{
     A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID, A2_SAMPLER_COMPILE_GROUP_ID,
     A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID, A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
+    A7_EXACT_ML_COMPILE_GROUP_ID, A7_EXACT_ML_REUSED_DECODE_GROUP_ID, A7_PIPELINE_GROUP_ID,
 };
 use crate::qualification::model::{
-    CorrectnessBinding, EvidenceState, MemoryMethod, MemoryPolicy, OutputContract,
-    PRODUCT_DIAGNOSTIC_GATE_STATISTIC, PerformanceDisposition, Phase, QualificationGroup,
-    QualificationStatus, RowOrigin, RunnerFidelity, ThresholdPolicy,
+    CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, MemoryMethod, MemoryPolicy,
+    OutputContract, PRODUCT_DIAGNOSTIC_GATE_STATISTIC, PerformanceDisposition, Phase,
+    QualificationGroup, QualificationStatus, RowOrigin, RunnerFidelity, ScalePoint, SizeClass,
+    ThresholdPolicy, WorkloadFamily,
 };
 use crate::root::RepoRoot;
 
@@ -119,6 +121,260 @@ pub(in crate::qualification::discovery) fn agent_diagnostic_groups(
     .into_iter()
     .map(|spec| agent_diagnostic_group(circuit, spec))
     .collect()
+}
+
+pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
+    existing: &[QualificationGroup],
+) -> Result<Vec<QualificationGroup>, BenchError> {
+    let circuit = existing
+        .iter()
+        .find(|group| group.id == CIRCUIT_PARSE_GROUP_ID)
+        .ok_or_else(|| {
+            BenchError::Qualification(
+                "A7 decoder diagnostics require an executable timing policy source".to_string(),
+            )
+        })?;
+    [
+        DecoderDiagnosticSpec {
+            id: A7_EXACT_ML_COMPILE_GROUP_ID,
+            manifest_row: "perfq-a7-exact-ml-compile",
+            phase: Phase::Compile,
+            correctness_cases: &[
+                "cq-evidence-qualification-3a9a1dd7ddabd7b1",
+                "cq-evidence-qualification-7179fce5697cce0d",
+                "cq-evidence-qualification-93951fde964ca94d",
+                "cq-evidence-qualification-b4fefe4518cc5c2d",
+            ],
+            owner: "stab-reference-decoder/exact-ml-compiler",
+            work_unit: "joint-state mechanism transitions",
+            family: exact_ml_compile_family,
+            expected_shape: "One completed compile-and-release count per invocation plus an untimed exact witness over model identity, dimensions, retained bytes, and every syndrome prediction.",
+            sink_policy: "DEM generation and one witness compilation occur before timing. The worker times only complete ExactMlDecoderSession compilation and release, then recompiles and validates the exact typed witness outside raw-work-v2.",
+            reason: "Measures the bounded exact-ML compiler at three admitted joint-state transition scales. This is Stab-only because pinned Stim v1.16.0 provides no faithful external-decoder compiler comparator.",
+        },
+        DecoderDiagnosticSpec {
+            id: A7_EXACT_ML_REUSED_DECODE_GROUP_ID,
+            manifest_row: "perfq-a7-exact-ml-reused-decode",
+            phase: Phase::Execute,
+            correctness_cases: &[
+                "cq-evidence-qualification-3add8f2f8632a7fb",
+                "cq-evidence-qualification-889f3fecd9d3e6da",
+                "cq-evidence-qualification-93951fde964ca94d",
+                "cq-evidence-qualification-9d8d2046dac8054b",
+                "cq-evidence-qualification-d1877c09db8c3c35",
+            ],
+            owner: "stab-decoder/reused-batch-decode",
+            work_unit: "decoded shots",
+            family: exact_ml_decode_family,
+            expected_shape: "Exact completed shot count and prediction digest from one precompiled session over a deterministic packed syndrome batch.",
+            sink_policy: "Model compilation, detector input construction, prediction allocation, and cancellation-token construction occur before timing. The worker times only repeated decode_batch calls and validates the complete caller-owned prediction buffer outside raw-work-v2.",
+            reason: "Measures allocation-free reuse of one exact-ML session and caller-owned output across deterministic small, medium, and accepted-maximum batches without inventing a Stim ratio.",
+        },
+        DecoderDiagnosticSpec {
+            id: A7_PIPELINE_GROUP_ID,
+            manifest_row: "perfq-a7-sample-detect-decode-pipeline",
+            phase: Phase::EndToEnd,
+            correctness_cases: &[
+                "cq-evidence-qualification-278e629a855d3c41",
+                "cq-evidence-qualification-7d5fce18cc43d73d",
+                "cq-evidence-qualification-93951fde964ca94d",
+                "cq-evidence-qualification-c61285e1ce0e88e8",
+            ],
+            owner: "stab-engine/sample-detect-decode-composition",
+            work_unit: "pipeline shots",
+            family: pipeline_family,
+            expected_shape: "Exact seeded shot and logical-failure counts from the public sample-to-detection-to-decoder composition.",
+            sink_policy: "Circuit generation, DEM lowering, plan compilation, session construction, and an independent seeded expected run occur before timing. Raw-work-v2 measures reusable sampling, typed detection conversion, exact decoding, and logical-failure counting; report comparison and digesting occur afterward.",
+            reason: "Measures the complete public A7 experiment at calibrated bounded shot scales. It remains a Stab-only baseline candidate because Stim has no equivalent external-decoder composition contract.",
+        },
+    ]
+    .into_iter()
+    .map(|spec| decoder_diagnostic_group(circuit, spec))
+    .collect()
+}
+
+struct DecoderDiagnosticSpec {
+    id: &'static str,
+    manifest_row: &'static str,
+    phase: Phase,
+    correctness_cases: &'static [&'static str],
+    owner: &'static str,
+    work_unit: &'static str,
+    family: fn() -> WorkloadFamily,
+    expected_shape: &'static str,
+    sink_policy: &'static str,
+    reason: &'static str,
+}
+
+fn decoder_diagnostic_group(
+    circuit: &QualificationGroup,
+    spec: DecoderDiagnosticSpec,
+) -> Result<QualificationGroup, BenchError> {
+    let mut group = circuit.clone();
+    group.id = spec.id.to_string();
+    group.manifest_row = spec.manifest_row.to_string();
+    group.row_origin = RowOrigin::Planned;
+    group.performance_feature = "PERF-DETECTION".to_string();
+    group.checklist_anchors.clear();
+    group.checklist_child_ids.clear();
+    group.public_api_items.clear();
+    group.disposition = PerformanceDisposition::Measured;
+    group.phase = spec.phase;
+    group.runner_fidelity = RunnerFidelity::StabReportOnly;
+    group.correctness_cases = spec
+        .correctness_cases
+        .iter()
+        .map(|case| (*case).to_string())
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = (spec.family)();
+    group.work_unit = spec.work_unit.to_string();
+    group.output_contract = OutputContract {
+        expected_shape: spec.expected_shape.to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: spec.sink_policy.to_string(),
+        comparator_sources: Vec::new(),
+    };
+    group.timing_policy.gate_statistic = PRODUCT_DIAGNOSTIC_GATE_STATISTIC.to_string();
+    group.memory_policy = MemoryPolicy {
+        method: MemoryMethod::NotApplicable,
+        scale_ids: Vec::new(),
+        expected_growth: "Retained prediction bytes and allocation-free reuse are exact focused-test contracts. Setup and peak process RSS remain in every diagnostic receipt, including the largest source-owned scale, without creating a fourth timing group."
+            .to_string(),
+    };
+    group.threshold_policy = ThresholdPolicy::ReportOnly;
+    group.reason = spec.reason.to_string();
+    group.owner = spec.owner.to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(group)
+}
+
+fn exact_ml_compile_family() -> WorkloadFamily {
+    generated_family(
+        "a7-exact-ml-compile-v1",
+        "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        [
+            scale(
+                "small",
+                SizeClass::Small,
+                "detectors=6; observables=1; mechanisms=12; joint_states=128",
+                1_536,
+                615,
+                "d76af5f2acbbabce017a7a4c59ba005b444175d242d64369d189baca9ab3876c",
+            ),
+            scale(
+                "medium",
+                SizeClass::Medium,
+                "detectors=10; observables=1; mechanisms=32; joint_states=2048",
+                65_536,
+                1_630,
+                "8b6d49a6d56cfcda62d7a1147f5f79bf1b7c271a3497d7e43f6fc3c8272bc6b8",
+            ),
+            scale(
+                "large",
+                SizeClass::Large,
+                "detectors=14; observables=1; mechanisms=64; joint_states=32768",
+                2_097_152,
+                3_296,
+                "6315c451daf2b510c69d33912bb85b1356078770ed9e3e384f832c1d97998cc8",
+            ),
+        ],
+    )
+}
+
+fn exact_ml_decode_family() -> WorkloadFamily {
+    generated_family(
+        "a7-exact-ml-reused-decode-v1",
+        "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        [
+            scale(
+                "small",
+                SizeClass::Small,
+                "shots=1024; detectors=14; observables=1",
+                1_024,
+                11_526,
+                "3e11e8b3ac52c11a09dfc97615ef5b0f059209fe3f1ace2599e96d40a2c81055",
+            ),
+            scale(
+                "medium",
+                SizeClass::Medium,
+                "shots=65536; detectors=14; observables=1",
+                65_536,
+                527_622,
+                "b2ddb9e0081df66c939959e66ab26cffa9b5672f5657769de6dd6435d01aecb1",
+            ),
+            scale(
+                "large",
+                SizeClass::Large,
+                "shots=262144; detectors=14; observables=1",
+                262_144,
+                2_100_486,
+                "0a541c73465194737db84d2051c834a678c0cacff1e58a5a8c5788fb693c9e30",
+            ),
+        ],
+    )
+}
+
+fn pipeline_family() -> WorkloadFamily {
+    generated_family(
+        "a7-sample-detect-decode-v1",
+        "ops/bench/src/qualification/runtime/worker/decoder_diagnostic.rs",
+        [
+            scale(
+                "small",
+                SizeClass::Small,
+                "shots=1024; distance=3; rounds=3; seed=0xA7D3C0DE",
+                1_024,
+                776,
+                "727aaea332dc3b6655f5233cec7ed4d5ba47fba1a8f70316e496a4165df7e518",
+            ),
+            scale(
+                "medium",
+                SizeClass::Medium,
+                "shots=16384; distance=3; rounds=3; seed=0xA7D3C0DE",
+                16_384,
+                776,
+                "d0e7b29774458576150c08bace932ebd9cadbc17ec3efd6a880e88b46831b044",
+            ),
+            scale(
+                "large",
+                SizeClass::Large,
+                "shots=65536; distance=3; rounds=3; seed=0xA7D3C0DE",
+                65_536,
+                776,
+                "f01d9efb4acadf4f36b4ba8cbe0f67db1669697624723b3763e6e7bb4764e645",
+            ),
+        ],
+    )
+}
+
+fn generated_family(id: &str, source: &str, scales: [ScalePoint; 3]) -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated { id: id.to_string() },
+        source: source.to_string(),
+        deterministic_seed: id.to_string(),
+        scales: scales.into(),
+    }
+}
+
+fn scale(
+    id: &str,
+    size_class: SizeClass,
+    parameters: &str,
+    semantic_work: u64,
+    input_bytes: u64,
+    input_digest: &str,
+) -> ScalePoint {
+    ScalePoint {
+        id: id.to_string(),
+        family_id: "default".to_string(),
+        size_class,
+        parameters: parameters.to_string(),
+        input_bytes: InputByteCount::Exact { bytes: input_bytes },
+        semantic_work: Some(semantic_work),
+        input_digest: Some(input_digest.to_string()),
+    }
 }
 
 struct AgentDiagnosticSpec {

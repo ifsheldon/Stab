@@ -16,6 +16,7 @@ use sha2::{Digest as _, Sha256};
 mod agent_diagnostic;
 mod bits;
 pub(super) mod clifford_string;
+mod decoder_diagnostic;
 pub(in crate::qualification::runtime) mod dem_model;
 mod error;
 mod not_zero;
@@ -41,7 +42,7 @@ use not_zero::{not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use prepared::PreparedWorkload;
 use workload::WorkerWorkload;
 
-const WORKER_SOURCES: [(&str, &[u8]); 14] = [
+const WORKER_SOURCES: [(&str, &[u8]); 15] = [
     ("worker.rs", include_bytes!("worker.rs")),
     (
         "worker/agent_diagnostic.rs",
@@ -51,6 +52,10 @@ const WORKER_SOURCES: [(&str, &[u8]); 14] = [
     (
         "worker/clifford_string.rs",
         include_bytes!("worker/clifford_string.rs"),
+    ),
+    (
+        "worker/decoder_diagnostic.rs",
+        include_bytes!("worker/decoder_diagnostic.rs"),
     ),
     ("worker/dem_model.rs", include_bytes!("worker/dem_model.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
@@ -287,6 +292,7 @@ enum WorkloadOutput {
 enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
     AgentDiagnostic(agent_diagnostic::AgentDiagnosticOutput),
+    DecoderDiagnostic(decoder_diagnostic::DecoderDiagnosticOutput),
     DemParsed(stab_core::DetectorErrorModel),
     DemSerialized(String),
     PopcountChecksum(u64),

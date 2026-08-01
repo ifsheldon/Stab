@@ -235,6 +235,21 @@ fn valid_contract_file() -> GroupContractFile {
             "sampler-compile",
             "compile-and-release",
         ),
+        product_diagnostic_contract(
+            super::super::invocation::A7_EXACT_ML_COMPILE_GROUP_ID,
+            "exact-ml-compile",
+            "compile-and-release",
+        ),
+        product_diagnostic_contract(
+            super::super::invocation::A7_EXACT_ML_REUSED_DECODE_GROUP_ID,
+            "exact-ml-reused-decode",
+            "decode-batch",
+        ),
+        product_diagnostic_contract(
+            super::super::invocation::A7_PIPELINE_GROUP_ID,
+            "sample-detect-decode-pipeline",
+            "sample-detect-decode",
+        ),
     ]);
     GroupContractFile {
         schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
@@ -410,6 +425,71 @@ fn product_diagnostics_require_exact_owners_without_parity_or_profiler_inputs() 
         validate(&invalid, &"a".repeat(64)),
         Err(GroupError::InvalidGroup(_))
     ));
+}
+
+#[test]
+fn a7_decoder_diagnostics_are_executable_stab_only_contracts() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+
+    for (group_id, workload_id, measurement_id, expected_work) in [
+        (
+            super::super::invocation::A7_EXACT_ML_COMPILE_GROUP_ID,
+            "exact-ml-compile",
+            "compile-and-release",
+            [1_536, 65_536, 2_097_152],
+        ),
+        (
+            super::super::invocation::A7_EXACT_ML_REUSED_DECODE_GROUP_ID,
+            "exact-ml-reused-decode",
+            "decode-batch",
+            [1_024, 65_536, 262_144],
+        ),
+        (
+            super::super::invocation::A7_PIPELINE_GROUP_ID,
+            "sample-detect-decode-pipeline",
+            "sample-detect-decode",
+            [1_024, 16_384, 65_536],
+        ),
+    ] {
+        let contract = file
+            .groups
+            .iter()
+            .find(|contract| contract.id.to_string() == group_id)
+            .expect("A7 decoder diagnostic contract");
+        assert_eq!(contract.claim_class, ClaimClass::ProductDiagnostic);
+        assert_eq!(contract.parity_eligibility, ParityEligibility::ReportOnly);
+        assert_eq!(contract.workload_id.to_string(), workload_id);
+        assert_eq!(
+            contract
+                .measurement_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            [measurement_id]
+        );
+        assert_eq!(
+            contract
+                .scales
+                .iter()
+                .map(|scale| scale.work_items.get())
+                .collect::<Vec<_>>(),
+            expected_work
+        );
+        assert!(!contract.correctness_case_ids.is_empty());
+        assert!(contract.comparator_sources.is_empty());
+        assert!(contract.profiler_note.is_none());
+        assert!(super::super::invocation::supports_group(contract));
+
+        let mut wrong_measurement = contract.clone();
+        wrong_measurement.measurement_ids =
+            vec![ProtocolId::try_new("wrong-measurement").expect("measurement id")];
+        assert!(!super::super::invocation::supports_group(
+            &wrong_measurement
+        ));
+    }
 }
 
 #[test]

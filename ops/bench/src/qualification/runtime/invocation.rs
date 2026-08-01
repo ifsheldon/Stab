@@ -47,6 +47,9 @@ pub(super) const A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID: &str =
     "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT";
 pub(super) const A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID: &str = "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE";
 pub(super) const A2_SAMPLER_COMPILE_GROUP_ID: &str = "PERFQ-A2-SAMPLER-COMPILE";
+pub(super) const A7_EXACT_ML_COMPILE_GROUP_ID: &str = "PERFQ-A7-EXACT-ML-COMPILE";
+pub(super) const A7_EXACT_ML_REUSED_DECODE_GROUP_ID: &str = "PERFQ-A7-EXACT-ML-REUSED-DECODE";
+pub(super) const A7_PIPELINE_GROUP_ID: &str = "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE";
 pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 pub(super) const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 pub(super) const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
@@ -98,6 +101,15 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == A2_SAMPLER_COMPILE_GROUP_ID
                     && workload == "sampler-compile"
                     && measurement == "compile-and-release")
+                || (group == A7_EXACT_ML_COMPILE_GROUP_ID
+                    && workload == "exact-ml-compile"
+                    && measurement == "compile-and-release")
+                || (group == A7_EXACT_ML_REUSED_DECODE_GROUP_ID
+                    && workload == "exact-ml-reused-decode"
+                    && measurement == "decode-batch")
+                || (group == A7_PIPELINE_GROUP_ID
+                    && workload == "sample-detect-decode-pipeline"
+                    && measurement == "sample-detect-decode")
                 || (group == GATE_NAME_HASH_GROUP_ID
                     && workload == "gate-name-hash"
                     && measurement == "hash-all-names")
@@ -153,7 +165,7 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    24
+    27
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
