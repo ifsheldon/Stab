@@ -21560,6 +21560,222 @@
       "standalone": true
     },
     {
+      "id": "a7-decoder-zero-shot-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "zero_shot_batches_complete_without_touching_reusable_storage",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A zero-shot decode completes without implementation dispatch, allocation, or mutation of caller-owned reusable prediction storage."
+      },
+      "negative_axes": [
+        "zero-shot-dispatch",
+        "zero-shot-allocation",
+        "zero-shot-mutation"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-exact-ml-prediction-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Exact-ML predictions cover probability-zero and probability-one mechanisms, duplicate target parity, deterministic ties, and zero-observable models within the admitted state table."
+      },
+      "negative_axes": [
+        "certain-mechanism-drift",
+        "duplicate-target-parity",
+        "tie-policy-drift",
+        "zero-observable-rejection"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-impossible-syndrome-atomicity-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "impossible_batch_syndrome_fails_before_any_prediction_mutation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "An impossible syndrome returns its typed decode failure before mutating any record in the caller-owned prediction batch."
+      },
+      "negative_axes": [
+        "impossible-syndrome-acceptance",
+        "partial-prediction-mutation",
+        "wrong-failure-syndrome"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-reused-decode-resource-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "reused_decode_is_allocation_free_and_partition_equivalent",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A compiled exact-ML session performs allocation-free reused decoding and produces the same complete prediction batch across whole and partitioned calls."
+      },
+      "negative_axes": [
+        "per-batch-allocation",
+        "partition-prediction-drift",
+        "session-state-drift"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-retained-table-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "retained_table_is_exactly_one_byte_per_detector_syndrome",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The compiled exact-ML session retains exactly one prediction byte for each admitted detector syndrome and no second joint-state probability table."
+      },
+      "negative_axes": [
+        "retained-byte-count-drift",
+        "retained-joint-table"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-fixed-admission-limits-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "fixed_width_and_mechanism_limits_accept_maxima_and_reject_first_excess",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Detector, observable, and represented-mechanism admission accepts each exact frozen maximum and rejects the first value above it with a typed limit error."
+      },
+      "negative_axes": [
+        "detector-limit-off-by-one",
+        "observable-limit-off-by-one",
+        "mechanism-limit-off-by-one"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-instruction-admission-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "represented_instruction_limit_accepts_exact_maximum_and_rejects_next",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Represented DEM instruction traversal accepts exactly 65,536 visits and rejects the first excess before exact-ML state-table work begins."
+      },
+      "negative_axes": [
+        "instruction-limit-off-by-one",
+        "state-work-before-admission"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
       "id": "a7-reference-exact-ml-oracle-contract",
       "feature_id": "CQ-DETECTION",
       "comparator": "semantic-invariant",
@@ -21579,14 +21795,13 @@
       },
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The exact-ML compiler uses an admitted in-place log-domain joint-state dynamic program whose small-model predictions agree with independent direct subset enumeration across all bounded effects and probability edges."
+        "detail": "The internal in-place log-domain convolution agrees with independent direct subset enumeration across a bounded exhaustive matrix of two-mechanism effects and probability edges."
       },
       "negative_axes": [
         "probability-domain-drift",
         "effect-mask-drift",
         "probability-zero",
         "probability-one",
-        "tie-policy-drift",
         "out-of-place-workspace-growth"
       ],
       "public_api_owners": [],

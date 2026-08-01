@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5",
+  "semantic_digest": "1ee917ada581e7b8643374760e437fd352cf4f0d4931a28afcea23abaa28f18d",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -197135,6 +197135,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-0b8090f2ca9daf37",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-impossible-syndrome-atomicity-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "impossible_batch_syndrome_fails_before_any_prediction_mutation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "An impossible syndrome returns its typed decode failure before mutating any record in the caller-owned prediction batch."
+      },
+      "negative_axes": [
+        "impossible-syndrome-acceptance",
+        "partial-prediction-mutation",
+        "wrong-failure-syndrome"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-0b86e94c2123a7bc",
       "feature_id": "CQ-GENERATION",
       "behavioral_surface": "engine",
@@ -197358,6 +197409,57 @@
       ],
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-0e2885667877d158",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-decoder-zero-shot-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "zero_shot_batches_complete_without_touching_reusable_storage",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A zero-shot decode completes without implementation dispatch, allocation, or mutation of caller-owned reusable prediction storage."
+      },
+      "negative_axes": [
+        "zero-shot-dispatch",
+        "zero-shot-allocation",
+        "zero-shot-mutation"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
       ],
       "status": "implemented"
     },
@@ -198012,6 +198114,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-160444d1041f2b2a",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-fixed-admission-limits-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "fixed_width_and_mechanism_limits_accept_maxima_and_reject_first_excess",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Detector, observable, and represented-mechanism admission accepts each exact frozen maximum and rejects the first value above it with a typed limit error."
+      },
+      "negative_axes": [
+        "detector-limit-off-by-one",
+        "observable-limit-off-by-one",
+        "mechanism-limit-off-by-one"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-164987f7d24514e8",
       "feature_id": "CQ-CLI",
       "behavioral_surface": "cli",
@@ -198057,6 +198210,56 @@
       ],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-1686de935fd64494",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-instruction-admission-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "represented_instruction_limit_accepts_exact_maximum_and_rejects_next",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Represented DEM instruction traversal accepts exactly 65,536 visits and rejects the first excess before exact-ML state-table work begins."
+      },
+      "negative_axes": [
+        "instruction-limit-off-by-one",
+        "state-work-before-admission"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
       ],
       "status": "implemented"
     },
@@ -204991,6 +205194,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-63678c8f7a576971",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-reused-decode-resource-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "reused_decode_is_allocation_free_and_partition_equivalent",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A compiled exact-ML session performs allocation-free reused decoding and produces the same complete prediction batch across whole and partitioned calls."
+      },
+      "negative_axes": [
+        "per-batch-allocation",
+        "partition-prediction-drift",
+        "session-state-drift"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-63e1a437c22a0479",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -206935,6 +207188,58 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-7b17d9e5cca84df5",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-exact-ml-prediction-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Exact-ML predictions cover probability-zero and probability-one mechanisms, duplicate target parity, deterministic ties, and zero-observable models within the admitted state table."
+      },
+      "negative_axes": [
+        "certain-mechanism-drift",
+        "duplicate-target-parity",
+        "tie-policy-drift",
+        "zero-observable-rejection"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-7bcf8fcdbbfa6d68",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -208366,6 +208671,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-8cae8440e6c8c601",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-retained-table-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "retained_table_is_exactly_one_byte_per_detector_syndrome",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The compiled exact-ML session retains exactly one prediction byte for each admitted detector syndrome and no second joint-state probability table."
+      },
+      "negative_axes": [
+        "retained-byte-count-drift",
+        "retained-joint-table"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-8dbda87b999b3f57",
       "feature_id": "CQ-CIRCUIT-API",
       "behavioral_surface": "engine",
@@ -209069,14 +209424,13 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The exact-ML compiler uses an admitted in-place log-domain joint-state dynamic program whose small-model predictions agree with independent direct subset enumeration across all bounded effects and probability edges."
+        "detail": "The internal in-place log-domain convolution agrees with independent direct subset enumeration across a bounded exhaustive matrix of two-mechanism effects and probability edges."
       },
       "negative_axes": [
         "probability-domain-drift",
         "effect-mask-drift",
         "probability-zero",
         "probability-one",
-        "tie-policy-drift",
         "out-of-place-workspace-growth"
       ],
       "performance_groups": [

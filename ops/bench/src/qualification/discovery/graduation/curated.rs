@@ -140,8 +140,12 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             manifest_row: "perfq-a7-exact-ml-compile",
             phase: Phase::Compile,
             correctness_cases: &[
+                "cq-evidence-qualification-160444d1041f2b2a",
+                "cq-evidence-qualification-1686de935fd64494",
                 "cq-evidence-qualification-3a9a1dd7ddabd7b1",
                 "cq-evidence-qualification-7179fce5697cce0d",
+                "cq-evidence-qualification-7b17d9e5cca84df5",
+                "cq-evidence-qualification-8cae8440e6c8c601",
                 "cq-evidence-qualification-93951fde964ca94d",
                 "cq-evidence-qualification-b4fefe4518cc5c2d",
             ],
@@ -157,7 +161,11 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             manifest_row: "perfq-a7-exact-ml-reused-decode",
             phase: Phase::Execute,
             correctness_cases: &[
+                "cq-evidence-qualification-0b8090f2ca9daf37",
+                "cq-evidence-qualification-0e2885667877d158",
                 "cq-evidence-qualification-3add8f2f8632a7fb",
+                "cq-evidence-qualification-63678c8f7a576971",
+                "cq-evidence-qualification-7b17d9e5cca84df5",
                 "cq-evidence-qualification-889f3fecd9d3e6da",
                 "cq-evidence-qualification-93951fde964ca94d",
                 "cq-evidence-qualification-9d8d2046dac8054b",
@@ -176,6 +184,8 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             phase: Phase::EndToEnd,
             correctness_cases: &[
                 "cq-evidence-qualification-278e629a855d3c41",
+                "cq-evidence-qualification-63678c8f7a576971",
+                "cq-evidence-qualification-7b17d9e5cca84df5",
                 "cq-evidence-qualification-7d5fce18cc43d73d",
                 "cq-evidence-qualification-93951fde964ca94d",
                 "cq-evidence-qualification-c61285e1ce0e88e8",
