@@ -638,6 +638,84 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
 }
 
 #[test]
+fn plan_sample_backend_selection_matches_advertised_capabilities() {
+    let (status, capabilities_stdout, capabilities_stderr) =
+        run_cli(["stab", "capabilities", "--format=json"], b"");
+    assert_eq!(status, 0);
+    assert_eq!(capabilities_stderr, b"");
+    let capabilities = json_stdout(&capabilities_stdout);
+    let selectable_backends = pointer(&capabilities, "/selectable_backends")
+        .as_array()
+        .expect("selectable backends are an array");
+
+    let plan_for = |requested| {
+        let (status, stdout, stderr) = run_cli(
+            [
+                "stab",
+                "plan",
+                "sample",
+                "--backend",
+                requested,
+                "--format=json",
+            ],
+            b"H 0\nM 0\n",
+        );
+        assert_eq!(status, 0, "requested backend {requested}");
+        assert_eq!(stderr, b"", "requested backend {requested}");
+        let report = json_stdout(&stdout);
+        assert_sample_plan_schema(&report);
+        assert_eq!(pointer(&report, "/schema_version"), 2);
+
+        let selected = pointer(&report, "/compilation/selected_backend");
+        assert_eq!(selected, "scalar");
+        assert!(
+            selectable_backends.contains(selected),
+            "selected backend must be advertised by capabilities"
+        );
+        assert_eq!(
+            pointer(&report, "/compilation/plan_fingerprint/backend"),
+            selected
+        );
+        report
+    };
+
+    let automatic = plan_for("auto");
+    let scalar = plan_for("scalar");
+    assert_eq!(
+        pointer(&automatic, "/compilation/request_fingerprint/digest"),
+        pointer(&scalar, "/compilation/request_fingerprint/digest")
+    );
+    assert_eq!(
+        pointer(&automatic, "/compilation/plan_fingerprint/digest"),
+        pointer(&scalar, "/compilation/plan_fingerprint/digest")
+    );
+}
+
+#[test]
+fn plan_sample_reports_an_unavailable_explicit_backend() {
+    let (status, stdout, stderr) = run_cli(
+        [
+            "stab",
+            "plan",
+            "sample",
+            "--backend=portable-simd",
+            "--format=json",
+            "--error-format=json",
+        ],
+        b"M 0\n",
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = json_stdout(&stderr);
+    assert_eq!(pointer(&diagnostic, "/code"), "invalid-sampler-compilation");
+    assert_eq!(
+        pointer(&diagnostic, "/message"),
+        "cannot compile circuit sampler: sampling backend portable-simd is unavailable"
+    );
+}
+
+#[test]
 fn plan_sample_is_deterministic_for_noisy_entropy_configuration() {
     let circuit = b"X_ERROR(0.5) 0\nM 0\n";
     let args = ["stab", "plan", "sample", "--shots=100", "--format=json"];

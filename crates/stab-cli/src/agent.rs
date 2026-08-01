@@ -7,7 +7,8 @@ use stab_core::{
     CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, EncodedSizeEstimate,
     Estimate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule,
     ModelFingerprint, ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate,
-    SamplingCompiler, advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
+    SamplingCompiler, advanced::backend::BackendPreference,
+    advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
 };
 
 use crate::{
@@ -68,6 +69,27 @@ enum PlanCommand {
     Sample(PlanSampleArgs),
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum PlanSampleBackendArg {
+    /// Select the best registered sampling backend for this build.
+    #[default]
+    Auto,
+    /// Require the scalar sampling backend.
+    Scalar,
+    /// Require the portable-SIMD sampling backend.
+    PortableSimd,
+}
+
+impl From<PlanSampleBackendArg> for BackendPreference {
+    fn from(value: PlanSampleBackendArg) -> Self {
+        match value {
+            PlanSampleBackendArg::Auto => Self::Auto,
+            PlanSampleBackendArg::Scalar => Self::Scalar,
+            PlanSampleBackendArg::PortableSimd => Self::PortableSimd,
+        }
+    }
+}
+
 #[derive(Debug, Args)]
 struct PlanSampleArgs {
     /// Circuit path. Defaults to stdin.
@@ -93,6 +115,10 @@ struct PlanSampleArgs {
     /// Accepted compatibility no-op, reported separately from compilation identity.
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
+
+    /// Sampling backend selection policy.
+    #[arg(long, value_enum, default_value_t = PlanSampleBackendArg::Auto)]
+    backend: PlanSampleBackendArg,
 
     /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
@@ -154,6 +180,7 @@ where
     R: Read,
     W: Write,
 {
+    let backend = BackendPreference::from(args.backend);
     let output_format = args.out_format.record_format();
     if output_format == RecordFormat::Ptb64 {
         validate_ptb64_shot_count(args.shots)?;
@@ -169,6 +196,7 @@ where
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
+        .backend(backend)
         .compile(&circuit)
         .map_err(|error| CliError::Circuit(stab_core::CircuitError::from(error)))?;
     let request_fingerprint = plan.request_fingerprint();
