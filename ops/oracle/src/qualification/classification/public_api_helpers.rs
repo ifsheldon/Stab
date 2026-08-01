@@ -49,6 +49,9 @@ pub(super) fn classify_facade_tier_api(crate_name: &str, api_path: &str) -> Opti
     if crate_name != "stab_core" {
         return None;
     }
+    if api_path.starts_with("stab_core::experimental::") {
+        return Some(FeatureId::CircuitApi);
+    }
     if api_path.starts_with("stab_core::advanced::storage::") {
         return Some(FeatureId::BitKernels);
     }
@@ -131,6 +134,9 @@ pub(super) fn classify_extracted_analysis_api(
         return Some(FeatureId::FlowUtils);
     }
     if source_path == "crates/stab-analysis/src/mbqc_decomposition.rs" {
+        return Some(FeatureId::CircuitApi);
+    }
+    if source_path == "crates/stab-analysis/src/circuit_pass.rs" {
         return Some(FeatureId::CircuitApi);
     }
     if api_lower.ends_with("::decomposed_circuit")
@@ -399,6 +405,7 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
     api_lower.ends_with("_with_limits")
         || api_lower.ends_with("_and_limits")
         || api_lower.ends_with("::compile_with_limits")
+        || api_lower.ends_with("::project_output_resources")
         || api_lower.ends_with("::validate_replay_work_units")
         || api_lower.ends_with("::try_for_each_detection_event_from_error_records")
         || api_lower.contains("resource_estimate")
@@ -409,6 +416,10 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
             "resourceestimate",
             "sourcelinelimit",
             "estimateclass",
+            "circuitpasslimits",
+            "circuitpassprojectionerror",
+            "circuitpassresources",
+            "circuitpassstage",
             "circuitflattenlimits",
             "demflattenlimits",
             "detectionconversionlimits",
@@ -422,5 +433,6 @@ pub(super) fn is_resource_policy_api(api_lower: &str) -> bool {
         ]
         .iter()
         .any(|name| api_lower.contains(name))
+        || api_lower.ends_with("::resource_stage")
         || api_path_mentions_item(api_lower, "estimate")
 }

@@ -27,10 +27,10 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "71ebfa6c152ac61c3f505d5f615c2e652a550e9a92fef3df64f4d7f5bb028fad";
+const CORRECTNESS_DIGEST: &str = "afec1b7090cc1254d6414ec4e10333e3d43976bbb5cc680822797ef231f4c676";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
-const EXPECTED_CHECKLIST_ROWS: usize = 128;
+const EXPECTED_CHECKLIST_ROWS: usize = 129;
 const EXPECTED_MANIFEST_ROWS: usize = 167;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
@@ -667,30 +667,24 @@ fn validate_groups(
             issues,
         );
         validate_text("qualification owner", &group.owner, issues);
+        let group_id = &group.id;
         match group.correctness_binding {
             CorrectnessBinding::ExactApiOwners
                 if group.correctness_cases.is_empty()
                     || group.planned_correctness_case_id.is_some() =>
             {
-                issues.push(format!(
-                    "API-bound group {} lacks exact CQ owners",
-                    group.id
-                ));
+                issues.push(format!("API-bound group {group_id} lacks exact CQ owners"));
             }
             CorrectnessBinding::ExactApiOwners if group.public_api_items.is_empty() => {
                 issues.push(format!(
-                    "non-API group {} claims exact API correctness owners",
-                    group.id
+                    "non-API group {group_id} claims exact API correctness owners"
                 ));
             }
             CorrectnessBinding::ExactCases
                 if group.correctness_cases.is_empty()
                     || group.planned_correctness_case_id.is_some() =>
             {
-                issues.push(format!(
-                    "exact-case group {} lacks exact CQ cases",
-                    group.id
-                ));
+                issues.push(format!("exact-case group {group_id} lacks exact CQ cases"));
             }
             CorrectnessBinding::Unresolved
                 if !group.correctness_cases.is_empty()
@@ -723,11 +717,16 @@ fn validate_groups(
                 ));
             }
         }
+        let mut group_api_paths = BTreeSet::new();
         for path in &group.public_api_items {
+            if !group_api_paths.insert(path.as_str()) {
+                issues.push(format!(
+                    "group {group_id} repeats public API ownership for {path}"
+                ));
+            }
             if !api_paths.contains(path.as_str()) {
                 issues.push(format!(
-                    "group {} references unknown public API {path}",
-                    group.id
+                    "group {group_id} references unknown public API {path}"
                 ));
             }
         }

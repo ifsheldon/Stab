@@ -8177,6 +8177,54 @@
         "standalone": true
       },
       {
+        "id": "a2-analysis-resource-identifier-contract",
+        "feature_id": "CQ-RESOURCE",
+        "comparator": "exact-value",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-analysis",
+            "--test",
+            "resource_identifiers",
+            "analysis_resource_identifiers_are_stable",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Every public analysis operation and resource dimension has an exhaustive stable kebab-case identifier used by machine-readable diagnostics."
+        },
+        "negative_axes": [
+          "analysis-operation-identity-drift",
+          "analysis-resource-identity-drift",
+          "new-identifier-coverage-gap"
+        ],
+        "public_api_owners": [
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceOperation"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceOperation::as_str"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceKind"
+          },
+          {
+            "crate_name": "stab_analysis",
+            "owner_path": "stab_analysis::ResourceKind::as_str"
+          }
+        ],
+        "standalone": true
+      },
+      {
         "id": "a2-circuit-parse-policy-admission",
         "feature_id": "CQ-RESOURCE",
         "comparator": "exact-value",
@@ -9474,22 +9522,6 @@
           {
             "crate_name": "stab_analysis",
             "owner_path": "stab_analysis::ResourceLimitError::limit"
-          },
-          {
-            "crate_name": "stab_analysis",
-            "owner_path": "stab_analysis::ResourceOperation"
-          },
-          {
-            "crate_name": "stab_analysis",
-            "owner_path": "stab_analysis::ResourceOperation::as_str"
-          },
-          {
-            "crate_name": "stab_analysis",
-            "owner_path": "stab_analysis::ResourceKind"
-          },
-          {
-            "crate_name": "stab_analysis",
-            "owner_path": "stab_analysis::ResourceKind::as_str"
           }
         ],
         "standalone": true
@@ -22042,6 +22074,775 @@
         "seeded-result-drift",
         "partition-drift",
         "materialized-shot-growth"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-input-admission-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "pass_input_is_admitted_before_implementation_runs",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Only the common executor can construct pass input, and it rejects represented input above the caller's policy before external implementation dispatch."
+      },
+      "negative_axes": [
+        "input-admission-bypass",
+        "dispatch-before-admission",
+        "context-limit-drift"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassContext"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassContext::new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassContext::limits"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassInput"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassInput::circuit"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassInput::context"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassInput::resources"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::run_circuit_pass"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-resource-dimensions-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "pass_input_resource_dimensions_are_admitted_independently",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Represented items, target occurrences, argument values, projected logical payload bytes, and repeat nesting are caller-configurable independent folded-model dimensions with finite defaults and a fixed recursive hard ceiling. Payload bytes exclude allocator metadata and spare collection capacity."
+      },
+      "negative_axes": [
+        "target-limit-alias",
+        "argument-limit-alias",
+        "represented-item-limit-alias",
+        "projected-payload-limit-alias",
+        "repeat-nesting-limit-bypass"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::DEFAULT_MAX_REPRESENTED_ITEMS"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::DEFAULT_MAX_TARGET_OCCURRENCES"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::DEFAULT_MAX_ARGUMENT_VALUES"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::DEFAULT_MAX_PROJECTED_PAYLOAD_BYTES"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::maximal"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::max_represented_items"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::max_target_occurrences"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::max_argument_values"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::max_projected_payload_bytes"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::repeat_nesting"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::with_max_represented_items"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::with_max_target_occurrences"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::with_max_argument_values"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::with_max_projected_payload_bytes"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassLimits::with_repeat_nesting"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassError::resource_limit_error"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-output-projection-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "pass_output_projection_admits_every_resource_before_lowering",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Every pass projects represented items, targets, arguments, logical payload bytes, and repeat nesting with checked arithmetic; the common executor admits that projection before invoking output-producing lowering."
+      },
+      "negative_axes": [
+        "output-allocation-before-admission",
+        "projected-resource-alias",
+        "projection-arithmetic-overflow",
+        "projection-dispatch-on-rejection"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass::project_output_resources"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::try_new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::represented_items"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::target_occurrences"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::argument_values"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::tag_bytes"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::repeat_nesting"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::projected_payload_bytes"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::checked_with_additional"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassResources::with_repeat_nesting"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassProjectionError"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassProjectionError::resource"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-resource-stage-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "circuit_pass_resource_stages_are_typed_across_framework_phases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Input admission, projected-output admission, and actual-output admission expose distinct typed framework stages with stable machine-readable codes instead of requiring callers to parse diagnostic prose."
+      },
+      "negative_axes": [
+        "input-stage-erasure",
+        "projection-stage-erasure",
+        "output-stage-erasure",
+        "stage-display-parsing"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassStage"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassStage::Input"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassStage::OutputProjection"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassStage::Output"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassStage::as_str"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassError::resource_stage"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-output-validation-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "pass_output_is_validated_before_it_is_returned",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Every admitted projection is followed by closed-dialect structural output admission, and a pass that understates any actual projected-payload dimension is rejected before callers receive its circuit and typed report."
+      },
+      "negative_axes": [
+        "output-validation-bypass",
+        "output-repeat-nesting-excess",
+        "output-projection-underestimate",
+        "unvalidated-result-exposure"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassOutput"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassOutput::new"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassOutput::circuit"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-error-category-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "circuit_pass_errors_preserve_framework_and_diagnostic_categories",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The public pass error keeps resource admission, projection underestimation, and implementation diagnostics as distinct typed categories with category-specific accessors and payloads."
+      },
+      "negative_axes": [
+        "resource-category-erasure",
+        "projection-category-erasure",
+        "projection-payload-loss",
+        "pass-diagnostic-erasure"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassError"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassError::projection_underestimate"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassError::diagnostic"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-circuit-pass-typed-diagnostic-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "pass_specific_diagnostics_remain_typed",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A pass can reject an unsupported research lowering with its concrete diagnostic type before producing output, and the common error preserves that source separately from framework admission failures."
+      },
+      "negative_axes": [
+        "pass-diagnostic-erasure",
+        "diagnostic-resource-alias"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-closed-model-extension-rejection-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "closed_model_rejects_unsupported_gate_lowering",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The public pass seam lowers only into the closed Stim-compatible Circuit model; constructing an unknown research gate fails with the typed model diagnostic before any candidate output exists."
+      },
+      "negative_axes": [
+        "unsupported-extension-acceptance",
+        "runtime-gate-registration",
+        "unknown-gate-output-exposure"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-without-noise-pass-adaptation-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-analysis",
+          "--test",
+          "circuit_pass",
+          "without_noise_pass_preserves_legacy_output_report_and_resource_policy",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The built-in pass preserves canonical noiseless output, folded repeat structure, tags, and measurement indexing while reporting each structural rewrite exactly."
+      },
+      "negative_axes": [
+        "built-in-output-drift",
+        "measurement-record-drift",
+        "tag-loss",
+        "report-count-drift",
+        "nondeterministic-output",
+        "legacy-resource-policy-drift"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoisePass"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass::Options"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass::Report"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass::Diagnostic"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPass::run"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassOutput::report"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::CircuitPassOutput::into_parts"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoiseOptions"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoiseReport"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoiseReport::removed_noise_instructions"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoiseReport::stripped_measurement_probabilities"
+        },
+        {
+          "crate_name": "stab_analysis",
+          "owner_path": "stab_analysis::WithoutNoiseReport::replaced_heralded_noise_instructions"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a8-external-noise-pass-determinism-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-noise-pass",
+          "--test",
+          "noise_pass_contract",
+          "inserts_deterministic_noise_after_single_target_group_unitaries",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A separately compiled Stable crate inserts deterministic typed X noise through only the public model and pass APIs without changing the gate registry or execution IR."
+      },
+      "negative_axes": [
+        "external-output-drift",
+        "nondeterministic-pass",
+        "ineligible-gate-insertion",
+        "source-boundary-fusion"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-external-noise-pass-preservation-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-noise-pass",
+          "--test",
+          "noise_pass_contract",
+          "preserves_nested_repeats_annotations_targets_and_opaque_tags",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The external pass keeps nested repeat blocks folded and preserves coordinates, complete target lists, source tags, and opaque non-UTF-8 metadata exactly."
+      },
+      "negative_axes": [
+        "repeat-expansion",
+        "coordinate-loss",
+        "target-loss",
+        "opaque-tag-loss"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-external-noise-pass-output-admission-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-noise-pass",
+          "--test",
+          "noise_pass_contract",
+          "common_admission_rejects_expanded_output_after_admitting_input",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A real external transform that expands represented output is rejected by common projected-output admission before its lowering hook allocates the expanded circuit."
+      },
+      "negative_axes": [
+        "external-output-admission-bypass",
+        "input-output-limit-alias",
+        "external-lowering-before-projection",
+        "resource-error-erasure"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-external-noise-pass-payload-projection-contract",
+      "feature_id": "CQ-RESOURCE",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-noise-pass",
+          "--test",
+          "noise_pass_contract",
+          "opaque_tag_output_projection_rejects_before_pass_allocation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The separately compiled external pass projects inserted item, target, argument, and opaque-tag logical payload and performs zero allocations when projected payload bytes exceed the admitted limit."
+      },
+      "negative_axes": [
+        "opaque-tag-byte-underestimate",
+        "output-allocation-before-byte-admission",
+        "record-count-proxy-for-payload-bytes"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-external-noise-pass-eligibility-contract",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-noise-pass",
+          "--test",
+          "noise_pass_contract",
+          "excludes_non_unitary_pair_and_pauli_product_operations",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The external reference transform inserts noise only after represented unitary instructions whose target groups are independent single-qubit applications, leaving measurements, annotations, pair gates, and Pauli-product operations unchanged."
+      },
+      "negative_axes": [
+        "pair-gate-noise-insertion",
+        "pauli-product-noise-insertion",
+        "measurement-noise-insertion",
+        "annotation-noise-insertion"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-cli-backend-selection-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_backend_selection_matches_advertised_capabilities",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Auto and explicit scalar requests resolve through the canonical compiler, advertise one executable backend, and bind the same request and plan identities when resolution agrees."
+      },
+      "negative_axes": [
+        "capability-selection-drift",
+        "auto-plan-identity-drift",
+        "requested-policy-in-neutral-identity",
+        "reported-backend-drift"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a8-cli-unavailable-backend-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::agent::plan_sample_reports_an_unavailable_explicit_backend",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A syntactically valid explicit backend that is absent from the executable registry fails compilation with the existing typed JSON diagnostic and no plan output."
+      },
+      "negative_axes": [
+        "unavailable-backend-fallback",
+        "placeholder-backend-advertisement",
+        "error-class-drift",
+        "partial-plan-output"
       ],
       "public_api_owners": [],
       "standalone": true

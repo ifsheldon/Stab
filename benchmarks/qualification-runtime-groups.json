@@ -1,7 +1,7 @@
 {
   "schema_version": 10,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "3e8350e9ad0e05a9acd3b73a214f52f8bacbea384ec1a147ccfb30b3a1277d18",
+  "performance_inventory_sha256": "5d35927f8518a6df5de141b674af8d38858b16338437f1e033897b0419090f20",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -183,6 +183,32 @@
           "witness_case_id": "cq-evidence-qualification-7d5fce18cc43d73d",
           "expected_output_digest": "9a8aa05a84e9c0a0553352ebeaae763b699c3ff0d96113f93d6411051dbd8152",
           "max_worker_peak_rss_bytes": 33554432
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A8-EXTERNAL-NOISE-PASS",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7a01f0caf77063a0",
+          "expected_output_digest": "497dec08e84316b349ec34173208f164e5d990ca8c712d015b85de2af0e6ac59",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7a01f0caf77063a0",
+          "expected_output_digest": "6f5cf5b7d020c0b6230fb489fa2cf9a719fe353c3e26a59ef2dde509bedca628",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7a01f0caf77063a0",
+          "expected_output_digest": "765bab36c6f7c0dc03a2e2e1821b9d2d2701062554d7f6273c94169c82cc1dca",
+          "max_worker_peak_rss_bytes": null
         }
       ]
     }
@@ -523,6 +549,55 @@
         "cq-evidence-qualification-c61285e1ce0e88e8"
       ],
       "owner": "stab-engine/sample-detect-decode-composition",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-A8-EXTERNAL-NOISE-PASS",
+      "claim_class": "product-diagnostic",
+      "parity_eligibility": "report-only",
+      "timing_batch_policy": "common-iterations",
+      "workload_id": "external-noise-pass",
+      "measurement_ids": [
+        "run-and-release"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "family_id": "default",
+          "size_class": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "family_id": "default",
+          "size_class": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "family_id": "default",
+          "size_class": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-0b7d994f36856b37",
+        "cq-evidence-qualification-462e13db123d5041",
+        "cq-evidence-qualification-63d794137c5e40e8",
+        "cq-evidence-qualification-7164c6c57e8187cf",
+        "cq-evidence-qualification-7a01f0caf77063a0",
+        "cq-evidence-qualification-8034f3ff6932ff5e",
+        "cq-evidence-qualification-88972b4df64c8539",
+        "cq-evidence-qualification-9271cf708f696d42",
+        "cq-evidence-qualification-da7f35283dd1c657"
+      ],
+      "owner": "stab-reference-noise-pass/x-error-transform",
       "profiler_note": null
     },
     {

@@ -20,6 +20,7 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a2-parse-estimate-contract",
     "a6-model-parse-resource-contract",
     "a2-resource-identifier-contract",
+    "a2-analysis-resource-identifier-contract",
     "a2-circuit-parse-policy-admission",
     "a2-dem-parse-policy-admission",
     "a2-parse-repeat-policy-admission",
@@ -107,6 +108,11 @@ const EXISTING_RESOURCE_SOURCE_IDS: &[&str] = &[
     "a5-direct-frame-compiled-storage-contract",
     "a5-direct-frame-pre-materialization-admission-contract",
     "a5-dem-sampling-allocation-contract",
+    "a8-circuit-pass-resource-dimensions-contract",
+    "a8-circuit-pass-output-projection-contract",
+    "a8-circuit-pass-resource-stage-contract",
+    "a8-external-noise-pass-output-admission-contract",
+    "a8-external-noise-pass-payload-projection-contract",
 ];
 
 struct PlannedResourceCaseSpec {

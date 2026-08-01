@@ -23,6 +23,8 @@ pub(in crate::qualification::discovery) const A7_EXACT_ML_REUSED_DECODE_GROUP_ID
     "PERFQ-A7-EXACT-ML-REUSED-DECODE";
 pub(in crate::qualification::discovery) const A7_PIPELINE_GROUP_ID: &str =
     "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE";
+pub(in crate::qualification::discovery) const A8_EXTERNAL_NOISE_PASS_GROUP_ID: &str =
+    "PERFQ-A8-EXTERNAL-NOISE-PASS";
 
 pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     let performance_feature = item
@@ -113,6 +115,9 @@ fn diagnostic_group_id(path: &str) -> Option<&'static str> {
         }
         "stab_decoder::decode_batch" | "stab_core::decode_batch" => {
             Some(A7_EXACT_ML_REUSED_DECODE_GROUP_ID)
+        }
+        "stab_analysis::run_circuit_pass" | "stab_core::experimental::run_circuit_pass" => {
+            Some(A8_EXTERNAL_NOISE_PASS_GROUP_ID)
         }
         _ => None,
     }
@@ -340,6 +345,26 @@ mod tests {
             assert_eq!(
                 disposition.parent_group_ids,
                 [A7_EXACT_ML_REUSED_DECODE_GROUP_ID],
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn circuit_pass_execution_is_owned_by_the_external_pass_diagnostic() {
+        for path in [
+            "stab_analysis::run_circuit_pass",
+            "stab_core::experimental::run_circuit_pass",
+        ] {
+            let disposition = make_disposition(&api(path, "function"));
+            assert_eq!(
+                disposition.disposition,
+                PerformanceDisposition::CoveredByParent,
+                "{path}"
+            );
+            assert_eq!(
+                disposition.parent_group_ids,
+                [A8_EXTERNAL_NOISE_PASS_GROUP_ID],
                 "{path}"
             );
         }

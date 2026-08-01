@@ -7,6 +7,7 @@ use crate::qualification::discovery::api::{
     A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID, A2_SAMPLER_COMPILE_GROUP_ID,
     A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID, A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
     A7_EXACT_ML_COMPILE_GROUP_ID, A7_EXACT_ML_REUSED_DECODE_GROUP_ID, A7_PIPELINE_GROUP_ID,
+    A8_EXTERNAL_NOISE_PASS_GROUP_ID,
 };
 use crate::qualification::model::{
     CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, MemoryMethod, MemoryPolicy,
@@ -208,6 +209,104 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
     .into_iter()
     .map(|spec| decoder_diagnostic_group(circuit, spec))
     .collect()
+}
+
+pub(in crate::qualification::discovery) fn external_pass_diagnostic_groups(
+    existing: &[QualificationGroup],
+) -> Result<Vec<QualificationGroup>, BenchError> {
+    let circuit = existing
+        .iter()
+        .find(|group| group.id == CIRCUIT_PARSE_GROUP_ID)
+        .ok_or_else(|| {
+            BenchError::Qualification(
+                "A8 external-pass diagnostic requires an executable circuit timing policy source"
+                    .to_string(),
+            )
+        })?;
+    let mut group = circuit.clone();
+    group.id = A8_EXTERNAL_NOISE_PASS_GROUP_ID.to_string();
+    group.manifest_row = "perfq-a8-external-noise-pass".to_string();
+    group.row_origin = RowOrigin::Planned;
+    group.performance_feature = "PERF-CIRCUIT-MODEL".to_string();
+    group.checklist_anchors.clear();
+    group.checklist_child_ids.clear();
+    group.public_api_items.clear();
+    group.disposition = PerformanceDisposition::Measured;
+    group.phase = Phase::Transform;
+    group.runner_fidelity = RunnerFidelity::StabReportOnly;
+    group.correctness_cases = [
+        "cq-evidence-qualification-0b7d994f36856b37",
+        "cq-evidence-qualification-462e13db123d5041",
+        "cq-evidence-qualification-63d794137c5e40e8",
+        "cq-evidence-qualification-7164c6c57e8187cf",
+        "cq-evidence-qualification-7a01f0caf77063a0",
+        "cq-evidence-qualification-8034f3ff6932ff5e",
+        "cq-evidence-qualification-88972b4df64c8539",
+        "cq-evidence-qualification-9271cf708f696d42",
+        "cq-evidence-qualification-da7f35283dd1c657",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = external_pass_family();
+    group.work_unit = "represented input instructions".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact canonical transformed circuit plus inserted-instruction and affected-target report counts from the public external pass operation."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Circuit generation and parsing occur before timing. Raw-work-v2 measures complete public run_circuit_pass calls, black-boxes every circuit and report, and releases every typed result before the finish clock. One independent untimed pass validates the canonical circuit and report before semantic hashing."
+            .to_string(),
+        comparator_sources: Vec::new(),
+    };
+    group.timing_policy.gate_statistic = PRODUCT_DIAGNOSTIC_GATE_STATISTIC.to_string();
+    group.memory_policy = MemoryPolicy {
+        method: MemoryMethod::NotApplicable,
+        scale_ids: Vec::new(),
+        expected_growth:
+            "No release memory claim; bounded worker RSS remains present only in raw diagnostic receipts."
+                .to_string(),
+    };
+    group.threshold_policy = ThresholdPolicy::ReportOnly;
+    group.reason = "Measures a meaningful external circuit transform through the complete public Stab pass executor at three exact represented-input scales. The row is Stab-only because pinned Stim v1.16.0 has no faithful external-pass contract, so it makes no parity or self-regression claim."
+        .to_string();
+    group.owner = "stab-reference-noise-pass/x-error-transform".to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(vec![group])
+}
+
+fn external_pass_family() -> WorkloadFamily {
+    generated_family(
+        "a8-external-noise-pass-v1",
+        "ops/bench/src/qualification/runtime/worker/noise_pass.rs",
+        [
+            scale(
+                "small",
+                SizeClass::Small,
+                "represented_input_instructions=64; probability=0.125; generator=a8-external-noise-pass-v1",
+                64,
+                429,
+                "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6",
+            ),
+            scale(
+                "medium",
+                SizeClass::Medium,
+                "represented_input_instructions=4096; probability=0.125; generator=a8-external-noise-pass-v1",
+                4_096,
+                27_981,
+                "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04",
+            ),
+            scale(
+                "large",
+                SizeClass::Large,
+                "represented_input_instructions=65536; probability=0.125; generator=a8-external-noise-pass-v1",
+                65_536,
+                447_821,
+                "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60",
+            ),
+        ],
+    )
 }
 
 struct DecoderDiagnosticSpec {

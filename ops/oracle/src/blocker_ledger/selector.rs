@@ -287,6 +287,7 @@ fn is_allowed_test_package(package: &str) -> bool {
             | "stab-records"
             | "stab-decoder"
             | "stab-reference-decoder"
+            | "stab-reference-noise-pass"
             | "stab-engine"
             | "stab-core"
             | "stab-cli"

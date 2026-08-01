@@ -52,6 +52,30 @@ fn validation_rejects_unknown_correctness_fixture_and_measurement_ids() {
 }
 
 #[test]
+fn validation_rejects_duplicate_public_api_ownership_inside_one_group() {
+    let (mut suite, manifest, references) = fixture();
+    let group = suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| !group.public_api_items.is_empty())
+        .expect("group with API ownership");
+    let duplicate = group
+        .public_api_items
+        .first()
+        .expect("owned public API")
+        .clone();
+    group.public_api_items.push(duplicate.clone());
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("duplicate group ownership must fail");
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("repeats public API ownership for {duplicate}"))
+    );
+}
+
+#[test]
 fn validation_rejects_unknown_feature_manifest_threshold_and_waiver_ids() {
     let (mut suite, manifest, mut references) = fixture();
     suite
@@ -985,7 +1009,7 @@ fn generated_inventory_has_a_finite_executable_matrix() {
         .count();
 
     assert_eq!(release, 19);
-    assert_eq!(diagnostics, 7);
+    assert_eq!(diagnostics, 8);
     assert!(release <= MAX_RELEASE_GROUPS);
     assert!(diagnostics <= MAX_DIAGNOSTIC_GROUPS);
     assert!(
