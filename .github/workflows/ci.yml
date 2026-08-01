@@ -41,10 +41,13 @@ jobs:
           just architecture::docs-check
 
       - name: Stable component tests
-        run: cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine --all-targets
+        run: cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine -p stab-decoder --all-targets
 
       - name: Portable SIMD component tests
         run: cargo test --locked -p stab-bits -p stab-algebra --no-default-features --features portable-simd
+
+      - name: Portable SIMD Clippy
+        run: cargo clippy --locked -p stab-bits -p stab-algebra --no-default-features --features portable-simd --all-targets -- -D warnings
 
       - name: Format
         run: cargo fmt --all --check
