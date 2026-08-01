@@ -330,20 +330,33 @@ fn all_finite_syndromes_can_be_exact_ties_without_unbounded_ambiguity_storage() 
 
 #[test]
 fn exact_tie_resolution_rejects_the_first_workspace_excess() {
-    let model = DetectorErrorModel::from_dem_str(
+    let largest_one_limb_model = DetectorErrorModel::from_dem_str(
+        "error(0) D19\n\
+         error(0.1) D0\n\
+         error(0.5) L0\n",
+    )
+    .expect("largest one-limb tied DEM");
+    ExactMlDecoderSession::try_compile_model(&largest_one_limb_model)
+        .expect("one exact limb per joint state fits the workspace");
+
+    let first_two_limb_model = DetectorErrorModel::from_dem_str(
         "error(0) D19\n\
          error(0.1) D0\n\
          error(0.1) D1\n\
          error(0.5) L0\n",
     )
-    .expect("wide tied DEM");
+    .expect("first two-limb tied DEM");
+    let expected_bytes =
+        ((ExactMlDecoderSession::MAX_JOINT_STATES as u128) * 2 + 4) * (size_of::<u64>() as u128);
 
     assert!(matches!(
-        ExactMlDecoderSession::try_compile_model(&model),
+        ExactMlDecoderSession::try_compile_model(&first_two_limb_model),
         Err(ExactMlCompileError::ExactWorkspaceLimit {
             actual_at_least,
             limit,
-        }) if actual_at_least > limit && limit == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES
+        }) if actual_at_least == expected_bytes
+            && actual_at_least == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES + 32
+            && limit == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES
     ));
 }
 
