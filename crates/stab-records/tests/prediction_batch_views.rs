@@ -64,3 +64,25 @@ fn zero_width_and_zero_length_prediction_prefixes_remain_valid() {
     assert_eq!(full.view().shot_count(), 2);
     assert_eq!(full.view().bits_per_shot(), 0);
 }
+
+#[test]
+fn mutable_prediction_prefix_reuse_allocates_nothing() {
+    let mut predictions = ObservablePredictionBatch::zeros(64, CorrectionWidth::new(3))
+        .expect("reusable prediction storage");
+    let allocations = allocation_counter::measure(|| {
+        for shot_count in [1, 17, 64, 3, 0] {
+            let mut prefix = predictions
+                .view_prefix_mut(shot_count)
+                .expect("bounded mutable prefix");
+            for shot_index in 0..shot_count {
+                prefix
+                    .copy_shot_from_bools(shot_index, &[true, false, true])
+                    .expect("replace prediction");
+            }
+            std::hint::black_box(prefix.view());
+        }
+    });
+
+    assert_eq!(allocations.count_total, 0, "{allocations:?}");
+    assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
+}

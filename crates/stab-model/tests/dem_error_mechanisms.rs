@@ -15,6 +15,7 @@ use stab_model::{
 #[derive(Default)]
 struct RecordingVisitor {
     mechanisms: Vec<(f64, Vec<DemErrorTarget>)>,
+    tags: Vec<Option<Vec<u8>>>,
     stop_after: Option<usize>,
 }
 
@@ -53,6 +54,7 @@ impl DemErrorMechanismVisitor for RecordingVisitor {
             .expect("valid absolute targets");
         self.mechanisms
             .push((mechanism.probability().get(), targets));
+        self.tags.push(mechanism.tag_bytes().map(<[u8]>::to_vec));
         if self
             .stop_after
             .is_some_and(|limit| self.mechanisms.len() == limit)
@@ -67,14 +69,14 @@ fn shifted_repeated_model() -> DetectorErrorModel {
     DetectorErrorModel::from_dem_str(
         "shift_detectors 2\n\
          repeat 2 {\n\
-             error(0.25) D0 D0 ^ D1 L0\n\
+             error[loop](0.25) D0 D0 ^ D1 L0\n\
              detector D1\n\
              shift_detectors 3\n\
          }\n\
          repeat 0 {\n\
              error(0.125) D9\n\
          }\n\
-         error(0.5) D0\n",
+         error[tail](0.5) D0\n",
     )
     .expect("shifted repeated DEM")
 }
@@ -123,6 +125,14 @@ fn mechanism_traversal_preserves_absolute_targets_duplicates_and_separators() {
                 ],
             ),
             (0.5, vec![detector(8)]),
+        ]
+    );
+    assert_eq!(
+        visitor.tags,
+        vec![
+            Some(b"loop".to_vec()),
+            Some(b"loop".to_vec()),
+            Some(b"tail".to_vec()),
         ]
     );
 }
@@ -267,4 +277,63 @@ fn represented_repeat_count_does_not_allocate_per_mechanism_or_target() {
         many.bytes_total, one.bytes_total,
         "one={one:?} many={many:?}"
     );
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct VisitorFailure;
+
+impl std::fmt::Display for VisitorFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("intentional visitor failure")
+    }
+}
+
+impl std::error::Error for VisitorFailure {}
+
+struct FailingVisitor;
+
+impl DemErrorMechanismVisitor for FailingVisitor {
+    type Error = VisitorFailure;
+
+    fn visit_error_mechanism(
+        &mut self,
+        _mechanism: DemErrorMechanismView<'_>,
+    ) -> Result<ControlFlow<()>, Self::Error> {
+        Err(VisitorFailure)
+    }
+}
+
+#[test]
+fn traversal_distinguishes_model_failures_from_visitor_failures() {
+    let model = DetectorErrorModel::from_dem_str("error(0.25) D0\n").expect("valid DEM");
+    let visitor_error = model
+        .try_visit_error_mechanisms(
+            DemErrorMechanismTraversalLimits::new(1, 1),
+            &mut FailingVisitor,
+        )
+        .expect_err("visitor error");
+    assert_eq!(
+        visitor_error,
+        DemErrorMechanismVisitError::Visitor(VisitorFailure)
+    );
+    assert!(
+        visitor_error
+            .to_string()
+            .contains("intentional visitor failure")
+    );
+
+    let overflowing = DetectorErrorModel::from_dem_str(
+        "repeat 1152921504606846975 {\n\
+             shift_detectors 1152921504606846975\n\
+         }\n\
+         error(0.25) D0\n",
+    )
+    .expect("individually valid compact repeat");
+    let model_error = overflowing
+        .try_visit_error_mechanisms(
+            DemErrorMechanismTraversalLimits::new(1, 1),
+            &mut RecordingVisitor::default(),
+        )
+        .expect_err("aggregate detector offset overflow");
+    assert!(matches!(model_error, DemErrorMechanismVisitError::Model(_)));
 }
