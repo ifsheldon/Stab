@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "220328b59d3cbbae0e7c2650e82ae826da5985f1e8b40f79e15d1f627845ad1d",
-  "semantic_digest": "be2576fa5eefc25159561a14a37317c9487228992a6a8c8c6261b650772783ba",
+  "correctness_digest": "56df8d57134e7685cf70b74b96ef56b6686380902988e8eeebf04e7333a7c02c",
+  "semantic_digest": "b44827913d1fcd68e6b9d716e38c1211f83528dda6aa6ae265d3fa70a9503091",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -222,7 +222,7 @@
     },
     {
       "id": "PERFC-03d7d6a50d2629d8",
-      "source_line": 174,
+      "source_line": 175,
       "anchor_digest": "3e058d65ddac267c048f82e210a979c40a7a1c5a1b772c4553f0a557e166a6d1",
       "section": "11. Command-Line API",
       "feature": "Legacy top-level command flags",
@@ -252,7 +252,7 @@
     },
     {
       "id": "PERFC-08246ed23f9cca9b",
-      "source_line": 228,
+      "source_line": 229,
       "anchor_digest": "cbbc566e294631e3a912d202cac37d6fc73c19d447bc647c03e799d2051d5fad",
       "section": "16. Test And Benchmark Surface",
       "feature": "Current beta performance gate",
@@ -475,7 +475,7 @@
     },
     {
       "id": "PERFC-147257abd12fe8fa",
-      "source_line": 120,
+      "source_line": 121,
       "anchor_digest": "b9ed1ade1c737eb050cb0ba800dc78a52159d5d2007d9671da11b52b4370c882",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`stim explain_errors` CLI",
@@ -526,7 +526,7 @@
     },
     {
       "id": "PERFC-1644aae3e8f22a7d",
-      "source_line": 122,
+      "source_line": 123,
       "anchor_digest": "c5f9eff7814a3e9d6518dfefe5a14754475fd79bf1f081c77353704ef0885b09",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "SAT or WCNF encoding",
@@ -556,7 +556,7 @@
     },
     {
       "id": "PERFC-1f7f9ad4fc536624",
-      "source_line": 121,
+      "source_line": 122,
       "anchor_digest": "67e4ea544dfd480e9a38d6966e4162824f62d281c240219b80d1490f2b00639d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Shortest graphlike and hypergraph logical-error search",
@@ -586,7 +586,7 @@
     },
     {
       "id": "PERFC-1ff33ed84805b2cc",
-      "source_line": 170,
+      "source_line": 171,
       "anchor_digest": "5d8c064325ef0d448833457b5973a7377bb799e9acd454e25c43c5971a5e534e",
       "section": "11. Command-Line API",
       "feature": "`stim diagram`",
@@ -637,7 +637,7 @@
     },
     {
       "id": "PERFC-29677000e90bf328",
-      "source_line": 146,
+      "source_line": 147,
       "anchor_digest": "6e791c95fe34c5086facb1a4ccd82a1e7ad5d45c43aeb18700940e5aa3f02c7a",
       "section": "9. Diagrams And Visualization",
       "feature": "Interactive HTML and Crumble diagram surfaces",
@@ -749,7 +749,7 @@
     },
     {
       "id": "PERFC-31c3e098ded9689f",
-      "source_line": 244,
+      "source_line": 245,
       "anchor_digest": "2ae94fe1fc5a88c26f90ec4b2cb2c6ce55028682cb9da9ee518c504d80e25a77",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Python bindings",
@@ -770,7 +770,7 @@
     },
     {
       "id": "PERFC-32f5951f3b880cdf",
-      "source_line": 166,
+      "source_line": 167,
       "anchor_digest": "3b3c663f266690c6d499924297aee84f03dfb2efe46df07f86bede24cca1e1f5",
       "section": "11. Command-Line API",
       "feature": "`stim detect`",
@@ -862,7 +862,7 @@
     },
     {
       "id": "PERFC-3883f38fcee402eb",
-      "source_line": 213,
+      "source_line": 214,
       "anchor_digest": "f84c9addf8a8601d0b0ec81f1bdd9da56c7d8f74b1721825c583081088912730",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "JS packaging",
@@ -883,7 +883,7 @@
     },
     {
       "id": "PERFC-399173601ec6dbac",
-      "source_line": 210,
+      "source_line": 211,
       "anchor_digest": "76bf69678f23d972b931021fd00e27c0a106f5e815f710ea0a1ab3691b8f4182",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Cargo workspace",
@@ -1057,7 +1057,7 @@
     },
     {
       "id": "PERFC-44abd4394a5490a8",
-      "source_line": 245,
+      "source_line": 246,
       "anchor_digest": "019f0faab5604daf0884149e7546e852432ca4a8d85a56d834b51071e5df4654",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "JS/WASM and ecosystem packages",
@@ -1099,7 +1099,7 @@
     },
     {
       "id": "PERFC-45e92e84c9cb919e",
-      "source_line": 168,
+      "source_line": 169,
       "anchor_digest": "03c57b01eebbe9e617955c2103826ef9ad1d92e2817b9939e51c381f9a0309c1",
       "section": "11. Command-Line API",
       "feature": "`stim analyze_errors`",
@@ -1325,7 +1325,7 @@
     },
     {
       "id": "PERFC-498524e36d0f0bbd",
-      "source_line": 193,
+      "source_line": 194,
       "anchor_digest": "b4d5f7a06100269c40e7b434c3c3edfc793ec3fe89bc2382995a5379fad05117",
       "section": "13. JavaScript And WASM API",
       "feature": "Crumble browser editor",
@@ -1346,7 +1346,7 @@
     },
     {
       "id": "PERFC-4a1660948ea63fb7",
-      "source_line": 180,
+      "source_line": 181,
       "anchor_digest": "ca670a7512f6696ff8eccf2bcd9b014b1bcf9efab90515034aaa224af0e27310",
       "section": "12. Python API",
       "feature": "Top-level `stim` functions",
@@ -1367,7 +1367,7 @@
     },
     {
       "id": "PERFC-4b8adb25ed1ec85c",
-      "source_line": 182,
+      "source_line": 183,
       "anchor_digest": "2a843b83de3177149573c07f221423b6f6f8ceecd432f62ae6b75f81c0554113",
       "section": "12. Python API",
       "feature": "`stim.DetectorErrorModel` class",
@@ -1439,7 +1439,7 @@
     },
     {
       "id": "PERFC-51cbbc11754eceb4",
-      "source_line": 237,
+      "source_line": 238,
       "anchor_digest": "dafdaa9dd08e317abb39c24602a80b9f4300ecf2a0eb4c1ab73ed3afb46be058",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full circuit transform API parity",
@@ -1462,6 +1462,36 @@
       ],
       "performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "The selected child remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "PERFC-51d1237fc1dc1b7a",
+      "source_line": 118,
+      "anchor_digest": "cdd895070a7a8526bd8edf72ebe18a9c5dca983a7834255c1026bf8fcb4f8107",
+      "section": "7. Error Analysis, Search, And Decoder Configuration",
+      "feature": "Decoder interoperability and bounded reference decoder",
+      "raw_status": "Reopened for A7 qualification",
+      "scope": "selected",
+      "deferred_remainder": false,
+      "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
+      "deferred_child": null,
+      "selected_child_ids": [
+        "PERFC-51d1237fc1dc1b7a-IMPLEMENTED"
+      ],
+      "deferred_child_ids": [],
+      "selected_child_ownership": [
+        {
+          "child_id": "PERFC-51d1237fc1dc1b7a-IMPLEMENTED",
+          "performance_features": [
+            "PERF-SEARCH-AND-MATCHING"
+          ]
+        }
+      ],
+      "performance_features": [
+        "PERF-SEARCH-AND-MATCHING"
       ],
       "disposition": "future-candidate",
       "parent_group_ids": [],
@@ -1499,7 +1529,7 @@
     },
     {
       "id": "PERFC-55676fc3004b7fd2",
-      "source_line": 225,
+      "source_line": 226,
       "anchor_digest": "ee4e42d87b5aae8c1a505c2901d7c051503626614d5992ef510bc87a51342f3f",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
@@ -1520,7 +1550,7 @@
     },
     {
       "id": "PERFC-56ceb30ebbb1ac8e",
-      "source_line": 157,
+      "source_line": 158,
       "anchor_digest": "5bdcc44a3b4d77fdc4c623ea28b789056f40b0d36ddc5df9b4c038a89dae82cf",
       "section": "10. Built-In Circuit Generation",
       "feature": "Python `stim.Circuit.generated`",
@@ -1541,7 +1571,7 @@
     },
     {
       "id": "PERFC-5ce01b23bf3372ce",
-      "source_line": 156,
+      "source_line": 157,
       "anchor_digest": "35f5317f5867d2d1535defa44d6d8922a6c1e8116f0cbd218456d752eabad1d7",
       "section": "10. Built-In Circuit Generation",
       "feature": "Generator parameters and noise knobs",
@@ -1571,7 +1601,7 @@
     },
     {
       "id": "PERFC-5d7bb0d4dff1956c",
-      "source_line": 240,
+      "source_line": 241,
       "anchor_digest": "14da4dbce62718afca1fa6dfb0d90c015ff5ab44c77d9bba5611444bacb96b03",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full feedback-inlining transform parity",
@@ -1654,7 +1684,7 @@
     },
     {
       "id": "PERFC-5f2145ca0e3328b5",
-      "source_line": 226,
+      "source_line": 227,
       "anchor_digest": "a5e666130cc41a62e03eb00df8c3d1461b7b230ae9cc711653859232255a9063",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
@@ -1726,7 +1756,7 @@
     },
     {
       "id": "PERFC-62f74c38edc28d0a",
-      "source_line": 119,
+      "source_line": 120,
       "anchor_digest": "2c97203f5d7ef0e4b228ea8ceb033e453fb81d7758c3adf81562594621ff1633",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Error explanation value objects",
@@ -1818,7 +1848,7 @@
     },
     {
       "id": "PERFC-655f504f7896dbf0",
-      "source_line": 199,
+      "source_line": 200,
       "anchor_digest": "e9a8a5b2bc8f57fbb63ca07ec9cc7dee923b23f9920749a05ab494ffa6f90093",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimcirq`",
@@ -1869,7 +1899,7 @@
     },
     {
       "id": "PERFC-675e4e7fa68ba3b9",
-      "source_line": 214,
+      "source_line": 215,
       "anchor_digest": "d39e9219f8f102da3a787224400dd8a2b01f2ab2dd6adf2b979e8cb26aad9f36",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Generated API docs",
@@ -1911,7 +1941,7 @@
     },
     {
       "id": "PERFC-68d7456b8df6bd93",
-      "source_line": 201,
+      "source_line": 202,
       "anchor_digest": "becd68d7ad621a12610737b1e0109bfff8240f162984b4b694769b8572d7881e",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "Crumble",
@@ -1932,7 +1962,7 @@
     },
     {
       "id": "PERFC-6931d59b7e752dfd",
-      "source_line": 155,
+      "source_line": 156,
       "anchor_digest": "63ff548e2d05dd3890100100cffcdd3597ac9d8406664109195879d82a086f72",
       "section": "10. Built-In Circuit Generation",
       "feature": "`color_code:memory_xyz`",
@@ -2022,7 +2052,7 @@
     },
     {
       "id": "PERFC-7cc38b462a082718",
-      "source_line": 135,
+      "source_line": 136,
       "anchor_digest": "a73f79a4a46eb2a8984f4473e6d39fb1a8e8cfe7b083cc46bb58797e6c728970",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Public borrowed Pauli string refs",
@@ -2043,7 +2073,7 @@
     },
     {
       "id": "PERFC-7d5dca89c9553856",
-      "source_line": 229,
+      "source_line": 230,
       "anchor_digest": "4f2dce9c57383122510c2cbb567c447fcccedfea2085f18cec2086486f7514fe",
       "section": "16. Test And Benchmark Surface",
       "feature": "Tests for deferred Python, JS, diagrams, and ecosystem packages",
@@ -2094,7 +2124,7 @@
     },
     {
       "id": "PERFC-83a09d1335d9c916",
-      "source_line": 118,
+      "source_line": 119,
       "anchor_digest": "a7515c8c7970503b17033c0a8b34fb3f18613493cabb2b2281b531402b198ff7",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
@@ -2124,7 +2154,7 @@
     },
     {
       "id": "PERFC-884dc647874f360d",
-      "source_line": 152,
+      "source_line": 153,
       "anchor_digest": "e0f7771e5a457271c32c91256f6ff382a9571e47357baf7fa304f37532533768",
       "section": "10. Built-In Circuit Generation",
       "feature": "`repetition_code:memory`",
@@ -2154,7 +2184,7 @@
     },
     {
       "id": "PERFC-88ab8542a3bfd441",
-      "source_line": 241,
+      "source_line": 242,
       "anchor_digest": "fefd53b8075742c0802e5ecf8224d54ca72bd47d79ef2f44bc310f4c2a98390f",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full ErrorMatcher provenance and `explain_errors` CLI",
@@ -2205,7 +2235,7 @@
     },
     {
       "id": "PERFC-89a73d0b1559b081",
-      "source_line": 136,
+      "source_line": 137,
       "anchor_digest": "213b9d2cac77703a110739618fdd05e687f568a4b4a3c936e6307608a2c5338d",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Conversion to or from numpy, state vectors, and arbitrary unitaries",
@@ -2226,7 +2256,7 @@
     },
     {
       "id": "PERFC-8ac4d4b2d32da162",
-      "source_line": 129,
+      "source_line": 130,
       "anchor_digest": "0c9ef23daa3177fbf3aec0e57183162776d0f8e930d7f1af3b81e7f238e81cc2",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Owned Pauli strings",
@@ -2286,7 +2316,7 @@
     },
     {
       "id": "PERFC-8c644079a9eeab7f",
-      "source_line": 137,
+      "source_line": 138,
       "anchor_digest": "c97e076e51e4a2c866d7606fa1da12e6a7b915bb76335afb77502bf4a6d00fe4",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Graph simulator and vector simulator public APIs",
@@ -2307,7 +2337,7 @@
     },
     {
       "id": "PERFC-90e17eacafaae97d",
-      "source_line": 211,
+      "source_line": 212,
       "anchor_digest": "f56f07472f2fddca5ebd8e8bee606fc67d10823fa7897293b56dc4ce9642cd76",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Operational command surface",
@@ -2328,7 +2358,7 @@
     },
     {
       "id": "PERFC-91a871904dcf3356",
-      "source_line": 184,
+      "source_line": 185,
       "anchor_digest": "4e62e2ddc4565ec4314aaf87d35f894fc1d4ec3bcba7ef04e3512445aac51e97",
       "section": "12. Python API",
       "feature": "Error explanation classes",
@@ -2349,7 +2379,7 @@
     },
     {
       "id": "PERFC-933e7f6e900d13cb",
-      "source_line": 192,
+      "source_line": 193,
       "anchor_digest": "9fbe18a00ddbe3ee924c7fd70535eabfc04dfb11210c2430908a80c95c70ec55",
       "section": "13. JavaScript And WASM API",
       "feature": "JS `Circuit`, `Tableau`, `PauliString`, and `TableauSimulator`",
@@ -2370,7 +2400,7 @@
     },
     {
       "id": "PERFC-93fad12b1d302b96",
-      "source_line": 185,
+      "source_line": 186,
       "anchor_digest": "69b1964ab6695fb116bb49de092e1547e96d9db996fe7f1dbb5e790ab2753ccf",
       "section": "12. Python API",
       "feature": "Stabilizer, gate metadata, and simulator classes",
@@ -2391,7 +2421,7 @@
     },
     {
       "id": "PERFC-94bd1a1c7045a109",
-      "source_line": 164,
+      "source_line": 165,
       "anchor_digest": "3cab43b0000fe22fa3918217891ebe4570a7548de3369743f7c3f94a7f106204",
       "section": "11. Command-Line API",
       "feature": "`stim convert`",
@@ -2483,7 +2513,7 @@
     },
     {
       "id": "PERFC-9de448bddb421bc8",
-      "source_line": 154,
+      "source_line": 155,
       "anchor_digest": "41d795b9f5a2fb8a9ce32fed2ea0331ff3b1d179f6f162742040443f4af1178d",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:unrotated_memory_x` and `surface_code:unrotated_memory_z`",
@@ -2513,7 +2543,7 @@
     },
     {
       "id": "PERFC-9ecb45672878e7e2",
-      "source_line": 215,
+      "source_line": 216,
       "anchor_digest": "30a2f1b90e44f809c415661d92b95ed655ae16afa144df8cf223cae76a643f9b",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Feature and roadmap docs",
@@ -2576,7 +2606,7 @@
     },
     {
       "id": "PERFC-a1d4bc5bbe9a861d",
-      "source_line": 239,
+      "source_line": 240,
       "anchor_digest": "697a3d78b0167639ec7df4bd620b99ebad8bd2a4f0f2caecee02c760bbb43e00",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Broader sweep-conditioned simulator and analysis parity",
@@ -2645,7 +2675,7 @@
     },
     {
       "id": "PERFC-a4e48e46d463de4c",
-      "source_line": 191,
+      "source_line": 192,
       "anchor_digest": "098c0dfb3b771f85bd3a3559e5a50b34f17c5dd022aad2363bedae390ffda347",
       "section": "13. JavaScript And WASM API",
       "feature": "WASM build and JS package",
@@ -2666,7 +2696,7 @@
     },
     {
       "id": "PERFC-a650fd6ccb22f00f",
-      "source_line": 171,
+      "source_line": 172,
       "anchor_digest": "14816f986478ef1961dc0622a8061c021e471e4bc1529f5a439ef4ae26d516cf",
       "section": "11. Command-Line API",
       "feature": "`stim explain_errors`",
@@ -2687,7 +2717,7 @@
     },
     {
       "id": "PERFC-a8a7e6dd54bc6357",
-      "source_line": 167,
+      "source_line": 168,
       "anchor_digest": "9549f38c3bb427aaa2c9871dc1dbd3737eccf461549c502d65ab0152df91b387",
       "section": "11. Command-Line API",
       "feature": "`stim m2d`",
@@ -2905,7 +2935,7 @@
     },
     {
       "id": "PERFC-b3ff07112043c802",
-      "source_line": 238,
+      "source_line": 239,
       "anchor_digest": "b1a1b176338715f7f3dd0ca49217153faf93e5815062e770acd30b0483346bfa",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full DEM public API parity",
@@ -2965,7 +2995,7 @@
     },
     {
       "id": "PERFC-badcbed4e03681fa",
-      "source_line": 172,
+      "source_line": 173,
       "anchor_digest": "a9b9071eb4875805acf98f24656efd51c8e0bd5825e4f2c9ab150ed9f1a9eaf8",
       "section": "11. Command-Line API",
       "feature": "`stim repl`",
@@ -2986,7 +3016,7 @@
     },
     {
       "id": "PERFC-bcb7981e583f0db1",
-      "source_line": 243,
+      "source_line": 244,
       "anchor_digest": "c79d4f690b38795ca8fee657cab68b6ff4999201499823fa8e3ca57ec9d6fcb5",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Diagrams and visualization",
@@ -3007,7 +3037,7 @@
     },
     {
       "id": "PERFC-bee7b774029de282",
-      "source_line": 203,
+      "source_line": 204,
       "anchor_digest": "37e720e4dc4a712855c554d0992f2466e2cf1b05ee51beaf332c53422154fffe",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "ZX and lattice-surgery glue",
@@ -3028,7 +3058,7 @@
     },
     {
       "id": "PERFC-c6090c35e680bc21",
-      "source_line": 242,
+      "source_line": 243,
       "anchor_digest": "5b0f5a032b3b8e5c3ebe116d0d0b06701d13fc5c46f4ab38cb6c84b3d4d32f5e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Public interactive `TableauSimulator` and `FlipSimulator` APIs",
@@ -3049,7 +3079,7 @@
     },
     {
       "id": "PERFC-c6e68a57b705e397",
-      "source_line": 131,
+      "source_line": 132,
       "anchor_digest": "4c26a2b93cc7d12be35ae35d2358dcead0cef18469f15149c7f614ee1f8a64ae",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Clifford strings",
@@ -3079,7 +3109,7 @@
     },
     {
       "id": "PERFC-ca130061d952e60f",
-      "source_line": 123,
+      "source_line": 124,
       "anchor_digest": "33dea12f5089e0a7b3f5ef357261de9058a902b8bc066e0074c40dca6a8642a3",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Sparse reverse detector-frame tracking",
@@ -3109,7 +3139,7 @@
     },
     {
       "id": "PERFC-ca86e3c10de8ab0e",
-      "source_line": 132,
+      "source_line": 133,
       "anchor_digest": "89264fe996ff2d5f269ad43239fd67bcde30d2d756c38125ebbd59a56cf1bded",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Tableaux and tableau iterators",
@@ -3139,7 +3169,7 @@
     },
     {
       "id": "PERFC-cbba6f2c91904807",
-      "source_line": 153,
+      "source_line": 154,
       "anchor_digest": "00d5e51dbd4be28240923aacdc8e18f11692ee694747db03148a84351de59a57",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:rotated_memory_x` and `surface_code:rotated_memory_z`",
@@ -3169,7 +3199,7 @@
     },
     {
       "id": "PERFC-cccae489f6a07220",
-      "source_line": 227,
+      "source_line": 228,
       "anchor_digest": "96ce6825c47bb8b05821b430e1a517ae5d2711e7242ca77012c7c29d62450147",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
@@ -3190,7 +3220,7 @@
     },
     {
       "id": "PERFC-cfa671aed2cf20dc",
-      "source_line": 133,
+      "source_line": 134,
       "anchor_digest": "1338d5342db54159382298e8c6baf4ca206aaa13f6cac15bad852cddff91fe25",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Algebra resource admission",
@@ -3308,7 +3338,7 @@
     },
     {
       "id": "PERFC-d454e10c3855a359",
-      "source_line": 173,
+      "source_line": 174,
       "anchor_digest": "e40a238928d8825251b816ed39227cbaba0c103e66ee3e5e64f9e7838d2aa25a",
       "section": "11. Command-Line API",
       "feature": "`stim help` command",
@@ -3368,7 +3398,7 @@
     },
     {
       "id": "PERFC-d4b49459a03a9bb6",
-      "source_line": 181,
+      "source_line": 182,
       "anchor_digest": "d29b211ab65358154d7c3e28b537c3b1d12547c772f7caec92b324efe98e383a",
       "section": "12. Python API",
       "feature": "`stim.Circuit` class",
@@ -3389,7 +3419,7 @@
     },
     {
       "id": "PERFC-d5c4a8400325bab2",
-      "source_line": 204,
+      "source_line": 205,
       "anchor_digest": "2d79363cc5ab1c29e346ab4d5b1846cca0a74090376b36acd99151734084c713",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "QASM and Quirk exports",
@@ -3410,7 +3440,7 @@
     },
     {
       "id": "PERFC-d96593c4523940ed",
-      "source_line": 246,
+      "source_line": 247,
       "anchor_digest": "7b5c77801a6717cb5fc8a86f94d45a1f3ed9572665da58c1aa96cd77a4bda73e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Generated feature/status matrix tooling",
@@ -3491,7 +3521,7 @@
     },
     {
       "id": "PERFC-dbdd023fd3d2ad04",
-      "source_line": 169,
+      "source_line": 170,
       "anchor_digest": "ed73f693ec55c7e66fac46078602910437bdb1bc4875c82b3616f248c07c1bad",
       "section": "11. Command-Line API",
       "feature": "`stim sample_dem`",
@@ -3544,7 +3574,7 @@
     },
     {
       "id": "PERFC-df6a905ca1763242",
-      "source_line": 134,
+      "source_line": 135,
       "anchor_digest": "993de8cc76d1d0b462c66068001b3e2348172f1f24acd827ba88ba0ddcbcdf86",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flows",
@@ -3574,7 +3604,7 @@
     },
     {
       "id": "PERFC-df75e03063fd3fc3",
-      "source_line": 200,
+      "source_line": 201,
       "anchor_digest": "2f9725f6bf654cee8c7ddd4041daa4b1e7c20ebc96f2dc262e4f7271883deb11",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`sinter`",
@@ -3595,7 +3625,7 @@
     },
     {
       "id": "PERFC-e298c35e6daabf7c",
-      "source_line": 143,
+      "source_line": 144,
       "anchor_digest": "0bac94c5b0ee4195af813b45f607c8a6193335dfeba74c941dd66e86b61d82de",
       "section": "9. Diagrams And Visualization",
       "feature": "Circuit timeline diagrams",
@@ -3646,7 +3676,7 @@
     },
     {
       "id": "PERFC-e78daef9f77f3f2a",
-      "source_line": 165,
+      "source_line": 166,
       "anchor_digest": "5e57a3460a4437b641bbf4fd0d1f46846151c9b5b1ad034169973254c1e2ed32",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
@@ -3678,7 +3708,7 @@
     },
     {
       "id": "PERFC-e9ea7ae3015ccb24",
-      "source_line": 163,
+      "source_line": 164,
       "anchor_digest": "d315a6f3374c95dbe937e2192167f620583dc216bf860f180ef0ead2530f76be",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
@@ -3710,7 +3740,7 @@
     },
     {
       "id": "PERFC-ec64113cdae0cd99",
-      "source_line": 130,
+      "source_line": 131,
       "anchor_digest": "1536b5d7e0c2104c100f62b2234aec61d5a765f0beb6a3e043c73efca03d5e1a",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flexible Pauli strings",
@@ -3830,7 +3860,7 @@
     },
     {
       "id": "PERFC-f652be46399d9e30",
-      "source_line": 202,
+      "source_line": 203,
       "anchor_digest": "779160519301ef8ae83b5a77954e6d74bf4d24b39ab9d4c6022bff4b7cac324c",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimflow`",
@@ -3851,7 +3881,7 @@
     },
     {
       "id": "PERFC-f94f299efef1806b",
-      "source_line": 183,
+      "source_line": 184,
       "anchor_digest": "b00da9477657a5bd0d4d3ad651d2b2ffd32d25e5333955aec9ca06f2d256aa49",
       "section": "12. Python API",
       "feature": "Sampler and converter classes",
@@ -3902,7 +3932,7 @@
     },
     {
       "id": "PERFC-fdf0cb5af29e8578",
-      "source_line": 212,
+      "source_line": 213,
       "anchor_digest": "6a946fbf8d724cdea3a1c887fa120e737c155899b2c51ee35568142f79711cad",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Python packaging",
@@ -3923,7 +3953,7 @@
     },
     {
       "id": "PERFC-fe506130e24c0ab7",
-      "source_line": 144,
+      "source_line": 145,
       "anchor_digest": "309e7a33382302c4634c6b3b8e122af8df5ea2712dd3aacb778d48da6fa18d27",
       "section": "9. Diagrams And Visualization",
       "feature": "Detector-slice diagrams",
@@ -3944,7 +3974,7 @@
     },
     {
       "id": "PERFC-ff83372101a84615",
-      "source_line": 145,
+      "source_line": 146,
       "anchor_digest": "91cd6e00076f404b397929b4d2ff1b823ba4ef51d875826fa85802d773c7df2c",
       "section": "9. Diagrams And Visualization",
       "feature": "DEM match-graph diagrams",
@@ -89766,10 +89796,12 @@
         "cq-evidence-qualification-1686de935fd64494",
         "cq-evidence-qualification-278e629a855d3c41",
         "cq-evidence-qualification-3a9a1dd7ddabd7b1",
+        "cq-evidence-qualification-55748da764c91bf8",
         "cq-evidence-qualification-7179fce5697cce0d",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-8cae8440e6c8c601",
         "cq-evidence-qualification-93951fde964ca94d",
+        "cq-evidence-qualification-b376b5e2d4be1223",
         "cq-evidence-qualification-b4fefe4518cc5c2d"
       ],
       "correctness_binding": "exact-cases",
@@ -89866,13 +89898,15 @@
         "cq-evidence-qualification-0b8090f2ca9daf37",
         "cq-evidence-qualification-0e2885667877d158",
         "cq-evidence-qualification-278e629a855d3c41",
+        "cq-evidence-qualification-36ae168d2b56fdbe",
         "cq-evidence-qualification-3add8f2f8632a7fb",
         "cq-evidence-qualification-63678c8f7a576971",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-889f3fecd9d3e6da",
         "cq-evidence-qualification-93951fde964ca94d",
         "cq-evidence-qualification-9d8d2046dac8054b",
-        "cq-evidence-qualification-d1877c09db8c3c35"
+        "cq-evidence-qualification-d1877c09db8c3c35",
+        "cq-evidence-qualification-f7e633d78cd2e6c6"
       ],
       "correctness_binding": "exact-cases",
       "planned_correctness_case_id": null,

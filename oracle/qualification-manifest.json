@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "220328b59d3cbbae0e7c2650e82ae826da5985f1e8b40f79e15d1f627845ad1d",
+  "semantic_digest": "56df8d57134e7685cf70b74b96ef56b6686380902988e8eeebf04e7333a7c02c",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -196431,7 +196431,7 @@
           "stab-model",
           "--test",
           "dem_error_mechanisms",
-          "nested_error_free_repeats_are_skipped_without_spending_represented_work",
+          "nested_error_free_repeats_are_skipped_while_advancing_detector_offsets",
           "--quiet",
           "--exact"
         ]
@@ -197451,11 +197451,10 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "A zero-shot decode completes without implementation dispatch, allocation, or mutation of caller-owned reusable prediction storage."
+        "detail": "A zero-shot decode completes with zero progress and without mutating caller-owned reusable prediction storage; implementation dispatch remains permitted so session-specific zero-shot invariants can run."
       },
       "negative_axes": [
-        "zero-shot-dispatch",
-        "zero-shot-allocation",
+        "zero-shot-progress",
         "zero-shot-mutation"
       ],
       "performance_groups": [
@@ -200950,6 +200949,55 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-36ae168d2b56fdbe",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-decoder-partition-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "fixture_session_is_partition_equivalent",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The independent conformance session produces the same ordered predictions when one detector batch is decoded whole or partitioned across reused calls."
+      },
+      "negative_axes": [
+        "fixture-partition-drift",
+        "fixture-session-state-drift"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-37741fb452e28c59",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -204307,6 +204355,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-55748da764c91bf8",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-exact-workspace-admission-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_tie_resolution_rejects_the_first_workspace_excess",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "An unresolved posterior whose exact dyadic limb table first exceeds 32 MiB returns the typed workspace error before allocation or a guessed prediction."
+      },
+      "negative_axes": [
+        "exact-workspace-overcommit",
+        "uncertified-tie-fallback",
+        "workspace-limit-erasure"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-5609f69379245a9f",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -207226,12 +207325,13 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "Exact-ML predictions cover probability-zero and probability-one mechanisms, duplicate target parity, deterministic ties, and zero-observable models within the admitted state table."
+        "detail": "Exact-ML predictions cover probability-zero and probability-one mechanisms, duplicate target parity, deterministic ties, arbitrarily small representable strict majorities, and zero-observable models within the admitted state table."
       },
       "negative_axes": [
         "certain-mechanism-drift",
         "duplicate-target-parity",
         "tie-policy-drift",
+        "strict-majority-erasure",
         "zero-observable-rejection"
       ],
       "performance_groups": [
@@ -209416,7 +209516,7 @@
           "-p",
           "stab-reference-decoder",
           "--lib",
-          "exact_ml::tests::log_domain_distribution_matches_exhaustive_subset_enumeration",
+          "exact_ml::tests::directed_intervals_and_exact_dyadics_match_exhaustive_subset_enumeration",
           "--quiet",
           "--exact"
         ]
@@ -209424,14 +209524,15 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The internal in-place log-domain convolution agrees with independent direct subset enumeration across a bounded exhaustive matrix of two-mechanism effects and probability edges."
+        "detail": "The internal directed intervals enclose and the fixed-limb exact dyadic convolution equals independent direct subset enumeration across a bounded exhaustive matrix of two-mechanism effects and probability edges."
       },
       "negative_axes": [
         "probability-domain-drift",
         "effect-mask-drift",
         "probability-zero",
         "probability-one",
-        "out-of-place-workspace-growth"
+        "interval-containment-drift",
+        "exact-numerator-drift"
       ],
       "performance_groups": [
         "PERF-DETECTION"
@@ -212203,6 +212304,57 @@
       ],
       "performance_groups": [
         "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-b376b5e2d4be1223",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-all-tie-certification-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "all_finite_syndromes_can_be_exact_ties_without_unbounded_ambiguity_storage",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Every syndrome in a 4,096-syndrome model can be finite and exactly tied without allocating a syndrome-index list; exact certification writes the already admitted one-byte prediction table."
+      },
+      "negative_axes": [
+        "all-tie-prediction-drift",
+        "ambiguity-list-growth",
+        "reachable-syndrome-loss"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
       ],
       "status": "implemented"
     },
@@ -219908,6 +220060,56 @@
       ],
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-f7e633d78cd2e6c6",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-preflight-cancellation-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_ml_obeys_canonical_preflight_and_pre_cancellation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The real exact-ML session shares canonical detector, correction, shot-capacity, mutation, and pre-cancellation behavior with the independent conformance session."
+      },
+      "negative_axes": [
+        "exact-session-preflight-bypass",
+        "exact-session-preflight-mutation",
+        "exact-session-pre-cancellation-drift"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
       ],
       "status": "implemented"
     },

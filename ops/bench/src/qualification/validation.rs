@@ -27,10 +27,10 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "220328b59d3cbbae0e7c2650e82ae826da5985f1e8b40f79e15d1f627845ad1d";
+const CORRECTNESS_DIGEST: &str = "56df8d57134e7685cf70b74b96ef56b6686380902988e8eeebf04e7333a7c02c";
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
-const EXPECTED_CHECKLIST_ROWS: usize = 127;
+const EXPECTED_CHECKLIST_ROWS: usize = 128;
 const EXPECTED_MANIFEST_ROWS: usize = 167;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
