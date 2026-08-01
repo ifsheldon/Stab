@@ -11,7 +11,7 @@ Current as of 2026-08-01.
 - A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
 - A5 detection and DEM batch pipelines: complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
 - A6 physical component extraction and Nightly isolation: complete at clean source revision `adae364500744c33f98f7777901ff50a28cbfdf6`.
-- A7 decoder interoperability and reference decoder: active; product seams and focused tests are implemented, while benchmark contracts, source-current evidence, and final audits remain.
+- A7 decoder interoperability and reference decoder: active; product seams, focused tests, and benchmark contracts are implemented, while source-current evidence and final audits remain.
 - Formal A9 release qualification for the current architecture: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use syn::punctuated::Punctuated;
 use syn::{Item, Meta, Token, UseTree, Visibility};
 
-use crate::policy::is_stable_component;
+use crate::policy::is_stable_source_package;
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
@@ -67,7 +67,7 @@ pub(super) fn scan_workspace_sources(
             }
         };
         let package = package_for_source(source_path, packages);
-        if package.is_some_and(|package| is_stable_component(&package.name))
+        if package.is_some_and(|package| is_stable_source_package(&package.name))
             && !facts.feature_gates.is_empty()
         {
             violations.push(Violation::new(

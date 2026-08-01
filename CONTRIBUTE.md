@@ -1,12 +1,12 @@
 # Contributing to Stab
 
 This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and current scalar `stab-engine` packages form a Stable Rust 1.97.1 component stack. The CLI and operational binaries also default to scalar behavior. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
+The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, current scalar `stab-engine`, and `stab-decoder` packages form a Stable Rust 1.97.1 component stack. The unpublished `stab-reference-decoder` independently proves the public decoder seam on the same Stable toolchain. The CLI and operational binaries also default to scalar behavior. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
 
 Check the Stable component directly with:
 
 ```sh
-cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine --all-targets
+cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine -p stab-decoder -p stab-reference-decoder --all-targets
 cargo test --locked -p stab-bits -p stab-algebra --no-default-features --features portable-simd
 just architecture::consumer-check
 just architecture::docs-check

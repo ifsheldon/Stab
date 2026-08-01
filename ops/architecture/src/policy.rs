@@ -43,6 +43,7 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
     ProductPackageContract::stable("stab-model", &[]),
     ProductPackageContract::stable("stab-records", &["stab-bits"]),
 ];
+const STABLE_TEST_SUPPORT_PACKAGES: &[&str] = &["stab-reference-decoder"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ProductPackageContract {
@@ -84,6 +85,10 @@ pub(crate) fn product_contract(name: &str) -> Option<&'static ProductPackageCont
 
 pub(crate) fn is_stable_component(name: &str) -> bool {
     product_contract(name).is_some_and(|contract| contract.stable_component)
+}
+
+pub(crate) fn is_stable_source_package(name: &str) -> bool {
+    is_stable_component(name) || STABLE_TEST_SUPPORT_PACKAGES.contains(&name)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -198,20 +203,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                 validate_product_identity(package, &mut violations);
                 validate_product_publication(package, &mut violations);
                 if is_stable_component(&package.name) {
-                    validate_stable_rust_version(package, &mut violations);
-                    if package
-                        .default_features
-                        .iter()
-                        .any(|feature| feature.contains("portable-simd"))
-                    {
-                        violations.push(Violation::new(
-                            "stable-default-reaches-nightly",
-                            format!(
-                                "Stable component {} enables portable SIMD through default features {:?}",
-                                package.name, package.default_features
-                            ),
-                        ));
-                    }
+                    validate_stable_source_package(package, &mut violations);
                 }
             }
             PackageClass::Ops if package_is_publishable(package) => {
@@ -224,17 +216,22 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                     ),
                 ));
             }
-            PackageClass::TestSupport if package_is_publishable(package) => {
-                violations.push(Violation::new(
-                    "test-support-package-publishable",
-                    format!(
-                        "test-support package {} at {} must set publish = false",
-                        package.name,
-                        package.relative_path.display()
-                    ),
-                ));
+            PackageClass::TestSupport => {
+                if package_is_publishable(package) {
+                    violations.push(Violation::new(
+                        "test-support-package-publishable",
+                        format!(
+                            "test-support package {} at {} must set publish = false",
+                            package.name,
+                            package.relative_path.display()
+                        ),
+                    ));
+                }
+                if STABLE_TEST_SUPPORT_PACKAGES.contains(&package.name.as_str()) {
+                    validate_stable_source_package(package, &mut violations);
+                }
             }
-            PackageClass::Ops | PackageClass::TestSupport | PackageClass::Unclassified => {}
+            PackageClass::Ops | PackageClass::Unclassified => {}
         }
     }
 
@@ -531,6 +528,23 @@ fn validate_stable_rust_version(package: &PackageSpec, violations: &mut Vec<Viol
     ));
 }
 
+fn validate_stable_source_package(package: &PackageSpec, violations: &mut Vec<Violation>) {
+    validate_stable_rust_version(package, violations);
+    if package
+        .default_features
+        .iter()
+        .any(|feature| feature.contains("portable-simd"))
+    {
+        violations.push(Violation::new(
+            "stable-default-reaches-nightly",
+            format!(
+                "Stable source package {} enables portable SIMD through default features {:?}",
+                package.name, package.default_features
+            ),
+        ));
+    }
+}
+
 fn package_is_publishable(package: &PackageSpec) -> bool {
     !matches!(&package.publish, Some(registries) if registries.is_empty())
 }
@@ -568,7 +582,7 @@ mod tests {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
             default_features: Vec::new(),
-            rust_version: is_stable_component(name).then(stable_rust_version),
+            rust_version: is_stable_source_package(name).then(stable_rust_version),
             version: Version::new(0, 2, 0),
             publish: if prefix == "crates" {
                 None
@@ -796,6 +810,38 @@ mod tests {
                 assert!(violation.message.contains("1.97.1"));
             }
         }
+    }
+
+    #[test]
+    fn stable_reference_proof_requires_exact_msrv_and_scalar_defaults() {
+        let valid = graph(vec![package("stab-reference-decoder", "test-support")]);
+        assert!(validate_graph(&valid).violations.is_empty());
+
+        for actual in [None, Some(Version::new(1, 97, 0))] {
+            let mut invalid = valid.clone();
+            invalid
+                .packages
+                .first_mut()
+                .expect("reference package")
+                .rust_version = actual;
+            assert!(validate_graph(&invalid).violations.iter().any(|violation| {
+                violation.code == "stable-component-rust-version"
+                    && violation.message.contains("stab-reference-decoder")
+            }));
+        }
+
+        let mut nightly_default = valid;
+        nightly_default
+            .packages
+            .first_mut()
+            .expect("reference package")
+            .default_features = vec!["portable-simd".to_owned()];
+        assert!(
+            validate_graph(&nightly_default)
+                .violations
+                .iter()
+                .any(|violation| violation.code == "stable-default-reaches-nightly")
+        );
     }
 
     #[test]
