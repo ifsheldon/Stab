@@ -20913,14 +20913,12 @@
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Immutable and mutable observable-prediction views expose exactly the admitted shot prefix at the declared correction width; checked updates cannot reach suffix storage, and repeated prefix borrowing allocates nothing."
+        "detail": "Immutable and mutable observable-prediction views expose exactly the admitted shot prefix at the declared correction width; checked updates cannot reach suffix storage."
       },
       "negative_axes": [
         "prefix-beyond-storage",
         "suffix-mutation",
-        "prediction-width-mismatch",
-        "zero-width-prefix",
-        "record-count-allocation-growth"
+        "prediction-width-mismatch"
       ],
       "public_api_owners": [
         {
@@ -20960,6 +20958,67 @@
           "owner_path": "stab_records::ObservablePredictionBatchViewMut::view"
         }
       ],
+      "standalone": true
+    },
+    {
+      "id": "a7-record-prediction-zero-width-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "prediction_batch_views",
+          "zero_width_and_zero_length_prediction_prefixes_remain_valid",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Zero-width observable-prediction storage supports empty and nonempty shot prefixes without inventing correction bits or admitting an out-of-range shot."
+      },
+      "negative_axes": [
+        "zero-width-prefix",
+        "zero-length-prefix",
+        "out-of-range-zero-width-shot"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-record-prediction-allocation-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "prediction_batch_views",
+          "mutable_prediction_prefix_reuse_allocates_nothing",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Repeated mutable prefix borrowing and admitted prediction writes allocate no memory after caller-owned storage construction."
+      },
+      "negative_axes": [
+        "record-count-allocation-growth",
+        "prefix-reborrow-allocation"
+      ],
+      "public_api_owners": [],
       "standalone": true
     },
     {
@@ -21090,14 +21149,11 @@
       },
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The model admits the exact represented mechanism count before callbacks, independently bounds represented instruction visits, skips error-free repeat expansion, and preserves typed model and visitor failures."
+        "detail": "The model admits the exact represented mechanism count before callbacks and stops immediately when the visitor requests it."
       },
       "negative_axes": [
         "callback-before-admission",
         "mechanism-limit-off-by-one",
-        "instruction-limit-off-by-one",
-        "error-free-repeat-expansion",
-        "per-mechanism-allocation",
         "late-visitor-stop"
       ],
       "public_api_owners": [
@@ -21122,6 +21178,96 @@
           "owner_path": "stab_model::DemErrorMechanismVisitError"
         }
       ],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-instruction-limit-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "represented_instruction_work_is_bounded_independently_of_mechanism_count",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Represented instruction visits have an independent exact limit even when the represented mechanism count remains admitted."
+      },
+      "negative_axes": [
+        "instruction-limit-off-by-one",
+        "mechanism-limit-substitution"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-repeat-skip-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "nested_error_free_repeats_are_skipped_without_spending_represented_work",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Nested error-free repeats are skipped without expanding their represented count or spending error-mechanism traversal work."
+      },
+      "negative_axes": [
+        "error-free-repeat-expansion",
+        "error-free-work-charge"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-allocation-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "represented_repeat_count_does_not_allocate_per_mechanism_or_target",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Increasing represented repeat count does not add one allocation per mechanism or target during borrowed traversal."
+      },
+      "negative_axes": [
+        "per-mechanism-allocation",
+        "per-target-allocation"
+      ],
+      "public_api_owners": [],
       "standalone": true
     },
     {
@@ -21344,12 +21490,11 @@
       },
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "The static session contract validates requested and completed progress, completed status, and fixed layout after dispatch without dynamic trait-object allocation in the hot path."
+        "detail": "The static session contract validates requested and completed progress plus fixed layout after dispatch; completed summaries are valid by construction and the hot path uses no dynamic trait object."
       },
       "negative_axes": [
         "requested-shot-drift",
         "completed-shot-overflow",
-        "incomplete-completed-status",
         "session-layout-change",
         "dynamic-dispatch"
       ],

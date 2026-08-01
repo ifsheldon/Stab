@@ -11,7 +11,7 @@ Formal completion for the current inventories: **not started**. The latest histo
 
 | Category | Count |
 | --- | ---: |
-| Implemented correctness evidence parents | 881 |
+| Implemented correctness evidence parents | 886 |
 | Evidence-close correctness parents | 17 |
 | Planned correctness parents | 1271 |
 | Deferred checklist surfaces or remainders | 53 |
@@ -22,11 +22,11 @@ Formal completion for the current inventories: **not started**. The latest histo
 
 ## Contract Identities
 
-- Correctness inventory: `52c33002cfd0b08b9f54600f82d4c723709de940970262bc3a505c7922d20772`
-- Performance inventory: `17d2c0617d7b3257923542c80b70e9049e7a3ae53079c716514ad135b632c0d7`
-- Stim parity policy: `d145e689a52518243b91ba1af38aefd6b69a6b60ba146edfd2869fff9d4672ea`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
+- Correctness inventory: `52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5`
+- Performance inventory: `86919fb66368f870c8a5062a13958f74761e291779fa7067af5c0e7950506e4a`
+- Stim parity policy: `c982ca2391b7c69aded0bec4c63eee419ffe1d5083219336c97981c36a4abc48`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `ea22135233c3df0a8a950739f149daee028b592ec5d8fe8b46f9be1a7c770868`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `a924c556b97e67d7356315eae78c4adc4162bee62a0a6c4029e0f8cbc4c947a6`; missing identities are unseeded, never passing.
 
 ## Interpretation
 

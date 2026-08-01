@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "52c33002cfd0b08b9f54600f82d4c723709de940970262bc3a505c7922d20772",
-  "semantic_digest": "17d2c0617d7b3257923542c80b70e9049e7a3ae53079c716514ad135b632c0d7",
+  "correctness_digest": "52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5",
+  "semantic_digest": "86919fb66368f870c8a5062a13958f74761e291779fa7067af5c0e7950506e4a",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -22506,39 +22506,6 @@
     {
       "id": "cq-api-item-af306a82c75cfe5c",
       "path": "stab_core::DecodeContractError::FailureProgress::requested",
-      "kind": "field",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-60b1766c39034cce",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus",
-      "kind": "variant",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-c28ef05f28eafab3",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus::actual",
-      "kind": "field",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-efff113a0ec7d10b",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus::expected",
       "kind": "field",
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],
@@ -59818,39 +59785,6 @@
     {
       "id": "cq-api-item-f956c88835438c74",
       "path": "stab_decoder::DecodeContractError::FailureProgress::requested",
-      "kind": "field",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-9303912875be9386",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus",
-      "kind": "variant",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-026e25432cbf6839",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus::actual",
-      "kind": "field",
-      "performance_feature": "PERF-DETECTION",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "disposition": "not-performance-relevant",
-      "parent_group_ids": [],
-      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
-    },
-    {
-      "id": "cq-api-item-9ebc5fdd4159b842",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus::expected",
       "kind": "field",
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [],

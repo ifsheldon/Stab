@@ -36,9 +36,6 @@ pub enum DecodeContractError {
     #[error("decoder summary completed {actual} shots, exceeding the requested {requested}")]
     CompletedShotCount { requested: usize, actual: usize },
 
-    #[error("completed decoder summary reported {actual} shots, expected {expected}")]
-    IncompleteCompletedStatus { expected: usize, actual: usize },
-
     #[error(
         "decoder failure reported {actual} completed shots, exceeding the requested {requested}"
     )]

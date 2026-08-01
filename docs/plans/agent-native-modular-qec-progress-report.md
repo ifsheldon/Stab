@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Progress Report
 
-Current as of 2026-07-30.
+Current as of 2026-08-01.
 
 ## Status
 
@@ -10,8 +10,9 @@ Current as of 2026-07-30.
 - A3 stable packed records and codecs: complete; product timing and allocation evidence binds clean revision `cb0f2ddbb19a99e16f27471b91966312a4404f79`, and the final oracle ownership repair is commit `07df4b33`.
 - A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
 - A5 detection and DEM batch pipelines: complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
-- A6 physical component extraction and Nightly isolation: active.
-- Formal correctness and performance evidence for the current post-A1 inventories: not started.
+- A6 physical component extraction and Nightly isolation: complete at clean source revision `adae364500744c33f98f7777901ff50a28cbfdf6`.
+- A7 decoder interoperability and reference decoder: active; product seams and focused tests are implemented, while benchmark contracts, source-current evidence, and final audits remain.
+- Formal A9 release qualification for the current architecture: not started.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
 
@@ -1076,3 +1077,11 @@ Focused tests compare exhaustive small mechanism sets with direct subset enumera
 Seven behavior-level correctness parents own the common decoder API, and three standalone parents own the independent exact-ML oracle, generated repetition comparison, and public experiment. The checked inventories now discover 7,295 public API items under correctness identity `52c33002cfd0b08b9f54600f82d4c723709de940970262bc3a505c7922d20772` and performance identity `17d2c0617d7b3257923542c80b70e9049e7a3ae53079c716514ad135b632c0d7` without adding a speculative runtime group; decoder accessors and error plumbing remain correctness-owned but do not inflate the future benchmark candidate list.
 
 A7 remains active. No more than three executable Stab-only benchmark groups, source-current correctness and diagnostic measurements, milestone audit, full code review, and final closure evidence are not supplied by this checkpoint.
+
+## A7 Correctness Ownership Repair
+
+An independent read-only audit found that two A7 correctness parents named resource axes exercised only by neighboring tests, and that two reachable malformed decoder-progress branches lacked direct conformance coverage. The prediction-prefix and DEM-mechanism resource claims are now split into exact independently selectable cases for zero-width behavior, allocation-free reuse, represented-instruction limits, error-free repeat skipping, and allocation growth. The decoder fixture now proves both completed-summary overflow and implementation-failure progress overflow through the public session boundary.
+
+The former `IncompleteCompletedStatus` error was unreachable from safe Rust because `DecodeBatchSummary::completed` always records the complete requested prefix and the summary fields are private. A7 removes that impossible public variant and its dead validation branch instead of adding an unsafe or invalid-state constructor solely to test it. Completed status remains construction-enforced and is exercised by ordinary session and exact-ML completion tests.
+
+The regenerated correctness inventory contains 2,886 upstream cases, 7,289 public API items, and 2,174 evidence parents under identity `52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5`. The corresponding pre-benchmark performance inventory remains at 179 groups under identity `86919fb66368f870c8a5062a13958f74761e291779fa7067af5c0e7950506e4a`. These identities supersede only the preceding unmeasured A7 implementation checkpoint; all earlier evidence remains historical.

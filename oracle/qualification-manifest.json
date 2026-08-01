@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "52c33002cfd0b08b9f54600f82d4c723709de940970262bc3a505c7922d20772",
+  "semantic_digest": "52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -78099,45 +78099,6 @@
       ]
     },
     {
-      "id": "cq-api-item-60b1766c39034cce",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_core",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus",
-      "kind": "variant",
-      "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 131,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
-      "id": "cq-api-item-c28ef05f28eafab3",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_core",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus::actual",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 131,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
-      "id": "cq-api-item-efff113a0ec7d10b",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_core",
-      "path": "stab_core::DecodeContractError::IncompleteCompletedStatus::expected",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 131,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
       "id": "cq-api-item-a9b36c814501bda8",
       "feature_id": "CQ-DETECTION",
       "crate_name": "stab_core",
@@ -120275,7 +120236,7 @@
       "path": "stab_decoder::DecodeBatchError",
       "kind": "enum",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 103,
+      "source_line": 100,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120288,7 +120249,7 @@
       "path": "stab_decoder::DecodeBatchError as Debug for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 102,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120301,7 +120262,7 @@
       "path": "stab_decoder::DecodeBatchError as Display for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 127,
+      "source_line": 124,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120314,7 +120275,7 @@
       "path": "stab_decoder::DecodeBatchError as Error for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 137,
+      "source_line": 134,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120327,7 +120288,7 @@
       "path": "stab_decoder::DecodeBatchError as From@4c2c665916c1 for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 109,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120340,7 +120301,7 @@
       "path": "stab_decoder::DecodeBatchError as From@a12b6a6f0c5e for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 121,
+      "source_line": 118,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120353,7 +120314,7 @@
       "path": "stab_decoder::DecodeBatchError as From@b290389229c5 for@456c8dd4c3de",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 115,
+      "source_line": 112,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120366,7 +120327,7 @@
       "path": "stab_decoder::DecodeBatchError::Contract",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 106,
+      "source_line": 103,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120379,7 +120340,7 @@
       "path": "stab_decoder::DecodeBatchError::Contract::0",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 106,
+      "source_line": 103,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120392,7 +120353,7 @@
       "path": "stab_decoder::DecodeBatchError::Preflight",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 104,
+      "source_line": 101,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120405,7 +120366,7 @@
       "path": "stab_decoder::DecodeBatchError::Preflight::0",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 104,
+      "source_line": 101,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120418,7 +120379,7 @@
       "path": "stab_decoder::DecodeBatchError::Session",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 105,
+      "source_line": 102,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120431,7 +120392,7 @@
       "path": "stab_decoder::DecodeBatchError::Session::0",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 105,
+      "source_line": 102,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120964,7 +120925,7 @@
       "path": "stab_decoder::DecodeContractError::FailureProgress",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 45,
+      "source_line": 42,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120977,7 +120938,7 @@
       "path": "stab_decoder::DecodeContractError::FailureProgress::actual",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 45,
+      "source_line": 42,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -120990,46 +120951,7 @@
       "path": "stab_decoder::DecodeContractError::FailureProgress::requested",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 45,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
-      "id": "cq-api-item-9303912875be9386",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_decoder",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus",
-      "kind": "variant",
-      "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 40,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
-      "id": "cq-api-item-026e25432cbf6839",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_decoder",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus::actual",
-      "kind": "field",
-      "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 40,
-      "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
-      "performance_groups": [
-        "PERF-DETECTION"
-      ]
-    },
-    {
-      "id": "cq-api-item-9ebc5fdd4159b842",
-      "feature_id": "CQ-DETECTION",
-      "crate_name": "stab_decoder",
-      "path": "stab_decoder::DecodeContractError::IncompleteCompletedStatus::expected",
-      "kind": "field",
-      "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 40,
+      "source_line": 42,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121042,7 +120964,7 @@
       "path": "stab_decoder::DecodeContractError::PredictionStorage",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 54,
+      "source_line": 51,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121055,7 +120977,7 @@
       "path": "stab_decoder::DecodeContractError::PredictionStorage::message",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 54,
+      "source_line": 51,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121107,7 +121029,7 @@
       "path": "stab_decoder::DecodeContractError::SessionLayoutChanged",
       "kind": "variant",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 48,
+      "source_line": 45,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121120,7 +121042,7 @@
       "path": "stab_decoder::DecodeContractError::SessionLayoutChanged::actual",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 50,
+      "source_line": 47,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121133,7 +121055,7 @@
       "path": "stab_decoder::DecodeContractError::SessionLayoutChanged::expected",
       "kind": "field",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 49,
+      "source_line": 46,
       "owner_case_id": "cq-evidence-qualification-d1877c09db8c3c35",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121367,7 +121289,7 @@
       "path": "stab_decoder::DecodeSessionFailure",
       "kind": "struct",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 59,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121380,7 +121302,7 @@
       "path": "stab_decoder::DecodeSessionFailure as Debug for@dd829fb054fd",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 58,
+      "source_line": 55,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121393,7 +121315,7 @@
       "path": "stab_decoder::DecodeSessionFailure as Display for@dd829fb054fd",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 85,
+      "source_line": 82,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121406,7 +121328,7 @@
       "path": "stab_decoder::DecodeSessionFailure as Error for@dd829fb054fd",
       "kind": "trait-impl",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 95,
+      "source_line": 92,
       "owner_case_id": "cq-evidence-qualification-ba417419ecdecca1",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121419,7 +121341,7 @@
       "path": "stab_decoder::DecodeSessionFailure::completed_shots",
       "kind": "method",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 72,
+      "source_line": 69,
       "owner_case_id": "cq-evidence-api-1c8db59e6fa4a8ed",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121432,7 +121354,7 @@
       "path": "stab_decoder::DecodeSessionFailure::into_source",
       "kind": "method",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 80,
+      "source_line": 77,
       "owner_case_id": "cq-evidence-api-89b09de3c2780c38",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121445,7 +121367,7 @@
       "path": "stab_decoder::DecodeSessionFailure::new",
       "kind": "method",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 65,
+      "source_line": 62,
       "owner_case_id": "cq-evidence-api-17809aa8e3cb03f5",
       "performance_groups": [
         "PERF-DETECTION"
@@ -121458,7 +121380,7 @@
       "path": "stab_decoder::DecodeSessionFailure::source_ref",
       "kind": "method",
       "source_path": "crates/stab-decoder/src/error.rs",
-      "source_line": 76,
+      "source_line": 73,
       "owner_case_id": "cq-evidence-api-a2d263cdf0b00f69",
       "performance_groups": [
         "PERF-DETECTION"
@@ -196480,6 +196402,55 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-065b7cb4b5d31c62",
+      "feature_id": "CQ-DEM-FORMAT",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-model-error-mechanism-repeat-skip-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "nested_error_free_repeats_are_skipped_without_spending_represented_work",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Nested error-free repeats are skipped without expanding their represented count or spending error-mechanism traversal work."
+      },
+      "negative_axes": [
+        "error-free-repeat-expansion",
+        "error-free-work-charge"
+      ],
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-07dcd72c46e4643d",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -198549,6 +198520,55 @@
       "negative_axes": [
         "materialized-repeat-expansion-limit",
         "round-to-zero-probability"
+      ],
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-1d8a793d9c4bee97",
+      "feature_id": "CQ-DEM-FORMAT",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-model-error-mechanism-allocation-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "represented_repeat_count_does_not_allocate_per_mechanism_or_target",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Increasing represented repeat count does not add one allocation per mechanism or target during borrowed traversal."
+      },
+      "negative_axes": [
+        "per-mechanism-allocation",
+        "per-target-allocation"
       ],
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -201807,14 +201827,12 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Immutable and mutable observable-prediction views expose exactly the admitted shot prefix at the declared correction width; checked updates cannot reach suffix storage, and repeated prefix borrowing allocates nothing."
+        "detail": "Immutable and mutable observable-prediction views expose exactly the admitted shot prefix at the declared correction width; checked updates cannot reach suffix storage."
       },
       "negative_axes": [
         "prefix-beyond-storage",
         "suffix-mutation",
-        "prediction-width-mismatch",
-        "zero-width-prefix",
-        "record-count-allocation-growth"
+        "prediction-width-mismatch"
       ],
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -208093,6 +208111,57 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-889f3fecd9d3e6da",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-record-prediction-allocation-contract",
+      "comparator": "semantic-invariant",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "prediction_batch_views",
+          "mutable_prediction_prefix_reuse_allocates_nothing",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Repeated mutable prefix borrowing and admitted prediction writes allocate no memory after caller-owned storage construction."
+      },
+      "negative_axes": [
+        "record-count-allocation-growth",
+        "prefix-reborrow-allocation"
+      ],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-8986fa17e643d87e",
       "feature_id": "CQ-RESULT-FORMATS",
       "behavioral_surface": "file-format",
@@ -209522,6 +209591,58 @@
       ],
       "performance_groups": [
         "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-99a3c74d5bbbf115",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-record-prediction-zero-width-contract",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--test",
+          "prediction_batch_views",
+          "zero_width_and_zero_length_prediction_prefixes_remain_valid",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Zero-width observable-prediction storage supports empty and nonempty shot prefixes without inventing correction bits or admitting an out-of-range shot."
+      },
+      "negative_axes": [
+        "zero-width-prefix",
+        "zero-length-prefix",
+        "out-of-range-zero-width-shot"
+      ],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "implemented"
     },
@@ -211682,6 +211803,56 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-qualification-b349821bbc632b06",
+      "feature_id": "CQ-DEM-FORMAT",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-model-error-mechanism-instruction-limit-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "represented_instruction_work_is_bounded_independently_of_mechanism_count",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Represented instruction visits have an independent exact limit even when the represented mechanism count remains admitted."
+      },
+      "negative_axes": [
+        "instruction-limit-off-by-one",
+        "mechanism-limit-substitution"
+      ],
+      "performance_groups": [
+        "PERF-DEM-MODEL"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-qualification-b4fefe4518cc5c2d",
       "feature_id": "CQ-DEM-FORMAT",
       "behavioral_surface": "file-format",
@@ -211720,14 +211891,11 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The model admits the exact represented mechanism count before callbacks, independently bounds represented instruction visits, skips error-free repeat expansion, and preserves typed model and visitor failures."
+        "detail": "The model admits the exact represented mechanism count before callbacks and stops immediately when the visitor requests it."
       },
       "negative_axes": [
         "callback-before-admission",
         "mechanism-limit-off-by-one",
-        "instruction-limit-off-by-one",
-        "error-free-repeat-expansion",
-        "per-mechanism-allocation",
         "late-visitor-stop"
       ],
       "performance_groups": [
@@ -215423,12 +215591,11 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "constant-scratch",
-        "detail": "The static session contract validates requested and completed progress, completed status, and fixed layout after dispatch without dynamic trait-object allocation in the hot path."
+        "detail": "The static session contract validates requested and completed progress plus fixed layout after dispatch; completed summaries are valid by construction and the hot path uses no dynamic trait object."
       },
       "negative_axes": [
         "requested-shot-drift",
         "completed-shot-overflow",
-        "incomplete-completed-status",
         "session-layout-change",
         "dynamic-dispatch"
       ],

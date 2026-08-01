@@ -166,13 +166,5 @@ fn validate_summary(
             actual: summary.completed_shots(),
         });
     }
-    if summary.status() == DecodeBatchStatus::Completed
-        && summary.completed_shots() != requested_shots
-    {
-        return Err(DecodeContractError::IncompleteCompletedStatus {
-            expected: requested_shots,
-            actual: summary.completed_shots(),
-        });
-    }
     Ok(())
 }

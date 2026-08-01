@@ -35,6 +35,7 @@ struct FixtureSession {
     calls: usize,
     cancel_after: Option<usize>,
     fail_after: Option<usize>,
+    reported_failure_progress: Option<usize>,
     returned_summary: Option<DecodeBatchSummary>,
     replacement_layout: Option<DecoderLayout>,
 }
@@ -46,6 +47,7 @@ impl FixtureSession {
             calls: 0,
             cancel_after: None,
             fail_after: None,
+            reported_failure_progress: None,
             returned_summary: None,
             replacement_layout: None,
         }
@@ -66,6 +68,9 @@ impl DecoderSession for FixtureSession {
     ) -> Result<DecodeBatchSummary, DecodeSessionFailure<Self::Error>> {
         self.calls += 1;
         let requested = batch.shot_count();
+        if let Some(completed_shots) = self.reported_failure_progress {
+            return Err(DecodeSessionFailure::new(FixtureError, completed_shots));
+        }
         let mut completed = 0;
         while completed < requested {
             if cancellation.is_cancelled() {
@@ -314,6 +319,23 @@ fn implementation_failure_preserves_exact_completed_progress() {
         prediction_bits(&predictions),
         vec![vec![false], vec![true], vec![true]]
     );
+
+    let mut malformed_session = FixtureSession::new(layout(1, 1));
+    malformed_session.reported_failure_progress = Some(4);
+    let error = decode_batch(
+        &mut malformed_session,
+        DecoderInputBatchView::from_detectors(detectors.view()),
+        &mut predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect_err("failure progress beyond the requested prefix");
+    assert!(matches!(
+        error,
+        DecodeBatchError::Contract(DecodeContractError::FailureProgress {
+            requested: 3,
+            actual: 4
+        })
+    ));
 }
 
 #[test]
@@ -335,6 +357,23 @@ fn malformed_session_progress_and_layout_changes_are_rejected() {
         error,
         DecodeBatchError::Contract(DecodeContractError::RequestedShotCount {
             expected: 2,
+            actual: 3
+        })
+    ));
+
+    let mut completed_overflow_session = FixtureSession::new(layout(1, 1));
+    completed_overflow_session.returned_summary = Some(DecodeBatchSummary::cancelled(2, 3));
+    let error = decode_batch(
+        &mut completed_overflow_session,
+        DecoderInputBatchView::from_detectors(detectors.view()),
+        &mut predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect_err("completed progress beyond the requested prefix");
+    assert!(matches!(
+        error,
+        DecodeBatchError::Contract(DecodeContractError::CompletedShotCount {
+            requested: 2,
             actual: 3
         })
     ));
