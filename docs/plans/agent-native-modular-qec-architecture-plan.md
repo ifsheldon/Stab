@@ -798,7 +798,7 @@ Status: Complete. Closure is recorded against measured source revision `adae3645
 
 ## Milestone A7: Decoder Interoperability And Reference Decoder
 
-Status: Active.
+Status: Complete. Closure is recorded against measured source revision `38160da59e6a55b1e4efd753d2aee8b8eb18f2b0`; the later status-only closure commit does not replace that evidence identity.
 
 ### Rationale And Boundary Decisions
 
@@ -907,6 +907,8 @@ Status: Active.
 - The three decoder phases have executable Stab-only diagnostic contracts that freeze future self-regression identities without a fabricated Stim comparator, and every source-owned correctness and benchmark contract regenerates cleanly.
 
 ## Milestone A8: Circuit Pass And Backend Extension Seams
+
+Status: Active.
 
 ### Tasks
 
