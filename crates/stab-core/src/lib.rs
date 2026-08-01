@@ -126,6 +126,12 @@ pub use stab_algebra::{
     PauliString, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
     Tableau, stabilizers_to_tableau, unitary_to_tableau,
 };
+pub use stab_decoder::{
+    DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeCancellation,
+    DecodeContractError, DecodePreflightError, DecodeSessionFailure, DecoderInputBatchView,
+    DecoderLayout, DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
+    decode_batch,
+};
 pub use stab_model::ModelFingerprint;
 pub use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,

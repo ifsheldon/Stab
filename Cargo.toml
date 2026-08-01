@@ -6,6 +6,7 @@ members = [
     "crates/stab-bits",
     "crates/stab-cli",
     "crates/stab-core",
+    "crates/stab-decoder",
     "crates/stab-engine",
     "crates/stab-kernels-simd",
     "crates/stab-model",
@@ -15,6 +16,7 @@ members = [
     "ops/oracle",
     "ops/pre-commit",
     "test-support/compat-corpus",
+    "test-support/reference-decoder",
 ]
 default-members = [
     "crates/stab-core",
@@ -56,6 +58,7 @@ stab-analysis = { path = "crates/stab-analysis", version = "=0.2.0" }
 stab-bits = { path = "crates/stab-bits", version = "=0.2.0" }
 stab-cli = { path = "crates/stab-cli", version = "=0.2.0" }
 stab-core = { path = "crates/stab-core", version = "=0.2.0", default-features = false }
+stab-decoder = { path = "crates/stab-decoder", version = "=0.2.0" }
 stab-engine = { path = "crates/stab-engine", version = "=0.2.0" }
 stab-kernels-simd = { path = "crates/stab-kernels-simd", version = "=0.2.0" }
 stab-model = { path = "crates/stab-model", version = "=0.2.0" }

@@ -10,7 +10,7 @@ Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, 
 The longer-term vision is composable Rust components for QEC tooling.
 
 The exact implemented scope, including deliberate deferrals such as Python bindings, WASM, diagrams, and `explain_errors`, is recorded in [docs/stab-feature-checklist.md](docs/stab-feature-checklist.md).
-Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, and engine crates plus a curated `stab-core` facade.
+Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade.
 
 ## Quickstart
 

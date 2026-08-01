@@ -10,7 +10,8 @@ Finish Milestone A7 of the [agent-native modular QEC architecture plan](agent-na
 
 - A0 through A6 are complete. A6 is bound to measured source revision `adae364500744c33f98f7777901ff50a28cbfdf6`; later A7 work does not rewrite or promote that evidence.
 - The physical component workspace, typed record batches, immutable engine plans, reusable sessions, bounded sinks, model fingerprints, and exact DEM syntax are available.
-- `stab-decoder` and the reference decoder do not yet exist in the active tree.
+- The bounded record/model seams, Stable `stab-decoder` contract, unpublished exact-ML reference implementation, generated repetition checks, public sample-to-detect-to-decode experiment, exact correctness ownership, and generated inventory integration are implemented in the active tree.
+- Executable self-regression benchmark groups, source-current correctness and diagnostic evidence, milestone audit, and full code review remain to be completed before A7 closure.
 - The parked A7 stashes are rejected prototypes. Reuse sound ideas manually; do not apply either stash wholesale.
 - A9 owns formal controlled-host release evidence. A7 produces source-current correctness, executable benchmark contracts, and diagnostic self-regression measurements only.
 

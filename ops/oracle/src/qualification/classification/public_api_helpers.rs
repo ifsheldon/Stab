@@ -8,6 +8,12 @@ pub(super) fn classify_component_crate_api(
     if crate_name == "stab_cli" {
         return Some(FeatureId::Cli);
     }
+    if source_path.starts_with("crates/stab-decoder/")
+        || crate_name == "stab_decoder"
+        || (crate_name == "stab_core" && is_decoder_api(api_path))
+    {
+        return Some(FeatureId::Detection);
+    }
     if source_path.starts_with("crates/stab-kernels-simd/") || crate_name == "stab_kernels_simd" {
         return Some(if api_path.contains("clifford") {
             FeatureId::Algebra
@@ -16,6 +22,27 @@ pub(super) fn classify_component_crate_api(
         });
     }
     None
+}
+
+fn is_decoder_api(api_path: &str) -> bool {
+    [
+        "decodebatcherror",
+        "decodebatchstatus",
+        "decodebatchsummary",
+        "decodecancellation",
+        "decodecontracterror",
+        "decodepreflighterror",
+        "decodesessionfailure",
+        "decoderinputbatchview",
+        "decoderlayout",
+        "decodermodelview",
+        "decodermodelviewerror",
+        "decodersession",
+        "validateddecodebatch",
+    ]
+    .iter()
+    .any(|item| api_path_mentions_item(api_path, item))
+        || api_path.ends_with("::decode_batch")
 }
 
 pub(super) fn classify_facade_tier_api(crate_name: &str, api_path: &str) -> Option<FeatureId> {

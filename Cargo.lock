@@ -2273,7 +2273,17 @@ dependencies = [
  "stab-analysis",
  "stab-bits",
  "stab-compat-corpus",
+ "stab-decoder",
  "stab-engine",
+ "stab-model",
+ "stab-records",
+ "thiserror",
+]
+
+[[package]]
+name = "stab-decoder"
+version = "0.2.0"
+dependencies = [
  "stab-model",
  "stab-records",
  "thiserror",
@@ -2348,6 +2358,19 @@ dependencies = [
  "proptest",
  "stab-bits",
  "stab-compat-corpus",
+ "thiserror",
+]
+
+[[package]]
+name = "stab-reference-decoder"
+version = "0.2.0"
+dependencies = [
+ "allocation-counter",
+ "stab-analysis",
+ "stab-decoder",
+ "stab-engine",
+ "stab-model",
+ "stab-records",
  "thiserror",
 ]
 

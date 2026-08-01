@@ -435,7 +435,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
 }
 
 #[test]
-fn implemented_bits_and_algebra_apis_execute_their_canonical_packages() {
+fn implemented_bits_algebra_and_decoder_apis_execute_their_canonical_packages() {
     let root = RepoRoot {
         path: Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -449,6 +449,7 @@ fn implemented_bits_and_algebra_apis_execute_their_canonical_packages() {
         let expected_package = match item.crate_name.as_str() {
             "stab_bits" => "stab-bits",
             "stab_algebra" => "stab-algebra",
+            "stab_decoder" => "stab-decoder",
             _ => continue,
         };
         let owner = manifest

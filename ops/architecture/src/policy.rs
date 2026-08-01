@@ -334,7 +334,9 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             .unwrap_or(PackageClass::Unclassified);
 
         if from_class == PackageClass::TestSupport {
-            if matches!(to_class, PackageClass::Product | PackageClass::Ops) {
+            if matches!(to_class, PackageClass::Product | PackageClass::Ops)
+                && !is_permitted_test_support_component_edge(edge)
+            {
                 violations.push(Violation::new(
                     "test-support-upward-dependency",
                     format!(
@@ -413,6 +415,24 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
     PolicyReport {
         violations,
         migration_allowances,
+    }
+}
+
+fn is_permitted_test_support_component_edge(edge: &WorkspaceEdge) -> bool {
+    if edge.from != "stab-reference-decoder" || edge.optional {
+        return false;
+    }
+    match edge.kind {
+        DependencyKind::Normal => {
+            matches!(
+                edge.to.as_str(),
+                "stab-decoder" | "stab-model" | "stab-records"
+            )
+        }
+        DependencyKind::Development => {
+            matches!(edge.to.as_str(), "stab-analysis" | "stab-engine")
+        }
+        DependencyKind::Build | DependencyKind::Unknown => false,
     }
 }
 
@@ -636,6 +656,83 @@ mod tests {
                 .code,
             "test-support-upward-dependency"
         );
+    }
+
+    #[test]
+    fn reference_decoder_has_only_its_earned_component_edges() {
+        let packages = vec![
+            package("stab-reference-decoder", "test-support"),
+            package("stab-decoder", "crates"),
+            package("stab-model", "crates"),
+            package("stab-records", "crates"),
+            package("stab-analysis", "crates"),
+            package("stab-engine", "crates"),
+            package("stab-core", "crates"),
+            package("stab-bench", "ops"),
+        ];
+        let permitted = WorkspaceGraph {
+            packages: packages.clone(),
+            edges: vec![
+                WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: "stab-decoder".to_owned(),
+                    kind: DependencyKind::Normal,
+                    optional: false,
+                },
+                WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: "stab-model".to_owned(),
+                    kind: DependencyKind::Normal,
+                    optional: false,
+                },
+                WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: "stab-records".to_owned(),
+                    kind: DependencyKind::Normal,
+                    optional: false,
+                },
+                WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: "stab-analysis".to_owned(),
+                    kind: DependencyKind::Development,
+                    optional: false,
+                },
+                WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: "stab-engine".to_owned(),
+                    kind: DependencyKind::Development,
+                    optional: false,
+                },
+            ],
+            declared_path_dependencies: Vec::new(),
+            resolved_dependencies: Vec::new(),
+        };
+        assert!(validate_graph(&permitted).violations.is_empty());
+
+        for (target, kind) in [
+            ("stab-core", DependencyKind::Normal),
+            ("stab-engine", DependencyKind::Normal),
+            ("stab-bench", DependencyKind::Development),
+        ] {
+            let forbidden = WorkspaceGraph {
+                edges: vec![WorkspaceEdge {
+                    from: "stab-reference-decoder".to_owned(),
+                    to: target.to_owned(),
+                    kind,
+                    optional: false,
+                }],
+                ..permitted.clone()
+            };
+            assert_eq!(
+                validate_graph(&forbidden)
+                    .violations
+                    .first()
+                    .expect("forbidden reference edge")
+                    .code,
+                "test-support-upward-dependency",
+                "{kind:?} reference edge to {target}"
+            );
+        }
     }
 
     #[test]

@@ -19,6 +19,7 @@ arrayvec = { workspace = true }
 stab-bits = { workspace = true }
 stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
+stab-decoder = { workspace = true }
 stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }

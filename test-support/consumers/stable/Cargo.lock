@@ -242,6 +242,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stab-decoder"
+version = "0.2.0"
+dependencies = [
+ "stab-model",
+ "stab-records",
+ "thiserror",
+]
+
+[[package]]
 name = "stab-engine"
 version = "0.2.0"
 dependencies = [
@@ -281,6 +290,7 @@ dependencies = [
  "stab-algebra",
  "stab-analysis",
  "stab-bits",
+ "stab-decoder",
  "stab-engine",
  "stab-model",
  "stab-records",

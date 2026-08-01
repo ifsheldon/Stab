@@ -24,7 +24,9 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
         .first()
         .cloned()
         .unwrap_or_else(|| "PERF-RESOURCE-BOUNDARIES".to_string());
-    let behavioral = is_behavioral(item) && !is_fixed_fingerprint_metadata(item);
+    let behavioral = is_behavioral(item)
+        && !is_fixed_fingerprint_metadata(item)
+        && !is_decoder_boundary_plumbing(item);
     let supporting_performance_features = item.performance_groups.iter().skip(1).cloned().collect();
     let diagnostic_parent = behavioral
         .then(|| diagnostic_group_id(&item.path))
@@ -71,10 +73,22 @@ pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
             "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
                 .to_string()
         } else {
-            "Declaration-only, derived, marker, or diagnostic shape has no independent runtime workload."
+            "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
                 .to_string()
         },
     }
+}
+
+fn is_decoder_boundary_plumbing(item: &CorrectnessApi) -> bool {
+    let path = item.path.as_str();
+    let is_decoder_item = path.starts_with("stab_decoder::")
+        || path.starts_with("stab_core::Decoder")
+        || path.starts_with("stab_core::Decode");
+    is_decoder_item
+        && !matches!(
+            path,
+            "stab_decoder::decode_batch" | "stab_core::decode_batch"
+        )
 }
 
 fn diagnostic_group_id(path: &str) -> Option<&'static str> {
@@ -286,6 +300,36 @@ mod tests {
             PerformanceDisposition::FutureCandidate,
             "{path}"
         );
+    }
+
+    #[test]
+    fn decoder_boundary_plumbing_does_not_create_speculative_workloads() {
+        for path in [
+            "stab_decoder::DecoderLayout::new",
+            "stab_decoder::DecoderInputBatchView::detector",
+            "stab_decoder::ValidatedDecodeBatch::set_prediction",
+            "stab_decoder::DecodeBatchError as Display for@hash",
+            "stab_core::DecoderModelView::try_new",
+            "stab_core::DecodeCancellation::cancel",
+        ] {
+            let disposition = make_disposition(&api(path, "method"));
+            assert_eq!(
+                disposition.disposition,
+                PerformanceDisposition::NotPerformanceRelevant,
+                "{path}"
+            );
+            assert!(disposition.parent_group_ids.is_empty(), "{path}");
+        }
+
+        for path in ["stab_decoder::decode_batch", "stab_core::decode_batch"] {
+            let disposition = make_disposition(&api(path, "function"));
+            assert_eq!(
+                disposition.disposition,
+                PerformanceDisposition::FutureCandidate,
+                "{path}"
+            );
+            assert!(disposition.parent_group_ids.is_empty(), "{path}");
+        }
     }
 
     #[test]

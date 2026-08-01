@@ -6,13 +6,14 @@ use super::validation::{
 };
 use crate::blocker_ledger::selector::CargoTestSelector;
 
-const CANONICAL_OWNER_PACKAGES: [(&str, &str); 6] = [
+const CANONICAL_OWNER_PACKAGES: [(&str, &str); 7] = [
     ("stab_bits", "stab-bits"),
     ("stab_records", "stab-records"),
     ("stab_algebra", "stab-algebra"),
     ("stab_model", "stab-model"),
     ("stab_analysis", "stab-analysis"),
     ("stab_engine", "stab-engine"),
+    ("stab_decoder", "stab-decoder"),
 ];
 
 pub(super) fn validate(manifest: &QualificationManifest, violations: &mut ValidationIssues) {

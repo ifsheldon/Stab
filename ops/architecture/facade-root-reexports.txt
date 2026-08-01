@@ -25,6 +25,18 @@ CompilationCapability
 CompilationOperation
 CompilationRequestFingerprint
 CorrectionWidth
+DecodeBatchError
+DecodeBatchStatus
+DecodeBatchSummary
+DecodeCancellation
+DecodeContractError
+DecodePreflightError
+DecodeSessionFailure
+DecoderInputBatchView
+DecoderLayout
+DecoderModelView
+DecoderModelViewError
+DecoderSession
 DemDetectorId
 DemFlattenLimits
 DemInstruction
@@ -146,6 +158,7 @@ Target
 TimeReversedForFlowsOptions
 UnsignedStabilizerFlowCheck
 UnsignedStabilizerFlowFailure
+ValidatedDecodeBatch
 ValidationError
 ValidationErrorCode
 all_detecting_region_targets
@@ -167,6 +180,7 @@ circuit_to_detector_error_model
 circuit_to_tableau
 circuit_with_inlined_feedback
 count_determined_measurements
+decode_batch
 decomposed_circuit
 detection_record_width
 detection_record_width_with_limits

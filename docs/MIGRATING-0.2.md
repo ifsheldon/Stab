@@ -18,6 +18,7 @@ We accepted the review's recommendation to expose a small number of strong compo
 | `stab-algebra` | Stable Pauli, Clifford, tableau, and flow mathematics |
 | `stab-analysis` | Stable pure transforms, generation, circuit-to-DEM analysis, search, SAT, and error matching |
 | `stab-engine` | Compilers, immutable plans, mutable sessions, sampling, conversion, and typed batch delivery |
+| `stab-decoder` | Stable truth-hidden decoder inputs, caller-owned observable predictions, preflight, cancellation, progress, and statically dispatched session interoperability |
 | `stab-kernels-simd` | Dependency-free Nightly portable-SIMD leaf kernels; not a simulation backend |
 | `stab-core` | Curated Nightly facade and compatibility conveniences |
 | `stab-cli` | The single `stab` command-line binary |
@@ -39,7 +40,7 @@ Use a component crate directly when only one layer is needed. Use `stab-core` fo
 | `stab_core::advanced::compat::...` | Pre-0.2 materialized and callback-oriented adapters |
 | `stab_core::experimental::...` | Implemented extension contracts that may change before 1.0 |
 
-`experimental` is intentionally empty in 0.2. Publishing placeholder pass, decoder, or backend traits would make speculation look supported; real external implementations will define those seams in later milestones.
+`experimental` is intentionally empty in 0.2. Decoder interoperability is a proven Stable component contract and is available from `stab-decoder` or the facade root; no placeholder pass or backend traits are published in anticipation of hypothetical implementations.
 
 The supported `analysis` and `execution` namespaces remain because they describe semantic operations, not physical source ownership. The retired `bits`, `stabilizers`, `result_formats`, and `result_streaming` namespaces mirrored implementation owners and made the facade expand whenever a component changed.
 

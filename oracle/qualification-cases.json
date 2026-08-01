@@ -21123,6 +21123,395 @@
         }
       ],
       "standalone": true
+    },
+    {
+      "id": "a7-decoder-model-layout-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "model_view_derives_exact_layout_and_fingerprint",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The decoder model view borrows one exact DEM, derives checked detector and observable widths, and carries the model fingerprint without copying or flattening model storage."
+      },
+      "negative_axes": [
+        "detector-width-overflow",
+        "observable-width-overflow",
+        "model-fingerprint-drift",
+        "model-copy"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecoderLayout"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecoderModelView"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecoderModelViewError"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-truth-hidden-input-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "detection_input_drops_observable_truth",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Decoder input borrows detector storage only, preserves shot and detector dimensions, and cannot expose observable truth from a detection batch."
+      },
+      "negative_axes": [
+        "observable-truth-leak",
+        "detector-bit-drift",
+        "shot-count-drift",
+        "input-copy"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecoderInputBatchView"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-preflight-before-mutation-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "dimensional_failures_precede_dispatch_and_prediction_mutation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The canonical decode entry point rejects detector width, correction width, and prediction capacity mismatches before implementation dispatch or any caller-owned prediction mutation."
+      },
+      "negative_axes": [
+        "detector-width-mismatch",
+        "correction-width-mismatch",
+        "prediction-capacity-mismatch",
+        "dispatch-before-admission",
+        "mutation-before-admission"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodePreflightError"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::decode_batch"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-pre-cancellation-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "pre_cancelled_batch_returns_without_dispatch_or_mutation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The cloneable one-way cancellation token stops a pre-cancelled batch with zero completed shots before implementation dispatch and without mutating reusable predictions."
+      },
+      "negative_axes": [
+        "pre-cancel-dispatch",
+        "pre-cancel-mutation",
+        "nonzero-pre-cancel-progress",
+        "cancellation-reset"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeCancellation"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-validated-prefix-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "cancellation_commits_only_the_completed_prefix",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A non-forgeable validated batch exposes only admitted detector and prediction prefixes; cancellation commits exactly the reported prefix and leaves every suffix record untouched."
+      },
+      "negative_axes": [
+        "validated-batch-forgery",
+        "out-of-prefix-write",
+        "completed-prefix-drift",
+        "suffix-mutation",
+        "per-record-allocation"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::ValidatedDecodeBatch"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-summary-and-session-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "malformed_session_progress_and_layout_changes_are_rejected",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The static session contract validates requested and completed progress, completed status, and fixed layout after dispatch without dynamic trait-object allocation in the hot path."
+      },
+      "negative_axes": [
+        "requested-shot-drift",
+        "completed-shot-overflow",
+        "incomplete-completed-status",
+        "session-layout-change",
+        "dynamic-dispatch"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeBatchStatus"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeBatchSummary"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeContractError"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecoderSession"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-decoder-implementation-failure-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-decoder",
+          "--test",
+          "session_contract",
+          "implementation_failure_preserves_exact_completed_progress",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Implementation failures retain the concrete source error and exact committed prediction prefix, while the aggregate decode error preserves preflight, session, and contract classes without erasure."
+      },
+      "negative_axes": [
+        "source-error-erasure",
+        "failure-progress-drift",
+        "failure-progress-overflow",
+        "aggregate-error-class-drift"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeBatchError"
+        },
+        {
+          "crate_name": "stab_decoder",
+          "owner_path": "stab_decoder::DecodeSessionFailure"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-exact-ml-oracle-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--lib",
+          "exact_ml::tests::log_domain_distribution_matches_exhaustive_subset_enumeration",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The exact-ML compiler uses an admitted in-place log-domain joint-state dynamic program whose small-model predictions agree with independent direct subset enumeration across all bounded effects and probability edges."
+      },
+      "negative_axes": [
+        "probability-domain-drift",
+        "effect-mask-drift",
+        "probability-zero",
+        "probability-one",
+        "tie-policy-drift",
+        "out-of-place-workspace-growth"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-generated-repetition-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "generated_repetition",
+          "generated_distance_three_and_five_predictions_match_independent_oracle",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Generated distance-3 and distance-5 repetition circuits lower through public analysis, and every admitted detector syndrome prediction matches an independent probability-domain dynamic program."
+      },
+      "negative_axes": [
+        "generated-model-drift",
+        "circuit-to-dem-drift",
+        "syndrome-coverage-gap",
+        "observable-prediction-drift",
+        "shared-oracle-implementation"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-public-experiment-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "public_experiment",
+          "public_sample_detect_decode_experiment_is_seeded_and_partition_invariant",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "streaming",
+        "detail": "The external experiment composes public analysis, sampling, measurement-to-detection, typed detection delivery, decoding, and logical-failure counting with bounded batches and deterministic partition-equivalent seeded execution."
+      },
+      "negative_axes": [
+        "private-api-dependency",
+        "observable-truth-fed-to-decoder",
+        "seeded-result-drift",
+        "partition-drift",
+        "materialized-shot-growth"
+      ],
+      "public_api_owners": [],
+      "standalone": true
     }
   ],
   "public_api_aliases": [

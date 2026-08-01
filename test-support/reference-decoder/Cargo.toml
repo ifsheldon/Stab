@@ -1,0 +1,20 @@
+[package]
+name = "stab-reference-decoder"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+stab-decoder = { workspace = true }
+stab-model = { workspace = true }
+stab-records = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+allocation-counter = { workspace = true }
+stab-analysis = { workspace = true }
+stab-engine = { workspace = true }

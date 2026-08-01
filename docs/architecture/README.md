@@ -68,11 +68,12 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current A6 product graph after complete model, analysis, and scalar-engine extraction is:
+The current product graph after the A7 decoder boundary is:
 
 ```text
 stab-cli -> stab-core
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
+stab-decoder -> stab-model + stab-records
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-analysis -> stab-model + stab-algebra
 stab-model -> no Stab crate
@@ -80,7 +81,7 @@ stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
 
-`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, and `stab-engine` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. `stab-analysis` owns every implemented pure analysis slice: gate-to-algebra semantic projections, recursive circuit and DEM tag stripping, full-circuit tableau conversion, simplification, decomposition, bounded circuit and DEM flattening, DEM probability rounding, SAT/WCNF materialization, graphlike and hypergraph logical-error search, error matching and provenance values, noise removal, repetition/surface/color circuit generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM lowering, loop folding, and XYZ error-probability decomposition. `stab-engine` owns backend-neutral compilation-request fingerprints, execution-side biased randomization, circuit-sampling plans and sessions, measurement-to-detection plans and sessions, direct or fused circuit detection sampling, DEM compilation and execution, reference-sample trees, and sampled-flow execution. Its typed measurement, detection, and DEM-sample sinks preserve cancellation, progress, poisoning, reusable-buffer, reference-sample, sweep-state, replay, and bounded active-storage contracts without importing codecs, paths, CLI, or ops. `stab-core` directly reexports canonical engine execution identities and curates common values, batches, diagnostics, policies, and compatibility conveniences; explicit storage, records, backend, traversal, algebra, and pre-0.2 adapters live under `stab_core::advanced`. The current reference tree preserves the established bounded flat materialization contract; optimized folded construction for enormous compact repeats is future performance work and is not conflated with Stim's folded-tree benchmark. The completed target graph below remains normative for A6 work. Dependency arrows point from a consumer to its dependency:
+`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-decoder` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. `stab-analysis` owns every implemented pure analysis slice: gate-to-algebra semantic projections, recursive circuit and DEM tag stripping, full-circuit tableau conversion, simplification, decomposition, bounded circuit and DEM flattening, DEM probability rounding, SAT/WCNF materialization, graphlike and hypergraph logical-error search, error matching and provenance values, noise removal, repetition/surface/color circuit generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM lowering, loop folding, and XYZ error-probability decomposition. `stab-engine` owns backend-neutral compilation-request fingerprints, execution-side biased randomization, circuit-sampling plans and sessions, measurement-to-detection plans and sessions, direct or fused circuit detection sampling, DEM compilation and execution, reference-sample trees, and sampled-flow execution. Its typed measurement, detection, and DEM-sample sinks preserve cancellation, progress, poisoning, reusable-buffer, reference-sample, sweep-state, replay, and bounded active-storage contracts without importing codecs, paths, CLI, or ops. `stab-decoder` owns truth-hidden detector input, caller-owned observable prediction, preflight, cancellation, progress, and statically dispatched session contracts while leaving compilation to each implementation. `stab-core` directly reexports canonical engine and decoder identities and curates common values, batches, diagnostics, policies, and compatibility conveniences; explicit storage, records, backend, traversal, algebra, and pre-0.2 adapters live under `stab_core::advanced`. The current reference tree preserves the established bounded flat materialization contract; optimized folded construction for enormous compact repeats is future performance work and is not conflated with Stim's folded-tree benchmark. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -92,24 +93,25 @@ stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
+stab-decoder -> stab-model + stab-records
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-cli -> stab-core
 
 ops -> product crates
 product crates -X-> ops
 ```
 
-`stab-decoder` is reserved by the architecture policy but is not part of the completed A6 graph. A7 must add the physical crate and its earned dependency edge before this current-state graph includes it.
+The unpublished `stab-reference-decoder` proves this public seam using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. It cannot depend on `stab-core`, CLI, ops, private modules, or Nightly features.
 
-`just architecture::check` derives package identity, Stable status, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits test-support dependencies only as development edges, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
+`just architecture::check` derives package identity, Stable status, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits only the source-owned public-component edges required by each test-support proof, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
 
-The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects upward dependencies from test support into product or operations code. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
+The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects test-support dependencies on product or operations code except the narrow `stab-reference-decoder` component proof recorded above. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
 
 The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects module path overrides and item-generating macros in facade tier entry files, rejects exported macros anywhere in `stab-core`, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and keeps `experimental` empty until A8 supplies an explicit allowlist. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check. Every unstable Rust `feature(...)` gate is rejected in Stable components, including target-gated and nested `cfg_attr` forms.
+Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, unapproved test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check. Every unstable Rust `feature(...)` gate is rejected in Stable components, including target-gated and nested `cfg_attr` forms.
 
 `just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through bits, algebra, and core in each portable graph.
 
@@ -117,7 +119,7 @@ Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. An
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, and the current scalar engine. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, and complete scalar `stab-engine` packages build on that compiler. The optional raw SIMD crate and consumers that enable it require the pinned Nightly target.
+Rust 1.97.1 is the minimum supported Stable compiler for model, bits, records, scalar algebra, pure analysis, the current scalar engine, and decoder interoperability. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, complete scalar `stab-engine`, and `stab-decoder` packages build on that compiler. The optional raw SIMD crate and consumers that enable it require the pinned Nightly target.
 
 `stab-kernels-simd`, the complete `stab-core` facade, and `stab-cli` use the pinned Nightly compiler. `stab-engine` currently remains Stable-compatible because its only registered sampling backend is scalar.
 
@@ -143,7 +145,7 @@ Stable components must compile without enabling or parsing Nightly-only code.
 
 Default root reexports are curated.
 `analysis` and `execution` remain semantic facade namespaces; implementation-owner namespaces such as `bits`, `stabilizers`, `result_formats`, and `result_streaming` are not public facade modules.
-The `experimental` namespace is empty in 0.2 because no external pass, decoder, or backend implementation has yet earned a less-stable public contract.
+The `experimental` namespace remains empty in 0.2. Decoder interoperability has earned a Stable component contract and is reexported directly from the facade root, while no external pass or backend implementation has earned a separate pre-stable facade surface.
 
 The qualification inventory records every exported item, but inventory ownership does not imply that every item belongs at the facade root.
 

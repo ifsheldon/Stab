@@ -1,0 +1,17 @@
+[package]
+name = "stab-decoder"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+description = "Stable decoder interoperability contracts for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+stab-model = { workspace = true }
+stab-records = { workspace = true }
+thiserror = { workspace = true }

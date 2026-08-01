@@ -32,7 +32,7 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-The `stab-decoder` edges become active only when A7 adds that package. Until then, the reserved name and intended dependencies remain architecture policy rather than a workspace edge.
+The `stab-decoder` edges are active after A7 adds the physical package and the public external-decoder proof. Architecture policy continues to reject every dependency outside the graph.
 
 `stab-model` owns closed Stim circuit and detector-error-model syntax and structure. `stab-analysis` may depend on model and algebra semantics, while `stab-engine` may depend on analysis lowering; the inverse engine-to-analysis edge is forbidden. Records know packed result layouts but not circuits. SIMD kernels accept raw words and have no Stab dependency. `stab-core` is an ergonomic compatibility facade, not an implementation owner.
 
