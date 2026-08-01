@@ -20,6 +20,7 @@ use thiserror::Error;
 
 const EXPERIMENT_SEED: u64 = 0xA7D3_C0DE;
 const EXPERIMENT_SHOTS: u64 = 1_024;
+const DIAGNOSTIC_REPORTS: [(u64, u64); 3] = [(1_024, 37), (16_384, 586), (262_144, 9_294)];
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ExperimentReport {
@@ -29,6 +30,14 @@ struct ExperimentReport {
 
 #[test]
 fn public_sample_detect_decode_experiment_is_seeded_and_partition_invariant() {
+    for (shots, expected_failures) in DIAGNOSTIC_REPORTS {
+        let report = run_experiment(&[shots]);
+        assert_eq!(report.shots, shots);
+        assert_eq!(report.logical_failures, expected_failures);
+        assert!(report.logical_failures > 0);
+        assert!(report.logical_failures < report.shots);
+    }
+
     let whole = run_experiment(&[EXPERIMENT_SHOTS]);
     let repeated = run_experiment(&[EXPERIMENT_SHOTS]);
     let partitioned = run_experiment(&[17, 63, 64, 113, 767]);
@@ -42,7 +51,7 @@ fn public_sample_detect_decode_experiment_is_seeded_and_partition_invariant() {
 }
 
 fn run_experiment(partitions: &[u64]) -> ExperimentReport {
-    assert_eq!(partitions.iter().sum::<u64>(), EXPERIMENT_SHOTS);
+    assert!(partitions.iter().sum::<u64>() > 0);
     let params = RepetitionCodeParams::new(
         RoundCount::try_new(3).expect("rounds"),
         CodeDistance::try_new(3).expect("distance"),

@@ -251,12 +251,18 @@ fn valid_contract_file() -> GroupContractFile {
             "sample-detect-decode",
         ),
     ]);
+    let product_diagnostic_policies = groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .map(product_diagnostic_policy)
+        .collect();
     GroupContractFile {
         schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
         timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         performance_inventory_sha256: "a".repeat(64),
         product_diagnostic_suite_timeout_seconds: NonZeroU64::new(600)
             .expect("positive suite timeout"),
+        product_diagnostic_policies,
         groups,
     }
 }
@@ -285,6 +291,30 @@ fn product_diagnostic_contract(
         owner: ProtocolId::try_new("stab-core/agent-diagnostic").expect("owner"),
         profiler_note: None,
         comparator_sources: Vec::new(),
+    }
+}
+
+fn product_diagnostic_policy(group: &GroupContract) -> ProductDiagnosticPolicy {
+    ProductDiagnosticPolicy {
+        group_id: group.id.clone(),
+        scales: group
+            .scales
+            .iter()
+            .map(|scale| ProductDiagnosticScalePolicy {
+                scale_id: scale.id.clone(),
+                batch_policy: ProductDiagnosticBatchPolicy::CalibratedRepeat,
+                witness_case_id: group
+                    .correctness_case_ids
+                    .first()
+                    .expect("correctness witness")
+                    .clone(),
+                expected_output_digest: SemanticDigest::try_new("d".repeat(64))
+                    .expect("output digest"),
+                max_worker_peak_rss_bytes: Some(
+                    NonZeroU64::new(32 << 20).expect("positive memory cap"),
+                ),
+            })
+            .collect(),
     }
 }
 
@@ -439,7 +469,7 @@ fn a7_decoder_diagnostics_are_executable_stab_only_contracts() {
             super::super::invocation::A7_EXACT_ML_COMPILE_GROUP_ID,
             "exact-ml-compile",
             "compile-and-release",
-            [1_536, 65_536, 2_097_152],
+            [1_536, 65_536, 4_194_304],
         ),
         (
             super::super::invocation::A7_EXACT_ML_REUSED_DECODE_GROUP_ID,
@@ -451,7 +481,7 @@ fn a7_decoder_diagnostics_are_executable_stab_only_contracts() {
             super::super::invocation::A7_PIPELINE_GROUP_ID,
             "sample-detect-decode-pipeline",
             "sample-detect-decode",
-            [1_024, 16_384, 65_536],
+            [1_024, 16_384, 262_144],
         ),
     ] {
         let contract = file
@@ -482,6 +512,39 @@ fn a7_decoder_diagnostics_are_executable_stab_only_contracts() {
         assert!(contract.comparator_sources.is_empty());
         assert!(contract.profiler_note.is_none());
         assert!(super::super::invocation::supports_group(contract));
+        let policy = file
+            .product_diagnostic_policies
+            .iter()
+            .find(|policy| policy.group_id == contract.id)
+            .expect("A7 source-owned diagnostic policy");
+        assert_eq!(policy.scales.len(), contract.scales.len());
+        let expected_batch_policy = if group_id == super::super::invocation::A7_PIPELINE_GROUP_ID {
+            ProductDiagnosticBatchPolicy::SinglePass
+        } else {
+            ProductDiagnosticBatchPolicy::CalibratedRepeat
+        };
+        assert!(policy.scales.iter().all(|scale| {
+            scale.batch_policy == expected_batch_policy
+                && contract
+                    .correctness_case_ids
+                    .contains(&scale.witness_case_id)
+        }));
+        assert!(
+            policy
+                .scales
+                .get(..2)
+                .expect("small and medium scales")
+                .iter()
+                .all(|scale| scale.max_worker_peak_rss_bytes.is_none())
+        );
+        assert!(
+            policy
+                .scales
+                .get(2)
+                .expect("large scale")
+                .max_worker_peak_rss_bytes
+                .is_some()
+        );
 
         let mut wrong_measurement = contract.clone();
         wrong_measurement.measurement_ids =
@@ -518,6 +581,84 @@ fn product_diagnostic_suite_timeout_is_bounded_and_matches_inventory() {
         validate_inventory_contracts(&file, &suite),
         Err(GroupError::InventoryContract(group))
             if group == super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID
+    ));
+}
+
+#[test]
+fn product_diagnostic_policy_is_exactly_scoped_and_memory_bounded() {
+    let mut file = valid_contract_file();
+    let group = file
+        .groups
+        .iter()
+        .find(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .expect("product diagnostic")
+        .clone();
+    let policy = product_diagnostic_policy(&group);
+    let policy_index = file
+        .product_diagnostic_policies
+        .iter()
+        .position(|candidate| candidate.group_id == group.id)
+        .expect("product policy");
+    *file
+        .product_diagnostic_policies
+        .get_mut(policy_index)
+        .expect("product policy") = policy.clone();
+    validate(&file, &"a".repeat(64)).expect("valid product policy");
+
+    let mut duplicate = file.clone();
+    duplicate.product_diagnostic_policies.push(policy.clone());
+    assert!(matches!(
+        validate(&duplicate, &"a".repeat(64)),
+        Err(GroupError::InvalidProductDiagnosticPolicy(_))
+    ));
+
+    let mut missing_scale = file.clone();
+    missing_scale
+        .product_diagnostic_policies
+        .get_mut(policy_index)
+        .expect("product policy")
+        .scales
+        .clear();
+    assert!(matches!(
+        validate(&missing_scale, &"a".repeat(64)),
+        Err(GroupError::InvalidProductDiagnosticPolicy(_))
+    ));
+
+    let mut wrong_class = file;
+    let promotable_group_id = wrong_class
+        .groups
+        .iter()
+        .find(|group| group.claim_class == ClaimClass::PromotablePerformance)
+        .expect("promotable group")
+        .id
+        .clone();
+    wrong_class
+        .product_diagnostic_policies
+        .get_mut(policy_index)
+        .expect("product policy")
+        .group_id = promotable_group_id;
+    assert!(matches!(
+        validate(&wrong_class, &"a".repeat(64)),
+        Err(GroupError::InvalidProductDiagnosticPolicy(_))
+    ));
+
+    let mut missing_policy = valid_contract_file();
+    missing_policy.product_diagnostic_policies.pop();
+    assert!(matches!(
+        validate(&missing_policy, &"a".repeat(64)),
+        Err(GroupError::ProductDiagnosticPolicyCoverage)
+    ));
+
+    let mut stale_witness = valid_contract_file();
+    stale_witness
+        .product_diagnostic_policies
+        .get_mut(policy_index)
+        .and_then(|policy| policy.scales.first_mut())
+        .expect("product scale policy")
+        .witness_case_id = "cq-stale".to_string();
+    assert!(matches!(
+        validate(&stale_witness, &"a".repeat(64)),
+        Err(GroupError::InvalidProductDiagnosticPolicy(_))
     ));
 }
 

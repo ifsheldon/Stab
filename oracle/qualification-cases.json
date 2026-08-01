@@ -21821,14 +21821,14 @@
           "stab-reference-decoder",
           "--test",
           "generated_repetition",
-          "generated_distance_three_and_five_predictions_match_independent_oracle",
+          "generated_and_diagnostic_models_match_independent_oracle",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "Generated distance-3 and distance-5 repetition circuits lower through public analysis, and every admitted detector syndrome prediction matches an independent probability-domain dynamic program."
+        "detail": "Generated repetition circuits and every exact A7 compile/decode diagnostic model are checked across all admitted detector syndromes against an independent probability-domain dynamic program."
       },
       "negative_axes": [
         "generated-model-drift",

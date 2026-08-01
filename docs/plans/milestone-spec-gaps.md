@@ -1558,3 +1558,21 @@ Current text: A6 required every affected A2, A4, and A5 diagnostic while naming 
 Gap: an agent could omit an inconvenient changed path or expand A6 back into the superseded complete matrix, and an independent reviewer could not reproduce the selected scope.
 Proposed amendment: freeze one small table of exact group or row IDs, measurement IDs, scales, inclusion reasons, and deliberate exclusions. Require a recorded specification amendment before changing that set.
 Resolution: the A6 extraction map now freezes four A2 product-diagnostic groups, one parser row, three A4 sampling rows, and three A5 phase rows with exact measurements. It explicitly excludes unrelated M7, M8, M9, M10, PF, and inherited rows whose timed algorithm or public process path did not change, while direct Stable package tests and generated ownership retain their semantic coverage.
+
+## 2026-08-01 - A7: Numerical Tie-Resolution Resource Bounds
+
+Status: Resolved
+Revealed by: full code review of exact-ML tie semantics and the first decoder diagnostic contract.
+Current text: A7 admitted 20 detectors, one observable, 256 mechanisms, `2^21` joint states, 16 MiB of temporary probability workspace, and `2^28` pair transitions while also requiring exact ties to choose prediction zero.
+Gap: finite-precision log probabilities can make an exact or numerically unresolved tie appear ordered. Correct deterministic resolution needs a higher-precision fallback, but the plan did not say whether its storage and work replaced or accumulated with the primary pass. The old wording also made derived per-pass ceilings sound like separately reachable runtime rejection branches.
+Proposed amendment: state the primary and fallback resources independently, define their peak and total bounds, and distinguish dimension-derived ceilings from user-triggerable admission errors.
+Resolution: the primary `f64` table is at most 16 MiB and is dropped before a mutually exclusive double-double table of at most 32 MiB. Peak probability workspace is therefore 32 MiB. Each pass performs at most `2^28` pair updates and an ambiguous model can perform at most `2^29` total updates across both passes. Public constants now name primary, tie-resolution, peak, per-pass, and total bounds explicitly; detector, observable, mechanism, and represented-instruction limits remain the reachable typed admission errors.
+
+## 2026-08-01 - A7: Product-Diagnostic Witness And Batching Policy
+
+Status: Resolved
+Revealed by: independent review of the first A7 diagnostic runner and frozen output policies.
+Current text: A7 required exact semantic witnesses outside timing and small, medium, and large scales, but it did not say whether every product diagnostic and scale had to own a frozen witness or whether stateful pipelines could use calibrated repeats.
+Gap: an absent policy could fall back to the calibration worker's own output, making the implementation its own oracle. The first pipeline draft also validated only the first iteration while timing later stateful iterations, so the witness did not cover the complete timed result.
+Proposed amendment: require one policy for every product diagnostic and scale, bind it to an exact correctness case and frozen output digest, run a one-iteration contract preflight before timing, and make batching a per-scale decision. Stateful pipelines must be single-pass unless a complete repeat-dependent witness is specified.
+Resolution: runtime-group schema 10 now enforces exhaustive per-scale product-diagnostic policies. Calibration-derived fallback is removed. Compile and reused-decode scales retain repeat-independent calibrated timing, while every pipeline sample is one complete pass whose full seeded report matches the source-owned witness. Independent probability-domain and public experiment tests cover the exact diagnostic models and all three pipeline scales.

@@ -1,8 +1,192 @@
 {
-  "schema_version": 9,
+  "schema_version": 10,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "01f9b58f61f4c48917ebeffba0148ba745f5326d4950eb679e0223e3d733d9af",
+  "performance_inventory_sha256": "be2576fa5eefc25159561a14a37317c9487228992a6a8c8c6261b650772783ba",
   "product_diagnostic_suite_timeout_seconds": 600,
+  "product_diagnostic_policies": [
+    {
+      "group_id": "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-e16abe30d8c7992c",
+          "expected_output_digest": "3739fcba16dffcde687cb879082b7a3c60ae9cc99e3e28bb8d49944b1a91ea65",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-e16abe30d8c7992c",
+          "expected_output_digest": "4f3a4ea2fbfd5b01038969565e67c702ea0a5633d420c55c27df51c4bc08e155",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-e16abe30d8c7992c",
+          "expected_output_digest": "aec1d777ea9f24501b159d47c0fae32fe87e7f43d831f274124164749e19ee2f",
+          "max_worker_peak_rss_bytes": null
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+          "expected_output_digest": "285ca1e298f28f4ead24f0b5847ddb5263cecc81e493e4471c962ae38a94c4bd",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+          "expected_output_digest": "4165eca052b28629e6dda02748086ea7c0f369c7becfe06e6fb3acebf6f47566",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d63aa8cd2dc62e63",
+          "expected_output_digest": "51f2dc392b63dc437dbd9eec2ba98fe2ec6b7e11710c8e7ba8d9d9a5f077e4a5",
+          "max_worker_peak_rss_bytes": null
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d65b079751fe7119",
+          "expected_output_digest": "a54c4614e24003100d638a629677da1a83510ea32a923bde410856f5914559ac",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d65b079751fe7119",
+          "expected_output_digest": "338f05c441c83c9a51bc28155a5a2db3516341de18ac0796c6fffe8d5522f678",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-d65b079751fe7119",
+          "expected_output_digest": "550bd143ffd01988ca713b0e2973639561357493965cfd7f6d900509953ef206",
+          "max_worker_peak_rss_bytes": null
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A2-SAMPLER-COMPILE",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7bcf8fcdbbfa6d68",
+          "expected_output_digest": "2a3a6afd72fbfb415c04af1b1dd1e41bbe1c9e74c8553e833c4eb7e1947518af",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7bcf8fcdbbfa6d68",
+          "expected_output_digest": "50c0d0ad868fafa163eedbe586eb9dd7eaedaa82564a20711b950db2e2a74565",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-7bcf8fcdbbfa6d68",
+          "expected_output_digest": "2958ae8f7e0a617d1d1d619b5527886506dd4fa441662a2aea1f399c9844d59e",
+          "max_worker_peak_rss_bytes": null
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A7-EXACT-ML-COMPILE",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "7191868d63b6167e082428e6838144c24959c24432d2d39f68ee0aea1f2aa956",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "b420b9bf7ecd5e4a792586fa2901dfe88f477e48be79c5678f88cc0d05fea407",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "8d491c30bc1381be6bc856c69879a3c29b5c42567ba4ccccdd8d7bc953565f88",
+          "max_worker_peak_rss_bytes": 67108864
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A7-EXACT-ML-REUSED-DECODE",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "03300cf777f659a142a4aef4ca60aefa0f2d134d8bad1cfe7d0b387f7517eac4",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "67dd955da306bd58924b1abbe1e713245887aefdc20fad75773d88bec41be502",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "calibrated-repeat",
+          "witness_case_id": "cq-evidence-qualification-278e629a855d3c41",
+          "expected_output_digest": "eff5964c8712f8493d84f77f3a4243a31a7c1659d1689542e8ddac14db9b583f",
+          "max_worker_peak_rss_bytes": 33554432
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE",
+      "scales": [
+        {
+          "scale_id": "small",
+          "batch_policy": "single-pass",
+          "witness_case_id": "cq-evidence-qualification-7d5fce18cc43d73d",
+          "expected_output_digest": "4e091ca8fbf44661cef6c2aabed42fbc0a5351a1ee1f1d50a7f698c103011744",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "medium",
+          "batch_policy": "single-pass",
+          "witness_case_id": "cq-evidence-qualification-7d5fce18cc43d73d",
+          "expected_output_digest": "b68bcb4e17126ec96a919de980153e3da1828880e96842a37368c42e7e894d1d",
+          "max_worker_peak_rss_bytes": null
+        },
+        {
+          "scale_id": "large",
+          "batch_policy": "single-pass",
+          "witness_case_id": "cq-evidence-qualification-7d5fce18cc43d73d",
+          "expected_output_digest": "9a8aa05a84e9c0a0553352ebeaae763b699c3ff0d96113f93d6411051dbd8152",
+          "max_worker_peak_rss_bytes": 33554432
+        }
+      ]
+    }
+  ],
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -221,14 +405,15 @@
           "id": "large",
           "family_id": "default",
           "size_class": "large",
-          "work_items": 2097152,
-          "input_bytes": 3296,
-          "input_digest": "6315c451daf2b510c69d33912bb85b1356078770ed9e3e384f832c1d97998cc8"
+          "work_items": 4194304,
+          "input_bytes": 50,
+          "input_digest": "605f2f7256498d73a515a0ea07ffd04cb420fa76f9cb000417cf02116e097b0e"
         }
       ],
       "correctness_case_ids": [
         "cq-evidence-qualification-160444d1041f2b2a",
         "cq-evidence-qualification-1686de935fd64494",
+        "cq-evidence-qualification-278e629a855d3c41",
         "cq-evidence-qualification-3a9a1dd7ddabd7b1",
         "cq-evidence-qualification-7179fce5697cce0d",
         "cq-evidence-qualification-7b17d9e5cca84df5",
@@ -277,6 +462,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-0b8090f2ca9daf37",
         "cq-evidence-qualification-0e2885667877d158",
+        "cq-evidence-qualification-278e629a855d3c41",
         "cq-evidence-qualification-3add8f2f8632a7fb",
         "cq-evidence-qualification-63678c8f7a576971",
         "cq-evidence-qualification-7b17d9e5cca84df5",
@@ -318,9 +504,9 @@
           "id": "large",
           "family_id": "default",
           "size_class": "large",
-          "work_items": 65536,
+          "work_items": 262144,
           "input_bytes": 776,
-          "input_digest": "f01d9efb4acadf4f36b4ba8cbe0f67db1669697624723b3763e6e7bb4764e645"
+          "input_digest": "6b247b780447aad7eb3df7800834aa0528776aba97d529878fdacc59872c76e2"
         }
       ],
       "correctness_case_ids": [

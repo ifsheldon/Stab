@@ -841,23 +841,24 @@ Status: Active.
 
 - Add unpublished `stab-reference-decoder` under `test-support` and forbid dependencies on `stab-core`, CLI, ops, private modules, or Nightly features.
 - Compile each independent DEM error mechanism into one detector-plus-observable effect mask and run an in-place log-domain dynamic program over joint states.
-- Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, `2^21` joint states, 16 MiB of temporary probability workspace, and `2^28` pair transitions.
+- Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, and `2^21` joint states. The primary `f64` pass uses at most 16 MiB; an ambiguous comparison drops that buffer before a mutually exclusive double-double pass using at most 32 MiB, so peak probability workspace is 32 MiB. Each pass performs at most `2^28` pair updates and the optional two-pass path performs at most `2^29` total pair updates.
 - Retain exactly one byte per detector syndrome after compilation. Ties choose observable prediction zero, zero-observable models are valid, and impossible syndromes produce a typed error before the batch output is mutated.
 - Use checked allocation and arithmetic throughout. Reused decoding performs no allocation and updates only a completed prefix when cancellation is observed.
 
 ### A7.4 Independent Correctness And Experiment Tests
 
 - Compare the log-domain joint distribution against direct subset enumeration for exhaustive small mechanisms, including probabilities zero and one, duplicate targets, zero-effect mechanisms, ties, and impossible syndromes.
-- Generate noisy distance-3 and distance-5 repetition circuits through `stab-analysis`, lower them to DEMs, compile the reference decoder, and compare every bounded syndrome prediction with an independent brute-force oracle.
+- Generate noisy distance-3 and distance-5 repetition circuits through `stab-analysis`, lower them to DEMs, compile the reference decoder, and compare every bounded syndrome prediction with an independent probability-domain oracle. Apply the same independent oracle to every exact-ML compile and reused-decode diagnostic model.
 - Test detector, observable, prediction, and shot-count mismatches before mutation; every exact resource boundary and first rejection; session reuse; whole-versus-partitioned batches; pre-cancellation; mid-batch cancellation through the conformance fixture; failure progress; and zero-shot behavior.
 - Build one external end-to-end experiment using only public `stab-analysis`, `stab-engine`, `stab-model`, `stab-records`, and `stab-decoder` APIs: generate a repetition circuit, compile sampling and measurement-to-detection plans, stream typed detection batches into the reference session, and count logical failures after predictions are produced.
-- Prove exact seeded repetition of the experiment and equivalent results when one sampling session is partitioned across calls.
+- Prove exact seeded reports at all three pipeline diagnostic scales and equivalent results when one sampling session is partitioned across calls.
 
 ### A7.5 Qualification And Benchmarks
 
 - Add exact correctness ownership for the record prefix view, bounded mechanism traversal, decoder model and session contracts, exact-ML compiler, and external experiment. Round trips or broad workspace commands cannot be their sole owners.
 - Add exactly three Stab-only product-diagnostic runtime groups: exact-ML compilation, reused batch decode, and sample-to-detect-to-decode execution.
-- Give each group deterministic generators, exact semantic witnesses outside timing, small, medium, and large scales, phase-specific work units, source-owned workload rationales, correctness prerequisites, and executable worker contracts.
+- Give each group deterministic generators, exact semantic witnesses outside timing, small, medium, and large scales, phase-specific work units, source-owned workload rationales, correctness prerequisites, and executable worker contracts. Require a one-iteration `contract` preflight against a source-owned digest before timing; calibration cannot define its own witness.
+- Use calibrated repeat counts only for stateless compilation and reused decoding. Run the stateful public pipeline once per timing sample and bind its complete seeded report.
 - Treat the three groups as stable baseline-candidate identities, not as current self-regression results. Product diagnostics intentionally have no Stim parity policy entry, profiler note, rollup, completion result, or self-regression verdict. A9 may promote and seed architecture-specific baselines only after reviewed controlled full and soak evidence for the same identities.
 - Attach retained-byte, zero-allocation reuse, bounded session growth, and accepted-maximum memory checks to the owning workloads instead of adding a standalone memory timing group.
 - Keep the release matrix below 40 groups and diagnostics below 60; consolidate an existing group before exceeding either cap.

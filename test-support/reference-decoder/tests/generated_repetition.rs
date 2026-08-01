@@ -18,30 +18,79 @@ use stab_reference_decoder::{ExactMlDecodeError, ExactMlDecoderSession};
 use thiserror::Error;
 
 #[test]
-fn generated_distance_three_and_five_predictions_match_independent_oracle() {
+fn generated_and_diagnostic_models_match_independent_oracle() {
     for distance in [3, 5] {
         let model = generated_repetition_model(distance);
-        let session = ExactMlDecoderSession::try_compile_model(&model).expect("compile exact ML");
-        let oracle = IndependentProbabilityOracle::compile(&model);
+        predictions_match_independent_oracle(&model, &format!("distance={distance}"));
+    }
 
-        assert_eq!(session.syndrome_count(), oracle.predictions.len());
-        for (syndrome, expected) in oracle.predictions.iter().copied().enumerate() {
-            let syndrome = u64::try_from(syndrome).expect("bounded syndrome");
-            match expected {
-                Some(expected) => assert_eq!(
-                    session
-                        .prediction_for_syndrome(syndrome)
-                        .expect("possible generated syndrome"),
-                    expected,
-                    "distance={distance} syndrome={syndrome}"
-                ),
-                None => assert!(matches!(
+    for (label, model) in diagnostic_compile_models() {
+        predictions_match_independent_oracle(&model, label);
+    }
+    predictions_match_independent_oracle(&diagnostic_model(14, 64), "reused-decode");
+}
+
+fn predictions_match_independent_oracle(model: &DetectorErrorModel, label: &str) {
+    let session = ExactMlDecoderSession::try_compile_model(model).expect("compile exact ML");
+    let oracle = IndependentProbabilityOracle::compile(model);
+
+    assert_eq!(session.syndrome_count(), oracle.predictions.len());
+    for (syndrome, expected) in oracle.predictions.iter().copied().enumerate() {
+        let syndrome = u64::try_from(syndrome).expect("bounded syndrome");
+        match expected {
+            Some(expected) => assert_eq!(
+                session
+                    .prediction_for_syndrome(syndrome)
+                    .expect("possible diagnostic syndrome"),
+                expected,
+                "{label} syndrome={syndrome}"
+            ),
+            None => assert!(
+                matches!(
                     session.prediction_for_syndrome(syndrome),
                     Err(ExactMlDecodeError::ImpossibleSyndrome { .. })
-                )),
-            }
+                ),
+                "{label} syndrome={syndrome}"
+            ),
         }
     }
+}
+
+fn diagnostic_compile_models() -> [(&'static str, DetectorErrorModel); 3] {
+    [
+        ("compile-small", diagnostic_model(6, 12)),
+        ("compile-medium", diagnostic_model(10, 32)),
+        (
+            "compile-accepted-maximum",
+            DetectorErrorModel::from_dem_str("error(0) D19\nerror(0.5) L0\n")
+                .expect("accepted-maximum DEM"),
+        ),
+    ]
+}
+
+fn diagnostic_model(detector_count: usize, mechanism_count: usize) -> DetectorErrorModel {
+    let mut text = String::new();
+    for mechanism in 0..mechanism_count {
+        let probability_millis = 5 + (mechanism * 17) % 190;
+        text.push_str(&format!("error(0.{probability_millis:03})"));
+        if mechanism < detector_count {
+            text.push_str(&format!(" D{mechanism}"));
+            if mechanism == 0 {
+                text.push_str(" L0");
+            }
+        } else if mechanism == detector_count {
+            text.push_str(" L0");
+        } else {
+            let first = mechanism % detector_count;
+            let second = (first + 1 + mechanism / detector_count) % detector_count;
+            text.push_str(&format!(" D{first} D{second}"));
+            if mechanism % 3 == 0 {
+                text.push_str(" L0");
+            }
+        }
+        text.push('\n');
+    }
+    DetectorErrorModel::from_dem_str(&text).expect("diagnostic DEM")
 }
 
 fn generated_repetition_model(distance: u32) -> DetectorErrorModel {

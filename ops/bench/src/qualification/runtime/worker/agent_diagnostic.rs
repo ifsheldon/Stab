@@ -102,7 +102,7 @@ impl AgentDiagnosticFixture {
         &self,
         output: AgentDiagnosticOutput,
         iterations: u64,
-        work_items: u64,
+        _work_items: u64,
     ) -> Result<String, WorkerError> {
         if self.kind == AgentDiagnosticKind::SamplerCompile {
             let AgentDiagnosticOutput::CompileRelease {
@@ -127,8 +127,6 @@ impl AgentDiagnosticFixture {
         }
         let mut material = Vec::with_capacity(128);
         material.push(self.kind.marker());
-        material.extend_from_slice(&iterations.to_le_bytes());
-        material.extend_from_slice(&work_items.to_le_bytes());
         encode_output(&output, &self.circuit, &mut material);
         Ok(semantic_digest(byte_digest(&material)))
     }
@@ -263,6 +261,26 @@ mod tests {
                     .expect("validated output");
                 assert_eq!(digest.len(), 64, "{workload:?} work_items={work_items}");
             }
+        }
+    }
+
+    #[test]
+    fn a2_agent_diagnostic_witnesses_are_repeat_count_independent() {
+        for workload in [
+            WorkerWorkload::CircuitModelFingerprint,
+            WorkerWorkload::SamplingRequestFingerprint,
+            WorkerWorkload::SamplingRequestEstimate,
+            WorkerWorkload::SamplerCompile,
+        ] {
+            let digest = |iterations| {
+                let fixture =
+                    AgentDiagnosticFixture::prepare(workload, SCALES[0]).expect("fixture");
+                let output = fixture.execute(iterations).expect("diagnostic output");
+                fixture
+                    .validate(output, iterations, SCALES[0])
+                    .expect("validated output")
+            };
+            assert_eq!(digest(1), digest(2), "{workload:?}");
         }
     }
 

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "1ee917ada581e7b8643374760e437fd352cf4f0d4931a28afcea23abaa28f18d",
+  "semantic_digest": "220328b59d3cbbae0e7c2650e82ae826da5985f1e8b40f79e15d1f627845ad1d",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -199599,7 +199599,7 @@
           "stab-reference-decoder",
           "--test",
           "generated_repetition",
-          "generated_distance_three_and_five_predictions_match_independent_oracle",
+          "generated_and_diagnostic_models_match_independent_oracle",
           "--quiet",
           "--exact"
         ]
@@ -199607,7 +199607,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "Generated distance-3 and distance-5 repetition circuits lower through public analysis, and every admitted detector syndrome prediction matches an independent probability-domain dynamic program."
+        "detail": "Generated repetition circuits and every exact A7 compile/decode diagnostic model are checked across all admitted detector syndromes against an independent probability-domain dynamic program."
       },
       "negative_axes": [
         "generated-model-drift",

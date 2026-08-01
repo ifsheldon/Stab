@@ -229,6 +229,15 @@ fn validate_product_diagnostic(group: &QualificationGroup, issues: &mut Issues) 
             !parameters.is_empty() && parameters.values().all(|value| !is_placeholder(value))
         })
     });
+    let valid_memory_policy = match group.memory_policy.method {
+        crate::qualification::model::MemoryMethod::NotApplicable => {
+            group.memory_policy.scale_ids.is_empty()
+        }
+        crate::qualification::model::MemoryMethod::ProcessRss => {
+            group.memory_policy.scale_ids.as_slice() == ["large"]
+        }
+        crate::qualification::model::MemoryMethod::StabAllocations => false,
+    };
     if actual_scale_ids != expected_scale_ids
         || !valid_parameters
         || group.disposition != crate::qualification::model::PerformanceDisposition::Measured
@@ -245,8 +254,7 @@ fn validate_product_diagnostic(group: &QualificationGroup, issues: &mut Issues) 
         || group.timing_policy.full_pairs != 9
         || group.timing_policy.timeout_seconds != 600
         || group.timing_policy.gate_statistic != PRODUCT_DIAGNOSTIC_GATE_STATISTIC
-        || group.memory_policy.method != crate::qualification::model::MemoryMethod::NotApplicable
-        || !group.memory_policy.scale_ids.is_empty()
+        || !valid_memory_policy
         || group.threshold_policy != ThresholdPolicy::ReportOnly
     {
         issues.push(format!(

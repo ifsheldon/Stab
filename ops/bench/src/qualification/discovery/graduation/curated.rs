@@ -142,6 +142,7 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             correctness_cases: &[
                 "cq-evidence-qualification-160444d1041f2b2a",
                 "cq-evidence-qualification-1686de935fd64494",
+                "cq-evidence-qualification-278e629a855d3c41",
                 "cq-evidence-qualification-3a9a1dd7ddabd7b1",
                 "cq-evidence-qualification-7179fce5697cce0d",
                 "cq-evidence-qualification-7b17d9e5cca84df5",
@@ -150,10 +151,10 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
                 "cq-evidence-qualification-b4fefe4518cc5c2d",
             ],
             owner: "stab-reference-decoder/exact-ml-compiler",
-            work_unit: "joint-state mechanism transitions",
+            work_unit: "joint-state mechanism loop visits",
             family: exact_ml_compile_family,
             expected_shape: "One completed compile-and-release count per invocation plus an untimed exact witness over model identity, dimensions, retained bytes, and every syndrome prediction.",
-            sink_policy: "DEM generation and one witness compilation occur before timing. The worker times only complete ExactMlDecoderSession compilation and release, then recompiles and validates the exact typed witness outside raw-work-v2.",
+            sink_policy: "DEM generation occurs before timing. The worker times only complete ExactMlDecoderSession compilation and release, then recompiles and emits the exact typed witness outside raw-work-v2 for comparison with a frozen source-owned digest.",
             reason: "Measures the bounded exact-ML compiler at three admitted joint-state transition scales. This is Stab-only because pinned Stim v1.16.0 provides no faithful external-decoder compiler comparator.",
         },
         DecoderDiagnosticSpec {
@@ -163,6 +164,7 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             correctness_cases: &[
                 "cq-evidence-qualification-0b8090f2ca9daf37",
                 "cq-evidence-qualification-0e2885667877d158",
+                "cq-evidence-qualification-278e629a855d3c41",
                 "cq-evidence-qualification-3add8f2f8632a7fb",
                 "cq-evidence-qualification-63678c8f7a576971",
                 "cq-evidence-qualification-7b17d9e5cca84df5",
@@ -175,8 +177,8 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             work_unit: "decoded shots",
             family: exact_ml_decode_family,
             expected_shape: "Exact completed shot count and prediction digest from one precompiled session over a deterministic packed syndrome batch.",
-            sink_policy: "Model compilation, detector input construction, prediction allocation, and cancellation-token construction occur before timing. The worker times only repeated decode_batch calls and validates the complete caller-owned prediction buffer outside raw-work-v2.",
-            reason: "Measures allocation-free reuse of one exact-ML session and caller-owned output across deterministic small, medium, and accepted-maximum batches without inventing a Stim ratio.",
+            sink_policy: "Model compilation, detector input construction, prediction allocation, and cancellation-token construction occur before timing. Raw-work-v2 includes each decode_batch call and mandatory returned-progress validation; the complete caller-owned prediction buffer is digested afterward and compared with a frozen source-owned witness.",
+            reason: "Measures allocation-free reuse of one exact-ML session and caller-owned output across deterministic small, medium, and accepted-maximum shot-count batches without inventing a Stim ratio. The shared 14-detector session is not the decoder-width admission maximum.",
         },
         DecoderDiagnosticSpec {
             id: A7_PIPELINE_GROUP_ID,
@@ -194,8 +196,8 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
             work_unit: "pipeline shots",
             family: pipeline_family,
             expected_shape: "Exact seeded shot and logical-failure counts from the public sample-to-detection-to-decoder composition.",
-            sink_policy: "Circuit generation, DEM lowering, plan compilation, session construction, and an independent seeded expected run occur before timing. Raw-work-v2 measures reusable sampling, typed detection conversion, exact decoding, and logical-failure counting; report comparison and digesting occur afterward.",
-            reason: "Measures the complete public A7 experiment at calibrated bounded shot scales. It remains a Stab-only baseline candidate because Stim has no equivalent external-decoder composition contract.",
+            sink_policy: "Circuit generation, DEM lowering, plan compilation, and session construction occur before timing. Raw-work-v2 measures one complete reusable sampling, typed detection conversion, exact decoding, and logical-failure-counting pass; the complete report is validated afterward against a frozen source-owned witness.",
+            reason: "Measures the complete public A7 experiment at bounded single-pass shot scales. It remains a Stab-only baseline candidate because Stim has no equivalent external-decoder composition contract.",
         },
     ]
     .into_iter()
@@ -248,9 +250,9 @@ fn decoder_diagnostic_group(
     };
     group.timing_policy.gate_statistic = PRODUCT_DIAGNOSTIC_GATE_STATISTIC.to_string();
     group.memory_policy = MemoryPolicy {
-        method: MemoryMethod::NotApplicable,
-        scale_ids: Vec::new(),
-        expected_growth: "Retained prediction bytes and allocation-free reuse are exact focused-test contracts. Setup and peak process RSS remain in every diagnostic receipt, including the largest source-owned scale, without creating a fourth timing group."
+        method: MemoryMethod::ProcessRss,
+        scale_ids: vec!["large".to_string()],
+        expected_growth: "The largest source-owned scale owns one separately instrumented accepted-maximum worker peak-RSS check. The cap is frozen in the runtime diagnostic policy; retained prediction bytes and allocation-free reuse remain exact focused-test contracts."
             .to_string(),
     };
     group.threshold_policy = ThresholdPolicy::ReportOnly;
@@ -284,10 +286,10 @@ fn exact_ml_compile_family() -> WorkloadFamily {
             scale(
                 "large",
                 SizeClass::Large,
-                "detectors=14; observables=1; mechanisms=64; joint_states=32768",
-                2_097_152,
-                3_296,
-                "6315c451daf2b510c69d33912bb85b1356078770ed9e3e384f832c1d97998cc8",
+                "detectors=20; observables=1; represented_mechanisms=2; active_mechanisms=1; joint_states=2097152; passes=2; tie_fallback=true",
+                4_194_304,
+                50,
+                "605f2f7256498d73a515a0ea07ffd04cb420fa76f9cb000417cf02116e097b0e",
             ),
         ],
     )
@@ -350,10 +352,10 @@ fn pipeline_family() -> WorkloadFamily {
             scale(
                 "large",
                 SizeClass::Large,
-                "shots=65536; distance=3; rounds=3; seed=0xA7D3C0DE",
-                65_536,
+                "shots=262144; distance=3; rounds=3; seed=0xA7D3C0DE",
+                262_144,
                 776,
-                "f01d9efb4acadf4f36b4ba8cbe0f67db1669697624723b3763e6e7bb4764e645",
+                "6b247b780447aad7eb3df7800834aa0528776aba97d529878fdacc59872c76e2",
             ),
         ],
     )

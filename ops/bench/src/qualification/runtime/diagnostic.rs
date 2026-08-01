@@ -8,7 +8,10 @@ use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::calibration::{CalibrationProbe, calibrate};
-use super::group::{GroupContract, ScaleContract};
+use super::group::{
+    GroupContract, ProductDiagnosticBatchPolicy, ProductDiagnosticPolicy,
+    ProductDiagnosticScalePolicy, ScaleContract,
+};
 use super::host::{HostEvidence, HostGuard};
 use super::invocation::{
     DiagnosticInvocationRequest, DiagnosticWorkerIdentityEvidence, InvocationError,
@@ -24,7 +27,7 @@ use super::run::{
 use crate::qualification::model::SizeClass;
 use crate::root::RepoRoot;
 
-const DIAGNOSTIC_REPORT_SCHEMA_VERSION: u32 = 2;
+const DIAGNOSTIC_REPORT_SCHEMA_VERSION: u32 = 3;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/a2-diagnostic-latest";
 
 #[derive(Clone, Debug, Args)]
@@ -105,11 +108,26 @@ struct DiagnosticScaleEvidence {
     work_items: u64,
     input_bytes: u64,
     input_digest: String,
+    batch_policy: ProductDiagnosticBatchPolicy,
+    witness_case_id: String,
+    expected_output_digest: String,
     calibration: DiagnosticCalibrationEvidence,
     semantic_validation: InvocationRecord,
     warmups: Vec<InvocationRecord>,
     samples: Vec<InvocationRecord>,
+    memory: Option<DiagnosticMemoryEvidence>,
     summary: DiagnosticScaleSummary,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DiagnosticMemoryEvidence {
+    max_worker_peak_rss_bytes: u64,
+    setup_rss_bytes: u64,
+    peak_rss_bytes: u64,
+    peak_delta_bytes: u64,
+    parent_observed_peak_rss_bytes: Option<u64>,
+    invocation: InvocationRecord,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -148,6 +166,10 @@ pub(super) fn run_with_repository(
     let resolved_group =
         super::group::load_group(source_root, performance_inventory_sha256, &args.group)?;
     require_product_diagnostic(&resolved_group.contract)?;
+    let diagnostic_policy = resolved_group
+        .product_diagnostic_policy
+        .as_ref()
+        .ok_or(DiagnosticError::MissingSourceOwnedWitness)?;
     let scales = selected_scales(&resolved_group.contract, &args)?;
     let scale_ids = scales
         .iter()
@@ -171,6 +193,7 @@ pub(super) fn run_with_repository(
         scale_evidence.push(run_scale(
             &worker,
             &resolved_group.contract,
+            diagnostic_policy,
             scale,
             args.tier,
             &deadline,
@@ -223,7 +246,12 @@ pub(super) fn run_with_repository(
         stab_build_receipt: build_receipt,
         scales: scale_evidence,
     };
-    validate_report(&report, &resolved_group.contract, suite_timeout_seconds)?;
+    validate_report(
+        &report,
+        &resolved_group.contract,
+        diagnostic_policy,
+        suite_timeout_seconds,
+    )?;
     let report_json = render_json(&report)?;
     let report_markdown = render_markdown(&report, &super::run::sha256_hex(&report_json));
     let repository_evidence = report.repository.clone();
@@ -241,14 +269,126 @@ pub(super) fn run_with_repository(
 fn run_scale(
     worker: &PreparedDiagnosticWorker,
     group: &GroupContract,
+    diagnostic_policy: &ProductDiagnosticPolicy,
     scale: &ScaleContract,
     tier: QualificationTier,
     deadline: &SuiteDeadline,
 ) -> Result<DiagnosticScaleEvidence, DiagnosticError> {
+    let scale_policy = diagnostic_policy.scale(&scale.id)?;
+    let semantic_validation = invoke(
+        worker,
+        group,
+        scale,
+        EvidenceMode::Contract,
+        NonZeroU64::MIN,
+        Some(&scale_policy.expected_output_digest),
+        deadline,
+    )?;
+    let (selected_iterations, selected_measured_seconds, probes) =
+        calibrate_scale(worker, group, scale_policy, scale, deadline)?;
+    let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
+    for _ in 0..WARMUP_BATCHES {
+        warmups.push(invoke(
+            worker,
+            group,
+            scale,
+            EvidenceMode::Timing,
+            selected_iterations,
+            Some(&scale_policy.expected_output_digest),
+            deadline,
+        )?);
+    }
+    let mut samples = Vec::with_capacity(tier.sample_count());
+    for _ in 0..tier.sample_count() {
+        samples.push(invoke(
+            worker,
+            group,
+            scale,
+            EvidenceMode::Timing,
+            selected_iterations,
+            Some(&scale_policy.expected_output_digest),
+            deadline,
+        )?);
+    }
+    let memory = scale_policy
+        .max_worker_peak_rss_bytes
+        .map(|maximum| {
+            run_memory(
+                worker,
+                group,
+                scale,
+                maximum.get(),
+                &scale_policy.expected_output_digest,
+                deadline,
+            )
+        })
+        .transpose()?;
+    let summary = summarize_samples(&samples)?;
+    Ok(DiagnosticScaleEvidence {
+        scale_id: scale.id.to_string(),
+        family_id: scale.family_id.to_string(),
+        size_class: scale.size_class,
+        work_items: scale.work_items.get(),
+        input_bytes: scale.input_bytes,
+        input_digest: scale.input_digest.as_str().to_string(),
+        batch_policy: scale_policy.batch_policy,
+        witness_case_id: scale_policy.witness_case_id.clone(),
+        expected_output_digest: scale_policy.expected_output_digest.as_str().to_string(),
+        calibration: DiagnosticCalibrationEvidence {
+            selected_iterations: selected_iterations.get(),
+            selected_measured_seconds,
+            probes,
+        },
+        semantic_validation,
+        warmups,
+        samples,
+        memory,
+        summary,
+    })
+}
+
+fn calibrate_scale(
+    worker: &PreparedDiagnosticWorker,
+    group: &GroupContract,
+    scale_policy: &ProductDiagnosticScalePolicy,
+    scale: &ScaleContract,
+    deadline: &SuiteDeadline,
+) -> Result<(NonZeroU64, f64, Vec<DiagnosticCalibrationProbe>), DiagnosticError> {
+    let source_expected = &scale_policy.expected_output_digest;
+    if scale_policy.batch_policy == ProductDiagnosticBatchPolicy::SinglePass {
+        let iterations = NonZeroU64::MIN;
+        let invocation = invoke(
+            worker,
+            group,
+            scale,
+            EvidenceMode::Timing,
+            iterations,
+            Some(source_expected),
+            deadline,
+        )?;
+        let measured = invocation.measured_duration()?.as_secs_f64();
+        return Ok((
+            iterations,
+            measured,
+            vec![DiagnosticCalibrationProbe {
+                iterations: iterations.get(),
+                invocation,
+            }],
+        ));
+    }
+
     let mut probes = Vec::new();
     let decision = calibrate(super::run::calibration_policy()?, |iterations| {
-        let invocation = invoke(worker, group, scale, iterations, None, deadline)
-            .map_err(|error| error.to_string())?;
+        let invocation = invoke(
+            worker,
+            group,
+            scale,
+            EvidenceMode::Timing,
+            iterations,
+            Some(source_expected),
+            deadline,
+        )
+        .map_err(|error| error.to_string())?;
         let measured = invocation
             .measured_duration()
             .map_err(|error| error.to_string())?;
@@ -261,58 +401,53 @@ fn run_scale(
         });
         Ok(CalibrationProbe { measured, wall })
     })?;
-    let selected_digest = probes
-        .last()
-        .and_then(|probe| only_row(&probe.invocation.rows).ok())
-        .map(|row| row.output_digest.clone())
-        .ok_or(DiagnosticError::MissingCalibrationProbe)?;
-    let semantic_validation = invoke(
+    Ok((decision.iterations, decision.measured.as_secs_f64(), probes))
+}
+
+fn run_memory(
+    worker: &PreparedDiagnosticWorker,
+    group: &GroupContract,
+    scale: &ScaleContract,
+    max_peak_rss_bytes: u64,
+    expected_output_digest: &SemanticDigest,
+    deadline: &SuiteDeadline,
+) -> Result<DiagnosticMemoryEvidence, DiagnosticError> {
+    let invocation = invoke(
         worker,
         group,
         scale,
-        decision.iterations,
-        Some(&selected_digest),
+        EvidenceMode::Memory,
+        NonZeroU64::MIN,
+        Some(expected_output_digest),
         deadline,
     )?;
-    let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
-    for _ in 0..WARMUP_BATCHES {
-        warmups.push(invoke(
-            worker,
-            group,
-            scale,
-            decision.iterations,
-            Some(&selected_digest),
-            deadline,
-        )?);
+    memory_evidence_from_invocation(invocation, group, scale, max_peak_rss_bytes)
+}
+
+fn memory_evidence_from_invocation(
+    invocation: InvocationRecord,
+    group: &GroupContract,
+    scale: &ScaleContract,
+    max_peak_rss_bytes: u64,
+) -> Result<DiagnosticMemoryEvidence, DiagnosticError> {
+    let row = only_row(&invocation.rows)?;
+    let setup_rss_bytes = row.setup_rss_bytes.ok_or(DiagnosticError::MissingMemory)?;
+    let peak_rss_bytes = row.peak_rss_bytes.ok_or(DiagnosticError::MissingMemory)?;
+    if peak_rss_bytes > max_peak_rss_bytes {
+        return Err(DiagnosticError::MemoryLimitExceeded {
+            group: group.id.to_string(),
+            scale: scale.id.to_string(),
+            actual: peak_rss_bytes,
+            maximum: max_peak_rss_bytes,
+        });
     }
-    let mut samples = Vec::with_capacity(tier.sample_count());
-    for _ in 0..tier.sample_count() {
-        samples.push(invoke(
-            worker,
-            group,
-            scale,
-            decision.iterations,
-            Some(&selected_digest),
-            deadline,
-        )?);
-    }
-    let summary = summarize_samples(&samples)?;
-    Ok(DiagnosticScaleEvidence {
-        scale_id: scale.id.to_string(),
-        family_id: scale.family_id.to_string(),
-        size_class: scale.size_class,
-        work_items: scale.work_items.get(),
-        input_bytes: scale.input_bytes,
-        input_digest: scale.input_digest.as_str().to_string(),
-        calibration: DiagnosticCalibrationEvidence {
-            selected_iterations: decision.iterations.get(),
-            selected_measured_seconds: decision.measured.as_secs_f64(),
-            probes,
-        },
-        semantic_validation,
-        warmups,
-        samples,
-        summary,
+    Ok(DiagnosticMemoryEvidence {
+        max_worker_peak_rss_bytes: max_peak_rss_bytes,
+        setup_rss_bytes,
+        peak_rss_bytes,
+        peak_delta_bytes: peak_rss_bytes.saturating_sub(setup_rss_bytes),
+        parent_observed_peak_rss_bytes: invocation.parent_observed_peak_rss_bytes,
+        invocation,
     })
 }
 
@@ -320,6 +455,7 @@ fn invoke(
     worker: &PreparedDiagnosticWorker,
     group: &GroupContract,
     scale: &ScaleContract,
+    evidence_mode: EvidenceMode,
     iterations: NonZeroU64,
     expected_output_digest: Option<&SemanticDigest>,
     deadline: &SuiteDeadline,
@@ -327,7 +463,7 @@ fn invoke(
     let timeout = deadline.invocation_timeout()?;
     Ok(worker.invoke(DiagnosticInvocationRequest {
         group,
-        evidence_mode: EvidenceMode::Timing,
+        evidence_mode,
         iterations,
         scale,
         expected_output_digest,
@@ -361,6 +497,7 @@ fn require_product_diagnostic(group: &GroupContract) -> Result<(), DiagnosticErr
 fn validate_report(
     report: &DiagnosticReport,
     group: &GroupContract,
+    diagnostic_policy: &ProductDiagnosticPolicy,
     suite_timeout_seconds: u64,
 ) -> Result<(), DiagnosticError> {
     if report.schema_version != DIAGNOSTIC_REPORT_SCHEMA_VERSION
@@ -371,26 +508,92 @@ fn validate_report(
         || report.correctness_case_ids != group.correctness_case_ids
         || report.scales.is_empty()
         || report.scales.len() != report.command.scale_ids.len()
+        || report.command.scale_ids
+            != report
+                .scales
+                .iter()
+                .map(|scale| scale.scale_id.clone())
+                .collect::<Vec<_>>()
         || report.command.suite_timeout_seconds != suite_timeout_seconds
     {
         return Err(DiagnosticError::Report);
     }
     for scale in &report.scales {
+        let contract_scale = group.scale(&scale.scale_id)?;
+        let scale_policy = diagnostic_policy.scale(&contract_scale.id)?;
+        let expected_output_digest = &scale_policy.expected_output_digest;
+        let expected_memory_limit = scale_policy.max_worker_peak_rss_bytes;
+        let memory_matches = match (&scale.memory, expected_memory_limit) {
+            (None, None) => true,
+            (Some(memory), Some(maximum)) => {
+                memory.max_worker_peak_rss_bytes == maximum.get()
+                    && memory.setup_rss_bytes <= memory.peak_rss_bytes
+                    && memory.peak_delta_bytes
+                        == memory.peak_rss_bytes.saturating_sub(memory.setup_rss_bytes)
+                    && memory.peak_rss_bytes <= memory.max_worker_peak_rss_bytes
+                    && memory.parent_observed_peak_rss_bytes
+                        == memory.invocation.parent_observed_peak_rss_bytes
+                    && invocation_is_stab(
+                        &memory.invocation,
+                        group,
+                        contract_scale,
+                        EvidenceMode::Memory,
+                        1,
+                        Some(expected_output_digest),
+                    )
+            }
+            _ => false,
+        };
         if scale.calibration.probes.is_empty()
+            || scale.scale_id != contract_scale.id.to_string()
+            || scale.family_id != contract_scale.family_id.to_string()
+            || scale.size_class != contract_scale.size_class
+            || scale.work_items != contract_scale.work_items.get()
+            || scale.input_bytes != contract_scale.input_bytes
+            || scale.input_digest != contract_scale.input_digest.as_str()
+            || scale.calibration.selected_iterations == 0
+            || !scale.calibration.selected_measured_seconds.is_finite()
+            || scale.calibration.selected_measured_seconds <= 0.0
             || scale.warmups.len() != WARMUP_BATCHES
             || scale.samples.len() != report.command.retained_samples
+            || scale.batch_policy != scale_policy.batch_policy
+            || scale.witness_case_id != scale_policy.witness_case_id
+            || scale.expected_output_digest != expected_output_digest.as_str()
+            || !memory_matches
             || !summaries_match(&scale.summary, &summarize_samples(&scale.samples)?)
-            || !std::iter::once(&scale.semantic_validation)
-                .chain(&scale.warmups)
+            || !invocation_is_stab(
+                &scale.semantic_validation,
+                group,
+                contract_scale,
+                EvidenceMode::Contract,
+                1,
+                Some(expected_output_digest),
+            )
+            || !scale
+                .warmups
+                .iter()
                 .chain(&scale.samples)
-                .chain(
-                    scale
-                        .calibration
-                        .probes
-                        .iter()
-                        .map(|probe| &probe.invocation),
-                )
-                .all(|invocation| invocation_is_stab_timing(invocation, group))
+                .all(|invocation| {
+                    invocation_is_stab(
+                        invocation,
+                        group,
+                        contract_scale,
+                        EvidenceMode::Timing,
+                        scale.calibration.selected_iterations,
+                        Some(expected_output_digest),
+                    )
+                })
+            || !scale.calibration.probes.iter().all(|probe| {
+                probe.iterations > 0
+                    && invocation_is_stab(
+                        &probe.invocation,
+                        group,
+                        contract_scale,
+                        EvidenceMode::Timing,
+                        probe.iterations,
+                        Some(expected_output_digest),
+                    )
+            })
         {
             return Err(DiagnosticError::Report);
         }
@@ -428,15 +631,29 @@ impl SuiteDeadline {
     }
 }
 
-fn invocation_is_stab_timing(invocation: &InvocationRecord, group: &GroupContract) -> bool {
+fn invocation_is_stab(
+    invocation: &InvocationRecord,
+    group: &GroupContract,
+    scale: &ScaleContract,
+    evidence_mode: EvidenceMode,
+    expected_iterations: u64,
+    expected_output_digest: Option<&SemanticDigest>,
+) -> bool {
     invocation.implementation == Implementation::Stab
-        && invocation.evidence_mode == EvidenceMode::Timing
+        && invocation.evidence_mode == evidence_mode
         && only_row(&invocation.rows).is_ok_and(|row| {
             row.implementation == Implementation::Stab
-                && row.evidence_mode == EvidenceMode::Timing
+                && row.evidence_mode == evidence_mode
                 && row.timing_boundary == RAW_WORK_TIMING_BOUNDARY
                 && row.workload_id == group.workload_id
                 && group.measurement_ids.contains(&row.measurement_id)
+                && row.iteration_count == expected_iterations
+                && expected_iterations
+                    .checked_mul(scale.work_items.get())
+                    .is_some_and(|work_count| row.work_count == work_count)
+                && row.input_bytes == scale.input_bytes
+                && row.input_digest == scale.input_digest
+                && expected_output_digest.is_none_or(|expected| row.output_digest == *expected)
         })
 }
 
@@ -501,9 +718,17 @@ fn render_json(value: &impl Serialize) -> Result<Vec<u8>, DiagnosticError> {
 }
 
 fn render_markdown(report: &DiagnosticReport, report_sha256: &str) -> String {
+    let host_violations = if report.host.violations.is_empty() {
+        "none".to_string()
+    } else {
+        report.host.violations.join("; ")
+    };
     let mut output = format!(
-        "# Stab Product Diagnostic\n\n- Scope: `stab-only-product`\n- Group: `{}`\n- Timing boundary: `raw-work-v2`\n- Report SHA-256: `{report_sha256}`\n- Stim parity: not applicable\n- Stab self-regression: not evaluated\n\n## Per-Scale Measurements\n\n| Scale | Iterations | Retained samples | Median batch seconds | Median ns/work-item | Raw batch seconds |\n|---|---:|---:|---:|---:|---|\n",
-        report.group_id
+        "# Stab Product Diagnostic\n\n- Scope: `stab-only-product`\n- Group: `{}`\n- Timing boundary: `raw-work-v2`\n- Report SHA-256: `{report_sha256}`\n- Host profile: `{}`\n- Host verified: `{}`\n- Unverified host explicitly allowed: `{}`\n- Host-policy violations: `{host_violations}`\n- Stim parity: not applicable\n- Stab self-regression: not evaluated\n\n## Per-Scale Measurements\n\n| Scale | Iterations | Retained samples | Median batch seconds | Median ns/work-item | Raw batch seconds |\n|---|---:|---:|---:|---:|---|\n",
+        report.group_id,
+        report.host.profile_id,
+        report.host.verified,
+        report.command.allow_unverified_host,
     );
     for scale in &report.scales {
         let seconds = scale
@@ -522,6 +747,27 @@ fn render_markdown(report: &DiagnosticReport, report_sha256: &str) -> String {
             scale.summary.median_seconds_per_work_item * 1e9,
             seconds
         ));
+    }
+    let memory = report
+        .scales
+        .iter()
+        .filter_map(|scale| scale.memory.as_ref().map(|memory| (scale, memory)))
+        .collect::<Vec<_>>();
+    if !memory.is_empty() {
+        output.push_str(
+            "\n## Accepted-Maximum Memory\n\n| Scale | Setup RSS bytes | Peak RSS bytes | Peak delta bytes | Cap bytes | Verdict |\n|---|---:|---:|---:|---:|---|\n",
+        );
+        for (scale, memory) in memory {
+            output.push_str(&format!(
+                "| `{}` | {} | {} | {} | {} | `{}` |\n",
+                scale.scale_id,
+                memory.setup_rss_bytes,
+                memory.peak_rss_bytes,
+                memory.peak_delta_bytes,
+                memory.max_worker_peak_rss_bytes,
+                "pass",
+            ));
+        }
     }
     output
 }
@@ -544,8 +790,19 @@ pub(super) enum DiagnosticError {
     Run(#[from] super::run::RunError),
     #[error("runtime group {0} is not a Stab-only product diagnostic")]
     Scope(String),
-    #[error("Stab-only diagnostic calibration produced no selected output")]
-    MissingCalibrationProbe,
+    #[error("Stab-only diagnostic scale lacks its source-owned semantic witness")]
+    MissingSourceOwnedWitness,
+    #[error("Stab-only diagnostic memory receipt lacks worker RSS fields")]
+    MissingMemory,
+    #[error(
+        "Stab-only diagnostic {group}/{scale} reached {actual} peak RSS bytes, exceeding its source-owned {maximum}-byte cap"
+    )]
+    MemoryLimitExceeded {
+        group: String,
+        scale: String,
+        actual: u64,
+        maximum: u64,
+    },
     #[error("Stab-only diagnostic report has an invalid claim or receipt shape")]
     Report,
     #[error("Stab-only diagnostic invocation produced {0} measurements instead of one")]
@@ -564,7 +821,10 @@ pub(super) enum DiagnosticError {
 mod tests {
     use clap::Parser as _;
 
+    use super::super::group::ParityEligibility;
+    use super::super::protocol::{InputDigest, ProtocolId};
     use super::*;
+    use crate::qualification::model::TimingBatchPolicy;
 
     #[derive(clap::Parser)]
     struct TestCli {
@@ -646,8 +906,56 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn product_diagnostic_memory_evidence_enforces_worker_peak_cap() {
+        let contract = GroupContract {
+            id: ProtocolId::try_new("product-diagnostic").expect("group"),
+            claim_class: ClaimClass::ProductDiagnostic,
+            parity_eligibility: ParityEligibility::ReportOnly,
+            timing_batch_policy: TimingBatchPolicy::CommonIterations,
+            workload_id: ProtocolId::try_new("sampling-request-estimate").expect("workload"),
+            measurement_ids: vec![ProtocolId::try_new("estimate").expect("measurement")],
+            scales: vec![ScaleContract {
+                id: ProtocolId::try_new("large").expect("scale"),
+                family_id: ProtocolId::try_new("default").expect("family"),
+                size_class: SizeClass::Large,
+                work_items: NonZeroU64::new(100).expect("work"),
+                input_bytes: 1,
+                input_digest: InputDigest::try_new("1".repeat(64)).expect("input digest"),
+            }],
+            correctness_case_ids: vec!["cq-exact".to_string()],
+            owner: ProtocolId::try_new("owner").expect("owner"),
+            profiler_note: None,
+            comparator_sources: Vec::new(),
+        };
+        let scale = contract.scales.first().expect("large scale");
+        let memory_invocation = || {
+            let mut invocation = invocation(0.1, 100);
+            invocation.evidence_mode = EvidenceMode::Memory;
+            invocation.parent_observed_peak_rss_bytes = Some(24);
+            let row = invocation.rows.first_mut().expect("memory row");
+            row.evidence_mode = EvidenceMode::Memory;
+            row.setup_rss_bytes = Some(10);
+            row.peak_rss_bytes = Some(20);
+            invocation
+        };
+
+        let evidence = memory_evidence_from_invocation(memory_invocation(), &contract, scale, 20)
+            .expect("memory at cap");
+        assert_eq!(evidence.peak_delta_bytes, 10);
+        assert_eq!(evidence.max_worker_peak_rss_bytes, 20);
+        assert!(matches!(
+            memory_evidence_from_invocation(memory_invocation(), &contract, scale, 19),
+            Err(DiagnosticError::MemoryLimitExceeded {
+                actual: 20,
+                maximum: 19,
+                ..
+            })
+        ));
+    }
+
     fn invocation(elapsed_seconds: f64, work_count: u64) -> InvocationRecord {
-        use super::super::protocol::{GitCommit, InputDigest, ProtocolId, Sha256Digest};
+        use super::super::protocol::{GitCommit, Sha256Digest};
 
         InvocationRecord {
             implementation: Implementation::Stab,

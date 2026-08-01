@@ -641,6 +641,7 @@ mod tests {
         ResolvedGroupContract {
             source_sha256: digest('9'),
             product_diagnostic_suite_timeout_seconds: NonZeroU64::new(1).expect("timeout"),
+            product_diagnostic_policy: None,
             contract: GroupContract {
                 id: ProtocolId::try_new(GROUP_IDS[0]).expect("group"),
                 claim_class: ClaimClass::PromotablePerformance,
@@ -763,6 +764,7 @@ mod tests {
         ResolvedGroupContract {
             source_sha256: digest(if index == 0 { '9' } else { '8' }),
             product_diagnostic_suite_timeout_seconds: NonZeroU64::new(1).expect("timeout"),
+            product_diagnostic_policy: None,
             contract: GroupContract {
                 id: ProtocolId::try_new(group_id).expect("group"),
                 claim_class: ClaimClass::PromotablePerformance,

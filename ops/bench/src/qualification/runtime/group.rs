@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 use super::protocol::{
-    InputDigest, ProtocolId, RAW_WORK_TIMING_BOUNDARY, Sha256Digest, TimingBoundary,
+    InputDigest, ProtocolId, RAW_WORK_TIMING_BOUNDARY, SemanticDigest, Sha256Digest, TimingBoundary,
 };
 use super::run::ClaimClass;
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
@@ -16,7 +16,7 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 9;
+pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 10;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_RELEASE_GROUPS: usize = 40;
@@ -152,6 +152,45 @@ pub(super) struct ScaleContract {
     pub(super) input_digest: InputDigest,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum ProductDiagnosticBatchPolicy {
+    CalibratedRepeat,
+    SinglePass,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ProductDiagnosticScalePolicy {
+    pub(super) scale_id: ProtocolId,
+    pub(super) batch_policy: ProductDiagnosticBatchPolicy,
+    pub(super) witness_case_id: String,
+    pub(super) expected_output_digest: SemanticDigest,
+    pub(super) max_worker_peak_rss_bytes: Option<NonZeroU64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ProductDiagnosticPolicy {
+    pub(super) group_id: ProtocolId,
+    pub(super) scales: Vec<ProductDiagnosticScalePolicy>,
+}
+
+impl ProductDiagnosticPolicy {
+    pub(super) fn scale(
+        &self,
+        scale_id: &ProtocolId,
+    ) -> Result<&ProductDiagnosticScalePolicy, GroupError> {
+        self.scales
+            .iter()
+            .find(|scale| scale.scale_id == *scale_id)
+            .ok_or_else(|| GroupError::UnknownDiagnosticPolicyScale {
+                group: self.group_id.to_string(),
+                scale: scale_id.to_string(),
+            })
+    }
+}
+
 impl GroupContract {
     pub(super) fn single_measurement(&self) -> Result<&ProtocolId, GroupError> {
         let [measurement] = self.measurement_ids.as_slice() else {
@@ -186,16 +225,18 @@ impl GroupContract {
 pub(super) struct ResolvedGroupContract {
     pub(super) source_sha256: String,
     pub(super) product_diagnostic_suite_timeout_seconds: NonZeroU64,
+    pub(super) product_diagnostic_policy: Option<ProductDiagnosticPolicy>,
     pub(super) contract: GroupContract,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GroupContractFile {
     schema_version: u32,
     timing_boundary: TimingBoundary,
     performance_inventory_sha256: String,
     product_diagnostic_suite_timeout_seconds: NonZeroU64,
+    product_diagnostic_policies: Vec<ProductDiagnosticPolicy>,
     groups: Vec<GroupContract>,
 }
 
@@ -205,6 +246,11 @@ pub(super) fn load_group(
     group_id: &str,
 ) -> Result<ResolvedGroupContract, GroupError> {
     let (file, source_sha256) = load(root, expected_inventory_sha256)?;
+    let product_diagnostic_policy = file
+        .product_diagnostic_policies
+        .iter()
+        .find(|policy| policy.group_id.to_string() == group_id)
+        .cloned();
     let contract = file
         .groups
         .into_iter()
@@ -213,6 +259,7 @@ pub(super) fn load_group(
     Ok(ResolvedGroupContract {
         source_sha256,
         product_diagnostic_suite_timeout_seconds: file.product_diagnostic_suite_timeout_seconds,
+        product_diagnostic_policy,
         contract,
     })
 }
@@ -238,7 +285,7 @@ fn validate_inventory_contracts(
     suite: &super::super::model::QualificationSuite,
 ) -> Result<(), GroupError> {
     use super::super::model::{
-        CorrectnessBinding, EvidenceState, InputByteCount, PerformanceDisposition,
+        CorrectnessBinding, EvidenceState, InputByteCount, MemoryMethod, PerformanceDisposition,
         QualificationStatus, RunnerFidelity, ThresholdPolicy,
     };
 
@@ -385,6 +432,26 @@ fn validate_inventory_contracts(
             .iter()
             .map(|scale| scale.id.clone())
             .collect::<Vec<_>>();
+        let diagnostic_policy = file
+            .product_diagnostic_policies
+            .iter()
+            .find(|policy| policy.group_id == contract.id);
+        let contract_memory_scale_ids = diagnostic_policy
+            .into_iter()
+            .flat_map(|policy| &policy.scales)
+            .filter(|scale| scale.max_worker_peak_rss_bytes.is_some())
+            .map(|scale| scale.scale_id.to_string())
+            .collect::<Vec<_>>();
+        let memory_policy_matches = match group.memory_policy.method {
+            MemoryMethod::ProcessRss => {
+                !group.memory_policy.scale_ids.is_empty()
+                    && group.memory_policy.scale_ids == contract_memory_scale_ids
+            }
+            MemoryMethod::NotApplicable => {
+                group.memory_policy.scale_ids.is_empty() && contract_memory_scale_ids.is_empty()
+            }
+            MemoryMethod::StabAllocations => false,
+        };
         let scales_match = contract
             .scales
             .iter()
@@ -413,7 +480,7 @@ fn validate_inventory_contracts(
                 != file.product_diagnostic_suite_timeout_seconds.get()
             || group.status == QualificationStatus::Planned
             || inventory_scale_ids != contract_scale_ids
-            || !group.memory_policy.scale_ids.is_empty()
+            || !memory_policy_matches
             || !group.output_contract.comparator_sources.is_empty()
             || !contract.comparator_sources.is_empty()
             || !scales_match
@@ -560,6 +627,52 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             diagnostic_max: MAX_DIAGNOSTIC_GROUPS,
         });
     }
+    let mut policy_group_ids = BTreeSet::new();
+    for policy in &file.product_diagnostic_policies {
+        let Some(group) = file.groups.iter().find(|group| group.id == policy.group_id) else {
+            return Err(GroupError::InvalidProductDiagnosticPolicy(
+                policy.group_id.to_string(),
+            ));
+        };
+        let group_scale_ids = group
+            .scales
+            .iter()
+            .map(|scale| &scale.id)
+            .collect::<Vec<_>>();
+        let policy_scale_ids = policy
+            .scales
+            .iter()
+            .map(|scale| &scale.scale_id)
+            .collect::<Vec<_>>();
+        let capped_scale_count = policy
+            .scales
+            .iter()
+            .filter(|scale| scale.max_worker_peak_rss_bytes.is_some())
+            .count();
+        if !policy_group_ids.insert(&policy.group_id)
+            || group.claim_class != ClaimClass::ProductDiagnostic
+            || policy.scales.is_empty()
+            || group_scale_ids != policy_scale_ids
+            || capped_scale_count > 1
+            || policy.scales.iter().any(|scale| {
+                !valid_case_id(&scale.witness_case_id)
+                    || !group.correctness_case_ids.contains(&scale.witness_case_id)
+            })
+        {
+            return Err(GroupError::InvalidProductDiagnosticPolicy(
+                policy.group_id.to_string(),
+            ));
+        }
+    }
+    let diagnostic_group_ids = file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .map(|group| &group.id)
+        .collect::<BTreeSet<_>>();
+    if policy_group_ids != diagnostic_group_ids {
+        return Err(GroupError::ProductDiagnosticPolicyCoverage);
+    }
     let mut group_ids = BTreeSet::new();
     for group in &file.groups {
         if !group_ids.insert(group.id.clone())
@@ -690,10 +803,16 @@ pub(super) enum GroupError {
     },
     #[error("runtime group contract group is invalid: {0}")]
     InvalidGroup(String),
+    #[error("runtime product-diagnostic policy is invalid for group {0}")]
+    InvalidProductDiagnosticPolicy(String),
+    #[error("runtime product-diagnostic policies do not exactly cover product diagnostic groups")]
+    ProductDiagnosticPolicyCoverage,
     #[error("runtime group contract does not define group {0}")]
     UnknownGroup(String),
     #[error("runtime group contract group {group} does not define scale {scale}")]
     UnknownScale { group: String, scale: String },
+    #[error("runtime product-diagnostic policy for group {group} does not define scale {scale}")]
+    UnknownDiagnosticPolicyScale { group: String, scale: String },
     #[error("runtime group {0} does not match the implemented worker shape")]
     UnsupportedRuntimeShape(String),
     #[error(
