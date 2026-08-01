@@ -13,7 +13,6 @@ stab-decoder = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 thiserror = { workspace = true }
-twofloat = { workspace = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }

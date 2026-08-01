@@ -832,7 +832,7 @@ Status: Active.
 
 ### A7.2 Stable Decoder Crate
 
-- Add publishable Stable Rust 1.97.1 `stab-decoder` with normal dependencies only on `stab-model` and `stab-records`.
+- Add publishable Stable Rust 1.97.1 `stab-decoder` whose only normal dependencies on other Stab crates are `stab-model` and `stab-records`.
 - Reexport its common contracts through the curated `stab-core` facade without creating facade-owned wrapper identities.
 - Add it to the Stable external consumer, architecture graph, component contract, migration inventory, API documentation, and CI Stable lane.
 - Add the previously queued portable-SIMD warnings-denied Clippy lane while changing CI for A7.
@@ -841,9 +841,9 @@ Status: Active.
 
 - Add unpublished `stab-reference-decoder` under `test-support` and forbid dependencies on `stab-core`, CLI, ops, private modules, or Nightly features.
 - Compile each independent DEM error mechanism into one detector-plus-observable effect mask and run an in-place log-domain dynamic program over joint states.
-- Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, and `2^21` joint states. The primary `f64` pass uses at most 16 MiB; an ambiguous comparison drops that buffer before a mutually exclusive double-double pass using at most 32 MiB, so peak probability workspace is 32 MiB. Each pass performs at most `2^28` pair updates and the optional two-pass path performs at most `2^29` total pair updates.
+- Admit at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, and `2^21` joint states. The primary directed-interval pass uses at most 32 MiB and certifies disjoint posterior bounds. An unresolved comparison drops that buffer before a mutually exclusive exact-dyadic pass using at most 32 MiB; models whose exact limb table would exceed that cap fail with a typed resource error instead of guessing. Peak probability workspace is therefore 32 MiB. Each pass performs at most `2^28` pair updates and the optional two-pass path performs at most `2^29` total pair updates.
 - Retain exactly one byte per detector syndrome after compilation. Ties choose observable prediction zero, zero-observable models are valid, and impossible syndromes produce a typed error before the batch output is mutated.
-- Use checked allocation and arithmetic throughout. Reused decoding performs no allocation and updates only a completed prefix when cancellation is observed.
+- Use checked allocation and arithmetic throughout. Exact ties choose observable prediction zero, while arbitrarily small strict majorities retain their mathematical sign. Reused decoding performs no allocation and updates only a completed prefix when cancellation is observed.
 
 ### A7.4 Independent Correctness And Experiment Tests
 

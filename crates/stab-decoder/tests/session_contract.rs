@@ -291,6 +291,47 @@ fn cancellation_commits_only_the_completed_prefix() {
 }
 
 #[test]
+fn fixture_session_is_partition_equivalent() {
+    let whole_records = detector_records(&[vec![false], vec![true], vec![true], vec![false]]);
+    let mut whole_predictions =
+        ObservablePredictionBatch::zeros(4, CorrectionWidth::new(1)).expect("whole predictions");
+    let mut whole_session = FixtureSession::new(layout(1, 1));
+    decode_batch(
+        &mut whole_session,
+        DecoderInputBatchView::from_detectors(whole_records.view()),
+        &mut whole_predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect("whole decode");
+
+    let left_records = detector_records(&[vec![false], vec![true]]);
+    let right_records = detector_records(&[vec![true], vec![false]]);
+    let mut left_predictions =
+        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("left predictions");
+    let mut right_predictions =
+        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("right predictions");
+    let mut partitioned_session = FixtureSession::new(layout(1, 1));
+    decode_batch(
+        &mut partitioned_session,
+        DecoderInputBatchView::from_detectors(left_records.view()),
+        &mut left_predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect("left decode");
+    decode_batch(
+        &mut partitioned_session,
+        DecoderInputBatchView::from_detectors(right_records.view()),
+        &mut right_predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect("right decode");
+
+    let mut partitioned = prediction_bits(&left_predictions);
+    partitioned.extend(prediction_bits(&right_predictions));
+    assert_eq!(partitioned, prediction_bits(&whole_predictions));
+}
+
+#[test]
 fn implementation_failure_preserves_exact_completed_progress() {
     let detectors = detector_records(&[vec![false], vec![true], vec![false]]);
     let mut predictions =

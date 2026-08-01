@@ -1576,3 +1576,21 @@ Current text: A7 required exact semantic witnesses outside timing and small, med
 Gap: an absent policy could fall back to the calibration worker's own output, making the implementation its own oracle. The first pipeline draft also validated only the first iteration while timing later stateful iterations, so the witness did not cover the complete timed result.
 Proposed amendment: require one policy for every product diagnostic and scale, bind it to an exact correctness case and frozen output digest, run a one-iteration contract preflight before timing, and make batching a per-scale decision. Stateful pipelines must be single-pass unless a complete repeat-dependent witness is specified.
 Resolution: runtime-group schema 10 now enforces exhaustive per-scale product-diagnostic policies. Calibration-derived fallback is removed. Compile and reused-decode scales retain repeat-independent calibrated timing, while every pipeline sample is one complete pass whose full seeded report matches the source-owned witness. Independent probability-domain and public experiment tests cover the exact diagnostic models and all three pipeline scales.
+
+## 2026-08-01 - A7: Stable Decoder Dependency Wording
+
+Status: Resolved
+Revealed by: milestone audit of the publishable `stab-decoder` crate boundary.
+Current text: A7.2 required normal dependencies only on `stab-model` and `stab-records`, while the implementation also uses the third-party `thiserror` crate and the architecture policy constrains only product-to-product edges.
+Gap: the wording could be read as prohibiting all third-party runtime dependencies even though the intended architecture rule concerns dependencies on other Stab crates.
+Proposed amendment: state that `stab-model` and `stab-records` are the only normal dependencies on other Stab crates, while ordinary reviewed ecosystem dependencies remain permitted.
+Resolution: the A7.2 plan text now names the intended Stab-product dependency boundary explicitly; the enforced architecture graph and crate manifest already satisfy it.
+
+## 2026-08-01 - A7: Exact Posterior Certification
+
+Status: Resolved
+Revealed by: full code review of strict near-tie posterior comparisons and worst-case ambiguity storage.
+Current text: the resolved numerical-tie amendment used a fixed double-double error budget, classified every unresolved difference as a tie, and stored unresolved syndrome indexes in an unreserved vector.
+Gap: an admitted strict majority can be smaller than any fixed double-double budget, so the fallback could return prediction zero for a non-tie. A model with every syndrome tied could also grow the ambiguity vector through unchecked allocation. The previous amendment bounded numeric payload but did not certify mathematical ordering or all supporting allocation.
+Proposed amendment: make the primary pass use directed probability intervals whose disjoint bounds certify ordinary comparisons, represent unresolved states in the already checked one-byte prediction table, and use a mutually exclusive exact-dyadic pass for the remaining comparisons. Bound the exact limb workspace to 32 MiB and reject larger tables with a typed error.
+Resolution: exact-ML compilation now uses outward-rounded interval arithmetic followed, only when needed, by fixed-limb arithmetic over the exact binary rationals represented by input `f64` probabilities. Strict majorities of arbitrary representable size keep their sign, exact ties select zero, ambiguity tracking cannot allocate, every exact workspace allocation is fallible, and the mutually exclusive peak remains 32 MiB. The earlier double-double resolution is historical and superseded by this stronger certificate.

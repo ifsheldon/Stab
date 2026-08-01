@@ -10,7 +10,6 @@ use stab_model::{
 };
 use stab_records::FormatError;
 use thiserror::Error;
-use twofloat::TwoFloat;
 
 const MAX_DETECTORS: usize = 20;
 const MAX_OBSERVABLES: usize = 1;
@@ -18,18 +17,15 @@ const MAX_MECHANISMS: u64 = 256;
 const MAX_MECHANISM_STORAGE: usize = 256;
 const MAX_INSTRUCTION_VISITS: u64 = 65_536;
 const MAX_JOINT_STATES: usize = 1 << 21;
-const MAX_PRIMARY_WORKSPACE_BYTES: u128 = 16 * 1024 * 1024;
+const MAX_PRIMARY_WORKSPACE_BYTES: u128 = 32 * 1024 * 1024;
 const MAX_TIE_WORKSPACE_BYTES: u128 = 32 * 1024 * 1024;
 const MAX_PEAK_WORKSPACE_BYTES: u128 = MAX_TIE_WORKSPACE_BYTES;
 const MAX_PAIR_TRANSITIONS_PER_PASS: u128 = 1 << 28;
 const MAX_TOTAL_PAIR_TRANSITIONS: u128 = 1 << 29;
-const COMPARISON_ERROR_OPERATIONS_PER_MECHANISM: usize = 16;
-const DOUBLE_DOUBLE_RELATIVE_EPSILON: f64 = f64::EPSILON * f64::EPSILON;
 
-const _: () =
-    assert!((MAX_JOINT_STATES as u128) * (size_of::<f64>() as u128) == MAX_PRIMARY_WORKSPACE_BYTES);
 const _: () = assert!(
-    (MAX_JOINT_STATES as u128) * (size_of::<TwoFloat>() as u128) == MAX_TIE_WORKSPACE_BYTES
+    (MAX_JOINT_STATES as u128) * (size_of::<ProbabilityInterval>() as u128)
+        == MAX_PRIMARY_WORKSPACE_BYTES
 );
 const _: () = assert!(
     (MAX_MECHANISMS as u128) * ((MAX_JOINT_STATES / 2) as u128) == MAX_PAIR_TRANSITIONS_PER_PASS
@@ -39,6 +35,7 @@ const _: () = assert!(MAX_PAIR_TRANSITIONS_PER_PASS * 2 == MAX_TOTAL_PAIR_TRANSI
 const PREDICT_ZERO: u8 = 0;
 const PREDICT_ONE: u8 = 1;
 const IMPOSSIBLE_SYNDROME: u8 = 2;
+const AMBIGUOUS_SYNDROME: u8 = 3;
 
 /// Reusable exact maximum-likelihood decoder for one admitted detector-error model.
 #[derive(Debug)]
@@ -90,26 +87,16 @@ impl ExactMlDecoderSession {
                 message: "exact-ML mechanism collector stopped traversal early".to_owned(),
             });
         }
-        let distribution = joint_distribution(joint_state_count, &collector.mechanisms)?;
-        let (mut predictions, ambiguous_syndromes) = initial_prediction_table(
-            detector_count,
-            observable_count,
-            &distribution,
-            active_mechanism_count(&collector.mechanisms),
-        )?;
+        let distribution = interval_joint_distribution(joint_state_count, &collector.mechanisms)?;
+        let mut predictions =
+            initial_prediction_table(detector_count, observable_count, &distribution)?;
         drop(distribution);
-        if !ambiguous_syndromes.is_empty() {
-            // Recompute only uncertain comparisons at double-double precision so exact and
-            // numerically unresolved posteriors follow the deterministic zero tie policy.
-            let high_precision_distribution =
-                high_precision_joint_distribution(joint_state_count, &collector.mechanisms)?;
-            resolve_ambiguous_predictions(
-                detector_count,
-                &ambiguous_syndromes,
-                &high_precision_distribution,
-                active_mechanism_count(&collector.mechanisms),
-                &mut predictions,
-            )?;
+        if predictions.contains(&AMBIGUOUS_SYNDROME) {
+            // The interval pass certifies ordinary comparisons. Recompute unresolved cases using
+            // exact dyadic arithmetic because every finite f64 probability is a binary rational.
+            let exact_distribution =
+                ExactDyadicDistribution::try_compute(joint_state_count, &collector.mechanisms)?;
+            resolve_ambiguous_predictions(detector_count, &exact_distribution, &mut predictions)?;
         }
         Ok(Self {
             layout,
@@ -248,6 +235,11 @@ pub enum ExactMlCompileError {
 
     #[error("exact ML joint-state limit is {limit}, got at least {actual_at_least}")]
     JointStateLimit { actual_at_least: u128, limit: usize },
+
+    #[error(
+        "exact ML tie resolution needs at least {actual_at_least} bytes, exceeding the {limit}-byte workspace limit"
+    )]
+    ExactWorkspaceLimit { actual_at_least: u128, limit: u128 },
 
     #[error("invalid detector-error model during exact ML traversal: {0}")]
     ModelTraversal(#[source] ModelError),
@@ -435,31 +427,73 @@ fn joint_state_count(joint_width: usize) -> Result<usize, ExactMlCompileError> {
     Ok(count)
 }
 
-fn active_mechanism_count(mechanisms: &[Mechanism]) -> usize {
-    mechanisms
-        .iter()
-        .filter(|mechanism| mechanism.effect != 0 && mechanism.probability != 0.0)
-        .count()
+#[derive(Clone, Copy, Debug)]
+struct ProbabilityInterval {
+    lower: f64,
+    upper: f64,
 }
 
-fn joint_distribution(
+impl ProbabilityInterval {
+    const ZERO: Self = Self {
+        lower: 0.0,
+        upper: 0.0,
+    };
+    const ONE: Self = Self {
+        lower: 1.0,
+        upper: 1.0,
+    };
+
+    const fn exact(value: f64) -> Self {
+        Self {
+            lower: value,
+            upper: value,
+        }
+    }
+
+    fn complement(probability: f64) -> Self {
+        if probability == 0.0 {
+            return Self::ONE;
+        }
+        if probability == 1.0 {
+            return Self::ZERO;
+        }
+        let rounded = 1.0 - probability;
+        Self {
+            lower: next_down_probability(rounded),
+            upper: next_up_probability(rounded),
+        }
+    }
+
+    fn weighted_sum(left: Self, left_weight: Self, right: Self, right_weight: Self) -> Self {
+        interval_add(
+            interval_multiply(left, left_weight),
+            interval_multiply(right, right_weight),
+        )
+    }
+
+    const fn is_exactly_zero(self) -> bool {
+        self.upper == 0.0
+    }
+}
+
+fn interval_joint_distribution(
     state_count: usize,
     mechanisms: &[Mechanism],
-) -> Result<Vec<f64>, ExactMlCompileError> {
+) -> Result<Vec<ProbabilityInterval>, ExactMlCompileError> {
     let mut distribution = Vec::new();
     distribution
         .try_reserve_exact(state_count)
         .map_err(|error| ExactMlCompileError::Allocation {
-            component: "temporary log-probability workspace",
+            component: "temporary directed-interval workspace",
             message: error.to_string(),
         })?;
-    distribution.resize(state_count, f64::NEG_INFINITY);
+    distribution.resize(state_count, ProbabilityInterval::ZERO);
     let Some(initial) = distribution.first_mut() else {
         return Err(ExactMlCompileError::InternalInvariant {
             message: "joint-state table was empty after positive admission".to_owned(),
         });
     };
-    *initial = 0.0;
+    *initial = ProbabilityInterval::ONE;
 
     for mechanism in mechanisms {
         if mechanism.effect == 0 || mechanism.probability == 0.0 {
@@ -473,16 +507,8 @@ fn joint_distribution(
                 ),
             });
         }
-        let log_error = if mechanism.probability == 1.0 {
-            0.0
-        } else {
-            mechanism.probability.ln()
-        };
-        let log_no_error = if mechanism.probability == 1.0 {
-            f64::NEG_INFINITY
-        } else {
-            (-mechanism.probability).ln_1p()
-        };
+        let error_probability = ProbabilityInterval::exact(mechanism.probability);
+        let no_error_probability = ProbabilityInterval::complement(mechanism.probability);
         for left in 0..state_count {
             let right = left ^ mechanism.effect;
             if left >= right {
@@ -500,13 +526,17 @@ fn joint_distribution(
                     .ok_or_else(|| ExactMlCompileError::InternalInvariant {
                         message: "right joint state escaped admitted workspace".to_owned(),
                     })?;
-            let next_left = log_add(
-                left_probability + log_no_error,
-                right_probability + log_error,
+            let next_left = ProbabilityInterval::weighted_sum(
+                left_probability,
+                no_error_probability,
+                right_probability,
+                error_probability,
             );
-            let next_right = log_add(
-                right_probability + log_no_error,
-                left_probability + log_error,
+            let next_right = ProbabilityInterval::weighted_sum(
+                right_probability,
+                no_error_probability,
+                left_probability,
+                error_probability,
             );
             let Some(left_slot) = distribution.get_mut(left) else {
                 return Err(ExactMlCompileError::InternalInvariant {
@@ -528,9 +558,8 @@ fn joint_distribution(
 fn initial_prediction_table(
     detector_count: usize,
     observable_count: usize,
-    distribution: &[f64],
-    active_mechanisms: usize,
-) -> Result<(Vec<u8>, Vec<usize>), ExactMlCompileError> {
+    distribution: &[ProbabilityInterval],
+) -> Result<Vec<u8>, ExactMlCompileError> {
     let syndrome_count = joint_state_count(detector_count)?;
     let mut predictions = Vec::new();
     predictions
@@ -540,45 +569,34 @@ fn initial_prediction_table(
             message: error.to_string(),
         })?;
     predictions.resize(syndrome_count, IMPOSSIBLE_SYNDROME);
-    let mut ambiguous_syndromes = Vec::new();
 
     for syndrome in 0..syndrome_count {
-        let log_zero =
+        let zero =
             *distribution
                 .get(syndrome)
                 .ok_or_else(|| ExactMlCompileError::InternalInvariant {
                     message: "zero-observable state escaped joint distribution".to_owned(),
                 })?;
         let code = if observable_count == 0 {
-            if log_zero == f64::NEG_INFINITY {
+            if zero.is_exactly_zero() {
                 IMPOSSIBLE_SYNDROME
             } else {
                 PREDICT_ZERO
             }
         } else {
             let observable_one_state = syndrome | syndrome_count;
-            let log_one = *distribution.get(observable_one_state).ok_or_else(|| {
+            let one = *distribution.get(observable_one_state).ok_or_else(|| {
                 ExactMlCompileError::InternalInvariant {
                     message: "one-observable state escaped joint distribution".to_owned(),
                 }
             })?;
-            match (log_zero == f64::NEG_INFINITY, log_one == f64::NEG_INFINITY) {
+            match (zero.is_exactly_zero(), one.is_exactly_zero()) {
                 (true, true) => IMPOSSIBLE_SYNDROME,
                 (true, false) => PREDICT_ONE,
                 (false, true) => PREDICT_ZERO,
-                (false, false) => {
-                    let difference = log_one - log_zero;
-                    if difference.abs()
-                        <= f64_comparison_error_budget(log_zero, log_one, active_mechanisms)
-                    {
-                        ambiguous_syndromes.push(syndrome);
-                        PREDICT_ZERO
-                    } else if difference > 0.0 {
-                        PREDICT_ONE
-                    } else {
-                        PREDICT_ZERO
-                    }
-                }
+                (false, false) if one.lower > zero.upper => PREDICT_ONE,
+                (false, false) if zero.lower > one.upper => PREDICT_ZERO,
+                (false, false) => AMBIGUOUS_SYNDROME,
             }
         };
         let Some(slot) = predictions.get_mut(syndrome) else {
@@ -588,201 +606,437 @@ fn initial_prediction_table(
         };
         *slot = code;
     }
-    Ok((predictions, ambiguous_syndromes))
+    Ok(predictions)
 }
 
-fn f64_comparison_error_budget(log_zero: f64, log_one: f64, active_mechanisms: usize) -> f64 {
-    let operation_count = active_mechanisms
-        .saturating_mul(COMPARISON_ERROR_OPERATIONS_PER_MECHANISM)
-        .saturating_add(COMPARISON_ERROR_OPERATIONS_PER_MECHANISM);
-    let magnitude = log_zero.abs().max(log_one.abs()).max(1.0);
-    magnitude * (operation_count as f64) * f64::EPSILON
-}
-
-fn high_precision_joint_distribution(
-    state_count: usize,
-    mechanisms: &[Mechanism],
-) -> Result<Vec<TwoFloat>, ExactMlCompileError> {
-    let mut distribution = Vec::new();
-    distribution
-        .try_reserve_exact(state_count)
-        .map_err(|error| ExactMlCompileError::Allocation {
-            component: "high-precision tie-resolution workspace",
-            message: error.to_string(),
-        })?;
-    distribution.resize(state_count, TwoFloat::NEG_INFINITY);
-    let Some(initial) = distribution.first_mut() else {
-        return Err(ExactMlCompileError::InternalInvariant {
-            message: "high-precision joint-state table was empty after positive admission"
-                .to_owned(),
-        });
-    };
-    *initial = TwoFloat::from(0.0);
-
-    for mechanism in mechanisms {
-        if mechanism.effect == 0 || mechanism.probability == 0.0 {
-            continue;
-        }
-        if mechanism.effect >= state_count {
-            return Err(ExactMlCompileError::InternalInvariant {
-                message: format!(
-                    "mechanism effect {} escaped {state_count} high-precision joint states",
-                    mechanism.effect
-                ),
-            });
-        }
-        let probability = TwoFloat::from(mechanism.probability);
-        let log_error = if mechanism.probability == 1.0 {
-            TwoFloat::from(0.0)
-        } else {
-            checked_twofloat(probability.ln(), "error-probability logarithm")?
-        };
-        let log_no_error = if mechanism.probability == 1.0 {
-            TwoFloat::NEG_INFINITY
-        } else {
-            checked_twofloat((-probability).ln_1p(), "no-error probability logarithm")?
-        };
-        for left in 0..state_count {
-            let right = left ^ mechanism.effect;
-            if left >= right {
-                continue;
-            }
-            let left_probability =
-                *distribution
-                    .get(left)
-                    .ok_or_else(|| ExactMlCompileError::InternalInvariant {
-                        message: "left state escaped high-precision workspace".to_owned(),
-                    })?;
-            let right_probability =
-                *distribution
-                    .get(right)
-                    .ok_or_else(|| ExactMlCompileError::InternalInvariant {
-                        message: "right state escaped high-precision workspace".to_owned(),
-                    })?;
-            let next_left = high_precision_log_add(
-                high_precision_shift(left_probability, log_no_error)?,
-                high_precision_shift(right_probability, log_error)?,
-            )?;
-            let next_right = high_precision_log_add(
-                high_precision_shift(right_probability, log_no_error)?,
-                high_precision_shift(left_probability, log_error)?,
-            )?;
-            let Some(left_slot) = distribution.get_mut(left) else {
-                return Err(ExactMlCompileError::InternalInvariant {
-                    message: "left state disappeared from high-precision workspace".to_owned(),
-                });
-            };
-            *left_slot = next_left;
-            let Some(right_slot) = distribution.get_mut(right) else {
-                return Err(ExactMlCompileError::InternalInvariant {
-                    message: "right state disappeared from high-precision workspace".to_owned(),
-                });
-            };
-            *right_slot = next_right;
-        }
+fn interval_multiply(left: ProbabilityInterval, right: ProbabilityInterval) -> ProbabilityInterval {
+    if left.is_exactly_zero() || right.is_exactly_zero() {
+        return ProbabilityInterval::ZERO;
     }
-    Ok(distribution)
+    ProbabilityInterval {
+        lower: next_down_probability(left.lower * right.lower),
+        upper: next_up_probability(left.upper * right.upper),
+    }
+}
+
+fn interval_add(left: ProbabilityInterval, right: ProbabilityInterval) -> ProbabilityInterval {
+    if left.is_exactly_zero() && right.is_exactly_zero() {
+        return ProbabilityInterval::ZERO;
+    }
+    ProbabilityInterval {
+        lower: next_down_probability(left.lower + right.lower),
+        upper: next_up_probability(left.upper + right.upper),
+    }
+}
+
+fn next_down_probability(value: f64) -> f64 {
+    if value <= 0.0 {
+        0.0
+    } else if value >= 1.0 {
+        f64::from_bits(1.0_f64.to_bits() - 1)
+    } else {
+        f64::from_bits(value.to_bits() - 1)
+    }
+}
+
+fn next_up_probability(value: f64) -> f64 {
+    if value <= 0.0 {
+        f64::from_bits(1)
+    } else if value >= 1.0 {
+        1.0
+    } else {
+        f64::from_bits(value.to_bits() + 1)
+    }
 }
 
 fn resolve_ambiguous_predictions(
     detector_count: usize,
-    ambiguous_syndromes: &[usize],
-    distribution: &[TwoFloat],
-    active_mechanisms: usize,
+    distribution: &ExactDyadicDistribution,
     predictions: &mut [u8],
 ) -> Result<(), ExactMlCompileError> {
     let syndrome_count = joint_state_count(detector_count)?;
-    for &syndrome in ambiguous_syndromes {
-        let log_zero =
-            *distribution
-                .get(syndrome)
-                .ok_or_else(|| ExactMlCompileError::InternalInvariant {
-                    message: "ambiguous zero-observable state escaped high-precision distribution"
-                        .to_owned(),
-                })?;
-        let log_one = *distribution.get(syndrome | syndrome_count).ok_or_else(|| {
+    for (syndrome, prediction) in predictions.iter_mut().enumerate() {
+        if *prediction != AMBIGUOUS_SYNDROME {
+            continue;
+        }
+        let one_state = syndrome.checked_add(syndrome_count).ok_or_else(|| {
             ExactMlCompileError::InternalInvariant {
-                message: "ambiguous one-observable state escaped high-precision distribution"
-                    .to_owned(),
+                message: "ambiguous observable state index overflowed".to_owned(),
             }
         })?;
-        if high_precision_impossible(log_zero) || high_precision_impossible(log_one) {
+        let zero = distribution.state(syndrome)?;
+        let one = distribution.state(one_state)?;
+        if exact_is_zero(zero) && exact_is_zero(one) {
             return Err(ExactMlCompileError::InternalInvariant {
-                message: "finite f64 posterior became impossible during tie resolution".to_owned(),
+                message: "reachable interval state became impossible during exact resolution"
+                    .to_owned(),
             });
         }
-        let difference = checked_twofloat(log_one - log_zero, "posterior log difference")?;
-        let operation_count = active_mechanisms
-            .saturating_mul(COMPARISON_ERROR_OPERATIONS_PER_MECHANISM)
-            .saturating_add(COMPARISON_ERROR_OPERATIONS_PER_MECHANISM);
-        let magnitude = log_zero.abs().max(log_one.abs()).max(TwoFloat::from(1.0));
-        let error_budget = checked_twofloat(
-            magnitude * TwoFloat::from(DOUBLE_DOUBLE_RELATIVE_EPSILON) * (operation_count as f64),
-            "posterior comparison error budget",
-        )?;
-        let code = if difference > error_budget {
+        *prediction = if exact_compare(one, zero).is_gt() {
             PREDICT_ONE
         } else {
             PREDICT_ZERO
         };
-        let Some(slot) = predictions.get_mut(syndrome) else {
-            return Err(ExactMlCompileError::InternalInvariant {
-                message: "ambiguous syndrome escaped retained prediction table".to_owned(),
-            });
-        };
-        *slot = code;
     }
     Ok(())
 }
 
-fn high_precision_shift(
-    probability: TwoFloat,
-    weight: TwoFloat,
-) -> Result<TwoFloat, ExactMlCompileError> {
-    if high_precision_impossible(probability) || high_precision_impossible(weight) {
-        Ok(TwoFloat::NEG_INFINITY)
-    } else {
-        checked_twofloat(probability + weight, "weighted high-precision posterior")
-    }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ExactProbability {
+    numerator: u64,
+    denominator_exponent: usize,
 }
 
-fn high_precision_log_add(
-    left: TwoFloat,
-    right: TwoFloat,
-) -> Result<TwoFloat, ExactMlCompileError> {
-    if high_precision_impossible(left) {
-        return Ok(right);
-    }
-    if high_precision_impossible(right) {
-        return Ok(left);
-    }
-    let (larger, smaller) = if left >= right {
-        (left, right)
-    } else {
-        (right, left)
-    };
-    let correction = checked_twofloat(
-        (smaller - larger).exp().ln_1p(),
-        "high-precision log-sum correction",
-    )?;
-    checked_twofloat(larger + correction, "high-precision log-sum")
-}
-
-fn high_precision_impossible(value: TwoFloat) -> bool {
-    value.hi() == f64::NEG_INFINITY
-}
-
-fn checked_twofloat(
-    value: TwoFloat,
-    operation: &'static str,
-) -> Result<TwoFloat, ExactMlCompileError> {
-    if value.is_valid() {
-        Ok(value)
-    } else {
-        Err(ExactMlCompileError::InternalInvariant {
-            message: format!("{operation} produced a non-finite double-double value"),
+impl ExactProbability {
+    fn from_f64(probability: f64) -> Result<Self, ExactMlCompileError> {
+        if probability == 0.0 {
+            return Ok(Self {
+                numerator: 0,
+                denominator_exponent: 0,
+            });
+        }
+        if probability == 1.0 {
+            return Ok(Self {
+                numerator: 1,
+                denominator_exponent: 0,
+            });
+        }
+        let bits = probability.to_bits();
+        let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        let (significand, binary_exponent) = if exponent_bits == 0 {
+            (fraction, -1074_i32)
+        } else {
+            (fraction | (1_u64 << 52), exponent_bits - 1023 - 52)
+        };
+        if significand == 0 || binary_exponent >= 0 {
+            return Err(ExactMlCompileError::InternalInvariant {
+                message: format!(
+                    "probability {probability:?} escaped the finite dyadic fraction contract"
+                ),
+            });
+        }
+        let denominator_exponent = usize::try_from(-binary_exponent).map_err(|_| {
+            ExactMlCompileError::InternalInvariant {
+                message: "probability denominator exponent does not fit usize".to_owned(),
+            }
+        })?;
+        let reduction = usize::try_from(significand.trailing_zeros())
+            .unwrap_or(usize::MAX)
+            .min(denominator_exponent);
+        Ok(Self {
+            numerator: significand >> reduction,
+            denominator_exponent: denominator_exponent - reduction,
         })
     }
+}
+
+struct ExactDyadicDistribution {
+    words: Vec<u64>,
+    state_words: usize,
+    state_count: usize,
+    limbs_per_state: usize,
+}
+
+impl ExactDyadicDistribution {
+    fn try_compute(
+        state_count: usize,
+        mechanisms: &[Mechanism],
+    ) -> Result<Self, ExactMlCompileError> {
+        let mut denominator_exponent = 0_usize;
+        for mechanism in mechanisms {
+            if mechanism.effect == 0 || mechanism.probability == 0.0 {
+                continue;
+            }
+            denominator_exponent = denominator_exponent
+                .checked_add(
+                    ExactProbability::from_f64(mechanism.probability)?.denominator_exponent,
+                )
+                .ok_or(ExactMlCompileError::ExactWorkspaceLimit {
+                    actual_at_least: u128::MAX,
+                    limit: MAX_TIE_WORKSPACE_BYTES,
+                })?;
+        }
+        let significant_bits = denominator_exponent.checked_add(1).ok_or(
+            ExactMlCompileError::ExactWorkspaceLimit {
+                actual_at_least: u128::MAX,
+                limit: MAX_TIE_WORKSPACE_BYTES,
+            },
+        )?;
+        let limbs_per_state = significant_bits
+            .checked_add(63)
+            .map(|bits| bits / 64)
+            .filter(|limbs| *limbs > 0)
+            .ok_or(ExactMlCompileError::ExactWorkspaceLimit {
+                actual_at_least: u128::MAX,
+                limit: MAX_TIE_WORKSPACE_BYTES,
+            })?;
+        let state_words = state_count.checked_mul(limbs_per_state).ok_or(
+            ExactMlCompileError::ExactWorkspaceLimit {
+                actual_at_least: u128::MAX,
+                limit: MAX_TIE_WORKSPACE_BYTES,
+            },
+        )?;
+        let scratch_words =
+            limbs_per_state
+                .checked_mul(2)
+                .ok_or(ExactMlCompileError::ExactWorkspaceLimit {
+                    actual_at_least: u128::MAX,
+                    limit: MAX_TIE_WORKSPACE_BYTES,
+                })?;
+        let total_words = state_words.checked_add(scratch_words).ok_or(
+            ExactMlCompileError::ExactWorkspaceLimit {
+                actual_at_least: u128::MAX,
+                limit: MAX_TIE_WORKSPACE_BYTES,
+            },
+        )?;
+        let actual_bytes = (total_words as u128) * (size_of::<u64>() as u128);
+        if actual_bytes > MAX_TIE_WORKSPACE_BYTES {
+            return Err(ExactMlCompileError::ExactWorkspaceLimit {
+                actual_at_least: actual_bytes,
+                limit: MAX_TIE_WORKSPACE_BYTES,
+            });
+        }
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(total_words)
+            .map_err(|error| ExactMlCompileError::Allocation {
+                component: "exact dyadic tie-resolution workspace",
+                message: error.to_string(),
+            })?;
+        words.resize(total_words, 0);
+        let Some(initial) = words.first_mut() else {
+            return Err(ExactMlCompileError::InternalInvariant {
+                message: "exact dyadic workspace was empty after positive admission".to_owned(),
+            });
+        };
+        *initial = 1;
+        let mut result = Self {
+            words,
+            state_words,
+            state_count,
+            limbs_per_state,
+        };
+        for mechanism in mechanisms {
+            result.apply(*mechanism)?;
+        }
+        Ok(result)
+    }
+
+    fn apply(&mut self, mechanism: Mechanism) -> Result<(), ExactMlCompileError> {
+        if mechanism.effect == 0 || mechanism.probability == 0.0 {
+            return Ok(());
+        }
+        if mechanism.effect >= self.state_count {
+            return Err(ExactMlCompileError::InternalInvariant {
+                message: format!(
+                    "mechanism effect {} escaped {} exact states",
+                    mechanism.effect, self.state_count
+                ),
+            });
+        }
+        let probability = ExactProbability::from_f64(mechanism.probability)?;
+        let (states, scratch) = self
+            .words
+            .split_at_mut_checked(self.state_words)
+            .ok_or_else(|| ExactMlCompileError::InternalInvariant {
+                message: "exact state and scratch workspace boundary drifted".to_owned(),
+            })?;
+        let (left_scratch, right_scratch) = scratch
+            .split_at_mut_checked(self.limbs_per_state)
+            .ok_or_else(|| ExactMlCompileError::InternalInvariant {
+                message: "exact scratch workspace boundary drifted".to_owned(),
+            })?;
+        for left_index in 0..self.state_count {
+            let right_index = left_index ^ mechanism.effect;
+            if left_index >= right_index {
+                continue;
+            }
+            let (left, right) =
+                exact_state_pair_mut(states, self.limbs_per_state, left_index, right_index)?;
+            exact_multiply_small(left, probability.numerator, left_scratch)?;
+            exact_multiply_small(right, probability.numerator, right_scratch)?;
+            exact_shift_left(left, probability.denominator_exponent)?;
+            exact_shift_left(right, probability.denominator_exponent)?;
+            exact_sub_assign(left, left_scratch)?;
+            exact_add_assign(left, right_scratch)?;
+            exact_sub_assign(right, right_scratch)?;
+            exact_add_assign(right, left_scratch)?;
+        }
+        Ok(())
+    }
+
+    fn state(&self, index: usize) -> Result<&[u64], ExactMlCompileError> {
+        if index >= self.state_count {
+            return Err(ExactMlCompileError::InternalInvariant {
+                message: format!(
+                    "exact state {index} escaped admitted count {}",
+                    self.state_count
+                ),
+            });
+        }
+        let start = index.checked_mul(self.limbs_per_state).ok_or_else(|| {
+            ExactMlCompileError::InternalInvariant {
+                message: "exact state offset overflowed".to_owned(),
+            }
+        })?;
+        let end = start.checked_add(self.limbs_per_state).ok_or_else(|| {
+            ExactMlCompileError::InternalInvariant {
+                message: "exact state range overflowed".to_owned(),
+            }
+        })?;
+        self.words
+            .get(start..end)
+            .ok_or_else(|| ExactMlCompileError::InternalInvariant {
+                message: "exact state escaped allocated workspace".to_owned(),
+            })
+    }
+}
+
+fn exact_state_pair_mut(
+    states: &mut [u64],
+    limbs_per_state: usize,
+    left_index: usize,
+    right_index: usize,
+) -> Result<(&mut [u64], &mut [u64]), ExactMlCompileError> {
+    let left_start = left_index.checked_mul(limbs_per_state).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "left exact-state offset overflowed".to_owned(),
+        }
+    })?;
+    let left_end = left_start.checked_add(limbs_per_state).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "left exact-state range overflowed".to_owned(),
+        }
+    })?;
+    let right_start = right_index.checked_mul(limbs_per_state).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "right exact-state offset overflowed".to_owned(),
+        }
+    })?;
+    let right_end = right_start.checked_add(limbs_per_state).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "right exact-state range overflowed".to_owned(),
+        }
+    })?;
+    let (before_right, from_right) = states.split_at_mut_checked(right_start).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "right exact-state boundary escaped workspace".to_owned(),
+        }
+    })?;
+    let left = before_right.get_mut(left_start..left_end).ok_or_else(|| {
+        ExactMlCompileError::InternalInvariant {
+            message: "left exact state escaped workspace".to_owned(),
+        }
+    })?;
+    let right = from_right
+        .get_mut(..right_end - right_start)
+        .ok_or_else(|| ExactMlCompileError::InternalInvariant {
+            message: "right exact state escaped workspace".to_owned(),
+        })?;
+    Ok((left, right))
+}
+
+fn exact_multiply_small(
+    input: &[u64],
+    multiplier: u64,
+    output: &mut [u64],
+) -> Result<(), ExactMlCompileError> {
+    output.fill(0);
+    let mut carry = 0_u128;
+    for (input_limb, output_limb) in input.iter().copied().zip(output.iter_mut()) {
+        let product = (input_limb as u128) * (multiplier as u128) + carry;
+        let low_limb = product & u128::from(u64::MAX);
+        *output_limb =
+            u64::try_from(low_limb).map_err(|_| ExactMlCompileError::InternalInvariant {
+                message: "masked exact product limb did not fit u64".to_owned(),
+            })?;
+        carry = product >> 64;
+    }
+    if carry != 0 {
+        return Err(ExactMlCompileError::InternalInvariant {
+            message: "exact small multiplication exceeded admitted limb width".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn exact_shift_left(value: &mut [u64], bits: usize) -> Result<(), ExactMlCompileError> {
+    if bits == 0 {
+        return Ok(());
+    }
+    let word_shift = bits / 64;
+    let bit_shift = bits % 64;
+    for destination in (0..value.len()).rev() {
+        let shifted = if destination < word_shift {
+            0
+        } else {
+            let source = destination - word_shift;
+            let lower = value.get(source).copied().ok_or_else(|| {
+                ExactMlCompileError::InternalInvariant {
+                    message: "exact shift source escaped workspace".to_owned(),
+                }
+            })?;
+            let mut shifted = lower << bit_shift;
+            if bit_shift != 0 && source > 0 {
+                let carry = value.get(source - 1).copied().ok_or_else(|| {
+                    ExactMlCompileError::InternalInvariant {
+                        message: "exact shift carry source escaped workspace".to_owned(),
+                    }
+                })?;
+                shifted |= carry >> (64 - bit_shift);
+            }
+            shifted
+        };
+        let slot =
+            value
+                .get_mut(destination)
+                .ok_or_else(|| ExactMlCompileError::InternalInvariant {
+                    message: "exact shift destination escaped workspace".to_owned(),
+                })?;
+        *slot = shifted;
+    }
+    Ok(())
+}
+
+fn exact_sub_assign(left: &mut [u64], right: &[u64]) -> Result<(), ExactMlCompileError> {
+    let mut borrow = false;
+    for (left_limb, right_limb) in left.iter_mut().zip(right.iter().copied()) {
+        let (without_right, first_borrow) = left_limb.overflowing_sub(right_limb);
+        let (result, second_borrow) = without_right.overflowing_sub(u64::from(borrow));
+        *left_limb = result;
+        borrow = first_borrow || second_borrow;
+    }
+    if borrow {
+        return Err(ExactMlCompileError::InternalInvariant {
+            message: "exact probability update became negative".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn exact_add_assign(left: &mut [u64], right: &[u64]) -> Result<(), ExactMlCompileError> {
+    let mut carry = false;
+    for (left_limb, right_limb) in left.iter_mut().zip(right.iter().copied()) {
+        let (with_right, first_carry) = left_limb.overflowing_add(right_limb);
+        let (result, second_carry) = with_right.overflowing_add(u64::from(carry));
+        *left_limb = result;
+        carry = first_carry || second_carry;
+    }
+    if carry {
+        return Err(ExactMlCompileError::InternalInvariant {
+            message: "exact probability update exceeded admitted limb width".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn exact_is_zero(value: &[u64]) -> bool {
+    value.iter().all(|limb| *limb == 0)
+}
+
+fn exact_compare(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
+    left.iter().rev().cmp(right.iter().rev())
 }
 
 fn batch_syndrome(
@@ -806,82 +1060,5 @@ fn batch_syndrome(
     Ok(syndrome)
 }
 
-fn log_add(left: f64, right: f64) -> f64 {
-    if left == f64::NEG_INFINITY {
-        return right;
-    }
-    if right == f64::NEG_INFINITY {
-        return left;
-    }
-    let (larger, smaller) = if left >= right {
-        (left, right)
-    } else {
-        (right, left)
-    };
-    larger + (smaller - larger).exp().ln_1p()
-}
-
 #[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::indexing_slicing,
-        reason = "exact-ML unit tests use bounded generated tables"
-    )]
-
-    use super::{Mechanism, joint_distribution};
-
-    const PROBABILITIES: [f64; 4] = [0.0, 0.25, 0.5, 1.0];
-
-    #[test]
-    fn log_domain_distribution_matches_exhaustive_subset_enumeration() {
-        for first_effect in 0..8 {
-            for first_probability in PROBABILITIES {
-                for second_effect in 0..8 {
-                    for second_probability in PROBABILITIES {
-                        let mechanisms = [
-                            Mechanism {
-                                probability: first_probability,
-                                effect: first_effect,
-                            },
-                            Mechanism {
-                                probability: second_probability,
-                                effect: second_effect,
-                            },
-                        ];
-                        let actual = joint_distribution(8, &mechanisms).expect("distribution");
-                        let expected = direct_distribution(8, &mechanisms);
-                        for state in 0..8 {
-                            let actual_probability = actual[state].exp();
-                            let expected_probability = expected[state];
-                            assert!(
-                                (actual_probability - expected_probability).abs() <= 1e-14,
-                                "effects=({first_effect},{second_effect}) probabilities=({first_probability},{second_probability}) state={state}: actual={actual_probability} expected={expected_probability}"
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn direct_distribution(state_count: usize, mechanisms: &[Mechanism]) -> Vec<f64> {
-        let mut result = vec![0.0; state_count];
-        let subset_count = 1_usize << mechanisms.len();
-        for subset in 0..subset_count {
-            let mut state = 0_usize;
-            let mut probability = 1.0;
-            for (index, mechanism) in mechanisms.iter().enumerate() {
-                let occurs = subset & (1_usize << index) != 0;
-                if occurs {
-                    state ^= mechanism.effect;
-                    probability *= mechanism.probability;
-                } else {
-                    probability *= 1.0 - mechanism.probability;
-                }
-            }
-            result[state] += probability;
-        }
-        result
-    }
-}
+mod tests;

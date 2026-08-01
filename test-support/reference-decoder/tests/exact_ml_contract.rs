@@ -5,10 +5,11 @@
 )]
 
 use stab_decoder::{
-    DecodeBatchError, DecodeBatchStatus, DecodeCancellation, DecoderInputBatchView, decode_batch,
+    DecodeBatchError, DecodeBatchStatus, DecodeCancellation, DecodePreflightError,
+    DecoderInputBatchView, decode_batch,
 };
 use stab_model::{DemDetectorId, DemInstruction, DemTarget, DetectorErrorModel, Probability};
-use stab_records::{CorrectionWidth, ObservablePredictionBatch, PackedShotBatch};
+use stab_records::{CorrectionWidth, DetectorWidth, ObservablePredictionBatch, PackedShotBatch};
 use stab_reference_decoder::{ExactMlCompileError, ExactMlDecodeError, ExactMlDecoderSession};
 
 fn records(records: &[Vec<bool>]) -> PackedShotBatch {
@@ -50,6 +51,20 @@ fn exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models() {
         session
             .prediction_for_syndrome(1)
             .expect("resolved near tie picks one")
+    );
+
+    let strict_tiny_majority = DetectorErrorModel::from_dem_str(
+        "error(0.5000000000000001) L0\n\
+         error(0.5000000000000001) L0\n\
+         error(0.5000000000000001) L0\n",
+    )
+    .expect("strict tiny-majority DEM");
+    let session = ExactMlDecoderSession::try_compile_model(&strict_tiny_majority)
+        .expect("compile strict tiny majority");
+    assert!(
+        session
+            .prediction_for_syndrome(0)
+            .expect("strict majority must not become a tie")
     );
 
     let duplicate =
@@ -117,6 +132,102 @@ fn impossible_batch_syndrome_fails_before_any_prediction_mutation() {
                 )
     ));
     assert_eq!(output, before);
+}
+
+#[test]
+fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
+    let model = DetectorErrorModel::from_dem_str("error(0.25) D0 L0\n").expect("DEM");
+    let mut session = ExactMlDecoderSession::try_compile_model(&model).expect("compile");
+
+    let wrong_width = records(&[vec![true, false]]);
+    let mut output =
+        ObservablePredictionBatch::zeros(1, CorrectionWidth::new(1)).expect("predictions");
+    output
+        .records_mut()
+        .copy_shot_from_bools(0, &[true])
+        .expect("sentinel");
+    let before = output.clone();
+    let error = decode_batch(
+        &mut session,
+        DecoderInputBatchView::from_detectors(wrong_width.view()),
+        &mut output,
+        &DecodeCancellation::new(),
+    )
+    .expect_err("detector width mismatch");
+    assert!(matches!(
+        error,
+        DecodeBatchError::Preflight(DecodePreflightError::DetectorWidth {
+            expected,
+            actual,
+        }) if expected == DetectorWidth::new(1) && actual == DetectorWidth::new(2)
+    ));
+    assert_eq!(output, before);
+
+    let records = records(&[vec![false], vec![true]]);
+    let mut wrong_correction =
+        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(0)).expect("wrong correction");
+    let before = wrong_correction.clone();
+    let error = decode_batch(
+        &mut session,
+        DecoderInputBatchView::from_detectors(records.view()),
+        &mut wrong_correction,
+        &DecodeCancellation::new(),
+    )
+    .expect_err("correction width mismatch");
+    assert!(matches!(
+        error,
+        DecodeBatchError::Preflight(DecodePreflightError::CorrectionWidth {
+            expected,
+            actual,
+        }) if expected == CorrectionWidth::new(1) && actual == CorrectionWidth::new(0)
+    ));
+    assert_eq!(wrong_correction, before);
+
+    let mut too_short =
+        ObservablePredictionBatch::zeros(1, CorrectionWidth::new(1)).expect("short predictions");
+    too_short
+        .records_mut()
+        .copy_shot_from_bools(0, &[true])
+        .expect("short sentinel");
+    let before = too_short.clone();
+    let error = decode_batch(
+        &mut session,
+        DecoderInputBatchView::from_detectors(records.view()),
+        &mut too_short,
+        &DecodeCancellation::new(),
+    )
+    .expect_err("prediction capacity mismatch");
+    assert!(matches!(
+        error,
+        DecodeBatchError::Preflight(DecodePreflightError::PredictionShotCapacity {
+            required: 2,
+            available: 1,
+        })
+    ));
+    assert_eq!(too_short, before);
+
+    let mut cancelled_output =
+        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("cancelled output");
+    for shot in 0..2 {
+        cancelled_output
+            .records_mut()
+            .copy_shot_from_bools(shot, &[true])
+            .expect("cancelled sentinel");
+    }
+    let before = cancelled_output.clone();
+    let cancellation = DecodeCancellation::new();
+    cancellation.cancel();
+    let summary = decode_batch(
+        &mut session,
+        DecoderInputBatchView::from_detectors(records.view()),
+        &mut cancelled_output,
+        &cancellation,
+    )
+    .expect("pre-cancelled decode");
+    assert_eq!(summary.status(), DecodeBatchStatus::Cancelled);
+    assert_eq!(summary.requested_shots(), 2);
+    assert_eq!(summary.completed_shots(), 0);
+    assert_eq!(cancelled_output, before);
 }
 
 #[test]
@@ -195,6 +306,45 @@ fn retained_table_is_exactly_one_byte_per_detector_syndrome() {
         assert_eq!(session.syndrome_count(), 1 << detector_count);
         assert_eq!(session.retained_prediction_bytes(), 1 << detector_count);
     }
+}
+
+#[test]
+fn all_finite_syndromes_can_be_exact_ties_without_unbounded_ambiguity_storage() {
+    let mut dem = String::new();
+    for detector in 0..12 {
+        dem.push_str(&format!("error(0.5) D{detector}\n"));
+    }
+    dem.push_str("error(0.5) L0\n");
+    let model = DetectorErrorModel::from_dem_str(&dem).expect("all-tied DEM");
+    let session = ExactMlDecoderSession::try_compile_model(&model).expect("compile all ties");
+
+    assert_eq!(session.syndrome_count(), 1 << 12);
+    for syndrome in 0..(1 << 12) {
+        assert!(
+            !session
+                .prediction_for_syndrome(syndrome)
+                .expect("every syndrome is reachable and tied")
+        );
+    }
+}
+
+#[test]
+fn exact_tie_resolution_rejects_the_first_workspace_excess() {
+    let model = DetectorErrorModel::from_dem_str(
+        "error(0) D19\n\
+         error(0.1) D0\n\
+         error(0.1) D1\n\
+         error(0.5) L0\n",
+    )
+    .expect("wide tied DEM");
+
+    assert!(matches!(
+        ExactMlDecoderSession::try_compile_model(&model),
+        Err(ExactMlCompileError::ExactWorkspaceLimit {
+            actual_at_least,
+            limit,
+        }) if actual_at_least > limit && limit == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES
+    ));
 }
 
 #[test]

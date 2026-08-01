@@ -186,25 +186,29 @@ fn represented_instruction_work_is_bounded_independently_of_mechanism_count() {
 }
 
 #[test]
-fn nested_error_free_repeats_are_skipped_without_spending_represented_work() {
+fn nested_error_free_repeats_are_skipped_while_advancing_detector_offsets() {
     let model = DetectorErrorModel::from_dem_str(
         "repeat 1000000 {\n\
              repeat 1000000 {\n\
                  detector D0\n\
                  shift_detectors 1\n\
              }\n\
-         }\n",
+         }\n\
+         error(0.25) D0\n",
     )
-    .expect("error-free nested DEM");
+    .expect("nested DEM with one trailing error");
     let mut visitor = RecordingVisitor::default();
 
     assert_eq!(
         model
-            .try_visit_error_mechanisms(DemErrorMechanismTraversalLimits::new(0, 0), &mut visitor,)
+            .try_visit_error_mechanisms(DemErrorMechanismTraversalLimits::new(1, 1), &mut visitor,)
             .expect("skip error-free repeats"),
         ControlFlow::Continue(())
     );
-    assert!(visitor.mechanisms.is_empty());
+    assert_eq!(
+        visitor.mechanisms,
+        vec![(0.25, vec![detector(1_000_000_000_000)])]
+    );
 }
 
 #[test]

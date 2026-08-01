@@ -67,7 +67,6 @@ statrs = { version = "0.18.0", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
-twofloat = "0.8.4"
 unicode-general-category = "1.1.0"
 
 [workspace.lints.rust]
