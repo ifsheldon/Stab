@@ -1,7 +1,7 @@
 {
   "schema_version": 10,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "b44827913d1fcd68e6b9d716e38c1211f83528dda6aa6ae265d3fa70a9503091",
+  "performance_inventory_sha256": "cf99ac90a3cfd40ed6611edda54d3cfed0ad01eb2efd9a950782dcbd05468d88",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -419,6 +419,7 @@
         "cq-evidence-qualification-7179fce5697cce0d",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-8cae8440e6c8c601",
+        "cq-evidence-qualification-8ebad0693c3e5b9a",
         "cq-evidence-qualification-93951fde964ca94d",
         "cq-evidence-qualification-b376b5e2d4be1223",
         "cq-evidence-qualification-b4fefe4518cc5c2d"

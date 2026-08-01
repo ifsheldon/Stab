@@ -148,6 +148,7 @@ pub(in crate::qualification::discovery) fn decoder_diagnostic_groups(
                 "cq-evidence-qualification-7179fce5697cce0d",
                 "cq-evidence-qualification-7b17d9e5cca84df5",
                 "cq-evidence-qualification-8cae8440e6c8c601",
+                "cq-evidence-qualification-8ebad0693c3e5b9a",
                 "cq-evidence-qualification-93951fde964ca94d",
                 "cq-evidence-qualification-b376b5e2d4be1223",
                 "cq-evidence-qualification-b4fefe4518cc5c2d",

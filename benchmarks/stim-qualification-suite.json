@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "56df8d57134e7685cf70b74b96ef56b6686380902988e8eeebf04e7333a7c02c",
-  "semantic_digest": "b44827913d1fcd68e6b9d716e38c1211f83528dda6aa6ae265d3fa70a9503091",
+  "correctness_digest": "21114133f195c915b34d05d3d01e25bb58b3363ccdac3c28406bd1c9bf2aca4e",
+  "semantic_digest": "cf99ac90a3cfd40ed6611edda54d3cfed0ad01eb2efd9a950782dcbd05468d88",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -1470,7 +1470,7 @@
     {
       "id": "PERFC-51d1237fc1dc1b7a",
       "source_line": 118,
-      "anchor_digest": "cdd895070a7a8526bd8edf72ebe18a9c5dca983a7834255c1026bf8fcb4f8107",
+      "anchor_digest": "617f5e53f32bce8c1338a724c0dfba857edde92926d73897ba1015eaf964352d",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Decoder interoperability and bounded reference decoder",
       "raw_status": "Reopened for A7 qualification",
@@ -89800,6 +89800,7 @@
         "cq-evidence-qualification-7179fce5697cce0d",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-8cae8440e6c8c601",
+        "cq-evidence-qualification-8ebad0693c3e5b9a",
         "cq-evidence-qualification-93951fde964ca94d",
         "cq-evidence-qualification-b376b5e2d4be1223",
         "cq-evidence-qualification-b4fefe4518cc5c2d"

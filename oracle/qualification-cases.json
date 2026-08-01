@@ -21458,8 +21458,7 @@
         "validated-batch-forgery",
         "out-of-prefix-write",
         "completed-prefix-drift",
-        "suffix-mutation",
-        "per-record-allocation"
+        "suffix-mutation"
       ],
       "public_api_owners": [
         {
@@ -21766,10 +21765,11 @@
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "The compiled exact-ML session retains exactly one prediction byte for each admitted detector syndrome and no second joint-state probability table."
+        "detail": "Thread-local allocator instrumentation proves that a live compiled exact-ML session retains one allocation containing exactly one prediction byte for each admitted detector syndrome after every temporary probability workspace is released."
       },
       "negative_axes": [
         "retained-byte-count-drift",
+        "retained-allocation-count-drift",
         "retained-joint-table"
       ],
       "public_api_owners": [],
@@ -21827,7 +21827,7 @@
       },
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "Every syndrome in a 4,096-syndrome model can be finite and exactly tied without allocating a syndrome-index list; exact certification writes the already admitted one-byte prediction table."
+        "detail": "Every syndrome in a 4,096-syndrome model can be finite and exactly tied while thread-local allocator instrumentation observes only the retained 4,096-byte prediction allocation after exact certification, excluding a retained syndrome-index or ambiguity table."
       },
       "negative_axes": [
         "all-tie-prediction-drift",
@@ -21864,6 +21864,37 @@
         "exact-workspace-overcommit",
         "uncertified-tie-fallback",
         "workspace-limit-erasure"
+      ],
+      "public_api_owners": [],
+      "standalone": true
+    },
+    {
+      "id": "a7-reference-exact-limb-work-admission-contract",
+      "feature_id": "CQ-DETECTION",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_limb_work_limit_rejects_before_exact_allocation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "A limb-heavy unresolved posterior whose exact table fits the byte workspace but exceeds the independent 2^28 limb-transition budget returns the typed work-limit error before exact allocation or iteration."
+      },
+      "negative_axes": [
+        "limb-weighted-work-overcommit",
+        "workspace-only-admission",
+        "work-limit-erasure"
       ],
       "public_api_owners": [],
       "standalone": true

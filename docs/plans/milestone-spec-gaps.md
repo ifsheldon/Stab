@@ -1603,3 +1603,12 @@ Current text: A7 required source-current correctness, diagnostic timing, exact-r
 Gap: changing the checklist row from reopened to done necessarily changes its source-owned anchor and the generated performance inventory after the measurements exist. Requiring the status descendant to reproduce the same inventory would make honest closure circular, while treating the earlier report as evidence for the new digest would misstate provenance.
 Proposed amendment: bind executable evidence and CI to one clean measured source commit, then permit one narrowly scoped status-only descendant that records the exact measured identity without replaying or relabeling its artifacts. Any executable, fixture, workflow, benchmark contract, qualification case, or substantive normative change must invalidate the evidence.
 Resolution: A7.6 now permits only the append-only progress report, generated status and inventory updates induced by the checklist status, `GOAL.md`, the A7 status line, and directly linked closure prose in the descendant. The closure must continue to name the measured source revision and its original correctness and performance digests.
+
+## 2026-08-01 - A7: Limb-Weighted Exact Work Admission
+
+Status: Resolved
+Revealed by: final full-code-review of the exact-dyadic fallback
+Current text: A7 bounded each probability pass to `2^28` state-pair updates and bounded the exact workspace to 32 MiB.
+Gap: one exact state-pair update performs work linear in the number of limbs per state, so a model with fewer state pairs but thousands of exact limbs could satisfy both existing limits while exceeding the intended CPU budget.
+Proposed amendment: independently admit the product of exact pair transitions and limbs per state, use checked arithmetic, and reject work above `2^28` pair-transition limbs before allocating or iterating the exact workspace.
+Resolution: exact fallback now returns typed `ExactWorkLimit` before allocation when checked limb transitions exceed `2^28`. A private arithmetic test accepts the exact maximum and rejects the first excess, while a public compile-path fixture proves a limb-heavy model can fit the byte workspace and still fail the independent work admission.

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "56df8d57134e7685cf70b74b96ef56b6686380902988e8eeebf04e7333a7c02c",
+  "semantic_digest": "21114133f195c915b34d05d3d01e25bb58b3363ccdac3c28406bd1c9bf2aca4e",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -201405,8 +201405,7 @@
         "validated-batch-forgery",
         "out-of-prefix-write",
         "completed-prefix-drift",
-        "suffix-mutation",
-        "per-record-allocation"
+        "suffix-mutation"
       ],
       "performance_groups": [
         "PERF-DETECTION"
@@ -208809,10 +208808,11 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "The compiled exact-ML session retains exactly one prediction byte for each admitted detector syndrome and no second joint-state probability table."
+        "detail": "Thread-local allocator instrumentation proves that a live compiled exact-ML session retains one allocation containing exactly one prediction byte for each admitted detector syndrome after every temporary probability workspace is released."
       },
       "negative_axes": [
         "retained-byte-count-drift",
+        "retained-allocation-count-drift",
         "retained-joint-table"
       ],
       "performance_groups": [
@@ -208869,6 +208869,57 @@
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-8ebad0693c3e5b9a",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "engine",
+      "provenance": "qualification-plan",
+      "source_id": "a7-reference-exact-limb-work-admission-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-reference-decoder",
+          "--test",
+          "exact_ml_contract",
+          "exact_limb_work_limit_rejects_before_exact_allocation",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "A limb-heavy unresolved posterior whose exact table fits the byte workspace but exceeds the independent 2^28 limb-transition budget returns the typed work-limit error before exact allocation or iteration."
+      },
+      "negative_axes": [
+        "limb-weighted-work-overcommit",
+        "workspace-only-admission",
+        "work-limit-erasure"
+      ],
+      "performance_groups": [
+        "PERF-DETECTION"
       ],
       "status": "implemented"
     },
@@ -212346,7 +212397,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "Every syndrome in a 4,096-syndrome model can be finite and exactly tied without allocating a syndrome-index list; exact certification writes the already admitted one-byte prediction table."
+        "detail": "Every syndrome in a 4,096-syndrome model can be finite and exactly tied while thread-local allocator instrumentation observes only the retained 4,096-byte prediction allocation after exact certification, excluding a retained syndrome-index or ambiguity table."
       },
       "negative_axes": [
         "all-tie-prediction-drift",
