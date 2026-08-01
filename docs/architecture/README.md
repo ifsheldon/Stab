@@ -68,10 +68,13 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current product graph after the A7 decoder boundary is:
+The current product graph after the A8 circuit-pass and backend-selection boundary is:
 
 ```text
 stab-cli -> stab-core
+
+stab-reference-decoder -> stab-decoder + stab-model + stab-records
+stab-reference-noise-pass -> stab-analysis + stab-model
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
@@ -101,13 +104,13 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-The unpublished `stab-reference-decoder` proves this public seam using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. It cannot depend on `stab-core`, CLI, ops, private modules, or Nightly features.
+The unpublished `stab-reference-decoder` proves decoder composition using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. The unpublished `stab-reference-noise-pass` proves circuit-pass composition using only `stab-analysis` and `stab-model`. Neither proof crate can depend on `stab-core`, CLI, ops, private modules, or Nightly features.
 
 `just architecture::check` derives package identity, Stable status, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits only the source-owned public-component edges required by each test-support proof, rejects Stable defaults that reach portable SIMD, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum.
 
-The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects test-support dependencies on product or operations code except the narrow `stab-reference-decoder` component proof recorded above. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
+The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects test-support dependencies on product or operations code except the exact public-component edges assigned to the two proof crates above. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
 
-The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects module path overrides and item-generating macros in facade tier entry files, rejects exported macros anywhere in `stab-core`, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and keeps `experimental` empty until A8 supplies an explicit allowlist. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
+The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects module path overrides and item-generating macros in facade tier entry files, rejects exported macros anywhere in `stab-core`, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and compares `experimental` against the exact A8 circuit-pass allowlist. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
@@ -145,7 +148,7 @@ Stable components must compile without enabling or parsing Nightly-only code.
 
 Default root reexports are curated.
 `analysis` and `execution` remain semantic facade namespaces; implementation-owner namespaces such as `bits`, `stabilizers`, `result_formats`, and `result_streaming` are not public facade modules.
-The `experimental` namespace remains empty in 0.2. Decoder interoperability has earned a Stable component contract and is reexported directly from the facade root, while no external pass or backend implementation has earned a separate pre-stable facade surface.
+The `experimental` namespace contains only the circuit-pass contract and built-in without-noise pass proven by the separate Stable noise-pass crate. Decoder interoperability has a Stable component contract and remains reexported directly from the facade root. Backend preference stays under `advanced::backend`; no backend trait, GPU placeholder, or dynamic plugin API is exposed.
 
 The qualification inventory records every exported item, but inventory ownership does not imply that every item belongs at the facade root.
 
@@ -169,7 +172,7 @@ Stable diagnostic codes and JSON rendering are for tools and agents.
 
 The first supported extension seams are:
 
-- typed circuit passes that return validated Stim-compatible circuits;
+- typed circuit passes that admit conservative output projections before lowering and return validated Stim-compatible circuits;
 - packed measurement and detection sinks;
 - decoder sessions consuming detection batches;
 - compile-time backend selection.
@@ -177,6 +180,10 @@ The first supported extension seams are:
 Dynamic Rust libraries, runtime gate registration, serialized executable plans, and unimplemented backend placeholders are forbidden.
 
 An extension seam is accepted only after a separate crate uses it without private or operational APIs.
+
+The common circuit-pass executor admits the folded input before dispatch, admits each pass's conservative represented-item, target, argument, projected-payload, and repeat-nesting output projection before proportional lowering allocation, and validates the returned `Circuit` against both the caller policy and that projection. Projected payload excludes allocator metadata and spare collection capacity, so it is not a resident-memory claim. Pass-specific options, reports, and diagnostics remain associated types. Since the model dialect is closed, a research operation that cannot lower to ordinary Stim-compatible gates is rejected instead of registering a runtime instruction.
+
+Requirements for a future process-isolated decoder are documented in [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md); Stab 0.2 does not implement that transport.
 
 ## Decision Records
 
@@ -187,6 +194,7 @@ An extension seam is accepted only after a separate crate uses it without privat
 - [A2 Resource Policy Inventory](a2-resource-policy-inventory.md)
 - [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md)
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
+- [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md)
 - [ADR 0007: Product Dependency Graph](adr-0007-product-dependency-graph.md)
 
 ## Change Rules

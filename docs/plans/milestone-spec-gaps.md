@@ -1612,3 +1612,48 @@ Current text: A7 bounded each probability pass to `2^28` state-pair updates and 
 Gap: one exact state-pair update performs work linear in the number of limbs per state, so a model with fewer state pairs but thousands of exact limbs could satisfy both existing limits while exceeding the intended CPU budget.
 Proposed amendment: independently admit the product of exact pair transitions and limbs per state, use checked arithmetic, and reject work above `2^28` pair-transition limbs before allocating or iterating the exact workspace.
 Resolution: exact fallback now returns typed `ExactWorkLimit` before allocation when checked limb transitions exceed `2^28`. A private arithmetic test accepts the exact maximum and rejects the first excess, while a public compile-path fixture proves a limb-heavy model can fit the byte workspace and still fail the independent work admission.
+
+## 2026-08-02 - A8: Projected Output Admission Before Lowering
+
+Status: Resolved
+Revealed by: milestone-audit of the first circuit-pass implementation
+Current text: A8 required input resource admission and validation of the returned circuit after a pass ran.
+Gap: post-run validation could reject an expanded output only after an external implementation had already allocated and copied work proportional to that rejected output, so the stated resource boundary did not prevent the materialization it was meant to bound.
+Proposed amendment: require each pass to compute a checked conservative folded-output projection without allocating proportional output, admit every projected dimension before calling the lowering hook, and independently reject an actual output that exceeds either caller limits or its projection.
+Resolution: `CircuitPassResources` and `CircuitPassProjectionError` define represented-item, target, argument, opaque-tag, repeat-nesting, and logical-payload projection. Payload bytes exclude allocator metadata and spare collection capacity, so the API names and documentation present this as a bound on proportional model payload rather than exact retained memory. `CircuitPassStage` reports typed input, projected-output, and actual-output resource rejection. `run_circuit_pass` admits input, then projected output, then validates actual output and rejects underestimation. The external Stable pass proves allocation-free rejection at an opaque-tag payload boundary.
+
+## 2026-08-02 - A8: Closed-Dialect And Pass-Diagnostic Rejection
+
+Status: Resolved
+Revealed by: review of the A8 qualification negative axes
+Current text: one typed pass-diagnostic test was described as proving unsupported-extension rejection.
+Gap: a pass-specific decision not to lower an operation and the public model's refusal to construct an unknown gate are different contracts. Treating one as evidence for both overclaimed the extension boundary.
+Proposed amendment: retain the typed pass-diagnostic test only for diagnostic preservation and add an independently selectable closed-model test that attempts to lower an unknown research gate.
+Resolution: `pass_specific_diagnostics_remain_typed` owns pass-diagnostic propagation, while `closed_model_rejects_unsupported_gate_lowering` proves that an unknown gate cannot become candidate `Circuit` output. Their qualification cases and negative axes are separate.
+
+## 2026-08-02 - A8: Backend Benchmark Sufficiency
+
+Status: Resolved
+Revealed by: milestone-audit of the requested backend selection benchmark
+Current text: A8 listed backend compile and execution selection overhead as a required new benchmark.
+Gap: the engine currently has one executable scalar sampling backend. A selector-only microbenchmark would measure dispatch scaffolding without representative alternative backend work and would duplicate existing compile and execution diagnostics.
+Proposed amendment: reuse the existing source-owned backend compile and execution diagnostics while one executable backend exists; add a selector benchmark only after a second executable backend or a measured dispatch-overhead risk exists.
+Resolution: A8 adds no placeholder backend timing row. It retains exact CLI and capability consistency tests, existing compile and execution diagnostics, and the one earned external-pass throughput diagnostic.
+
+## 2026-08-02 - A8: Projected Payload Versus Retained Memory
+
+Status: Resolved
+Revealed by: final full-code-review of the circuit-pass byte projection
+Current text: the first audit repair described `materialized_bytes` as a conservative retained-output estimate and caller memory limit.
+Gap: semantic item, target, argument, and tag payload does not include allocator metadata, boxed opaque-tag descriptors, or spare `Vec` capacity. Post-run recomputation of the same formula therefore cannot prove an exact retained-memory ceiling.
+Proposed amendment: either move exact retained-capacity accounting into the closed model or name and document the pass boundary as projected logical payload without making a resident-memory claim.
+Resolution: the experimental pass API now uses `max_projected_payload_bytes`, `with_max_projected_payload_bytes`, and `projected_payload_bytes`. Documentation explicitly excludes allocator metadata and spare collection capacity. The limit remains useful for rejecting work proportional to a model's logical output before lowering, while formal memory claims remain benchmark-owned.
+
+## 2026-08-02 - A8: Typed Circuit-Pass Resource Stage
+
+Status: Resolved
+Revealed by: final full-code-review of circuit-pass diagnostics
+Current text: input, projected-output, and actual-output admission were distinct in the executor and display text, but the stage type was private.
+Gap: callers and qualification tests had to parse a human-readable message to distinguish the three public failure phases.
+Proposed amendment: expose a non-exhaustive typed stage and a pass-error accessor, and make behavioral tests assert the typed value.
+Resolution: public `CircuitPassStage::{Input, OutputProjection, Output}` and `CircuitPassError::resource_stage` expose the phase. Projection and actual-output tests no longer parse display strings.

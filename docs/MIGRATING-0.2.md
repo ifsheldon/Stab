@@ -40,7 +40,7 @@ Use a component crate directly when only one layer is needed. Use `stab-core` fo
 | `stab_core::advanced::compat::...` | Pre-0.2 materialized and callback-oriented adapters |
 | `stab_core::experimental::...` | Implemented extension contracts that may change before 1.0 |
 
-`experimental` is intentionally empty in 0.2. Decoder interoperability is a proven Stable component contract and is available from `stab-decoder` or the facade root; no placeholder pass or backend traits are published in anticipation of hypothetical implementations.
+`experimental` contains the circuit-pass contract and built-in without-noise pass proven by a separate Stable crate. Pass implementations must conservatively project folded output resources before lowering; the common executor admits that projection, reports a typed input/projection/output rejection stage, validates the actual closed-model result, and rejects underestimation. Projected payload bytes exclude allocator metadata and spare collection capacity. The canonical pass owner is `stab-analysis`; the facade tier is pre-stable convenience. Decoder interoperability remains available from `stab-decoder` or the facade root. No placeholder backend, GPU, dynamic plugin, or runtime gate-registry traits are published.
 
 The supported `analysis` and `execution` namespaces remain because they describe semantic operations, not physical source ownership. The retired `bits`, `stabilizers`, `result_formats`, and `result_streaming` namespaces mirrored implementation owners and made the facade expand whenever a component changed.
 
@@ -55,6 +55,7 @@ The supported `analysis` and `execution` namespaces remain because they describe
 | `stab_core::result_formats::DetsLayout` | `stab_core::advanced::records::DetsLayout` or `stab_records::DetsLayout` |
 | `stab_core::result_streaming::for_each_record` | `stab_core::advanced::records::for_each_record` or `stab_records::try_for_each_record` |
 | `stab_core::BackendPreference` | `stab_core::advanced::backend::BackendPreference` or `stab_engine::BackendPreference` |
+| No circuit-pass facade | `stab_core::experimental::{CircuitPass, run_circuit_pass, CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage}` or canonical `stab_analysis` paths |
 | `stab_core::CompiledSampler` | `stab_core::advanced::compat::CompiledSampler`; new code should use `SamplingCompiler`, `SamplingPlan`, and `SamplingSession` |
 | `stab_core::CompiledDetectionConverter` | `stab_core::advanced::compat::CompiledDetectionConverter`; new code should use the measurement-to-detection compiler, plan, session, and sink adapter |
 | `stab_core::CompiledDemSampler` | `stab_core::advanced::compat::CompiledDemSampler`; new code should use `DemSamplingCompiler`, `DemSamplingPlan`, and a sampling or replay session |

@@ -913,8 +913,8 @@ Status: Active.
 ### Tasks
 
 - Adapt one built-in transform and one external noise-insertion transform to a common pass contract.
-- Add typed pass context, options, report, diagnostics, and limits.
-- Validate every pass output as a Stim-compatible circuit.
+- Add typed pass context, options, report, diagnostics, limits, and a conservative folded-resource projection.
+- Admit every input dimension before implementation dispatch, admit projected logical output payload before lowering allocates in proportion to it, then validate the actual Stim-compatible circuit and reject an underestimated projection before release. Payload bytes exclude allocator metadata and spare collection capacity and are not an exact resident-memory claim.
 - Expose backend availability and selection through capabilities and plan summaries.
 - Document the future external-process decoder protocol requirements without implementing transport.
 
@@ -922,8 +922,9 @@ Status: Active.
 
 - Pass determinism.
 - Tag, repeat, coordinate, and target preservation.
-- Invalid lowering and unsupported extension rejection.
-- Resource admission.
+- Typed pass-diagnostic propagation and closed-model rejection of unknown extension gates as distinct failure contracts.
+- Independent input and projected-output admission for represented items, targets, arguments, projected logical payload bytes, and repeat nesting.
+- Allocation-free rejection when a projected external-pass output exceeds its payload budget, plus typed input/projection/output stages and post-lowering rejection of an underestimated projection.
 - External-crate compilation.
 - Backend auto selection, explicit selection, unavailable backend errors, and capability consistency.
 
@@ -931,11 +932,12 @@ Status: Active.
 
 - Built-in transform before and after adaptation.
 - External noise pass by input instruction count.
-- Backend compile and execution selection overhead.
+- Reuse existing backend compile and execution diagnostics while only one executable backend exists; add a selector microbenchmark only if a second executable backend or measured selection-overhead risk makes it representative.
 
 ### Done Criteria
 
-- A separate crate can add a meaningful transform without changing the Stim gate table, execution IR, or unrelated model code.
+- A separate crate can add a meaningful transform without changing the Stim gate table, execution IR, or unrelated model code, and rejected proportional output work is admitted before it is allocated.
+- The executor independently verifies the actual output stays within both the caller's limits and the pass's conservative projection.
 - No placeholder GPU or dynamic plugin interface exists.
 
 ## Milestone A9: Qualification And Stab 0.2.0

@@ -152,10 +152,14 @@ Fields that do not belong to a dialect are absent.
 The command shape is:
 
 ```text
-stab plan sample [INPUT] [--shots=N] [--out_format=FORMAT] [--seed=N] [--skip_reference_sample] [--skip_loop_folding] [--format=human|json]
+stab plan sample [INPUT] [--shots=N] [--out_format=FORMAT] [--seed=N] [--skip_reference_sample] [--skip_loop_folding] [--backend=auto|scalar|portable-simd] [--format=human|json]
 ```
 
-The command parses the circuit, validates PTB64 grouping, compiles a scalar sampling plan, calculates identities and estimates, renders the report, and exits without executing a shot.
+The command parses the circuit, validates PTB64 grouping, compiles a sampling plan using the requested backend policy, calculates identities and estimates, renders the report, and exits without executing a shot.
+
+`--backend` defaults to `auto`. `auto` selects the best backend registered by the current build, `scalar` requires the scalar backend, and `portable-simd` requires a separately registered portable-SIMD sampling backend. A syntactically valid but unavailable explicit backend fails compilation with a nonzero status; enabling portable-SIMD kernels elsewhere in Stab does not by itself register a selectable sampling backend.
+
+Backend availability is discoverable through `stab capabilities`. `auto` is a selection policy and is not listed as a backend; a successful plan's `selected_backend` is always one of the advertised `selectable_backends` values.
 
 Every report contains:
 
@@ -175,7 +179,7 @@ The `compilation` object contains:
 - `compiler_schema_version`;
 - `normalized_options`, currently empty;
 - `configurable_limits`, currently empty;
-- `selected_backend`, currently `scalar`;
+- `selected_backend`, the backend actually selected by compilation and currently `scalar` in supported builds;
 - `validated`, true only after compilation succeeds.
 
 The `run` object contains:
@@ -189,6 +193,8 @@ The `run` object contains:
 - `skip_loop_folding_effect`, fixed to `accepted-no-op`.
 
 Shots, seed, reference mode, output format, and the compatibility no-op do not alter request or plan fingerprints.
+
+The requested backend policy never alters the backend-neutral request fingerprint. The resolved backend is part of the plan fingerprint, so `auto` and an explicit backend produce the same plan fingerprint when they resolve to the same executable backend.
 
 Fixed-width output estimates include Stim v1.16.0's one-shot CLI rule that hides heralded-noise measurement columns on the normal-reference path.
 

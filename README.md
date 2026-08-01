@@ -10,7 +10,7 @@ Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, 
 The longer-term vision is composable Rust components for QEC tooling.
 
 The exact implemented scope, including deliberate deferrals such as Python bindings, WASM, diagrams, and `explain_errors`, is recorded in [docs/stab-feature-checklist.md](docs/stab-feature-checklist.md).
-Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade.
+Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade. The analysis crate also exposes an experimental typed circuit-pass seam with pre-lowering output-resource admission, proven by a separate Stable consumer crate.
 
 ## Quickstart
 
@@ -45,7 +45,7 @@ stab convert --in shots.01 --in_format 01 --out shots.b8 --out_format b8 --circu
 # Discover capabilities, inspect the model, and validate a sampling request without executing it.
 stab capabilities --format=json
 stab inspect surface_d3.stim --format=json
-stab plan sample surface_d3.stim --shots 1000 --seed 42 --out_format b8 --format=json
+stab plan sample surface_d3.stim --shots 1000 --seed 42 --out_format b8 --backend=auto --format=json
 ```
 
 Every command above finishes in well under a second at distance 3.
@@ -53,7 +53,7 @@ Larger distances exercise much bigger simulations; Stab enforces documented reso
 
 Use `stab help commands`, `stab help formats`, and `stab help gates` to explore the supported surface.
 Human-readable diagnostics remain the default; add `--error-format=json` to any command when an agent or tool needs one schema-version-1 JSON object per warning or error.
-The Stab-native `capabilities`, `inspect`, and `plan sample` extensions use `--format=json` for one successful machine-readable document on stdout; planning validates compilation but never executes a shot.
+The Stab-native `capabilities`, `inspect`, and `plan sample` extensions use `--format=json` for one successful machine-readable document on stdout; planning validates compilation and explicit backend selection but never executes a shot.
 
 ## Supported Platforms
 
