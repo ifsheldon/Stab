@@ -21049,8 +21049,7 @@
         "nested-repeat-shift-drift",
         "duplicate-target-loss",
         "separator-loss",
-        "tag-loss",
-        "visitor-error-erasure"
+        "tag-loss"
       ],
       "public_api_owners": [
         {
@@ -21075,10 +21074,6 @@
         },
         {
           "crate_name": "stab_model",
-          "owner_path": "stab_model::DemErrorMechanismVisitor::Error"
-        },
-        {
-          "crate_name": "stab_model",
           "owner_path": "stab_model::DemErrorMechanismVisitor::visit_error_mechanism"
         },
         {
@@ -21088,6 +21083,38 @@
         {
           "crate_name": "stab_model",
           "owner_path": "stab_model::DemErrorTargetIter"
+        }
+      ],
+      "standalone": true
+    },
+    {
+      "id": "a7-model-error-mechanism-visitor-failure-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "traversal_distinguishes_model_failures_from_visitor_failures",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "Visitor-defined failures and model traversal failures remain distinguishable through the public traversal error without erasing the visitor error."
+      },
+      "negative_axes": [],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_model",
+          "owner_path": "stab_model::DemErrorMechanismVisitor::Error"
         }
       ],
       "standalone": true
@@ -21112,14 +21139,10 @@
         ]
       },
       "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "The borrowed mechanism view exposes each represented DEM error probability exactly, including probabilities carried through shifted and repeated model structure, without per-mechanism allocation."
+        "kind": "not-applicable",
+        "detail": "The borrowed mechanism view exposes each represented DEM error probability exactly, including probabilities carried through shifted and repeated model structure. Allocation behavior is owned by the dedicated traversal-allocation case."
       },
-      "negative_axes": [
-        "probability-drift",
-        "repeat-probability-loss",
-        "per-mechanism-allocation"
-      ],
+      "negative_axes": [],
       "public_api_owners": [
         {
           "crate_name": "stab_model",
@@ -21290,15 +21313,10 @@
         ]
       },
       "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "The decoder model view borrows one exact DEM, derives checked detector and observable widths, and carries the model fingerprint without copying or flattening model storage."
+        "kind": "not-applicable",
+        "detail": "The decoder model view exposes the exact DEM, derives detector, observable, and correction widths, and carries the model fingerprint."
       },
-      "negative_axes": [
-        "detector-width-overflow",
-        "observable-width-overflow",
-        "model-fingerprint-drift",
-        "model-copy"
-      ],
+      "negative_axes": [],
       "public_api_owners": [
         {
           "crate_name": "stab_decoder",

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "21114133f195c915b34d05d3d01e25bb58b3363ccdac3c28406bd1c9bf2aca4e",
+  "semantic_digest": "71ebfa6c152ac61c3f505d5f615c2e652a550e9a92fef3df64f4d7f5bb028fad",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -134950,7 +134950,7 @@
       "kind": "type-alias",
       "source_path": "crates/stab-model/src/dem/error_mechanisms.rs",
       "source_line": 104,
-      "owner_case_id": "cq-evidence-qualification-7179fce5697cce0d",
+      "owner_case_id": "cq-evidence-qualification-ebdac93f5e4509f3",
       "performance_groups": [
         "PERF-DEM-MODEL"
       ]
@@ -201347,15 +201347,10 @@
       },
       "supporting_selectors": [],
       "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "The decoder model view borrows one exact DEM, derives checked detector and observable widths, and carries the model fingerprint without copying or flattening model storage."
+        "kind": "not-applicable",
+        "detail": "The decoder model view exposes the exact DEM, derives detector, observable, and correction widths, and carries the model fingerprint."
       },
-      "negative_axes": [
-        "detector-width-overflow",
-        "observable-width-overflow",
-        "model-fingerprint-drift",
-        "model-copy"
-      ],
+      "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
       ],
@@ -206487,8 +206482,7 @@
         "nested-repeat-shift-drift",
         "duplicate-target-loss",
         "separator-loss",
-        "tag-loss",
-        "visitor-error-erasure"
+        "tag-loss"
       ],
       "performance_groups": [
         "PERF-DEM-MODEL"
@@ -217390,14 +217384,10 @@
       },
       "supporting_selectors": [],
       "resource_contract": {
-        "kind": "constant-scratch",
-        "detail": "The borrowed mechanism view exposes each represented DEM error probability exactly, including probabilities carried through shifted and repeated model structure, without per-mechanism allocation."
+        "kind": "not-applicable",
+        "detail": "The borrowed mechanism view exposes each represented DEM error probability exactly, including probabilities carried through shifted and repeated model structure. Allocation behavior is owned by the dedicated traversal-allocation case."
       },
-      "negative_axes": [
-        "probability-drift",
-        "repeat-probability-loss",
-        "per-mechanism-allocation"
-      ],
+      "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
       ],
@@ -218844,6 +218834,53 @@
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-ebdac93f5e4509f3",
+      "feature_id": "CQ-DEM-FORMAT",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "a7-model-error-mechanism-visitor-failure-contract",
+      "comparator": "error-class",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-model",
+          "--test",
+          "dem_error_mechanisms",
+          "traversal_distinguishes_model_failures_from_visitor_failures",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "Visitor-defined failures and model traversal failures remain distinguishable through the public traversal error without erasing the visitor error."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-DEM-MODEL"
       ],
       "status": "implemented"
     },

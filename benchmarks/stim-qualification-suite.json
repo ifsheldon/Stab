@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "21114133f195c915b34d05d3d01e25bb58b3363ccdac3c28406bd1c9bf2aca4e",
-  "semantic_digest": "cf99ac90a3cfd40ed6611edda54d3cfed0ad01eb2efd9a950782dcbd05468d88",
+  "correctness_digest": "71ebfa6c152ac61c3f505d5f615c2e652a550e9a92fef3df64f4d7f5bb028fad",
+  "semantic_digest": "3e8350e9ad0e05a9acd3b73a214f52f8bacbea384ec1a147ccfb30b3a1277d18",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -71851,7 +71851,7 @@
       "kind": "type-alias",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-7179fce5697cce0d",
+      "correctness_case_id": "cq-evidence-qualification-ebdac93f5e4509f3",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
