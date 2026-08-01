@@ -31,6 +31,27 @@ fn exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models() {
     let session = ExactMlDecoderSession::try_compile_model(&tie).expect("compile tie");
     assert!(!session.prediction_for_syndrome(0).expect("tie picks zero"));
 
+    let interacting_tie =
+        DetectorErrorModel::from_dem_str("error(0.01) D0\nerror(0.6) L0\nerror(0.01) D0 L0\n")
+            .expect("interacting tie DEM");
+    let session = ExactMlDecoderSession::try_compile_model(&interacting_tie)
+        .expect("compile interacting tie");
+    assert!(
+        !session
+            .prediction_for_syndrome(1)
+            .expect("symbolic tie picks zero")
+    );
+
+    let near_tie =
+        DetectorErrorModel::from_dem_str("error(0.01) D0\nerror(0.6) L0\nerror(0.0099) D0 L0\n")
+            .expect("near-tie DEM");
+    let session = ExactMlDecoderSession::try_compile_model(&near_tie).expect("compile near tie");
+    assert!(
+        session
+            .prediction_for_syndrome(1)
+            .expect("resolved near tie picks one")
+    );
+
     let duplicate =
         DetectorErrorModel::from_dem_str("error(1) D0 D0 L0 L0\n").expect("duplicate DEM");
     let session = ExactMlDecoderSession::try_compile_model(&duplicate).expect("compile duplicate");

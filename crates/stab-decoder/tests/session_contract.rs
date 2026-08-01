@@ -79,7 +79,9 @@ impl DecoderSession for FixtureSession {
             if self.fail_after == Some(completed) {
                 return Err(DecodeSessionFailure::new(FixtureError, completed));
             }
-            let prediction = batch.detector(completed, 0).unwrap_or(false);
+            let prediction = batch
+                .detector(completed, 0)
+                .expect("validated detector read");
             batch
                 .set_prediction(completed, 0, prediction)
                 .expect("validated prediction write");
