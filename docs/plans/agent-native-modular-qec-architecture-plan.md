@@ -856,9 +856,9 @@ Status: Active.
 ### A7.5 Qualification And Benchmarks
 
 - Add exact correctness ownership for the record prefix view, bounded mechanism traversal, decoder model and session contracts, exact-ML compiler, and external experiment. Round trips or broad workspace commands cannot be their sole owners.
-- Add no more than three release-candidate runtime groups: exact-ML compilation, reused batch decode, and sample-to-detect-to-decode execution.
-- Give each group deterministic generators, exact semantic witnesses outside timing, small, medium, and large scales, phase-specific work units, profiler notes, correctness prerequisites, and executable worker contracts.
-- Mark all three groups as Stab-only self-regression workloads. They have no Stim parity policy entry and remain `unseeded` until controlled full and soak evidence can produce an accepted architecture-specific baseline under A9.
+- Add exactly three Stab-only product-diagnostic runtime groups: exact-ML compilation, reused batch decode, and sample-to-detect-to-decode execution.
+- Give each group deterministic generators, exact semantic witnesses outside timing, small, medium, and large scales, phase-specific work units, source-owned workload rationales, correctness prerequisites, and executable worker contracts.
+- Treat the three groups as stable baseline-candidate identities, not as current self-regression results. Product diagnostics intentionally have no Stim parity policy entry, profiler note, rollup, completion result, or self-regression verdict. A9 may promote and seed architecture-specific baselines only after reviewed controlled full and soak evidence for the same identities.
 - Attach retained-byte, zero-allocation reuse, bounded session growth, and accepted-maximum memory checks to the owning workloads instead of adding a standalone memory timing group.
 - Keep the release matrix below 40 groups and diagnostics below 60; consolidate an existing group before exceeding either cap.
 
@@ -895,14 +895,14 @@ Status: Active.
 - Batch decode throughput.
 - Full sample-to-detect-to-decode throughput.
 - Bounded memory.
-- Decoder benchmarks use Stab self-regression only because Stim has no faithful decoder comparator.
+- Decoder benchmarks are Stab-only baseline candidates because Stim has no faithful decoder comparator; A9 owns controlled baseline seeding and later self-regression claims.
 
 ### Done Criteria
 
 - The decoder crate depends only on public stable component APIs.
 - One real end-to-end QEC experiment runs without `stab-core`, private APIs, or ops features.
 - Decoder width and shot-count failures leave prediction storage unchanged, cancellation commits only a documented prefix, and reused exact-ML decoding allocates no memory.
-- The three decoder phases have executable self-regression contracts without a fabricated Stim comparator, and every source-owned correctness and benchmark contract regenerates cleanly.
+- The three decoder phases have executable Stab-only diagnostic contracts that freeze future self-regression identities without a fabricated Stim comparator, and every source-owned correctness and benchmark contract regenerates cleanly.
 
 ## Milestone A8: Circuit Pass And Backend Extension Seams
 

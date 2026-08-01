@@ -1064,7 +1064,7 @@ A7 starts from clean `main` after the A6 closure and the Node.js 24 checkout-act
 
 The target reference implementation is an unpublished Stable crate with exact fixed admission: at most 20 detectors, one observable, 256 represented mechanisms, 65,536 represented instruction visits, `2^21` joint states, 16 MiB of temporary probability workspace, and `2^28` pair transitions. It will use an in-place log-domain dynamic program, retain one byte per detector syndrome, choose prediction zero on ties, reject impossible syndromes before mutating a batch, and allocate nothing during reused decoding.
 
-A7 will add at most three performance groups for decoder compilation, reused batch decoding, and full sample-to-detect-to-decode execution. They are Stab-only self-regression workloads because pinned Stim has no decoder comparator; A7 will not fabricate a parity ratio. Formal controlled-host baseline seeding remains an A9 obligation.
+A7 will add at most three performance groups for decoder compilation, reused batch decoding, and full sample-to-detect-to-decode execution. They are Stab-only diagnostic baseline candidates because pinned Stim has no decoder comparator; A7 will not fabricate a parity ratio or current self-regression verdict. Formal controlled-host baseline seeding remains an A9 obligation.
 
 ## A7 Decoder Implementation Checkpoint
 
@@ -1085,3 +1085,13 @@ An independent read-only audit found that two A7 correctness parents named resou
 The former `IncompleteCompletedStatus` error was unreachable from safe Rust because `DecodeBatchSummary::completed` always records the complete requested prefix and the summary fields are private. A7 removes that impossible public variant and its dead validation branch instead of adding an unsafe or invalid-state constructor solely to test it. Completed status remains construction-enforced and is exercised by ordinary session and exact-ML completion tests.
 
 The regenerated correctness inventory contains 2,886 upstream cases, 7,289 public API items, and 2,174 evidence parents under identity `52038b6beebc79e30d00ab10df5a5942a8dc32f24dbf318e9fc27f6367190ab5`. The corresponding pre-benchmark performance inventory remains at 179 groups under identity `86919fb66368f870c8a5062a13958f74761e291779fa7067af5c0e7950506e4a`. These identities supersede only the preceding unmeasured A7 implementation checkpoint; all earlier evidence remains historical.
+
+## A7 Decoder Benchmark Contract
+
+Commit `ff69ed8d` adds the three source-owned A7 product diagnostics without adding a Stim comparator or parity threshold. `PERFQ-A7-EXACT-ML-COMPILE` measures complete compile-and-release at 1,536, 65,536, and 2,097,152 joint-state mechanism transitions. `PERFQ-A7-EXACT-ML-REUSED-DECODE` measures one precompiled session over 1,024, 65,536, and 262,144 deterministic shots. `PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE` measures the public reusable pipeline over 1,024, 16,384, and 65,536 seeded shots.
+
+Every scale has an exact generated-input digest and an independently checked untimed output witness. Compilation validates model dimensions, retained bytes, and every syndrome prediction; reused decoding validates the complete caller-owned prediction digest and separately proves zero allocation after preparation; the pipeline validates exact shot and logical-failure counts against an independent seeded execution. Worker admission accepts the pipeline's 262,144-shot memory probe without making it a fourth timing scale.
+
+The rows use the existing `product-diagnostic` claim class. That path intentionally produces no Stim ratio, profiler-note obligation, self-regression verdict, rollup, or release completion claim. The three identities are source-current baseline candidates only; A9 owns controlled full and soak evidence and any reviewed architecture-specific baseline seed. This choice preserves the existing benchmark-science boundary instead of adding a parallel decoder-only evidence mechanism.
+
+The regenerated performance inventory contains 182 groups under identity `01844149cde46789822d116ff9c2c0f880e12b2e4970a6f0f20a323e5a36e9e4`. The generated dashboard reports nineteen release groups and eight diagnostics, including the infrastructure protocol group. Workspace formatting, warnings-denied Clippy, all workspace tests, all 565 `stab-bench` tests, the allocation-instrumented reuse test, qualification check and deterministic regeneration, generated-status check, and benchmark smoke pass. No source-current A7 timing report is claimed by this checkpoint.

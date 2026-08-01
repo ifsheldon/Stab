@@ -11,9 +11,9 @@ Finish Milestone A7 of the [agent-native modular QEC architecture plan](agent-na
 - A0 through A6 are complete. A6 is bound to measured source revision `adae364500744c33f98f7777901ff50a28cbfdf6`; later A7 work does not rewrite or promote that evidence.
 - The physical component workspace, typed record batches, immutable engine plans, reusable sessions, bounded sinks, model fingerprints, and exact DEM syntax are available.
 - The bounded record/model seams, Stable `stab-decoder` contract, unpublished exact-ML reference implementation, generated repetition checks, public sample-to-detect-to-decode experiment, exact correctness ownership, and generated inventory integration are implemented in the active tree.
-- Executable self-regression benchmark groups, source-current correctness and diagnostic evidence, milestone audit, and full code review remain to be completed before A7 closure.
+- Three executable Stab-only decoder diagnostics now own exact-ML compilation, reused batch decoding, and the public sample-to-detect-to-decode pipeline. Source-current correctness and diagnostic reports, milestone audit, and full code review remain before A7 closure.
 - The parked A7 stashes are rejected prototypes. Reuse sound ideas manually; do not apply either stash wholesale.
-- A9 owns formal controlled-host release evidence. A7 produces source-current correctness, executable benchmark contracts, and diagnostic self-regression measurements only.
+- A9 owns formal controlled-host release evidence and self-regression baseline seeding. A7 produces source-current correctness, executable benchmark contracts, and Stab-only diagnostic measurements only.
 
 ## Sources Of Truth
 
@@ -34,7 +34,7 @@ Stop and repair the owning source when the plan, Cargo metadata, architecture ch
 3. Add Stable `stab-decoder`, canonical facade reexports, external Stable-consumer behavior, architecture enforcement, API docs, and the portable-SIMD Clippy CI lane.
 4. Add unpublished `stab-reference-decoder` with the exact A7 limits, log-domain dynamic program, impossible-syndrome behavior, reusable session, and independent exhaustive oracle.
 5. Prove distance-3 and distance-5 generated repetition models and one real public-only sampling, conversion, decoding, and logical-error experiment with seeded and partitioned execution.
-6. Add exact correctness ownership and no more than three executable Stab-only benchmark groups for compilation, reused decode, and the full pipeline. Do not create a Stim ratio.
+6. Add exact correctness ownership and exactly three executable Stab-only product diagnostics for compilation, reused decode, and the full pipeline. Freeze future regression identities without creating a Stim ratio or claiming a current self-regression result.
 7. Regenerate correctness, performance, and status artifacts; run focused Stable and Nightly checks, source-current correctness tiers, benchmark smoke, and diagnostic measurements at unique paths.
 8. Run milestone-audit and full-code-review, fix every confirmed finding, rerun affected evidence from the resulting clean commit, and synchronize closure documentation.
 
@@ -48,7 +48,7 @@ Stop and repair the owning source when the plan, Cargo metadata, architecture ch
 - Exact ML admits at most 20 detectors, one observable, 256 mechanisms, 65,536 represented instruction visits, `2^21` joint states, 16 MiB temporary workspace, and `2^28` transitions.
 - Reused exact-ML decoding allocates no memory and retains one byte per detector syndrome.
 - The external decoder and experiment depend only on public Stable component APIs; they do not import `stab-core`, CLI, ops, private modules, or Nightly features.
-- Decoder benchmarks are Stab self-regression only and are unseeded until A9 controlled full and soak evidence; the `1.25x` Stim gate is neither applied nor weakened.
+- Decoder diagnostics have no Stim comparator or current self-regression verdict. A9 alone may seed controlled full and soak baselines for their frozen identities; the `1.25x` Stim gate is neither applied nor weakened.
 - Historical evidence and failed artifact paths remain immutable.
 
 ## Done
