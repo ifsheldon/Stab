@@ -10,7 +10,7 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 
 - Ten product packages are versioned `0.2.0` with exact sibling requirements and a source-owned publication order.
 - The active release matrix contains 19 promotable groups and 21 unique exact correctness parents. Formal A9 PR, full, soak, controlled timing, rollup, and completion evidence has not started.
-- Historical package preflights remain diagnostic only. The latest useful probe is schema version 3 at `9b9150d8030991f88589cb5ecd417a54f80ad403`; later release repairs require a new unique schema-version-4 preflight.
+- Historical package preflights remain diagnostic only. The latest useful probe is schema version 4 at clean revision `544e39653ffea370fc3a872b3d3f7e61bb5aa4cd`, stored at `target/releases/v0.2.0-544e3965-preflight` with report SHA-256 `3605104a5d3d0f757379035f1910e5859b9ce303bf4423b3ded33a1cee4936c0`.
 - Commits through `212331732c7ebd0bbf55534c1d1fbd2935a1e84c` repair the reviewed publication boundary: isolated Cargo, bounded archives and subprocesses, exact canonical crates.io metadata, direct upload of the retained reviewed `.crate` bytes, checksum polling, machine-checked A9 authorization, descriptor-safe cleanup, pinned workflow actions, retained GitHub asset bytes, remote annotated-tag verification, private draft creation, remote size and SHA-256 verification, and publication-token-free release-operator builds in both workflow and local just paths.
 - Explicit crates.io and GitHub publication-token variables are absent from Cargo, build scripts, inherited workflow and job environments, unrelated commands, arguments, reports, and logs. The required variable is bound only while executing the current already-built authenticated operator after local verification and A9 authorization. Reviewed pinned actions and their declared GitHub job permissions remain a separate trusted boundary.
 - The pre-evidence milestone audit and full-code-review are complete. They found and repaired credential exposure through workflow and local `cargo run` dispatch; no further confirmed implementation defect, evidence loophole, or milestone under-specification remains before the diagnostic package preflight.
@@ -21,9 +21,9 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 
 ## Next Actions
 
-1. Commit the pre-evidence audit checkpoint, re-run the affected documentation and contract checks, and run one new diagnostic schema-version-4 `release::check` under a unique path from the final clean commit. Preserve but never promote or reuse failed and historical paths.
+1. Commit this diagnostic checkpoint, re-run the affected documentation and contract checks, and preserve the schema-version-4 path without promoting or reusing it.
 2. Push the exact final pre-evidence commit and require its own GitHub CI before formal correctness, timing, or publication work.
-3. Inspect the diagnostic report, all ten retained archive digests, embedded VCS identities, package metadata, and toolchain identity. Record the immutable path as diagnostic evidence only.
+3. Re-fetch `origin/main`, verify the exact pushed SHA, and inspect both the `Rust` and `Qualification Contracts` jobs for that revision. Older successful runs do not satisfy this gate.
 4. Run and replay PR, full, and soak correctness, the live result-format corpus, the implemented oracle matrix, worker reproducibility, and controlled AArch64 full and soak evidence for all 19 release groups.
 5. Enforce `1.25x` Stim parity, seeded `1.15x` Stab self-regression, memory and scaling policy, and honest `unseeded` outcomes. Produce 38 rollups and the 138-report `a9-release` schema-version-3 completion, then replay it once.
 6. Restore swap after every timing session, verify no qualification process remains, and preserve all failed or noisy artifacts.
