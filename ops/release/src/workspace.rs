@@ -35,19 +35,25 @@ pub(crate) fn validate_architecture(
 ) -> Result<(), ReleaseError> {
     cargo.run(
         root,
-        [
-            OsString::from("run"),
-            OsString::from("--quiet"),
-            OsString::from("--locked"),
-            OsString::from("--package"),
-            OsString::from("stab-architecture"),
-            OsString::from("--"),
-            OsString::from("check"),
-        ],
+        architecture_arguments(root),
         ARCHITECTURE_TIMEOUT,
         MAX_COMMAND_OUTPUT_BYTES,
     )?;
     Ok(())
+}
+
+fn architecture_arguments(root: &Path) -> Vec<OsString> {
+    vec![
+        OsString::from("run"),
+        OsString::from("--quiet"),
+        OsString::from("--locked"),
+        OsString::from("--package"),
+        OsString::from("stab-architecture"),
+        OsString::from("--"),
+        OsString::from("--root"),
+        root.as_os_str().to_os_string(),
+        OsString::from("check"),
+    ]
 }
 
 pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
@@ -226,6 +232,26 @@ fn validate_metadata(root: &Path, package: &Package) -> Result<(), ReleaseError>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn isolated_architecture_check_receives_the_repository_root() {
+        let root = Path::new("/checked/stab");
+        assert_eq!(
+            architecture_arguments(root),
+            [
+                "run",
+                "--quiet",
+                "--locked",
+                "--package",
+                "stab-architecture",
+                "--",
+                "--root",
+                "/checked/stab",
+                "check",
+            ]
+            .map(OsString::from)
+        );
+    }
 
     #[test]
     fn checked_workspace_matches_release_order_and_metadata() {
