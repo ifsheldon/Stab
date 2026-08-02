@@ -55,8 +55,33 @@ fn inspect_workflow(
     path: &Path,
     report: &mut WorkflowActionReport,
 ) -> Result<(), CheckError> {
+    inspect_workflow_with_post_open_hook(root, path, report, || {})
+}
+
+fn inspect_workflow_with_post_open_hook(
+    root: &Path,
+    path: &Path,
+    report: &mut WorkflowActionReport,
+    post_open_hook: impl FnOnce(),
+) -> Result<(), CheckError> {
     let relative = path.strip_prefix(root).unwrap_or(path);
-    let metadata = std::fs::symlink_metadata(path).map_err(|source| CheckError::ReadWorkflow {
+    let file = match open_workflow_descriptor(path) {
+        Ok(file) => file,
+        Err(WorkflowOpenError::Symlink) => {
+            report.violations.push(Violation::new(
+                "workflow-not-regular-file",
+                format!("workflow {} must be a regular file", relative.display()),
+            ));
+            return Ok(());
+        }
+        Err(WorkflowOpenError::Io(source)) => {
+            return Err(CheckError::ReadWorkflow {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+    let metadata = file.metadata().map_err(|source| CheckError::ReadWorkflow {
         path: path.to_path_buf(),
         source,
     })?;
@@ -68,10 +93,7 @@ fn inspect_workflow(
         return Ok(());
     }
 
-    let file = File::open(path).map_err(|source| CheckError::ReadWorkflow {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    post_open_hook();
     let mut bytes = Vec::new();
     file.take((MAX_WORKFLOW_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
@@ -99,6 +121,36 @@ fn inspect_workflow(
     };
     inspect_workflow_source(relative, source, report);
     Ok(())
+}
+
+enum WorkflowOpenError {
+    Symlink,
+    Io(std::io::Error),
+}
+
+fn open_workflow_descriptor(path: &Path) -> Result<File, WorkflowOpenError> {
+    #[cfg(unix)]
+    {
+        use rustix::fs::{Mode, OFlags};
+
+        let descriptor = rustix::fs::open(
+            path,
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+            Mode::empty(),
+        )
+        .map_err(|source| match source {
+            rustix::io::Errno::LOOP => WorkflowOpenError::Symlink,
+            source => WorkflowOpenError::Io(std::io::Error::from(source)),
+        })?;
+        Ok(File::from(descriptor))
+    }
+
+    #[cfg(not(unix))]
+    {
+        Err(WorkflowOpenError::Io(std::io::Error::other(
+            "workflow action scanning requires a Unix no-follow open",
+        )))
+    }
 }
 
 fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActionReport) {
@@ -364,6 +416,64 @@ jobs:
             report.violations.first().map(|violation| violation.code),
             Some("workflow-invalid-yaml")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workflow_symlink_entries_are_rejected_without_following_target() {
+        let repository = tempfile::tempdir().expect("create repository");
+        let workflows = repository.path().join(WORKFLOW_DIRECTORY);
+        std::fs::create_dir_all(&workflows).expect("create workflow directory");
+        let target = repository.path().join("target.yml");
+        std::fs::write(
+            &target,
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v7\n",
+        )
+        .expect("write target workflow");
+        std::os::unix::fs::symlink(&target, workflows.join("ci.yml"))
+            .expect("create workflow symlink");
+
+        let report = scan_workflow_actions(repository.path()).expect("scan workflows");
+
+        assert_eq!(report.action_use_count, 0);
+        assert_eq!(report.violations.len(), 1);
+        assert_eq!(
+            report.violations.first().map(|violation| violation.code),
+            Some("workflow-not-regular-file")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workflow_scan_reads_validated_descriptor_after_path_replacement() {
+        let repository = tempfile::tempdir().expect("create repository");
+        let workflows = repository.path().join(WORKFLOW_DIRECTORY);
+        std::fs::create_dir_all(&workflows).expect("create workflow directory");
+        let path = workflows.join("ci.yml");
+        std::fs::write(
+            &path,
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
+        )
+        .expect("write initial workflow");
+        let malicious = repository.path().join("malicious.yml");
+        std::fs::write(
+            &malicious,
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v7\n",
+        )
+        .expect("write replacement target");
+        let mut report = WorkflowActionReport {
+            action_use_count: 0,
+            violations: Vec::new(),
+        };
+
+        inspect_workflow_with_post_open_hook(repository.path(), &path, &mut report, || {
+            std::fs::remove_file(&path).expect("remove original workflow path");
+            std::os::unix::fs::symlink(&malicious, &path).expect("replace path with symlink");
+        })
+        .expect("inspect workflow");
+
+        assert_eq!(report.action_use_count, 1);
+        assert!(report.violations.is_empty(), "{:?}", report.violations);
     }
 
     #[test]

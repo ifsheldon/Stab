@@ -16,6 +16,7 @@ cargo_metadata = { workspace = true }
 clap = { workspace = true }
 proc-macro2 = { workspace = true }
 pulldown-cmark = { workspace = true }
+rustix = { workspace = true }
 syn = { workspace = true, features = ["visit"] }
 thiserror = { workspace = true }
 unicode-general-category = { workspace = true }
