@@ -41,6 +41,9 @@ pub(crate) struct StatusArgs {
     /// Compare the generated dashboard with the checked file instead of writing it.
     #[arg(long)]
     check: bool,
+    /// Require one source-current A9 release completion checkpoint.
+    #[arg(long, requires = "check")]
+    require_release_completion: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +179,9 @@ struct CompletionContract<'a> {
 pub(crate) fn run(root: &RepoRoot, args: StatusArgs) -> Result<(), BenchError> {
     let suite = super::read(root)?;
     let data = collect(root, &suite, !args.check)?;
+    if args.require_release_completion {
+        require_current_release_completion(data.completion.as_ref(), data.completion_is_current)?;
+    }
     let rendered = render(&data);
     let path = root.path.join(STATUS_PATH);
     if args.check {
@@ -192,6 +198,22 @@ pub(crate) fn run(root: &RepoRoot, args: StatusArgs) -> Result<(), BenchError> {
         println!("[{PREFIX}] wrote {STATUS_PATH}");
     }
     Ok(())
+}
+
+fn require_current_release_completion(
+    completion: Option<&CurrentCompletion>,
+    is_current: bool,
+) -> Result<(), BenchError> {
+    if is_current
+        && completion.is_some_and(|completion| completion.scope_id == RELEASE_COMPLETION_SCOPE)
+    {
+        Ok(())
+    } else {
+        Err(BenchError::Qualification(
+            "release publication requires one source-current a9-release completion checkpoint"
+                .to_string(),
+        ))
+    }
 }
 
 pub(crate) fn publish_completion_manifest(
@@ -849,6 +871,20 @@ mod tests {
         }
     }
 
+    fn test_completion(scope_id: &str) -> CurrentCompletion {
+        CurrentCompletion {
+            scope_id: scope_id.to_string(),
+            path: "target/benchmarks/qualification/completion".to_string(),
+            report_sha256: TEST_DIGEST.to_string(),
+            stab_commit: "1".repeat(40),
+            architecture: "aarch64-unknown-linux-gnu".to_string(),
+            performance_inventory_sha256: TEST_DIGEST.to_string(),
+            correctness_inventory_sha256: TEST_DIGEST.to_string(),
+            parity_outcome: CompletionParityOutcome::Passed,
+            regression_outcome: CompletionRegressionOutcome::Passed,
+        }
+    }
+
     fn test_git(repository: &Path, arguments: &[&str]) -> String {
         let output = std::process::Command::new("git")
             .arg("-C")
@@ -938,6 +974,18 @@ mod tests {
         assert!(rendered.contains(&data.parity_policy_sha256));
         assert!(rendered.contains(&data.regression_policy_sha256));
         assert!(rendered.contains(&data.regression_baselines_sha256));
+    }
+
+    #[test]
+    fn release_authorization_requires_a_current_a9_completion() {
+        let historical = test_completion(RELEASE_COMPLETION_SCOPE);
+        assert!(require_current_release_completion(Some(&historical), false).is_err());
+        let wrong_scope = test_completion(HISTORICAL_DEM_COMPLETION_SCOPE);
+        assert!(require_current_release_completion(Some(&wrong_scope), true).is_err());
+        assert!(require_current_release_completion(None, true).is_err());
+        let current = test_completion(RELEASE_COMPLETION_SCOPE);
+        require_current_release_completion(Some(&current), true)
+            .expect("current A9 release completion authorizes publication");
     }
 
     #[test]

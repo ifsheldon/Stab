@@ -1,5 +1,4 @@
 use std::ffi::{OsStr, OsString};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -122,7 +121,7 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
 
     work.revalidate()?;
     output.revalidate()?;
-    fs::remove_dir_all(work.path()).map_err(|source| ReleaseError::io(work.path(), source))?;
+    work.remove_tree()?;
     output.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 

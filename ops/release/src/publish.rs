@@ -9,6 +9,7 @@ use crate::{
 
 const MAX_CARGO_OUTPUT_BYTES: usize = 8 << 20;
 const CARGO_PUBLISH_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+const A9_AUTHORIZATION_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 static PUBLICATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn publish_reviewed(
@@ -24,6 +25,23 @@ pub(crate) fn publish_reviewed(
     }
     let (preflight_directory, report) = package::load_reviewed_report(root, preflight)?;
     let reviewed_packages = preflight_directory.open_directory(OsStr::new("packages"))?;
+    let authorization_work = create_publication_work(root)?;
+    {
+        let cargo_target = authorization_work.create_directory(OsStr::new("cargo-target"))?;
+        let cargo = cargo::CargoSandbox::create(root, &authorization_work, &cargo_target)?;
+        cargo.run(
+            root,
+            qualification_status_arguments(),
+            A9_AUTHORIZATION_TIMEOUT,
+            MAX_CARGO_OUTPUT_BYTES,
+        )?;
+    }
+    authorization_work.revalidate()?;
+    authorization_work.remove_tree()?;
+    preflight_directory.revalidate()?;
+    reviewed_packages.revalidate()?;
+    repository::require_unchanged(root, &report.commit)?;
+    repository::require_toolchain(root, &report.toolchain)?;
     let registry = registry::CratesIo::new();
 
     for package in &report.packages {
@@ -40,16 +58,7 @@ pub(crate) fn publish_reviewed(
             continue;
         }
 
-        let work_name = format!(
-            ".publish-{}-{}",
-            std::process::id(),
-            PUBLICATION_COUNTER.fetch_add(1, Ordering::Relaxed)
-        );
-        let work = safe_fs::RetainedDirectory::create_new_under(
-            root,
-            Path::new("target/releases").join(&work_name).as_path(),
-            Some(Path::new("target/releases")),
-        )?;
+        let work = create_publication_work(root)?;
         let cargo_target = work.create_directory(OsStr::new("cargo-target"))?;
         let cargo = cargo::CargoSandbox::create(root, &work, &cargo_target)?;
         let package_args = individual_package_arguments(&package.name);
@@ -100,6 +109,35 @@ pub(crate) fn publish_reviewed(
         report.packages.len()
     );
     Ok(())
+}
+
+fn create_publication_work(root: &Path) -> Result<safe_fs::RetainedDirectory, ReleaseError> {
+    let work_name = format!(
+        ".publish-{}-{}",
+        std::process::id(),
+        PUBLICATION_COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
+    safe_fs::RetainedDirectory::create_new_under(
+        root,
+        Path::new("target/releases").join(&work_name).as_path(),
+        Some(Path::new("target/releases")),
+    )
+}
+
+fn qualification_status_arguments() -> Vec<OsString> {
+    [
+        "run",
+        "--quiet",
+        "--locked",
+        "--package",
+        "stab-bench",
+        "--",
+        "qualification-status",
+        "--check",
+        "--require-release-completion",
+    ]
+    .map(OsString::from)
+    .to_vec()
 }
 
 fn require_rebuilt_match(
@@ -182,6 +220,25 @@ mod tests {
                 "--no-verify",
                 "--package",
                 "stab-core"
+            ]
+            .map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn publication_authentication_uses_the_checked_a9_status_contract() {
+        assert_eq!(
+            qualification_status_arguments(),
+            [
+                "run",
+                "--quiet",
+                "--locked",
+                "--package",
+                "stab-bench",
+                "--",
+                "qualification-status",
+                "--check",
+                "--require-release-completion",
             ]
             .map(OsString::from)
         );
