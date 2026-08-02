@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
-use std::fs;
+use std::fs::File;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
-use object::{Architecture, BinaryFormat, Object as _};
+use object::{Architecture, BinaryFormat, Object as _, ObjectKind, ObjectSegment as _};
 use serde::{Deserialize, Serialize};
 
 use crate::{RELEASE_VERSION, ReleaseError, archive, repository, safe_fs};
@@ -109,15 +109,12 @@ pub(crate) fn build_binary(
     let binary_path = release_directory.path().join("stab");
     let binary_file = release_directory.open_regular(OsStr::new("stab"))?;
     let identity = safe_fs::file_identity(&binary_file, &binary_path)?;
-    let bytes = safe_fs::read_bounded_file(binary_file, &binary_path, MAX_BINARY_BYTES)?;
+    let binary_reader = binary_file
+        .try_clone()
+        .map_err(|source| ReleaseError::io(&binary_path, source))?;
+    let bytes = safe_fs::read_bounded_file(binary_reader, &binary_path, MAX_BINARY_BYTES)?;
     validate_binary_bytes(&bytes, target)?;
-    let version = repository::run_capture(
-        root,
-        binary_path.as_os_str(),
-        [OsStr::new("--version")],
-        VERSION_TIMEOUT,
-        MAX_VERSION_OUTPUT,
-    )?;
+    let version = capture_version_from_descriptor(root, &binary_file, &binary_path)?;
     validate_version_output(&version)?;
     safe_fs::require_same_path_identity(&binary_path, identity)?;
 
@@ -157,7 +154,7 @@ pub(crate) fn build_binary(
     output.write_new(OsStr::new(&manifest_name), &manifest_bytes)?;
     work.revalidate()?;
     output.revalidate()?;
-    fs::remove_dir_all(work.path()).map_err(|source| ReleaseError::io(work.path(), source))?;
+    work.remove_tree()?;
     output.sync()?;
     Ok(PackagedBinary {
         binary,
@@ -207,17 +204,12 @@ pub(crate) fn verify_assets(root: &Path, assets: &Path, tag: &str) -> Result<(),
             )));
         }
     }
-    let actual_files = fs::read_dir(directory.path())
-        .map_err(|source| ReleaseError::io(directory.path(), source))?
-        .map(|entry| {
-            entry
-                .map_err(|source| ReleaseError::io(directory.path(), source))
-                .and_then(|entry| {
-                    entry
-                        .file_name()
-                        .into_string()
-                        .map_err(|_| ReleaseError::InvalidPath(entry.path()))
-                })
+    let actual_files = directory
+        .entry_names(expected_files.len().saturating_add(1))?
+        .into_iter()
+        .map(|name| {
+            name.into_string()
+                .map_err(|name| ReleaseError::InvalidPath(directory.path().join(name)))
         })
         .collect::<Result<BTreeSet<_>, _>>()?;
     directory.revalidate()?;
@@ -241,18 +233,69 @@ fn validate_binary_bytes(bytes: &[u8], target: ReleaseTarget) -> Result<(), Rele
             target.binary_format()
         )));
     }
+    let kind = binary.kind();
+    let runnable_kind = match target {
+        ReleaseTarget::LinuxAarch64 => {
+            matches!(kind, ObjectKind::Executable | ObjectKind::Dynamic)
+        }
+        ReleaseTarget::MacosAarch64 => kind == ObjectKind::Executable,
+    };
+    if !runnable_kind {
+        return Err(ReleaseError::BinaryContract(format!(
+            "asset has {kind:?} object kind, expected an executable{}",
+            if target == ReleaseTarget::LinuxAarch64 {
+                " or position-independent executable"
+            } else {
+                ""
+            }
+        )));
+    }
+    let entry = binary.entry();
+    let entry_is_executable = entry != 0
+        && binary.segments().any(|segment| {
+            let start = segment.address();
+            let virtual_entry = start.checked_add(segment.size()).is_some_and(|end| {
+                segment.permissions().executable() && (start..end).contains(&entry)
+            });
+            let (file_start, file_size) = segment.file_range();
+            let file_entry = target == ReleaseTarget::MacosAarch64
+                && file_start.checked_add(file_size).is_some_and(|end| {
+                    segment.permissions().executable() && (file_start..end).contains(&entry)
+                });
+            virtual_entry || file_entry
+        });
+    if !entry_is_executable {
+        return Err(ReleaseError::BinaryContract(format!(
+            "asset entry point {entry:#x} is not inside an executable segment"
+        )));
+    }
     Ok(())
 }
 
 fn validate_version_output(output: &str) -> Result<(), ReleaseError> {
-    let expected = format!("stab {RELEASE_VERSION}");
-    if output.trim() != expected {
+    let expected = format!("stab {RELEASE_VERSION}\n");
+    if output != expected {
         return Err(ReleaseError::BinaryContract(format!(
             "stab --version returned {:?}, expected {expected:?}",
-            output.trim()
+            output
         )));
     }
     Ok(())
+}
+
+fn capture_version_from_descriptor(
+    root: &Path,
+    binary: &File,
+    display_path: &Path,
+) -> Result<String, ReleaseError> {
+    let program = safe_fs::descriptor_program(binary, display_path)?;
+    repository::run_capture(
+        root,
+        program.path().as_os_str(),
+        [OsStr::new("--version")],
+        VERSION_TIMEOUT,
+        MAX_VERSION_OUTPUT,
+    )
 }
 
 fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
@@ -269,32 +312,210 @@ fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
 
 #[cfg(test)]
 mod tests {
-    use object::Endianness;
-    use object::write::Object as WriteObject;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt as _;
 
     use super::*;
 
-    fn executable(format: BinaryFormat, architecture: Architecture) -> Vec<u8> {
-        WriteObject::new(format, architecture, Endianness::Little)
-            .write()
-            .expect("object bytes")
+    fn write_bytes(bytes: &mut [u8], offset: usize, value: &[u8]) {
+        let end = offset.checked_add(value.len()).expect("fixture offset");
+        bytes
+            .get_mut(offset..end)
+            .expect("fixture range")
+            .copy_from_slice(value);
+    }
+
+    fn write_u16(bytes: &mut [u8], offset: usize, value: u16) {
+        write_bytes(bytes, offset, &value.to_le_bytes());
+    }
+
+    fn write_u32(bytes: &mut [u8], offset: usize, value: u32) {
+        write_bytes(bytes, offset, &value.to_le_bytes());
+    }
+
+    fn write_u64(bytes: &mut [u8], offset: usize, value: u64) {
+        write_bytes(bytes, offset, &value.to_le_bytes());
+    }
+
+    fn elf_aarch64(kind: u16, machine: u16) -> Vec<u8> {
+        const HEADER_BYTES: usize = 64;
+        const PROGRAM_HEADER_BYTES: usize = 56;
+        const CODE: [u8; 12] = [
+            0x00, 0x00, 0x80, 0xd2, // mov x0, #0
+            0xa8, 0x0b, 0x80, 0xd2, // mov x8, #93
+            0x01, 0x00, 0x00, 0xd4, // svc #0
+        ];
+        let code_offset = HEADER_BYTES + PROGRAM_HEADER_BYTES;
+        let mut bytes = vec![0; code_offset + CODE.len()];
+        write_bytes(
+            &mut bytes,
+            0,
+            &[0x7f, b'E', b'L', b'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        );
+        write_u16(&mut bytes, 16, kind);
+        write_u16(&mut bytes, 18, machine);
+        write_u32(&mut bytes, 20, 1);
+        let base = if kind == object::elf::ET_DYN.0 {
+            0
+        } else {
+            0x40_0000
+        };
+        write_u64(&mut bytes, 24, base + code_offset as u64);
+        write_u64(&mut bytes, 32, HEADER_BYTES as u64);
+        write_u16(&mut bytes, 52, 64);
+        write_u16(&mut bytes, 54, 56);
+        write_u16(&mut bytes, 56, 1);
+
+        write_u32(&mut bytes, HEADER_BYTES, object::elf::PT_LOAD.0);
+        write_u32(
+            &mut bytes,
+            HEADER_BYTES + 4,
+            (object::elf::PF_R | object::elf::PF_X).0,
+        );
+        write_u64(&mut bytes, HEADER_BYTES + 16, base);
+        write_u64(&mut bytes, HEADER_BYTES + 24, base);
+        let file_size = bytes.len() as u64;
+        write_u64(&mut bytes, HEADER_BYTES + 32, file_size);
+        write_u64(&mut bytes, HEADER_BYTES + 40, file_size);
+        write_u64(&mut bytes, HEADER_BYTES + 48, 0x1000);
+        write_bytes(&mut bytes, code_offset, &CODE);
+        bytes
+    }
+
+    fn macho_aarch64_executable() -> Vec<u8> {
+        const HEADER_BYTES: usize = 32;
+        const SEGMENT_COMMAND_BYTES: usize = 72;
+        const ENTRY_COMMAND_BYTES: usize = 24;
+        let code_offset = HEADER_BYTES + SEGMENT_COMMAND_BYTES + ENTRY_COMMAND_BYTES;
+        let mut bytes = vec![0; code_offset + 4];
+        write_u32(&mut bytes, 0, object::macho::MH_MAGIC_64);
+        write_u32(&mut bytes, 4, object::macho::CPU_TYPE_ARM64.0);
+        write_u32(&mut bytes, 8, object::macho::CPU_SUBTYPE_ARM64_ALL.0);
+        write_u32(&mut bytes, 12, object::macho::MH_EXECUTE.0);
+        write_u32(&mut bytes, 16, 2);
+        write_u32(&mut bytes, 20, 96);
+        write_u32(
+            &mut bytes,
+            24,
+            (object::macho::MH_NOUNDEFS
+                | object::macho::MH_DYLDLINK
+                | object::macho::MH_TWOLEVEL
+                | object::macho::MH_PIE)
+                .0,
+        );
+
+        let segment = HEADER_BYTES;
+        write_u32(&mut bytes, segment, object::macho::LC_SEGMENT_64.0);
+        write_u32(&mut bytes, segment + 4, 72);
+        write_bytes(&mut bytes, segment + 8, b"__TEXT");
+        write_u64(&mut bytes, segment + 24, 0x1_0000_0000);
+        write_u64(&mut bytes, segment + 32, 0x1000);
+        let file_size = bytes.len() as u64;
+        write_u64(&mut bytes, segment + 48, file_size);
+        write_u32(&mut bytes, segment + 56, 5);
+        write_u32(&mut bytes, segment + 60, 5);
+
+        let entry = segment + SEGMENT_COMMAND_BYTES;
+        write_u32(&mut bytes, entry, object::macho::LC_MAIN.0);
+        write_u32(&mut bytes, entry + 4, 24);
+        write_u64(&mut bytes, entry + 8, code_offset as u64);
+        write_bytes(&mut bytes, code_offset, &0xd65f_03c0_u32.to_le_bytes());
+        bytes
     }
 
     #[test]
     fn arbitrary_wrong_version_and_wrong_architecture_binaries_are_rejected() {
         assert!(validate_binary_bytes(b"arbitrary payload", ReleaseTarget::LinuxAarch64).is_err());
         assert!(validate_version_output("stab 9.9.9\n").is_err());
-        let wrong_arch = executable(BinaryFormat::Elf, Architecture::X86_64);
+        let wrong_arch = elf_aarch64(object::elf::ET_EXEC.0, object::elf::EM_X86_64.0);
         assert!(validate_binary_bytes(&wrong_arch, ReleaseTarget::LinuxAarch64).is_err());
     }
 
     #[test]
-    fn target_format_and_version_contracts_accept_exact_values() {
-        let linux = executable(BinaryFormat::Elf, Architecture::Aarch64);
+    fn runnable_target_binaries_are_accepted_and_relocatable_objects_are_rejected() {
+        let linux = elf_aarch64(object::elf::ET_EXEC.0, object::elf::EM_AARCH64.0);
         validate_binary_bytes(&linux, ReleaseTarget::LinuxAarch64).expect("Linux AArch64");
-        let macos = executable(BinaryFormat::MachO, Architecture::Aarch64);
+        let linux_pie = elf_aarch64(object::elf::ET_DYN.0, object::elf::EM_AARCH64.0);
+        validate_binary_bytes(&linux_pie, ReleaseTarget::LinuxAarch64).expect("Linux AArch64 PIE");
+        let relocatable = elf_aarch64(object::elf::ET_REL.0, object::elf::EM_AARCH64.0);
+        assert!(validate_binary_bytes(&relocatable, ReleaseTarget::LinuxAarch64).is_err());
+        let mut missing_entry = linux.clone();
+        write_u64(&mut missing_entry, 24, 0);
+        assert!(validate_binary_bytes(&missing_entry, ReleaseTarget::LinuxAarch64).is_err());
+        let mut non_executable_entry = linux;
+        write_u32(&mut non_executable_entry, 68, object::elf::PF_R.0);
+        assert!(validate_binary_bytes(&non_executable_entry, ReleaseTarget::LinuxAarch64).is_err());
+        let macos = macho_aarch64_executable();
         validate_binary_bytes(&macos, ReleaseTarget::MacosAarch64).expect("macOS AArch64");
-        validate_version_output("stab 0.2.0\n").expect("version");
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    #[test]
+    fn accepted_linux_fixtures_execute_successfully() {
+        for (name, kind) in [
+            ("executable", object::elf::ET_EXEC.0),
+            ("pie", object::elf::ET_DYN.0),
+        ] {
+            let root = tempfile::tempdir().expect("root");
+            let path = root.path().join(name);
+            fs::write(&path, elf_aarch64(kind, object::elf::EM_AARCH64.0)).expect("write fixture");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+                .expect("fixture permissions");
+            assert!(
+                std::process::Command::new(&path)
+                    .status()
+                    .expect("execute fixture")
+                    .success(),
+                "{name} fixture did not execute successfully"
+            );
+        }
+    }
+
+    #[test]
+    fn version_output_requires_one_exact_lf_terminated_record() {
+        validate_version_output("stab 0.2.0\n").expect("exact version");
+        for invalid in [
+            "stab 0.2.0",
+            "stab 0.2.0\r\n",
+            "stab 0.2.0\n\n",
+            " stab 0.2.0\n",
+            "stab 0.2.0 \n",
+            "stab 0.2.0\nextra",
+        ] {
+            assert!(
+                validate_version_output(invalid).is_err(),
+                "accepted {invalid:?}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn version_execution_uses_the_retained_binary_descriptor() {
+        let root = tempfile::tempdir().expect("root");
+        let directory =
+            safe_fs::RetainedDirectory::create_new_under(root.path(), Path::new("bin"), None)
+                .expect("directory");
+        let original_path = directory.path().join("stab");
+        let original = directory
+            .write_new(OsStr::new("stab"), b"#!/bin/sh\nprintf 'stab 0.2.0\\n'\n")
+            .expect("original");
+        original
+            .set_permissions(fs::Permissions::from_mode(0o755))
+            .expect("permissions");
+        drop(original);
+        let retained = directory
+            .open_regular(OsStr::new("stab"))
+            .expect("retained binary");
+        fs::rename(&original_path, directory.path().join("displaced")).expect("displace");
+        fs::write(&original_path, b"#!/bin/sh\nprintf 'stab 9.9.9\\n'\n").expect("replacement");
+        fs::set_permissions(&original_path, fs::Permissions::from_mode(0o755))
+            .expect("replacement permissions");
+
+        let version = capture_version_from_descriptor(root.path(), &retained, &original_path)
+            .expect("descriptor version");
+        assert_eq!(version, "stab 0.2.0\n");
     }
 
     #[test]

@@ -1,5 +1,4 @@
 use std::ffi::{OsStr, OsString};
-use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -88,7 +87,7 @@ pub(crate) fn publish_reviewed(
             &package.sha256,
         )?;
         work.revalidate()?;
-        fs::remove_dir_all(work.path()).map_err(|source| ReleaseError::io(work.path(), source))?;
+        work.remove_tree()?;
         println!(
             "[stab-release] published and checksum-verified {} {} ({})",
             package.name, package.version, package.sha256

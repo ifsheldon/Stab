@@ -85,6 +85,10 @@ pub enum ReleaseError {
     NotRegularFile(PathBuf),
     #[error("release input exceeds its {limit}-byte bound: {path}")]
     FileTooLarge { path: PathBuf, limit: u64 },
+    #[error("release directory exceeds its {limit}-entry bound: {path}")]
+    DirectoryTooLarge { path: PathBuf, limit: usize },
+    #[error("release directory exceeds its {limit}-level depth bound: {path}")]
+    DirectoryDepth { path: PathBuf, limit: usize },
     #[error("release input changed while it was being used: {0}")]
     FileIdentityChanged(PathBuf),
     #[error("release binary contract violation: {0}")]
