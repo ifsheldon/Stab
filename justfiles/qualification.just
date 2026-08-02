@@ -37,3 +37,8 @@ correctness-preflight *args:
 [working-directory: '..']
 status *args:
     cargo run -q -p stab-bench -- qualification-status {{args}}
+
+# Replay and publish the checked source copy of one release completion manifest.
+[working-directory: '..']
+completion-checkpoint *args:
+    cargo run -q -p stab-bench --profile release -- qualification-completion-checkpoint {{args}}

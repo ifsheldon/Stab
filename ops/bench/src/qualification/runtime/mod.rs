@@ -28,7 +28,10 @@ mod worker;
 
 pub(super) use crate::process;
 
-pub(crate) use completion::{CompletionArgs, CompletionReportArgs};
+pub(super) use completion::CompletionStatusRegression;
+pub(crate) use completion::{
+    CompletionArgs, CompletionCheckpointArgs, CompletionReportArgs, CompletionReportValidation,
+};
 pub(crate) use diagnostic::DiagnosticArgs;
 pub(super) use group::GROUP_CONTRACT_SCHEMA_VERSION;
 pub(crate) use parity::ParityArgs;
@@ -99,6 +102,27 @@ pub(super) fn qualification_policy_status(
         regression_default_max_relative_ratio: regression.default_max_relative_ratio,
         regression_seeded_identity_count: regression.seeded_identity_count,
     })
+}
+
+pub(super) fn inspect_completion_status_manifest(
+    source_root: &crate::root::RepoRoot,
+    report_json: &[u8],
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    expected_parity_policy_sha256: &str,
+    expected_regression_policy_sha256: &str,
+    expected_regression_baselines_sha256: &str,
+) -> Result<completion::InspectedCompletionStatus, String> {
+    completion::inspect_status_manifest(
+        source_root,
+        report_json,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        expected_parity_policy_sha256,
+        expected_regression_policy_sha256,
+        expected_regression_baselines_sha256,
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub(super) fn validate_status_artifact_path(path: &std::path::Path) -> Result<(), String> {
@@ -273,8 +297,25 @@ pub(crate) fn run_completion_report(
     inventory_digest: &str,
     correctness_digest: &str,
     args: CompletionReportArgs,
-) -> Result<std::path::PathBuf, String> {
+) -> Result<CompletionReportValidation, String> {
     completion::run_report_with_repository(
+        &session.root,
+        &session.source_root,
+        &session.repository,
+        inventory_digest,
+        correctness_digest,
+        args,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn completion_checkpoint_manifest(
+    session: &QualificationSession,
+    inventory_digest: &str,
+    correctness_digest: &str,
+    args: CompletionCheckpointArgs,
+) -> Result<Vec<u8>, String> {
+    completion::checkpoint_manifest_with_repository(
         &session.root,
         &session.source_root,
         &session.repository,

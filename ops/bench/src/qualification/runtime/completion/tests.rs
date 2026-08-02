@@ -640,6 +640,91 @@ fn completion_scopes_cover_historical_dem_and_complete_release_matrix() {
 }
 
 #[test]
+fn checked_status_manifest_authenticates_current_release_contracts() {
+    let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("performance inventory");
+    let scope =
+        scope::load(&root, &suite.semantic_digest, RELEASE_SCOPE_ID).expect("A9 release scope");
+    let mut manifest = release_manifest(
+        &root,
+        &suite.semantic_digest,
+        &suite.correctness_digest,
+        &scope,
+    );
+    manifest.parity_policy_sha256 =
+        super::super::parity::policy_sha256(&root, &suite.semantic_digest).expect("parity policy");
+    let regression =
+        super::super::self_regression::source_identities(&root, &suite.semantic_digest)
+            .expect("regression identities");
+    manifest.regression_policy_sha256 = regression.policy_sha256;
+    manifest.regression_baselines_sha256 = regression.baselines_sha256;
+    let bytes = canonical_json(&manifest).expect("canonical manifest");
+
+    let inspected = inspect_status_manifest(
+        &root,
+        &bytes,
+        &suite.semantic_digest,
+        &suite.correctness_digest,
+        &manifest.parity_policy_sha256,
+        &manifest.regression_policy_sha256,
+        &manifest.regression_baselines_sha256,
+    )
+    .expect("current status manifest");
+    assert!(inspected.matches_current_contract);
+    assert_eq!(inspected.summary.scope_id, RELEASE_SCOPE_ID);
+    assert_eq!(
+        inspected.summary.stab_commit,
+        manifest.repository.commit_after
+    );
+    assert_eq!(
+        inspected.summary.regression,
+        CompletionStatusRegression::Unseeded
+    );
+
+    let historical = inspect_status_manifest(
+        &root,
+        &bytes,
+        &"0".repeat(64),
+        &suite.correctness_digest,
+        &manifest.parity_policy_sha256,
+        &manifest.regression_policy_sha256,
+        &manifest.regression_baselines_sha256,
+    )
+    .expect("well-formed historical manifest");
+    assert!(!historical.matches_current_contract);
+
+    let mut malformed = manifest;
+    malformed.environment.architecture.clear();
+    assert!(
+        inspect_status_manifest(
+            &root,
+            &canonical_json(&malformed).expect("canonical malformed manifest"),
+            &suite.semantic_digest,
+            &suite.correctness_digest,
+            &malformed.parity_policy_sha256,
+            &malformed.regression_policy_sha256,
+            &malformed.regression_baselines_sha256,
+        )
+        .is_err()
+    );
+    let mut noncanonical = bytes;
+    noncanonical.extend_from_slice(b" \n");
+    assert!(
+        inspect_status_manifest(
+            &root,
+            &noncanonical,
+            &suite.semantic_digest,
+            &suite.correctness_digest,
+            &"0".repeat(64),
+            &"0".repeat(64),
+            &"0".repeat(64),
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn legacy_schema_one_receipts_remain_readable_but_not_current() {
     let receipt = serde_json::json!({
         "schema_version": 1,

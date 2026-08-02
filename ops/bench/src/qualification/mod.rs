@@ -20,9 +20,9 @@ mod status;
 mod validation;
 
 pub(crate) use runtime::{
-    BaselineCandidateArgs, CompletionArgs, CompletionReportArgs, DiagnosticArgs, ParityArgs,
-    ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, SelfRegressionArgs,
-    SimdCompareArgs, SimdReportArgs, WorkerArgs,
+    BaselineCandidateArgs, CompletionArgs, CompletionCheckpointArgs, CompletionReportArgs,
+    DiagnosticArgs, ParityArgs, ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs,
+    SelfRegressionArgs, SimdCompareArgs, SimdReportArgs, WorkerArgs,
 };
 pub(crate) use status::StatusArgs;
 
@@ -176,19 +176,49 @@ pub(crate) fn completion_report(
 ) -> Result<(), BenchError> {
     with_checked_formal_session(root, |session| {
         let checked = read(session.source_root())?;
-        let output = runtime::run_completion_report(
+        let validation = runtime::run_completion_report(
             session,
             EXPECTED_FROZEN_DIGEST,
             &checked.correctness_digest,
             args,
         )
         .map_err(BenchError::Qualification)?;
-        println!(
-            "[{PREFIX}] reconstructed performance qualification completion manifest at {}",
-            output.display()
-        );
+        match validation {
+            runtime::CompletionReportValidation::Replayed(output) => println!(
+                "[{PREFIX}] reconstructed performance qualification completion manifest at {}",
+                output.display()
+            ),
+            runtime::CompletionReportValidation::HistoricalReadable {
+                path,
+                schema_version,
+            } => println!(
+                "[{PREFIX}] historical completion schema {schema_version} is readable at {}; source artifacts were not replayed",
+                path.display()
+            ),
+        }
         Ok(())
     })
+}
+
+pub(crate) fn completion_checkpoint(
+    root: &RepoRoot,
+    args: CompletionCheckpointArgs,
+) -> Result<(), BenchError> {
+    let report_json = with_checked_formal_session(root, |session| {
+        let checked = read(session.source_root())?;
+        runtime::completion_checkpoint_manifest(
+            session,
+            EXPECTED_FROZEN_DIGEST,
+            &checked.correctness_digest,
+            args,
+        )
+        .map_err(BenchError::Qualification)
+    })?;
+    status::publish_completion_manifest(root, &report_json)?;
+    println!(
+        "[{PREFIX}] published authenticated completion checkpoint at benchmarks/qualification-completion-checkpoint.json"
+    );
+    Ok(())
 }
 
 pub(crate) fn parity(root: &RepoRoot, args: ParityArgs) -> Result<(), BenchError> {

@@ -20,6 +20,7 @@ use crate::root::RepoRoot;
 mod group_correctness;
 mod legacy;
 mod scope;
+mod status_manifest;
 #[cfg(test)]
 mod tests;
 
@@ -27,6 +28,8 @@ use group_correctness::{CompletionCorrectness, collect as completion_correctness
 use scope::{CompletionScope, MAX_ROLLUPS, RELEASE_SCOPE_ID, expected_rollup_keys};
 #[cfg(test)]
 use scope::{DEM_PARSE_GROUP, DEM_PRINT_GROUP, DEM_SCOPE_ID};
+pub(super) use status_manifest::checkpoint_manifest_with_repository;
+pub(crate) use status_manifest::{CompletionStatusRegression, InspectedCompletionStatus};
 
 const COMPLETION_SCHEMA_VERSION: u32 = 3;
 const PREFLIGHT_SCHEMA_VERSION: u32 = 3;
@@ -56,6 +59,19 @@ pub(crate) struct CompletionReportArgs {
     /// Published completion manifest to reconstruct offline.
     #[arg(long, default_value = DEFAULT_OUTPUT)]
     input: PathBuf,
+}
+
+#[derive(Clone, Debug, Args)]
+pub(crate) struct CompletionCheckpointArgs {
+    /// Replayed schema-version-3 completion whose exact manifest will be checked in.
+    #[arg(long)]
+    input: PathBuf,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum CompletionReportValidation {
+    Replayed(PathBuf),
+    HistoricalReadable { path: PathBuf, schema_version: u32 },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -228,7 +244,7 @@ pub(super) fn run_report_with_repository(
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     args: CompletionReportArgs,
-) -> Result<PathBuf, CompletionError> {
+) -> Result<CompletionReportValidation, CompletionError> {
     let input = DirectQualificationArtifactPath::try_new(&args.input)?;
     let report_json = read_completion_artifact(
         root,
@@ -247,7 +263,10 @@ pub(super) fn run_report_with_repository(
         if Path::new(&summary.output) != input.as_path() {
             return Err(CompletionError::OutputBinding);
         }
-        return Ok(input.into_path_buf());
+        return Ok(CompletionReportValidation::HistoricalReadable {
+            path: input.into_path_buf(),
+            schema_version,
+        });
     }
     if schema_version != COMPLETION_SCHEMA_VERSION {
         return Err(CompletionError::SchemaVersion(schema_version));
@@ -317,7 +336,27 @@ pub(super) fn run_report_with_repository(
         &preflight_json,
         &markdown,
     )?;
-    Ok(input.into_path_buf())
+    Ok(CompletionReportValidation::Replayed(input.into_path_buf()))
+}
+
+pub(super) fn inspect_status_manifest(
+    source_root: &RepoRoot,
+    report_json: &[u8],
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    expected_parity_policy_sha256: &str,
+    expected_regression_policy_sha256: &str,
+    expected_regression_baselines_sha256: &str,
+) -> Result<InspectedCompletionStatus, CompletionError> {
+    status_manifest::inspect(
+        source_root,
+        report_json,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        expected_parity_policy_sha256,
+        expected_regression_policy_sha256,
+        expected_regression_baselines_sha256,
+    )
 }
 
 #[allow(

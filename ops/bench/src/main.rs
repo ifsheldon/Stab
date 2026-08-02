@@ -135,6 +135,9 @@ enum Command {
     /// Reconstruct a completion manifest offline from its exact rollups and reports.
     QualificationCompletionReport(qualification::CompletionReportArgs),
 
+    /// Check in an authenticated copy of one fully replayed release completion manifest.
+    QualificationCompletionCheckpoint(qualification::CompletionCheckpointArgs),
+
     /// Check promotable qualification evidence against source-owned Stim parity thresholds.
     QualificationParity(qualification::ParityArgs),
 
@@ -358,6 +361,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationCompletionReport(args) => {
             qualification::completion_report(&root, args)?;
+        }
+        Command::QualificationCompletionCheckpoint(args) => {
+            qualification::completion_checkpoint(&root, args)?;
         }
         Command::QualificationParity(args) | Command::QualificationRegression(args) => {
             qualification::parity(&root, args)?;
