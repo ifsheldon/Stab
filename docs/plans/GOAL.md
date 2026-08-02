@@ -11,6 +11,7 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - A8 measured source `c797ebc908ce1b81675e479031c39f71740058ae` passed exact-revision GitHub Actions through status descendant `c4299a23383043ee74daba80621d25072cdac5b9`, run `30732340918`.
 - Ten product packages are already versioned `0.2.0`: `stab-kernels-simd`, `stab-bits`, `stab-model`, `stab-records`, `stab-algebra`, `stab-analysis`, `stab-decoder`, `stab-engine`, `stab-core`, and `stab-cli`.
 - All ten packages assemble successfully with `cargo package --no-verify`; internal publishable dependencies require exact `=0.2.0` versions.
+- The `release::` just surface is backed by the unpublished `stab-release` Rust ops crate. It validates the exact package set and topological order, records clean-source package archive digests, packages tagged binaries and checksums, and keeps crates.io publication an explicit one-package-at-a-time operation.
 - `docs/MIGRATING-0.2.md`, the component graph, facade tiers, migration inventory, README, feature checklist, qualification inventories, and generated dashboard exist.
 - The active performance matrix contains 19 promotable groups and remains below the 40-group release cap. Eight product diagnostics plus one infrastructure group remain below the 60-group diagnostic cap.
 - The 19 release groups reference 21 unique exact correctness parents. Formal source-current PR, full, and soak evidence has not started.
@@ -20,7 +21,7 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 
 ## Execution Sequence
 
-1. Freeze release metadata and operations. Give every package reviewable crates.io metadata, add a thin `release::` just surface backed by a Rust ops binary, replace release-workflow packaging logic with that binary, define the exact dependency-ordered publication procedure, and document partial-publication recovery.
+1. Verify the frozen release metadata and operations from a clean commit. Run the Rust-backed package preflight into a new `target/releases/` path, inspect every archive, and preserve its report identity; the exact publication order and partial-publication recovery procedure live in `docs/RELEASING.md`.
 2. Freeze the finite A9 evidence scope before timing. Keep the 19 release groups unless a demonstrated architecture risk justifies a source-owned addition; do not promote diagnostics merely to increase coverage. Use the source-derived `a9-release` completion scope for all 38 full/soak rollups and 138 source reports.
 3. Run milestone-audit and full-code-review over release metadata, package boundaries, CI/release workflow, correctness ownership, benchmark comparability, resource limits, and documentation. Fix every confirmed finding before evidence.
 4. Commit the final pre-evidence source, regenerate correctness and performance inventories and generated status, and require a clean unchanged worktree for every formal artifact.

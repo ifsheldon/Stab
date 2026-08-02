@@ -7,6 +7,8 @@ description = "Stable typed Stim circuit and detector-error-model values for Sta
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
 
 [lints]
 workspace = true

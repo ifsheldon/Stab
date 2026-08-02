@@ -239,3 +239,7 @@ Use `--thresholds <path>` once regression thresholds exist to fail selected rows
 The native target is limited to machine-local benchmark evidence and does not change generic release binaries.
 `just bench::compare-allocations` builds `stab-bench` with the optional `count-allocations` feature and adds Stab-side allocation counts plus resident-memory samples to the compare report. The report retains raw timing ratios for context but marks parity timing as `not-evaluated-instrumented`; combining allocation tracking with beta or regression timing gates is rejected. Keep timing-gate runs on plain `just bench::compare`.
 Use `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` once the first complete memory report exists to fail rows whose peak live allocation bytes or sampled resident bytes exceed the M12 25 percent regression budget.
+
+## Release Operations
+
+Use `just release::publish-order` to validate and print the coordinated product-crate order. From the final clean reviewed release revision, use `just release::check --out target/releases/<unique-preflight-name>` to assemble all ten crates and record archive identities. The release workflow uses `just release::package-binary` through the same Rust ops binary for platform artifacts and checksums; complex packaging logic must not move back into workflow shell steps. The complete irreversible publication, partial-failure recovery, tag, and GitHub verification procedure is in [docs/RELEASING.md](docs/RELEASING.md).

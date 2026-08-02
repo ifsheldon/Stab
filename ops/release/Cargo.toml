@@ -1,0 +1,25 @@
+[package]
+name = "stab-release"
+version.workspace = true
+edition.workspace = true
+description = "Release preflight and artifact packaging for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+cargo_metadata = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+stab-architecture = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

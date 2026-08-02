@@ -20,3 +20,6 @@ mod bench 'justfiles/bench.just'
 
 # Documentation generation helpers.
 mod docs 'justfiles/docs.just'
+
+# Coordinated package and binary release helpers.
+mod release 'justfiles/release.just'

@@ -7,6 +7,8 @@ description = "Stable packed bit storage and scalar layout primitives for Stab."
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
 
 [lints]
 workspace = true

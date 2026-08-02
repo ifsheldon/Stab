@@ -62,6 +62,7 @@
 - The hook should treat submodules as pointer updates, run Rust checks only for staged Rust-affecting paths, scan staged source blobs for oversized files, and check Stab's instruction-document policy only when instruction docs or `.gitmodules` change.
 - Every scanned `README.md` must have a colocated `AGENTS.md`, and every effective `AGENTS.md` source must have at least one `CLAUDE.md` symlink pointing to it.
 - Document new operational workflows in the matching docs when adding or changing them.
+- Use `just release::publish-order` and `just release::check --out target/releases/<unique-name>` for coordinated product-crate release preflight, and use `just release::package-binary` for tagged GitHub binary artifacts. Follow `docs/RELEASING.md` for irreversible crates.io publication, partial-release recovery, tag creation, and final verification; never add credentials to arguments or generated release reports.
 
 ### Stim Compatibility
 

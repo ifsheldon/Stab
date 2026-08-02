@@ -29,6 +29,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Show toolchain
         run: rustup show active-toolchain
@@ -37,17 +41,9 @@ jobs:
         run: cargo build --release --locked -p stab-cli
 
       - name: Package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          cp target/release/stab "dist/stab-${{ matrix.name }}"
-          cd dist
-          if command -v sha256sum >/dev/null 2>&1; then
-            sha256sum "stab-${{ matrix.name }}" > "stab-${{ matrix.name }}.sha256"
-          else
-            shasum -a 256 "stab-${{ matrix.name }}" > "stab-${{ matrix.name }}.sha256"
-          fi
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: cargo run -q --locked -p stab-release -- package-binary --binary target/release/stab --target ${{ matrix.name }} --out dist --tag "$RELEASE_TAG"
 
       - name: Upload release assets
         env:

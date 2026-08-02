@@ -954,6 +954,7 @@ Status: Active.
 - Fix every confirmed implementation, test, benchmark, documentation, and architecture finding.
 - Regenerate from one clean commit.
 - Publish all product crates and `stab-core` together as `0.2.0`.
+- Validate the coordinated package set, exact internal versions, topological publication order, shared package README, archive digests, annotated release tag, and binary checksums through the Rust-backed `release::` workflow; document non-atomic crates.io recovery before publication.
 - Keep ops crates and the reference decoder unpublished.
 
 ### Correctness Evidence

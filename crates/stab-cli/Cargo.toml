@@ -6,6 +6,8 @@ description = "Stim-compatible command-line interface for Stab."
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
 
 [lints]
 workspace = true
