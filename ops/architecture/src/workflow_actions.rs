@@ -8,6 +8,7 @@ use crate::{CheckError, Violation};
 
 const WORKFLOW_DIRECTORY: &str = ".github/workflows";
 const MAX_WORKFLOW_BYTES: usize = 1 << 20;
+const DRAFT_OPERATOR_COMMAND: &str = "./target/debug/stab-release create-draft --assets target/releases/assets --tag \"$RELEASE_TAG\" --confirm-version 0.2.0";
 
 pub(super) struct WorkflowActionReport {
     pub action_use_count: usize,
@@ -181,6 +182,9 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
         ));
         return;
     };
+    let workflow_secrets = mapping_value(root, "env")
+        .map(release_secrets)
+        .unwrap_or_default();
     let Some(jobs) = mapping_value(root, "jobs") else {
         return;
     };
@@ -197,6 +201,11 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
         let Some(job) = job.as_hash() else {
             continue;
         };
+        let inherited_secrets = workflow_secrets.merged(
+            mapping_value(job, "env")
+                .map(release_secrets)
+                .unwrap_or_default(),
+        );
         if let Some(reference) = mapping_value(job, "uses") {
             inspect_action_reference(path, job_name, reference, report);
         }
@@ -218,7 +227,81 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
                     report,
                 );
             }
+            let location = format!("{job_name}.steps[{index}]");
+            let step_secrets = mapping_value(step, "env")
+                .map(release_secrets)
+                .unwrap_or_default();
+            if inherited_secrets.any() || step_secrets.any() {
+                inspect_secret_bearing_step(
+                    path,
+                    &location,
+                    step,
+                    inherited_secrets,
+                    step_secrets,
+                    report,
+                );
+            }
         }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct ReleaseSecrets {
+    github_token: bool,
+    unexpected: bool,
+}
+
+impl ReleaseSecrets {
+    fn any(self) -> bool {
+        self.github_token || self.unexpected
+    }
+
+    fn merged(self, other: Self) -> Self {
+        Self {
+            github_token: self.github_token || other.github_token,
+            unexpected: self.unexpected || other.unexpected,
+        }
+    }
+}
+
+fn release_secrets(value: &Yaml) -> ReleaseSecrets {
+    let Some(environment) = value.as_hash() else {
+        return ReleaseSecrets::default();
+    };
+    ReleaseSecrets {
+        github_token: mapping_value(environment, "GITHUB_TOKEN").is_some(),
+        unexpected: [
+            "CARGO_REGISTRY_TOKEN",
+            "CARGO_REGISTRIES_CRATES_IO_TOKEN",
+            "GH_TOKEN",
+        ]
+        .iter()
+        .any(|key| mapping_value(environment, key).is_some()),
+    }
+}
+
+fn inspect_secret_bearing_step(
+    path: &Path,
+    location: &str,
+    step: &yaml_rust2::yaml::Hash,
+    inherited_secrets: ReleaseSecrets,
+    step_secrets: ReleaseSecrets,
+    report: &mut WorkflowActionReport,
+) {
+    let command = mapping_value(step, "run").and_then(yaml_scalar);
+    let exact_operator = !inherited_secrets.any()
+        && step_secrets.github_token
+        && !step_secrets.unexpected
+        && mapping_value(step, "uses").is_none()
+        && command == Some(DRAFT_OPERATOR_COMMAND);
+    if !exact_operator {
+        report.violations.push(Violation::new(
+            "workflow-release-secret-scope",
+            format!(
+                "workflow {} step {location} exposes a release credential outside the prebuilt draft operator",
+                path.display()
+            ),
+        ));
     }
 }
 
@@ -405,6 +488,111 @@ jobs:
         );
         assert_eq!(report.action_use_count, 1);
         assert!(report.violations.is_empty());
+    }
+
+    #[test]
+    fn release_credentials_are_rejected_from_cargo_and_action_steps() {
+        let report = inspect(
+            r#"
+jobs:
+  draft:
+    steps:
+      - env:
+          GITHUB_TOKEN: secret
+        run: cargo run -p stab-release -- create-draft
+      - env:
+          CARGO_REGISTRY_TOKEN: secret
+        uses: owner/action@0123456789abcdef0123456789abcdef01234567
+"#,
+        );
+        assert_eq!(
+            report
+                .violations
+                .iter()
+                .filter(|violation| violation.code == "workflow-release-secret-scope")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn inherited_release_credentials_are_rejected() {
+        for source in [
+            r#"
+env:
+  GITHUB_TOKEN: secret
+jobs:
+  draft:
+    steps:
+      - run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+"#,
+            r#"
+jobs:
+  draft:
+    env:
+      GITHUB_TOKEN: secret
+    steps:
+      - run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+"#,
+        ] {
+            let report = inspect(source);
+            assert_eq!(
+                report
+                    .violations
+                    .iter()
+                    .filter(|violation| violation.code == "workflow-release-secret-scope")
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn draft_operator_rejects_extra_secrets_and_shell_composition() {
+        for source in [
+            r#"
+jobs:
+  draft:
+    steps:
+      - env:
+          GITHUB_TOKEN: secret
+          CARGO_REGISTRY_TOKEN: other-secret
+        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+"#,
+            r#"
+jobs:
+  draft:
+    steps:
+      - env:
+          GITHUB_TOKEN: secret
+        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0; echo leaked
+"#,
+        ] {
+            let report = inspect(source);
+            assert_eq!(
+                report
+                    .violations
+                    .iter()
+                    .filter(|violation| violation.code == "workflow-release-secret-scope")
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn release_credential_is_accepted_only_for_the_prebuilt_draft_operator() {
+        let report = inspect(
+            r#"
+jobs:
+  draft:
+    steps:
+      - env:
+          GITHUB_TOKEN: secret
+        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+"#,
+        );
+        assert!(report.violations.is_empty(), "{:?}", report.violations);
     }
 
     #[test]

@@ -75,8 +75,11 @@ jobs:
           merge-multiple: true
           path: target/releases/assets
 
+      - name: Build credential-free release operator
+        run: cargo build -q --locked -p stab-release
+
       - name: Verify retained assets and create digest-checked draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: cargo run -q --locked -p stab-release -- create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
