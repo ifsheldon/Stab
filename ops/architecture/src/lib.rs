@@ -15,6 +15,7 @@ mod markdown;
 mod metadata;
 mod policy;
 mod source_scan;
+mod workflow_actions;
 
 use std::path::{Path, PathBuf};
 
@@ -57,6 +58,7 @@ pub struct CheckSummary {
     pub package_count: usize,
     pub dependency_edge_count: usize,
     pub rust_source_count: usize,
+    pub workflow_action_count: usize,
     pub migration_allowances: Vec<MigrationAllowance>,
 }
 
@@ -69,8 +71,11 @@ impl CheckSummary {
             );
         }
         println!(
-            "[{PREFIX}] checked {} workspace packages, {} workspace dependency edges, and {} Rust source files",
-            self.package_count, self.dependency_edge_count, self.rust_source_count
+            "[{PREFIX}] checked {} workspace packages, {} workspace dependency edges, {} Rust source files, and {} workflow action uses",
+            self.package_count,
+            self.dependency_edge_count,
+            self.rust_source_count,
+            self.workflow_action_count
         );
     }
 }
@@ -137,6 +142,18 @@ pub enum CheckError {
         path: PathBuf,
         source: std::io::Error,
     },
+
+    #[error("failed to inspect workflow directory {path}: {source}")]
+    InspectWorkflowDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("failed to read workflow file {path}: {source}")]
+    ReadWorkflow {
+        path: PathBuf,
+        source: std::io::Error,
+    },
 }
 
 /// Checks the Cargo dependency graph and direct portable-SIMD source boundary.
@@ -148,8 +165,10 @@ pub fn check_workspace(root: &Path) -> Result<CheckReport, CheckError> {
     let graph = metadata::load_workspace_graph(&root)?;
     let mut policy_report = policy::validate_graph(&graph);
     let source_report = source_scan::scan_workspace_sources(&root, &graph.packages)?;
+    let workflow_report = workflow_actions::scan_workflow_actions(&root)?;
 
     policy_report.violations.extend(source_report.violations);
+    policy_report.violations.extend(workflow_report.violations);
     policy_report
         .migration_allowances
         .extend(source_report.migration_allowances);
@@ -163,6 +182,7 @@ pub fn check_workspace(root: &Path) -> Result<CheckReport, CheckError> {
             package_count: graph.packages.len(),
             dependency_edge_count: graph.edges.len(),
             rust_source_count: source_report.rust_source_count,
+            workflow_action_count: workflow_report.action_use_count,
             migration_allowances: policy_report.migration_allowances,
         },
         violations: policy_report.violations,
