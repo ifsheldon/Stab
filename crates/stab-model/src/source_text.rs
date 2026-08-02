@@ -139,6 +139,24 @@ impl<'a> SourceCommands<'a> {
         };
         let source = line.source();
         let command_start = self.next_relative_start;
+
+        // Plain commands cannot contain a comment or a block boundary. Returning the complete
+        // line here avoids the stateful tag/comment scan on the dominant parser path.
+        if command_start == 0
+            && !source
+                .text()
+                .as_bytes()
+                .iter()
+                .any(|byte| matches!(byte, b'#' | b'{' | b'}' | b'['))
+        {
+            self.current_line = None;
+            return Some(SourceCommand {
+                line_number: line.line_number(),
+                source,
+                end_error_span: line.end_error_span(),
+            });
+        }
+
         let mut in_tag = false;
         let mut in_arguments = false;
         let mut escaped = false;

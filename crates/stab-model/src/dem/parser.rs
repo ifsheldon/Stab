@@ -223,7 +223,7 @@ fn parse_dem_instruction(
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
 ) -> ModelResult<DemInstruction> {
-    let (name, rest) = parse_name(line_number, line)?;
+    let (kind, name, rest) = parse_instruction_kind(line_number, line)?;
     if name.text().eq_ignore_ascii_case("repeat") {
         return Err(line_error(
             ModelDialect::DetectorErrorModel,
@@ -235,7 +235,7 @@ fn parse_dem_instruction(
             instruction_context(name.text()),
         ));
     }
-    let kind = DemInstructionKind::lookup_name(name.text()).ok_or_else(|| {
+    let kind = kind.ok_or_else(|| {
         let name_excerpt = bounded_parse_diagnostic_text(name.text());
         line_error(
             ModelDialect::DetectorErrorModel,
@@ -271,6 +271,37 @@ fn parse_dem_instruction(
         targets.values,
         tag,
     ))
+}
+
+fn parse_instruction_kind(
+    line_number: usize,
+    line: SourceSlice<'_>,
+) -> ModelResult<(Option<DemInstructionKind>, SourceSlice<'_>, SourceSlice<'_>)> {
+    for (name, kind) in [
+        ("error", DemInstructionKind::Error),
+        ("detector", DemInstructionKind::Detector),
+        ("logical_observable", DemInstructionKind::LogicalObservable),
+        ("shift_detectors", DemInstructionKind::ShiftDetectors),
+    ] {
+        if line.text().starts_with(name)
+            && line
+                .text()
+                .as_bytes()
+                .get(name.len())
+                .is_none_or(|byte| matches!(byte, b'[' | b'(' | b' ' | b'\t' | b'\r'))
+        {
+            let parsed_name = line
+                .prefix(name.len())
+                .ok_or_else(|| parse_line_error(line_number, "invalid DEM instruction name"))?;
+            let rest = line
+                .suffix(name.len())
+                .ok_or_else(|| parse_line_error(line_number, "invalid DEM instruction name"))?;
+            return Ok((Some(kind), parsed_name, rest));
+        }
+    }
+
+    let (name, rest) = parse_name(line_number, line)?;
+    Ok((DemInstructionKind::lookup_name(name.text()), name, rest))
 }
 
 fn parse_name(

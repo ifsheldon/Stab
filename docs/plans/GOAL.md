@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete; A9 evidence must restart after the controlled-host policy revision.
+Status: Active. Milestones A0 through A8 are complete; A9 evidence must restart after the DEM parser parity repair.
 
 ## Objective
 
@@ -15,20 +15,22 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - Explicit crates.io and GitHub publication-token variables are absent from Cargo, build scripts, inherited workflow and job environments, unrelated commands, arguments, reports, and logs. The required variable is bound only while executing the current already-built authenticated operator after local verification and A9 authorization. Reviewed pinned actions and their declared GitHub job permissions remain a separate trusted boundary.
 - The pre-evidence milestone audit and full-code-review are complete. They found and repaired credential exposure through workflow and local `cargo run` dispatch; no further confirmed implementation defect, evidence loophole, or milestone under-specification remains before the diagnostic package preflight.
 - Complete local non-timing verification passes at `212331732c7ebd0bbf55534c1d1fbd2935a1e84c`: Stable component tests, portable-SIMD tests and Clippy, formatting, workspace Clippy and tests, architecture and consumer checks, API and documentation checks, the live 62-case result-format corpus, the implemented oracle matrix, correctness and performance checks and deterministic regeneration, generated status, benchmark smoke, and pre-commit.
-- Exact-revision GitHub run `30745417172` passed both `Rust` and `Qualification Contracts` for commit `1f494b4797176cd783c2332cdc3bd034aa889291`, including the pinned-compiler repair.
-- Source-current PR, full, soak, and exact-parent correctness evidence was produced at `1f494b47`. Two controlled gate-lookup reports also passed under the former 85 C host policy, while the large scale was rejected before publication when the host reached 90.5 C.
+- Exact-revision GitHub run `30751862781` passed both `Rust` and `Qualification Contracts` for controlled-policy commit `92b629faca87347786f9cb1296f32b9ddb1121b4`.
+- Source-current PR, broad full, broad soak, 11 exact full prerequisites, oracle checks, and worker reproducibility passed at `92b629fa`. All 17 non-DEM full-tier groups and gate lookup's soak tier also passed and replayed under the revised host policy.
 - The controlled thermal ceiling is now 100000 millidegrees Celsius for both checked profiles. Every exposed thermal zone on the current AArch64 host reports a 104800 millidegree Celsius firmware critical trip. The 100 C value is an evidence-admissibility ceiling, not a hardware-safety claim; thermal throttling and every other host-policy check remain disqualifying.
-- Changing the checked host policy changes the source and policy identities. All correctness and performance artifacts from `1f494b47`, including the two accepted gate-lookup reports, are historical and cannot satisfy the current A9 completion.
+- The first DEM parse report at `92b629fa` failed stably at median `1.524360x` with upper confidence bound `1.537406x`; it was replayed, preserved, and not rerun.
+- The repaired parser restores plain-command and canonical-name fast paths without changing grammar or diagnostics. Dirty-tree exact-shape guidance is `1.076759x`, but only fresh clean paired evidence can satisfy the gate.
+- This source change makes every accepted `92b629fa` report historical for current A9 completion. No old report may be combined with replacement evidence.
 - The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, draft, or public GitHub release.
-- `origin/main` and local `main` matched `1f494b4797176cd783c2332cdc3bd034aa889291` before this policy change. The policy commit requires its own push and exact-revision CI before replacement evidence begins.
+- Local and remote `main` matched `92b629faca87347786f9cb1296f32b9ddb1121b4` before the parser repair. The repair requires regenerated contracts, a focused commit, push, and exact-head CI.
 - Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Formal timing must preserve and restore that exact configuration.
 
 ## Next Actions
 
-1. Verify and commit the 100 C controlled-host policy with synchronized benchmark and progress documentation.
-2. Push the exact policy commit, re-fetch `origin/main`, and require both `Rust` and `Qualification Contracts` to pass for that exact revision.
-3. From that clean verified revision, rerun and replay PR, full, and soak correctness, the live result-format corpus, the implemented oracle matrix, and worker reproducibility.
-4. Produce controlled AArch64 full and soak evidence for all 19 release groups under the revised checked policy, using new artifact paths only.
+1. Regenerate correctness, performance, and generated-status contracts for the DEM parser repair; run targeted and standard checks; commit and push the focused fix.
+2. Re-fetch `origin/main` and require both `Rust` and `Qualification Contracts` to pass for the exact repair revision.
+3. From that clean verified revision, rerun and replay PR, full, and soak correctness, every exact prerequisite, the live result-format corpus, the implemented oracle matrix, and worker reproducibility.
+4. Produce controlled AArch64 full and soak evidence for all 19 release groups from that one revision, using new artifact paths only.
 5. Enforce `1.25x` Stim parity, seeded `1.15x` Stab self-regression, memory and scaling policy, and honest `unseeded` outcomes. Produce 38 rollups and the 138-report `a9-release` schema-version-3 completion, then replay it once.
 6. Restore swap after every timing session, verify no qualification process remains, and preserve all failed or noisy artifacts.
 7. Re-run both audits. Any confirmed executable, test, fixture, workflow, inventory, policy, or normative-contract fix invalidates affected evidence and must precede replacement runs.
