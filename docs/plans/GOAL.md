@@ -1,58 +1,52 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete; A9 is the remaining architecture-plan milestone.
+Status: Active. Milestones A0 through A8 are complete; A9 remains pre-evidence.
 
 ## Objective
 
-Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): freeze the coordinated 0.2 product, produce source-current correctness and controlled performance evidence, publish every product crate together, publish the `v0.2.0` GitHub release, and close the architecture migration without weakening compatibility or performance policy.
+Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): freeze the coordinated 0.2 product, produce source-current correctness and controlled performance evidence, publish the ten product crates from exact reviewed bytes, publish `v0.2.0`, and close the architecture migration without weakening compatibility, resource, or performance policy.
 
 ## Current State
 
-- A8 measured source `c797ebc908ce1b81675e479031c39f71740058ae` passed exact-revision GitHub Actions through status descendant `c4299a23383043ee74daba80621d25072cdac5b9`, run `30732340918`.
-- Ten product packages are already versioned `0.2.0` in publication order: `stab-kernels-simd`, `stab-model`, `stab-bits`, `stab-records`, `stab-algebra`, `stab-analysis`, `stab-decoder`, `stab-engine`, `stab-core`, and `stab-cli`; internal publishable dependencies require exact `=0.2.0` versions.
-- The first A9 preflight reports are review-rejected because `cargo publish --dry-run` left stale shared `target/package` archives. The repaired `release::` surface creates fresh isolated archives, validates embedded commits, preserves immutable reviewed copies, records Cargo and rustc identities, rebuilds byte-identically before each explicit crates.io upload, and verifies the registry checksum before continuing.
-- Clean schema-version-3 validation probes at `3cfef095c1c3d2cb765b394198a9ba6318c7c651` and `12de9967d7c61c3f76477bff54068994d483c724` produced source-current archives, but the post-audit repairs make every such path historical diagnostic evidence. The final publication source requires a new exact-commit preflight after the single status descendant passes CI.
-- Tagged binaries are built inside the release operation, version and architecture checked, and bound to source and toolchain manifests. GitHub Actions aggregates both AArch64 targets and creates a draft only after complete asset verification; it never publishes a partial release or replaces assets.
-- `docs/MIGRATING-0.2.md`, the component graph, facade tiers, migration inventory, README, feature checklist, qualification inventories, and generated dashboard exist.
-- The active performance matrix contains 19 promotable groups and remains below the 40-group release cap. Eight product diagnostics plus one infrastructure group remain below the 60-group diagnostic cap.
-- The 19 release groups reference 21 unique exact correctness parents. Formal source-current PR, full, and soak evidence has not started.
-- The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, or GitHub release.
-- Completion schema 3 supports a source-derived `a9-release` scope covering all current promotable groups and records exact correctness evidence per group. Checkpoint schema 2 references a byte-identical checked copy of the replayed manifest; the dashboard hashes and validates that copy, requires a clean checked state, and permits at most one exact seven-path status descendant. Historical completion schemas 1 and 2 are readable but are not reported as replayed.
-- The second pre-evidence review's implementation blockers are repaired locally: release interruption terminates the complete child process group, Cargo execution uses a private source-owned environment, credentials reach only the reviewed upload, archive expansion is bounded, asset execution and cleanup stay descriptor-bound, executable identity is exact, and every remote workflow action is pinned to a full commit SHA and checked by architecture policy.
-- No Cargo registry credential is currently configured on this host. Publication waits for all pre-publication evidence and audits, then requires the user to provide a crates.io token through `CARGO_REGISTRY_TOKEN`; the token must never enter logs, files, arguments, or generated artifacts.
-- The repaired source is not on GitHub yet: after a fresh fetch, `origin/main` still points to `c4299a23383043ee74daba80621d25072cdac5b9`. Formal correctness, timing, and release preflight remain stopped until the final pre-evidence source is committed, pushed, and passes exact-revision CI.
+- Ten product packages are versioned `0.2.0` with exact sibling requirements and a source-owned publication order.
+- The active release matrix contains 19 promotable groups and 21 unique exact correctness parents. Formal A9 PR, full, soak, controlled timing, rollup, and completion evidence has not started.
+- Historical package preflights remain diagnostic only. The latest useful probe is schema version 3 at `9b9150d8030991f88589cb5ecd417a54f80ad403`; later release repairs require a new unique schema-version-4 preflight.
+- Commits through `9943393543634582d5fdd1ec6e5b23ebafa0f68c` repair the reviewed publication boundary: isolated Cargo, bounded archives and subprocesses, exact canonical crates.io metadata, direct upload of the retained reviewed `.crate` bytes, checksum polling, machine-checked A9 authorization, descriptor-safe cleanup, pinned workflow actions, retained GitHub asset bytes, remote annotated-tag verification, private draft creation, and remote size and SHA-256 verification.
+- Crates.io and GitHub credentials are absent from child environments, arguments, reports, and logs. They enter only the exact authenticated HTTP clients after local verification and A9 authorization.
+- The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, draft, or public GitHub release.
+- `origin/main` still points to `c4299a23383043ee74daba80621d25072cdac5b9`; the local A9 repair series has no exact-revision GitHub CI. Older successful CI is not evidence for the local source.
+- Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Formal timing must preserve and restore that exact configuration.
 
-## Execution Sequence
+## Next Actions
 
-1. Finish the pre-evidence repair, synchronize README, checklist, migration guide, plans, benchmark contracts, generated status, and release instructions, then run milestone-audit and full-code-review. Fix every confirmed finding before evidence.
-2. Commit the final pre-evidence source, regenerate correctness and performance contracts without drift, push it, and require exact-revision CI before formal work.
-3. From that clean commit, run one new diagnostic `release::check`, inspect every immutable archive, and preserve the report identity. This catches package-contract drift before expensive evidence but is not the final publication authority. Never promote or reuse a prior path.
-4. Keep the 19 release groups and 21 exact correctness parents frozen. Run and replay PR, full, and soak correctness, the live result-format corpus, and the implemented oracle matrix.
-5. Reproduce both workers, then produce controlled AArch64 full and soak evidence for all 19 groups and scales. Replay reports, enforce `1.25x` Stim parity and seeded `1.15x` Stab self-regression, report unseeded identities honestly, run memory/scaling checks, publish 38 rollups and the 138-report `a9-release` completion manifest, and replay it once.
-6. Run the legacy primary timing and memory suites only as diagnostic continuity. Shared-host timing, unverified-host timing, and product diagnostics cannot replace controlled release evidence.
-7. Restore the exact prior swap configuration after every timing session, verify no qualification process remains, and preserve every failed or historical artifact path.
-8. Re-run milestone-audit and full-code-review against completed evidence. Any confirmed executable, test, fixture, workflow, inventory, policy, or normative-document fix invalidates affected evidence and must be committed before replacement runs.
-9. If the evidence and reviews pass unchanged, run `just qualification::completion-checkpoint --input <a9-release-completion>` from the clean measured commit. Generate the dashboard, then create exactly one status descendant limited to the checked completion manifest, its checkpoint, generated dashboard, progress report, architecture-plan status, this GOAL, and specification-gap log. The manifest remains labeled with its measured parent commit.
-10. Push that single descendant and require exact-revision CI. From the same clean descendant, create a new final immutable `release::check` report; inspect its exact archives, VCS and toolchain identities, Cargo isolation, and publication order before the first upload.
-11. Publish the reviewed crates, create and push annotated tag `v0.2.0` at the status descendant, dispatch the draft-only release workflow, inspect and publish the complete draft, and verify every crates.io checksum, GitHub asset, source identity, and action identity. Record post-publication facts in registry metadata, the annotated tag, and release assets without creating a second source descendant.
+1. Synchronize the release and A9 documents, run `milestone-audit` and `full-code-review`, and fix every confirmed source or contract finding.
+2. Run the complete non-timing local verification suite and one new diagnostic schema-version-4 `release::check` under a unique path from the final clean commit. Preserve but never promote or reuse failed and historical paths.
+3. Push the exact final pre-evidence commit and require its own GitHub CI before formal correctness, timing, or publication work.
+4. Run and replay PR, full, and soak correctness, the live result-format corpus, the implemented oracle matrix, worker reproducibility, and controlled AArch64 full and soak evidence for all 19 release groups.
+5. Enforce `1.25x` Stim parity, seeded `1.15x` Stab self-regression, memory and scaling policy, and honest `unseeded` outcomes. Produce 38 rollups and the 138-report `a9-release` schema-version-3 completion, then replay it once.
+6. Restore swap after every timing session, verify no qualification process remains, and preserve all failed or noisy artifacts.
+7. Re-run both audits. Any confirmed executable, test, fixture, workflow, inventory, policy, or normative-contract fix invalidates affected evidence and must precede replacement runs.
+8. If evidence remains valid, create the authenticated completion checkpoint and exactly one seven-path status descendant, push it, and require exact-revision CI.
+9. From that clean descendant, create and inspect one final immutable schema-version-4 package preflight. Run `release::publish-reviewed`, create and push the annotated tag, dispatch `release::create-draft`, inspect the verified private draft, and publish it manually.
+
+## Release Gates
+
+- Do not relax the `1.25x` parity threshold, `1.15x` self-regression threshold, workload equivalence, memory limits, or controlled-host policy.
+- Do not publish from a dirty tree, a stale preflight, a source outside the one-descendant completion contract, or a revision without exact-head CI.
+- `release::publish-reviewed` and `release::create-draft` must both pass `qualification-status --check --require-release-completion` before reading a credential or making an irreversible request.
+- Crates.io publication is irreversible and non-atomic. Upload only the canonical metadata and exact retained archive from the reviewed preflight, in source-owned order, and stop on any mismatch.
+- GitHub creation is draft-only. Require the existing remote annotated tag to resolve to the reviewed commit; upload only retained assets; reject missing, extra, duplicate, wrong-size, or wrong-digest remote assets; never replace an existing release or asset.
+- Keep ops and test-support crates unpublished. Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR remain outside 0.2.0.
 
 ## Sources Of Truth
 
-- [Architecture plan](agent-native-modular-qec-architecture-plan.md), especially Milestone A9
+- [Architecture plan](agent-native-modular-qec-architecture-plan.md), especially A9
 - [Architecture progress report](agent-native-modular-qec-progress-report.md)
-- [Correctness qualification contract](comprehensive-correctness-qualification-plan.md)
-- [Performance qualification contract](comprehensive-stim-performance-qualification-plan.md)
-- [Benchmark instructions](../../benchmarks/AGENTS.md)
-- [0.2 migration guide](../MIGRATING-0.2.md)
+- [Correctness contract](comprehensive-correctness-qualification-plan.md)
+- [Performance contract](comprehensive-stim-performance-qualification-plan.md)
+- [Release procedure](../RELEASING.md)
 - [Specification-gap log](milestone-spec-gaps.md)
-
-## Nonnegotiable Gates
-
-- Do not relax the `1.25x` Stim parity threshold, the `1.15x` self-regression threshold, memory limits, workload equivalence, or host policy to obtain a release.
-- Do not publish from a dirty tree, a revision outside the exact status-descendant contract, or a source whose immutable package archives and byte-identical rebuilds were not preflighted.
-- Crates.io publication is irreversible and non-atomic. Complete all local and remote preflight before the first upload, publish only in the source-owned topological order, and stop on any identity or availability mismatch.
-- Keep ops and test-support crates unpublished. Keep deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR outside 0.2.0.
 
 ## Done
 
-The architecture plan is complete only when every A9 evidence and publication requirement is independently verified, `v0.2.0` is available from the intended registries and GitHub release, final audits are clean, swap is restored, no qualification process remains, and the worktree is clean.
+A9 is complete only when source-current evidence and audits pass, all ten exact reviewed archives are visible with matching crates.io checksums, the annotated tag and verified GitHub assets bind the release commit, the draft is manually published, swap is restored, no qualification process remains, and the worktree is clean.

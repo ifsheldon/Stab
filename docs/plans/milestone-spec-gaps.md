@@ -1684,3 +1684,21 @@ Current text: the first A9 sequence generated a final package preflight before f
 Gap: the status commit necessarily invalidated the preflight's exact source identity, while a second documentation commit would invalidate the one-descendant evidence contract. Literal compliance was impossible.
 Proposed amendment: treat pre-evidence package checks as diagnostic, create and verify the single authenticated status descendant first, generate the final immutable package preflight from that exact clean descendant, and publish, tag, and release without another source commit.
 Resolution: the measured parent owns correctness and timing. One seven-path descendant checks in the authenticated completion manifest and status documents and must pass exact-revision CI. The final package preflight, crates.io publication, annotated `v0.2.0` tag, and draft release all bind that clean descendant. Post-publication identities live in registry metadata, the annotated tag, workflow records, and release provenance assets instead of requiring a second source descendant.
+
+## 2026-08-02 - A9: Machine Authorization Of Irreversible Producers
+
+Status: Resolved
+Revealed by: external review of the crates.io and GitHub publication entry points after completion-checkpoint authentication was implemented.
+Current text: A9 required source-current completion, exact-revision CI, reviewed package bytes, and a draft-only release workflow before publication.
+Gap: the sequence described those as human prerequisites but did not require each irreversible producer to prove the authenticated completion checkpoint itself. A caller could therefore invoke package publication or draft creation directly after supplying a credential while bypassing the documented evidence gate.
+Proposed amendment: require every registry or GitHub mutation entry point to run `qualification-status --check --require-release-completion` from isolated source-current Cargo state before reading a credential, querying publication state, or creating a remote object.
+Resolution: the shared release authorization module now owns the exact checked command. Both `release::publish-reviewed` and `release::create-draft` invoke it before credential access or remote mutation, remove ambient credentials from authorization children, and stop on stale, incomplete, dirty, or unauthenticated status.
+
+## 2026-08-02 - A9: Exact Bytes Through Remote Publication
+
+Status: Resolved
+Revealed by: external review of Cargo upload semantics and the split asset-verification/workflow-upload boundary.
+Current text: A9 required publication to verify reviewed crate bytes and required GitHub to create a draft only after complete asset verification.
+Gap: the milestone did not say whether the exact reviewed bytes had to cross the remote protocol boundary. A later `cargo publish` could repackage a reviewed crate, and a separate `gh release create` step could reopen mutable asset paths after verification while still satisfying the literal wording.
+Proposed amendment: retain canonical registry metadata, crate archives, and GitHub assets from verification through their exact upload requests; prohibit upload-time repackaging and path reopening; and require remote checksum or digest verification before success.
+Resolution: preflight schema version 4 stores canonical crates.io metadata alongside immutable archives. Publication rebuilds only as an independent equality witness, then submits the retained reviewed metadata and archive directly through Cargo's crates.io protocol library and waits for the exact registry checksum. GitHub draft creation is one Rust operation that retains all six files, verifies the remote annotated tag, uploads those retained bytes, and checks the final remote names, states, sizes, and SHA-256 digests. Descriptor-safe tombstone cleanup and no-follow workflow reads close the adjacent replacement races.
