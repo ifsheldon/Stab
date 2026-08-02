@@ -46,7 +46,7 @@ hex = "0.4.3"
 ignore = "0.4.26"
 memory-stats = "1.2.0"
 num-complex = "0.4.6"
-object = { version = "0.40.0", default-features = false, features = ["read", "std", "write"] }
+object = { version = "0.40.0", default-features = false, features = ["read", "std"] }
 proptest = "1.11.0"
 proc-macro2 = "1.0.107"
 pulldown-cmark = { version = "0.13.4", default-features = false }
@@ -76,7 +76,7 @@ tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
 unicode-general-category = "1.1.0"
-ureq = { version = "3.3.0", features = ["json"] }
+ureq = "3.3.0"
 
 [workspace.lints.rust]
 let_underscore_drop = "warn"

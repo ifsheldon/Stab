@@ -4,7 +4,9 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::{RELEASE_VERSION, ReleaseError, archive, package, registry, repository, safe_fs};
+use crate::{
+    RELEASE_VERSION, ReleaseError, archive, cargo, package, registry, repository, safe_fs,
+};
 
 const MAX_CARGO_OUTPUT_BYTES: usize = 8 << 20;
 const CARGO_PUBLISH_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -24,7 +26,6 @@ pub(crate) fn publish_reviewed(
     let (preflight_directory, report) = package::load_reviewed_report(root, preflight)?;
     let reviewed_packages = preflight_directory.open_directory(OsStr::new("packages"))?;
     let registry = registry::CratesIo::new();
-    let cargo = repository::cargo_program();
 
     for package in &report.packages {
         if registry::require_absent_or_matching(
@@ -51,16 +52,11 @@ pub(crate) fn publish_reviewed(
             Some(Path::new("target/releases")),
         )?;
         let cargo_target = work.create_directory(OsStr::new("cargo-target"))?;
-        let environment = vec![(
-            OsString::from("CARGO_TARGET_DIR"),
-            cargo_target.path().as_os_str().to_os_string(),
-        )];
+        let cargo = cargo::CargoSandbox::create(root, &work, &cargo_target)?;
         let package_args = individual_package_arguments(&package.name);
-        repository::run_with_environment(
+        cargo.run(
             root,
-            &cargo,
             &package_args,
-            &environment,
             CARGO_PUBLISH_TIMEOUT,
             MAX_CARGO_OUTPUT_BYTES,
         )?;
@@ -73,11 +69,11 @@ pub(crate) fn publish_reviewed(
         repository::require_toolchain(root, &report.toolchain)?;
 
         let publish_args = individual_publish_arguments(&package.name);
-        repository::run_with_environment(
+        let token = cargo::CratesIoToken::from_environment()?;
+        cargo.upload(
             root,
-            &cargo,
             &publish_args,
-            &environment,
+            &token,
             CARGO_PUBLISH_TIMEOUT,
             MAX_CARGO_OUTPUT_BYTES,
         )?;
@@ -152,6 +148,7 @@ fn individual_publish_arguments(package: &str) -> Vec<OsString> {
         "--locked",
         "--registry",
         "crates-io",
+        "--no-verify",
         "--package",
         package,
     ]
@@ -183,6 +180,7 @@ mod tests {
                 "--locked",
                 "--registry",
                 "crates-io",
+                "--no-verify",
                 "--package",
                 "stab-core"
             ]

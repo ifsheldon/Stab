@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use cargo_metadata::{Metadata, Package};
 
-use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, repository};
+use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, cargo, repository};
 
 const README_FILE: &str = "README.crates.md";
 const RELEASE_KEYWORDS: &[&str] = &[
@@ -29,10 +29,12 @@ pub(crate) struct ReleaseWorkspace {
     pub(crate) packages: Vec<ReleasePackage>,
 }
 
-pub(crate) fn validate_architecture(root: &Path) -> Result<(), ReleaseError> {
-    repository::run_with_environment(
+pub(crate) fn validate_architecture(
+    root: &Path,
+    cargo: &cargo::CargoSandbox,
+) -> Result<(), ReleaseError> {
+    cargo.run(
         root,
-        &repository::cargo_program(),
         [
             OsString::from("run"),
             OsString::from("--quiet"),
@@ -42,7 +44,6 @@ pub(crate) fn validate_architecture(root: &Path) -> Result<(), ReleaseError> {
             OsString::from("--"),
             OsString::from("check"),
         ],
-        &[],
         ARCHITECTURE_TIMEOUT,
         MAX_COMMAND_OUTPUT_BYTES,
     )?;
@@ -62,7 +63,29 @@ pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
         METADATA_TIMEOUT,
         MAX_COMMAND_OUTPUT_BYTES,
     )?;
-    let metadata: Metadata = serde_json::from_str(&metadata_json)?;
+    inspect_metadata(root, &metadata_json)
+}
+
+pub(crate) fn inspect_isolated(
+    root: &Path,
+    cargo: &cargo::CargoSandbox,
+) -> Result<ReleaseWorkspace, ReleaseError> {
+    let metadata_json = cargo.run_capture(
+        root,
+        [
+            OsStr::new("metadata"),
+            OsStr::new("--format-version"),
+            OsStr::new("1"),
+            OsStr::new("--locked"),
+        ],
+        METADATA_TIMEOUT,
+        MAX_COMMAND_OUTPUT_BYTES,
+    )?;
+    inspect_metadata(root, &metadata_json)
+}
+
+fn inspect_metadata(root: &Path, metadata_json: &str) -> Result<ReleaseWorkspace, ReleaseError> {
+    let metadata: Metadata = serde_json::from_str(metadata_json)?;
     let workspace_ids = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
     let workspace_packages = metadata
         .packages

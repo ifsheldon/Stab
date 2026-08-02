@@ -11,6 +11,7 @@
 
 mod archive;
 mod artifact;
+mod cargo;
 mod error;
 mod package;
 mod process;
@@ -38,6 +39,37 @@ pub const PRODUCT_PACKAGE_ORDER: &[&str] = &[
     "stab-core",
     "stab-cli",
 ];
+
+#[doc(hidden)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "hidden exec boundary mirrors its typed CLI fields"
+)]
+pub fn execute_isolated_cargo(
+    cargo: &Path,
+    rustc: &Path,
+    rustdoc: &Path,
+    home: &Path,
+    cargo_home: &Path,
+    target: &Path,
+    temporary: &Path,
+    config: &Path,
+    permit_registry_token: bool,
+    cargo_args: &[std::ffi::OsString],
+) -> Result<(), ReleaseError> {
+    cargo::execute_isolated_cargo(
+        cargo,
+        rustc,
+        rustdoc,
+        home,
+        cargo_home,
+        target,
+        temporary,
+        config,
+        permit_registry_token,
+        cargo_args,
+    )
+}
 
 pub fn check(output: &Path) -> Result<(), ReleaseError> {
     let root = repository_root()?;

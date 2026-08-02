@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -12,6 +13,29 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    #[command(name = "__isolated-cargo", hide = true)]
+    IsolatedCargo {
+        #[arg(long)]
+        cargo: PathBuf,
+        #[arg(long)]
+        rustc: PathBuf,
+        #[arg(long)]
+        rustdoc: PathBuf,
+        #[arg(long)]
+        home: PathBuf,
+        #[arg(long)]
+        cargo_home: PathBuf,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        temporary: PathBuf,
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        permit_registry_token: bool,
+        #[arg(last = true, allow_hyphen_values = true)]
+        cargo_args: Vec<OsString>,
+    },
     /// Validate and package every coordinated product crate from a clean revision.
     Check {
         /// New report directory below target/releases/.
@@ -54,6 +78,29 @@ enum Command {
 
 fn main() {
     let result = match Cli::parse().command {
+        Command::IsolatedCargo {
+            cargo,
+            rustc,
+            rustdoc,
+            home,
+            cargo_home,
+            target,
+            temporary,
+            config,
+            permit_registry_token,
+            cargo_args,
+        } => stab_release::execute_isolated_cargo(
+            &cargo,
+            &rustc,
+            &rustdoc,
+            &home,
+            &cargo_home,
+            &target,
+            &temporary,
+            &config,
+            permit_registry_token,
+            &cargo_args,
+        ),
         Command::Check { out } => stab_release::check(&out),
         Command::PublishOrder => stab_release::print_publish_order(),
         Command::PublishReviewed {

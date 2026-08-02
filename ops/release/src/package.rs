@@ -6,7 +6,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, archive, repository, safe_fs, workspace,
+    PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, archive, cargo, repository, safe_fs,
+    workspace,
 };
 
 const MAX_PACKAGE_LIST_BYTES: usize = 4 << 20;
@@ -42,10 +43,6 @@ pub(crate) struct PackageArchive {
 pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError> {
     let commit = repository::require_clean(root)?;
     let toolchain = repository::capture_toolchain(root)?;
-    workspace::validate_architecture(root)?;
-    let workspace = workspace::inspect(root)?;
-    validate_package_lists(root, &workspace)?;
-
     let output = safe_fs::RetainedDirectory::create_new_under(
         root,
         output,
@@ -53,27 +50,22 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     )?;
     let work = output.create_directory(OsStr::new("work"))?;
     let cargo_target = work.create_directory(OsStr::new("cargo-target"))?;
-    let cargo_environment = vec![(
-        OsString::from("CARGO_TARGET_DIR"),
-        cargo_target.path().as_os_str().to_os_string(),
-    )];
-    let cargo = repository::cargo_program();
+    let cargo = cargo::CargoSandbox::create(root, &work, &cargo_target)?;
+    workspace::validate_architecture(root, &cargo)?;
+    let workspace = workspace::inspect_isolated(root, &cargo)?;
+    validate_package_lists(root, &workspace, &cargo)?;
 
-    repository::run_with_environment(
+    cargo.run(
         root,
-        &cargo,
         coordinated_package_arguments(&workspace),
-        &cargo_environment,
         CARGO_PACKAGE_TIMEOUT,
         MAX_CARGO_OUTPUT_BYTES,
     )?;
     repository::require_unchanged(root, &commit)?;
 
-    repository::run_with_environment(
+    cargo.run(
         root,
-        &cargo,
         coordinated_publish_arguments(&workspace),
-        &cargo_environment,
         CARGO_PACKAGE_TIMEOUT,
         MAX_CARGO_OUTPUT_BYTES,
     )?;
@@ -251,8 +243,8 @@ fn validate_report(
 fn validate_package_lists(
     root: &Path,
     workspace: &workspace::ReleaseWorkspace,
+    cargo: &cargo::CargoSandbox,
 ) -> Result<(), ReleaseError> {
-    let cargo = repository::cargo_program();
     for package in &workspace.packages {
         let args = vec![
             OsString::from("package"),
@@ -261,13 +253,8 @@ fn validate_package_lists(
             OsString::from("--package"),
             OsString::from(&package.name),
         ];
-        let package_list = repository::run_capture(
-            root,
-            &cargo,
-            &args,
-            CARGO_PACKAGE_TIMEOUT,
-            MAX_PACKAGE_LIST_BYTES,
-        )?;
+        let package_list =
+            cargo.run_capture(root, &args, CARGO_PACKAGE_TIMEOUT, MAX_PACKAGE_LIST_BYTES)?;
         if !package_list.lines().any(|line| line == "README.crates.md") {
             return Err(ReleaseError::PackageContract(format!(
                 "{} package does not include README.crates.md",
