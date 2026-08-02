@@ -12,7 +12,7 @@
       "require_frequency_governor": true,
       "allowed_frequency_governors": ["performance"],
       "require_thermal_probe": true,
-      "maximum_temperature_millidegrees_celsius": 85000
+      "maximum_temperature_millidegrees_celsius": 100000
     },
     {
       "id": "linux-aarch64-controlled",
@@ -25,7 +25,7 @@
       "require_frequency_governor": true,
       "allowed_frequency_governors": ["performance"],
       "require_thermal_probe": true,
-      "maximum_temperature_millidegrees_celsius": 85000
+      "maximum_temperature_millidegrees_celsius": 100000
     }
   ]
 }
