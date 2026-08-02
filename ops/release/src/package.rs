@@ -35,7 +35,6 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     let commit = repository::require_clean(root)?;
     let workspace = workspace::inspect(root)?;
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let mut archives = Vec::with_capacity(workspace.packages.len());
     for package in &workspace.packages {
         let package_list = repository::run_capture(
             root,
@@ -49,17 +48,12 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
                 package.name
             )));
         }
-        repository::run_inherit(
-            root,
-            &cargo,
-            &[
-                "package",
-                "--locked",
-                "--no-verify",
-                "--package",
-                &package.name,
-            ],
-        )?;
+    }
+    let package_args = coordinated_package_arguments(&workspace);
+    repository::run_inherit(root, &cargo, &package_args)?;
+
+    let mut archives = Vec::with_capacity(workspace.packages.len());
+    for package in &workspace.packages {
         let metadata = fs::symlink_metadata(&package.archive)
             .map_err(|source| ReleaseError::io(&package.archive, source))?;
         if !metadata.file_type().is_file() {
@@ -108,6 +102,15 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     Ok(output)
 }
 
+fn coordinated_package_arguments(workspace: &workspace::ReleaseWorkspace) -> Vec<&str> {
+    let mut args = vec!["package", "--locked", "--no-verify"];
+    for package in &workspace.packages {
+        args.push("--package");
+        args.push(package.name.as_str());
+    }
+    args
+}
+
 fn path_text(path: &Path) -> Result<String, ReleaseError> {
     path.to_str()
         .map(ToString::to_string)
@@ -130,5 +133,33 @@ mod tests {
                 Err(ReleaseError::InvalidPath(_))
             ));
         }
+    }
+
+    #[test]
+    fn package_assembly_uses_one_coordinated_cargo_invocation() {
+        let workspace = workspace::ReleaseWorkspace {
+            packages: PRODUCT_PACKAGE_ORDER
+                .iter()
+                .map(|name| workspace::ReleasePackage {
+                    name: name.to_string(),
+                    version: RELEASE_VERSION.to_string(),
+                    archive: PathBuf::from(format!("target/package/{name}.crate")),
+                })
+                .collect(),
+        };
+        let arguments = coordinated_package_arguments(&workspace);
+        assert_eq!(
+            arguments.get(..3).expect("Cargo package prefix"),
+            ["package", "--locked", "--no-verify"]
+        );
+        assert_eq!(
+            arguments
+                .get(3..)
+                .expect("package selectors")
+                .chunks_exact(2)
+                .map(|chunk| chunk.get(1).copied().expect("package name"))
+                .collect::<Vec<_>>(),
+            PRODUCT_PACKAGE_ORDER
+        );
     }
 }

@@ -27,7 +27,7 @@ From the final clean reviewed revision, choose a new output path containing the 
 just release::check --out target/releases/v0.2.0-<commit>-preflight
 ```
 
-The Rust release tool reruns the architecture policy, validates the exact package set and topological order, executes `cargo package --locked --no-verify` for all ten crates, and writes archive lengths and SHA-256 digests to `report.json`. It rejects a dirty or changing repository, an existing report path, path traversal, symlinked output ancestors, missing shared package documentation, incomplete metadata, and inexact internal versions. `--no-verify` is necessary before internal dependencies exist on crates.io; workspace tests, Clippy, Stable component checks, and external-consumer checks remain separate release gates.
+The Rust release tool reruns the architecture policy, validates the exact package set and topological order, and executes one coordinated multi-package `cargo package --locked --no-verify` invocation so Cargo resolves unpublished exact-version siblings from the selected workspace set. It writes archive lengths and SHA-256 digests to `report.json`. It rejects a dirty or changing repository, an existing report path, path traversal, symlinked output ancestors, missing shared package documentation, incomplete metadata, and inexact internal versions. `--no-verify` is necessary before internal dependencies exist on crates.io; workspace tests, Clippy, Stable component checks, and external-consumer checks remain separate release gates.
 
 Review every assembled archive before the first upload. Do not reuse a failed preflight output path, and do not publish from a revision other than the report's exact commit.
 
