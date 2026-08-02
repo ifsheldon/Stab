@@ -6,9 +6,13 @@ check *args:
 publish-order:
     cargo run -q --locked -p stab-release -- publish-order
 
+# Build the release operator without exposing publication credentials to Cargo or build scripts.
+build-operator:
+    env -u CARGO_REGISTRY_TOKEN -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GITHUB_TOKEN -u GH_TOKEN cargo build -q --locked -p stab-release
+
 # Publish reviewed crates one at a time and verify crates.io checksums.
-publish-reviewed *args:
-    cargo run -q --locked -p stab-release -- publish-reviewed {{args}}
+publish-reviewed *args: build-operator
+    exec ./target/debug/stab-release publish-reviewed {{args}}
 
 # Build and package one tagged stab binary with checksum and provenance.
 build-binary *args:
@@ -23,5 +27,5 @@ verify-assets *args:
     cargo run -q --locked -p stab-release -- verify-assets {{args}}
 
 # Verify exact assets, create a private GitHub draft, and check remote digests.
-create-draft *args:
-    cargo run -q --locked -p stab-release -- create-draft {{args}}
+create-draft *args: build-operator
+    exec ./target/debug/stab-release create-draft {{args}}
