@@ -2,11 +2,15 @@ use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ReleaseError;
 
 const MAX_REMOVE_DEPTH: usize = 128;
 const MAX_REMOVE_ENTRIES: usize = 1_000_000;
+const MAX_TOMBSTONE_NAME_ATTEMPTS: usize = 1024;
+
+static NEXT_TOMBSTONE_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub(crate) struct RetainedDirectory {
@@ -182,14 +186,33 @@ impl RetainedDirectory {
         self.revalidate()?;
         #[cfg(unix)]
         {
+            #[cfg(test)]
+            run_remove_tree_hook(RemoveTreeHookEvent {
+                point: RemoveTreeHookPoint::BeforeRoot,
+                original_path: self.path.clone(),
+                tombstone_path: None,
+            });
+            let (tombstone_name, tombstone_path) = move_entry_to_private_tombstone(
+                &self.parent,
+                &self.name,
+                parent_display_path(&self.path),
+                &self.path,
+                self.identity,
+            )?;
+            #[cfg(test)]
+            run_remove_tree_hook(RemoveTreeHookEvent {
+                point: RemoveTreeHookPoint::RootMoved,
+                original_path: self.path.clone(),
+                tombstone_path: Some(tombstone_path.clone()),
+            });
             let mut removed_entries = 0;
-            remove_directory_contents(&self.file, &self.path, 0, &mut removed_entries)?;
-            let reopened = open_directory_at(&self.parent, &self.name, &self.path)?;
-            if file_identity(&reopened, &self.path)? != self.identity {
-                return Err(ReleaseError::FileIdentityChanged(self.path.clone()));
-            }
-            rustix::fs::unlinkat(&self.parent, &self.name, rustix::fs::AtFlags::REMOVEDIR)
-                .map_err(|source| ReleaseError::io(&self.path, source.into()))?;
+            remove_directory_contents(&self.file, &tombstone_path, 0, &mut removed_entries)?;
+            remove_moved_directory(
+                &self.parent,
+                &tombstone_name,
+                &tombstone_path,
+                self.identity,
+            )?;
             self.parent
                 .sync_all()
                 .map_err(|source| ReleaseError::io(parent_display_path(&self.path), source))?;
@@ -578,6 +601,198 @@ fn read_directory_names(
 }
 
 #[cfg(unix)]
+fn move_entry_to_private_tombstone(
+    parent: &File,
+    original_name: &OsStr,
+    parent_display_path: &Path,
+    original_display_path: &Path,
+    expected_identity: FileIdentity,
+) -> Result<(OsString, PathBuf), ReleaseError> {
+    for _ in 0..MAX_TOMBSTONE_NAME_ATTEMPTS {
+        let tombstone_name = private_tombstone_name();
+        let tombstone_path = parent_display_path.join(&tombstone_name);
+        let renamed = rustix::fs::renameat_with(
+            parent,
+            original_name,
+            parent,
+            &tombstone_name,
+            rustix::fs::RenameFlags::NOREPLACE,
+        );
+        match renamed {
+            Ok(()) => {
+                let moved_identity = match identity_at(parent, &tombstone_name, &tombstone_path) {
+                    Ok(identity) => identity,
+                    Err(error) => {
+                        drop(restore_mismatched_tombstone(
+                            parent,
+                            &tombstone_name,
+                            original_name,
+                            parent_display_path,
+                            &tombstone_path,
+                        ));
+                        return Err(error);
+                    }
+                };
+                if moved_identity == expected_identity {
+                    return Ok((tombstone_name, tombstone_path));
+                }
+                restore_mismatched_tombstone(
+                    parent,
+                    &tombstone_name,
+                    original_name,
+                    parent_display_path,
+                    &tombstone_path,
+                )?;
+                return Err(ReleaseError::FileIdentityChanged(
+                    original_display_path.to_path_buf(),
+                ));
+            }
+            Err(rustix::io::Errno::EXIST) => continue,
+            Err(rustix::io::Errno::NOENT) => {
+                return Err(ReleaseError::FileIdentityChanged(
+                    original_display_path.to_path_buf(),
+                ));
+            }
+            Err(source) => return Err(ReleaseError::io(original_display_path, source.into())),
+        }
+    }
+    Err(ReleaseError::OutputExists(
+        parent_display_path.join(".stab-release-delete-*"),
+    ))
+}
+
+#[cfg(unix)]
+fn restore_mismatched_tombstone(
+    parent: &File,
+    tombstone_name: &OsStr,
+    original_name: &OsStr,
+    parent_display_path: &Path,
+    tombstone_path: &Path,
+) -> Result<(), ReleaseError> {
+    match rustix::fs::renameat_with(
+        parent,
+        tombstone_name,
+        parent,
+        original_name,
+        rustix::fs::RenameFlags::NOREPLACE,
+    ) {
+        Ok(()) | Err(rustix::io::Errno::EXIST) | Err(rustix::io::Errno::NOENT) => {
+            parent
+                .sync_all()
+                .map_err(|source| ReleaseError::io(parent_display_path, source))?;
+            Ok(())
+        }
+        Err(source) => Err(ReleaseError::io(tombstone_path, source.into())),
+    }
+}
+
+#[cfg(unix)]
+fn remove_moved_directory(
+    parent: &File,
+    name: &OsStr,
+    display_path: &Path,
+    expected_identity: FileIdentity,
+) -> Result<(), ReleaseError> {
+    if identity_at(parent, name, display_path)? != expected_identity {
+        return Err(ReleaseError::FileIdentityChanged(
+            display_path.to_path_buf(),
+        ));
+    }
+    rustix::fs::unlinkat(parent, name, rustix::fs::AtFlags::REMOVEDIR)
+        .map_err(|source| ReleaseError::io(display_path, source.into()))
+}
+
+#[cfg(unix)]
+fn remove_moved_non_directory(
+    parent: &File,
+    name: &OsStr,
+    display_path: &Path,
+    expected_identity: FileIdentity,
+) -> Result<(), ReleaseError> {
+    if identity_at(parent, name, display_path)? != expected_identity {
+        return Err(ReleaseError::FileIdentityChanged(
+            display_path.to_path_buf(),
+        ));
+    }
+    rustix::fs::unlinkat(parent, name, rustix::fs::AtFlags::empty())
+        .map_err(|source| ReleaseError::io(display_path, source.into()))
+}
+
+#[cfg(unix)]
+fn private_tombstone_name() -> OsString {
+    let id = NEXT_TOMBSTONE_ID.fetch_add(1, Ordering::Relaxed);
+    OsString::from(format!(
+        ".stab-release-delete-{}-{id:016x}",
+        std::process::id()
+    ))
+}
+
+#[cfg(unix)]
+fn identity_at(
+    directory: &File,
+    name: &OsStr,
+    display_path: &Path,
+) -> Result<FileIdentity, ReleaseError> {
+    let metadata = rustix::fs::statat(directory, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
+        .map_err(|source| ReleaseError::io(display_path, source.into()))?;
+    Ok(FileIdentity {
+        device: metadata.st_dev,
+        inode: metadata.st_ino,
+    })
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RemoveTreeHookPoint {
+    BeforeRoot,
+    RootMoved,
+    BeforeEntry,
+    EntryMoved,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct RemoveTreeHookEvent {
+    point: RemoveTreeHookPoint,
+    original_path: PathBuf,
+    tombstone_path: Option<PathBuf>,
+}
+
+#[cfg(test)]
+type RemoveTreeHook = Box<dyn FnMut(RemoveTreeHookEvent)>;
+
+#[cfg(test)]
+thread_local! {
+    static REMOVE_TREE_HOOK: std::cell::RefCell<Option<RemoveTreeHook>> =
+        std::cell::RefCell::new(None);
+}
+
+#[cfg(test)]
+fn run_remove_tree_hook(event: RemoveTreeHookEvent) {
+    REMOVE_TREE_HOOK.with(|hook| {
+        if let Some(hook) = hook.borrow_mut().as_mut() {
+            hook(event);
+        }
+    });
+}
+
+#[cfg(test)]
+fn with_remove_tree_hook<T>(
+    hook: impl FnMut(RemoveTreeHookEvent) + 'static,
+    body: impl FnOnce() -> T,
+) -> T {
+    REMOVE_TREE_HOOK.with(|slot| {
+        assert!(slot.borrow().is_none());
+        *slot.borrow_mut() = Some(Box::new(hook));
+    });
+    let result = body();
+    REMOVE_TREE_HOOK.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+    result
+}
+
+#[cfg(unix)]
 fn remove_directory_contents(
     directory: &File,
     display_path: &Path,
@@ -602,19 +817,45 @@ fn remove_directory_contents(
         let path = display_path.join(&name);
         let metadata = rustix::fs::statat(directory, &name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
             .map_err(|source| ReleaseError::io(&path, source.into()))?;
+        let expected_identity = FileIdentity {
+            device: metadata.st_dev,
+            inode: metadata.st_ino,
+        };
+        #[cfg(test)]
+        run_remove_tree_hook(RemoveTreeHookEvent {
+            point: RemoveTreeHookPoint::BeforeEntry,
+            original_path: path.clone(),
+            tombstone_path: None,
+        });
+        let (tombstone_name, tombstone_path) = move_entry_to_private_tombstone(
+            directory,
+            &name,
+            display_path,
+            &path,
+            expected_identity,
+        )?;
+        #[cfg(test)]
+        run_remove_tree_hook(RemoveTreeHookEvent {
+            point: RemoveTreeHookPoint::EntryMoved,
+            original_path: path,
+            tombstone_path: Some(tombstone_path.clone()),
+        });
         if rustix::fs::FileType::from_raw_mode(metadata.st_mode).is_dir() {
-            let child = open_directory_at(directory, &name, &path)?;
-            let identity = file_identity(&child, &path)?;
-            remove_directory_contents(&child, &path, depth + 1, removed_entries)?;
-            let reopened = open_directory_at(directory, &name, &path)?;
-            if file_identity(&reopened, &path)? != identity {
-                return Err(ReleaseError::FileIdentityChanged(path));
-            }
-            rustix::fs::unlinkat(directory, &name, rustix::fs::AtFlags::REMOVEDIR)
-                .map_err(|source| ReleaseError::io(&path, source.into()))?;
+            let child = open_directory_at(directory, &tombstone_name, &tombstone_path)?;
+            remove_directory_contents(&child, &tombstone_path, depth + 1, removed_entries)?;
+            remove_moved_directory(
+                directory,
+                &tombstone_name,
+                &tombstone_path,
+                expected_identity,
+            )?;
         } else {
-            rustix::fs::unlinkat(directory, &name, rustix::fs::AtFlags::empty())
-                .map_err(|source| ReleaseError::io(&path, source.into()))?;
+            remove_moved_non_directory(
+                directory,
+                &tombstone_name,
+                &tombstone_path,
+                expected_identity,
+            )?;
         }
     }
     directory
@@ -677,7 +918,9 @@ fn absolute_components(path: &Path) -> Result<Vec<&OsStr>, ReleaseError> {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
     use std::fs;
+    use std::rc::Rc;
 
     use super::*;
 
@@ -781,6 +1024,96 @@ mod tests {
             fs::read(work_path.join("sentinel")).expect("replacement survives"),
             b"replacement"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn descriptor_cleanup_preserves_root_replacement_installed_before_tombstone_move() {
+        let root = tempfile::tempdir().expect("root");
+        fs::create_dir(root.path().join("target")).expect("target");
+        let work = RetainedDirectory::create_new_under(
+            root.path(),
+            Path::new("target/release-work"),
+            None,
+        )
+        .expect("work");
+        work.write_new(OsStr::new("artifact"), b"original")
+            .expect("artifact");
+        let work_path = work.path().to_path_buf();
+        let displaced_path = root.path().join("target/displaced-original");
+        let replacement_seen = Rc::new(Cell::new(false));
+        let hook_seen = Rc::clone(&replacement_seen);
+        let hook_work_path = work_path.clone();
+        let hook_displaced_path = displaced_path.clone();
+
+        let result = with_remove_tree_hook(
+            move |event| {
+                if event.point == RemoveTreeHookPoint::BeforeRoot
+                    && event.original_path == hook_work_path
+                    && !hook_seen.replace(true)
+                {
+                    fs::rename(&hook_work_path, &hook_displaced_path).expect("displace retained");
+                    fs::create_dir(&hook_work_path).expect("replacement root");
+                    fs::write(hook_work_path.join("sentinel"), b"replacement")
+                        .expect("replacement sentinel");
+                }
+            },
+            || work.remove_tree(),
+        );
+
+        assert!(matches!(result, Err(ReleaseError::FileIdentityChanged(_))));
+        assert!(replacement_seen.get());
+        assert_eq!(
+            fs::read(work_path.join("sentinel")).expect("replacement survives"),
+            b"replacement"
+        );
+        assert_eq!(
+            fs::read(displaced_path.join("artifact")).expect("retained tree survives"),
+            b"original"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn descriptor_cleanup_preserves_root_replacement_installed_after_tombstone_move() {
+        let root = tempfile::tempdir().expect("root");
+        fs::create_dir(root.path().join("target")).expect("target");
+        let work = RetainedDirectory::create_new_under(
+            root.path(),
+            Path::new("target/release-work"),
+            None,
+        )
+        .expect("work");
+        work.write_new(OsStr::new("artifact"), b"original")
+            .expect("artifact");
+        let work_path = work.path().to_path_buf();
+        let replacement_seen = Rc::new(Cell::new(false));
+        let hook_seen = Rc::clone(&replacement_seen);
+        let hook_work_path = work_path.clone();
+
+        with_remove_tree_hook(
+            move |event| {
+                if event.point == RemoveTreeHookPoint::RootMoved
+                    && event.original_path == hook_work_path
+                    && !hook_seen.replace(true)
+                {
+                    let tombstone_path = event.tombstone_path.expect("tombstone path");
+                    assert!(tombstone_path.exists());
+                    fs::create_dir(&hook_work_path).expect("replacement root");
+                    fs::write(hook_work_path.join("sentinel"), b"replacement")
+                        .expect("replacement sentinel");
+                }
+            },
+            || work.remove_tree(),
+        )
+        .expect("remove retained tree");
+
+        assert!(replacement_seen.get());
+        assert_eq!(
+            fs::read(work_path.join("sentinel")).expect("replacement survives"),
+            b"replacement"
+        );
+        assert!(!work_path.join("artifact").exists());
     }
 
     #[cfg(unix)]
