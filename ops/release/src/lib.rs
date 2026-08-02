@@ -11,9 +11,11 @@
 
 mod archive;
 mod artifact;
+mod authorization;
 mod cancellation;
 mod cargo;
 mod error;
+mod github;
 mod package;
 mod process;
 mod publish;
@@ -101,6 +103,17 @@ pub fn verify_assets(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
         "[stab-release] verified release assets in {}",
         assets.display()
     );
+    Ok(())
+}
+
+pub fn create_verified_draft(
+    assets: &Path,
+    tag: &str,
+    confirmation: &str,
+) -> Result<(), ReleaseError> {
+    let root = repository_root()?;
+    github::create_verified_draft(&root, assets, tag, confirmation)?;
+    println!("[stab-release] created and verified private draft {tag} with exact reviewed assets");
     Ok(())
 }
 

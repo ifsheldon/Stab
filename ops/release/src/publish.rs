@@ -4,12 +4,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::{
-    RELEASE_VERSION, ReleaseError, archive, cargo, package, registry, repository, safe_fs,
+    RELEASE_VERSION, ReleaseError, archive, authorization, cargo, package, registry, repository,
+    safe_fs,
 };
 
 const MAX_CARGO_OUTPUT_BYTES: usize = 8 << 20;
 const CARGO_PACKAGE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
-const A9_AUTHORIZATION_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 static PUBLICATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn publish_reviewed(
@@ -27,19 +27,7 @@ pub(crate) fn publish_reviewed(
     let reviewed_packages = preflight_directory.open_directory(OsStr::new("packages"))?;
     let reviewed_metadata = preflight_directory.open_directory(OsStr::new("registry-metadata"))?;
     let cancellation = crate::cancellation::ReleaseCancellation::for_signals()?;
-    let authorization_work = create_publication_work(root)?;
-    {
-        let cargo_target = authorization_work.create_directory(OsStr::new("cargo-target"))?;
-        let cargo = cargo::CargoSandbox::create(root, &authorization_work, &cargo_target)?;
-        cargo.run(
-            root,
-            qualification_status_arguments(),
-            A9_AUTHORIZATION_TIMEOUT,
-            MAX_CARGO_OUTPUT_BYTES,
-        )?;
-    }
-    authorization_work.revalidate()?;
-    authorization_work.remove_tree()?;
+    authorization::require_a9_release(root, &cancellation)?;
     preflight_directory.revalidate()?;
     reviewed_packages.revalidate()?;
     reviewed_metadata.revalidate()?;
@@ -150,22 +138,6 @@ fn create_publication_work(root: &Path) -> Result<safe_fs::RetainedDirectory, Re
     )
 }
 
-fn qualification_status_arguments() -> Vec<OsString> {
-    [
-        "run",
-        "--quiet",
-        "--locked",
-        "--package",
-        "stab-bench",
-        "--",
-        "qualification-status",
-        "--check",
-        "--require-release-completion",
-    ]
-    .map(OsString::from)
-    .to_vec()
-}
-
 fn require_rebuilt_match(
     rebuilt_directory: &safe_fs::RetainedDirectory,
     package: &package::PackageArchive,
@@ -247,25 +219,6 @@ mod tests {
                 "--no-verify",
                 "--package",
                 "stab-core"
-            ]
-            .map(OsString::from)
-        );
-    }
-
-    #[test]
-    fn publication_authentication_uses_the_checked_a9_status_contract() {
-        assert_eq!(
-            qualification_status_arguments(),
-            [
-                "run",
-                "--quiet",
-                "--locked",
-                "--package",
-                "stab-bench",
-                "--",
-                "qualification-status",
-                "--check",
-                "--require-release-completion",
             ]
             .map(OsString::from)
         );

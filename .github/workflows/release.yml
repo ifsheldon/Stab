@@ -54,10 +54,10 @@ jobs:
           retention-days: 7
 
   draft:
-    name: Verify assets and create draft
+    name: Create verified private draft
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -75,13 +75,8 @@ jobs:
           merge-multiple: true
           path: target/releases/assets
 
-      - name: Verify complete asset set
+      - name: Verify retained assets and create digest-checked draft
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: cargo run -q --locked -p stab-release -- verify-assets --assets target/releases/assets --tag "$RELEASE_TAG"
-
-      - name: Create draft release with immutable asset names
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: gh release create "$RELEASE_TAG" target/releases/assets/stab-linux-aarch64 target/releases/assets/stab-linux-aarch64.sha256 target/releases/assets/stab-linux-aarch64.json target/releases/assets/stab-macos-aarch64 target/releases/assets/stab-macos-aarch64.sha256 target/releases/assets/stab-macos-aarch64.json --draft --verify-tag --title "Stab 0.2.0" --notes "Stab 0.2.0"
+        run: cargo run -q --locked -p stab-release -- create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0

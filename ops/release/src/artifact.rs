@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs::File;
+use std::io::{Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
@@ -15,6 +16,66 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const RELEASE_TARGETS: &[&str] = &["linux-aarch64", "macos-aarch64"];
 const ASSET_MANIFEST_SCHEMA_VERSION: u32 = 1;
+
+pub(crate) struct ReviewedAsset {
+    name: String,
+    path: PathBuf,
+    file: File,
+    identity: safe_fs::FileIdentity,
+    bytes: u64,
+    sha256: String,
+}
+
+impl ReviewedAsset {
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
+    pub(crate) fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    pub(crate) fn upload_file(&mut self) -> Result<File, ReleaseError> {
+        self.file
+            .seek(SeekFrom::Start(0))
+            .map_err(|source| ReleaseError::io(&self.path, source))?;
+        self.file
+            .try_clone()
+            .map_err(|source| ReleaseError::io(&self.path, source))
+    }
+}
+
+pub(crate) struct ReviewedAssets {
+    directory: safe_fs::RetainedDirectory,
+    commit: String,
+    assets: Vec<ReviewedAsset>,
+}
+
+impl ReviewedAssets {
+    pub(crate) fn commit(&self) -> &str {
+        &self.commit
+    }
+
+    pub(crate) fn assets_mut(&mut self) -> &mut [ReviewedAsset] {
+        &mut self.assets
+    }
+
+    pub(crate) fn assets(&self) -> &[ReviewedAsset] {
+        &self.assets
+    }
+
+    pub(crate) fn revalidate(&self) -> Result<(), ReleaseError> {
+        self.directory.revalidate()?;
+        for asset in &self.assets {
+            safe_fs::require_same_path_identity(&asset.path, asset.identity)?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PackagedBinary {
@@ -159,11 +220,20 @@ pub(crate) fn build_binary(
 }
 
 pub(crate) fn verify_assets(root: &Path, assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    review_assets(root, assets, tag)?.revalidate()
+}
+
+pub(crate) fn review_assets(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+) -> Result<ReviewedAssets, ReleaseError> {
     let commit = repository::require_clean_tag(root, tag)?;
     validate_relative(assets)?;
     let directory =
         safe_fs::RetainedDirectory::open_under(root, assets, Some(Path::new("target/releases")))?;
     let mut expected_files = BTreeSet::new();
+    let mut reviewed_assets = Vec::with_capacity(RELEASE_TARGETS.len() * 3);
     for label in RELEASE_TARGETS {
         let target = ReleaseTarget::parse(label)?;
         let asset_name = format!("stab-{label}");
@@ -174,16 +244,16 @@ pub(crate) fn verify_assets(root: &Path, assets: &Path, tag: &str) -> Result<(),
             checksum_name.clone(),
             manifest_name.clone(),
         ]);
-        let bytes = directory.read_bounded(OsStr::new(&asset_name), MAX_BINARY_BYTES)?;
+        let (binary, bytes) = retain_asset(&directory, &asset_name, MAX_BINARY_BYTES)?;
         validate_binary_bytes(&bytes, target)?;
         let digest = archive::sha256_bytes(&bytes);
-        let checksum = directory.read_bounded(OsStr::new(&checksum_name), 4096)?;
+        let (checksum_asset, checksum) = retain_asset(&directory, &checksum_name, 4096)?;
         if checksum != format!("{digest}  {asset_name}\n").as_bytes() {
             return Err(ReleaseError::BinaryContract(format!(
                 "checksum sidecar for {asset_name} is invalid"
             )));
         }
-        let manifest_bytes = directory.read_bounded(OsStr::new(&manifest_name), 1 << 20)?;
+        let (manifest_asset, manifest_bytes) = retain_asset(&directory, &manifest_name, 1 << 20)?;
         let manifest: AssetManifest = serde_json::from_slice(&manifest_bytes)?;
         if manifest.schema_version != ASSET_MANIFEST_SCHEMA_VERSION
             || manifest.tag != tag
@@ -198,6 +268,7 @@ pub(crate) fn verify_assets(root: &Path, assets: &Path, tag: &str) -> Result<(),
                 "asset manifest for {label} does not bind the reviewed tag, target, version, and bytes"
             )));
         }
+        reviewed_assets.extend([binary, checksum_asset, manifest_asset]);
     }
     let actual_files = directory
         .entry_names(expected_files.len().saturating_add(1))?
@@ -213,7 +284,44 @@ pub(crate) fn verify_assets(root: &Path, assets: &Path, tag: &str) -> Result<(),
             "release asset set differs: expected {expected_files:?}, found {actual_files:?}"
         )));
     }
-    Ok(())
+    let reviewed = ReviewedAssets {
+        directory,
+        commit,
+        assets: reviewed_assets,
+    };
+    reviewed.revalidate()?;
+    Ok(reviewed)
+}
+
+fn retain_asset(
+    directory: &safe_fs::RetainedDirectory,
+    name: &str,
+    limit: u64,
+) -> Result<(ReviewedAsset, Vec<u8>), ReleaseError> {
+    let path = directory.path().join(name);
+    let mut file = directory.open_regular(OsStr::new(name))?;
+    let identity = safe_fs::file_identity(&file, &path)?;
+    let reader = file
+        .try_clone()
+        .map_err(|source| ReleaseError::io(&path, source))?;
+    let bytes = safe_fs::read_bounded_file(reader, &path, limit)?;
+    file.seek(SeekFrom::Start(0))
+        .map_err(|source| ReleaseError::io(&path, source))?;
+    let byte_count = u64::try_from(bytes.len()).map_err(|_| {
+        ReleaseError::BinaryContract(format!("asset {name} size does not fit in u64"))
+    })?;
+    let sha256 = archive::sha256_bytes(&bytes);
+    Ok((
+        ReviewedAsset {
+            name: name.to_string(),
+            path,
+            file,
+            identity,
+            bytes: byte_count,
+            sha256,
+        },
+        bytes,
+    ))
 }
 
 fn validate_binary_bytes(bytes: &[u8], target: ReleaseTarget) -> Result<(), ReleaseError> {
@@ -310,8 +418,80 @@ mod tests {
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt as _;
+    use std::process::Command;
 
     use super::*;
+    use crate::RELEASE_TAG;
+
+    fn git(root: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "Stab Test")
+            .env("GIT_AUTHOR_EMAIL", "stab-test@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Stab Test")
+            .env("GIT_COMMITTER_EMAIL", "stab-test@example.invalid")
+            .status()
+            .expect("git command");
+        assert!(status.success(), "git {args:?}");
+    }
+
+    fn tagged_asset_repository() -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().expect("root");
+        git(root.path(), &["init", "--quiet"]);
+        fs::write(root.path().join(".gitignore"), "target/\n").expect("gitignore");
+        fs::write(root.path().join("source.txt"), "reviewed source\n").expect("source");
+        git(root.path(), &["add", ".gitignore", "source.txt"]);
+        git(root.path(), &["commit", "--quiet", "-m", "fixture"]);
+        git(
+            root.path(),
+            &["tag", "-a", RELEASE_TAG, "-m", "fixture tag"],
+        );
+        let assets = PathBuf::from("target/releases/assets");
+        let directory = root.path().join(&assets);
+        fs::create_dir_all(&directory).expect("asset directory");
+        let commit = repository::require_clean_tag(root.path(), RELEASE_TAG).expect("tag");
+        let toolchain = repository::ToolchainIdentity {
+            cargo_program: "/fixture/cargo".to_string(),
+            cargo_version: "cargo fixture\n".to_string(),
+            rustc_program: "/fixture/rustc".to_string(),
+            rustc_version: "rustc fixture\n".to_string(),
+            active_toolchain: "fixture-toolchain\n".to_string(),
+        };
+        for (label, bytes) in [
+            (
+                "linux-aarch64",
+                elf_aarch64(object::elf::ET_EXEC.0, object::elf::EM_AARCH64.0),
+            ),
+            ("macos-aarch64", macho_aarch64_executable()),
+        ] {
+            let name = format!("stab-{label}");
+            let digest = archive::sha256_bytes(&bytes);
+            fs::write(directory.join(&name), &bytes).expect("binary");
+            fs::write(
+                directory.join(format!("{name}.sha256")),
+                format!("{digest}  {name}\n"),
+            )
+            .expect("checksum");
+            let manifest = AssetManifest {
+                schema_version: ASSET_MANIFEST_SCHEMA_VERSION,
+                tag: RELEASE_TAG.to_string(),
+                commit: commit.clone(),
+                version: RELEASE_VERSION.to_string(),
+                target: label.to_string(),
+                binary: name.clone(),
+                bytes: bytes.len() as u64,
+                sha256: digest,
+                toolchain: toolchain.clone(),
+            };
+            let mut manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest");
+            manifest_bytes.push(b'\n');
+            fs::write(directory.join(format!("{name}.json")), manifest_bytes).expect("manifest");
+        }
+        (root, assets)
+    }
 
     fn write_bytes(bytes: &mut [u8], offset: usize, value: &[u8]) {
         let end = offset.checked_add(value.len()).expect("fixture offset");
@@ -524,6 +704,39 @@ mod tests {
                 Some(Path::new("target/releases"))
             ),
             Err(ReleaseError::OutputExists(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_retain_original_bytes_and_detect_path_replacement() {
+        let (root, assets) = tagged_asset_repository();
+        let mut reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        assert_eq!(reviewed.assets().len(), 6);
+        let original = reviewed
+            .assets()
+            .iter()
+            .find(|asset| asset.name() == "stab-linux-aarch64")
+            .map(|asset| asset.sha256().to_string())
+            .expect("Linux asset");
+        let path = root.path().join(&assets).join("stab-linux-aarch64");
+        fs::rename(&path, path.with_extension("reviewed")).expect("displace reviewed path");
+        fs::write(&path, b"replacement bytes").expect("replacement");
+
+        let retained = reviewed
+            .assets_mut()
+            .iter_mut()
+            .find(|asset| asset.name() == "stab-linux-aarch64")
+            .expect("retained Linux asset");
+        let retained_bytes = safe_fs::read_bounded_file(
+            retained.upload_file().expect("upload descriptor"),
+            Path::new("retained Linux asset"),
+            MAX_BINARY_BYTES,
+        )
+        .expect("retained bytes");
+        assert_eq!(archive::sha256_bytes(&retained_bytes), original);
+        assert!(matches!(
+            reviewed.revalidate(),
+            Err(ReleaseError::FileIdentityChanged(_))
         ));
     }
 }

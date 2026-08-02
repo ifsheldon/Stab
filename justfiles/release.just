@@ -21,3 +21,7 @@ package-binary *args:
 # Verify the complete tagged binary asset set before draft publication.
 verify-assets *args:
     cargo run -q --locked -p stab-release -- verify-assets {{args}}
+
+# Verify exact assets, create a private GitHub draft, and check remote digests.
+create-draft *args:
+    cargo run -q --locked -p stab-release -- create-draft {{args}}

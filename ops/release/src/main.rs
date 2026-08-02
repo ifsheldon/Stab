@@ -72,6 +72,18 @@ enum Command {
         #[arg(long)]
         tag: String,
     },
+    /// Verify exact assets and create a digest-checked private GitHub draft.
+    CreateDraft {
+        /// Directory containing both targets' binaries, checksums, and manifests.
+        #[arg(long)]
+        assets: PathBuf,
+        /// Annotated release tag that must resolve locally and remotely to this revision.
+        #[arg(long)]
+        tag: String,
+        /// Exact release version confirming the remote draft creation.
+        #[arg(long)]
+        confirm_version: String,
+    },
 }
 
 fn main() {
@@ -107,6 +119,11 @@ fn main() {
             stab_release::build_binary(&target, &out, &tag)
         }
         Command::VerifyAssets { assets, tag } => stab_release::verify_assets(&assets, &tag),
+        Command::CreateDraft {
+            assets,
+            tag,
+            confirm_version,
+        } => stab_release::create_verified_draft(&assets, &tag, &confirm_version),
     };
     if let Err(error) = result {
         eprintln!("[stab-release] error: {error}");
