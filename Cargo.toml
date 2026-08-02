@@ -39,12 +39,14 @@ arrayvec = "0.7.8"
 cargo_metadata = "0.23.1"
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
+flate2 = "1.1.9"
 gix = "0.85.0"
 hashbrown = "0.17.1"
 hex = "0.4.3"
 ignore = "0.4.26"
 memory-stats = "1.2.0"
 num-complex = "0.4.6"
+object = { version = "0.40.0", default-features = false, features = ["read", "std", "write"] }
 proptest = "1.11.0"
 proc-macro2 = "1.0.107"
 pulldown-cmark = { version = "0.13.4", default-features = false }
@@ -69,10 +71,12 @@ stab-model = { path = "crates/stab-model", version = "=0.2.0" }
 stab-records = { path = "crates/stab-records", version = "=0.2.0" }
 stab-architecture = { path = "ops/architecture" }
 statrs = { version = "0.18.0", default-features = false }
+tar = "0.4.46"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
 unicode-general-category = "1.1.0"
+ureq = { version = "3.3.0", features = ["json"] }
 
 [workspace.lints.rust]
 let_underscore_drop = "warn"

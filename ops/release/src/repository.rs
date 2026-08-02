@@ -1,20 +1,38 @@
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
+#[cfg(test)]
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
-use crate::{RELEASE_TAG, ReleaseError};
+use serde::{Deserialize, Serialize};
 
-const MAX_COMMAND_OUTPUT: usize = 1 << 20;
+use crate::{RELEASE_TAG, ReleaseError, process};
+
+const MAX_COMMAND_OUTPUT: usize = 8 << 20;
+const GIT_TIMEOUT: Duration = Duration::from_secs(30);
+const TOOLCHAIN_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ToolchainIdentity {
+    pub(crate) cargo_program: String,
+    pub(crate) cargo_version: String,
+    pub(crate) rustc_program: String,
+    pub(crate) rustc_version: String,
+    pub(crate) active_toolchain: String,
+}
 
 pub(crate) fn require_clean(root: &Path) -> Result<String, ReleaseError> {
     let status = run_capture(
         root,
-        "git",
-        &[
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=normal",
-            "--ignore-submodules=none",
+        OsStr::new("git"),
+        [
+            OsStr::new("status"),
+            OsStr::new("--porcelain=v1"),
+            OsStr::new("--untracked-files=normal"),
+            OsStr::new("--ignore-submodules=none"),
         ],
+        GIT_TIMEOUT,
         MAX_COMMAND_OUTPUT,
     )?;
     if !status.trim().is_empty() {
@@ -22,8 +40,13 @@ pub(crate) fn require_clean(root: &Path) -> Result<String, ReleaseError> {
     }
     let commit = run_capture(
         root,
-        "git",
-        &["rev-parse", "--verify", "HEAD"],
+        OsStr::new("git"),
+        [
+            OsStr::new("rev-parse"),
+            OsStr::new("--verify"),
+            OsStr::new("HEAD"),
+        ],
+        GIT_TIMEOUT,
         MAX_COMMAND_OUTPUT,
     )?;
     let commit = commit.trim().to_string();
@@ -57,8 +80,13 @@ pub(crate) fn require_clean_tag(root: &Path, tag: &str) -> Result<String, Releas
     let tag_ref = format!("refs/tags/{tag}");
     let kind = run_capture(
         root,
-        "git",
-        &["cat-file", "-t", &tag_ref],
+        OsStr::new("git"),
+        [
+            OsStr::new("cat-file"),
+            OsStr::new("-t"),
+            OsStr::new(&tag_ref),
+        ],
+        GIT_TIMEOUT,
         MAX_COMMAND_OUTPUT,
     )?;
     if kind.trim() != "tag" {
@@ -69,8 +97,13 @@ pub(crate) fn require_clean_tag(root: &Path, tag: &str) -> Result<String, Releas
     let peeled = format!("{tag_ref}^{{commit}}");
     let tag_commit = run_capture(
         root,
-        "git",
-        &["rev-parse", "--verify", &peeled],
+        OsStr::new("git"),
+        [
+            OsStr::new("rev-parse"),
+            OsStr::new("--verify"),
+            OsStr::new(&peeled),
+        ],
+        GIT_TIMEOUT,
         MAX_COMMAND_OUTPUT,
     )?
     .trim()
@@ -85,55 +118,85 @@ pub(crate) fn require_clean_tag(root: &Path, tag: &str) -> Result<String, Releas
     Ok(head)
 }
 
-pub(crate) fn run_capture(
+pub(crate) fn capture_toolchain(root: &Path) -> Result<ToolchainIdentity, ReleaseError> {
+    let cargo = cargo_program();
+    let rustc = rustc_program();
+    Ok(ToolchainIdentity {
+        cargo_program: cargo.to_string_lossy().into_owned(),
+        cargo_version: run_capture(
+            root,
+            &cargo,
+            [OsStr::new("--version"), OsStr::new("--verbose")],
+            TOOLCHAIN_TIMEOUT,
+            MAX_COMMAND_OUTPUT,
+        )?,
+        rustc_program: rustc.to_string_lossy().into_owned(),
+        rustc_version: run_capture(
+            root,
+            &rustc,
+            [OsStr::new("--version"), OsStr::new("--verbose")],
+            TOOLCHAIN_TIMEOUT,
+            MAX_COMMAND_OUTPUT,
+        )?,
+        active_toolchain: run_capture(
+            root,
+            OsStr::new("rustup"),
+            [OsStr::new("show"), OsStr::new("active-toolchain")],
+            TOOLCHAIN_TIMEOUT,
+            MAX_COMMAND_OUTPUT,
+        )?,
+    })
+}
+
+pub(crate) fn require_toolchain(
     root: &Path,
-    program: &str,
-    args: &[&str],
+    expected: &ToolchainIdentity,
+) -> Result<(), ReleaseError> {
+    let actual = capture_toolchain(root)?;
+    if actual != *expected {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "expected {expected:?}, found {actual:?}"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn cargo_program() -> OsString {
+    std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"))
+}
+
+pub(crate) fn run_capture<I, S>(
+    root: &Path,
+    program: &OsStr,
+    args: I,
+    timeout: Duration,
     limit: usize,
-) -> Result<String, ReleaseError> {
-    let output = Command::new(program)
-        .args(args)
-        .current_dir(root)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|source| ReleaseError::CommandIo {
-            program: program.to_string(),
-            source,
-        })?;
-    if output.stdout.len().saturating_add(output.stderr.len()) > limit {
-        return Err(ReleaseError::CommandOutputLimit {
-            program: program.to_string(),
-            limit,
-        });
-    }
-    if !output.status.success() {
-        return Err(ReleaseError::CommandFailed {
-            program: program.to_string(),
-            status: output.status.to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        });
-    }
+) -> Result<String, ReleaseError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = process::run(root, program, args, &[], timeout, limit)?;
     String::from_utf8(output.stdout).map_err(ReleaseError::from)
 }
 
-pub(crate) fn run_inherit(root: &Path, program: &str, args: &[&str]) -> Result<(), ReleaseError> {
-    let status = Command::new(program)
-        .args(args)
-        .current_dir(root)
-        .stdin(Stdio::null())
-        .status()
-        .map_err(|source| ReleaseError::CommandIo {
-            program: program.to_string(),
-            source,
-        })?;
-    if !status.success() {
-        return Err(ReleaseError::CommandFailed {
-            program: program.to_string(),
-            status: status.to_string(),
-            stderr: "see inherited Cargo diagnostics".to_string(),
-        });
-    }
-    Ok(())
+pub(crate) fn run_with_environment<I, S>(
+    root: &Path,
+    program: &OsStr,
+    args: I,
+    environment: &[(OsString, OsString)],
+    timeout: Duration,
+    limit: usize,
+) -> Result<process::ProcessOutput, ReleaseError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    process::run(root, program, args, environment, timeout, limit)
+}
+
+fn rustc_program() -> OsString {
+    std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"))
 }
 
 #[cfg(test)]

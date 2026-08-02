@@ -27,32 +27,23 @@ From the final clean reviewed revision, choose a new output path containing the 
 just release::check --out target/releases/v0.2.0-<commit>-preflight
 ```
 
-The Rust release tool reruns the architecture policy, validates the exact package set and topological order, and executes one coordinated multi-package `cargo publish --dry-run --locked --registry crates-io` invocation. Cargo packages every selected crate, resolves unpublished exact-version siblings through its temporary local registry, and compiles each normalized registry archive without uploading it. The tool then writes archive lengths and SHA-256 digests to `report.json`. It rejects a dirty or changing repository, an existing report path, path traversal, symlinked output ancestors, missing shared package documentation, incomplete metadata, inexact internal versions, or a failed registry-form build. Workspace tests, Clippy, Stable component checks, and external-consumer checks remain separate release gates.
+The Rust release tool reruns the architecture policy, validates the exact package set and topological order, creates all ten normalized archives in a new isolated Cargo target, and validates each archive's `.cargo_vcs_info.json` against the clean current commit. It then executes one coordinated multi-package `cargo publish --dry-run --locked --registry crates-io` invocation so Cargo resolves unpublished exact-version siblings through its temporary registry and compiles the normalized registry packages without uploading them. Fresh reviewed archives are copied under the unique preflight directory, made read-only, and recorded in `report.json` with their exact lengths, SHA-256 digests, Git commit, Cargo identity, rustc identity, and active Rustup toolchain. The tool never reads archives from the workspace's shared `target/package` directory.
 
-Review every assembled archive before the first upload. Do not reuse a failed preflight output path, and do not publish from a revision other than the report's exact commit.
+Review every immutable archive under the preflight directory before the first upload. Do not reuse a failed preflight output path, modify a reviewed archive, or publish from a revision or toolchain other than the report's exact identities.
 
 ## Crates.io Publication
 
-Provide the crates.io credential interactively with `cargo login` or through a secret `CARGO_REGISTRY_TOKEN` environment variable. Never put the token in a command argument, tracked file, generated report, log, or task transcript.
+Provide the crates.io credential interactively with `cargo login --registry crates-io` or through the secret `CARGO_REGISTRY_TOKEN` environment variable. Never put the token in a command argument, tracked file, generated report, log, or task transcript.
 
-Publish one package at a time in the printed order:
+Publish the reviewed set with an explicit irreversible-operation confirmation:
 
 ```text
-cargo publish --locked -p stab-kernels-simd
-cargo publish --locked -p stab-model
-cargo publish --locked -p stab-bits
-cargo publish --locked -p stab-records
-cargo publish --locked -p stab-algebra
-cargo publish --locked -p stab-analysis
-cargo publish --locked -p stab-decoder
-cargo publish --locked -p stab-engine
-cargo publish --locked -p stab-core
-cargo publish --locked -p stab-cli
+just release::publish-reviewed --preflight target/releases/v0.2.0-<commit>-preflight --confirm-version 0.2.0
 ```
 
-After each upload, wait until `cargo info <package>@0.2.0` resolves from crates.io before publishing a dependent package. Stop immediately on an identity, registry, or package error.
+Cargo cannot upload an existing `.crate` file directly. Before each upload, the Rust operation therefore rebuilds that package from the report's exact clean commit into a new isolated target and requires the result to match the reviewed archive byte for byte. It then invokes `cargo publish --locked --registry crates-io`, verifies that Cargo's post-publish archive still has the reviewed checksum, and waits until the crates.io API reports that exact checksum before advancing to a dependent package. Missing versions are published, already-visible matching versions are accepted for safe resumption, and any existing mismatched checksum stops the release.
 
-If publication stops partway through, already published versions cannot be replaced. Verify that every published crate belongs to the reviewed preflight source, then resume at the first missing package after its prerequisites become visible. If any published archive has the wrong source or a source correction is required, do not mix revisions under `0.2.0`; coordinate a new patch version and document the partial release.
+If publication stops partway through, rerun the same command with the same reviewed preflight. The operation rechecks every visible checksum and resumes at the first missing package. Already published versions cannot be replaced. If any published archive has the wrong checksum or a source correction is required, do not mix revisions under `0.2.0`; coordinate a new patch version and document the partial release.
 
 ## Tag And GitHub Release
 
@@ -63,6 +54,6 @@ git tag -a v0.2.0 -m "Stab 0.2.0"
 git push origin v0.2.0
 ```
 
-Create the GitHub release from that existing tag. The release workflow explicitly checks out the tag, verifies that it is an annotated tag at the clean current revision, builds `stab-cli`, and invokes the Rust release tool to produce `stab-linux-aarch64`, `stab-macos-aarch64`, and their SHA-256 sidecars. Manual workflow dispatch must name the same existing tag.
+Dispatch the `Release` workflow with the existing tag. Each native runner checks out that tag and invokes the Rust release operation, which builds into a new isolated target, requires `stab --version` to report `0.2.0`, validates the AArch64 executable format for the target operating system, and emits the binary, checksum sidecar, and source-provenance manifest. The final job downloads both target sets, rejects missing, extra, replaced, wrong-version, wrong-architecture, wrong-commit, or checksum-mismatched assets, then creates a draft GitHub release without `--clobber`. The workflow never responds to an already-published release and never makes the draft public.
 
-Verify the GitHub release source identity, both binaries, both checksum files, and the checksums themselves. Preserve the preflight report, final qualification checkpoint, release URL, crates.io package links, and workflow run in the A9 progress report.
+Inspect the draft, verify its source identity, both binaries, both checksum files, both provenance manifests, and all GitHub-recorded asset digests, then publish the draft manually. A failed workflow can leave an incomplete draft; delete that draft only after reviewing its assets, then rerun. Existing release assets are never replaced. Preserve the preflight report, final qualification checkpoint, release URL, crates.io package links, and workflow run in the A9 progress report.

@@ -9,10 +9,15 @@
     )
 )]
 
+mod archive;
 mod artifact;
 mod error;
 mod package;
+mod process;
+mod publish;
+mod registry;
 mod repository;
+mod safe_fs;
 mod workspace;
 
 use std::path::{Path, PathBuf};
@@ -49,19 +54,29 @@ pub fn print_publish_order() -> Result<(), ReleaseError> {
     Ok(())
 }
 
-pub fn package_binary(
-    binary: &Path,
-    target: &str,
-    output: &Path,
-    tag: &str,
-) -> Result<(), ReleaseError> {
+pub fn publish_reviewed(preflight: &Path, confirmation: &str) -> Result<(), ReleaseError> {
     let root = repository_root()?;
-    repository::require_clean_tag(&root, tag)?;
-    let packaged = artifact::package_binary(&root, binary, target, output)?;
+    publish::publish_reviewed(&root, preflight, confirmation)
+}
+
+pub fn build_binary(target: &str, output: &Path, tag: &str) -> Result<(), ReleaseError> {
+    let root = repository_root()?;
+    let packaged = artifact::build_binary(&root, target, output, tag)?;
     println!(
-        "[stab-release] wrote {} and {}",
+        "[stab-release] wrote {}, {}, and {}",
         packaged.binary.display(),
-        packaged.checksum.display()
+        packaged.checksum.display(),
+        packaged.manifest.display()
+    );
+    Ok(())
+}
+
+pub fn verify_assets(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    let root = repository_root()?;
+    artifact::verify_assets(&root, assets, tag)?;
+    println!(
+        "[stab-release] verified release assets in {}",
+        assets.display()
     );
     Ok(())
 }

@@ -1,20 +1,22 @@
 name: Release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to receive the binaries
+        description: Existing annotated release tag to build into a draft release
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
-  stab:
+  build:
     name: Build stab (${{ matrix.name }})
     strategy:
       fail-fast: false
@@ -23,30 +25,63 @@ jobs:
           - name: linux-aarch64
             os: ubuntu-24.04-arm
           - name: macos-aarch64
-            os: macos-latest
+            os: macos-15-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout tagged source
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Show toolchain
         run: rustup show active-toolchain
 
-      - name: Build stab
-        run: cargo build --release --locked -p stab-cli
-
-      - name: Package
+      - name: Build and validate tagged binary
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: cargo run -q --locked -p stab-release -- package-binary --binary target/release/stab --target ${{ matrix.name }} --out dist --tag "$RELEASE_TAG"
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TARGET: ${{ matrix.name }}
+        run: cargo run -q --locked -p stab-release -- build-binary --target "$RELEASE_TARGET" --out "target/releases/binary-$RELEASE_TARGET" --tag "$RELEASE_TAG"
 
-      - name: Upload release assets
+      - name: Retain validated assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: stab-${{ matrix.name }}
+          path: target/releases/binary-${{ matrix.name }}/*
+          if-no-files-found: error
+          retention-days: 7
+
+  draft:
+    name: Verify assets and create draft
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download all validated assets
+        uses: actions/download-artifact@v8
+        with:
+          pattern: stab-*
+          merge-multiple: true
+          path: target/releases/assets
+
+      - name: Verify complete asset set
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: cargo run -q --locked -p stab-release -- verify-assets --assets target/releases/assets --tag "$RELEASE_TAG"
+
+      - name: Create draft release with immutable asset names
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: gh release upload "$RELEASE_TAG" dist/* --clobber
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: gh release create "$RELEASE_TAG" target/releases/assets/stab-linux-aarch64 target/releases/assets/stab-linux-aarch64.sha256 target/releases/assets/stab-linux-aarch64.json target/releases/assets/stab-macos-aarch64 target/releases/assets/stab-macos-aarch64.sha256 target/releases/assets/stab-macos-aarch64.json --draft --verify-tag --title "Stab 0.2.0" --notes "Stab 0.2.0"

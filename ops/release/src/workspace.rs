@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::ffi::{OsStr, OsString};
+use std::path::Path;
+use std::time::Duration;
 
-use cargo_metadata::{MetadataCommand, Package};
+use cargo_metadata::{Metadata, Package};
 
-use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError};
+use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, repository};
 
 const README_FILE: &str = "README.crates.md";
 const RELEASE_KEYWORDS: &[&str] = &[
@@ -12,12 +14,14 @@ const RELEASE_KEYWORDS: &[&str] = &[
     "stabilizer",
     "simulation",
 ];
+const ARCHITECTURE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+const METADATA_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const MAX_COMMAND_OUTPUT_BYTES: usize = 16 << 20;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ReleasePackage {
     pub(crate) name: String,
     pub(crate) version: String,
-    pub(crate) archive: PathBuf,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,24 +29,40 @@ pub(crate) struct ReleaseWorkspace {
     pub(crate) packages: Vec<ReleasePackage>,
 }
 
-pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
-    let architecture = stab_architecture::check_workspace(root)
-        .map_err(|error| ReleaseError::Architecture(error.to_string()))?;
-    if !architecture.passed() {
-        let violations = architecture
-            .violations
-            .iter()
-            .map(|violation| format!("[{}] {}", violation.code, violation.message))
-            .collect::<Vec<_>>()
-            .join("; ");
-        return Err(ReleaseError::Architecture(violations));
-    }
+pub(crate) fn validate_architecture(root: &Path) -> Result<(), ReleaseError> {
+    repository::run_with_environment(
+        root,
+        &repository::cargo_program(),
+        [
+            OsString::from("run"),
+            OsString::from("--quiet"),
+            OsString::from("--locked"),
+            OsString::from("--package"),
+            OsString::from("stab-architecture"),
+            OsString::from("--"),
+            OsString::from("check"),
+        ],
+        &[],
+        ARCHITECTURE_TIMEOUT,
+        MAX_COMMAND_OUTPUT_BYTES,
+    )?;
+    Ok(())
+}
 
-    let metadata = MetadataCommand::new()
-        .current_dir(root)
-        .manifest_path(root.join("Cargo.toml"))
-        .other_options(vec!["--locked".to_string()])
-        .exec()?;
+pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
+    let metadata_json = repository::run_capture(
+        root,
+        &repository::cargo_program(),
+        [
+            OsStr::new("metadata"),
+            OsStr::new("--format-version"),
+            OsStr::new("1"),
+            OsStr::new("--locked"),
+        ],
+        METADATA_TIMEOUT,
+        MAX_COMMAND_OUTPUT_BYTES,
+    )?;
+    let metadata: Metadata = serde_json::from_str(&metadata_json)?;
     let workspace_ids = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
     let workspace_packages = metadata
         .packages
@@ -83,11 +103,6 @@ pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
             Ok(ReleasePackage {
                 name: name.to_string(),
                 version: package.version.to_string(),
-                archive: metadata
-                    .target_directory
-                    .join("package")
-                    .join(format!("{name}-{RELEASE_VERSION}.crate"))
-                    .into_std_path_buf(),
             })
         })
         .collect::<Result<Vec<_>, ReleaseError>>()?;

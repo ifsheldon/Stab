@@ -6,6 +6,18 @@ check *args:
 publish-order:
     cargo run -q --locked -p stab-release -- publish-order
 
-# Package one tagged stab binary and its SHA-256 sidecar.
+# Publish reviewed crates one at a time and verify crates.io checksums.
+publish-reviewed *args:
+    cargo run -q --locked -p stab-release -- publish-reviewed {{args}}
+
+# Build and package one tagged stab binary with checksum and provenance.
+build-binary *args:
+    cargo run -q --locked -p stab-release -- build-binary {{args}}
+
+# Backward-compatible name for the source-building binary operation.
 package-binary *args:
-    cargo run -q --locked -p stab-release -- package-binary {{args}}
+    cargo run -q --locked -p stab-release -- build-binary {{args}}
+
+# Verify the complete tagged binary asset set before draft publication.
+verify-assets *args:
+    cargo run -q --locked -p stab-release -- verify-assets {{args}}
