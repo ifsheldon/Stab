@@ -24,6 +24,10 @@ pub enum ReleaseError {
     CommandOutputLimit { program: String, limit: usize },
     #[error("release command {program} timed out after {timeout:?}")]
     CommandTimeout { program: String, timeout: Duration },
+    #[error("release command {program} was interrupted by SIGINT or SIGTERM")]
+    CommandInterrupted { program: String },
+    #[error("failed to install release cancellation handlers: {0}")]
+    CommandSignalHandlers(String),
     #[error("failed to capture release command {program}: {source}")]
     CommandCapture {
         program: String,
