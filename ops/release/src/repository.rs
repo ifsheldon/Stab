@@ -211,6 +211,27 @@ where
     run_capture_with_environment(root, program, args, &[], timeout, limit)
 }
 
+pub(crate) fn run_cargo_capture<I, S>(
+    root: &Path,
+    args: I,
+    timeout: Duration,
+    limit: usize,
+) -> Result<String, ReleaseError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let cargo = toolchain_program(root, "cargo")?;
+    let rustc_path = toolchain_program(root, "rustc")?;
+    let rustc_file = crate::safe_fs::open_regular_file(&rustc_path)?;
+    let rustc = crate::safe_fs::descriptor_program(&rustc_file, &rustc_path)?;
+    let environment = [(
+        OsString::from("RUSTC"),
+        rustc.path().as_os_str().to_os_string(),
+    )];
+    run_capture_with_environment(root, cargo.as_os_str(), args, &environment, timeout, limit)
+}
+
 fn run_capture_with_environment<I, S>(
     root: &Path,
     program: &OsStr,

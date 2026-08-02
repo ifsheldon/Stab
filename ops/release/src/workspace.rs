@@ -58,10 +58,8 @@ fn architecture_arguments(root: &Path) -> Vec<OsString> {
 }
 
 pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
-    let cargo = repository::toolchain_program(root, "cargo")?;
-    let metadata_json = repository::run_capture(
+    let metadata_json = repository::run_cargo_capture(
         root,
-        cargo.as_os_str(),
         [
             OsStr::new("metadata"),
             OsStr::new("--format-version"),
