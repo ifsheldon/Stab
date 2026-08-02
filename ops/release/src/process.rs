@@ -2,12 +2,12 @@ use std::ffi::{OsStr, OsString};
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use crate::ReleaseError;
+use crate::{ReleaseError, cancellation::ReleaseCancellation, safe_fs};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 const READER_DRAIN_GRACE: Duration = Duration::from_millis(100);
@@ -29,7 +29,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let cancellation = ProcessCancellation::for_signals()?;
+    let cancellation = ReleaseCancellation::for_signals()?;
     run_with_cancellation(
         working_directory,
         program,
@@ -48,7 +48,7 @@ fn run_with_cancellation<I, S>(
     environment: &[(OsString, OsString)],
     timeout: Duration,
     output_limit: usize,
-    cancellation: &ProcessCancellation,
+    cancellation: &ReleaseCancellation,
 ) -> Result<ProcessOutput, ReleaseError>
 where
     I: IntoIterator<Item = S>,
@@ -60,22 +60,43 @@ where
             program: program_text,
         });
     }
-    let mut command = Command::new(program);
+    let retained_program = if is_descriptor_program(program) {
+        None
+    } else {
+        Some(retain_program(program)?)
+    };
+    let execution_program = retained_program
+        .as_ref()
+        .map_or_else(|| Path::new(program), safe_fs::DescriptorProgram::path);
+    let mut command = Command::new(execution_program);
     command
         .args(args)
         .current_dir(working_directory)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .envs(environment.iter().map(|(key, value)| (key, value)));
-    clear_git_overrides(&mut command);
+        .env_clear();
+    for (key, value) in environment {
+        if !key.to_string_lossy().starts_with("GIT_") {
+            command.env(key, value);
+        }
+    }
     command
+        .env("LANG", "C")
+        .env("LC_ALL", "C")
+        .env("PATH", "/usr/bin:/bin")
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_TERMINAL_PROMPT", "0");
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt as _;
+
+        if !is_descriptor_program(program)
+            && let Some(name) = Path::new(program).file_name()
+        {
+            command.arg0(name);
+        }
         command.process_group(0);
     }
 
@@ -137,26 +158,47 @@ where
     })
 }
 
-fn clear_git_overrides(command: &mut Command) {
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("GIT_") {
-            command.env_remove(key);
-        }
-    }
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_COMMON_DIR",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CONFIG",
-        "GIT_CONFIG_GLOBAL",
-        "GIT_CONFIG_SYSTEM",
-        "GIT_CONFIG_COUNT",
-    ] {
-        command.env_remove(key);
-    }
+fn retain_program(program: &OsStr) -> Result<safe_fs::DescriptorProgram, ReleaseError> {
+    let path = Path::new(program);
+    let resolved = if path.is_absolute() {
+        path.to_path_buf()
+    } else if path.components().count() == 1 {
+        [Path::new("/usr/bin"), Path::new("/bin")]
+            .into_iter()
+            .map(|directory| directory.join(path))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| ReleaseError::CommandIo {
+                program: program.to_string_lossy().into_owned(),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "program is not present in the fixed release tool path",
+                ),
+            })?
+    } else {
+        return Err(ReleaseError::CommandIo {
+            program: program.to_string_lossy().into_owned(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "release program paths must be absolute or a single tool name",
+            ),
+        });
+    };
+    let file = safe_fs::open_regular_file(&resolved)?;
+    safe_fs::descriptor_program(&file, &resolved)
+}
+
+fn is_descriptor_program(program: &OsStr) -> bool {
+    let path = Path::new(program);
+    let parent = path.parent();
+    let descriptor = path
+        .file_name()
+        .and_then(OsStr::to_str)
+        .is_some_and(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()));
+    descriptor
+        && matches!(
+            parent,
+            Some(parent) if parent == Path::new("/proc/self/fd") || parent == Path::new("/dev/fd")
+        )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -165,49 +207,6 @@ enum Termination {
     Interrupted,
     OutputLimit,
     Timeout,
-}
-
-#[derive(Clone)]
-struct ProcessCancellation {
-    cancelled: Arc<AtomicBool>,
-}
-
-impl ProcessCancellation {
-    fn for_signals() -> Result<Self, ReleaseError> {
-        static CANCELLED: OnceLock<Arc<AtomicBool>> = OnceLock::new();
-        static INSTALLED: OnceLock<Result<(), String>> = OnceLock::new();
-        let cancelled = Arc::clone(CANCELLED.get_or_init(|| Arc::new(AtomicBool::new(false))));
-        let installed = INSTALLED.get_or_init(|| {
-            for signal in [
-                signal_hook::consts::signal::SIGINT,
-                signal_hook::consts::signal::SIGTERM,
-            ] {
-                signal_hook::flag::register(signal, Arc::clone(&cancelled))
-                    .map_err(|source| source.to_string())?;
-            }
-            Ok(())
-        });
-        if let Err(reason) = installed {
-            return Err(ReleaseError::CommandSignalHandlers(reason.clone()));
-        }
-        Ok(Self { cancelled })
-    }
-
-    fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
-    }
-
-    #[cfg(test)]
-    fn for_test() -> Self {
-        Self {
-            cancelled: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    #[cfg(test)]
-    fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
-    }
 }
 
 struct ManagedChild {
@@ -593,6 +592,24 @@ mod tests {
     }
 
     #[test]
+    fn ambient_registry_token_does_not_cross_the_supervisor_boundary() {
+        let (program, args, environment) = helper_request("secret-supervisor");
+        let status = Command::new(program)
+            .args(args)
+            .envs(environment)
+            .env("CARGO_REGISTRY_TOKEN", "must-not-reach-release-children")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("spawn secret-scope supervisor");
+        assert!(
+            status.success(),
+            "secret-scope supervisor failed with {status}"
+        );
+    }
+
+    #[test]
     fn successful_child_output_is_fully_drained() {
         let (program, args, environment) = helper_request("bounded-output");
         let output = run(
@@ -618,7 +635,7 @@ mod tests {
         let published = directory.path().join("published");
         let (program, args, mut environment) = helper_request("mock-publication");
         environment.extend(marker_environment(&started, &published));
-        let cancellation = ProcessCancellation::for_test();
+        let cancellation = ReleaseCancellation::for_test();
         let trigger = cancellation.clone();
         let started_for_trigger = started.clone();
         let canceller = thread::spawn(move || {
@@ -843,6 +860,32 @@ mod tests {
                     std::process::exit(9);
                 }
             }
+            Ok("secret-env") => {
+                if std::env::var_os("CARGO_REGISTRY_TOKEN").is_none() {
+                    println!("registry-token-absent");
+                } else {
+                    std::process::exit(10);
+                }
+            }
+            Ok("secret-supervisor") => {
+                let (program, args, environment) = helper_request("secret-env");
+                let output = run(
+                    Path::new(env!("CARGO_MANIFEST_DIR")),
+                    &program,
+                    &args,
+                    &environment,
+                    Duration::from_secs(5),
+                    4096,
+                )
+                .expect("isolated secret probe");
+                if !output
+                    .stdout
+                    .windows(b"registry-token-absent".len())
+                    .any(|window| window == b"registry-token-absent")
+                {
+                    std::process::exit(11);
+                }
+            }
             Ok("bounded-output") => {
                 std::io::stdout()
                     .write_all(&vec![0xa5; 128 << 10])
@@ -857,7 +900,10 @@ mod tests {
                 std::fs::write(published, b"published").expect("write mock publication marker");
             }
             Ok("signal-supervisor") => {
-                let (program, args, environment) = helper_request("mock-publication");
+                let (program, args, mut environment) = helper_request("mock-publication");
+                let started = required_marker_path(STARTED_PATH_ENV);
+                let published = required_marker_path(PUBLISHED_PATH_ENV);
+                environment.extend(marker_environment(&started, &published));
                 match run(
                     Path::new(env!("CARGO_MANIFEST_DIR")),
                     &program,

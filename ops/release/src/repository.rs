@@ -1,5 +1,5 @@
 use std::ffi::{OsStr, OsString};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -119,13 +119,15 @@ pub(crate) fn require_clean_tag(root: &Path, tag: &str) -> Result<String, Releas
 }
 
 pub(crate) fn capture_toolchain(root: &Path) -> Result<ToolchainIdentity, ReleaseError> {
-    let cargo = cargo_program();
-    let rustc = rustc_program();
+    let cargo = toolchain_program(root, "cargo")?;
+    let rustc = toolchain_program(root, "rustc")?;
+    let rustup = rustup_program()?;
+    let rustup_environment = rustup_environment()?;
     Ok(ToolchainIdentity {
         cargo_program: cargo.to_string_lossy().into_owned(),
         cargo_version: run_capture(
             root,
-            &cargo,
+            cargo.as_os_str(),
             [OsStr::new("--version"), OsStr::new("--verbose")],
             TOOLCHAIN_TIMEOUT,
             MAX_COMMAND_OUTPUT,
@@ -133,15 +135,16 @@ pub(crate) fn capture_toolchain(root: &Path) -> Result<ToolchainIdentity, Releas
         rustc_program: rustc.to_string_lossy().into_owned(),
         rustc_version: run_capture(
             root,
-            &rustc,
+            rustc.as_os_str(),
             [OsStr::new("--version"), OsStr::new("--verbose")],
             TOOLCHAIN_TIMEOUT,
             MAX_COMMAND_OUTPUT,
         )?,
-        active_toolchain: run_capture(
+        active_toolchain: run_capture_with_environment(
             root,
-            OsStr::new("rustup"),
+            rustup.as_os_str(),
             [OsStr::new("show"), OsStr::new("active-toolchain")],
+            &rustup_environment,
             TOOLCHAIN_TIMEOUT,
             MAX_COMMAND_OUTPUT,
         )?,
@@ -161,8 +164,37 @@ pub(crate) fn require_toolchain(
     Ok(())
 }
 
-pub(crate) fn cargo_program() -> OsString {
-    std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"))
+pub(crate) fn toolchain_program(root: &Path, program: &str) -> Result<PathBuf, ReleaseError> {
+    let rustup = rustup_program()?;
+    let output = run_capture_with_environment(
+        root,
+        rustup.as_os_str(),
+        [OsStr::new("which"), OsStr::new(program)],
+        &rustup_environment()?,
+        TOOLCHAIN_TIMEOUT,
+        MAX_COMMAND_OUTPUT,
+    )?;
+    let path_text = output
+        .strip_suffix("\r\n")
+        .or_else(|| output.strip_suffix('\n'))
+        .ok_or_else(|| {
+            ReleaseError::ToolchainIdentity(format!(
+                "rustup which {program} did not return one terminated path"
+            ))
+        })?;
+    if path_text.contains('\n') || path_text.is_empty() {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "rustup which {program} returned an invalid path"
+        )));
+    }
+    let path = PathBuf::from(path_text);
+    if !path.is_absolute() {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "rustup which {program} returned a relative path"
+        )));
+    }
+    drop(crate::safe_fs::open_regular_file(&path)?);
+    Ok(path)
 }
 
 pub(crate) fn run_capture<I, S>(
@@ -176,27 +208,55 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = process::run(root, program, args, &[], timeout, limit)?;
-    String::from_utf8(output.stdout).map_err(ReleaseError::from)
+    run_capture_with_environment(root, program, args, &[], timeout, limit)
 }
 
-pub(crate) fn run_with_environment<I, S>(
+fn run_capture_with_environment<I, S>(
     root: &Path,
     program: &OsStr,
     args: I,
     environment: &[(OsString, OsString)],
     timeout: Duration,
     limit: usize,
-) -> Result<process::ProcessOutput, ReleaseError>
+) -> Result<String, ReleaseError>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    process::run(root, program, args, environment, timeout, limit)
+    let output = process::run(root, program, args, environment, timeout, limit)?;
+    String::from_utf8(output.stdout).map_err(ReleaseError::from)
 }
 
-fn rustc_program() -> OsString {
-    std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"))
+fn rustup_program() -> Result<PathBuf, ReleaseError> {
+    let mut candidates = Vec::new();
+    if let Some(cargo_home) = std::env::var_os("CARGO_HOME") {
+        candidates.push(PathBuf::from(cargo_home).join("bin/rustup"));
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        candidates.push(PathBuf::from(home).join(".cargo/bin/rustup"));
+    }
+    candidates.push(PathBuf::from("/usr/bin/rustup"));
+    for candidate in candidates {
+        if crate::safe_fs::open_regular_file(&candidate).is_ok() {
+            return Ok(candidate);
+        }
+    }
+    Err(ReleaseError::ToolchainIdentity(
+        "could not resolve rustup from CARGO_HOME, HOME, or /usr/bin".to_string(),
+    ))
+}
+
+fn rustup_environment() -> Result<Vec<(OsString, OsString)>, ReleaseError> {
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(
+            "HOME is required to resolve the pinned Rust toolchain".to_string(),
+        )
+    })?;
+    let mut environment = vec![(OsString::from("HOME"), home)];
+    if let Some(rustup_home) = std::env::var_os("RUSTUP_HOME") {
+        environment.push((OsString::from("RUSTUP_HOME"), rustup_home));
+    }
+    Ok(environment)
 }
 
 #[cfg(test)]

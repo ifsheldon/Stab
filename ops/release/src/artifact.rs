@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
@@ -7,7 +7,7 @@ use std::time::Duration;
 use object::{Architecture, BinaryFormat, Object as _, ObjectKind, ObjectSegment as _};
 use serde::{Deserialize, Serialize};
 
-use crate::{RELEASE_VERSION, ReleaseError, archive, repository, safe_fs};
+use crate::{RELEASE_VERSION, ReleaseError, archive, cargo, repository, safe_fs};
 
 const MAX_BINARY_BYTES: u64 = 128 << 20;
 const MAX_VERSION_OUTPUT: usize = 64 << 10;
@@ -83,13 +83,9 @@ pub(crate) fn build_binary(
     )?;
     let work = output.create_directory(OsStr::new("work"))?;
     let cargo_target = work.create_directory(OsStr::new("cargo-target"))?;
-    let environment = vec![(
-        OsString::from("CARGO_TARGET_DIR"),
-        cargo_target.path().as_os_str().to_os_string(),
-    )];
-    repository::run_with_environment(
+    let cargo = cargo::CargoSandbox::create(root, &work, &cargo_target)?;
+    cargo.run(
         root,
-        &repository::cargo_program(),
         [
             OsStr::new("build"),
             OsStr::new("--release"),
@@ -97,7 +93,6 @@ pub(crate) fn build_binary(
             OsStr::new("--package"),
             OsStr::new("stab-cli"),
         ],
-        &environment,
         BUILD_TIMEOUT,
         8 << 20,
     )?;

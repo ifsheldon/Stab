@@ -8,7 +8,7 @@ use crate::{
 };
 
 const MAX_CARGO_OUTPUT_BYTES: usize = 8 << 20;
-const CARGO_PUBLISH_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+const CARGO_PACKAGE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const A9_AUTHORIZATION_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 static PUBLICATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -25,6 +25,8 @@ pub(crate) fn publish_reviewed(
     }
     let (preflight_directory, report) = package::load_reviewed_report(root, preflight)?;
     let reviewed_packages = preflight_directory.open_directory(OsStr::new("packages"))?;
+    let reviewed_metadata = preflight_directory.open_directory(OsStr::new("registry-metadata"))?;
+    let cancellation = crate::cancellation::ReleaseCancellation::for_signals()?;
     let authorization_work = create_publication_work(root)?;
     {
         let cargo_target = authorization_work.create_directory(OsStr::new("cargo-target"))?;
@@ -40,11 +42,13 @@ pub(crate) fn publish_reviewed(
     authorization_work.remove_tree()?;
     preflight_directory.revalidate()?;
     reviewed_packages.revalidate()?;
+    reviewed_metadata.revalidate()?;
     repository::require_unchanged(root, &report.commit)?;
     repository::require_toolchain(root, &report.toolchain)?;
-    let registry = registry::CratesIo::new();
+    let registry = registry::CratesIo::new(cancellation.clone());
 
     for package in &report.packages {
+        cancellation.check("reviewed package publication")?;
         if registry::require_absent_or_matching(
             &registry,
             &package.name,
@@ -65,7 +69,7 @@ pub(crate) fn publish_reviewed(
         cargo.run(
             root,
             &package_args,
-            CARGO_PUBLISH_TIMEOUT,
+            CARGO_PACKAGE_TIMEOUT,
             MAX_CARGO_OUTPUT_BYTES,
         )?;
         cargo_target.revalidate()?;
@@ -73,24 +77,46 @@ pub(crate) fn publish_reviewed(
         require_rebuilt_match(&rebuilt_directory, package, &report.commit)?;
         preflight_directory.revalidate()?;
         reviewed_packages.revalidate()?;
+        reviewed_metadata.revalidate()?;
         repository::require_unchanged(root, &report.commit)?;
         repository::require_toolchain(root, &report.toolchain)?;
 
-        let publish_args = individual_publish_arguments(&package.name);
-        let token = cargo::CratesIoToken::from_environment()?;
-        cargo.upload(
-            root,
-            &publish_args,
-            &token,
-            CARGO_PUBLISH_TIMEOUT,
-            MAX_CARGO_OUTPUT_BYTES,
+        let metadata_name = package::registry_metadata_name(&package.name, &package.version);
+        let metadata_bytes = reviewed_metadata.read_bounded(
+            OsStr::new(&metadata_name),
+            registry::MAX_REGISTRY_METADATA_BYTES,
         )?;
+        if registry::metadata_sha256(&metadata_bytes) != package.registry_metadata_sha256
+            || u64::try_from(metadata_bytes.len()).ok() != Some(package.registry_metadata_bytes)
+        {
+            return Err(ReleaseError::PublicationState(format!(
+                "reviewed registry metadata for {} changed before upload",
+                package.name
+            )));
+        }
+        registry::validate_reviewed_metadata(&metadata_bytes, &package.name, &package.version)?;
+        let archive_name = package::archive_name(&package.name, &package.version);
+        let reviewed_archive = reviewed_packages.open_regular(OsStr::new(&archive_name))?;
+        require_reviewed_match(
+            &reviewed_archive,
+            package,
+            &report.commit,
+            reviewed_packages.path(),
+        )?;
+        cancellation.check("reviewed package publication")?;
+        let token = registry::CratesIoToken::from_environment()?;
+        registry.publish_reviewed(&metadata_bytes, &reviewed_archive, &token)?;
+        drop(token);
+        cancellation.check("reviewed package publication")?;
         rebuilt_directory.revalidate()?;
         require_rebuilt_match(&rebuilt_directory, package, &report.commit)?;
+        reviewed_packages.revalidate()?;
+        reviewed_metadata.revalidate()?;
         repository::require_unchanged(root, &report.commit)?;
         repository::require_toolchain(root, &report.toolchain)?;
         registry::wait_for_matching_checksum(
             &registry,
+            &cancellation,
             &package.name,
             &package.version,
             &package.sha256,
@@ -173,24 +199,38 @@ fn require_rebuilt_match(
     Ok(())
 }
 
+fn require_reviewed_match(
+    archive_file: &std::fs::File,
+    package: &package::PackageArchive,
+    commit: &str,
+    directory: &Path,
+) -> Result<(), ReleaseError> {
+    let archive_name = package::archive_name(&package.name, &package.version);
+    let archive_path = directory.join(&archive_name);
+    let validated = archive::read_file_and_validate(
+        archive_file
+            .try_clone()
+            .map_err(|source| ReleaseError::io(&archive_path, source))?,
+        &archive_path,
+        &package.name,
+        &package.version,
+        commit,
+    )?;
+    if validated.sha256 != package.sha256
+        || u64::try_from(validated.bytes.len()).ok() != Some(package.bytes)
+    {
+        return Err(ReleaseError::PublicationState(format!(
+            "reviewed archive for {} changed before upload",
+            package.name
+        )));
+    }
+    Ok(())
+}
+
 fn individual_package_arguments(package: &str) -> Vec<OsString> {
     ["package", "--locked", "--no-verify", "--package", package]
         .map(OsString::from)
         .to_vec()
-}
-
-fn individual_publish_arguments(package: &str) -> Vec<OsString> {
-    [
-        "publish",
-        "--locked",
-        "--registry",
-        "crates-io",
-        "--no-verify",
-        "--package",
-        package,
-    ]
-    .map(OsString::from)
-    .to_vec()
 }
 
 #[cfg(test)]
@@ -198,25 +238,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn publication_is_explicit_and_registry_pinned() {
+    fn publication_rebuild_is_explicit() {
         assert_eq!(
             individual_package_arguments("stab-core"),
             [
                 "package",
                 "--locked",
-                "--no-verify",
-                "--package",
-                "stab-core"
-            ]
-            .map(OsString::from)
-        );
-        assert_eq!(
-            individual_publish_arguments("stab-core"),
-            [
-                "publish",
-                "--locked",
-                "--registry",
-                "crates-io",
                 "--no-verify",
                 "--package",
                 "stab-core"

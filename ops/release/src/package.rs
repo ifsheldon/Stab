@@ -5,14 +5,16 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, archive, cargo, repository, safe_fs,
-    workspace,
+    PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, archive, cargo, registry, repository,
+    safe_fs, workspace,
 };
 
 const MAX_PACKAGE_LIST_BYTES: usize = 4 << 20;
 const MAX_CARGO_OUTPUT_BYTES: usize = 8 << 20;
 const CARGO_PACKAGE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
-pub(crate) const RELEASE_PREFLIGHT_SCHEMA_VERSION: u32 = 3;
+pub(crate) const RELEASE_PREFLIGHT_SCHEMA_VERSION: u32 = 4;
+const RELEASE_VERIFICATION: &str =
+    "fresh-coordinated-package-plus-cargo-publish-dry-run-plus-reviewed-registry-metadata";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +39,9 @@ pub(crate) struct PackageArchive {
     pub(crate) sha256: String,
     pub(crate) vcs_commit: String,
     pub(crate) shared_readme: String,
+    pub(crate) registry_metadata: String,
+    pub(crate) registry_metadata_bytes: u64,
+    pub(crate) registry_metadata_sha256: String,
 }
 
 pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError> {
@@ -74,6 +79,7 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     let cargo_packages = cargo_target.open_directory(OsStr::new("package"))?;
 
     let packages_directory = output.create_directory(OsStr::new("packages"))?;
+    let metadata_directory = output.create_directory(OsStr::new("registry-metadata"))?;
     let mut packages = Vec::with_capacity(workspace.packages.len());
     for package in &workspace.packages {
         let archive_name = archive_name(&package.name, &package.version);
@@ -87,6 +93,12 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
             &commit,
         )?;
         archive::write_immutable_copy(&packages_directory, OsStr::new(&archive_name), &reviewed)?;
+        let metadata_name = registry_metadata_name(&package.name, &package.version);
+        write_immutable_bytes(
+            &metadata_directory,
+            OsStr::new(&metadata_name),
+            &package.registry_metadata,
+        )?;
         let copied_path = packages_directory.path().join(&archive_name);
         let copied_file = packages_directory.open_regular(OsStr::new(&archive_name))?;
         let copied = archive::read_file_and_validate(
@@ -115,9 +127,20 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
             sha256: reviewed.sha256,
             vcs_commit: reviewed.vcs_commit,
             shared_readme: "README.crates.md".to_string(),
+            registry_metadata: format!("registry-metadata/{metadata_name}"),
+            registry_metadata_bytes: u64::try_from(package.registry_metadata.len()).map_err(
+                |_| {
+                    ReleaseError::PackageContract(format!(
+                        "{} registry metadata size does not fit in u64",
+                        package.name
+                    ))
+                },
+            )?,
+            registry_metadata_sha256: registry::metadata_sha256(&package.registry_metadata),
         });
     }
     packages_directory.make_read_only()?;
+    metadata_directory.make_read_only()?;
 
     work.revalidate()?;
     output.revalidate()?;
@@ -130,7 +153,7 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
         version: RELEASE_VERSION.to_string(),
         commit,
         registry: "crates-io".to_string(),
-        verification: "fresh-coordinated-package-plus-cargo-publish-dry-run".to_string(),
+        verification: RELEASE_VERIFICATION.to_string(),
         toolchain,
         publication_order: PRODUCT_PACKAGE_ORDER
             .iter()
@@ -188,7 +211,7 @@ fn validate_report(
     if report.schema_version != RELEASE_PREFLIGHT_SCHEMA_VERSION
         || report.version != RELEASE_VERSION
         || report.registry != "crates-io"
-        || report.verification != "fresh-coordinated-package-plus-cargo-publish-dry-run"
+        || report.verification != RELEASE_VERIFICATION
         || report.publication_order != PRODUCT_PACKAGE_ORDER
         || report.packages.len() != PRODUCT_PACKAGE_ORDER.len()
     {
@@ -205,13 +228,16 @@ fn validate_report(
     }
     repository::require_toolchain(root, &report.toolchain)?;
     let packages = directory.open_directory(OsStr::new("packages"))?;
+    let metadata = directory.open_directory(OsStr::new("registry-metadata"))?;
     for (expected_name, package) in PRODUCT_PACKAGE_ORDER.iter().zip(&report.packages) {
         let expected_archive = archive_name(expected_name, RELEASE_VERSION);
+        let expected_metadata = registry_metadata_name(expected_name, RELEASE_VERSION);
         if package.name != *expected_name
             || package.version != RELEASE_VERSION
             || package.archive != format!("packages/{expected_archive}")
             || package.vcs_commit != report.commit
             || package.shared_readme != "README.crates.md"
+            || package.registry_metadata != format!("registry-metadata/{expected_metadata}")
         {
             return Err(ReleaseError::PackageContract(format!(
                 "reviewed package record for {expected_name} is invalid"
@@ -234,7 +260,23 @@ fn validate_report(
                 detail: "reviewed archive checksum or length differs from report".to_string(),
             });
         }
+        let metadata_path = metadata.path().join(&expected_metadata);
+        let metadata_bytes = metadata.read_bounded(
+            OsStr::new(&expected_metadata),
+            registry::MAX_REGISTRY_METADATA_BYTES,
+        )?;
+        registry::validate_reviewed_metadata(&metadata_bytes, &package.name, &package.version)?;
+        if registry::metadata_sha256(&metadata_bytes) != package.registry_metadata_sha256
+            || u64::try_from(metadata_bytes.len()).ok() != Some(package.registry_metadata_bytes)
+        {
+            return Err(ReleaseError::ArchiveContract {
+                path: metadata_path,
+                detail: "reviewed registry metadata checksum or length differs from report"
+                    .to_string(),
+            });
+        }
     }
+    metadata.revalidate()?;
     directory.revalidate()?;
     Ok(())
 }
@@ -296,6 +338,33 @@ pub(crate) fn archive_name(package: &str, version: &str) -> String {
     format!("{package}-{version}.crate")
 }
 
+pub(crate) fn registry_metadata_name(package: &str, version: &str) -> String {
+    format!("{package}-{version}.json")
+}
+
+fn write_immutable_bytes(
+    directory: &safe_fs::RetainedDirectory,
+    name: &OsStr,
+    bytes: &[u8],
+) -> Result<(), ReleaseError> {
+    let file = directory.write_new(name, bytes)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        file.set_permissions(std::fs::Permissions::from_mode(0o444))
+            .map_err(|source| ReleaseError::io(directory.path().join(name), source))?;
+        file.sync_all()
+            .map_err(|source| ReleaseError::io(directory.path().join(name), source))?;
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = file;
+        Err(ReleaseError::UnsupportedPlatform)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,6 +376,7 @@ mod tests {
                 .map(|name| workspace::ReleasePackage {
                     name: name.to_string(),
                     version: RELEASE_VERSION.to_string(),
+                    registry_metadata: Vec::new(),
                 })
                 .collect(),
         }

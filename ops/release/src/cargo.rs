@@ -19,14 +19,12 @@ git-fetch-with-cli = false
 "#;
 const ISOLATED_CARGO_COMMAND: &str = "__isolated-cargo";
 const SYSTEM_PATH: &str = "/usr/bin:/bin";
-const TOOL_LOOKUP_TIMEOUT: Duration = Duration::from_secs(30);
-const MAX_TOOL_LOOKUP_BYTES: usize = 64 << 10;
 
 pub(crate) struct CargoSandbox {
-    launcher: PathBuf,
-    cargo: PathBuf,
-    rustc: PathBuf,
-    rustdoc: PathBuf,
+    launcher: safe_fs::DescriptorProgram,
+    cargo: safe_fs::DescriptorProgram,
+    rustc: safe_fs::DescriptorProgram,
+    rustdoc: safe_fs::DescriptorProgram,
     home: safe_fs::RetainedDirectory,
     cargo_home: safe_fs::RetainedDirectory,
     temporary: safe_fs::RetainedDirectory,
@@ -34,28 +32,6 @@ pub(crate) struct CargoSandbox {
     manifest: PathBuf,
     config: PathBuf,
     config_identity: safe_fs::FileIdentity,
-}
-
-pub(crate) struct CratesIoToken(OsString);
-
-impl CratesIoToken {
-    pub(crate) fn from_environment() -> Result<Self, ReleaseError> {
-        let token = std::env::var_os("CARGO_REGISTRY_TOKEN").ok_or_else(|| {
-            ReleaseError::PublicationState(
-                "CARGO_REGISTRY_TOKEN is required for the crates.io upload".to_string(),
-            )
-        })?;
-        if token.is_empty() {
-            return Err(ReleaseError::PublicationState(
-                "CARGO_REGISTRY_TOKEN must not be empty".to_string(),
-            ));
-        }
-        Ok(Self(token))
-    }
-
-    fn expose(&self) -> &OsStr {
-        &self.0
-    }
 }
 
 impl CargoSandbox {
@@ -74,13 +50,15 @@ impl CargoSandbox {
         cargo_home.sync()?;
 
         Ok(Self {
-            launcher: std::env::current_exe().map_err(|source| ReleaseError::CommandIo {
-                program: "current release executable".to_string(),
-                source,
-            })?,
-            cargo: resolve_toolchain_program(root, "cargo")?,
-            rustc: resolve_toolchain_program(root, "rustc")?,
-            rustdoc: resolve_toolchain_program(root, "rustdoc")?,
+            launcher: retain_program(&std::env::current_exe().map_err(|source| {
+                ReleaseError::CommandIo {
+                    program: "current release executable".to_string(),
+                    source,
+                }
+            })?)?,
+            cargo: retain_program(&resolve_toolchain_program(root, "cargo")?)?,
+            rustc: retain_program(&resolve_toolchain_program(root, "rustc")?)?,
+            rustdoc: retain_program(&resolve_toolchain_program(root, "rustdoc")?)?,
             home,
             cargo_home,
             temporary,
@@ -102,7 +80,7 @@ impl CargoSandbox {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.run_inner(root, args, None, timeout, output_limit)
+        self.run_inner(root, args, timeout, output_limit)
     }
 
     pub(crate) fn run_capture<I, S>(
@@ -120,26 +98,10 @@ impl CargoSandbox {
         String::from_utf8(output.stdout).map_err(ReleaseError::from)
     }
 
-    pub(crate) fn upload<I, S>(
-        &self,
-        root: &Path,
-        args: I,
-        token: &CratesIoToken,
-        timeout: Duration,
-        output_limit: usize,
-    ) -> Result<process::ProcessOutput, ReleaseError>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
-    {
-        self.run_inner(root, args, Some(token), timeout, output_limit)
-    }
-
     fn run_inner<I, S>(
         &self,
         root: &Path,
         args: I,
-        token: Option<&CratesIoToken>,
         timeout: Duration,
         output_limit: usize,
     ) -> Result<process::ProcessOutput, ReleaseError>
@@ -148,20 +110,14 @@ impl CargoSandbox {
         S: AsRef<OsStr>,
     {
         self.revalidate()?;
-        let mut helper_args = self.helper_arguments(token.is_some());
+        let mut helper_args = self.helper_arguments();
         helper_args.push(OsString::from("--"));
         helper_args.extend(arguments_with_manifest(args, &self.manifest));
-        let environment = token.map_or_else(Vec::new, |token| {
-            vec![(
-                OsString::from("CARGO_REGISTRY_TOKEN"),
-                token.expose().to_os_string(),
-            )]
-        });
         let result = process::run(
             root,
-            self.launcher.as_os_str(),
+            self.launcher.path().as_os_str(),
             &helper_args,
-            &environment,
+            &[],
             timeout,
             output_limit,
         );
@@ -169,15 +125,15 @@ impl CargoSandbox {
         result
     }
 
-    fn helper_arguments(&self, permit_token: bool) -> Vec<OsString> {
-        let mut args = vec![
+    fn helper_arguments(&self) -> Vec<OsString> {
+        vec![
             OsString::from(ISOLATED_CARGO_COMMAND),
             OsString::from("--cargo"),
-            self.cargo.as_os_str().to_os_string(),
+            self.cargo.path().as_os_str().to_os_string(),
             OsString::from("--rustc"),
-            self.rustc.as_os_str().to_os_string(),
+            self.rustc.path().as_os_str().to_os_string(),
             OsString::from("--rustdoc"),
-            self.rustdoc.as_os_str().to_os_string(),
+            self.rustdoc.path().as_os_str().to_os_string(),
             OsString::from("--home"),
             self.home.path().as_os_str().to_os_string(),
             OsString::from("--cargo-home"),
@@ -188,11 +144,7 @@ impl CargoSandbox {
             self.temporary.path().as_os_str().to_os_string(),
             OsString::from("--config"),
             self.config.as_os_str().to_os_string(),
-        ];
-        if permit_token {
-            args.push(OsString::from("--permit-registry-token"));
-        }
-        args
+        ]
     }
 
     fn revalidate(&self) -> Result<(), ReleaseError> {
@@ -240,15 +192,9 @@ pub(crate) fn execute_isolated_cargo(
     target: &Path,
     temporary: &Path,
     config: &Path,
-    permit_registry_token: bool,
     cargo_args: &[OsString],
 ) -> Result<(), ReleaseError> {
     require_no_root_cargo_config()?;
-    let token = if permit_registry_token {
-        Some(CratesIoToken::from_environment()?)
-    } else {
-        None
-    };
     let request = CargoEnvironment {
         rustc,
         rustdoc,
@@ -258,7 +204,7 @@ pub(crate) fn execute_isolated_cargo(
         temporary,
     };
     let mut command = Command::new(cargo);
-    configure_command(&mut command, &request, token.as_ref());
+    configure_command(&mut command, &request);
     command.arg("--config").arg(config).args(cargo_args);
     #[cfg(unix)]
     {
@@ -286,11 +232,7 @@ struct CargoEnvironment<'a> {
     temporary: &'a Path,
 }
 
-fn configure_command(
-    command: &mut Command,
-    request: &CargoEnvironment<'_>,
-    token: Option<&CratesIoToken>,
-) {
+fn configure_command(command: &mut Command, request: &CargoEnvironment<'_>) {
     command
         .current_dir(Path::new("/"))
         .env_clear()
@@ -307,9 +249,6 @@ fn configure_command(
         .env("RUSTC", request.rustc)
         .env("RUSTDOC", request.rustdoc)
         .env("TMPDIR", request.temporary);
-    if let Some(token) = token {
-        command.env("CARGO_REGISTRY_TOKEN", token.expose());
-    }
 }
 
 fn private_directory(
@@ -352,39 +291,12 @@ fn set_private_file_permissions(file: &fs::File, path: &Path) -> Result<(), Rele
 }
 
 fn resolve_toolchain_program(root: &Path, program: &str) -> Result<PathBuf, ReleaseError> {
-    let output = repository::run_capture(
-        root,
-        OsStr::new("rustup"),
-        [OsStr::new("which"), OsStr::new(program)],
-        TOOL_LOOKUP_TIMEOUT,
-        MAX_TOOL_LOOKUP_BYTES,
-    )?;
-    let path_text = output
-        .strip_suffix("\r\n")
-        .or_else(|| output.strip_suffix('\n'))
-        .ok_or_else(|| {
-            ReleaseError::ToolchainIdentity(format!(
-                "rustup which {program} did not return one terminated path"
-            ))
-        })?;
-    if path_text.contains('\n') || path_text.is_empty() {
-        return Err(ReleaseError::ToolchainIdentity(format!(
-            "rustup which {program} returned an invalid path"
-        )));
-    }
-    let path = PathBuf::from(path_text);
-    if !path.is_absolute() {
-        return Err(ReleaseError::ToolchainIdentity(format!(
-            "rustup which {program} returned a relative path"
-        )));
-    }
-    let metadata = fs::metadata(&path).map_err(|source| ReleaseError::io(&path, source))?;
-    if !metadata.is_file() {
-        return Err(ReleaseError::ToolchainIdentity(format!(
-            "rustup which {program} did not resolve to a regular file"
-        )));
-    }
-    Ok(path)
+    repository::toolchain_program(root, program)
+}
+
+fn retain_program(path: &Path) -> Result<safe_fs::DescriptorProgram, ReleaseError> {
+    let file = safe_fs::open_regular_file(path)?;
+    safe_fs::descriptor_program(&file, path)
 }
 
 fn require_no_root_cargo_config() -> Result<(), ReleaseError> {
@@ -445,7 +357,7 @@ mod tests {
         }
     }
 
-    fn run_probe(test_name: &str, token: Option<CratesIoToken>) {
+    fn run_probe(test_name: &str) {
         let root = tempfile::tempdir().expect("private Cargo root");
         let fixture = EnvironmentFixture::new(root.path());
         let request = fixture.request();
@@ -464,7 +376,7 @@ mod tests {
             .env("CARGO_TARGET_DIR", "/attacker/target")
             .env("RUSTC_WRAPPER", "/attacker/wrapper")
             .env("STAB_RELEASE_HOSTILE_SECRET", "hostile-secret");
-        configure_command(&mut command, &request, token.as_ref());
+        configure_command(&mut command, &request);
         let output = command.output().expect("run isolation probe");
         assert!(
             output.status.success(),
@@ -482,11 +394,11 @@ mod tests {
         fs::create_dir_all(&fixture.temporary).expect("private temporary directory");
     }
 
-    fn assert_probe_environment(expect_token: bool) {
+    fn assert_probe_environment() {
         let keys = std::env::vars_os()
             .map(|(key, _)| key.to_string_lossy().into_owned())
             .collect::<BTreeSet<_>>();
-        let mut expected = [
+        let expected = [
             "CARGO_HOME",
             "CARGO_TARGET_DIR",
             "CARGO_TERM_COLOR",
@@ -504,13 +416,6 @@ mod tests {
         .map(str::to_string)
         .into_iter()
         .collect::<BTreeSet<_>>();
-        if expect_token {
-            expected.insert("CARGO_REGISTRY_TOKEN".to_string());
-            assert_eq!(
-                std::env::var("CARGO_REGISTRY_TOKEN").as_deref(),
-                Ok("reviewed-token")
-            );
-        }
         assert_eq!(keys, expected);
         let cargo_home = PathBuf::from(std::env::var_os("CARGO_HOME").expect("Cargo home"));
         assert_eq!(
@@ -521,15 +426,7 @@ mod tests {
 
     #[test]
     fn hostile_ambient_cargo_state_and_secrets_are_removed() {
-        run_probe("cargo::tests::probe_without_registry_token", None);
-    }
-
-    #[test]
-    fn reviewed_token_is_visible_only_in_the_upload_environment() {
-        run_probe(
-            "cargo::tests::probe_with_registry_token",
-            Some(CratesIoToken(OsString::from("reviewed-token"))),
-        );
+        run_probe("cargo::tests::probe_without_registry_token");
     }
 
     #[test]
@@ -660,7 +557,7 @@ mod tests {
             .env("CARGO_REGISTRIES_CRATES_IO_TOKEN", "ambient-other-secret")
             .env("RUSTC_WRAPPER", "/attacker/ambient-wrapper")
             .env("STAB_RELEASE_HOSTILE_SECRET", "from-environment");
-        configure_command(&mut command, &request, None);
+        configure_command(&mut command, &request);
         let output = command
             .arg("--config")
             .arg(&fixture.config)
@@ -679,12 +576,6 @@ mod tests {
     #[test]
     #[ignore = "executed only as a subprocess by Cargo isolation tests"]
     fn probe_without_registry_token() {
-        assert_probe_environment(false);
-    }
-
-    #[test]
-    #[ignore = "executed only as a subprocess by Cargo isolation tests"]
-    fn probe_with_registry_token() {
-        assert_probe_environment(true);
+        assert_probe_environment();
     }
 }

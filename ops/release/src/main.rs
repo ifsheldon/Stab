@@ -31,8 +31,6 @@ enum Command {
         temporary: PathBuf,
         #[arg(long)]
         config: PathBuf,
-        #[arg(long)]
-        permit_registry_token: bool,
         #[arg(last = true, allow_hyphen_values = true)]
         cargo_args: Vec<OsString>,
     },
@@ -87,7 +85,6 @@ fn main() {
             target,
             temporary,
             config,
-            permit_registry_token,
             cargo_args,
         } => stab_release::execute_isolated_cargo(
             &cargo,
@@ -98,7 +95,6 @@ fn main() {
             &target,
             &temporary,
             &config,
-            permit_registry_token,
             &cargo_args,
         ),
         Command::Check { out } => stab_release::check(&out),

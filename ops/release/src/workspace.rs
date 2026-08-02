@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use cargo_metadata::{Metadata, Package};
 
-use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, cargo, repository};
+use crate::{PRODUCT_PACKAGE_ORDER, RELEASE_VERSION, ReleaseError, cargo, registry, repository};
 
 const README_FILE: &str = "README.crates.md";
 const RELEASE_KEYWORDS: &[&str] = &[
@@ -22,6 +22,7 @@ const MAX_COMMAND_OUTPUT_BYTES: usize = 16 << 20;
 pub(crate) struct ReleasePackage {
     pub(crate) name: String,
     pub(crate) version: String,
+    pub(crate) registry_metadata: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,9 +58,10 @@ fn architecture_arguments(root: &Path) -> Vec<OsString> {
 }
 
 pub(crate) fn inspect(root: &Path) -> Result<ReleaseWorkspace, ReleaseError> {
+    let cargo = repository::toolchain_program(root, "cargo")?;
     let metadata_json = repository::run_capture(
         root,
-        &repository::cargo_program(),
+        cargo.as_os_str(),
         [
             OsStr::new("metadata"),
             OsStr::new("--format-version"),
@@ -132,6 +134,7 @@ fn inspect_metadata(root: &Path, metadata_json: &str) -> Result<ReleaseWorkspace
             Ok(ReleasePackage {
                 name: name.to_string(),
                 version: package.version.to_string(),
+                registry_metadata: registry::canonical_metadata(root, package)?,
             })
         })
         .collect::<Result<Vec<_>, ReleaseError>>()?;

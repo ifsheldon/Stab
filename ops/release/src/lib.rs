@@ -11,6 +11,7 @@
 
 mod archive;
 mod artifact;
+mod cancellation;
 mod cargo;
 mod error;
 mod package;
@@ -54,20 +55,10 @@ pub fn execute_isolated_cargo(
     target: &Path,
     temporary: &Path,
     config: &Path,
-    permit_registry_token: bool,
     cargo_args: &[std::ffi::OsString],
 ) -> Result<(), ReleaseError> {
     cargo::execute_isolated_cargo(
-        cargo,
-        rustc,
-        rustdoc,
-        home,
-        cargo_home,
-        target,
-        temporary,
-        config,
-        permit_registry_token,
-        cargo_args,
+        cargo, rustc, rustdoc, home, cargo_home, target, temporary, config, cargo_args,
     )
 }
 
