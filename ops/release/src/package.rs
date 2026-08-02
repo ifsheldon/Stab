@@ -8,6 +8,7 @@ use crate::{
 };
 
 const MAX_PACKAGE_LIST_BYTES: usize = 4 << 20;
+const RELEASE_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -15,6 +16,8 @@ struct ReleasePreflightReport {
     schema_version: u32,
     version: String,
     commit: String,
+    registry: String,
+    verification: String,
     publication_order: Vec<String>,
     packages: Vec<PackageArchive>,
 }
@@ -49,8 +52,8 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
             )));
         }
     }
-    let package_args = coordinated_package_arguments(&workspace);
-    repository::run_inherit(root, &cargo, &package_args)?;
+    let publish_args = coordinated_publish_arguments(&workspace);
+    repository::run_inherit(root, &cargo, &publish_args)?;
 
     let mut archives = Vec::with_capacity(workspace.packages.len());
     for package in &workspace.packages {
@@ -77,9 +80,11 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     repository::require_unchanged(root, &commit)?;
 
     let report = ReleasePreflightReport {
-        schema_version: 1,
+        schema_version: RELEASE_PREFLIGHT_SCHEMA_VERSION,
         version: RELEASE_VERSION.to_string(),
         commit,
+        registry: "crates-io".to_string(),
+        verification: "cargo-publish-dry-run".to_string(),
         publication_order: PRODUCT_PACKAGE_ORDER
             .iter()
             .map(|name| name.to_string())
@@ -102,8 +107,14 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
     Ok(output)
 }
 
-fn coordinated_package_arguments(workspace: &workspace::ReleaseWorkspace) -> Vec<&str> {
-    let mut args = vec!["package", "--locked", "--no-verify"];
+fn coordinated_publish_arguments(workspace: &workspace::ReleaseWorkspace) -> Vec<&str> {
+    let mut args = vec![
+        "publish",
+        "--dry-run",
+        "--locked",
+        "--registry",
+        "crates-io",
+    ];
     for package in &workspace.packages {
         args.push("--package");
         args.push(package.name.as_str());
@@ -136,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    fn package_assembly_uses_one_coordinated_cargo_invocation() {
+    fn release_verification_uses_one_coordinated_crates_io_dry_run() {
         let workspace = workspace::ReleaseWorkspace {
             packages: PRODUCT_PACKAGE_ORDER
                 .iter()
@@ -147,14 +158,21 @@ mod tests {
                 })
                 .collect(),
         };
-        let arguments = coordinated_package_arguments(&workspace);
+        let arguments = coordinated_publish_arguments(&workspace);
         assert_eq!(
-            arguments.get(..3).expect("Cargo package prefix"),
-            ["package", "--locked", "--no-verify"]
+            arguments.get(..6).expect("Cargo publish prefix"),
+            [
+                "publish",
+                "--dry-run",
+                "--locked",
+                "--registry",
+                "crates-io",
+                "--package"
+            ]
         );
         assert_eq!(
             arguments
-                .get(3..)
+                .get(5..)
                 .expect("package selectors")
                 .chunks_exact(2)
                 .map(|chunk| chunk.get(1).copied().expect("package name"))
