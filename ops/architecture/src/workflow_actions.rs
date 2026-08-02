@@ -298,7 +298,7 @@ fn inspect_secret_bearing_step(
         report.violations.push(Violation::new(
             "workflow-release-secret-scope",
             format!(
-                "workflow {} step {location} exposes a release credential outside the prebuilt draft operator",
+                "workflow {} step {location} exposes an explicit release-token environment variable outside the prebuilt draft operator",
                 path.display()
             ),
         ));
