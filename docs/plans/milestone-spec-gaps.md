@@ -1657,3 +1657,12 @@ Current text: input, projected-output, and actual-output admission were distinct
 Gap: callers and qualification tests had to parse a human-readable message to distinguish the three public failure phases.
 Proposed amendment: expose a non-exhaustive typed stage and a pass-error accessor, and make behavioral tests assert the typed value.
 Resolution: public `CircuitPassStage::{Input, OutputProjection, Output}` and `CircuitPassError::resource_stage` expose the phase. Projection and actual-output tests no longer parse display strings.
+
+## 2026-08-02 - A9: Evidence Revision And Status Closure
+
+Status: Resolved
+Revealed by: pre-evidence milestone audit of the first coordinated `a9-release` completion and generated-status implementation.
+Current text: A9 required all formal evidence to come from one clean commit, then required the completion checkpoint, generated dashboard, final audit status, and release documentation to be committed before publication from the reviewed source.
+Gap: recording a source-bound completion checkpoint necessarily creates a descendant commit. The plan neither defined which descendant changes were presentation-only nor required the dashboard to prove that the checkpoint's measured revision remained its unchanged product ancestor. Inventory equality alone could therefore present old evidence as current after unrelated source changes.
+Proposed amendment: bind formal evidence to one clean measured commit, permit one descendant with an exact committed-path allowlist for the completion checkpoint and directly owned status documents, require Git ancestry and allowlist validation, and keep every artifact labeled with the measured source identity.
+Resolution: A9 now names the exact six closure paths. The generated dashboard requires the checkpoint commit to equal `HEAD` or be its ancestor with no intervening committed path outside that allowlist. Product code, tests, fixtures, workflows, inventories, policies, README, checklist, migration guide, and release operations remain evidence-invalidating changes.
