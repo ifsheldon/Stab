@@ -1,58 +1,52 @@
-# Goal: Close A8 Circuit Pass And Backend Extension Seams
+# Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Local source, correctness, diagnostic, and audit work is complete; exact-revision GitHub CI is the remaining blocker.
+Status: Active. Milestones A0 through A8 are complete; A9 is the remaining architecture-plan milestone.
 
 ## Objective
 
-Close Milestone A8 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md) without expanding the earned extension boundary. The common typed circuit-pass executor, built-in without-noise adapter, external Stable noise pass, and sampling-backend selection surface must remain source-current and evidence-backed.
+Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): freeze the coordinated 0.2 product, produce source-current correctness and controlled performance evidence, publish every product crate together, publish the `v0.2.0` GitHub release, and close the architecture migration without weakening compatibility or performance policy.
 
-## Measured Source
+## Current State
 
-- Product and qualification source revision: `c797ebc908ce1b81675e479031c39f71740058ae`.
-- Correctness inventory identity: `afec1b7090cc1254d6414ec4e10333e3d43976bbb5cc680822797ef231f4c676`.
-- Performance inventory identity: `5d35927f8518a6df5de141b674af8d38858b16338437f1e033897b0419090f20`.
-- The measured worktree was clean, the pinned Stim revision remained `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, and no failed artifact path was reused.
+- A8 measured source `c797ebc908ce1b81675e479031c39f71740058ae` passed exact-revision GitHub Actions through status descendant `c4299a23383043ee74daba80621d25072cdac5b9`, run `30732340918`.
+- Ten product packages are already versioned `0.2.0`: `stab-kernels-simd`, `stab-bits`, `stab-model`, `stab-records`, `stab-algebra`, `stab-analysis`, `stab-decoder`, `stab-engine`, `stab-core`, and `stab-cli`.
+- All ten packages assemble successfully with `cargo package --no-verify`; internal publishable dependencies require exact `=0.2.0` versions.
+- `docs/MIGRATING-0.2.md`, the component graph, facade tiers, migration inventory, README, feature checklist, qualification inventories, and generated dashboard exist.
+- The active performance matrix contains 19 promotable groups and remains below the 40-group release cap. Eight product diagnostics plus one infrastructure group remain below the 60-group diagnostic cap.
+- The 19 release groups reference 21 unique exact correctness parents. Formal source-current PR, full, and soak evidence has not started.
+- The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, or GitHub release.
+- No Cargo registry credential is currently configured on this host. Publication waits for all pre-publication evidence and audits, then requires the user to provide a crates.io token through `cargo login` or `CARGO_REGISTRY_TOKEN`; the token must never enter logs, files, arguments, or generated artifacts.
 
-## Completed Evidence
+## Execution Sequence
 
-- Exact A8 correctness selection: 17 source-owned parents, including the repaired analysis resource-identifier owner.
-- PR: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-pr-r2`.
-- Full: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-full`.
-- Soak: 17 of 17 passed and replayed at `target/qualification/correctness/a8-c797ebc9-soak`.
-- Controlled external-pass diagnostic: `target/benchmarks/qualification/a8-c797ebc9-external-noise-pass-controlled-pr`, verified host, report SHA-256 `76c9184f3bc5bdc8e3d04bfd230486ff0e70480b6eb3104432b34ac503a6ab15`.
-- External-pass medians: `94.108`, `92.936`, and `98.992` ns per represented input instruction at small, medium, and large scales.
-- Built-in continuity: current `0.000229623` seconds versus predecessor `0.000232035` seconds, a `0.989605x` ratio. This is report-only continuity evidence, not a Stim parity or self-regression gate.
-- Final milestone-audit and full-code-review found no unresolved implementation defect or specification loophole. Existing files near 1200 lines remain a watch list, but A8 introduced no source file over policy.
-- `/swap.img` is active with its original size `137438949376` bytes and priority `-2`; no benchmark or qualification process and no A8 temporary worktree remains.
-
-## Remaining Blocker
-
-GitHub still reports `origin/main` at A7 revision `da276e4933aa8ebced4279b77a790b0cb11998a5`. The A8 commits are therefore not present on the remote and no workflow has tested the A8 source. Do not mark A8 complete or relabel the local diagnostics as release evidence until a pushed revision containing `c797ebc9` passes both CI jobs.
-
-## Next Actions
-
-1. Push local `main` to `origin/main` and verify the remote contains `c797ebc9` unchanged as the measured product ancestor.
-2. Watch the resulting GitHub Actions run and repair any source-current failure instead of weakening a contract.
-3. After both `Rust` and `Qualification Contracts` pass, append the run ID and exact tested revision to the progress report.
-4. In one status-only closure commit, mark A8 complete in the architecture plan and feature checklist, then make A9 the active goal.
+1. Freeze release metadata and operations. Give every package reviewable crates.io metadata, add a thin `release::` just surface backed by a Rust ops binary, replace release-workflow packaging logic with that binary, define the exact dependency-ordered publication procedure, and document partial-publication recovery.
+2. Decide the finite A9 evidence scope before timing. Keep the 19 release groups unless a demonstrated architecture risk justifies a source-owned addition; do not promote diagnostics merely to increase coverage. Add one revision-scoped completion manifest only if the existing completion contract cannot represent the complete release matrix.
+3. Run milestone-audit and full-code-review over release metadata, package boundaries, CI/release workflow, correctness ownership, benchmark comparability, resource limits, and documentation. Fix every confirmed finding before evidence.
+4. Commit the final pre-evidence source, regenerate correctness and performance inventories and generated status, and require a clean unchanged worktree for every formal artifact.
+5. Run the exact 21 release-group correctness prerequisites at PR, full, and soak tiers and replay each report. Run the live result-format corpus and implemented oracle matrix.
+6. Reproduce both performance workers, then produce controlled AArch64 full and soak evidence for every scale of all 19 release groups. Replay reports, enforce the unchanged `1.25x` Stim parity gate, evaluate seeded self-regression at `1.15x`, report unseeded identities honestly, run required memory/scaling checks, and publish architecture-scoped rollups and the A9 completion checkpoint.
+7. Run the legacy primary timing and memory suites only as diagnostic continuity. Shared-host timing, unverified-host timing, and product diagnostics cannot replace controlled release evidence.
+8. Restore the exact prior swap configuration after every controlled timing session, verify no qualification process remains, and preserve every failed or historical artifact path.
+9. Re-run milestone-audit and full-code-review against the completed evidence. Synchronize README, checklist, migration guide, plans, generated status, reports, and release notes.
+10. From the final clean reviewed commit, publish the ten crates in dependency order, create and push signed or annotated tag `v0.2.0`, publish the GitHub release, let the release workflow attach binaries and checksums, and verify crates.io packages, release assets, and exact source identity.
 
 ## Sources Of Truth
 
-- [Architecture plan](agent-native-modular-qec-architecture-plan.md), especially Milestone A8
+- [Architecture plan](agent-native-modular-qec-architecture-plan.md), especially Milestone A9
 - [Architecture progress report](agent-native-modular-qec-progress-report.md)
-- [Component contracts](../architecture/component-contracts.md)
-- [Decoder extension ADR](../architecture/adr-0006-decoder-extension-boundaries.md)
 - [Correctness qualification contract](comprehensive-correctness-qualification-plan.md)
 - [Performance qualification contract](comprehensive-stim-performance-qualification-plan.md)
+- [Benchmark instructions](../../benchmarks/AGENTS.md)
+- [0.2 migration guide](../MIGRATING-0.2.md)
 - [Specification-gap log](milestone-spec-gaps.md)
 
-## Nonnegotiable Closure Rules
+## Nonnegotiable Gates
 
-- The pass seam stays closed over public typed circuit models; no dynamic plugin ABI, runtime gate registration, public execution IR, external decoder transport, GPU placeholder, or fabricated comparator is added.
-- The external-pass diagnostic remains Stab-only. It proves bounded source-current throughput and semantic witnesses, not Stim parity, current self-regression, or release qualification.
-- Historical, unverified, failed, and predecessor artifacts keep their original identities and claims.
-- Any product, test, benchmark-contract, inventory, fixture, workflow, or substantive normative change after `c797ebc9` invalidates this checkpoint and requires fresh affected evidence.
+- Do not relax the `1.25x` Stim parity threshold, the `1.15x` self-regression threshold, memory limits, workload equivalence, or host policy to obtain a release.
+- Do not publish from a dirty tree, a revision different from the reviewed evidence source, or a source whose package archives were not preflighted.
+- Crates.io publication is irreversible and non-atomic. Complete all local and remote preflight before the first upload, publish only in the source-owned topological order, and stop on any identity or availability mismatch.
+- Keep ops and test-support crates unpublished. Keep deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR outside 0.2.0.
 
 ## Done
 
-A8 is complete only after exact-revision CI is green and the status-only closure records that run without changing the measured product or evidence contracts.
+The architecture plan is complete only when every A9 evidence and publication requirement is independently verified, `v0.2.0` is available from the intended registries and GitHub release, final audits are clean, swap is restored, no qualification process remains, and the worktree is clean.

@@ -908,7 +908,7 @@ Status: Complete. Closure is recorded against measured source revision `38160da5
 
 ## Milestone A8: Circuit Pass And Backend Extension Seams
 
-Status: Active. Source-current local evidence is complete; exact-revision GitHub CI remains pending.
+Status: Complete. Closure is recorded against measured source revision `c797ebc908ce1b81675e479031c39f71740058ae`; status descendant `c4299a23383043ee74daba80621d25072cdac5b9` passed exact-revision GitHub CI without changing the measured product or evidence contracts.
 
 ### Tasks
 
@@ -941,6 +941,8 @@ Status: Active. Source-current local evidence is complete; exact-revision GitHub
 - No placeholder GPU or dynamic plugin interface exists.
 
 ## Milestone A9: Qualification And Stab 0.2.0
+
+Status: Active.
 
 ### Tasks
 
