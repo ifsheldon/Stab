@@ -13,7 +13,8 @@ const STATUS_PATH: &str = "docs/qualification-status.md";
 const RUNTIME_GROUPS_PATH: &str = "benchmarks/qualification-runtime-groups.json";
 const COMPLETION_CHECKPOINT_PATH: &str = "benchmarks/qualification-completion-checkpoint.json";
 const COMPLETION_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
-const COMPLETION_SCOPE: &str = "dem-r6";
+const HISTORICAL_DEM_COMPLETION_SCOPE: &str = "dem-r6";
+const RELEASE_COMPLETION_SCOPE: &str = "a9-release";
 const MAX_SOURCE_BYTES: usize = 32 << 20;
 
 #[derive(Clone, Debug, Args)]
@@ -243,8 +244,10 @@ fn validate_completion_checkpoint(
     let Some(current) = &checkpoint.current else {
         return Ok(false);
     };
-    if current.scope_id != COMPLETION_SCOPE
-        || !valid_sha256(&current.report_sha256)
+    if !matches!(
+        current.scope_id.as_str(),
+        HISTORICAL_DEM_COMPLETION_SCOPE | RELEASE_COMPLETION_SCOPE
+    ) || !valid_sha256(&current.report_sha256)
         || !valid_sha256(&current.performance_inventory_sha256)
         || !valid_sha256(&current.correctness_inventory_sha256)
         || !valid_git_commit(&current.stab_commit)
@@ -255,10 +258,9 @@ fn validate_completion_checkpoint(
             "qualification completion checkpoint is malformed".to_string(),
         ));
     }
-    Ok(
-        current.performance_inventory_sha256 == performance_inventory_sha256
-            && current.correctness_inventory_sha256 == correctness_inventory_sha256,
-    )
+    Ok(current.scope_id == RELEASE_COMPLETION_SCOPE
+        && current.performance_inventory_sha256 == performance_inventory_sha256
+        && current.correctness_inventory_sha256 == correctness_inventory_sha256)
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -391,8 +393,11 @@ mod tests {
             "every runtime contract is classified"
         );
         assert!(data.correctness_counts.values().sum::<usize>() > 1_000);
-        let completion = data.completion.as_ref().expect("current DEM completion");
-        assert_eq!(completion.scope_id, COMPLETION_SCOPE);
+        let completion = data.completion.as_ref().expect("completion checkpoint");
+        assert!(matches!(
+            completion.scope_id.as_str(),
+            HISTORICAL_DEM_COMPLETION_SCOPE | RELEASE_COMPLETION_SCOPE
+        ));
         if data.completion_is_current {
             assert!(rendered.contains(&format!(
                 "Stim parity `{}`",
@@ -420,7 +425,7 @@ mod tests {
         let checkpoint = CompletionCheckpoint {
             schema_version: COMPLETION_CHECKPOINT_SCHEMA_VERSION,
             current: Some(CurrentCompletion {
-                scope_id: COMPLETION_SCOPE.to_string(),
+                scope_id: RELEASE_COMPLETION_SCOPE.to_string(),
                 path: "target/benchmarks/qualification/formal".to_string(),
                 report_sha256: "not-a-digest".to_string(),
                 stab_commit: "1".repeat(40),
@@ -443,7 +448,7 @@ mod tests {
         let checkpoint = CompletionCheckpoint {
             schema_version: COMPLETION_CHECKPOINT_SCHEMA_VERSION,
             current: Some(CurrentCompletion {
-                scope_id: COMPLETION_SCOPE.to_string(),
+                scope_id: RELEASE_COMPLETION_SCOPE.to_string(),
                 path: "target/benchmarks/qualification/formal".to_string(),
                 report_sha256: "4".repeat(64),
                 stab_commit: "1".repeat(40),
@@ -462,6 +467,25 @@ mod tests {
         assert!(
             !validate_completion_checkpoint(&checkpoint, &"5".repeat(64), &correctness)
                 .expect("historical checkpoint")
+        );
+
+        let dem_checkpoint = CompletionCheckpoint {
+            schema_version: COMPLETION_CHECKPOINT_SCHEMA_VERSION,
+            current: Some(CurrentCompletion {
+                scope_id: HISTORICAL_DEM_COMPLETION_SCOPE.to_string(),
+                path: "target/benchmarks/qualification/formal-dem".to_string(),
+                report_sha256: "4".repeat(64),
+                stab_commit: "1".repeat(40),
+                architecture: "aarch64".to_string(),
+                performance_inventory_sha256: performance.clone(),
+                correctness_inventory_sha256: correctness.clone(),
+                parity_outcome: CompletionParityOutcome::Passed,
+                regression_outcome: CompletionRegressionOutcome::Unseeded,
+            }),
+        };
+        assert!(
+            !validate_completion_checkpoint(&dem_checkpoint, &performance, &correctness)
+                .expect("DEM-only checkpoint")
         );
     }
 }

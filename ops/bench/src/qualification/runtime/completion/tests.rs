@@ -96,8 +96,16 @@ fn replay_evidence() -> RollupReplayEvidence {
     }
 }
 
+fn dem_scope() -> CompletionScope {
+    CompletionScope {
+        id: DEM_SCOPE_ID.to_string(),
+        group_ids: vec![DEM_PARSE_GROUP.to_string(), DEM_PRINT_GROUP.to_string()],
+        expected_source_reports: 36,
+    }
+}
+
 fn source_reports() -> Vec<CompletionSourceReport> {
-    expected_rollup_keys()
+    expected_rollup_keys(&dem_scope())
         .into_iter()
         .flat_map(|key| {
             let (group_id, tier) = key
@@ -199,22 +207,23 @@ fn manifest() -> CompletionManifest {
 #[test]
 fn completion_manifest_rejects_missing_extra_duplicate_and_failed_rollups() {
     let valid = manifest();
-    validate_manifest(&valid).expect("valid completion manifest");
+    let scope = dem_scope();
+    validate_manifest(&valid, &scope).expect("valid completion manifest");
 
     let mut missing = valid.clone();
     missing.rollups.pop();
-    assert!(validate_manifest(&missing).is_err());
+    assert!(validate_manifest(&missing, &scope).is_err());
 
     let mut extra = valid.clone();
     extra
         .rollups
         .push(rollup(DEM_PARSE_GROUP, QualificationTier::Full));
-    assert!(validate_manifest(&extra).is_err());
+    assert!(validate_manifest(&extra, &scope).is_err());
 
     let mut duplicate = valid.clone();
     let first_rollup = duplicate.rollups.first().expect("first rollup").clone();
     *duplicate.rollups.get_mut(1).expect("second rollup") = first_rollup;
-    assert!(validate_manifest(&duplicate).is_err());
+    assert!(validate_manifest(&duplicate, &scope).is_err());
 
     let mut failed = valid;
     failed
@@ -222,25 +231,26 @@ fn completion_manifest_rejects_missing_extra_duplicate_and_failed_rollups() {
         .first_mut()
         .expect("first rollup")
         .overall_outcome = GateOutcome::Failed;
-    assert!(validate_manifest(&failed).is_err());
+    assert!(validate_manifest(&failed, &scope).is_err());
 }
 
 #[test]
 fn completion_manifest_distinguishes_unseeded_and_passing_regression() {
     let mut current = manifest();
-    validate_manifest(&current).expect("unseeded first-run manifest");
+    let scope = dem_scope();
+    validate_manifest(&current, &scope).expect("unseeded first-run manifest");
     current.regression_outcomes = vec![
         regression(DEM_PARSE_GROUP, SelfRegressionOutcome::Passed),
         regression(DEM_PRINT_GROUP, SelfRegressionOutcome::Passed),
     ];
-    validate_manifest(&current).expect("seeded regression manifest");
+    validate_manifest(&current, &scope).expect("seeded regression manifest");
 
     current
         .regression_outcomes
         .first_mut()
         .expect("first regression outcome")
         .unseeded_measurements = 1;
-    assert!(validate_manifest(&current).is_err());
+    assert!(validate_manifest(&current, &scope).is_err());
 
     let mut false_unseeded = manifest();
     false_unseeded
@@ -248,11 +258,11 @@ fn completion_manifest_distinguishes_unseeded_and_passing_regression() {
         .first_mut()
         .expect("first regression outcome")
         .unseeded_measurements = 0;
-    assert!(validate_manifest(&false_unseeded).is_err());
+    assert!(validate_manifest(&false_unseeded, &scope).is_err());
 
     let mut wrong_group_order = manifest();
     wrong_group_order.regression_outcomes.swap(0, 1);
-    assert!(validate_manifest(&wrong_group_order).is_err());
+    assert!(validate_manifest(&wrong_group_order, &scope).is_err());
 }
 
 #[test]
@@ -297,12 +307,15 @@ fn completion_json_and_markdown_replay_are_deterministic() {
 
 #[test]
 fn completion_scope_rejects_unknown_missing_and_duplicate_rollups() {
+    let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("performance inventory");
     assert!(matches!(
-        require_scope("unknown", EXPECTED_DEM_ROLLUPS),
+        scope::load(&root, &suite.semantic_digest, "unknown"),
         Err(CompletionError::UnknownScope(_))
     ));
     assert!(matches!(
-        require_scope(DEM_SCOPE_ID, EXPECTED_DEM_ROLLUPS - 1),
+        require_scope(&dem_scope(), 3),
         Err(CompletionError::RollupCount(_))
     ));
     let output = DirectQualificationArtifactPath::try_new(Path::new(
@@ -317,6 +330,80 @@ fn completion_scope_rejects_unknown_missing_and_duplicate_rollups() {
     assert!(matches!(
         admit_paths(&output, &[output.as_path().to_path_buf()]),
         Err(CompletionError::OutputCollision(_))
+    ));
+}
+
+#[test]
+fn completion_scopes_cover_historical_dem_and_current_release_matrix() {
+    let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("performance inventory");
+
+    let dem =
+        scope::load(&root, &suite.semantic_digest, DEM_SCOPE_ID).expect("historical DEM scope");
+    assert_eq!(dem.group_ids.len(), 2);
+    assert_eq!(expected_rollup_keys(&dem).len(), 4);
+    assert_eq!(dem.expected_source_reports, 36);
+
+    let release =
+        scope::load(&root, &suite.semantic_digest, RELEASE_SCOPE_ID).expect("A9 release scope");
+    assert_eq!(release.group_ids.len(), 19);
+    assert_eq!(expected_rollup_keys(&release).len(), 38);
+    assert_eq!(release.expected_source_reports, 138);
+    assert!(release.group_ids.contains(&DEM_PARSE_GROUP.to_string()));
+    assert!(release.group_ids.contains(&DEM_PRINT_GROUP.to_string()));
+
+    let paths = (0..expected_rollup_keys(&release).len())
+        .map(|index| PathBuf::from(format!("target/benchmarks/qualification/rollup-{index}")))
+        .collect::<Vec<_>>();
+    let output = DirectQualificationArtifactPath::try_new(Path::new(
+        "target/benchmarks/qualification/completion",
+    ))
+    .expect("output");
+    assert_eq!(
+        admit_paths(&output, &paths)
+            .expect("release rollup paths")
+            .len(),
+        38
+    );
+
+    let mut rollups = expected_rollup_keys(&release)
+        .into_iter()
+        .rev()
+        .map(|key| {
+            let (group_id, tier) = key.rsplit_once(':').expect("rollup key");
+            let mut evidence = replay_evidence();
+            evidence.group_id = group_id.to_string();
+            evidence.tier = if tier == "full" {
+                QualificationTier::Full
+            } else {
+                QualificationTier::Soak
+            };
+            evidence
+        })
+        .collect::<Vec<_>>();
+    order_and_validate_scope(&release, &mut rollups).expect("ordered release rollups");
+    assert_eq!(
+        rollups
+            .iter()
+            .map(|rollup| rollup_key(&rollup.group_id, rollup.tier))
+            .collect::<Vec<_>>(),
+        expected_rollup_keys(&release)
+    );
+
+    let mut missing = rollups.clone();
+    missing.pop();
+    assert!(matches!(
+        order_and_validate_scope(&release, &mut missing),
+        Err(CompletionError::MissingRollup(_))
+    ));
+
+    let mut diagnostic = rollups;
+    diagnostic.first_mut().expect("first rollup").group_id =
+        "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE".to_string();
+    assert!(matches!(
+        order_and_validate_scope(&release, &mut diagnostic),
+        Err(CompletionError::UnknownRollup(_))
     ));
 }
 

@@ -972,6 +972,7 @@ Status: Active.
 - Benchmark manifest and qualification checks.
 - Legacy primary suite as diagnostic continuity.
 - Controlled AArch64 full and soak evidence for every affected release group, expected to include all current 19 groups.
+- One source-derived `a9-release` completion manifest covering the full and soak rollups for every current promotable group; retain `dem-r6` as a historical scoped completion and never treat it as release completion.
 - Stim paired median and confidence upper bound no greater than `1.25x`.
 - Stab self-regression no greater than `15%`, with missing identities reported as unseeded.
 - Allocation, resident memory, and scaling checks for plans, sessions, batches, and decoder execution.

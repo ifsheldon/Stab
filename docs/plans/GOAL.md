@@ -15,12 +15,13 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - The active performance matrix contains 19 promotable groups and remains below the 40-group release cap. Eight product diagnostics plus one infrastructure group remain below the 60-group diagnostic cap.
 - The 19 release groups reference 21 unique exact correctness parents. Formal source-current PR, full, and soak evidence has not started.
 - The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, or GitHub release.
+- The completion producer supports a source-derived `a9-release` scope covering all current promotable groups while retaining `dem-r6` for historical reconstruction. Only a current `a9-release` checkpoint can satisfy the generated release dashboard.
 - No Cargo registry credential is currently configured on this host. Publication waits for all pre-publication evidence and audits, then requires the user to provide a crates.io token through `cargo login` or `CARGO_REGISTRY_TOKEN`; the token must never enter logs, files, arguments, or generated artifacts.
 
 ## Execution Sequence
 
 1. Freeze release metadata and operations. Give every package reviewable crates.io metadata, add a thin `release::` just surface backed by a Rust ops binary, replace release-workflow packaging logic with that binary, define the exact dependency-ordered publication procedure, and document partial-publication recovery.
-2. Decide the finite A9 evidence scope before timing. Keep the 19 release groups unless a demonstrated architecture risk justifies a source-owned addition; do not promote diagnostics merely to increase coverage. Add one revision-scoped completion manifest only if the existing completion contract cannot represent the complete release matrix.
+2. Freeze the finite A9 evidence scope before timing. Keep the 19 release groups unless a demonstrated architecture risk justifies a source-owned addition; do not promote diagnostics merely to increase coverage. Use the source-derived `a9-release` completion scope for all 38 full/soak rollups and 138 source reports.
 3. Run milestone-audit and full-code-review over release metadata, package boundaries, CI/release workflow, correctness ownership, benchmark comparability, resource limits, and documentation. Fix every confirmed finding before evidence.
 4. Commit the final pre-evidence source, regenerate correctness and performance inventories and generated status, and require a clean unchanged worktree for every formal artifact.
 5. Run the exact 21 release-group correctness prerequisites at PR, full, and soak tiers and replay each report. Run the live result-format corpus and implemented oracle matrix.

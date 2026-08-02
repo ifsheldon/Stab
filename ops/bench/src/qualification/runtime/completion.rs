@@ -19,27 +19,26 @@ use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
 mod legacy;
+mod scope;
 #[cfg(test)]
 mod tests;
+
+use scope::{CompletionScope, MAX_ROLLUPS, RELEASE_SCOPE_ID, expected_rollup_keys};
+#[cfg(test)]
+use scope::{DEM_PARSE_GROUP, DEM_PRINT_GROUP, DEM_SCOPE_ID};
 
 const COMPLETION_SCHEMA_VERSION: u32 = 2;
 const PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 const LEGACY_COMPLETION_SCHEMA_VERSION: u32 = 1;
-const DEM_SCOPE_ID: &str = "dem-r6";
-const DEM_PARSE_GROUP: &str = "PERFQ-M10-DEM-PARSE-CONTRACT";
-const DEM_PRINT_GROUP: &str = "PERFQ-M10-DEM-PRINT-CONTRACT";
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/completion-latest";
 const MAX_COMPLETION_REPORT_BYTES: usize = 16 << 20;
 const MAX_COMPLETION_PREFLIGHT_BYTES: usize = 4 << 20;
 const MAX_COMPLETION_MARKDOWN_BYTES: usize = 4 << 20;
-const MAX_ROLLUPS: usize = 16;
-const EXPECTED_DEM_ROLLUPS: usize = 4;
-const EXPECTED_DEM_REPORTS: usize = 36;
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct CompletionArgs {
     /// Source-owned architecture/revision completion scope.
-    #[arg(long, default_value = DEM_SCOPE_ID)]
+    #[arg(long, default_value = RELEASE_SCOPE_ID)]
     scope: String,
 
     /// Full or soak scale-family rollup; repeat once per required group and tier.
@@ -263,11 +262,17 @@ pub(super) fn run_report_with_repository(
         MAX_COMPLETION_MARKDOWN_BYTES,
     )?;
     let manifest: CompletionManifest = parse_canonical(&report_json)?;
+    let scope = scope::load(
+        source_root,
+        expected_performance_inventory_sha256,
+        &manifest.scope_id,
+    )?;
     validate_manifest_boundary(
         &manifest,
         input.as_path(),
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
+        &scope,
     )?;
     let rollup_paths = manifest
         .rollups
@@ -324,7 +329,8 @@ fn reconstruct(
     rollup_paths: &[DirectQualificationArtifactPath],
     generated_unix_epoch_seconds: u64,
 ) -> Result<ReconstructedCompletion, CompletionError> {
-    require_scope(scope_id, rollup_paths.len())?;
+    let scope = scope::load(source_root, expected_performance_inventory_sha256, scope_id)?;
+    require_scope(&scope, rollup_paths.len())?;
     let repository_before = super::run::bound_repository_state(root, repository)?;
     require_clean_repository(&repository_before)?;
     let mut rollups = Vec::with_capacity(rollup_paths.len());
@@ -338,7 +344,7 @@ fn reconstruct(
             path.clone(),
         )?);
     }
-    order_and_validate_scope(&mut rollups)?;
+    order_and_validate_scope(&scope, &mut rollups)?;
     let shared = shared_identity(&rollups)?;
     let parity_policy_sha256 =
         super::parity::policy_sha256(source_root, expected_performance_inventory_sha256)?;
@@ -353,9 +359,14 @@ fn reconstruct(
         expected_performance_inventory_sha256,
         expected_correctness_inventory_sha256,
         &rollups,
+        &scope,
     )?;
-    let regression_outcomes =
-        evaluate_regression(source_root, expected_performance_inventory_sha256, &rollups)?;
+    let regression_outcomes = evaluate_regression(
+        source_root,
+        expected_performance_inventory_sha256,
+        &rollups,
+        &scope,
+    )?;
     let repository_after = super::run::bound_repository_state(root, repository)?;
     require_same_clean_repository(&repository_before, &repository_after)?;
 
@@ -381,7 +392,7 @@ fn reconstruct(
             })
         })
         .collect::<Result<Vec<_>, CompletionError>>()?;
-    let source_reports = completion_source_reports(&rollups)?;
+    let source_reports = completion_source_reports(&rollups, &scope)?;
     let memory = completion_memory(&rollups);
     let manifest = CompletionManifest {
         schema_version: COMPLETION_SCHEMA_VERSION,
@@ -422,7 +433,7 @@ fn reconstruct(
         environment_valid: true,
         memory_scaling_status: MemoryScalingStatus::Recorded,
     };
-    validate_manifest(&manifest)?;
+    validate_manifest(&manifest, &scope)?;
     Ok(ReconstructedCompletion {
         manifest,
         rollup_evidence: rollups,
@@ -451,30 +462,29 @@ fn admit_paths(
     Ok(admitted)
 }
 
-fn require_scope(scope_id: &str, rollup_count: usize) -> Result<(), CompletionError> {
-    if scope_id != DEM_SCOPE_ID {
-        return Err(CompletionError::UnknownScope(scope_id.to_string()));
-    }
-    if rollup_count != EXPECTED_DEM_ROLLUPS {
+fn require_scope(scope: &CompletionScope, rollup_count: usize) -> Result<(), CompletionError> {
+    if rollup_count != expected_rollup_keys(scope).len() {
         return Err(CompletionError::RollupCount(rollup_count));
     }
     Ok(())
 }
 
 fn order_and_validate_scope(
+    scope: &CompletionScope,
     rollups: &mut Vec<RollupReplayEvidence>,
 ) -> Result<(), CompletionError> {
+    let expected_keys = expected_rollup_keys(scope);
     let mut by_key = BTreeMap::new();
     for rollup in rollups.drain(..) {
         let key = rollup_key(&rollup.group_id, rollup.tier);
-        if !expected_rollup_keys().contains(&key) {
+        if !expected_keys.contains(&key) {
             return Err(CompletionError::UnknownRollup(key));
         }
         if by_key.insert(key.clone(), rollup).is_some() {
             return Err(CompletionError::DuplicateRollup(key));
         }
     }
-    for key in expected_rollup_keys() {
+    for key in expected_keys {
         rollups.push(
             by_key
                 .remove(&key)
@@ -487,18 +497,6 @@ fn order_and_validate_scope(
         ));
     }
     Ok(())
-}
-
-fn expected_rollup_keys() -> Vec<String> {
-    [
-        (DEM_PARSE_GROUP, QualificationTier::Full),
-        (DEM_PARSE_GROUP, QualificationTier::Soak),
-        (DEM_PRINT_GROUP, QualificationTier::Full),
-        (DEM_PRINT_GROUP, QualificationTier::Soak),
-    ]
-    .into_iter()
-    .map(|(group, tier)| rollup_key(group, tier))
-    .collect()
 }
 
 fn rollup_key(group_id: &str, tier: QualificationTier) -> String {
@@ -551,6 +549,7 @@ fn validate_source_parity(
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
     rollups: &[RollupReplayEvidence],
+    scope: &CompletionScope,
 ) -> Result<BTreeMap<String, usize>, CompletionError> {
     let mut paths = BTreeSet::new();
     let mut counts = BTreeMap::new();
@@ -559,7 +558,10 @@ fn validate_source_parity(
             .scales
             .first()
             .map(|scale| scale.measurements.len())
-            .ok_or(CompletionError::SourceReportCount(0))?;
+            .ok_or(CompletionError::SourceReportCount {
+                actual: 0,
+                expected: scope.expected_source_reports,
+            })?;
         let mut checked = 0;
         for source in &rollup.sources {
             if !paths.insert(source.path.clone()) {
@@ -584,8 +586,11 @@ fn validate_source_parity(
         }
         counts.insert(rollup_key(&rollup.group_id, rollup.tier), checked);
     }
-    if paths.len() != EXPECTED_DEM_REPORTS {
-        return Err(CompletionError::SourceReportCount(paths.len()));
+    if paths.len() != scope.expected_source_reports {
+        return Err(CompletionError::SourceReportCount {
+            actual: paths.len(),
+            expected: scope.expected_source_reports,
+        });
     }
     Ok(counts)
 }
@@ -594,9 +599,11 @@ fn evaluate_regression(
     source_root: &RepoRoot,
     expected_performance_inventory_sha256: &str,
     rollups: &[RollupReplayEvidence],
+    scope: &CompletionScope,
 ) -> Result<Vec<CompletionRegression>, CompletionError> {
-    [DEM_PARSE_GROUP, DEM_PRINT_GROUP]
-        .into_iter()
+    scope
+        .group_ids
+        .iter()
         .map(|group_id| {
             let full = find_rollup(rollups, group_id, QualificationTier::Full)?;
             let soak = find_rollup(rollups, group_id, QualificationTier::Soak)?;
@@ -633,6 +640,7 @@ fn find_rollup<'a>(
 
 fn completion_source_reports(
     rollups: &[RollupReplayEvidence],
+    scope: &CompletionScope,
 ) -> Result<Vec<CompletionSourceReport>, CompletionError> {
     let reports = rollups
         .iter()
@@ -647,8 +655,11 @@ fn completion_source_reports(
             })
         })
         .collect::<Result<Vec<_>, CompletionError>>()?;
-    if reports.len() != EXPECTED_DEM_REPORTS {
-        return Err(CompletionError::SourceReportCount(reports.len()));
+    if reports.len() != scope.expected_source_reports {
+        return Err(CompletionError::SourceReportCount {
+            actual: reports.len(),
+            expected: scope.expected_source_reports,
+        });
     }
     Ok(reports)
 }
@@ -816,30 +827,37 @@ fn bind_artifact_set(
     Ok(())
 }
 
-fn validate_manifest(manifest: &CompletionManifest) -> Result<(), CompletionError> {
+fn validate_manifest(
+    manifest: &CompletionManifest,
+    scope: &CompletionScope,
+) -> Result<(), CompletionError> {
     if manifest.schema_version != COMPLETION_SCHEMA_VERSION
-        || manifest.scope_id != DEM_SCOPE_ID
+        || manifest.scope_id != scope.id
         || manifest.stim_tag != STIM_TAG
         || manifest.stim_commit != STIM_COMMIT
         || manifest.repository.commit_before != manifest.repository.commit_after
         || manifest.repository.local_modifications_before
         || manifest.repository.local_modifications_after
-        || manifest.rollups.len() != EXPECTED_DEM_ROLLUPS
-        || manifest.source_reports.len() != EXPECTED_DEM_REPORTS
-        || manifest.memory.len() != EXPECTED_DEM_REPORTS
+        || manifest.rollups.len() != expected_rollup_keys(scope).len()
+        || manifest.source_reports.len() != scope.expected_source_reports
+        || manifest.memory.len() != scope.expected_source_reports
         || manifest.parity_outcome != GateOutcome::Passed
         || !manifest.environment_valid
         || manifest.timing_boundary != TimingBoundary::RawWorkV2
     {
         return Err(CompletionError::Boundary);
     }
-    let expected_keys = expected_rollup_keys();
+    let expected_keys = expected_rollup_keys(scope);
     let actual_keys = manifest
         .rollups
         .iter()
         .map(|rollup| rollup_key(&rollup.group_id, rollup.tier))
         .collect::<Vec<_>>();
-    let expected_regression_groups = [DEM_PARSE_GROUP, DEM_PRINT_GROUP];
+    let expected_regression_groups = scope
+        .group_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
     let actual_regression_groups = manifest
         .regression_outcomes
         .iter()
@@ -850,7 +868,7 @@ fn validate_manifest(manifest: &CompletionManifest) -> Result<(), CompletionErro
             .rollups
             .iter()
             .any(|rollup| rollup.overall_outcome != GateOutcome::Passed)
-        || manifest.regression_outcomes.len() != 2
+        || manifest.regression_outcomes.len() != scope.group_ids.len()
         || actual_regression_groups != expected_regression_groups
         || manifest.regression_outcomes.iter().any(|outcome| {
             (outcome.checked_measurements == 0 && outcome.unseeded_measurements == 0)
@@ -870,8 +888,9 @@ fn validate_manifest_boundary(
     input: &Path,
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
+    scope: &CompletionScope,
 ) -> Result<(), CompletionError> {
-    validate_manifest(manifest)?;
+    validate_manifest(manifest, scope)?;
     if Path::new(&manifest.output) != input {
         return Err(CompletionError::OutputBinding);
     }
@@ -1046,11 +1065,21 @@ pub(super) enum CompletionError {
     #[error(transparent)]
     Git(#[from] super::git::GitError),
     #[error(transparent)]
+    Group(#[from] super::group::GroupError),
+    #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
     Time(#[from] std::time::SystemTimeError),
     #[error("unknown completion scope {0:?}")]
     UnknownScope(String),
+    #[error("completion scope {0:?} contains no release groups")]
+    EmptyScope(String),
+    #[error("completion scope omits source-owned group {0}")]
+    MissingScopeGroup(String),
+    #[error("completion scope contains non-promotable group {0}")]
+    NonPromotableScopeGroup(String),
+    #[error("completion scope size overflows platform limits")]
+    ScopeSizeOverflow,
     #[error("completion scope has invalid rollup count {0}")]
     RollupCount(usize),
     #[error("completion output collides with source evidence at {0}")]
@@ -1065,8 +1094,8 @@ pub(super) enum CompletionError {
     UnknownRollup(String),
     #[error("completion mixes repository, host, worker, correctness, or timing identities")]
     MixedIdentity,
-    #[error("completion source report count is {0}, expected 36")]
-    SourceReportCount(usize),
+    #[error("completion source report count is {actual}, expected {expected}")]
+    SourceReportCount { actual: usize, expected: usize },
     #[error("completion source report failed explicit Stim parity: {0}")]
     FailedParity(PathBuf),
     #[error("completion producer repository is dirty")]
