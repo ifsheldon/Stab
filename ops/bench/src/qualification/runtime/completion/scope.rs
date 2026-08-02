@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::{CompletionError, QualificationTier, rollup_key};
 use crate::qualification::runtime::run::ClaimClass;
 use crate::root::RepoRoot;
@@ -12,6 +14,7 @@ pub(super) const MAX_ROLLUPS: usize = 64;
 pub(super) struct CompletionScope {
     pub(super) id: String,
     pub(super) group_ids: Vec<String>,
+    pub(super) correctness_case_ids: BTreeMap<String, Vec<String>>,
     pub(super) expected_source_reports: usize,
 }
 
@@ -35,6 +38,7 @@ pub(super) fn load(
         return Err(CompletionError::EmptyScope(scope_id.to_string()));
     }
 
+    let mut correctness_case_ids = BTreeMap::new();
     let mut expected_source_reports = 0usize;
     for group_id in &group_ids {
         let group = groups
@@ -52,11 +56,13 @@ pub(super) fn load(
         expected_source_reports = expected_source_reports
             .checked_add(group_reports)
             .ok_or(CompletionError::ScopeSizeOverflow)?;
+        correctness_case_ids.insert(group_id.clone(), group.correctness_case_ids.clone());
     }
 
     let scope = CompletionScope {
         id: scope_id.to_string(),
         group_ids,
+        correctness_case_ids,
         expected_source_reports,
     };
     if expected_rollup_keys(&scope).len() > MAX_ROLLUPS {

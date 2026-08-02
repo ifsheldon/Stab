@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
-use super::correctness::CorrectnessPreflightEvidence;
 use super::invocation::WorkerIdentityEvidence;
 use super::protocol::TimingBoundary;
 use super::rollup::{RollupReplayEvidence, RollupSourceEvidence};
@@ -18,18 +17,20 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
+mod group_correctness;
 mod legacy;
 mod scope;
 #[cfg(test)]
 mod tests;
 
+use group_correctness::{CompletionCorrectness, collect as completion_correctness};
 use scope::{CompletionScope, MAX_ROLLUPS, RELEASE_SCOPE_ID, expected_rollup_keys};
 #[cfg(test)]
 use scope::{DEM_PARSE_GROUP, DEM_PRINT_GROUP, DEM_SCOPE_ID};
 
-const COMPLETION_SCHEMA_VERSION: u32 = 2;
-const PREFLIGHT_SCHEMA_VERSION: u32 = 2;
-const LEGACY_COMPLETION_SCHEMA_VERSION: u32 = 1;
+const COMPLETION_SCHEMA_VERSION: u32 = 3;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 3;
+const LEGACY_COMPLETION_SCHEMA_VERSIONS: [u32; 2] = [1, 2];
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/completion-latest";
 const MAX_COMPLETION_REPORT_BYTES: usize = 16 << 20;
 const MAX_COMPLETION_PREFLIGHT_BYTES: usize = 4 << 20;
@@ -152,7 +153,7 @@ struct CompletionManifest {
     environment: CompletionEnvironment,
     workers: WorkerIdentityEvidence,
     timing_boundary: TimingBoundary,
-    correctness_preflight: CorrectnessPreflightEvidence,
+    correctness_preflights: Vec<CompletionCorrectness>,
     rollups: Vec<CompletionRollup>,
     source_reports: Vec<CompletionSourceReport>,
     memory: Vec<CompletionMemory>,
@@ -175,6 +176,7 @@ struct CompletionPreflight {
     parity_policy_sha256: String,
     regression_policy_sha256: String,
     regression_baselines_sha256: String,
+    correctness_preflights: Vec<CompletionCorrectness>,
     rollups: Vec<CompletionArtifact>,
     source_report_count: usize,
     memory_record_count: usize,
@@ -236,8 +238,12 @@ pub(super) fn run_report_with_repository(
         MAX_COMPLETION_REPORT_BYTES,
     )?;
     let schema_version = schema_version(&report_json)?;
-    if schema_version == LEGACY_COMPLETION_SCHEMA_VERSION {
-        let summary = legacy::parse(&report_json)?;
+    if LEGACY_COMPLETION_SCHEMA_VERSIONS.contains(&schema_version) {
+        let summary = match schema_version {
+            1 => legacy::parse_v1(&report_json)?,
+            2 => legacy::parse_v2(&report_json)?,
+            _ => return Err(CompletionError::SchemaVersion(schema_version)),
+        };
         if Path::new(&summary.output) != input.as_path() {
             return Err(CompletionError::OutputBinding);
         }
@@ -346,6 +352,8 @@ fn reconstruct(
     }
     order_and_validate_scope(&scope, &mut rollups)?;
     let shared = shared_identity(&rollups)?;
+    let correctness_preflights =
+        completion_correctness(&rollups, &scope, expected_correctness_inventory_sha256)?;
     let parity_policy_sha256 =
         super::parity::policy_sha256(source_root, expected_performance_inventory_sha256)?;
     let regression_sources = super::self_regression::source_identities(
@@ -424,7 +432,7 @@ fn reconstruct(
         },
         workers: shared.workers.clone(),
         timing_boundary: shared.timing_boundary,
-        correctness_preflight: shared.correctness_preflight.clone(),
+        correctness_preflights,
         rollups: completion_rollups,
         source_reports,
         memory,
@@ -529,7 +537,6 @@ fn shared_identity(
             || rollup.toolchain_sha256 != first.toolchain_sha256
             || rollup.workers != first.workers
             || rollup.timing_boundary != first.timing_boundary
-            || rollup.correctness_preflight != first.correctness_preflight
             || rollup.overall_outcome != GateOutcome::Passed
         {
             return Err(CompletionError::MixedIdentity);
@@ -838,6 +845,11 @@ fn validate_manifest(
         || manifest.repository.commit_before != manifest.repository.commit_after
         || manifest.repository.local_modifications_before
         || manifest.repository.local_modifications_after
+        || !group_correctness::valid_manifest(
+            &manifest.correctness_preflights,
+            scope,
+            &manifest.correctness_inventory_sha256,
+        )
         || manifest.rollups.len() != expected_rollup_keys(scope).len()
         || manifest.source_reports.len() != scope.expected_source_reports
         || manifest.memory.len() != scope.expected_source_reports
@@ -914,6 +926,7 @@ fn completion_preflight(manifest: &CompletionManifest, report_json: &[u8]) -> Co
         parity_policy_sha256: manifest.parity_policy_sha256.clone(),
         regression_policy_sha256: manifest.regression_policy_sha256.clone(),
         regression_baselines_sha256: manifest.regression_baselines_sha256.clone(),
+        correctness_preflights: manifest.correctness_preflights.clone(),
         rollups: manifest
             .rollups
             .iter()
@@ -1092,8 +1105,10 @@ pub(super) enum CompletionError {
     MissingRollup(String),
     #[error("completion contains rollup outside its source-owned scope: {0}")]
     UnknownRollup(String),
-    #[error("completion mixes repository, host, worker, correctness, or timing identities")]
+    #[error("completion mixes repository, host, worker, or timing identities")]
     MixedIdentity,
+    #[error("completion correctness evidence is missing or mismatched for group {0}")]
+    GroupCorrectness(String),
     #[error("completion source report count is {actual}, expected {expected}")]
     SourceReportCount { actual: usize, expected: usize },
     #[error("completion source report failed explicit Stim parity: {0}")]
