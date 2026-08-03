@@ -977,6 +977,7 @@ Status: Active.
 - One source-derived `a9-release` completion manifest covering the full and soak rollups for every current promotable group, with each group bound to its own exact correctness prerequisite receipt and only genuinely common source, inventory, worker, timing, host, and policy identities shared across groups; retain `dem-r6` as a historical scoped completion and never treat it as release completion.
 - Stim paired median and confidence upper bound no greater than `1.25x`.
 - Stab self-regression no greater than `15%`, with missing identities reported as unseeded.
+- Preserve every first failed or noisy formal result. If its source contract had no pre-existing profiler note, publish it as non-promotable pending-analysis evidence, bind the note in a focused source commit, and require fresh evidence rather than replacing or relabeling the retained report.
 - Allocation, resident memory, and scaling checks for plans, sessions, batches, and decoder execution.
 - No threshold relaxation or waiver may be introduced merely to close the migration.
 

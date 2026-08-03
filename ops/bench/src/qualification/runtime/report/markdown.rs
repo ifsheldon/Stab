@@ -23,6 +23,11 @@ pub(super) fn render(
         || "not-applicable".to_string(),
         |note| note.path.as_str().to_string(),
     );
+    let failure_analysis = super::failure_analysis_status(
+        report.claim_class,
+        &report.timing_attempts,
+        report.profiler_note.is_some(),
+    );
     let input = report
         .semantic_preflight
         .stim
@@ -51,7 +56,7 @@ pub(super) fn render(
     let report_sha256 = code(report_sha256);
     let parity_eligibility = parity_eligibility_line(report.parity_eligibility);
     Ok(format!(
-        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n{}- Owner: {}\n- Profiler note: {}\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Independent calibration ceiling: `{:.3}` seconds\n- Wide-ratio common ceiling: `{:.3}` seconds\n- Timing batch policy: {}\n- Common batch mode: {}\n- Stim selected iterations: `{}`\n- Stab selected iterations: `{}`\n- Common semantic iterations: `{}`\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median normalized Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
+        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n{}- Owner: {}\n- Profiler note: {}\n- Failure analysis: `{}`\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Independent calibration ceiling: `{:.3}` seconds\n- Wide-ratio common ceiling: `{:.3}` seconds\n- Timing batch policy: {}\n- Common batch mode: {}\n- Stim selected iterations: `{}`\n- Stab selected iterations: `{}`\n- Common semantic iterations: `{}`\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median normalized Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
         group_id,
         scale_id,
         report.command.work_items,
@@ -60,6 +65,7 @@ pub(super) fn render(
         parity_eligibility,
         owner,
         profiler_note,
+        failure_analysis,
         input.0,
         input_digest,
         report.tier,

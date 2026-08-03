@@ -1000,6 +1000,29 @@ fn runtime_contract_rejects_stale_profiler_note_digest() {
 }
 
 #[test]
+fn late_not_zero_source_contract_retains_observed_failure_owner() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let group = load_group(
+        &root,
+        &suite.semantic_digest,
+        super::super::invocation::SIMD_BITS_NOT_ZERO_LATE_GROUP_ID,
+    )
+    .expect("late-hit not-zero runtime contract");
+    let note = group
+        .contract
+        .profiler_note
+        .as_ref()
+        .expect("observed failed-or-noisy outcome has durable failure ownership");
+
+    assert_eq!(
+        note.path.as_str(),
+        "benchmarks/profiler-notes/qualification/perfq-m5-simd-bits-not-zero-late.md"
+    );
+}
+
+#[test]
 fn runtime_contract_rejects_stale_comparator_source_digest() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");

@@ -473,16 +473,20 @@ pub(super) fn run_with_repository(
         local_modifications_before: repository_before.local_modifications,
         local_modifications_after: repository_after.local_modifications,
     };
-    let promotable = super::report::promotion_eligibility(super::report::PromotionEvidence {
-        claim_class,
-        allow_unverified_host: args.allow_unverified_host,
-        tier: args.tier,
-        local_modifications_before: repository.local_modifications_before,
-        local_modifications_after: repository.local_modifications_after,
-        host_verified: host.verified,
-        correctness_status: correctness_preflight.status,
-        correctness_case_count: correctness_preflight.case_ids.len(),
-    });
+    let promotable = super::report::report_promotion_eligibility(
+        super::report::PromotionEvidence {
+            claim_class,
+            allow_unverified_host: args.allow_unverified_host,
+            tier: args.tier,
+            local_modifications_before: repository.local_modifications_before,
+            local_modifications_after: repository.local_modifications_after,
+            host_verified: host.verified,
+            correctness_status: correctness_preflight.status,
+            correctness_case_count: correctness_preflight.case_ids.len(),
+        },
+        &timing_attempts,
+        resolved_group.contract.profiler_note.is_some(),
+    );
     let report = QualificationReport {
         schema_version: REPORT_SCHEMA_VERSION,
         group_id: resolved_group.contract.id.to_string(),

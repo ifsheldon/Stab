@@ -53,10 +53,10 @@ These are checkpoint diagnostics and prerequisites, not promotable timing eviden
 - Source revision: `b7c6c34f156d5f785dc46e1f6e79c3f4bf1e6914`.
 - Command shape: `just bench::qualification-run --group PERFQ-M10-DEM-PARSE-CONTRACT --scale small --tier full` with the exact correctness request and completion hashes above.
 - Host preparation: swap was disabled before timing and restored immediately after the command; `/swap.img` is enabled again with zero bytes in use.
-- Result: the producer reached a failed or noisy product result, then correctly refused publication with `failed or noisy product evidence lacks source-owned failure ownership`.
+- Operator-observed, non-replayable result: the producer reported a failed or noisy product result, then refused publication with `failed or noisy product evidence lacks source-owned failure ownership`. Because no report exists, the outcome class and internal attempt sequence cannot be replayed.
 - Artifact disposition: no report directory or partial promotable artifact exists at `target/benchmarks/qualification/pq2-dem-b7c6c34-parse-small-full-1`.
 - Classification: harness-contract omission because the new DEM runtime groups had no bound profiler note. The timing gate, fixture, semantic work, comparator, and no-waiver policy remain unchanged.
-- Action: add and bind the source-owned DEM profiler note before the next clean-revision evidence run. Do not treat this no-artifact attempt as a timing result or rerun it in search of a favorable sample.
+- Action: add and bind the source-owned DEM profiler note before the next clean-revision evidence run. Do not treat this no-artifact command as a timing result or launch another qualification command from the same source in search of a favorable sample.
 
 ### Clean Checkpoint At `f23386bd`
 

@@ -250,35 +250,44 @@ pub(super) fn validate_report(
     )?;
     validate_calibration(&report.calibration)?;
     timing::validate(report)?;
-    validate_failure_evidence(report)?;
     validate_memory(report)?;
     validate_claim(report, &resolved_group.contract)?;
     Ok(correctness_binding)
 }
 
-fn validate_failure_evidence(report: &QualificationReport) -> Result<(), ReportError> {
-    require_failure_evidence(
-        report.claim_class,
-        &report.timing_attempts,
-        report.profiler_note.is_some(),
-    )
-}
-
-fn require_failure_evidence(
+fn failure_analysis_complete(
     claim_class: ClaimClass,
     timing_attempts: &[TimingAttempt],
     has_profiler_note: bool,
-) -> Result<(), ReportError> {
-    let failed_or_noisy = timing_attempts.iter().any(|attempt| {
+) -> bool {
+    claim_class != ClaimClass::PromotablePerformance
+        || !has_failed_or_noisy_timing(timing_attempts)
+        || has_profiler_note
+}
+
+fn has_failed_or_noisy_timing(timing_attempts: &[TimingAttempt]) -> bool {
+    timing_attempts.iter().any(|attempt| {
         attempt
             .statistics
             .iter()
             .any(|summary| summary.outcome != GateOutcome::Passed)
-    });
-    if claim_class == ClaimClass::PromotablePerformance && failed_or_noisy && !has_profiler_note {
-        return Err(ReportError::FailureEvidence);
+    })
+}
+
+fn failure_analysis_status(
+    claim_class: ClaimClass,
+    timing_attempts: &[TimingAttempt],
+    has_profiler_note: bool,
+) -> &'static str {
+    if claim_class != ClaimClass::PromotablePerformance
+        || !has_failed_or_noisy_timing(timing_attempts)
+    {
+        "not-required"
+    } else if has_profiler_note {
+        "source-owned"
+    } else {
+        "pending-source-owned-profiler-note"
     }
-    Ok(())
 }
 
 fn validate_correctness_evidence(
@@ -749,16 +758,22 @@ fn validate_claim(
             if group.parity_eligibility != super::group::ParityEligibility::ThresholdEligible
                 || report.correctness_preflight.case_ids != group.correctness_case_ids
                 || report.promotable
-                    != promotion_eligibility(PromotionEvidence {
-                        claim_class: report.claim_class,
-                        allow_unverified_host: report.command.allow_unverified_host,
-                        tier: report.tier,
-                        local_modifications_before: report.repository.local_modifications_before,
-                        local_modifications_after: report.repository.local_modifications_after,
-                        host_verified: report.host.verified,
-                        correctness_status: report.correctness_preflight.status,
-                        correctness_case_count: report.correctness_preflight.case_ids.len(),
-                    })
+                    != report_promotion_eligibility(
+                        PromotionEvidence {
+                            claim_class: report.claim_class,
+                            allow_unverified_host: report.command.allow_unverified_host,
+                            tier: report.tier,
+                            local_modifications_before: report
+                                .repository
+                                .local_modifications_before,
+                            local_modifications_after: report.repository.local_modifications_after,
+                            host_verified: report.host.verified,
+                            correctness_status: report.correctness_preflight.status,
+                            correctness_case_count: report.correctness_preflight.case_ids.len(),
+                        },
+                        &report.timing_attempts,
+                        report.profiler_note.is_some(),
+                    )
             {
                 return Err(ReportError::Claim);
             }
@@ -795,6 +810,15 @@ fn promotable_claim_requirements(evidence: PromotionEvidence) -> bool {
 pub(super) fn promotion_eligibility(evidence: PromotionEvidence) -> bool {
     evidence.claim_class == ClaimClass::PromotablePerformance
         && promotable_claim_requirements(evidence)
+}
+
+pub(super) fn report_promotion_eligibility(
+    evidence: PromotionEvidence,
+    timing_attempts: &[TimingAttempt],
+    has_profiler_note: bool,
+) -> bool {
+    promotion_eligibility(evidence)
+        && failure_analysis_complete(evidence.claim_class, timing_attempts, has_profiler_note)
 }
 
 fn validate_pair_execution(
@@ -958,8 +982,6 @@ pub(super) enum ReportError {
     Identity,
     #[error("qualification report group contract evidence is stale or inconsistent")]
     GroupEvidence,
-    #[error("failed or noisy product evidence lacks source-owned failure ownership")]
-    FailureEvidence,
     #[error("qualification report inventory evidence differs from the checked inventories")]
     InventoryEvidence,
     #[error("qualification report command evidence is invalid")]

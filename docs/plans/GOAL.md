@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete; A9 evidence must restart after the seventh DEM parser optimization.
+Status: Active. Milestones A0 through A8 are complete; A9 must restart after repairing first-failure retention and binding failure ownership for the late-hit bit scan.
 
 ## Objective
 
@@ -9,43 +9,37 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 ## Current State
 
 - Ten product packages are versioned `0.2.0` with exact sibling requirements and a source-owned publication order.
-- The active release matrix contains 19 promotable groups and 21 unique exact correctness parents.
-- Historical package preflights remain diagnostic only. The latest useful probe is schema version 4 at clean revision `544e39653ffea370fc3a872b3d3f7e61bb5aa4cd`, stored at `target/releases/v0.2.0-544e3965-preflight` with report SHA-256 `3605104a5d3d0f757379035f1910e5859b9ce303bf4423b3ded33a1cee4936c0`.
-- Commits through `212331732c7ebd0bbf55534c1d1fbd2935a1e84c` repair the reviewed publication boundary: isolated Cargo, bounded archives and subprocesses, exact canonical crates.io metadata, direct upload of the retained reviewed `.crate` bytes, checksum polling, machine-checked A9 authorization, descriptor-safe cleanup, pinned workflow actions, retained GitHub asset bytes, remote annotated-tag verification, private draft creation, remote size and SHA-256 verification, and publication-token-free release-operator builds in both workflow and local just paths.
-- Explicit crates.io and GitHub publication-token variables are absent from Cargo, build scripts, inherited workflow and job environments, unrelated commands, arguments, reports, and logs. The required variable is bound only while executing the current already-built authenticated operator after local verification and A9 authorization. Reviewed pinned actions and their declared GitHub job permissions remain a separate trusted boundary.
-- The historical pre-evidence milestone audit and full-code-review are complete through `212331732c7ebd0bbf55534c1d1fbd2935a1e84c`. They found and repaired credential exposure through workflow and local `cargo run` dispatch; the seventh optimization still requires its own source-current audits before commit and formal evidence.
-- The seventh-optimization milestone audit and full-code-review are complete. They found and repaired one typed-diagnostic span regression and one ambiguous historical-audit sentence; no other confirmed implementation defect or milestone loophole remains. `dem/parser.rs` is at 1,185 lines and remains on the watch list for extraction before further growth.
-- Source-current local non-timing verification passes: Stable component tests, portable-SIMD tests and Clippy, formatting, workspace Clippy and tests, architecture and consumer checks, API and documentation checks, pinned Stim identity, the live 62-case result-format corpus, the implemented oracle matrix, correctness and performance checks and deterministic regeneration, generated status, and benchmark smoke.
-- Exact-revision GitHub run `30774247780` passed both `Rust` and `Qualification Contracts` for sixth-optimization commit `68db1796ab7a427d5e4a6f7be5679a3debaa89bb`.
-- At `68db1796`, PR correctness passed 700 of 700 selected parents, broad full and soak each passed 933 of 933, all 11 exact full prerequisites passed and replayed, the live corpus and implemented oracle matrix passed, and worker reproducibility produced 46 canonical receipts.
-- The controlled thermal ceiling is now 100000 millidegrees Celsius for both checked profiles. Every exposed thermal zone on the current AArch64 host reports a 104800 millidegree Celsius firmware critical trip. The 100 C value is an evidence-admissibility ceiling, not a hardware-safety claim; thermal throttling and every other host-policy check remain disqualifying.
-- All 36 exact-revision DEM parse and print reports at `68db1796` passed the unchanged `1.25x` Stim parity gate. Their worst paired median was `1.121798x`, worst confidence upper bound was `1.148699x`, and hottest accepted reading was 88800 millidegrees Celsius.
-- The first parse-family self-regression check then rejected folded-repeats-small at `1.320574x` median deterioration and `1.331252x` upper-bound deterioration against the accepted baseline, above the unchanged `1.15x` gate. The failure was preserved without a waiver, favorable rerun, or threshold change.
-- The seventh optimization fast-paths exact canonical repeat headers and complete structural lines and uses native shallow destruction with an iterative fallback before recursion can exhaust the stack. CPU-0-pinned dirty guidance improves the exact folded small, medium, and large shapes by approximately 21, 20, and 16 percent while preserving exact output digests; it is not formal evidence.
-- This source change makes every `68db1796` correctness, worker, report, and rollup artifact historical for current A9 completion. No old artifact may be combined with replacement evidence, and none of its paths may be reused.
-- The latest formal completion is historical DEM-only evidence. There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, draft, or public GitHub release.
-- Local and remote `main` match `68db1796ab7a427d5e4a6f7be5679a3debaa89bb` before the seventh optimization. The optimization requires regenerated contracts, both audits, a focused commit, push, and exact-head CI.
-- Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Formal timing must preserve and restore that exact configuration.
+- The active release matrix contains 19 promotable groups, 138 full and soak reports, 38 rollups, and 21 unique exact correctness parents across 11 prerequisite sets.
+- Commit `f740fd36442e3561b3cb6acf172a24030352fe80` contains the reviewed seventh DEM parser optimization. Local and remote `main` match it, and exact-head GitHub Actions run `30790983034` passed both `Rust` and `Qualification Contracts`.
+- At `f740fd36`, PR correctness passed 700 of 700 selected parents, broad full and soak each passed 933 of 933, all 11 exact full prerequisites passed and replayed, the live 62-case result-format corpus and complete implemented oracle matrix passed, and worker reproducibility produced 46 canonical receipts.
+- Formal `f740fd36` timing accepted and replayed 77 reports: all 72 reports for eight complete groups plus five reports for `PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE`. Sixteen full and soak rollups were produced and replayed for the eight complete groups.
+- Every accepted report passed the unchanged `1.25x` Stim parity gate. Accepted paired medians ranged from `0.044611x` through `1.168380x`, the worst confidence upper bound was `1.191070x`, and the hottest accepted reading was 92700 millidegrees Celsius under the checked 100000-millidegree evidence ceiling.
+- DEM parse and print passed their seeded `1.15x` Stab self-regression checks at all 18 identities. The six completed compact groups correctly reported `unseeded`; no self-regression pass is claimed for them.
+- Operator-observed, non-replayable history records that the late-hit soak-large qualification command reached a failed or noisy timing outcome before publication refused the missing failure owner. The artifact absence and unused path are verifiable, but the unpublished outcome class and internal attempt sequence are not machine-replayable, and no ratio is claimed.
+- The repair preserves every future first failure as a non-promotable `pending-source-owned-profiler-note` report, binds the observed late-hit note, and refreshes the DEM note without changing any workload, comparator, `1.25x` parity gate, `1.15x` self-regression gate, host policy, or retry rule. These source changes make every `f740fd36` artifact historical for A9 completion.
+- The repair milestone audit and full code review found and closed the circular first-failure lifecycle plus three evidence-wording defects. Their final passes report no remaining implementation finding or specification loophole.
+- Historical package preflights and all earlier correctness, worker, timing, memory, rollup, and completion artifacts remain immutable diagnostics only. No artifact may be rebound across a source revision or reused as a replacement path.
+- The controlled thermal ceiling is 100000 millidegrees Celsius. It is an evidence-admissibility ceiling, not a hardware-safety claim; firmware trips, thermal throttling, affinity, load, memory, swap, and frequency-governor violations remain disqualifying.
+- Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`, and no qualification process remains.
+- There is no current A9 completion checkpoint, `v0.2.0` tag, crates.io publication, draft, or public GitHub release.
 
 ## Next Actions
 
-1. Stage the exact seventh optimization, synchronized evidence records, and regenerated contract bindings; run staged pre-commit; commit and push the focused fix.
-2. Re-fetch `origin/main` and require both `Rust` and `Qualification Contracts` to pass for the exact repair revision.
-3. From that clean verified revision, rerun and replay PR, full, and soak correctness, every exact prerequisite, the live result-format corpus, the implemented oracle matrix, and worker reproducibility.
-4. Produce controlled AArch64 full and soak evidence for all 19 release groups from that one revision, using new artifact paths only.
-5. Enforce `1.25x` Stim parity, seeded `1.15x` Stab self-regression, memory and scaling policy, and honest `unseeded` outcomes. Produce 38 rollups and the 138-report `a9-release` schema-version-3 completion, then replay it once.
-6. Restore swap after every timing session, verify no qualification process remains, and preserve all failed or noisy artifacts.
-7. Re-run both audits. Any confirmed executable, test, fixture, workflow, inventory, policy, or normative-contract fix invalidates affected evidence and must precede replacement runs.
-8. If evidence remains valid, create the authenticated completion checkpoint and exactly one seven-path status descendant, push it, and require exact-revision CI.
-9. From that clean descendant, create and inspect one final immutable schema-version-4 package preflight. Run `release::publish-reviewed`, create and push the annotated tag, dispatch `release::create-draft`, inspect the verified private draft, and publish it manually.
+1. Finish the broad verification stack, commit the audited first-failure and profiler-note repair, push it, and require exact-head CI.
+2. From that clean verified revision, rerun and replay PR, full, and soak correctness, all 11 exact prerequisites, the live result-format corpus, the implemented oracle matrix, and worker reproducibility.
+3. Produce controlled AArch64 full and soak evidence for all 19 release groups from that one revision, using new artifact paths only and preserving every failed, noisy, or host-rejected outcome.
+4. Enforce `1.25x` Stim parity, seeded `1.15x` Stab self-regression, honest `unseeded` outcomes, and memory and scaling policy. Produce 38 rollups and the 138-report `a9-release` schema-version-3 completion, then replay it once.
+5. Restore swap after every timing session and verify that no qualification process remains.
+6. Re-run milestone audit and full code review. Any confirmed executable, test, fixture, workflow, inventory, policy, or normative-contract fix invalidates affected evidence and must precede replacement runs.
+7. If evidence remains valid, create the authenticated completion checkpoint and exactly one seven-path status descendant, push it, and require exact-revision CI.
+8. From that clean descendant, create and inspect one final immutable schema-version-4 package preflight. Run `release::publish-reviewed`, create and push the annotated tag, dispatch `release::create-draft`, inspect the verified private draft, and publish it manually.
 
 ## Release Gates
 
 - Do not relax the `1.25x` parity threshold, `1.15x` self-regression threshold, workload equivalence, memory limits, or controlled-host policy.
-- Do not publish from a dirty tree, a stale preflight, a source outside the one-descendant completion contract, or a revision without exact-head CI.
+- Do not rerun a stable failure, replace a noisy attempt with a favorable sample outside the source-owned rule, reuse an artifact path, or combine evidence from different source revisions.
+- Do not publish from a dirty tree, stale preflight, source outside the one-descendant completion contract, or revision without exact-head CI.
 - `release::publish-reviewed` and `release::create-draft` must both pass `qualification-status --check --require-release-completion` before reading a credential or making an irreversible request.
-- Crates.io publication is irreversible and non-atomic. Upload only the canonical metadata and exact retained archive from the reviewed preflight, in source-owned order, and stop on any mismatch.
-- GitHub creation is draft-only. Require the existing remote annotated tag to resolve to the reviewed commit; upload only retained assets; reject missing, extra, duplicate, wrong-size, or wrong-digest remote assets; never replace an existing release or asset.
 - Keep ops and test-support crates unpublished. Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR remain outside 0.2.0.
 
 ## Sources Of Truth

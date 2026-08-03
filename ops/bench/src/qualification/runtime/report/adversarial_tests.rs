@@ -236,7 +236,7 @@ fn noisy_attempt_gets_exactly_one_complete_rerun_slot() {
 }
 
 #[test]
-fn failed_or_noisy_product_evidence_requires_a_profiler_note() {
+fn failed_or_noisy_product_evidence_without_a_note_is_analysis_pending() {
     let passed = vec![timing_attempt(
         0,
         TimingAttemptKind::Initial,
@@ -247,13 +247,68 @@ fn failed_or_noisy_product_evidence_requires_a_profiler_note() {
         TimingAttemptKind::Initial,
         GateOutcome::Failed,
     )];
-    assert!(require_failure_evidence(ClaimClass::PromotablePerformance, &passed, false).is_ok());
-    assert!(matches!(
-        require_failure_evidence(ClaimClass::PromotablePerformance, &failed, false),
-        Err(ReportError::FailureEvidence)
+    let noisy_then_passed = vec![
+        timing_attempt(0, TimingAttemptKind::Initial, GateOutcome::Noisy),
+        timing_attempt(
+            1,
+            TimingAttemptKind::PairedRatioNoiseRerun,
+            GateOutcome::Passed,
+        ),
+    ];
+    assert!(failure_analysis_complete(
+        ClaimClass::PromotablePerformance,
+        &passed,
+        false
     ));
-    assert!(require_failure_evidence(ClaimClass::PromotablePerformance, &failed, true).is_ok());
-    assert!(require_failure_evidence(ClaimClass::DiagnosticInfrastructure, &failed, false).is_ok());
+    assert!(!failure_analysis_complete(
+        ClaimClass::PromotablePerformance,
+        &failed,
+        false
+    ));
+    assert!(failure_analysis_complete(
+        ClaimClass::PromotablePerformance,
+        &failed,
+        true
+    ));
+    assert!(failure_analysis_complete(
+        ClaimClass::DiagnosticInfrastructure,
+        &failed,
+        false
+    ));
+    let promotable_source = PromotionEvidence {
+        claim_class: ClaimClass::PromotablePerformance,
+        allow_unverified_host: false,
+        tier: QualificationTier::Full,
+        local_modifications_before: false,
+        local_modifications_after: false,
+        host_verified: true,
+        correctness_status: CorrectnessPreflightStatus::Passed,
+        correctness_case_count: 1,
+    };
+    assert!(report_promotion_eligibility(
+        promotable_source,
+        &passed,
+        false
+    ));
+    assert!(!report_promotion_eligibility(
+        promotable_source,
+        &failed,
+        false
+    ));
+    assert!(!report_promotion_eligibility(
+        promotable_source,
+        &noisy_then_passed,
+        false
+    ));
+    assert!(report_promotion_eligibility(
+        promotable_source,
+        &failed,
+        true
+    ));
+    assert_eq!(
+        failure_analysis_status(ClaimClass::PromotablePerformance, &failed, false),
+        "pending-source-owned-profiler-note"
+    );
 }
 
 #[test]

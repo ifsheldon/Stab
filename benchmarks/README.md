@@ -185,7 +185,7 @@ Probe direct DEM parsing and canonical printing with `just bench::qualification-
 The reproducibility command fails before private builds when the checkout is dirty.
 Reports retain setup and peak RSS separately.
 Memory observations remain report-only until PQ6 defines explicit cross-scale growth slack.
-Any failed or noisy promotable group must retain its source-owned owner and profiler-note contract during offline replay.
+A first failed or noisy promotable-group report is retained even when no profiler note existed before measurement. It keeps the source-owned group owner, records a null note and `pending-source-owned-profiler-note`, and is non-promotable, so parity, rollup, and completion reject it. Once a focused source commit binds the required note, only fresh evidence from that new identity can become promotable; the first report remains immutable history.
 
 The sparse-XOR completion receipts at clean pre-migration revision `e2f6292f473b034d8886fc100039c7a78c4a3989` authorized retirement of exactly the two duplicate `m5-sparse-xor` M12 timing pairs. The current inventory preserves that migration and keeps its M12 memory baseline until PQ6 provides equal or stronger memory evidence. Clean post-migration revision `7b43b46d1c08f669264d009b8d3872ce86838f0e` regenerated and replayed the complete sparse row and item evidence chain at historical performance inventory `8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406`.
 

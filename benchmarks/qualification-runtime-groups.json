@@ -924,7 +924,10 @@
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
       "owner": "stab-bits/bit-vector",
-      "profiler_note": null,
+      "profiler_note": {
+        "path": "benchmarks/profiler-notes/qualification/perfq-m5-simd-bits-not-zero-late.md",
+        "sha256": "390d767c9a6dddfea1f5a4ad5eb860846548c66db05b13ffbfcba9dfded16d37"
+      },
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
@@ -1557,7 +1560,7 @@
       "owner": "stab-model/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "ff66d291d9448d068097d343a0bef2a46df9ab2600389b25070e13b1794b330f"
+        "sha256": "775ca44a4efe71a541884d10348ff1681ecb627c10421707050c9946f38d33ce"
       },
       "comparator_sources": [
         {
@@ -1662,7 +1665,7 @@
       "owner": "stab-model/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "ff66d291d9448d068097d343a0bef2a46df9ab2600389b25070e13b1794b330f"
+        "sha256": "775ca44a4efe71a541884d10348ff1681ecb627c10421707050c9946f38d33ce"
       },
       "comparator_sources": [
         {
