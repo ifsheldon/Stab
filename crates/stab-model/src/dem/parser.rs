@@ -11,6 +11,8 @@ use crate::{
     ParseErrorContext, ParseLimits, ValidationError,
 };
 
+mod fast;
+
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
 const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
@@ -79,11 +81,13 @@ impl<'a> DemParser<'a> {
                 let body = self.parse_block(true, depth + 1)?;
                 model.push_repeat_block(DemRepeatBlock::from_parts(repeat.count, body, repeat.tag));
             } else {
-                model.push_instruction(parse_dem_instruction(
-                    line_number,
-                    line,
-                    command.end_error_span(),
-                )?);
+                let instruction =
+                    if let Some(instruction) = fast::parse_canonical_instruction(line.text()) {
+                        instruction
+                    } else {
+                        parse_dem_instruction(line_number, line, command.end_error_span())?
+                    };
+                model.push_instruction(instruction);
             }
         }
 
