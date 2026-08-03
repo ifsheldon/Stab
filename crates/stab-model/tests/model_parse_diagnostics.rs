@@ -493,6 +493,36 @@ fn dem_repeat_count_diagnostics_preserve_established_human_messages() {
 }
 
 #[test]
+fn missing_repeat_counts_keep_established_spans_after_structural_shortcuts() {
+    for terminator in ["", "\n", "\r\n"] {
+        for prefix in ["REPEAT ", "REPEAT[tag] "] {
+            let input = format!("{prefix}{{{terminator}");
+            let error = Circuit::from_stim_str(&input).expect_err("missing circuit repeat count");
+            let diagnostic = error.parse_error().expect("typed circuit diagnostic");
+            assert_eq!(
+                (diagnostic.code(), diagnostic.span()),
+                (ParseErrorCode::MissingRepeatCount, span(prefix.len(), 1)),
+                "{input:?}",
+            );
+        }
+        for prefix in ["repeat ", "repeat[tag] "] {
+            let input = format!("{prefix}{{{terminator}");
+            let error = DetectorErrorModel::from_dem_str(&input)
+                .expect_err("missing detector-error-model repeat count");
+            let diagnostic = error.parse_error().expect("typed DEM diagnostic");
+            assert_eq!(
+                (diagnostic.code(), diagnostic.span()),
+                (
+                    ParseErrorCode::MissingRepeatCount,
+                    span(prefix.len() - 1, 0),
+                ),
+                "{input:?}",
+            );
+        }
+    }
+}
+
+#[test]
 fn byte_entrypoints_follow_source_order_and_accept_opaque_metadata_bytes() {
     let circuit_error =
         Circuit::from_stim_bytes(b"UNKNOWN 0\n\xff").expect_err("the earlier gate error must win");

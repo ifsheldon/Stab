@@ -1557,7 +1557,7 @@
       "owner": "stab-model/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "6f8343168f9be1070999eaa4852e4f4cbc025a1d40199bc353a8521793e392b1"
+        "sha256": "ff66d291d9448d068097d343a0bef2a46df9ab2600389b25070e13b1794b330f"
       },
       "comparator_sources": [
         {
@@ -1662,7 +1662,7 @@
       "owner": "stab-model/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "6f8343168f9be1070999eaa4852e4f4cbc025a1d40199bc353a8521793e392b1"
+        "sha256": "ff66d291d9448d068097d343a0bef2a46df9ab2600389b25070e13b1794b330f"
       },
       "comparator_sources": [
         {

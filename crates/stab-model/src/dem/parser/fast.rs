@@ -28,6 +28,13 @@ pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> 
     ))
 }
 
+pub(super) fn parse_canonical_repeat_header(header: &str) -> Option<(u64, Option<DemTag>)> {
+    let rest = header.strip_prefix("repeat")?;
+    let (tag, rest) = parse_canonical_tag(rest)?;
+    let count = parse_canonical_uint60(rest.strip_prefix(' ')?)?;
+    Some((count, tag))
+}
+
 fn parse_canonical_tag(rest: &str) -> Option<(Option<DemTag>, &str)> {
     let Some(body) = rest.strip_prefix('[') else {
         return Some((None, rest));
@@ -235,6 +242,44 @@ mod tests {
             assert!(
                 parse_canonical_instruction(line).is_none(),
                 "unexpectedly selected {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_repeat_headers_parse_exact_counts_and_tags() {
+        for (header, expected_count, expected_tag) in [
+            ("repeat 0", 0, None),
+            ("repeat 2", 2, None),
+            ("repeat[outer] 1000000", 1_000_000, Some("outer")),
+            (
+                "repeat[边界] 1152921504606846975",
+                MAX_DEM_TEXT_INTEGER,
+                Some("边界"),
+            ),
+        ] {
+            let (count, tag) = parse_canonical_repeat_header(header).expect("canonical header");
+            assert_eq!(count, expected_count, "{header}");
+            assert_eq!(tag.as_ref().map(DemTag::as_str), expected_tag, "{header}");
+        }
+    }
+
+    #[test]
+    fn ambiguous_or_invalid_repeat_headers_use_the_diagnostic_parser() {
+        for header in [
+            "REPEAT 2",
+            "repeat  2",
+            "repeat\t2",
+            "repeat[tag\\Cvalue] 2",
+            "repeat[] 2",
+            "repeat[tag]2",
+            "repeat[tag] 2 ",
+            "repeat -1",
+            "repeat 1152921504606846976",
+        ] {
+            assert!(
+                parse_canonical_repeat_header(header).is_none(),
+                "unexpectedly selected {header:?}"
             );
         }
     }

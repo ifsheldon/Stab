@@ -74,6 +74,30 @@ pub(super) fn models_equal(left: &DetectorErrorModel, right: &DetectorErrorModel
 }
 
 pub(super) fn drop_items(items: &mut Vec<DemItem>) {
+    drop_items_bounded(items, 0);
+}
+
+const SHALLOW_DROP_DEPTH: usize = 32;
+
+fn drop_items_bounded(items: &mut Vec<DemItem>, depth: usize) {
+    if items.is_empty() {
+        return;
+    }
+    if depth == SHALLOW_DROP_DEPTH {
+        drop_items_iterative(items);
+        return;
+    }
+    // Native vector destruction is substantially cheaper for ordinary shallow models. Empty each
+    // nested body first, then retain the iterative path before recursion can exhaust the stack.
+    for item in items.iter_mut() {
+        if let DemItem::RepeatBlock(repeat) = item {
+            drop_items_bounded(&mut repeat.body.items, depth + 1);
+        }
+    }
+    items.clear();
+}
+
+fn drop_items_iterative(items: &mut Vec<DemItem>) {
     let mut pending = std::mem::take(items);
     while let Some(mut item) = pending.pop() {
         // Borrow the variant because moving fields out of a type containing a

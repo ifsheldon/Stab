@@ -71,13 +71,30 @@ impl<'a> DemParser<'a> {
             }
 
             if let Some(header) = semantic_line.without_suffix('{') {
-                let repeat = self.parse_repeat_header(
-                    line_number,
-                    trim_command_space_end(header),
-                    semantic_line.span(),
-                    command.end_error_span(),
-                    depth,
-                )?;
+                let header = trim_command_space_end(header);
+                let repeat = if let Some((count, tag)) =
+                    fast::parse_canonical_repeat_header(header.text())
+                {
+                    ParsedRepeatHeader {
+                        count: DemRepeatCount::new(count),
+                        tag,
+                    }
+                } else {
+                    self.parse_repeat_header(line_number, header, command.end_error_span())?
+                };
+                let limit = self.limits.repeat_nesting_limit().get();
+                if depth >= limit {
+                    let actual = depth.checked_add(1).ok_or_else(|| {
+                        ModelError::invalid_detector_error_model(
+                            "DEM repeat nesting depth overflowed",
+                        )
+                    })?;
+                    return Err(dem_repeat_nesting_limit_error(
+                        actual,
+                        limit,
+                        semantic_line.span(),
+                    ));
+                }
                 let body = self.parse_block(true, depth + 1)?;
                 model.push_repeat_block(DemRepeatBlock::from_parts(repeat.count, body, repeat.tag));
             } else {
@@ -121,9 +138,7 @@ impl<'a> DemParser<'a> {
         &self,
         line_number: usize,
         header: SourceSlice<'a>,
-        header_span: ByteSpan,
         end_error_span: ByteSpan,
-        parent_depth: usize,
     ) -> ModelResult<ParsedRepeatHeader> {
         let (name, rest) = parse_name(line_number, header)?;
         if !name.text().eq_ignore_ascii_case("repeat") {
@@ -179,13 +194,6 @@ impl<'a> DemParser<'a> {
             ));
         }
         let count = parse_repeat_count(line_number, count_token)?;
-        let limit = self.limits.repeat_nesting_limit().get();
-        if parent_depth >= limit {
-            let actual = parent_depth.checked_add(1).ok_or_else(|| {
-                ModelError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
-            })?;
-            return Err(dem_repeat_nesting_limit_error(actual, limit, header_span));
-        }
         Ok(ParsedRepeatHeader {
             count: DemRepeatCount::new(count),
             tag,

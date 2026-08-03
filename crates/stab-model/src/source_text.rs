@@ -140,6 +140,19 @@ impl<'a> SourceCommands<'a> {
         let source = line.source();
         let command_start = self.next_relative_start;
 
+        if command_start == 0
+            && (is_complete_terminal_block_command(source.text())
+                || is_complete_block_terminator(source.text()))
+        {
+            let terminal_brace_span = byte_span_from_valid_range(source.byte_end() - 1, 1);
+            self.current_line = None;
+            return Some(SourceCommand {
+                line_number: line.line_number(),
+                source,
+                end_error_span: terminal_brace_span,
+            });
+        }
+
         // Commands without comments or block boundaries occupy the complete line. Tags do not
         // require stateful scanning unless a comment or brace could occur inside them.
         if command_start == 0
@@ -247,6 +260,42 @@ impl<'a> SourceCommands<'a> {
             end_error_span: line.end_error_span(),
         })
     }
+}
+
+fn is_complete_terminal_block_command(text: &str) -> bool {
+    if text.as_bytes().last() != Some(&b'{') {
+        return false;
+    }
+
+    let mut in_tag = false;
+    let mut in_arguments = false;
+    let mut escaped = false;
+    for (index, byte) in text.bytes().enumerate() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match byte {
+            b'\\' if in_tag => escaped = true,
+            b'[' if !in_tag && !in_arguments => in_tag = true,
+            b']' if in_tag => in_tag = false,
+            b'(' if !in_tag => in_arguments = true,
+            b')' if in_arguments => in_arguments = false,
+            b'#' | b'}' if !in_tag && !in_arguments => return false,
+            b'{' if !in_tag && !in_arguments => return index + 1 == text.len(),
+            _ => {}
+        }
+    }
+    false
+}
+
+fn is_complete_block_terminator(text: &str) -> bool {
+    text.as_bytes().split_last().is_some_and(|(last, prefix)| {
+        *last == b'}'
+            && prefix
+                .iter()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r'))
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -366,7 +415,10 @@ mod tests {
         reason = "unit tests use fixed source-line fixtures with known lengths"
     )]
 
-    use super::{SourceCommands, SourceLines, SourceSlice};
+    use super::{
+        SourceCommands, SourceLines, SourceSlice, is_complete_block_terminator,
+        is_complete_terminal_block_command,
+    };
 
     #[test]
     fn source_lines_preserve_str_lines_text_and_exact_byte_offsets() {
@@ -451,6 +503,41 @@ mod tests {
             actual.get(3).expect("fourth command").2.byte_start(),
             input.find('#').expect("comment")
         );
+    }
+
+    #[test]
+    fn structural_shortcuts_select_only_complete_unambiguous_commands() {
+        for command in [
+            "repeat 2 {",
+            "repeat[tag] 2 {",
+            "repeat[tag{value}] 2 {",
+            "repeat[tag\\C{value] 2 {",
+            "repeat(1 # argument) {",
+        ] {
+            assert!(
+                is_complete_terminal_block_command(command),
+                "did not select complete command {command:?}"
+            );
+        }
+        for ambiguous in [
+            "repeat 2 { # comment",
+            "repeat 2 { error(0.1) D0",
+            "repeat[tag 2 {",
+            "repeat(1 2 {",
+            "} repeat 2 {",
+        ] {
+            assert!(
+                !is_complete_terminal_block_command(ambiguous),
+                "selected ambiguous command {ambiguous:?}"
+            );
+        }
+
+        for terminator in ["}", " }", "\t}", "\r}"] {
+            assert!(is_complete_block_terminator(terminator), "{terminator:?}");
+        }
+        for mixed in ["} M 0", "} # comment", "}}", "tag}"] {
+            assert!(!is_complete_block_terminator(mixed), "{mixed:?}");
+        }
     }
 
     #[test]
