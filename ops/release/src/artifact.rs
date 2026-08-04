@@ -501,7 +501,7 @@ mod tests {
                 binary: name.clone(),
                 bytes: bytes.len() as u64,
                 sha256: digest,
-                toolchain: retarget_toolchain(&toolchain, label),
+                toolchain: fixture_toolchain(&toolchain, label),
             };
             let mut manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest");
             manifest_bytes.push(b'\n');
@@ -510,26 +510,110 @@ mod tests {
         (root, assets)
     }
 
-    fn retarget_toolchain(
+    fn fixture_toolchain(
         toolchain: &repository::ToolchainIdentity,
         label: &str,
     ) -> repository::ToolchainIdentity {
-        let current_host = toolchain
+        let target = ReleaseTarget::parse(label).expect("release target");
+        let target_host = target.rust_host();
+        let current_host = verbose_field(&toolchain.rustc_version, "host");
+        let active_name = toolchain
+            .active_toolchain
+            .split_once(" (overridden by '")
+            .map(|(name, _)| name)
+            .expect("active toolchain name");
+        let channel = active_name
+            .strip_suffix(&format!("-{current_host}"))
+            .expect("toolchain channel");
+        let target_name = format!("{channel}-{target_host}");
+        let toolchain_root = Path::new("/fixture/.rustup/toolchains").join(&target_name);
+        let (libcurl, ssl, os) = match target {
+            ReleaseTarget::LinuxAarch64 => (
+                "8.20.0-DEV (sys:0.4.88+curl-8.20.0 vendored ssl:OpenSSL/3.6.2)",
+                "OpenSSL 3.6.2 7 Apr 2026",
+                "Ubuntu 24.4.0 (noble) [64-bit]",
+            ),
+            ReleaseTarget::MacosAarch64 => (
+                "8.7.1 (sys:0.4.88+curl-8.20.0 system ssl:(SecureTransport) LibreSSL/3.3.6)",
+                "OpenSSL 3.6.2 7 Apr 2026",
+                "Mac OS 15.5.0 [64-bit]",
+            ),
+        };
+        let cargo_header = toolchain
+            .cargo_version
+            .lines()
+            .next()
+            .expect("Cargo version header");
+        let rustc_header = toolchain
             .rustc_version
             .lines()
-            .find_map(|line| line.strip_prefix("host: "))
-            .expect("current host");
-        let target_host = ReleaseTarget::parse(label)
-            .expect("release target")
-            .rust_host();
-        let replace = |value: &str| value.replace(current_host, target_host);
+            .next()
+            .expect("rustc version header");
         repository::ToolchainIdentity {
-            cargo_program: replace(&toolchain.cargo_program),
-            cargo_version: replace(&toolchain.cargo_version),
-            rustc_program: replace(&toolchain.rustc_program),
-            rustc_version: replace(&toolchain.rustc_version),
-            active_toolchain: replace(&toolchain.active_toolchain),
+            cargo_program: toolchain_root.join("bin/cargo").display().to_string(),
+            cargo_version: format!(
+                "{cargo_header}\nrelease: {}\ncommit-hash: {}\ncommit-date: {}\nhost: {target_host}\nlibgit2: {}\nlibcurl: {libcurl}\nssl: {ssl}\nos: {os}\n",
+                verbose_field(&toolchain.cargo_version, "release"),
+                verbose_field(&toolchain.cargo_version, "commit-hash"),
+                verbose_field(&toolchain.cargo_version, "commit-date"),
+                verbose_field(&toolchain.cargo_version, "libgit2"),
+            ),
+            rustc_program: toolchain_root.join("bin/rustc").display().to_string(),
+            rustc_version: format!(
+                "{rustc_header}\nbinary: {}\ncommit-hash: {}\ncommit-date: {}\nhost: {target_host}\nrelease: {}\nLLVM version: {}\n",
+                verbose_field(&toolchain.rustc_version, "binary"),
+                verbose_field(&toolchain.rustc_version, "commit-hash"),
+                verbose_field(&toolchain.rustc_version, "commit-date"),
+                verbose_field(&toolchain.rustc_version, "release"),
+                verbose_field(&toolchain.rustc_version, "LLVM version"),
+            ),
+            active_toolchain: format!(
+                "{target_name} (overridden by '/fixture/repository/rust-toolchain.toml')\n"
+            ),
         }
+    }
+
+    fn verbose_field<'a>(version: &'a str, field: &str) -> &'a str {
+        let prefix = format!("{field}: ");
+        version
+            .lines()
+            .find_map(|line| line.strip_prefix(&prefix))
+            .expect("verbose version field")
+    }
+
+    fn replace_verbose_field(version: &str, field: &str, replacement: &str) -> String {
+        let prefix = format!("{field}: ");
+        let mut replaced = false;
+        let mut result = String::new();
+        for line in version.lines() {
+            if line.starts_with(&prefix) {
+                result.push_str(field);
+                result.push_str(": ");
+                result.push_str(replacement);
+                replaced = true;
+            } else {
+                result.push_str(line);
+            }
+            result.push('\n');
+        }
+        assert!(replaced, "fixture field {field:?} exists");
+        result
+    }
+
+    fn remove_verbose_field(version: &str, field: &str) -> String {
+        let prefix = format!("{field}: ");
+        let mut removed = false;
+        let mut result = String::new();
+        for line in version.lines() {
+            if line.starts_with(&prefix) {
+                removed = true;
+                continue;
+            }
+            result.push_str(line);
+            result.push('\n');
+        }
+        assert!(removed, "fixture field {field:?} exists");
+        result
     }
 
     fn mutate_manifest_toolchain(
@@ -833,6 +917,83 @@ mod tests {
             toolchain.active_toolchain.insert_str(0, "mutated-");
         });
 
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_missing_verbose_identity_fields() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
+            toolchain.cargo_version = remove_verbose_field(&toolchain.cargo_version, "ssl");
+        });
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
+            toolchain.rustc_version =
+                remove_verbose_field(&toolchain.rustc_version, "LLVM version");
+        });
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_arbitrary_platform_identity_fields() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
+            toolchain.cargo_version =
+                replace_verbose_field(&toolchain.cargo_version, "libcurl", "arbitrary");
+        });
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_linux_metadata_for_macos() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
+            toolchain.cargo_version = replace_verbose_field(
+                &toolchain.cargo_version,
+                "os",
+                "Ubuntu 24.4.0 (noble) [64-bit]",
+            );
+        });
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_mismatched_toolchain_roots() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
+            let rustc = Path::new(&toolchain.rustc_program)
+                .file_name()
+                .expect("rustc program name");
+            toolchain.rustc_program = Path::new("/different/.rustup/toolchains")
+                .join(
+                    toolchain
+                        .active_toolchain
+                        .split_once(" (overridden by '")
+                        .map(|(name, _)| name)
+                        .expect("active toolchain name"),
+                )
+                .join("bin")
+                .join(rustc)
+                .display()
+                .to_string();
+        });
         assert!(matches!(
             review_assets(root.path(), &assets, RELEASE_TAG),
             Err(ReleaseError::ToolchainIdentity(_))

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 #[cfg(test)]
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -12,6 +12,24 @@ use crate::{RELEASE_TAG, ReleaseError, process};
 const MAX_COMMAND_OUTPUT: usize = 8 << 20;
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 const TOOLCHAIN_TIMEOUT: Duration = Duration::from_secs(30);
+const CARGO_VERBOSE_FIELDS: [&str; 8] = [
+    "release",
+    "commit-hash",
+    "commit-date",
+    "host",
+    "libgit2",
+    "libcurl",
+    "ssl",
+    "os",
+];
+const RUSTC_VERBOSE_FIELDS: [&str; 6] = [
+    "binary",
+    "commit-hash",
+    "commit-date",
+    "host",
+    "release",
+    "LLVM version",
+];
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -170,7 +188,11 @@ pub(crate) fn require_reviewed_asset_toolchain(
     reviewed: &ToolchainIdentity,
     target_host: &str,
 ) -> Result<(), ReleaseError> {
+    let target_family = ToolchainTargetFamily::from_host(target_host)?;
+    let current_cargo = parse_version_record("current Cargo", &current.cargo_version)?;
     let current_rustc = parse_version_record("current rustc", &current.rustc_version)?;
+    require_complete_fields("current Cargo", &current_cargo, &CARGO_VERBOSE_FIELDS)?;
+    require_complete_fields("current rustc", &current_rustc, &RUSTC_VERBOSE_FIELDS)?;
     let current_host = current_rustc.required("host")?;
     let current_name = parse_active_toolchain("current", &current.active_toolchain)?;
     let channel = current_name
@@ -182,8 +204,18 @@ pub(crate) fn require_reviewed_asset_toolchain(
         })?;
     let expected_name = format!("{channel}-{target_host}");
 
-    require_toolchain_program("Cargo", &reviewed.cargo_program, &expected_name, "cargo")?;
-    require_toolchain_program("rustc", &reviewed.rustc_program, &expected_name, "rustc")?;
+    require_toolchain_programs(
+        "current",
+        &current.cargo_program,
+        &current.rustc_program,
+        current_name,
+    )?;
+    require_toolchain_programs(
+        "reviewed",
+        &reviewed.cargo_program,
+        &reviewed.rustc_program,
+        &expected_name,
+    )?;
     let reviewed_name = parse_active_toolchain("reviewed", &reviewed.active_toolchain)?;
     if reviewed_name != expected_name {
         return Err(ReleaseError::ToolchainIdentity(format!(
@@ -191,17 +223,50 @@ pub(crate) fn require_reviewed_asset_toolchain(
         )));
     }
 
-    let current_cargo = parse_version_record("current Cargo", &current.cargo_version)?;
     let reviewed_cargo = parse_version_record("reviewed Cargo", &reviewed.cargo_version)?;
-    require_portable_version_match(
-        "Cargo",
-        &current_cargo,
-        &reviewed_cargo,
-        target_host,
-        &["libgit2", "libcurl", "ssl", "os"],
-    )?;
     let reviewed_rustc = parse_version_record("reviewed rustc", &reviewed.rustc_version)?;
-    require_portable_version_match("rustc", &current_rustc, &reviewed_rustc, target_host, &[])
+    require_complete_fields("reviewed Cargo", &reviewed_cargo, &CARGO_VERBOSE_FIELDS)?;
+    require_complete_fields("reviewed rustc", &reviewed_rustc, &RUSTC_VERBOSE_FIELDS)?;
+    require_cargo_identity(&current_cargo, &reviewed_cargo, target_host, target_family)?;
+    require_rustc_identity(&current_rustc, &reviewed_rustc, target_host)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ToolchainTargetFamily {
+    Linux,
+    Macos,
+}
+
+impl ToolchainTargetFamily {
+    fn from_host(host: &str) -> Result<Self, ReleaseError> {
+        match host {
+            "aarch64-unknown-linux-gnu" => Ok(Self::Linux),
+            "aarch64-apple-darwin" => Ok(Self::Macos),
+            _ => Err(ReleaseError::ToolchainIdentity(format!(
+                "reviewed toolchain host {host:?} has no release target family"
+            ))),
+        }
+    }
+
+    fn require_platform_metadata(self, cargo: &VersionRecord<'_>) -> Result<(), ReleaseError> {
+        let libcurl = cargo.required("libcurl")?;
+        let ssl = cargo.required("ssl")?;
+        let os = cargo.required("os")?;
+        require_libcurl_metadata(libcurl)?;
+        require_ssl_metadata(ssl)?;
+        if !os.ends_with(" [64-bit]")
+            || os.bytes().any(|byte| byte.is_ascii_control())
+            || match self {
+                Self::Linux => !linux_os_metadata(os),
+                Self::Macos => !(os.starts_with("Mac OS ") || os.starts_with("macOS ")),
+            }
+        {
+            return Err(ReleaseError::ToolchainIdentity(format!(
+                "reviewed Cargo OS metadata {os:?} does not match {self:?}"
+            )));
+        }
+        Ok(())
+    }
 }
 
 struct VersionRecord<'a> {
@@ -275,59 +340,213 @@ fn parse_active_toolchain<'a>(label: &str, text: &'a str) -> Result<&'a str, Rel
     Ok(name)
 }
 
-fn require_toolchain_program(
+fn require_toolchain_programs(
     label: &str,
-    program: &str,
+    cargo_program: &str,
+    rustc_program: &str,
     expected_name: &str,
-    binary: &str,
 ) -> Result<(), ReleaseError> {
-    let path = Path::new(program);
-    let expected_suffix = Path::new("toolchains")
-        .join(expected_name)
-        .join("bin")
-        .join(binary);
-    if !path.is_absolute() || !path.ends_with(&expected_suffix) {
+    let cargo_root = toolchain_program_root(label, cargo_program, expected_name, "cargo")?;
+    let rustc_root = toolchain_program_root(label, rustc_program, expected_name, "rustc")?;
+    if cargo_root != rustc_root {
         return Err(ReleaseError::ToolchainIdentity(format!(
-            "reviewed {label} program is not from {expected_name:?}"
+            "{label} Cargo and rustc programs do not share one pinned toolchain root"
         )));
     }
     Ok(())
 }
 
-fn require_portable_version_match(
+fn toolchain_program_root<'a>(
     label: &str,
+    program: &'a str,
+    expected_name: &str,
+    binary: &str,
+) -> Result<&'a Path, ReleaseError> {
+    let path = Path::new(program);
+    let bin_directory = path.parent();
+    let toolchain_root = bin_directory.and_then(Path::parent);
+    let toolchains_directory = toolchain_root.and_then(Path::parent);
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+        || path.file_name() != Some(OsStr::new(binary))
+        || bin_directory.and_then(Path::file_name) != Some(OsStr::new("bin"))
+        || toolchain_root.and_then(Path::file_name) != Some(OsStr::new(expected_name))
+        || toolchains_directory.and_then(Path::file_name) != Some(OsStr::new("toolchains"))
+    {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "{label} {binary} program is not from pinned toolchain {expected_name:?}"
+        )));
+    }
+    toolchain_root.ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "{label} {binary} program has no pinned toolchain root"
+        ))
+    })
+}
+
+fn require_complete_fields(
+    label: &str,
+    record: &VersionRecord<'_>,
+    expected: &[&str],
+) -> Result<(), ReleaseError> {
+    let complete = record.fields.len() == expected.len()
+        && expected
+            .iter()
+            .all(|field| record.fields.contains_key(field));
+    if !complete {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "{label} version record fields are incomplete or unexpected"
+        )));
+    }
+    Ok(())
+}
+
+fn require_cargo_identity(
     current: &VersionRecord<'_>,
     reviewed: &VersionRecord<'_>,
     target_host: &str,
-    platform_fields: &[&str],
+    target_family: ToolchainTargetFamily,
 ) -> Result<(), ReleaseError> {
     if current.header != reviewed.header {
+        return Err(ReleaseError::ToolchainIdentity(
+            "reviewed Cargo version record differs from the current pinned toolchain".to_owned(),
+        ));
+    }
+    for field in ["release", "commit-hash", "commit-date", "libgit2"] {
+        if current.required(field)? != reviewed.required(field)? {
+            return Err(ReleaseError::ToolchainIdentity(format!(
+                "reviewed Cargo field {field:?} differs from the current pinned identity"
+            )));
+        }
+    }
+    if reviewed.required("host")? != target_host {
         return Err(ReleaseError::ToolchainIdentity(format!(
-            "reviewed {label} version record differs from the current pinned toolchain"
+            "reviewed Cargo host differs from {target_host:?}"
         )));
     }
-    for (key, reviewed_value) in &reviewed.fields {
-        let matches = if *key == "host" {
-            *reviewed_value == target_host
-        } else if platform_fields.contains(key) {
-            !reviewed_value.is_empty()
-        } else {
-            current.fields.get(key) == Some(reviewed_value)
-        };
-        if !matches {
+    require_library_metadata("libgit2", reviewed.required("libgit2")?)?;
+    target_family.require_platform_metadata(reviewed)
+}
+
+fn require_rustc_identity(
+    current: &VersionRecord<'_>,
+    reviewed: &VersionRecord<'_>,
+    target_host: &str,
+) -> Result<(), ReleaseError> {
+    if current.header != reviewed.header {
+        return Err(ReleaseError::ToolchainIdentity(
+            "reviewed rustc version record differs from the current pinned toolchain".to_string(),
+        ));
+    }
+    for field in [
+        "binary",
+        "commit-hash",
+        "commit-date",
+        "release",
+        "LLVM version",
+    ] {
+        if current.required(field)? != reviewed.required(field)? {
             return Err(ReleaseError::ToolchainIdentity(format!(
-                "reviewed {label} field {key:?} differs from the expected pinned identity"
+                "reviewed rustc field {field:?} differs from the current pinned identity"
             )));
         }
     }
-    for key in current.fields.keys() {
-        if !platform_fields.contains(key) && !reviewed.fields.contains_key(key) {
-            return Err(ReleaseError::ToolchainIdentity(format!(
-                "reviewed {label} version record is missing expected field {key:?}"
-            )));
-        }
+    if reviewed.required("host")? != target_host {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "reviewed rustc host differs from {target_host:?}"
+        )));
     }
     Ok(())
+}
+
+fn require_library_metadata(label: &str, value: &str) -> Result<(), ReleaseError> {
+    let (version, details) = value.split_once(" (sys:").ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "reviewed Cargo {label} metadata is not structured"
+        ))
+    })?;
+    let details = details.strip_suffix(')').ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "reviewed Cargo {label} metadata has invalid framing"
+        ))
+    })?;
+    let (sys_version, linkage) = details.split_once(' ').ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "reviewed Cargo {label} metadata is missing linkage"
+        ))
+    })?;
+    if !valid_version_token(version) || !valid_version_token(sys_version) || linkage.is_empty() {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "reviewed Cargo {label} metadata has invalid version or linkage"
+        )));
+    }
+    Ok(())
+}
+
+fn require_libcurl_metadata(value: &str) -> Result<(), ReleaseError> {
+    require_library_metadata("libcurl", value)?;
+    let linkage = value
+        .split_once(" (sys:")
+        .and_then(|(_, details)| details.strip_suffix(')'))
+        .and_then(|details| details.split_once(' '))
+        .map(|(_, linkage)| linkage)
+        .ok_or_else(|| {
+            ReleaseError::ToolchainIdentity(
+                "reviewed Cargo libcurl metadata is not structured".to_string(),
+            )
+        })?;
+    let known_linkage = linkage.starts_with("vendored ssl:") || linkage.starts_with("system ssl:");
+    let known_tls = linkage.contains("OpenSSL/")
+        || linkage.contains("LibreSSL/")
+        || linkage.contains("SecureTransport");
+    if !known_linkage || !known_tls || linkage.bytes().any(|byte| byte.is_ascii_control()) {
+        return Err(ReleaseError::ToolchainIdentity(
+            "reviewed Cargo libcurl linkage metadata is invalid".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn linux_os_metadata(value: &str) -> bool {
+    [
+        "Alpine Linux ",
+        "Amazon Linux ",
+        "Arch Linux ",
+        "CentOS ",
+        "Debian ",
+        "Fedora Linux ",
+        "Linux ",
+        "NixOS ",
+        "Red Hat Enterprise Linux ",
+        "Rocky Linux ",
+        "SUSE Linux ",
+        "Ubuntu ",
+        "openSUSE ",
+    ]
+    .iter()
+    .any(|prefix| value.starts_with(prefix))
+}
+
+fn require_ssl_metadata(value: &str) -> Result<(), ReleaseError> {
+    if !(value.starts_with("OpenSSL ") || value.starts_with("LibreSSL "))
+        || !value.bytes().any(|byte| byte.is_ascii_digit())
+        || value.bytes().any(|byte| byte.is_ascii_control())
+    {
+        return Err(ReleaseError::ToolchainIdentity(
+            "reviewed Cargo SSL metadata is invalid".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn valid_version_token(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+' | b'_'))
+        && value.bytes().any(|byte| byte.is_ascii_digit())
 }
 
 pub(crate) fn toolchain_program(root: &Path, program: &str) -> Result<PathBuf, ReleaseError> {
