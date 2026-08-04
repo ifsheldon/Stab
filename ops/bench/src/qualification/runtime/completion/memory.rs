@@ -77,6 +77,7 @@ pub(super) fn collect(
             || receipt.probe.stim_binary_sha256 != shared.workers.stim_binary_sha256
             || receipt.probe.stab_source_sha256 != shared.workers.stab_source_sha256
             || receipt.probe.stab_build_fingerprint != shared.workers.stab_build_fingerprint
+            || receipt.probe.stab_binary_sha256 != shared.workers.stab_binary_sha256
         {
             return Err(CompletionError::MemoryReceiptIdentity(group_id.to_string()));
         }

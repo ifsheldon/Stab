@@ -35,6 +35,7 @@ pub(in crate::qualification::runtime) struct AdapterProbeReceipt {
     pub(in crate::qualification::runtime) stim_binary_sha256: String,
     pub(in crate::qualification::runtime) stab_source_sha256: String,
     pub(in crate::qualification::runtime) stab_build_fingerprint: String,
+    pub(in crate::qualification::runtime) stab_binary_sha256: String,
 }
 
 #[derive(Debug)]
@@ -202,6 +203,7 @@ pub(in crate::qualification::runtime) fn inspect_memory_receipt(
         return Err(ProbeError::MemoryReceipt);
     }
     receipt.host.validate_against_policy(source_root)?;
+    receipt.host.require_verified()?;
     Ok(DemMemoryReceiptEvidence {
         path: path.as_path().to_path_buf(),
         report_sha256: sha256_hex(&bytes),
@@ -255,6 +257,7 @@ fn valid_probe_identity(receipt: &AdapterProbeReceipt) -> bool {
             &receipt.stim_binary_sha256,
             &receipt.stab_source_sha256,
             &receipt.stab_build_fingerprint,
+            &receipt.stab_binary_sha256,
         ]
         .into_iter()
         .all(|digest| valid_sha256(digest))
@@ -300,6 +303,7 @@ mod tests {
                 stim_binary_sha256: "e".repeat(64),
                 stab_source_sha256: "f".repeat(64),
                 stab_build_fingerprint: "0".repeat(64),
+                stab_binary_sha256: "3".repeat(64),
             },
             dem_accepted_maximum_memory: worker::dem_model::DemFamily::ALL
                 .into_iter()
@@ -357,6 +361,13 @@ mod tests {
             .stab_peak_rss_bytes = 10;
         assert!(matches!(
             validate_execution(&inverted_rss),
+            Err(ProbeError::MemoryReceipt)
+        ));
+
+        let mut missing_worker_binary = execution();
+        missing_worker_binary.receipt.stab_binary_sha256.clear();
+        assert!(matches!(
+            validate_execution(&missing_worker_binary),
             Err(ProbeError::MemoryReceipt)
         ));
     }

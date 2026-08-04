@@ -19,6 +19,10 @@ pub(in crate::qualification::runtime) enum ProbeError {
     #[error(transparent)]
     Invocation(#[from] super::super::invocation::InvocationError),
     #[error(transparent)]
+    StabBuild(#[from] super::super::stab_build::StabBuildError),
+    #[error(transparent)]
+    Toolchain(#[from] super::super::toolchain::ToolchainError),
+    #[error(transparent)]
     Host(#[from] super::super::host::HostError),
     #[error("failed to resolve the current Stab qualification worker: {0}")]
     CurrentExecutable(std::io::Error),

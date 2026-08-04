@@ -459,8 +459,11 @@ fn run_adapter_probe(
     };
     let repository = super::git::repository_state(root)?;
     let adapter = prepare_adapter(root, &repository.commit)?;
-    let worker_identity = worker::current_identity()?;
-    let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
+    let toolchain = super::toolchain::collect(root)?;
+    let private_worker =
+        super::stab_build::StabWorkerExecutable::prepare(root, &repository.commit, &toolchain)?;
+    let worker_identity = private_worker.identity().clone();
+    let worker_program = private_worker.program();
     let mut common_arguments = vec![
         OsString::from("--workload"),
         OsString::from(workload),
@@ -491,7 +494,7 @@ fn run_adapter_probe(
     let mut worker_arguments = vec![OsString::from("qualification-worker")];
     worker_arguments.extend(common_arguments);
     let worker_request = ProcessRequest {
-        program: current_exe.clone(),
+        program: worker_program.clone(),
         args: worker_arguments,
         stdin: Vec::new(),
         working_directory: root.path.clone(),
@@ -503,12 +506,7 @@ fn run_adapter_probe(
     let stim_output = checked_process(run_bounded_process(&adapter_request)?, "Stim adapter")?;
     let stab_output = checked_process(run_bounded_process(&worker_request)?, "Stab worker")?;
     adapter.verify()?;
-    let post_worker_identity = worker::current_identity()?;
-    if post_worker_identity.source_digest != worker_identity.source_digest
-        || post_worker_identity.build_fingerprint != worker_identity.build_fingerprint
-    {
-        return Err(ProbeError::WorkerIdentityChanged);
-    }
+    private_worker.verify(&toolchain, &repository.commit)?;
 
     let stim_rows = parse_worker_json_lines(&stim_output.stdout)?;
     let stab_rows = parse_worker_json_lines(&stab_output.stdout)?;
@@ -553,16 +551,27 @@ fn run_adapter_probe(
         build_fingerprint: worker_identity.build_fingerprint.clone(),
     }
     .validate(&stab_rows)?;
-    pauli_iter::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
+    pauli_iter::validate_boundaries(
+        root,
+        args.group,
+        &adapter,
+        &worker_program,
+        &worker_identity,
+    )?;
     clifford_string::validate_boundaries(
         root,
         args.group,
         &adapter,
-        &current_exe,
+        &worker_program,
         &worker_identity,
     )?;
-    let dem_accepted_maximum_memory =
-        dem_model::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
+    let dem_accepted_maximum_memory = dem_model::validate_boundaries(
+        root,
+        args.group,
+        &adapter,
+        &worker_program,
+        &worker_identity,
+    )?;
 
     if args.evidence_mode == ProbeEvidenceMode::Timing {
         let pairs = pair_measurements(0, PairOrder::StimThenStab, &stim_rows, &stab_rows)?;
@@ -627,6 +636,7 @@ fn run_adapter_probe(
             stim_binary_sha256: adapter.binary_digest.as_str().to_string(),
             stab_source_sha256: stab.source_digest.as_str().to_string(),
             stab_build_fingerprint: stab.build_fingerprint.as_str().to_string(),
+            stab_binary_sha256: private_worker.binary_sha256().to_string(),
         },
         dem_accepted_maximum_memory,
     })

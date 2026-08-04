@@ -173,6 +173,14 @@ impl HostEvidence {
         }
         Ok(())
     }
+
+    pub(super) fn require_verified(&self) -> Result<(), HostError> {
+        if self.verified && self.violations.is_empty() {
+            Ok(())
+        } else {
+            Err(HostError::UnverifiedEvidence)
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -835,6 +843,8 @@ pub(crate) enum HostError {
     EvidenceProfile(String),
     #[error("qualification report host evidence does not replay under the source-owned policy")]
     EvidenceMismatch,
+    #[error("formal qualification requires verified host evidence without policy violations")]
+    UnverifiedEvidence,
     #[error(transparent)]
     Lease(#[from] lease::LeaseError),
 }
@@ -896,6 +906,15 @@ mod tests {
         assert!(enforce_or_mark_unverified(&mut evidence, false).is_err());
         assert!(enforce_or_mark_unverified(&mut evidence, true).is_ok());
         assert!(!evidence.verified);
+        assert!(matches!(
+            evidence.require_verified(),
+            Err(HostError::UnverifiedEvidence)
+        ));
+        evidence.violations.clear();
+        evidence.verified = true;
+        evidence
+            .require_verified()
+            .expect("verified evidence is promotable");
     }
 
     #[test]
