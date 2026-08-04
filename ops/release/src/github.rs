@@ -63,35 +63,52 @@ fn publish_draft(
     cancellation: &ReleaseCancellation,
 ) -> Result<(), ReleaseError> {
     cancellation.check("GitHub draft publication")?;
-    publisher.require_remote_annotated_tag(tag, commit, token)?;
-    reviewed.revalidate()?;
-    let created = publisher.create_draft(tag, commit, token)?;
-    validate_release(&created, tag, &[])?;
+    with_stable_remote_tag(publisher, tag, commit, token, |publisher| {
+        reviewed.revalidate()?;
+        let created = publisher.create_draft(tag, commit, token)?;
+        validate_release(&created, tag, &[])?;
 
-    for asset in reviewed.assets_mut() {
-        cancellation.check("GitHub asset upload")?;
-        let upload = asset.upload_file()?;
-        let recorded = publisher.upload_asset(created.id, asset.name(), upload, token)?;
-        validate_asset(&recorded, asset.name(), asset.bytes(), asset.sha256())?;
-    }
-    cancellation.check("GitHub draft verification")?;
-    let recorded = publisher.release_by_tag(tag, token)?;
-    if recorded.id != created.id {
-        return Err(ReleaseError::GitHubRelease(format!(
-            "GitHub returned release {} after creating release {}",
-            recorded.id, created.id
-        )));
-    }
-    let expected_assets = reviewed
-        .assets()
-        .iter()
-        .map(|asset| ExpectedAsset {
-            name: asset.name().to_string(),
-            bytes: asset.bytes(),
-            sha256: asset.sha256().to_string(),
-        })
-        .collect::<Vec<_>>();
-    validate_release(&recorded, tag, &expected_assets)
+        for asset in reviewed.assets_mut() {
+            cancellation.check("GitHub asset upload")?;
+            let upload = asset.upload_file()?;
+            let recorded = publisher.upload_asset(created.id, asset.name(), upload, token)?;
+            validate_asset(&recorded, asset.name(), asset.bytes(), asset.sha256())?;
+        }
+        cancellation.check("GitHub draft verification")?;
+        let recorded = publisher.release_by_tag(tag, token)?;
+        if recorded.id != created.id {
+            return Err(ReleaseError::GitHubRelease(format!(
+                "GitHub returned release {} after creating release {}",
+                recorded.id, created.id
+            )));
+        }
+        let expected_assets = reviewed
+            .assets()
+            .iter()
+            .map(|asset| ExpectedAsset {
+                name: asset.name().to_string(),
+                bytes: asset.bytes(),
+                sha256: asset.sha256().to_string(),
+            })
+            .collect::<Vec<_>>();
+        validate_release(&recorded, tag, &expected_assets)
+    })
+}
+
+fn with_stable_remote_tag<P, F>(
+    publisher: &mut P,
+    tag: &str,
+    commit: &str,
+    token: &GitHubToken,
+    operation: F,
+) -> Result<(), ReleaseError>
+where
+    P: DraftPublisher,
+    F: FnOnce(&mut P) -> Result<(), ReleaseError>,
+{
+    publisher.require_remote_annotated_tag(tag, commit, token)?;
+    operation(publisher)?;
+    publisher.require_remote_annotated_tag(tag, commit, token)
 }
 
 trait DraftPublisher {
@@ -601,6 +618,103 @@ mod tests {
         };
         assert!(require_annotated_reference(&lightweight, RELEASE_TAG).is_err());
         assert!(require_tag_commit(&object, RELEASE_TAG, &"3".repeat(40)).is_err());
+    }
+
+    struct MovingTagPublisher {
+        remote_commit: String,
+        events: Vec<&'static str>,
+    }
+
+    impl DraftPublisher for MovingTagPublisher {
+        fn require_remote_annotated_tag(
+            &mut self,
+            _tag: &str,
+            commit: &str,
+            _token: &GitHubToken,
+        ) -> Result<(), ReleaseError> {
+            self.events.push("tag-check");
+            if self.remote_commit == commit {
+                Ok(())
+            } else {
+                Err(ReleaseError::GitHubRelease(
+                    "remote tag moved after draft validation".to_string(),
+                ))
+            }
+        }
+
+        fn create_draft(
+            &mut self,
+            _tag: &str,
+            _commit: &str,
+            _token: &GitHubToken,
+        ) -> Result<RemoteRelease, ReleaseError> {
+            Err(ReleaseError::GitHubRelease(
+                "unexpected draft creation in tag-guard test".to_string(),
+            ))
+        }
+
+        fn upload_asset(
+            &mut self,
+            _release_id: u64,
+            _name: &str,
+            _file: File,
+            _token: &GitHubToken,
+        ) -> Result<RemoteAsset, ReleaseError> {
+            Err(ReleaseError::GitHubRelease(
+                "unexpected asset upload in tag-guard test".to_string(),
+            ))
+        }
+
+        fn release_by_tag(
+            &mut self,
+            _tag: &str,
+            _token: &GitHubToken,
+        ) -> Result<RemoteRelease, ReleaseError> {
+            Err(ReleaseError::GitHubRelease(
+                "unexpected release query in tag-guard test".to_string(),
+            ))
+        }
+    }
+
+    #[test]
+    fn late_remote_tag_change_is_rejected_after_final_validation() {
+        let reviewed_commit = "1".repeat(40);
+        let moved_commit = "2".repeat(40);
+        let mut publisher = MovingTagPublisher {
+            remote_commit: reviewed_commit.clone(),
+            events: Vec::new(),
+        };
+        let token = GitHubToken("reviewed-token".to_string());
+
+        let result = with_stable_remote_tag(
+            &mut publisher,
+            RELEASE_TAG,
+            &reviewed_commit,
+            &token,
+            |publisher| {
+                publisher.events.push("draft-created");
+                publisher.events.push("assets-uploaded");
+                publisher.events.push("final-release-validated");
+                publisher.remote_commit = moved_commit;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(ReleaseError::GitHubRelease(detail))
+                if detail == "remote tag moved after draft validation"
+        ));
+        assert_eq!(
+            publisher.events,
+            [
+                "tag-check",
+                "draft-created",
+                "assets-uploaded",
+                "final-release-validated",
+                "tag-check",
+            ]
+        );
     }
 
     #[test]
