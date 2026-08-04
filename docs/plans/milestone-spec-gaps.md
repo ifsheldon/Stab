@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-08-04 - A9: Completion Descriptor Budget
+
+Status: Resolved
+Revealed by: constructing the first complete 38-rollup, 138-report `a9-release` manifest under the development host's ordinary soft file-descriptor limit
+Current text: A9 required descriptor-safe source and artifact retention through atomic completion publication but did not bound retained descriptor growth or name a minimum supported `RLIMIT_NOFILE`.
+Gap: retaining one correctness tree per source report multiplied eleven exact prerequisite artifacts into 138 independent descriptor trees. The complete scope exhausted a soft limit of 1024 and mapped `EMFILE` to artifact mutation even though the checked receipt bytes and identity had not changed.
+Proposed amendment: retain one descriptor-safe correctness tree per exact preflight identity, require complete creation and replay under soft `RLIMIT_NOFILE=1024`, and classify descriptor exhaustion as a resource-read failure instead of evidence mutation.
+Resolution: the A9 performance evidence contract now states the 1024-descriptor acceptance boundary. Rollup replay retains one post-validation binding per exact rollup prerequisite, completion deduplicates each admitted binding immediately by canonical preflight identity and retains one representative through atomic publication, and all descriptor-opening and descriptor-duplication exhaustion remains a resource error through correctness-backed publication. Focused bounded-retention and mutation tests plus the complete low-limit reconstruction own the resource contract.
+
 ## 2026-07-28 - A4: Pre-A4 Performance Mapping
 
 Status: Resolved

@@ -975,6 +975,7 @@ Status: Active.
 - Legacy primary suite as diagnostic continuity.
 - Controlled AArch64 full and soak evidence for every affected release group, expected to include all current 19 groups.
 - One source-derived `a9-release` completion manifest covering the full and soak rollups for every current promotable group, with each group bound to its own exact correctness prerequisite receipt and only genuinely common source, inventory, worker, timing, host, and policy identities shared across groups; retain `dem-r6` as a historical scoped completion and never treat it as release completion.
+- Retain one descriptor-safe correctness tree per exact prerequisite identity during completion reconstruction instead of one tree per source report. Creation and replay of the complete 138-report release scope must pass with a soft `RLIMIT_NOFILE` of 1024; descriptor exhaustion is a resource failure and must never be reported as artifact mutation.
 - Stim paired median and confidence upper bound no greater than `1.25x`.
 - Stab self-regression no greater than `15%`, with missing identities reported as unseeded.
 - Preserve every first failed or noisy formal result. If its source contract had no pre-existing profiler note, publish it as non-promotable pending-analysis evidence, bind the note in a focused source commit, and require fresh evidence rather than replacing or relabeling the retained report.

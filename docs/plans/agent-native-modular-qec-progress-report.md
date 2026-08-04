@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Progress Report
 
-Current as of 2026-08-01.
+Current as of 2026-08-04.
 
 ## Status
 
@@ -11,8 +11,9 @@ Current as of 2026-08-01.
 - A4 sampling compiler, plan, session, and sink: complete at clean source revision `af71182ea60146986c4b4aac9d5713484eb7e449`.
 - A5 detection and DEM batch pipelines: complete at clean source revision `b8e3f459d2a8817aa98ca0d71072a9529fa9fe9c`.
 - A6 physical component extraction and Nightly isolation: complete at clean source revision `adae364500744c33f98f7777901ff50a28cbfdf6`.
-- A7 decoder interoperability and reference decoder: active; product seams, focused tests, and benchmark contracts are implemented, while source-current evidence and final audits remain.
-- Formal A9 release qualification for the current architecture: not started.
+- A7 decoder interoperability and reference decoder: complete at clean measured revision `38160da59e6a55b1e4efd753d2aee8b8eb18f2b0`.
+- A8 circuit-pass and backend extension seams: complete; measured ancestor `c797ebc908ce1b81675e479031c39f71740058ae` has an exact allowlisted status descendant and exact-revision CI.
+- A9 coordinated qualification and release: active; the first complete 138-report matrix passed, but completion reconstruction exposed a bounded file-descriptor defect and must restart after repair.
 
 The accepted pre-refactor formal evidence remains bound to clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3`.
 
@@ -1339,3 +1340,23 @@ The runner now publishes a first failed or noisy result without a pre-existing n
 Because the profiler-note binding changes the source-owned runtime contract and repository revision, all 77 accepted reports, 16 rollups, correctness artifacts, and worker receipts at `f740fd36` remain immutable historical evidence and cannot contribute to current A9 completion. The complete correctness, worker, 138-report timing, memory, 38-rollup, and completion chain must restart from the focused clean repair revision after exact-head CI, using unique paths throughout. Swap was restored as `/swap.img` with size `137438949376` bytes, zero used bytes, and priority `-2`, and no qualification process remained.
 
 The first repair milestone audit corrected three evidence defects: one historical result was mislabeled source-current, the six completed compact groups accidentally included the partial late-hit maximum, and the no-artifact record claimed an internal retry count that could not be reconstructed. The full code review then found that every other note-less promotable group could lose its first failed or noisy report through the same pre-publication check. The repaired lifecycle and synchronized documents close all four findings, and the resolved specification-gap entry records the original circular requirement. Final independent audit and review passes found no remaining implementation defect or milestone loophole. Formatting, warnings-denied workspace Clippy, all workspace tests, all 588 `stab-bench` tests with two intentional ignores, architecture and documentation checks, performance qualification checking and deterministic regeneration, generated-status checking, and the focused parity and rollup rejection tests pass. No formal timing was run from the dirty repair source.
+
+## A9 Complete Matrix And Completion Resource Rejection
+
+Commits `6b380c7a` and `a963a7b1` bound the first-failure lifecycle repair and synchronized the controlled 100000-millidegree Celsius ceiling. Exact pushed revision `a963a7b134efdf0d70c3dd811e3243037abf0d0d` passed GitHub Actions run `30836851178`: `Qualification Contracts` passed in 10 minutes 26 seconds and `Rust` passed in 23 minutes 2 seconds.
+
+Source-current PR correctness passed 700 of 700 selected parents, broad full and soak each passed 933 of 933, all 11 exact full prerequisites passed and replayed, the live 62-case result-format corpus and complete implemented oracle matrix passed, and worker reproducibility produced 46 canonical receipts. The exact correctness paths, request digests, and completion digests remain preserved under the `a9-a963a7b1-*` prefix.
+
+All 138 full and soak reports across the 19 release groups passed the unchanged `1.25x` Stim parity gate and produced 38 replayed rollups. Paired medians ranged from `0.000248377x` for large soak Clifford identity multiplication through `1.142711390x` for large soak coordinate-sparse DEM parsing. The worst confidence upper bound was `1.220137323x` for medium full coordinate-sparse DEM parsing. The hottest accepted reading was 92300 millidegrees Celsius. One circuit-canonical-print soak-medium attempt was rejected before publication when post-run load reached `10.360`; its path was retired, a fresh `r2` path passed, and no product result was rerun. DEM parse and print passed all 18 seeded `1.15x` self-regression identities; every compact group reported `unseeded` without claiming a pass. Two immutable accepted-maximum DEM memory receipts were also published.
+
+The first normal-environment completion attempt used the new immutable path `target/benchmarks/qualification/a9-a963a7b1-completion-r1-a9-release` and failed before publication. The process soft `RLIMIT_NOFILE` was 1024. Reconstruction retained independent descriptor trees for repeated correctness prerequisites while traversing 138 reports, exhausted descriptors at the Pauli-iterator prerequisite, and mapped the resulting `EMFILE` to the misleading artifact-mutation error. The named execution receipt still matched its checked SHA-256 `0de700ddbc69d95680b8afc084e0bb0b53a14aa865b805c9e9686bb045aac055`, inode, length, modification time, and preflight identity; no qualification process was concurrently writing it.
+
+A fresh-path diagnostic at `target/benchmarks/qualification/a9-a963a7b1-completion-r2-a9-release-diagnostic-high-nofile` raised only the child soft limit to 8192. Completion creation and offline replay then passed, proving that the 38 rollups, 138 reports, parity outcomes, memory records, and regression identities are otherwise coherent. This diagnostic does not satisfy A9 because ordinary completion remained broken and a raised descriptor limit was not a source-owned prerequisite.
+
+The repair retains one descriptor-safe binding per exact correctness preflight identity through atomic publication, removes repeated per-scale bindings after each rollup has independently revalidated its sources, and deduplicates each rollup binding immediately on admission instead of waiting for the full matrix to load. Both `openat` and descriptor-duplication exhaustion now remain resource errors through every correctness-backed publication boundary instead of becoming evidence-mutation errors. Focused tests own the retained-binding bound across the maximum rollup count, real duplicate-tree revalidation, malformed missing-binding rejection, and resource-error mapping. Because this is qualification source, every `a963a7b1` correctness, worker, timing, memory, rollup, and diagnostic completion artifact becomes immutable historical evidence after the repair commit. A9 must restart from the reviewed clean repair revision at unique paths and prove final completion and replay under soft `RLIMIT_NOFILE=1024`.
+
+Before commit, the patched release operator was exercised from a detached clean `a963a7b1` worktree against hard-linked read-only copies of the exact 38 rollups and their correctness evidence. Fresh diagnostic path `target/benchmarks/qualification/a9-a963a7b1-completion-r4-a9-release-diagnostic-low-nofile` created and replayed the complete manifest with the child soft `RLIMIT_NOFILE` fixed at 1024. This proves the resource repair against the original failure shape, but the dirty-source binary and historical evidence make the result diagnostic only; source-current A9 evidence still restarts after the focused repair commit and exact-head CI.
+
+Commit `08d0dfe46398f5447d74120fe79cfb9e3569bf5f` binds the reviewed implementation and tests. The post-repair milestone audit and full code review found no remaining P0 through P3 issue. Formatting, warnings-denied workspace Clippy, all workspace tests, architecture and documentation checks, performance qualification checking and deterministic regeneration, generated-status checking, benchmark smoke, all 591 active `stab-bench` tests, and staged pre-commit passed. Replacement evidence remains prohibited until the final documentation descendant is pushed and its exact-head `Rust` and `Qualification Contracts` jobs pass.
+
+Swap was restored after every timed report and remains `/swap.img` with size `137438949376` bytes, zero used bytes, and priority `-2`. No qualification process remains.
