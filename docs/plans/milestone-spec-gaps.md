@@ -23,6 +23,33 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-08-04 - A9: Completion Authorization Of Resource Evidence
+
+Status: Resolved
+Revealed by: final pre-evidence review of the release completion manifest
+Current text: A9 required accepted-maximum DEM memory probes and completion under soft `RLIMIT_NOFILE=1024`, but the completion manifest authenticated neither the standalone probe artifacts nor the limit under which creation and replay ran.
+Gap: a completion could claim recorded memory and bounded descriptor behavior while omitting the required parse and print maxima or while being created and replayed only under a raised limit. The checked dashboard and irreversible release authorization could not distinguish that weaker result.
+Proposed amendment: require exactly one controlled-host parse receipt and one print receipt from the measured revision, bind their exact worker and family evidence into completion, record the observed soft descriptor limit, and require release creation, offline replay, checkpoint replay, and checked status to enforce 1024.
+Resolution: memory-receipt schema version 2 binds the clean repository, verified host policy, `raw-work-v2`, Stim binary, both worker source and build identities, and every family maximum. Completion and preflight schema version 4 require and retain both receipt digests, record `soft_nofile_limit`, and reject release-scope creation, replay, checkpointing, or checked status unless it is exactly 1024. Completion schemas 1 through 3 remain historical readers only.
+
+## 2026-08-04 - A9: Replay Publication Lifetime And Final Git State
+
+Status: Resolved
+Revealed by: independent review of completion replay and checkpoint publication after the first complete A9 matrix
+Current text: replay had to revalidate source artifacts and final repository state before returning reconstructed completion bytes.
+Gap: the first implementation dropped report and correctness bindings before checked-status publication, and its final repository check could combine observations from different moments while mapping Git failures to a generic source-mutation error. A path replacement or repository change after reconstruction but before publication was therefore outside the authenticated lifetime.
+Proposed amendment: return an owning replay object that retains every source binding through atomic status publication, recheck it immediately before publication, derive Git state from two complete descriptor-rooted scans, and preserve typed unstable-state and repository-change diagnostics.
+Resolution: `ReplayedCompletion` owns the full reconstruction, including report, rollup, correctness, memory-receipt, completion, and repository bindings. Checkpoint publication occurs inside the checked formal session while that object is live and after an immediate current-state check. Final Git auditing rejects disagreement between two complete scans as `UnstableRepositoryState`, and completion preserves typed Git and repository errors.
+
+## 2026-08-04 - A9: Descriptor Proof And Shared Correctness Shape
+
+Status: Resolved
+Revealed by: audit of the first post-exhaustion descriptor regression
+Current text: A9 required one retained correctness tree per exact prerequisite identity and a complete release-scope test under soft `RLIMIT_NOFILE=1024`.
+Gap: the first synthetic test used anonymous `/dev/null` descriptors and undercounted valid layouts with 19 independently named correctness paths. The contract also did not require groups with an identical case set to share one exact artifact or constrain correctness evidence to the direct path shape produced by the qualification runner.
+Proposed amendment: derive the current 11 prerequisite artifacts from exact case-set ownership, require identical case sets to name identical evidence, admit only direct `target/qualification/<name>` artifacts, and test real retained correctness trees, case receipts, completion artifacts, and the final Git audit under 1024.
+Resolution: completion rejects inconsistent shared evidence and more than 11 distinct prerequisite artifacts, correctness path admission requires exactly three components, and correctness bindings hold the publisher-compatible shared lock. The production regression retains 179 performance and completion artifact directories, 11 real correctness trees, 44 real case receipts, and the final descriptor-backed Git scan under soft `RLIMIT_NOFILE=1024`.
+
 ## 2026-08-04 - A9: Completion Descriptor Budget
 
 Status: Resolved
@@ -30,7 +57,7 @@ Revealed by: constructing the first complete 38-rollup, 138-report `a9-release` 
 Current text: A9 required descriptor-safe source and artifact retention through atomic completion publication but did not bound retained descriptor growth or name a minimum supported `RLIMIT_NOFILE`.
 Gap: retaining one correctness tree per source report multiplied eleven exact prerequisite artifacts into 138 independent descriptor trees. The complete scope exhausted a soft limit of 1024 and mapped `EMFILE` to artifact mutation even though the checked receipt bytes and identity had not changed.
 Proposed amendment: retain one descriptor-safe correctness tree per exact preflight identity, require complete creation and replay under soft `RLIMIT_NOFILE=1024`, and classify descriptor exhaustion as a resource-read failure instead of evidence mutation.
-Resolution: the A9 performance evidence contract now states the 1024-descriptor acceptance boundary. Rollup replay retains one post-validation binding per exact rollup prerequisite, completion deduplicates each admitted binding immediately by canonical preflight identity and retains one representative through atomic publication, and all descriptor-opening and descriptor-duplication exhaustion remains a resource error through correctness-backed publication. Focused bounded-retention and mutation tests plus the complete low-limit reconstruction own the resource contract.
+Resolution: the A9 performance evidence contract now states the 1024-descriptor acceptance boundary. Rollup replay retains one post-validation binding per exact rollup prerequisite, completion deduplicates each admitted binding immediately by canonical preflight identity and retains one representative through atomic publication, and all descriptor-opening and descriptor-duplication exhaustion remains a resource error through correctness-backed publication. The later descriptor-proof entry above strengthens the original synthetic check with the exact shared prerequisite shape, real artifact trees, case receipts, and final Git auditing.
 
 ## 2026-07-28 - A4: Pre-A4 Performance Mapping
 

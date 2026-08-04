@@ -25,6 +25,7 @@ The A9 procedure permits exactly one status-only descendant after the measured s
 
 ```text
 RELEASE_COMMIT="$(git rev-parse HEAD^{commit})"
+RELEASE_TAG="v0.2.0"
 git status --short
 ```
 
