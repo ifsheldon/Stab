@@ -27,7 +27,20 @@ pub(super) struct RepositoryState {
 }
 
 pub(super) fn repository_state(root: &RepoRoot) -> Result<RepositoryState, GitError> {
-    GitView::open(root)?.state()
+    repository_state_with_hook(root, || {})
+}
+
+fn repository_state_with_hook(
+    root: &RepoRoot,
+    between_scans: impl FnOnce(),
+) -> Result<RepositoryState, GitError> {
+    let first = GitView::open(root)?.state()?;
+    between_scans();
+    let second = GitView::open(root)?.state()?;
+    if first != second {
+        return Err(GitError::UnstableRepositoryState);
+    }
+    Ok(second)
 }
 
 pub(super) fn validate_pinned_stim(root: &RepoRoot) -> Result<(), GitError> {
@@ -643,6 +656,8 @@ pub(super) enum GitError {
     DirtyStim,
     #[error("repository commit changed before materialization: {actual}, expected {expected}")]
     RepositoryCommitChanged { actual: String, expected: String },
+    #[error("repository state changed while it was being audited")]
+    UnstableRepositoryState,
     #[error("repository materialization directory is not empty: {0}")]
     NonemptyMaterialization(PathBuf),
     #[error("repository materialization path is not UTF-8: {0}")]
@@ -745,6 +760,17 @@ mod tests {
         let error = repository_state(&root).expect_err("symlink Git marker must fail");
 
         assert!(matches!(error, GitError::UnsafeGitMarker(path) if path == marker));
+    }
+
+    #[test]
+    fn repository_state_rejects_changes_between_complete_scans() {
+        let (_repository, root) = initialized_repository();
+        let tracked = root.path.join("tracked.txt");
+        let error = repository_state_with_hook(&root, || {
+            std::fs::write(&tracked, "changed between scans\n").expect("mutate tracked file");
+        })
+        .expect_err("mixed-time repository state must fail");
+        assert!(matches!(error, GitError::UnstableRepositoryState));
     }
 
     #[test]

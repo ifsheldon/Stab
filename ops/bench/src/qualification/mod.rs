@@ -204,17 +204,19 @@ pub(crate) fn completion_checkpoint(
     root: &RepoRoot,
     args: CompletionCheckpointArgs,
 ) -> Result<(), BenchError> {
-    let report_json = with_checked_formal_session(root, |session| {
+    with_checked_formal_session(root, |session| {
         let checked = read(session.source_root())?;
-        runtime::completion_checkpoint_manifest(
+        let replayed = runtime::completion_checkpoint_manifest(
             session,
             EXPECTED_FROZEN_DIGEST,
             &checked.correctness_digest,
             args,
         )
-        .map_err(BenchError::Qualification)
+        .map_err(BenchError::Qualification)?;
+        runtime::require_completion_checkpoint_current(session, &replayed)
+            .map_err(BenchError::Qualification)?;
+        status::publish_completion_manifest(root, replayed.report_json())
     })?;
-    status::publish_completion_manifest(root, &report_json)?;
     println!(
         "[{PREFIX}] published authenticated completion checkpoint at benchmarks/qualification-completion-checkpoint.json"
     );

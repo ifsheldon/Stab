@@ -1,15 +1,22 @@
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 
 use super::super::artifact::{
     DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding,
 };
+use super::super::host::HostEvidence;
 use super::super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
 use super::super::run::RepositoryEvidence;
+use super::super::run::sha256_hex;
 use super::super::worker;
 use super::dem_model::DemAcceptedMaximumMemory;
 use super::{ProbeArgs, ProbeError, ProbeEvidenceMode, ProbeGroup};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
+
+const MEMORY_RECEIPT_SCHEMA_VERSION: u32 = 2;
+pub(in crate::qualification::runtime) const MAX_MEMORY_RECEIPT_BYTES: usize = 4 << 20;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -23,11 +30,11 @@ pub(in crate::qualification::runtime) struct AdapterProbeReceipt {
     pub(super) input_bytes: u64,
     pub(super) input_digest: String,
     pub(super) output_digest: String,
-    pub(super) stim_source_sha256: String,
-    pub(super) stim_build_fingerprint: String,
-    pub(super) stim_binary_sha256: String,
-    pub(super) stab_source_sha256: String,
-    pub(super) stab_build_fingerprint: String,
+    pub(in crate::qualification::runtime) stim_source_sha256: String,
+    pub(in crate::qualification::runtime) stim_build_fingerprint: String,
+    pub(in crate::qualification::runtime) stim_binary_sha256: String,
+    pub(in crate::qualification::runtime) stab_source_sha256: String,
+    pub(in crate::qualification::runtime) stab_build_fingerprint: String,
 }
 
 #[derive(Debug)]
@@ -36,7 +43,7 @@ pub(super) struct AdapterProbeExecution {
     pub(super) dem_accepted_maximum_memory: Vec<DemAcceptedMaximumMemory>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct DemAcceptedMaximumMemoryReceipt {
     schema_version: u32,
@@ -46,8 +53,19 @@ struct DemAcceptedMaximumMemoryReceipt {
     timing_boundary: TimingBoundary,
     stim_tag: String,
     stim_commit: String,
+    host: HostEvidence,
     probe: AdapterProbeReceipt,
     accepted_maximum_memory: Vec<DemAcceptedMaximumMemory>,
+}
+
+#[derive(Debug)]
+pub(in crate::qualification::runtime) struct DemMemoryReceiptEvidence {
+    pub(in crate::qualification::runtime) path: PathBuf,
+    pub(in crate::qualification::runtime) report_sha256: String,
+    pub(in crate::qualification::runtime) repository: RepositoryEvidence,
+    pub(in crate::qualification::runtime) runtime_group_id: String,
+    pub(in crate::qualification::runtime) host: HostEvidence,
+    pub(in crate::qualification::runtime) probe: AdapterProbeReceipt,
 }
 
 pub(super) fn prepare_output(
@@ -117,17 +135,19 @@ pub(super) fn publish(
     repository: &RepositoryBinding,
     output_path: DirectQualificationArtifactPath,
     repository_evidence: RepositoryEvidence,
+    host: HostEvidence,
     execution: AdapterProbeExecution,
 ) -> Result<(), ProbeError> {
     validate_execution(&execution)?;
     let receipt = DemAcceptedMaximumMemoryReceipt {
-        schema_version: 1,
+        schema_version: MEMORY_RECEIPT_SCHEMA_VERSION,
         output: output_path.as_path().display().to_string(),
         repository: repository_evidence.clone(),
         runtime_group_id: execution.receipt.runtime_group_id.clone(),
         timing_boundary: RAW_WORK_TIMING_BOUNDARY,
         stim_tag: STIM_TAG.to_string(),
         stim_commit: STIM_COMMIT.to_string(),
+        host,
         probe: execution.receipt,
         accepted_maximum_memory: execution.dem_accepted_maximum_memory,
     };
@@ -146,31 +166,110 @@ pub(super) fn publish(
     Ok(())
 }
 
+pub(in crate::qualification::runtime) fn inspect_memory_receipt(
+    root: &RepoRoot,
+    source_root: &RepoRoot,
+    repository: &RepositoryBinding,
+    path: &DirectQualificationArtifactPath,
+) -> Result<DemMemoryReceiptEvidence, ProbeError> {
+    let bytes = super::super::artifact::read_artifact_bounded_with_repository(
+        root,
+        repository,
+        path,
+        "report.json",
+        MAX_MEMORY_RECEIPT_BYTES,
+    )?;
+    if bytes.is_empty() || !bytes.ends_with(b"\n") {
+        return Err(ProbeError::MemoryReceipt);
+    }
+    let receipt: DemAcceptedMaximumMemoryReceipt = serde_json::from_slice(&bytes)?;
+    let mut canonical = serde_json::to_vec_pretty(&receipt)?;
+    canonical.push(b'\n');
+    if canonical != bytes
+        || receipt.schema_version != MEMORY_RECEIPT_SCHEMA_VERSION
+        || Path::new(&receipt.output) != path.as_path()
+        || receipt.repository.commit_before != receipt.repository.commit_after
+        || receipt.repository.local_modifications_before
+        || receipt.repository.local_modifications_after
+        || receipt.timing_boundary != RAW_WORK_TIMING_BOUNDARY
+        || receipt.stim_tag != STIM_TAG
+        || receipt.stim_commit != STIM_COMMIT
+        || receipt.probe.runtime_group_id != receipt.runtime_group_id
+        || receipt.probe.evidence_mode != ProbeEvidenceMode::Memory.as_str()
+        || !valid_probe_identity(&receipt.probe)
+        || !valid_accepted_maximum_memory(&receipt.accepted_maximum_memory)
+    {
+        return Err(ProbeError::MemoryReceipt);
+    }
+    receipt.host.validate_against_policy(source_root)?;
+    Ok(DemMemoryReceiptEvidence {
+        path: path.as_path().to_path_buf(),
+        report_sha256: sha256_hex(&bytes),
+        repository: receipt.repository,
+        runtime_group_id: receipt.runtime_group_id,
+        host: receipt.host,
+        probe: receipt.probe,
+    })
+}
+
 fn validate_execution(execution: &AdapterProbeExecution) -> Result<(), ProbeError> {
-    let expected = worker::dem_model::DemFamily::ALL;
     if execution.receipt.evidence_mode != ProbeEvidenceMode::Memory.as_str()
-        || execution.dem_accepted_maximum_memory.len() != expected.len()
-        || execution
-            .dem_accepted_maximum_memory
-            .iter()
-            .zip(expected)
-            .any(|(actual, family)| {
-                actual.family_id != family.id()
-                    || actual.work_items != family.maximum_items()
-                    || actual.input_bytes == 0
-                    || actual.stim_peak_rss_bytes < actual.stim_setup_rss_bytes
-                    || actual.stab_peak_rss_bytes < actual.stab_setup_rss_bytes
-            })
+        || !valid_probe_identity(&execution.receipt)
+        || !valid_accepted_maximum_memory(&execution.dem_accepted_maximum_memory)
     {
         return Err(ProbeError::MemoryReceipt);
     }
     Ok(())
 }
 
+fn valid_accepted_maximum_memory(values: &[DemAcceptedMaximumMemory]) -> bool {
+    let expected = worker::dem_model::DemFamily::ALL;
+    values.len() == expected.len()
+        && values.iter().zip(expected).all(|(actual, family)| {
+            actual.family_id == family.id()
+                && actual.work_items == family.maximum_items()
+                && actual.input_bytes > 0
+                && valid_sha256(&actual.input_digest)
+                && valid_sha256(&actual.output_digest)
+                && actual.stim_peak_rss_bytes >= actual.stim_setup_rss_bytes
+                && actual.stab_peak_rss_bytes >= actual.stab_setup_rss_bytes
+        })
+}
+
+fn valid_probe_identity(receipt: &AdapterProbeReceipt) -> bool {
+    let expected_probe = match receipt.runtime_group_id.as_str() {
+        super::DEM_PARSE_RUNTIME_GROUP_ID => super::DEM_PARSE_PROBE_ID,
+        super::DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID => super::DEM_CANONICAL_PRINT_PROBE_ID,
+        _ => return false,
+    };
+    receipt.probe_id == expected_probe
+        && receipt.iteration_count > 0
+        && receipt.work_items > 0
+        && receipt.work_count > 0
+        && receipt.input_bytes > 0
+        && [
+            &receipt.input_digest,
+            &receipt.output_digest,
+            &receipt.stim_source_sha256,
+            &receipt.stim_build_fingerprint,
+            &receipt.stim_binary_sha256,
+            &receipt.stab_source_sha256,
+            &receipt.stab_build_fingerprint,
+        ]
+        .into_iter()
+        .all(|digest| valid_sha256(digest))
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU64;
-    use std::path::PathBuf;
 
     use super::*;
 
@@ -187,8 +286,8 @@ mod tests {
     fn execution() -> AdapterProbeExecution {
         AdapterProbeExecution {
             receipt: AdapterProbeReceipt {
-                probe_id: "probe".to_string(),
-                runtime_group_id: "group".to_string(),
+                probe_id: super::super::DEM_PARSE_PROBE_ID.to_string(),
+                runtime_group_id: super::super::DEM_PARSE_RUNTIME_GROUP_ID.to_string(),
                 evidence_mode: "memory".to_string(),
                 iteration_count: 1,
                 work_items: 64,

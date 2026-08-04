@@ -1,6 +1,6 @@
 #![allow(
     dead_code,
-    reason = "schema-version-1 and schema-version-2 completion fields remain for read-only historical parsing"
+    reason = "historical completion schema fields remain for read-only parsing"
 )]
 
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use super::super::probe::AdapterProbeReceipt;
 use super::super::run::{QualificationTier, RepositoryEvidence};
 use super::super::statistics::GateOutcome;
 use super::{
-    CompletionEnvironment, CompletionMemory, CompletionRegression, CompletionRollup,
+    CompletionCorrectness, CompletionMemory, CompletionRegression, CompletionRollup,
     CompletionSourceReport, MemoryScalingStatus,
 };
 use crate::qualification::runtime::protocol::TimingBoundary;
@@ -154,10 +154,51 @@ struct CompletionManifestV2 {
     stim_tag: String,
     stim_commit: String,
     repository: RepositoryEvidence,
-    environment: CompletionEnvironment,
+    environment: CompletionEnvironmentV2,
     workers: WorkerIdentityEvidence,
     timing_boundary: TimingBoundary,
     correctness_preflight: CorrectnessPreflightEvidence,
+    rollups: Vec<CompletionRollup>,
+    source_reports: Vec<CompletionSourceReport>,
+    memory: Vec<CompletionMemory>,
+    parity_outcome: GateOutcome,
+    regression_outcomes: Vec<CompletionRegression>,
+    environment_valid: bool,
+    memory_scaling_status: MemoryScalingStatus,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompletionEnvironmentV2 {
+    host_policy_sha256: String,
+    host_profile_id: String,
+    operating_system: String,
+    architecture: String,
+    cpu_identity: String,
+    rust_toolchain: String,
+    target_triple: String,
+    toolchain_sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompletionManifestV3 {
+    schema_version: u32,
+    output: String,
+    generated_unix_epoch_seconds: u64,
+    scope_id: String,
+    performance_inventory_sha256: String,
+    correctness_inventory_sha256: String,
+    parity_policy_sha256: String,
+    regression_policy_sha256: String,
+    regression_baselines_sha256: String,
+    stim_tag: String,
+    stim_commit: String,
+    repository: RepositoryEvidence,
+    environment: CompletionEnvironmentV2,
+    workers: WorkerIdentityEvidence,
+    timing_boundary: TimingBoundary,
+    correctness_preflights: Vec<CompletionCorrectness>,
     rollups: Vec<CompletionRollup>,
     source_reports: Vec<CompletionSourceReport>,
     memory: Vec<CompletionMemory>,
@@ -179,6 +220,16 @@ pub(super) fn parse_v1(bytes: &[u8]) -> Result<LegacyCompletionSummary, serde_js
 
 pub(super) fn parse_v2(bytes: &[u8]) -> Result<LegacyCompletionSummary, serde_json::Error> {
     let receipt: CompletionManifestV2 = serde_json::from_slice(bytes)?;
+    Ok(LegacyCompletionSummary {
+        output: receipt.output,
+        group_id: receipt.scope_id,
+        performance_inventory_sha256: receipt.performance_inventory_sha256,
+        correctness_inventory_sha256: receipt.correctness_inventory_sha256,
+    })
+}
+
+pub(super) fn parse_v3(bytes: &[u8]) -> Result<LegacyCompletionSummary, serde_json::Error> {
+    let receipt: CompletionManifestV3 = serde_json::from_slice(bytes)?;
     Ok(LegacyCompletionSummary {
         output: receipt.output,
         group_id: receipt.scope_id,

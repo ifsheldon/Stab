@@ -33,6 +33,8 @@ impl CorrectnessArtifactBinding {
         let output_path = root.path.join(relative_output_path);
         let (repository, ancestors, output_name, output) =
             open_repository_directory_chain(root, relative_output_path, &output_path)?;
+        rustix::fs::flock(&repository, rustix::fs::FlockOperation::LockShared)
+            .map_err(CorrectnessError::Resource)?;
         require_names(&output, top_level_names(), &output_path)?;
         let cases_path = output_path.join("cases");
         let cases = open_directory_at(&output, OsStr::new("cases"), &cases_path)?;

@@ -116,14 +116,11 @@ fn diagnostic_evidence_is_explicitly_nonapplicable() {
 
 #[test]
 fn correctness_output_path_matches_the_producer_boundary() {
-    for accepted in [
-        "target/qualification/cq2-full",
-        "target/qualification/correctness/full",
-    ] {
-        validate_output_path(Path::new(accepted)).expect("producer-compatible output path");
-    }
+    validate_output_path(Path::new("target/qualification/cq2-full"))
+        .expect("producer-compatible output path");
     for rejected in [
         "target/qualification",
+        "target/qualification/correctness/full",
         "target/qualification/../escape",
         "/target/qualification/cq2-full",
     ] {
@@ -862,7 +859,7 @@ fn assert_fixture_accepted(fixture: &Fixture) {
 fn fixture(mutation: FixtureMutation) -> Fixture {
     let repository = tempfile::tempdir().expect("temporary repository");
     let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-    let relative = PathBuf::from("target/qualification/correctness/full");
+    let relative = PathBuf::from("target/qualification/correctness-full");
     let output = repository.path().join(&relative);
     std::fs::create_dir_all(output.join("cases/cq-case")).expect("create correctness output");
     let include_extra_case = matches!(mutation, FixtureMutation::ExtraPassingCase);

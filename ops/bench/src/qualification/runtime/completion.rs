@@ -3,10 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use clap::Args;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 use super::artifact::{
     DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding,
     RetainedArtifactContext, RetainedArtifactDirectory,
@@ -20,26 +16,38 @@ use super::statistics::GateOutcome;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
+use clap::Args;
+use serde::{Deserialize, Serialize};
 
 mod bindings;
+mod error;
 mod group_correctness;
 mod legacy;
+mod memory;
 mod replay;
 mod scope;
 mod status_manifest;
 #[cfg(test)]
 mod tests;
 
+pub(super) use error::CompletionError;
 use group_correctness::{CompletionCorrectness, collect as completion_correctness};
+#[cfg(test)]
+use memory::validate_nofile_limit as validate_completion_nofile_limit;
+use memory::{
+    ACCEPTED_MAXIMUM_MEMORY_GROUPS, CompletionAcceptedMaximumMemoryReceipt,
+    RELEASE_SOFT_NOFILE_LIMIT, admit_paths as admit_memory_receipt_paths,
+    collect as collect_memory_receipts, require_nofile_limit as require_completion_nofile_limit,
+};
 use scope::{CompletionScope, MAX_ROLLUPS, RELEASE_SCOPE_ID, expected_rollup_keys};
 #[cfg(test)]
 use scope::{DEM_PARSE_GROUP, DEM_PRINT_GROUP, DEM_SCOPE_ID};
 pub(super) use status_manifest::checkpoint_manifest_with_repository;
 pub(crate) use status_manifest::{CompletionStatusRegression, InspectedCompletionStatus};
 
-const COMPLETION_SCHEMA_VERSION: u32 = 3;
-const PREFLIGHT_SCHEMA_VERSION: u32 = 3;
-const LEGACY_COMPLETION_SCHEMA_VERSIONS: [u32; 2] = [1, 2];
+const COMPLETION_SCHEMA_VERSION: u32 = 4;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 4;
+const LEGACY_COMPLETION_SCHEMA_VERSIONS: [u32; 3] = [1, 2, 3];
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/completion-latest";
 const MAX_COMPLETION_REPORT_BYTES: usize = 16 << 20;
 const MAX_COMPLETION_PREFLIGHT_BYTES: usize = 4 << 20;
@@ -55,6 +63,10 @@ pub(crate) struct CompletionArgs {
     #[arg(long, required = true)]
     rollup: Vec<PathBuf>,
 
+    /// Accepted-maximum DEM memory receipt; provide parse and print receipts.
+    #[arg(long = "memory-receipt", required = true)]
+    memory_receipt: Vec<PathBuf>,
+
     /// New immutable completion-manifest directory.
     #[arg(long, default_value = DEFAULT_OUTPUT)]
     out: PathBuf,
@@ -69,7 +81,7 @@ pub(crate) struct CompletionReportArgs {
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct CompletionCheckpointArgs {
-    /// Replayed schema-version-3 completion whose exact manifest will be checked in.
+    /// Replayed schema-version-4 completion whose exact manifest will be checked in.
     #[arg(long)]
     input: PathBuf,
 }
@@ -85,6 +97,7 @@ pub(crate) struct ReplayedCompletion {
     path: PathBuf,
     report_json: Vec<u8>,
     _artifact_binding: Arc<RetainedArtifactDirectory>,
+    source_evidence: Box<ReconstructedCompletion>,
 }
 
 impl ReplayedCompletion {
@@ -92,8 +105,19 @@ impl ReplayedCompletion {
         &self.path
     }
 
-    fn report_json(&self) -> &[u8] {
+    pub(crate) fn report_json(&self) -> &[u8] {
         &self.report_json
+    }
+
+    pub(super) fn require_current(
+        &self,
+        root: &RepoRoot,
+        repository: &RepositoryBinding,
+    ) -> Result<(), CompletionError> {
+        let source_evidence = &self.source_evidence;
+        source_evidence.require_sources_current(root)?;
+        self._artifact_binding.require_current(root)?;
+        require_completion_repository_state(root, repository, &source_evidence.manifest.repository)
     }
 }
 
@@ -108,6 +132,7 @@ struct CompletionEnvironment {
     rust_toolchain: String,
     target_triple: String,
     toolchain_sha256: String,
+    soft_nofile_limit: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -196,6 +221,7 @@ struct CompletionManifest {
     rollups: Vec<CompletionRollup>,
     source_reports: Vec<CompletionSourceReport>,
     memory: Vec<CompletionMemory>,
+    accepted_maximum_memory_receipts: Vec<CompletionAcceptedMaximumMemoryReceipt>,
     parity_outcome: GateOutcome,
     regression_outcomes: Vec<CompletionRegression>,
     environment_valid: bool,
@@ -219,15 +245,19 @@ struct CompletionPreflight {
     rollups: Vec<CompletionArtifact>,
     source_report_count: usize,
     memory_record_count: usize,
+    accepted_maximum_memory_receipts: Vec<CompletionAcceptedMaximumMemoryReceipt>,
     parity_outcome: GateOutcome,
     regression_outcomes: Vec<CompletionRegression>,
 }
 
+#[derive(Debug)]
 struct ReconstructedCompletion {
     manifest: CompletionManifest,
     rollup_evidence: Vec<RollupReplayEvidence>,
     correctness_bindings: Vec<Arc<super::correctness::CorrectnessArtifactBinding>>,
     artifact_bindings: Vec<bindings::RetainedRollupArtifacts>,
+    memory_receipt_evidence: Vec<super::probe::DemMemoryReceiptEvidence>,
+    memory_receipt_bindings: Vec<Arc<RetainedArtifactDirectory>>,
 }
 
 impl ReconstructedCompletion {
@@ -244,6 +274,22 @@ impl ReconstructedCompletion {
             .iter()
             .map(|rollup| bindings::RetainedRollupArtifacts::bind(root, context, rollup))
             .collect::<Result<Vec<_>, _>>()?;
+        self.memory_receipt_bindings = self
+            .memory_receipt_evidence
+            .iter()
+            .map(|receipt| {
+                let path = DirectQualificationArtifactPath::try_new(&receipt.path)?;
+                Ok(context.bind_digests(
+                    root,
+                    &path,
+                    &[(
+                        "report.json",
+                        receipt.report_sha256.as_str(),
+                        super::probe::MAX_MEMORY_RECEIPT_BYTES,
+                    )],
+                )?)
+            })
+            .collect::<Result<Vec<_>, CompletionError>>()?;
         Ok(())
     }
 
@@ -253,6 +299,9 @@ impl ReconstructedCompletion {
         }
         for binding in &self.correctness_bindings {
             binding.require_current()?;
+        }
+        for binding in &self.memory_receipt_bindings {
+            binding.require_current(root)?;
         }
         Ok(())
     }
@@ -269,6 +318,8 @@ pub(super) fn run_with_repository(
     let output = DirectQualificationArtifactPath::try_new(&args.out)?;
     QualificationOutput::require_absent_with_repository(root, repository, &output)?;
     let rollup_paths = admit_paths(&output, &args.rollup)?;
+    let memory_receipt_paths =
+        admit_memory_receipt_paths(&output, &rollup_paths, &args.memory_receipt)?;
     let reconstructed = reconstruct(
         root,
         source_root,
@@ -278,6 +329,7 @@ pub(super) fn run_with_repository(
         &args.scope,
         &output,
         &rollup_paths,
+        &memory_receipt_paths,
         current_unix_epoch_seconds()?,
     )?;
     publish(
@@ -325,11 +377,13 @@ fn reconstruct(
     scope_id: &str,
     output: &DirectQualificationArtifactPath,
     rollup_paths: &[DirectQualificationArtifactPath],
+    memory_receipt_paths: &[DirectQualificationArtifactPath],
     generated_unix_epoch_seconds: u64,
 ) -> Result<ReconstructedCompletion, CompletionError> {
     let scope = scope::load(source_root, expected_performance_inventory_sha256, scope_id)?;
+    let soft_nofile_limit = require_completion_nofile_limit(&scope)?;
     require_scope(&scope, rollup_paths.len())?;
-    let repository_before = super::run::bound_repository_state(root, repository)?;
+    let repository_before = completion_repository_state(root, repository)?;
     require_clean_repository(&repository_before)?;
     let mut rollups = Vec::with_capacity(rollup_paths.len());
     let mut correctness_bindings = bindings::RetainedBindings::default();
@@ -347,6 +401,14 @@ fn reconstruct(
     }
     order_and_validate_scope(&scope, &mut rollups)?;
     let shared = shared_identity(&rollups)?;
+    let memory_receipt_evidence = collect_memory_receipts(
+        root,
+        source_root,
+        repository,
+        memory_receipt_paths,
+        shared,
+        &repository_before,
+    )?;
     let correctness_preflights =
         completion_correctness(&rollups, &scope, expected_correctness_inventory_sha256)?;
     let parity_policy_sha256 =
@@ -370,7 +432,7 @@ fn reconstruct(
         &rollups,
         &scope,
     )?;
-    let repository_after = super::run::bound_repository_state(root, repository)?;
+    let repository_after = completion_repository_state(root, repository)?;
     require_same_clean_repository(&repository_before, &repository_after)?;
 
     let completion_rollups = rollups
@@ -424,6 +486,7 @@ fn reconstruct(
             rust_toolchain: shared.rust_toolchain.clone(),
             target_triple: shared.target_triple.clone(),
             toolchain_sha256: shared.toolchain_sha256.clone(),
+            soft_nofile_limit,
         },
         workers: shared.workers.clone(),
         timing_boundary: shared.timing_boundary,
@@ -431,6 +494,16 @@ fn reconstruct(
         rollups: completion_rollups,
         source_reports,
         memory,
+        accepted_maximum_memory_receipts: memory_receipt_evidence
+            .iter()
+            .map(|receipt| {
+                Ok(CompletionAcceptedMaximumMemoryReceipt {
+                    group_id: receipt.runtime_group_id.clone(),
+                    path: path_text(&receipt.path)?,
+                    report_sha256: receipt.report_sha256.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, CompletionError>>()?,
         parity_outcome: GateOutcome::Passed,
         regression_outcomes,
         environment_valid: true,
@@ -442,6 +515,8 @@ fn reconstruct(
         rollup_evidence: rollups,
         correctness_bindings: correctness_bindings.into_values(),
         artifact_bindings: Vec::new(),
+        memory_receipt_evidence,
+        memory_receipt_bindings: Vec::new(),
     })
 }
 
@@ -726,7 +801,11 @@ fn publish(
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
-    bind_evidence(&mut output, &reconstructed.rollup_evidence)?;
+    bind_evidence(
+        &mut output,
+        &reconstructed.rollup_evidence,
+        &reconstructed.memory_receipt_evidence,
+    )?;
 
     let expected_commit = reconstructed.manifest.repository.commit_after.clone();
     let expected_parity = reconstructed.manifest.parity_policy_sha256.clone();
@@ -777,6 +856,7 @@ fn publish(
 fn bind_evidence(
     output: &mut QualificationOutput,
     rollups: &[RollupReplayEvidence],
+    memory_receipts: &[super::probe::DemMemoryReceiptEvidence],
 ) -> Result<(), CompletionError> {
     for rollup in rollups {
         let path = DirectQualificationArtifactPath::try_new(&rollup.output)?;
@@ -807,6 +887,15 @@ fn bind_evidence(
                 ),
             )?;
         }
+    }
+    for receipt in memory_receipts {
+        let path = DirectQualificationArtifactPath::try_new(&receipt.path)?;
+        output.require_sibling_artifact_digest(
+            &path,
+            "report.json",
+            &receipt.report_sha256,
+            super::probe::MAX_MEMORY_RECEIPT_BYTES,
+        )?;
     }
     Ok(())
 }
@@ -844,6 +933,10 @@ fn validate_manifest(
         || manifest.rollups.len() != expected_rollup_keys(scope).len()
         || manifest.source_reports.len() != scope.expected_source_reports
         || manifest.memory.len() != scope.expected_source_reports
+        || manifest.environment.soft_nofile_limit == 0
+        || (scope.id == RELEASE_SCOPE_ID
+            && manifest.environment.soft_nofile_limit != RELEASE_SOFT_NOFILE_LIMIT)
+        || manifest.accepted_maximum_memory_receipts.len() != ACCEPTED_MAXIMUM_MEMORY_GROUPS.len()
         || manifest.parity_outcome != GateOutcome::Passed
         || !manifest.environment_valid
         || manifest.timing_boundary != TimingBoundary::RawWorkV2
@@ -856,6 +949,11 @@ fn validate_manifest(
         .iter()
         .map(|rollup| rollup_key(&rollup.group_id, rollup.tier))
         .collect::<Vec<_>>();
+    let memory_receipt_groups = manifest
+        .accepted_maximum_memory_receipts
+        .iter()
+        .map(|receipt| receipt.group_id.as_str())
+        .collect::<Vec<_>>();
     let expected_regression_groups = scope
         .group_ids
         .iter()
@@ -867,6 +965,14 @@ fn validate_manifest(
         .map(|outcome| outcome.group_id.as_str())
         .collect::<Vec<_>>();
     if actual_keys != expected_keys
+        || memory_receipt_groups != ACCEPTED_MAXIMUM_MEMORY_GROUPS
+        || manifest
+            .accepted_maximum_memory_receipts
+            .iter()
+            .any(|receipt| {
+                DirectQualificationArtifactPath::try_new(Path::new(&receipt.path)).is_err()
+                    || !valid_sha256(&receipt.report_sha256)
+            })
         || manifest
             .rollups
             .iter()
@@ -925,6 +1031,7 @@ fn completion_preflight(manifest: &CompletionManifest, report_json: &[u8]) -> Co
             .collect(),
         source_report_count: manifest.source_reports.len(),
         memory_record_count: manifest.memory.len(),
+        accepted_maximum_memory_receipts: manifest.accepted_maximum_memory_receipts.clone(),
         parity_outcome: manifest.parity_outcome,
         regression_outcomes: manifest.regression_outcomes.clone(),
     }
@@ -946,13 +1053,15 @@ fn render_markdown(manifest: &CompletionManifest, report_sha256: &str) -> String
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        "# Performance Qualification Completion\n\n- Scope: `{}`\n- Stab commit: `{}`\n- Stim commit: `{}`\n- Architecture: `{}`\n- CPU: `{}`\n- Stim parity: `{:?}`\n- Environment: `valid`\n- Memory and scaling: `recorded`\n- Rollups: `{}`\n- Source reports: `{}`\n- Completion report SHA-256: `{}`\n\n## Stab Self-Regression\n\n{}\n",
+        "# Performance Qualification Completion\n\n- Scope: `{}`\n- Stab commit: `{}`\n- Stim commit: `{}`\n- Architecture: `{}`\n- CPU: `{}`\n- Soft `RLIMIT_NOFILE`: `{}`\n- Stim parity: `{:?}`\n- Environment: `valid`\n- Memory and scaling: `recorded`\n- Accepted-maximum memory receipts: `{}`\n- Rollups: `{}`\n- Source reports: `{}`\n- Completion report SHA-256: `{}`\n\n## Stab Self-Regression\n\n{}\n",
         manifest.scope_id,
         manifest.repository.commit_after,
         manifest.stim_commit,
         manifest.environment.architecture,
         manifest.environment.cpu_identity,
+        manifest.environment.soft_nofile_limit,
         manifest.parity_outcome,
+        manifest.accepted_maximum_memory_receipts.len(),
         manifest.rollups.len(),
         manifest.source_reports.len(),
         report_sha256,
@@ -1026,84 +1135,46 @@ fn require_same_clean_repository(
     Ok(())
 }
 
+fn completion_repository_state(
+    root: &RepoRoot,
+    repository: &RepositoryBinding,
+) -> Result<super::git::RepositoryState, CompletionError> {
+    repository.require_current(root)?;
+    let descriptor_root = repository.descriptor_root(root)?;
+    let state = super::git::repository_state(&descriptor_root)?;
+    repository.require_current(root)?;
+    Ok(state)
+}
+
+fn require_completion_repository_state(
+    root: &RepoRoot,
+    repository: &RepositoryBinding,
+    expected: &RepositoryEvidence,
+) -> Result<(), CompletionError> {
+    let current = completion_repository_state(root, repository)?;
+    if current.commit != expected.commit_before
+        || current.commit != expected.commit_after
+        || current.local_modifications != expected.local_modifications_before
+        || current.local_modifications != expected.local_modifications_after
+    {
+        return Err(CompletionError::RepositoryChanged);
+    }
+    Ok(())
+}
+
 fn path_text(path: &Path) -> Result<String, CompletionError> {
     path.to_str()
         .map(ToString::to_string)
         .ok_or_else(|| CompletionError::PathEncoding(path.to_path_buf()))
 }
 
-fn current_unix_epoch_seconds() -> Result<u64, CompletionError> {
-    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-#[derive(Debug, Error)]
-pub(super) enum CompletionError {
-    #[error(transparent)]
-    Artifact(#[from] super::artifact::ArtifactError),
-    #[error(transparent)]
-    Rollup(#[from] super::rollup::RollupError),
-    #[error(transparent)]
-    Parity(#[from] super::parity::ParityError),
-    #[error(transparent)]
-    SelfRegression(#[from] super::self_regression::SelfRegressionError),
-    #[error(transparent)]
-    Git(#[from] super::git::GitError),
-    #[error(transparent)]
-    Group(#[from] super::group::GroupError),
-    #[error(transparent)]
-    Correctness(#[from] super::correctness::CorrectnessError),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Time(#[from] std::time::SystemTimeError),
-    #[error("unknown completion scope {0:?}")]
-    UnknownScope(String),
-    #[error("completion scope {0:?} contains no release groups")]
-    EmptyScope(String),
-    #[error("completion scope omits source-owned group {0}")]
-    MissingScopeGroup(String),
-    #[error("completion scope contains non-promotable group {0}")]
-    NonPromotableScopeGroup(String),
-    #[error("completion scope size overflows platform limits")]
-    ScopeSizeOverflow,
-    #[error("completion scope has invalid rollup count {0}")]
-    RollupCount(usize),
-    #[error("completion output collides with source evidence at {0}")]
-    OutputCollision(PathBuf),
-    #[error("completion repeats source path {0}")]
-    DuplicatePath(PathBuf),
-    #[error("completion repeats rollup identity {0}")]
-    DuplicateRollup(String),
-    #[error("completion omits rollup identity {0}")]
-    MissingRollup(String),
-    #[error("completion contains rollup outside its source-owned scope: {0}")]
-    UnknownRollup(String),
-    #[error("completion mixes repository, host, worker, or timing identities")]
-    MixedIdentity,
-    #[error("completion correctness evidence is missing or mismatched for group {0}")]
-    GroupCorrectness(String),
-    #[error("completion source report count is {actual}, expected {expected}")]
-    SourceReportCount { actual: usize, expected: usize },
-    #[error("completion source report failed explicit Stim parity: {0}")]
-    FailedParity(PathBuf),
-    #[error("completion producer repository is dirty")]
-    DirtyRepository,
-    #[error("completion producer repository changed during reconstruction")]
-    RepositoryChanged,
-    #[error("completion schema {0} is not supported")]
-    SchemaVersion(u32),
-    #[error("completion artifact violates its schema or source-owned scope")]
-    Boundary,
-    #[error("completion artifact is not canonical JSON")]
-    NonCanonical,
-    #[error("completion output path does not match its manifest")]
-    OutputBinding,
-    #[error("completion inventories do not match current source contracts")]
-    InventoryIdentity,
-    #[error("completion replay does not reconstruct the checked artifacts")]
-    Reconstruction,
-    #[error("completion source evidence changed during replay")]
-    SourceMutation,
-    #[error("completion path is not UTF-8: {0}")]
-    PathEncoding(PathBuf),
+fn current_unix_epoch_seconds() -> Result<u64, CompletionError> {
+    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }

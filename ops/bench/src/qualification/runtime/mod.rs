@@ -314,7 +314,7 @@ pub(crate) fn completion_checkpoint_manifest(
     inventory_digest: &str,
     correctness_digest: &str,
     args: CompletionCheckpointArgs,
-) -> Result<Vec<u8>, String> {
+) -> Result<completion::ReplayedCompletion, String> {
     completion::checkpoint_manifest_with_repository(
         &session.root,
         &session.source_root,
@@ -324,6 +324,15 @@ pub(crate) fn completion_checkpoint_manifest(
         args,
     )
     .map_err(|error| error.to_string())
+}
+
+pub(crate) fn require_completion_checkpoint_current(
+    session: &QualificationSession,
+    replayed: &completion::ReplayedCompletion,
+) -> Result<(), String> {
+    replayed
+        .require_current(&session.root, &session.repository)
+        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_parity(

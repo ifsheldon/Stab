@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::super::adapter::AdapterExecutable;
 use super::super::process::{ProcessRequest, ProcessResult, run_bounded_process};
@@ -20,7 +20,7 @@ pub(super) const MEDIUM_ITEMS: u64 = 4_096;
 const SMALL_ITEMS: u64 = 64;
 const LARGE_ITEMS: u64 = 65_536;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DemAcceptedMaximumMemory {
     pub(super) family_id: String,

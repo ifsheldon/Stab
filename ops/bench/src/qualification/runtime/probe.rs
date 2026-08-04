@@ -4,11 +4,9 @@ use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clap::{Args, ValueEnum};
-use thiserror::Error;
-
 use super::adapter::prepare_adapter;
 use super::artifact::RepositoryBinding;
+use super::host::HostGuard;
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
@@ -18,14 +16,20 @@ use super::statistics::{PairOrder, pair_measurements};
 use super::worker;
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
+use clap::{Args, ValueEnum};
 
 mod clifford_string;
 mod dem_model;
+mod error;
 mod memory_receipt;
 mod pauli_iter;
 
+pub(in crate::qualification::runtime) use error::ProbeError;
 use memory_receipt::AdapterProbeExecution;
 pub(in crate::qualification::runtime) use memory_receipt::AdapterProbeReceipt;
+pub(in crate::qualification::runtime) use memory_receipt::{
+    DemMemoryReceiptEvidence, MAX_MEMORY_RECEIPT_BYTES, inspect_memory_receipt,
+};
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
@@ -291,14 +295,23 @@ pub(super) fn run(
             }
             let repository_before = super::run::bound_repository_state(root, repository)?;
             memory_receipt::require_clean_repository(&repository_before)?;
+            let mut host_guard = HostGuard::prepare(source_root, false)?;
             let execution = run_adapter_probe(source_root, args)?;
+            let host = host_guard.finish()?;
             let repository_after = super::run::bound_repository_state(root, repository)?;
             let repository_evidence =
                 memory_receipt::bind_repository(repository_before, repository_after)?;
             let output = output.ok_or_else(|| {
                 ProbeError::Contract("DEM memory receipt output disappeared".to_string())
             })?;
-            memory_receipt::publish(root, repository, output, repository_evidence, execution)?;
+            memory_receipt::publish(
+                root,
+                repository,
+                output,
+                repository_evidence,
+                host,
+                execution,
+            )?;
             Ok(())
         }
     }
@@ -815,42 +828,6 @@ fn probe_environment() -> Vec<(OsString, OsString)> {
 
 fn display_rss(value: Option<u64>) -> String {
     value.map_or_else(|| "unobserved".to_string(), |value| value.to_string())
-}
-
-#[derive(Debug, Error)]
-pub(super) enum ProbeError {
-    #[error(transparent)]
-    Artifact(#[from] super::artifact::ArtifactError),
-    #[error(transparent)]
-    Adapter(#[from] super::adapter::AdapterError),
-    #[error(transparent)]
-    Git(#[from] super::git::GitError),
-    #[error(transparent)]
-    Worker(#[from] super::worker::WorkerError),
-    #[error(transparent)]
-    Process(#[from] super::process::ProcessError),
-    #[error(transparent)]
-    Protocol(#[from] super::protocol::ProtocolError),
-    #[error(transparent)]
-    Statistics(#[from] super::statistics::StatisticsError),
-    #[error(transparent)]
-    Invocation(#[from] super::invocation::InvocationError),
-    #[error("failed to resolve the current Stab qualification worker: {0}")]
-    CurrentExecutable(std::io::Error),
-    #[error("Stab qualification worker identity changed during the probe")]
-    WorkerIdentityChanged,
-    #[error("qualification probe publication requires a clean repository")]
-    DirtyRepository,
-    #[error("qualification probe repository changed from {before} to {after}")]
-    RepositoryChanged { before: String, after: String },
-    #[error("DEM accepted-maximum memory receipt is incomplete or malformed")]
-    MemoryReceipt,
-    #[error("qualification probe semantic work count overflows u64")]
-    WorkOverflow,
-    #[error("failed to serialize the qualification probe receipt: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("qualification probe contract failed: {0}")]
-    Contract(String),
 }
 
 #[cfg(test)]

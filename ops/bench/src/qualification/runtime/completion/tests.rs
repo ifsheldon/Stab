@@ -29,7 +29,7 @@ fn correctness_for(
         status: CorrectnessPreflightStatus::Passed,
         case_ids: case_ids.to_vec(),
         reason: "passed".to_string(),
-        source_directory: Some(format!("target/qualification/correctness/{group_id}")),
+        source_directory: Some(format!("target/qualification/{group_id}")),
         qualification_manifest_sha256: Some(correctness_inventory_sha256.to_string()),
         request_sha256: Some(digest("request")),
         completion_sha256: Some(digest("completion")),
@@ -192,6 +192,17 @@ fn memory() -> Vec<CompletionMemory> {
         .collect()
 }
 
+fn accepted_maximum_memory_receipts() -> Vec<CompletionAcceptedMaximumMemoryReceipt> {
+    ACCEPTED_MAXIMUM_MEMORY_GROUPS
+        .into_iter()
+        .map(|group_id| CompletionAcceptedMaximumMemoryReceipt {
+            group_id: group_id.to_string(),
+            path: format!("target/benchmarks/qualification/{group_id}-memory"),
+            report_sha256: "9".repeat(64),
+        })
+        .collect()
+}
+
 fn manifest() -> CompletionManifest {
     CompletionManifest {
         schema_version: COMPLETION_SCHEMA_VERSION,
@@ -220,6 +231,7 @@ fn manifest() -> CompletionManifest {
             rust_toolchain: "nightly".to_string(),
             target_triple: "aarch64-unknown-linux-gnu".to_string(),
             toolchain_sha256: "8".repeat(64),
+            soft_nofile_limit: RELEASE_SOFT_NOFILE_LIMIT,
         },
         workers: workers(),
         timing_boundary: TimingBoundary::RawWorkV2,
@@ -241,6 +253,7 @@ fn manifest() -> CompletionManifest {
         ],
         source_reports: source_reports(),
         memory: memory(),
+        accepted_maximum_memory_receipts: accepted_maximum_memory_receipts(),
         parity_outcome: GateOutcome::Passed,
         regression_outcomes: vec![
             regression(DEM_PARSE_GROUP, SelfRegressionOutcome::Unseeded),
@@ -268,6 +281,7 @@ fn release_manifest(
     result.source_reports.clear();
     result.memory.clear();
     result.regression_outcomes.clear();
+    let mut correctness_by_cases = BTreeMap::new();
 
     for group_id in &scope.group_ids {
         let group = groups
@@ -278,9 +292,13 @@ fn release_manifest(
             .correctness_case_ids
             .get(group_id)
             .expect("release correctness cases");
+        let evidence = correctness_by_cases
+            .entry(case_ids.clone())
+            .or_insert_with(|| correctness_for(group_id, case_ids, correctness_inventory_sha256))
+            .clone();
         result.correctness_preflights.push(CompletionCorrectness {
             group_id: group_id.clone(),
-            evidence: correctness_for(group_id, case_ids, correctness_inventory_sha256),
+            evidence,
         });
         result
             .regression_outcomes
@@ -376,6 +394,45 @@ fn completion_manifest_rejects_missing_extra_duplicate_and_failed_rollups() {
 }
 
 #[test]
+fn completion_manifest_authenticates_memory_receipts_and_descriptor_limit() {
+    let scope = dem_scope();
+    let valid = manifest();
+    validate_manifest(&valid, &scope).expect("valid memory contract");
+
+    let mut missing_receipt = valid.clone();
+    missing_receipt.accepted_maximum_memory_receipts.pop();
+    assert!(validate_manifest(&missing_receipt, &scope).is_err());
+
+    let mut wrong_group = valid.clone();
+    wrong_group
+        .accepted_maximum_memory_receipts
+        .first_mut()
+        .expect("memory receipt")
+        .group_id = "wrong-group".to_string();
+    assert!(validate_manifest(&wrong_group, &scope).is_err());
+
+    let mut missing_limit = valid;
+    missing_limit.environment.soft_nofile_limit = 0;
+    assert!(validate_manifest(&missing_limit, &scope).is_err());
+
+    let mut release_scope = scope;
+    release_scope.id = RELEASE_SCOPE_ID.to_string();
+    assert_eq!(
+        validate_completion_nofile_limit(&release_scope, Some(RELEASE_SOFT_NOFILE_LIMIT))
+            .expect("release descriptor limit"),
+        RELEASE_SOFT_NOFILE_LIMIT
+    );
+    assert!(matches!(
+        validate_completion_nofile_limit(&release_scope, Some(RELEASE_SOFT_NOFILE_LIMIT + 1)),
+        Err(CompletionError::DescriptorLimit { .. })
+    ));
+    assert!(matches!(
+        validate_completion_nofile_limit(&release_scope, None),
+        Err(CompletionError::DescriptorLimit { .. })
+    ));
+}
+
+#[test]
 fn completion_manifest_distinguishes_unseeded_and_passing_regression() {
     let mut current = manifest();
     let scope = dem_scope();
@@ -459,7 +516,7 @@ fn completion_requires_exact_correctness_per_group() {
                 QualificationTier::Soak
             };
             evidence.correctness_preflight = correctness_for(
-                group_id,
+                "shared",
                 scope
                     .correctness_case_ids
                     .get(group_id)
@@ -504,6 +561,34 @@ fn completion_requires_exact_correctness_per_group() {
     assert!(matches!(
         completion_correctness(&wrong_cases, &scope, &correctness_inventory_sha256),
         Err(CompletionError::GroupCorrectness(group)) if group == DEM_PARSE_GROUP
+    ));
+
+    let mut unshared = expected_rollup_keys(&scope)
+        .into_iter()
+        .map(|key| {
+            let (group_id, tier) = key.rsplit_once(':').expect("rollup key");
+            let mut evidence = replay_evidence();
+            evidence.group_id = group_id.to_string();
+            evidence.tier = if tier == "full" {
+                QualificationTier::Full
+            } else {
+                QualificationTier::Soak
+            };
+            evidence.correctness_preflight = correctness_for(
+                group_id,
+                scope
+                    .correctness_case_ids
+                    .get(group_id)
+                    .expect("group correctness cases"),
+                &correctness_inventory_sha256,
+            );
+            evidence
+        })
+        .collect::<Vec<_>>();
+    order_and_validate_scope(&scope, &mut unshared).expect("ordered fixture");
+    assert!(matches!(
+        completion_correctness(&unshared, &scope, &correctness_inventory_sha256),
+        Err(CompletionError::CorrectnessArtifactCount)
     ));
 
     let mut missing = manifest();
@@ -603,14 +688,13 @@ fn completion_scopes_cover_historical_dem_and_complete_release_matrix() {
             } else {
                 QualificationTier::Soak
             };
-            evidence.correctness_preflight = correctness_for(
-                group_id,
-                release
-                    .correctness_case_ids
-                    .get(group_id)
-                    .expect("group correctness cases"),
-                &suite.correctness_digest,
-            );
+            evidence.correctness_preflight = complete
+                .correctness_preflights
+                .iter()
+                .find(|correctness| correctness.group_id == group_id)
+                .expect("group correctness evidence")
+                .evidence
+                .clone();
             evidence
         })
         .collect::<Vec<_>>();
@@ -794,6 +878,12 @@ fn schema_two_completion_manifests_remain_readable_but_not_current() {
     let mut value = serde_json::to_value(&current).expect("completion value");
     let object = value.as_object_mut().expect("completion object");
     object.insert("schema_version".to_string(), serde_json::json!(2));
+    object.remove("accepted_maximum_memory_receipts");
+    object
+        .get_mut("environment")
+        .and_then(serde_json::Value::as_object_mut)
+        .expect("completion environment")
+        .remove("soft_nofile_limit");
     let correctness = object
         .remove("correctness_preflights")
         .and_then(|value| value.as_array().cloned())
@@ -807,6 +897,26 @@ fn schema_two_completion_manifests_remain_readable_but_not_current() {
     assert_eq!(summary.group_id, DEM_SCOPE_ID);
     assert_eq!(summary.output, current.output);
     assert_eq!(schema_version(&bytes).expect("schema"), 2);
+}
+
+#[test]
+fn schema_three_completion_manifests_remain_readable_but_not_current() {
+    let current = manifest();
+    let mut value = serde_json::to_value(&current).expect("completion value");
+    let object = value.as_object_mut().expect("completion object");
+    object.insert("schema_version".to_string(), serde_json::json!(3));
+    object.remove("accepted_maximum_memory_receipts");
+    object
+        .get_mut("environment")
+        .and_then(serde_json::Value::as_object_mut)
+        .expect("completion environment")
+        .remove("soft_nofile_limit");
+    let bytes = serde_json::to_vec(&value).expect("schema three bytes");
+
+    let summary = legacy::parse_v3(&bytes).expect("schema three completion");
+    assert_eq!(summary.group_id, DEM_SCOPE_ID);
+    assert_eq!(summary.output, current.output);
+    assert_eq!(schema_version(&bytes).expect("schema"), 3);
 }
 
 #[test]

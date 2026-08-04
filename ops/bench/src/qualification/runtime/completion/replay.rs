@@ -54,6 +54,11 @@ pub(in crate::qualification::runtime) fn run_report_with_repository(
         .iter()
         .map(|rollup| DirectQualificationArtifactPath::try_new(Path::new(&rollup.artifact.path)))
         .collect::<Result<Vec<_>, _>>()?;
+    let memory_receipt_paths = manifest
+        .accepted_maximum_memory_receipts
+        .iter()
+        .map(|receipt| DirectQualificationArtifactPath::try_new(Path::new(&receipt.path)))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut reconstructed = reconstruct(
         root,
         source_root,
@@ -63,6 +68,7 @@ pub(in crate::qualification::runtime) fn run_report_with_repository(
         &manifest.scope_id,
         &input,
         &rollup_paths,
+        &memory_receipt_paths,
         manifest.generated_unix_epoch_seconds,
     )?;
     let artifact_context = RetainedArtifactContext::open(root, repository)?;
@@ -91,6 +97,7 @@ pub(in crate::qualification::runtime) fn run_report_with_repository(
         path: input.into_path_buf(),
         report_json,
         _artifact_binding: completion_binding,
+        source_evidence: Box::new(reconstructed),
     }))
 }
 
@@ -99,9 +106,7 @@ fn require_final_repository_state(
     repository: &RepositoryBinding,
     expected: &RepositoryEvidence,
 ) -> Result<(), CompletionError> {
-    let current = super::super::run::bound_repository_state(root, repository)?;
-    super::super::run::require_current_repository_state(&current, expected)?;
-    Ok(())
+    super::require_completion_repository_state(root, repository, expected)
 }
 
 fn validate_legacy(
@@ -112,6 +117,7 @@ fn validate_legacy(
     let summary = match schema_version {
         1 => legacy::parse_v1(report_json)?,
         2 => legacy::parse_v2(report_json)?,
+        3 => legacy::parse_v3(report_json)?,
         _ => return Err(CompletionError::SchemaVersion(schema_version)),
     };
     if Path::new(&summary.output) != input.as_path() {
@@ -185,7 +191,7 @@ mod tests {
         git(repository.path(), &["commit", "--quiet", "-m", "fixture"]);
         let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
         let live_repository = RepositoryBinding::open(&root).expect("bind repository");
-        let clean = super::super::super::run::bound_repository_state(&root, &live_repository)
+        let clean = super::super::completion_repository_state(&root, &live_repository)
             .expect("clean repository state");
         let expected = RepositoryEvidence {
             commit_before: clean.commit.clone(),
@@ -200,11 +206,7 @@ mod tests {
             .expect("mutate tracked fixture");
         assert!(matches!(
             require_final_repository_state(&root, &live_repository, &expected),
-            Err(CompletionError::Artifact(
-                super::super::super::artifact::ArtifactError::ExternalSourceChanged(
-                    "repository state"
-                )
-            ))
+            Err(CompletionError::RepositoryChanged)
         ));
     }
 }

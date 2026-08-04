@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use super::{
     CompletionError, CompletionScope, QualificationTier, RollupReplayEvidence, find_rollup,
@@ -6,6 +7,8 @@ use super::{
 use crate::qualification::runtime::correctness::{
     CorrectnessPreflightEvidence, CorrectnessPreflightStatus,
 };
+
+const MAX_DISTINCT_CORRECTNESS_ARTIFACTS: usize = 11;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -19,7 +22,7 @@ pub(super) fn collect(
     scope: &CompletionScope,
     expected_correctness_inventory_sha256: &str,
 ) -> Result<Vec<CompletionCorrectness>, CompletionError> {
-    scope
+    let collected = scope
         .group_ids
         .iter()
         .map(|group_id| {
@@ -43,7 +46,11 @@ pub(super) fn collect(
                 evidence: full.correctness_preflight.clone(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    if !shared_prerequisites_are_consistent(&collected) {
+        return Err(CompletionError::CorrectnessArtifactCount);
+    }
+    Ok(collected)
 }
 
 pub(super) fn valid_manifest(
@@ -68,6 +75,24 @@ pub(super) fn valid_manifest(
                         })
             },
         )
+        && shared_prerequisites_are_consistent(correctness_preflights)
+}
+
+fn shared_prerequisites_are_consistent(correctness_preflights: &[CompletionCorrectness]) -> bool {
+    let mut by_case_set = BTreeMap::<&[String], &CorrectnessPreflightEvidence>::new();
+    for correctness in correctness_preflights {
+        match by_case_set.get(correctness.evidence.case_ids.as_slice()) {
+            Some(existing) if **existing != correctness.evidence => return false,
+            Some(_) => {}
+            None => {
+                by_case_set.insert(
+                    correctness.evidence.case_ids.as_slice(),
+                    &correctness.evidence,
+                );
+            }
+        }
+    }
+    by_case_set.len() <= MAX_DISTINCT_CORRECTNESS_ARTIFACTS
 }
 
 fn valid_evidence(

@@ -14,6 +14,7 @@ pub(super) struct RetainedBindings {
     retained: BTreeMap<Vec<u8>, Arc<CorrectnessArtifactBinding>>,
 }
 
+#[derive(Debug)]
 pub(super) struct RetainedRollupArtifacts {
     bindings: Vec<Arc<RetainedArtifactDirectory>>,
 }

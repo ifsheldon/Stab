@@ -653,7 +653,7 @@ fn validate_output_path(path: &Path) -> Result<(), CorrectnessError> {
         return Err(CorrectnessError::InvalidOutput(path.to_path_buf()));
     }
     let components = path.components().collect::<Vec<_>>();
-    if components.len() < 3
+    if components.len() != 3
         || components.first() != Some(&Component::Normal("target".as_ref()))
         || components.get(1) != Some(&Component::Normal("qualification".as_ref()))
     {

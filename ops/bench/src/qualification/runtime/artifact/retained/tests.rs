@@ -1,12 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use super::*;
+use crate::qualification::runtime::correctness::{
+    CorrectnessArtifactBinding, bind_test_artifact_tree,
+};
 use crate::qualification::runtime::run::sha256_hex;
 
 const DESCRIPTOR_HELPER: &str =
     "qualification::runtime::artifact::retained::tests::release_matrix_descriptor_helper";
 const DESCRIPTOR_ENV: &str = "STAB_BENCH_RETAINED_DESCRIPTOR_HELPER";
-const SIMULATED_CORRECTNESS_DESCRIPTORS: usize = 192;
+const RELEASE_ARTIFACT_DIRECTORIES: usize = 179;
+const RELEASE_CORRECTNESS_DIRECTORIES: usize = 11;
+const RELEASE_CORRECTNESS_CASES_PER_DIRECTORY: usize = 4;
 
 fn direct(path: &Path) -> DirectQualificationArtifactPath {
     DirectQualificationArtifactPath::try_new(path).expect("direct qualification artifact path")
@@ -21,6 +26,63 @@ fn write_fixture(root: &RepoRoot, name: &str) -> PathBuf {
         .expect("write retained preflight");
     std::fs::write(directory.join("report.md"), b"markdown\n").expect("write retained markdown");
     relative
+}
+
+fn write_correctness_fixture(
+    root: &RepoRoot,
+    index: usize,
+) -> (CorrectnessArtifactBinding, Vec<String>) {
+    let relative = PathBuf::from(format!(
+        "target/qualification/release-correctness-{index:02}"
+    ));
+    let directory = root.path.join(&relative);
+    std::fs::create_dir_all(directory.join("cases")).expect("create correctness fixture root");
+    for name in [
+        "completion.json",
+        "preflight.json",
+        "report.json",
+        "report.md",
+        "request.json",
+    ] {
+        std::fs::write(directory.join(name), b"fixture\n")
+            .expect("write correctness fixture artifact");
+    }
+    let case_ids = (0..RELEASE_CORRECTNESS_CASES_PER_DIRECTORY)
+        .map(|case_index| format!("case-{index:02}-{case_index:02}"))
+        .collect::<Vec<_>>();
+    for case_id in &case_ids {
+        let case = directory.join("cases").join(case_id);
+        std::fs::create_dir(&case).expect("create correctness case");
+        std::fs::write(case.join("execution-receipt.json"), b"receipt\n")
+            .expect("write correctness receipt");
+    }
+    let case_refs = case_ids.iter().map(String::as_str).collect::<Vec<_>>();
+    let binding =
+        bind_test_artifact_tree(root, &relative, &case_refs).expect("bind correctness fixture");
+    (binding, case_ids)
+}
+
+fn initialize_ignored_target_repository(path: &Path) {
+    let git = |arguments: &[&str]| {
+        let status = std::process::Command::new("/usr/bin/git")
+            .args(arguments)
+            .current_dir(path)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "Stab Test")
+            .env("GIT_AUTHOR_EMAIL", "stab-test@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Stab Test")
+            .env("GIT_COMMITTER_EMAIL", "stab-test@example.invalid")
+            .status()
+            .expect("run Git fixture command");
+        assert!(status.success());
+    };
+    git(&["init", "--quiet"]);
+    std::fs::write(path.join(".gitignore"), b"/target/\n").expect("write ignore fixture");
+    git(&["add", ".gitignore"]);
+    git(&["commit", "--quiet", "-m", "fixture"]);
 }
 
 fn read_binding(
@@ -197,23 +259,17 @@ fn release_matrix_descriptor_helper() {
     .expect("set soft descriptor limit");
 
     let repository = tempfile::tempdir().expect("temporary repository");
+    initialize_ignored_target_repository(repository.path());
     let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-    for index in 0..177 {
+    for index in 0..RELEASE_ARTIFACT_DIRECTORIES {
         write_fixture(&root, &format!("release-artifact-{index:03}"));
     }
-    let simulated_correctness_descriptors = (0..SIMULATED_CORRECTNESS_DESCRIPTORS)
-        .map(|_| {
-            rustix::fs::open(
-                "/dev/null",
-                rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::CLOEXEC,
-                rustix::fs::Mode::empty(),
-            )
-            .expect("open simulated correctness descriptor")
-        })
+    let correctness_bindings = (0..RELEASE_CORRECTNESS_DIRECTORIES)
+        .map(|index| write_correctness_fixture(&root, index).0)
         .collect::<Vec<_>>();
     let live_repository = RepositoryBinding::open(&root).expect("bind repository");
     let context = RetainedArtifactContext::open(&root, &live_repository).expect("open context");
-    let bindings = (0..177)
+    let bindings = (0..RELEASE_ARTIFACT_DIRECTORIES)
         .map(|index| {
             let path = PathBuf::from(format!(
                 "target/benchmarks/qualification/release-artifact-{index:03}"
@@ -226,9 +282,17 @@ fn release_matrix_descriptor_helper() {
             .require_current(&root)
             .expect("artifact remains current");
     }
-    assert_eq!(bindings.len(), 177);
-    assert_eq!(
-        simulated_correctness_descriptors.len(),
-        SIMULATED_CORRECTNESS_DESCRIPTORS
-    );
+    assert_eq!(bindings.len(), RELEASE_ARTIFACT_DIRECTORIES);
+    assert_eq!(correctness_bindings.len(), RELEASE_CORRECTNESS_DIRECTORIES);
+    for binding in &correctness_bindings {
+        binding
+            .require_current()
+            .expect("correctness evidence remains current");
+    }
+    let retained_root = live_repository
+        .descriptor_root(&root)
+        .expect("retain repository for final Git audit");
+    let state = crate::qualification::runtime::git::repository_state(&retained_root)
+        .expect("final Git audit fits descriptor budget");
+    assert!(!state.local_modifications);
 }
