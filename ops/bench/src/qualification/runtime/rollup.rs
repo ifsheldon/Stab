@@ -714,11 +714,7 @@ fn require_current_correctness(
         evidence
             .correctness_binding
             .require_current()
-            .map_err(|_| {
-                super::artifact::ArtifactError::ExternalSourceChanged(
-                    "correctness qualification evidence",
-                )
-            })?;
+            .map_err(super::correctness::publication_error)?;
     }
     Ok(())
 }

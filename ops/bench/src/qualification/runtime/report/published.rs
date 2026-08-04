@@ -80,11 +80,9 @@ pub(in crate::qualification::runtime) fn run_with_repository(
     let relative = output.relative().to_path_buf();
     output.commit_with_source_validation(|repository| {
         super::super::run::require_current_repository(root, &repository_binding, repository)?;
-        correctness_binding.require_current().map_err(|_| {
-            super::super::artifact::ArtifactError::ExternalSourceChanged(
-                "correctness qualification evidence",
-            )
-        })
+        correctness_binding
+            .require_current()
+            .map_err(super::super::correctness::publication_error)
     })?;
     Ok(relative)
 }

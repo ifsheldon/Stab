@@ -359,7 +359,7 @@ fn open_directory_at(
     path: &Path,
 ) -> Result<OwnedFd, CorrectnessError> {
     rustix::fs::openat(parent, name, directory_flags(), rustix::fs::Mode::empty())
-        .map_err(|_| CorrectnessError::ArtifactChanged(path.to_path_buf()))
+        .map_err(|error| open_error(error, path))
 }
 
 fn open_regular_at(
@@ -376,7 +376,7 @@ fn open_regular_at(
             | rustix::fs::OFlags::NONBLOCK,
         rustix::fs::Mode::empty(),
     )
-    .map_err(|_| CorrectnessError::ArtifactChanged(path.to_path_buf()))
+    .map_err(|error| open_error(error, path))
 }
 
 fn directory_flags() -> rustix::fs::OFlags {
@@ -445,5 +445,38 @@ fn read_descriptor(
 }
 
 fn read_error(error: rustix::io::Errno) -> CorrectnessError {
-    CorrectnessError::Read(error.to_string())
+    resource_error(error).unwrap_or_else(|| CorrectnessError::Read(error.to_string()))
+}
+
+fn open_error(error: rustix::io::Errno, path: &Path) -> CorrectnessError {
+    resource_error(error).unwrap_or_else(|| CorrectnessError::ArtifactChanged(path.to_path_buf()))
+}
+
+fn resource_error(error: rustix::io::Errno) -> Option<CorrectnessError> {
+    matches!(error, rustix::io::Errno::MFILE | rustix::io::Errno::NFILE)
+        .then_some(CorrectnessError::Resource(error))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn descriptor_exhaustion_is_not_reported_as_artifact_mutation() {
+        for error in [rustix::io::Errno::MFILE, rustix::io::Errno::NFILE] {
+            assert!(matches!(
+                open_error(error, Path::new("evidence.json")),
+                CorrectnessError::Resource(actual) if actual == error
+            ));
+            assert!(matches!(
+                read_error(error),
+                CorrectnessError::Resource(actual) if actual == error
+            ));
+            assert!(matches!(
+                super::super::publication_error(CorrectnessError::Resource(error)),
+                crate::qualification::runtime::artifact::ArtifactError::Io(actual)
+                    if actual == error
+            ));
+        }
+    }
 }

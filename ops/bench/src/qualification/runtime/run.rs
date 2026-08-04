@@ -552,11 +552,9 @@ pub(super) fn run_with_repository(
     let relative = output.relative().to_path_buf();
     output.commit_new_with_source_validation(|repository| {
         require_current_repository(root, &repository_evidence, repository)?;
-        correctness_binding.require_current().map_err(|_| {
-            super::artifact::ArtifactError::ExternalSourceChanged(
-                "correctness qualification evidence",
-            )
-        })
+        correctness_binding
+            .require_current()
+            .map_err(super::correctness::publication_error)
     })?;
     Ok(relative)
 }

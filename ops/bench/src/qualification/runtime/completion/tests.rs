@@ -1,6 +1,6 @@
 use super::*;
 use crate::qualification::runtime::correctness::{
-    CorrectnessPreflightEvidence, CorrectnessPreflightStatus,
+    CorrectnessError, CorrectnessPreflightEvidence, CorrectnessPreflightStatus,
 };
 
 fn workers() -> WorkerIdentityEvidence {
@@ -105,6 +105,27 @@ fn replay_evidence() -> RollupReplayEvidence {
         sources: Vec::new(),
         scales: Vec::new(),
     }
+}
+
+fn replay_evidence_with_binding(
+    group_id: &str,
+    tier: QualificationTier,
+    correctness_preflight: CorrectnessPreflightEvidence,
+    binding: std::sync::Arc<crate::qualification::runtime::correctness::CorrectnessArtifactBinding>,
+) -> RollupReplayEvidence {
+    let mut evidence = replay_evidence();
+    evidence.group_id = group_id.to_string();
+    evidence.tier = tier;
+    evidence.correctness_preflight = correctness_preflight;
+    evidence.correctness_bindings = vec![binding];
+    evidence
+}
+
+fn default_binding()
+-> std::sync::Arc<crate::qualification::runtime::correctness::CorrectnessArtifactBinding> {
+    std::sync::Arc::new(
+        crate::qualification::runtime::correctness::CorrectnessArtifactBinding::default(),
+    )
 }
 
 fn dem_scope() -> CompletionScope {
@@ -786,4 +807,135 @@ fn schema_two_completion_manifests_remain_readable_but_not_current() {
     assert_eq!(summary.group_id, DEM_SCOPE_ID);
     assert_eq!(summary.output, current.output);
     assert_eq!(schema_version(&bytes).expect("schema"), 2);
+}
+
+#[test]
+fn completion_retains_one_binding_per_exact_correctness_artifact() {
+    let shared = correctness_for("shared", &["case".to_string()], &"2".repeat(64));
+    let distinct = correctness_for("distinct", &["case".to_string()], &"2".repeat(64));
+    let mut rollups = vec![
+        replay_evidence_with_binding(
+            "group-a",
+            QualificationTier::Full,
+            shared.clone(),
+            default_binding(),
+        ),
+        replay_evidence_with_binding(
+            "group-a",
+            QualificationTier::Soak,
+            shared.clone(),
+            default_binding(),
+        ),
+        replay_evidence_with_binding(
+            "group-b",
+            QualificationTier::Full,
+            shared,
+            default_binding(),
+        ),
+        replay_evidence_with_binding(
+            "group-c",
+            QualificationTier::Full,
+            distinct,
+            default_binding(),
+        ),
+    ];
+    let mut retained = bindings::RetainedBindings::default();
+    for rollup in &mut rollups {
+        retained.admit(rollup).expect("admit binding");
+    }
+
+    assert_eq!(retained.len(), 2);
+    assert!(
+        rollups
+            .iter()
+            .all(|rollup| rollup.correctness_bindings.is_empty())
+    );
+    assert_eq!(retained.into_values().len(), 2);
+}
+
+#[test]
+fn completion_rejects_a_rollup_without_one_correctness_binding() {
+    let mut rollup = replay_evidence();
+    let mut retained = bindings::RetainedBindings::default();
+
+    assert!(matches!(
+        retained.admit(&mut rollup),
+        Err(CompletionError::GroupCorrectness(group)) if group == DEM_PARSE_GROUP
+    ));
+}
+
+#[test]
+fn repeated_correctness_prerequisites_do_not_grow_retained_bindings() {
+    let shared = correctness_for("shared", &["case".to_string()], &"2".repeat(64));
+    let mut retained = bindings::RetainedBindings::default();
+
+    for index in 0..MAX_ROLLUPS {
+        let mut rollup = replay_evidence_with_binding(
+            &format!("group-{index}"),
+            QualificationTier::Full,
+            shared.clone(),
+            default_binding(),
+        );
+        retained.admit(&mut rollup).expect("admit binding");
+        assert_eq!(retained.len(), 1);
+        assert!(rollup.correctness_bindings.is_empty());
+    }
+}
+
+#[test]
+fn duplicate_correctness_binding_is_revalidated_before_release() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve correctness repository");
+    let relative = Path::new("correctness-source");
+    let output = repository.path().join(relative);
+    let case = output.join("cases/case-a");
+    std::fs::create_dir_all(&case).expect("create correctness case");
+    for name in [
+        "completion.json",
+        "preflight.json",
+        "report.json",
+        "report.md",
+        "request.json",
+    ] {
+        std::fs::write(output.join(name), format!("{name}\n")).expect("write correctness artifact");
+    }
+    std::fs::write(case.join("execution-receipt.json"), b"receipt\n")
+        .expect("write correctness receipt");
+    let first = crate::qualification::runtime::correctness::bind_test_artifact_tree(
+        &root,
+        relative,
+        &["case-a"],
+    )
+    .expect("bind first correctness tree");
+    let second = crate::qualification::runtime::correctness::bind_test_artifact_tree(
+        &root,
+        relative,
+        &["case-a"],
+    )
+    .expect("bind second correctness tree");
+    let preflight = correctness_for("shared", &["case-a".to_string()], &"2".repeat(64));
+    let mut first_rollup = replay_evidence_with_binding(
+        "group-a",
+        QualificationTier::Full,
+        preflight.clone(),
+        std::sync::Arc::new(first),
+    );
+    let mut second_rollup = replay_evidence_with_binding(
+        "group-b",
+        QualificationTier::Full,
+        preflight,
+        std::sync::Arc::new(second),
+    );
+    let mut retained = bindings::RetainedBindings::default();
+    retained
+        .admit(&mut first_rollup)
+        .expect("admit current first binding");
+
+    std::fs::write(output.join("unexpected"), b"replacement\n").expect("mutate correctness tree");
+    assert!(matches!(
+        retained.admit(&mut second_rollup),
+        Err(CompletionError::Correctness(
+            CorrectnessError::ArtifactChanged(_)
+        ))
+    ));
 }

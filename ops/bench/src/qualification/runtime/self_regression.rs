@@ -240,11 +240,9 @@ pub(super) fn candidate_with_repository(
     output.commit_new_with_source_validation(|binding| {
         binding.require_current(root)?;
         for correctness in &correctness_bindings {
-            correctness.require_current().map_err(|_| {
-                super::artifact::ArtifactError::ExternalSourceChanged(
-                    "correctness qualification evidence",
-                )
-            })?;
+            correctness
+                .require_current()
+                .map_err(super::correctness::publication_error)?;
         }
         Ok(())
     })?;

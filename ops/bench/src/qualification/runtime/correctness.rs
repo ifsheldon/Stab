@@ -157,6 +157,15 @@ pub(in crate::qualification::runtime) fn bind_test_artifact_tree(
     Ok(binding)
 }
 
+pub(super) fn publication_error(error: CorrectnessError) -> super::artifact::ArtifactError {
+    match error {
+        CorrectnessError::Resource(source) => super::artifact::ArtifactError::Io(source),
+        _ => super::artifact::ArtifactError::ExternalSourceChanged(
+            "correctness qualification evidence",
+        ),
+    }
+}
+
 struct RequiredValidation<'a> {
     output: &'a Path,
     case_ids: &'a [String],
@@ -923,6 +932,8 @@ pub(super) enum CorrectnessError {
     InvalidCases,
     #[error("failed to read correctness evidence: {0}")]
     Read(String),
+    #[error("correctness evidence filesystem resource exhausted: {0}")]
+    Resource(rustix::io::Errno),
     #[error("correctness evidence artifact changed before performance publication: {0}")]
     ArtifactChanged(PathBuf),
     #[error("correctness evidence artifact size cannot be represented on this host")]

@@ -259,6 +259,13 @@ pub(super) fn build_replay_evidence(
     preflight_json: &[u8],
     markdown: &[u8],
 ) -> Result<RollupReplayEvidence, RollupError> {
+    let correctness_binding = loaded
+        .first()
+        .map(|candidate| Arc::clone(&candidate.correctness_binding))
+        .ok_or(RollupError::InputCount {
+            actual: 0,
+            expected: contract.scales.len(),
+        })?;
     let regression_scales = reconstructed
         .scales
         .iter()
@@ -316,10 +323,7 @@ pub(super) fn build_replay_evidence(
         comparator_sources,
         workers: reconstructed.workers,
         correctness_preflight: reconstructed.correctness_preflight,
-        correctness_bindings: loaded
-            .iter()
-            .map(|candidate| Arc::clone(&candidate.correctness_binding))
-            .collect(),
+        correctness_bindings: vec![correctness_binding],
         overall_outcome: reconstructed.overall_outcome,
         scales: regression_scales,
         sources: reconstructed

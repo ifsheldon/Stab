@@ -17,6 +17,7 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::qualification::model::{SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
+mod bindings;
 mod group_correctness;
 mod legacy;
 mod scope;
@@ -203,6 +204,7 @@ struct CompletionPreflight {
 struct ReconstructedCompletion {
     manifest: CompletionManifest,
     rollup_evidence: Vec<RollupReplayEvidence>,
+    correctness_bindings: Vec<std::sync::Arc<super::correctness::CorrectnessArtifactBinding>>,
 }
 
 pub(super) fn run_with_repository(
@@ -379,15 +381,18 @@ fn reconstruct(
     let repository_before = super::run::bound_repository_state(root, repository)?;
     require_clean_repository(&repository_before)?;
     let mut rollups = Vec::with_capacity(rollup_paths.len());
+    let mut correctness_bindings = bindings::RetainedBindings::default();
     for path in rollup_paths {
-        rollups.push(super::rollup::replay_with_repository(
+        let mut rollup = super::rollup::replay_with_repository(
             root,
             source_root,
             repository,
             expected_performance_inventory_sha256,
             expected_correctness_inventory_sha256,
             path.clone(),
-        )?);
+        )?;
+        correctness_bindings.admit(&mut rollup)?;
+        rollups.push(rollup);
     }
     order_and_validate_scope(&scope, &mut rollups)?;
     let shared = shared_identity(&rollups)?;
@@ -484,6 +489,7 @@ fn reconstruct(
     Ok(ReconstructedCompletion {
         manifest,
         rollup_evidence: rollups,
+        correctness_bindings: correctness_bindings.into_values(),
     })
 }
 
@@ -774,11 +780,7 @@ fn publish(
     let expected_parity = reconstructed.manifest.parity_policy_sha256.clone();
     let expected_regression_policy = reconstructed.manifest.regression_policy_sha256.clone();
     let expected_regression_baselines = reconstructed.manifest.regression_baselines_sha256.clone();
-    let correctness_bindings = reconstructed
-        .rollup_evidence
-        .iter()
-        .flat_map(|rollup| rollup.correctness_bindings.iter())
-        .collect::<Vec<_>>();
+    let correctness_bindings = &reconstructed.correctness_bindings;
     output.commit_new_with_source_validation(|bound_repository| {
         bound_repository.require_current(root)?;
         let retained_root = bound_repository.descriptor_root(root)?;
@@ -810,12 +812,10 @@ fn publish(
                 "completion policy identities",
             ));
         }
-        for binding in &correctness_bindings {
-            binding.require_current().map_err(|_| {
-                super::artifact::ArtifactError::ExternalSourceChanged(
-                    "correctness qualification evidence",
-                )
-            })?;
+        for binding in correctness_bindings {
+            binding
+                .require_current()
+                .map_err(super::correctness::publication_error)?;
         }
         Ok(())
     })?;
@@ -1118,6 +1118,8 @@ pub(super) enum CompletionError {
     Git(#[from] super::git::GitError),
     #[error(transparent)]
     Group(#[from] super::group::GroupError),
+    #[error(transparent)]
+    Correctness(#[from] super::correctness::CorrectnessError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
