@@ -8,7 +8,24 @@ use crate::{CheckError, Violation};
 
 const WORKFLOW_DIRECTORY: &str = ".github/workflows";
 const MAX_WORKFLOW_BYTES: usize = 1 << 20;
-const DRAFT_OPERATOR_COMMAND: &str = "./target/debug/stab-release create-draft --assets target/releases/assets --tag \"$RELEASE_TAG\" --confirm-version 0.2.0";
+const DRAFT_OPERATOR_COMMAND: &str = "\"$RELEASE_OPERATOR\" create-draft --assets target/releases/assets --tag \"$RELEASE_TAG\" --confirm-version 0.2.0";
+const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
+const RELEASE_CHECKOUT_REF: &str = "${{ github.sha }}";
+const RELEASE_TAG_INPUT: &str = "${{ inputs.tag }}";
+const RELEASE_EVENT_REF: &str = "${{ github.ref }}";
+const RELEASE_EVENT_SHA: &str = "${{ github.sha }}";
+const RELEASE_OPERATOR_PATH: &str =
+    "${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release";
+const RELEASE_OPERATOR_TARGET: &str = "${{ runner.temp }}/stab-release-operator-${{ github.sha }}";
+const RELEASE_OPERATOR_BUILD_COMMAND: &str = "cargo build -q --locked -p stab-release";
+const GITHUB_TOKEN_SECRET: &str = "${{ secrets.GITHUB_TOKEN }}";
+const RELEASE_REVISION_COMMAND: &str = concat!(
+    "test \"$RELEASE_TAG\" = \"v0.2.0\"\n",
+    "test \"$RELEASE_REF\" = \"refs/tags/v0.2.0\"\n",
+    "test \"$(git rev-parse HEAD)\" = \"$RELEASE_SHA\"\n",
+    "test \"$(git rev-parse \"${RELEASE_TAG}^{commit}\")\" = \"$RELEASE_SHA\"\n",
+    "test \"$(git rev-parse \"${RELEASE_REF}^{commit}\")\" = \"$RELEASE_SHA\"",
+);
 
 pub(super) struct WorkflowActionReport {
     pub action_use_count: usize,
@@ -182,6 +199,7 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
         ));
         return;
     };
+    inspect_release_revision_binding(path, root, report);
     let workflow_secrets = mapping_value(root, "env")
         .map(release_secrets)
         .unwrap_or_default();
@@ -245,6 +263,184 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
     }
 }
 
+fn inspect_release_revision_binding(
+    path: &Path,
+    root: &yaml_rust2::yaml::Hash,
+    report: &mut WorkflowActionReport,
+) {
+    if path != Path::new(RELEASE_WORKFLOW_PATH) {
+        return;
+    }
+    if !exact_release_dispatch(root) {
+        release_revision_violation(
+            path,
+            "must expose only workflow_dispatch with one required string input named tag",
+            report,
+        );
+    }
+
+    let Some(jobs) = mapping_value(root, "jobs").and_then(Yaml::as_hash) else {
+        release_revision_violation(path, "must define build and draft jobs", report);
+        return;
+    };
+    for job_name in ["build", "draft"] {
+        let Some(job) = mapping_value(jobs, job_name).and_then(Yaml::as_hash) else {
+            release_revision_violation(
+                path,
+                &format!("job {job_name} must exist and contain revision-bound steps"),
+                report,
+            );
+            continue;
+        };
+        inspect_release_job_revision(path, job_name, job, report);
+    }
+}
+
+fn exact_release_dispatch(root: &yaml_rust2::yaml::Hash) -> bool {
+    let Some(trigger) = mapping_value(root, "on").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    if trigger.len() != 1 {
+        return false;
+    }
+    let Some(dispatch) = mapping_value(trigger, "workflow_dispatch").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    let Some(inputs) = mapping_value(dispatch, "inputs").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    if inputs.len() != 1 {
+        return false;
+    }
+    let Some(tag) = mapping_value(inputs, "tag").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    matches!(mapping_value(tag, "required"), Some(Yaml::Boolean(true)))
+        && mapping_value(tag, "type").and_then(yaml_scalar) == Some("string")
+        && mapping_value(tag, "default").is_none()
+}
+
+fn inspect_release_job_revision(
+    path: &Path,
+    job_name: &str,
+    job: &yaml_rust2::yaml::Hash,
+    report: &mut WorkflowActionReport,
+) {
+    let Some(steps) = mapping_value(job, "steps").and_then(Yaml::as_vec) else {
+        release_revision_violation(
+            path,
+            &format!("job {job_name} must contain release steps"),
+            report,
+        );
+        return;
+    };
+    let checkout_indices = steps
+        .iter()
+        .enumerate()
+        .filter_map(|(index, step)| {
+            let step = step.as_hash()?;
+            let action = mapping_value(step, "uses").and_then(yaml_scalar)?;
+            action.starts_with("actions/checkout@").then_some(index)
+        })
+        .collect::<Vec<_>>();
+    let [checkout_index] = checkout_indices.as_slice() else {
+        release_revision_violation(
+            path,
+            &format!("job {job_name} must contain exactly one checkout"),
+            report,
+        );
+        return;
+    };
+    let Some(checkout) = steps.get(*checkout_index).and_then(Yaml::as_hash) else {
+        release_revision_violation(
+            path,
+            &format!("job {job_name} has a malformed checkout step"),
+            report,
+        );
+        return;
+    };
+    let checkout_ref = mapping_value(checkout, "with")
+        .and_then(Yaml::as_hash)
+        .and_then(|options| mapping_value(options, "ref"))
+        .and_then(yaml_scalar);
+    if checkout_ref != Some(RELEASE_CHECKOUT_REF) {
+        release_revision_violation(
+            path,
+            &format!("job {job_name} checkout must use immutable github.sha"),
+            report,
+        );
+    }
+
+    let verification = steps.get(checkout_index.saturating_add(1));
+    if !verification.is_some_and(exact_release_revision_step) {
+        release_revision_violation(
+            path,
+            &format!(
+                "job {job_name} must verify the v0.2.0 input tag and dispatch ref against github.sha immediately after checkout"
+            ),
+            report,
+        );
+    }
+    if job_name == "draft" && !steps.iter().any(exact_release_operator_build_step) {
+        release_revision_violation(
+            path,
+            "job draft must build the release operator into the exact SHA-scoped runner target",
+            report,
+        );
+    }
+}
+
+fn exact_release_operator_build_step(step: &Yaml) -> bool {
+    let Some(step) = step.as_hash() else {
+        return false;
+    };
+    if mapping_value(step, "name").and_then(yaml_scalar)
+        != Some("Build credential-free release operator")
+        || mapping_value(step, "run").and_then(yaml_scalar) != Some(RELEASE_OPERATOR_BUILD_COMMAND)
+    {
+        return false;
+    }
+    let Some(environment) = mapping_value(step, "env").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    environment.len() == 1
+        && mapping_value(environment, "CARGO_TARGET_DIR").and_then(yaml_scalar)
+            == Some(RELEASE_OPERATOR_TARGET)
+}
+
+fn exact_release_revision_step(step: &Yaml) -> bool {
+    let Some(step) = step.as_hash() else {
+        return false;
+    };
+    if step.len() != 3
+        || mapping_value(step, "name").and_then(yaml_scalar)
+            != Some("Verify immutable release revision")
+        || mapping_value(step, "run")
+            .and_then(yaml_scalar)
+            .map(str::trim_end)
+            != Some(RELEASE_REVISION_COMMAND)
+    {
+        return false;
+    }
+    let Some(environment) = mapping_value(step, "env").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    environment.len() == 3
+        && mapping_value(environment, "RELEASE_TAG").and_then(yaml_scalar)
+            == Some(RELEASE_TAG_INPUT)
+        && mapping_value(environment, "RELEASE_REF").and_then(yaml_scalar)
+            == Some(RELEASE_EVENT_REF)
+        && mapping_value(environment, "RELEASE_SHA").and_then(yaml_scalar)
+            == Some(RELEASE_EVENT_SHA)
+}
+
+fn release_revision_violation(path: &Path, detail: &str, report: &mut WorkflowActionReport) {
+    report.violations.push(Violation::new(
+        "workflow-release-revision-binding",
+        format!("workflow {} {detail}", path.display()),
+    ));
+}
+
 #[derive(Clone, Copy, Default)]
 struct ReleaseSecrets {
     github_token: bool,
@@ -289,9 +485,21 @@ fn inspect_secret_bearing_step(
     report: &mut WorkflowActionReport,
 ) {
     let command = mapping_value(step, "run").and_then(yaml_scalar);
+    let exact_environment = mapping_value(step, "env")
+        .and_then(Yaml::as_hash)
+        .is_some_and(|environment| {
+            environment.len() == 3
+                && mapping_value(environment, "GITHUB_TOKEN").and_then(yaml_scalar)
+                    == Some(GITHUB_TOKEN_SECRET)
+                && mapping_value(environment, "RELEASE_OPERATOR").and_then(yaml_scalar)
+                    == Some(RELEASE_OPERATOR_PATH)
+                && mapping_value(environment, "RELEASE_TAG").and_then(yaml_scalar)
+                    == Some(RELEASE_TAG_INPUT)
+        });
     let exact_operator = !inherited_secrets.any()
         && step_secrets.github_token
         && !step_secrets.unexpected
+        && exact_environment
         && mapping_value(step, "uses").is_none()
         && command == Some(DRAFT_OPERATOR_COMMAND);
     if !exact_operator {
@@ -387,13 +595,67 @@ mod tests {
     use super::*;
 
     fn inspect(source: &str) -> WorkflowActionReport {
+        inspect_at(Path::new(".github/workflows/test.yml"), source)
+    }
+
+    fn inspect_at(path: &Path, source: &str) -> WorkflowActionReport {
         let mut report = WorkflowActionReport {
             action_use_count: 0,
             violations: Vec::new(),
         };
-        inspect_workflow_source(Path::new(".github/workflows/test.yml"), source, &mut report);
+        inspect_workflow_source(path, source, &mut report);
         report
     }
+
+    const REVISION_BOUND_RELEASE_WORKFLOW: &str = r#"
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable release revision
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$RELEASE_TAG" = "v0.2.0"
+          test "$RELEASE_REF" = "refs/tags/v0.2.0"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_REF}^{commit}")" = "$RELEASE_SHA"
+  draft:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable release revision
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$RELEASE_TAG" = "v0.2.0"
+          test "$RELEASE_REF" = "refs/tags/v0.2.0"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_REF}^{commit}")" = "$RELEASE_SHA"
+      - name: Build credential-free release operator
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}
+        run: cargo build -q --locked -p stab-release
+"#;
 
     #[test]
     fn full_commit_refs_are_accepted_for_steps_and_reusable_jobs() {
@@ -431,6 +693,62 @@ jobs:
                 .violations
                 .iter()
                 .all(|violation| violation.code == "workflow-action-mutable-ref")
+        );
+    }
+
+    #[test]
+    fn release_workflow_accepts_exact_tag_dispatch_bound_to_event_sha() {
+        let report = inspect_at(
+            Path::new(".github/workflows/release.yml"),
+            REVISION_BOUND_RELEASE_WORKFLOW,
+        );
+
+        assert!(report.violations.is_empty(), "{:?}", report.violations);
+    }
+
+    #[test]
+    fn release_workflow_rejects_default_branch_dispatch_guard() {
+        let source = REVISION_BOUND_RELEASE_WORKFLOW.replace(
+            "test \"$RELEASE_REF\" = \"refs/tags/v0.2.0\"",
+            "test \"$RELEASE_REF\" = \"refs/heads/main\"",
+        );
+        let report = inspect_at(Path::new(".github/workflows/release.yml"), &source);
+
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.code == "workflow-release-revision-binding")
+        );
+    }
+
+    #[test]
+    fn release_workflow_rejects_mutable_tag_checkout() {
+        let source = REVISION_BOUND_RELEASE_WORKFLOW
+            .replace("ref: ${{ github.sha }}", "ref: ${{ inputs.tag }}");
+        let report = inspect_at(Path::new(".github/workflows/release.yml"), &source);
+
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.code == "workflow-release-revision-binding")
+        );
+    }
+
+    #[test]
+    fn release_workflow_rejects_shared_operator_target() {
+        let source = REVISION_BOUND_RELEASE_WORKFLOW.replace(
+            "${{ runner.temp }}/stab-release-operator-${{ github.sha }}",
+            "target",
+        );
+        let report = inspect_at(Path::new(".github/workflows/release.yml"), &source);
+
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.code == "workflow-release-revision-binding")
         );
     }
 
@@ -588,8 +906,10 @@ jobs:
   draft:
     steps:
       - env:
-          GITHUB_TOKEN: secret
-        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_OPERATOR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: '"$RELEASE_OPERATOR" create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0'
 "#,
         );
         assert!(report.violations.is_empty(), "{:?}", report.violations);

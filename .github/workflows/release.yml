@@ -32,9 +32,21 @@ jobs:
       - name: Checkout tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify immutable release revision
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$RELEASE_TAG" = "v0.2.0"
+          test "$RELEASE_REF" = "refs/tags/v0.2.0"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_REF}^{commit}")" = "$RELEASE_SHA"
 
       - name: Show toolchain
         run: rustup show active-toolchain
@@ -64,9 +76,21 @@ jobs:
       - name: Checkout tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify immutable release revision
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$RELEASE_TAG" = "v0.2.0"
+          test "$RELEASE_REF" = "refs/tags/v0.2.0"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$RELEASE_SHA"
+          test "$(git rev-parse "${RELEASE_REF}^{commit}")" = "$RELEASE_SHA"
 
       - name: Download all validated assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -76,10 +100,13 @@ jobs:
           path: target/releases/assets
 
       - name: Build credential-free release operator
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}
         run: cargo build -q --locked -p stab-release
 
       - name: Verify retained assets and create digest-checked draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_OPERATOR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release
           RELEASE_TAG: ${{ inputs.tag }}
-        run: ./target/debug/stab-release create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0
+        run: '"$RELEASE_OPERATOR" create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0'
