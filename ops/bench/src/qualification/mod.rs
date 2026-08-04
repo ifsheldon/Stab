@@ -186,7 +186,7 @@ pub(crate) fn completion_report(
         match validation {
             runtime::CompletionReportValidation::Replayed(output) => println!(
                 "[{PREFIX}] reconstructed performance qualification completion manifest at {}",
-                output.display()
+                output.path().display()
             ),
             runtime::CompletionReportValidation::HistoricalReadable {
                 path,

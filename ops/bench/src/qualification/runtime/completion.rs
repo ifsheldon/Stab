@@ -1,12 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
+use super::artifact::{
+    DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding,
+    RetainedArtifactContext, RetainedArtifactDirectory,
+};
 use super::invocation::WorkerIdentityEvidence;
 use super::protocol::TimingBoundary;
 use super::rollup::{RollupReplayEvidence, RollupSourceEvidence};
@@ -20,6 +24,7 @@ use crate::root::RepoRoot;
 mod bindings;
 mod group_correctness;
 mod legacy;
+mod replay;
 mod scope;
 mod status_manifest;
 #[cfg(test)]
@@ -69,10 +74,27 @@ pub(crate) struct CompletionCheckpointArgs {
     input: PathBuf,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub(crate) enum CompletionReportValidation {
-    Replayed(PathBuf),
+    Replayed(ReplayedCompletion),
     HistoricalReadable { path: PathBuf, schema_version: u32 },
+}
+
+#[derive(Debug)]
+pub(crate) struct ReplayedCompletion {
+    path: PathBuf,
+    report_json: Vec<u8>,
+    _artifact_binding: Arc<RetainedArtifactDirectory>,
+}
+
+impl ReplayedCompletion {
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn report_json(&self) -> &[u8] {
+        &self.report_json
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -204,7 +226,36 @@ struct CompletionPreflight {
 struct ReconstructedCompletion {
     manifest: CompletionManifest,
     rollup_evidence: Vec<RollupReplayEvidence>,
-    correctness_bindings: Vec<std::sync::Arc<super::correctness::CorrectnessArtifactBinding>>,
+    correctness_bindings: Vec<Arc<super::correctness::CorrectnessArtifactBinding>>,
+    artifact_bindings: Vec<bindings::RetainedRollupArtifacts>,
+}
+
+impl ReconstructedCompletion {
+    fn bind_source_artifacts(
+        &mut self,
+        root: &RepoRoot,
+        context: &Arc<RetainedArtifactContext>,
+    ) -> Result<(), CompletionError> {
+        if !self.artifact_bindings.is_empty() {
+            return Err(CompletionError::SourceMutation);
+        }
+        self.artifact_bindings = self
+            .rollup_evidence
+            .iter()
+            .map(|rollup| bindings::RetainedRollupArtifacts::bind(root, context, rollup))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
+    }
+
+    fn require_sources_current(&self, root: &RepoRoot) -> Result<(), CompletionError> {
+        for binding in &self.artifact_bindings {
+            binding.require_current(root)?;
+        }
+        for binding in &self.correctness_bindings {
+            binding.require_current()?;
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn run_with_repository(
@@ -239,107 +290,7 @@ pub(super) fn run_with_repository(
     Ok(output.into_path_buf())
 }
 
-pub(super) fn run_report_with_repository(
-    root: &RepoRoot,
-    source_root: &RepoRoot,
-    repository: &RepositoryBinding,
-    expected_performance_inventory_sha256: &str,
-    expected_correctness_inventory_sha256: &str,
-    args: CompletionReportArgs,
-) -> Result<CompletionReportValidation, CompletionError> {
-    let input = DirectQualificationArtifactPath::try_new(&args.input)?;
-    let report_json = read_completion_artifact(
-        root,
-        repository,
-        &input,
-        "report.json",
-        MAX_COMPLETION_REPORT_BYTES,
-    )?;
-    let schema_version = schema_version(&report_json)?;
-    if LEGACY_COMPLETION_SCHEMA_VERSIONS.contains(&schema_version) {
-        let summary = match schema_version {
-            1 => legacy::parse_v1(&report_json)?,
-            2 => legacy::parse_v2(&report_json)?,
-            _ => return Err(CompletionError::SchemaVersion(schema_version)),
-        };
-        if Path::new(&summary.output) != input.as_path() {
-            return Err(CompletionError::OutputBinding);
-        }
-        return Ok(CompletionReportValidation::HistoricalReadable {
-            path: input.into_path_buf(),
-            schema_version,
-        });
-    }
-    if schema_version != COMPLETION_SCHEMA_VERSION {
-        return Err(CompletionError::SchemaVersion(schema_version));
-    }
-
-    let preflight_json = read_completion_artifact(
-        root,
-        repository,
-        &input,
-        "preflight.json",
-        MAX_COMPLETION_PREFLIGHT_BYTES,
-    )?;
-    let markdown = read_completion_artifact(
-        root,
-        repository,
-        &input,
-        "report.md",
-        MAX_COMPLETION_MARKDOWN_BYTES,
-    )?;
-    let manifest: CompletionManifest = parse_canonical(&report_json)?;
-    let scope = scope::load(
-        source_root,
-        expected_performance_inventory_sha256,
-        &manifest.scope_id,
-    )?;
-    validate_manifest_boundary(
-        &manifest,
-        input.as_path(),
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-        &scope,
-    )?;
-    let rollup_paths = manifest
-        .rollups
-        .iter()
-        .map(|rollup| DirectQualificationArtifactPath::try_new(Path::new(&rollup.artifact.path)))
-        .collect::<Result<Vec<_>, _>>()?;
-    let reconstructed = reconstruct(
-        root,
-        source_root,
-        repository,
-        expected_performance_inventory_sha256,
-        expected_correctness_inventory_sha256,
-        &manifest.scope_id,
-        &input,
-        &rollup_paths,
-        manifest.generated_unix_epoch_seconds,
-    )?;
-    let reconstructed_json = canonical_json(&reconstructed.manifest)?;
-    let reconstructed_preflight = canonical_json(&completion_preflight(
-        &reconstructed.manifest,
-        &reconstructed_json,
-    ))?;
-    let reconstructed_markdown =
-        render_markdown(&reconstructed.manifest, &sha256_hex(&reconstructed_json));
-    if reconstructed_json != report_json
-        || reconstructed_preflight != preflight_json
-        || reconstructed_markdown.as_bytes() != markdown
-    {
-        return Err(CompletionError::Reconstruction);
-    }
-    require_completion_artifacts_unchanged(
-        root,
-        repository,
-        &input,
-        &report_json,
-        &preflight_json,
-        &markdown,
-    )?;
-    Ok(CompletionReportValidation::Replayed(input.into_path_buf()))
-}
+pub(in crate::qualification::runtime) use replay::run_report_with_repository;
 
 pub(super) fn inspect_status_manifest(
     source_root: &RepoRoot,
@@ -490,6 +441,7 @@ fn reconstruct(
         manifest,
         rollup_evidence: rollups,
         correctness_bindings: correctness_bindings.into_values(),
+        artifact_bindings: Vec::new(),
     })
 }
 
@@ -1022,26 +974,6 @@ fn read_completion_artifact(
         name,
         maximum_bytes,
     )?)
-}
-
-fn require_completion_artifacts_unchanged(
-    root: &RepoRoot,
-    repository: &RepositoryBinding,
-    path: &DirectQualificationArtifactPath,
-    report: &[u8],
-    preflight: &[u8],
-    markdown: &[u8],
-) -> Result<(), CompletionError> {
-    for (name, expected, limit) in [
-        ("report.json", report, MAX_COMPLETION_REPORT_BYTES),
-        ("preflight.json", preflight, MAX_COMPLETION_PREFLIGHT_BYTES),
-        ("report.md", markdown, MAX_COMPLETION_MARKDOWN_BYTES),
-    ] {
-        if read_completion_artifact(root, repository, path, name, limit)? != expected {
-            return Err(CompletionError::SourceMutation);
-        }
-    }
-    Ok(())
 }
 
 fn schema_version(bytes: &[u8]) -> Result<u32, CompletionError> {

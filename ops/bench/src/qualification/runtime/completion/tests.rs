@@ -939,3 +939,83 @@ fn duplicate_correctness_binding_is_revalidated_before_release() {
         ))
     ));
 }
+
+fn write_performance_artifact(root: &RepoRoot, name: &str) -> (PathBuf, [String; 3]) {
+    let relative = PathBuf::from("target/benchmarks/qualification").join(name);
+    let directory = root.path.join(&relative);
+    std::fs::create_dir_all(&directory).expect("create performance artifact");
+    let bytes = [b"report\n".as_slice(), b"preflight\n", b"markdown\n"];
+    for (name, bytes) in ["report.json", "preflight.json", "report.md"]
+        .into_iter()
+        .zip(bytes)
+    {
+        std::fs::write(directory.join(name), bytes).expect("write performance artifact");
+    }
+    (
+        relative,
+        bytes.map(crate::qualification::runtime::run::sha256_hex),
+    )
+}
+
+#[test]
+fn completion_revalidates_retained_rollup_and_source_artifacts() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let (rollup_path, rollup_digests) = write_performance_artifact(&root, "bound-rollup");
+    let (source_path, source_digests) = write_performance_artifact(&root, "bound-source");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+    let context =
+        RetainedArtifactContext::open(&root, &live_repository).expect("open artifact context");
+    let mut evidence = replay_evidence();
+    evidence.output = rollup_path;
+    evidence.report_sha256 = rollup_digests[0].clone();
+    evidence.preflight_sha256 = rollup_digests[1].clone();
+    evidence.markdown_sha256 = rollup_digests[2].clone();
+    evidence.sources.push(RollupSourceEvidence {
+        scale_id: "small".to_string(),
+        path: source_path.clone(),
+        report_sha256: source_digests[0].clone(),
+        preflight_sha256: source_digests[1].clone(),
+        markdown_sha256: source_digests[2].clone(),
+    });
+    let retained = bindings::RetainedRollupArtifacts::bind(&root, &context, &evidence)
+        .expect("retain rollup artifacts");
+    retained.require_current(&root).expect("artifacts current");
+
+    std::fs::write(root.path.join(source_path).join("report.md"), b"changed\n")
+        .expect("mutate retained source");
+    assert!(matches!(
+        retained.require_current(&root),
+        Err(CompletionError::Artifact(
+            super::super::artifact::ArtifactError::ConcurrentReplacement("report.md")
+        ))
+    ));
+}
+
+#[test]
+fn completion_revalidates_retained_rollup_identity() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+    let (rollup_path, rollup_digests) = write_performance_artifact(&root, "bound-rollup-id");
+    let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+    let context =
+        RetainedArtifactContext::open(&root, &live_repository).expect("open artifact context");
+    let mut evidence = replay_evidence();
+    evidence.output = rollup_path.clone();
+    evidence.report_sha256 = rollup_digests[0].clone();
+    evidence.preflight_sha256 = rollup_digests[1].clone();
+    evidence.markdown_sha256 = rollup_digests[2].clone();
+    let retained = bindings::RetainedRollupArtifacts::bind(&root, &context, &evidence)
+        .expect("retain rollup artifacts");
+
+    let report = root.path.join(rollup_path).join("report.json");
+    let displaced = root.path.join("displaced-rollup-report.json");
+    std::fs::rename(&report, &displaced).expect("displace rollup report");
+    std::fs::write(&report, b"report\n").expect("write identical rollup report");
+    assert!(matches!(
+        retained.require_current(&root),
+        Err(CompletionError::Artifact(
+            super::super::artifact::ArtifactError::ConcurrentReplacement("report.json")
+        ))
+    ));
+}

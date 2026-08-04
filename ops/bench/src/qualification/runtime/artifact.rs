@@ -9,9 +9,11 @@ use crate::root::RepoRoot;
 mod error;
 mod filesystem;
 mod repository;
+mod retained;
 
 pub(crate) use error::ArtifactError;
 pub(in crate::qualification::runtime) use repository::{BoundRepository, RepositoryBinding};
+pub(crate) use retained::{RetainedArtifactContext, RetainedArtifactDirectory};
 
 use filesystem::{
     artifact_entry_matches, create_staging_directory, directory_entry_is_missing,
