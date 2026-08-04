@@ -592,12 +592,18 @@ mod tests {
     }
 
     #[test]
-    fn ambient_registry_token_does_not_cross_the_supervisor_boundary() {
+    fn ambient_release_credentials_do_not_cross_the_supervisor_boundary() {
         let (program, args, environment) = helper_request("secret-supervisor");
         let status = Command::new(program)
             .args(args)
             .envs(environment)
             .env("CARGO_REGISTRY_TOKEN", "must-not-reach-release-children")
+            .env(
+                "CARGO_REGISTRIES_CRATES_IO_TOKEN",
+                "must-not-reach-release-children",
+            )
+            .env("GITHUB_TOKEN", "must-not-reach-release-children")
+            .env("GH_TOKEN", "must-not-reach-release-children")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -861,8 +867,16 @@ mod tests {
                 }
             }
             Ok("secret-env") => {
-                if std::env::var_os("CARGO_REGISTRY_TOKEN").is_none() {
-                    println!("registry-token-absent");
+                if [
+                    "CARGO_REGISTRY_TOKEN",
+                    "CARGO_REGISTRIES_CRATES_IO_TOKEN",
+                    "GITHUB_TOKEN",
+                    "GH_TOKEN",
+                ]
+                .iter()
+                .all(|name| std::env::var_os(name).is_none())
+                {
+                    println!("release-credentials-absent");
                 } else {
                     std::process::exit(10);
                 }
@@ -880,8 +894,8 @@ mod tests {
                 .expect("isolated secret probe");
                 if !output
                     .stdout
-                    .windows(b"registry-token-absent".len())
-                    .any(|window| window == b"registry-token-absent")
+                    .windows(b"release-credentials-absent".len())
+                    .any(|window| window == b"release-credentials-absent")
                 {
                     std::process::exit(11);
                 }

@@ -374,6 +374,7 @@ mod tests {
             .env("CARGO_REGISTRY_TOKEN", "ambient-secret")
             .env("CARGO_REGISTRIES_CRATES_IO_TOKEN", "ambient-other-secret")
             .env("GITHUB_TOKEN", "ambient-github-secret")
+            .env("GH_TOKEN", "ambient-gh-secret")
             .env("CARGO_TARGET_DIR", "/attacker/target")
             .env("RUSTC_WRAPPER", "/attacker/wrapper")
             .env("STAB_RELEASE_HOSTILE_SECRET", "hostile-secret");
@@ -528,6 +529,7 @@ mod tests {
         "CARGO_REGISTRY_TOKEN",
         "CARGO_REGISTRIES_CRATES_IO_TOKEN",
         "GITHUB_TOKEN",
+        "GH_TOKEN",
         "RUSTC_WRAPPER",
         "STAB_RELEASE_HOSTILE_SECRET",
     ] {
@@ -558,6 +560,7 @@ mod tests {
             .env("CARGO_REGISTRY_TOKEN", "ambient-secret")
             .env("CARGO_REGISTRIES_CRATES_IO_TOKEN", "ambient-other-secret")
             .env("GITHUB_TOKEN", "ambient-github-secret")
+            .env("GH_TOKEN", "ambient-gh-secret")
             .env("RUSTC_WRAPPER", "/attacker/ambient-wrapper")
             .env("STAB_RELEASE_HOSTILE_SECRET", "from-environment");
         configure_command(&mut command, &request);

@@ -75,6 +75,11 @@ pub enum ReleaseError {
     PublicationConfirmation { expected: String, actual: String },
     #[error("release publication state conflicts with the reviewed preflight: {0}")]
     PublicationState(String),
+    #[error("release credential environment violates the {operation} boundary; unset: {variables}")]
+    CredentialEnvironment {
+        operation: &'static str,
+        variables: String,
+    },
     #[error("release path is invalid: {0}")]
     InvalidPath(PathBuf),
     #[error("release target label is invalid: {0:?}")]

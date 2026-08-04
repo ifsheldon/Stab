@@ -112,6 +112,13 @@ impl ReleaseTarget {
             Self::MacosAarch64 => BinaryFormat::MachO,
         }
     }
+
+    fn rust_host(self) -> &'static str {
+        match self {
+            Self::LinuxAarch64 => "aarch64-unknown-linux-gnu",
+            Self::MacosAarch64 => "aarch64-apple-darwin",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -229,6 +236,7 @@ pub(crate) fn review_assets(
     tag: &str,
 ) -> Result<ReviewedAssets, ReleaseError> {
     let commit = repository::require_clean_tag(root, tag)?;
+    let toolchain = repository::capture_toolchain(root)?;
     validate_relative(assets)?;
     let directory =
         safe_fs::RetainedDirectory::open_under(root, assets, Some(Path::new("target/releases")))?;
@@ -255,6 +263,11 @@ pub(crate) fn review_assets(
         }
         let (manifest_asset, manifest_bytes) = retain_asset(&directory, &manifest_name, 1 << 20)?;
         let manifest: AssetManifest = serde_json::from_slice(&manifest_bytes)?;
+        repository::require_reviewed_asset_toolchain(
+            &toolchain,
+            &manifest.toolchain,
+            target.rust_host(),
+        )?;
         if manifest.schema_version != ASSET_MANIFEST_SCHEMA_VERSION
             || manifest.tag != tag
             || manifest.commit != commit
@@ -270,6 +283,8 @@ pub(crate) fn review_assets(
         }
         reviewed_assets.extend([binary, checksum_asset, manifest_asset]);
     }
+    repository::require_unchanged(root, &commit)?;
+    repository::require_toolchain(root, &toolchain)?;
     let actual_files = directory
         .entry_names(expected_files.len().saturating_add(1))?
         .into_iter()
@@ -443,7 +458,15 @@ mod tests {
         git(root.path(), &["init", "--quiet"]);
         fs::write(root.path().join(".gitignore"), "target/\n").expect("gitignore");
         fs::write(root.path().join("source.txt"), "reviewed source\n").expect("source");
-        git(root.path(), &["add", ".gitignore", "source.txt"]);
+        fs::write(
+            root.path().join("rust-toolchain.toml"),
+            include_bytes!("../../../rust-toolchain.toml"),
+        )
+        .expect("toolchain pin");
+        git(
+            root.path(),
+            &["add", ".gitignore", "source.txt", "rust-toolchain.toml"],
+        );
         git(root.path(), &["commit", "--quiet", "-m", "fixture"]);
         git(
             root.path(),
@@ -453,13 +476,7 @@ mod tests {
         let directory = root.path().join(&assets);
         fs::create_dir_all(&directory).expect("asset directory");
         let commit = repository::require_clean_tag(root.path(), RELEASE_TAG).expect("tag");
-        let toolchain = repository::ToolchainIdentity {
-            cargo_program: "/fixture/cargo".to_string(),
-            cargo_version: "cargo fixture\n".to_string(),
-            rustc_program: "/fixture/rustc".to_string(),
-            rustc_version: "rustc fixture\n".to_string(),
-            active_toolchain: "fixture-toolchain\n".to_string(),
-        };
+        let toolchain = repository::capture_toolchain(root.path()).expect("fixture toolchain");
         for (label, bytes) in [
             (
                 "linux-aarch64",
@@ -484,13 +501,50 @@ mod tests {
                 binary: name.clone(),
                 bytes: bytes.len() as u64,
                 sha256: digest,
-                toolchain: toolchain.clone(),
+                toolchain: retarget_toolchain(&toolchain, label),
             };
             let mut manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest");
             manifest_bytes.push(b'\n');
             fs::write(directory.join(format!("{name}.json")), manifest_bytes).expect("manifest");
         }
         (root, assets)
+    }
+
+    fn retarget_toolchain(
+        toolchain: &repository::ToolchainIdentity,
+        label: &str,
+    ) -> repository::ToolchainIdentity {
+        let current_host = toolchain
+            .rustc_version
+            .lines()
+            .find_map(|line| line.strip_prefix("host: "))
+            .expect("current host");
+        let target_host = ReleaseTarget::parse(label)
+            .expect("release target")
+            .rust_host();
+        let replace = |value: &str| value.replace(current_host, target_host);
+        repository::ToolchainIdentity {
+            cargo_program: replace(&toolchain.cargo_program),
+            cargo_version: replace(&toolchain.cargo_version),
+            rustc_program: replace(&toolchain.rustc_program),
+            rustc_version: replace(&toolchain.rustc_version),
+            active_toolchain: replace(&toolchain.active_toolchain),
+        }
+    }
+
+    fn mutate_manifest_toolchain(
+        root: &Path,
+        assets: &Path,
+        label: &str,
+        mutate: impl FnOnce(&mut repository::ToolchainIdentity),
+    ) {
+        let path = root.join(assets).join(format!("stab-{label}.json"));
+        let bytes = fs::read(&path).expect("read manifest");
+        let mut manifest: AssetManifest = serde_json::from_slice(&bytes).expect("parse manifest");
+        mutate(&mut manifest.toolchain);
+        let mut bytes = serde_json::to_vec_pretty(&manifest).expect("serialize manifest");
+        bytes.push(b'\n');
+        fs::write(path, bytes).expect("write mutated manifest");
     }
 
     fn write_bytes(bytes: &mut [u8], offset: usize, value: &[u8]) {
@@ -737,6 +791,51 @@ mod tests {
         assert!(matches!(
             reviewed.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_mutated_cargo_identity() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
+            toolchain.cargo_version =
+                toolchain
+                    .cargo_version
+                    .replacen("commit-hash: ", "commit-hash: mutated-", 1);
+        });
+
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_mutated_rustc_identity() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
+            toolchain.rustc_version =
+                toolchain
+                    .rustc_version
+                    .replacen("commit-hash: ", "commit-hash: mutated-", 1);
+        });
+
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_reject_mutated_active_toolchain() {
+        let (root, assets) = tagged_asset_repository();
+        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
+            toolchain.active_toolchain.insert_str(0, "mutated-");
+        });
+
+        assert!(matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG),
+            Err(ReleaseError::ToolchainIdentity(_))
         ));
     }
 }

@@ -12,7 +12,7 @@ build-operator:
 
 # Publish reviewed crates one at a time and verify crates.io checksums.
 publish-reviewed *args: build-operator
-    exec ./target/debug/stab-release publish-reviewed {{args}}
+    exec /usr/bin/env -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GITHUB_TOKEN -u GH_TOKEN ./target/debug/stab-release publish-reviewed {{args}}
 
 # Build and package one tagged stab binary with checksum and provenance.
 build-binary *args:
@@ -28,4 +28,4 @@ verify-assets *args:
 
 # Verify exact assets, create a private GitHub draft, and check remote digests.
 create-draft *args: build-operator
-    exec ./target/debug/stab-release create-draft {{args}}
+    exec /usr/bin/env -u CARGO_REGISTRY_TOKEN -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GH_TOKEN ./target/debug/stab-release create-draft {{args}}

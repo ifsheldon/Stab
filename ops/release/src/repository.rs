@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 #[cfg(test)]
@@ -160,6 +161,171 @@ pub(crate) fn require_toolchain(
         return Err(ReleaseError::ToolchainIdentity(format!(
             "expected {expected:?}, found {actual:?}"
         )));
+    }
+    Ok(())
+}
+
+pub(crate) fn require_reviewed_asset_toolchain(
+    current: &ToolchainIdentity,
+    reviewed: &ToolchainIdentity,
+    target_host: &str,
+) -> Result<(), ReleaseError> {
+    let current_rustc = parse_version_record("current rustc", &current.rustc_version)?;
+    let current_host = current_rustc.required("host")?;
+    let current_name = parse_active_toolchain("current", &current.active_toolchain)?;
+    let channel = current_name
+        .strip_suffix(&format!("-{current_host}"))
+        .ok_or_else(|| {
+            ReleaseError::ToolchainIdentity(format!(
+                "current active toolchain {current_name:?} does not end with host {current_host:?}"
+            ))
+        })?;
+    let expected_name = format!("{channel}-{target_host}");
+
+    require_toolchain_program("Cargo", &reviewed.cargo_program, &expected_name, "cargo")?;
+    require_toolchain_program("rustc", &reviewed.rustc_program, &expected_name, "rustc")?;
+    let reviewed_name = parse_active_toolchain("reviewed", &reviewed.active_toolchain)?;
+    if reviewed_name != expected_name {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "reviewed active toolchain is {reviewed_name:?}, expected {expected_name:?}"
+        )));
+    }
+
+    let current_cargo = parse_version_record("current Cargo", &current.cargo_version)?;
+    let reviewed_cargo = parse_version_record("reviewed Cargo", &reviewed.cargo_version)?;
+    require_portable_version_match(
+        "Cargo",
+        &current_cargo,
+        &reviewed_cargo,
+        target_host,
+        &["libgit2", "libcurl", "ssl", "os"],
+    )?;
+    let reviewed_rustc = parse_version_record("reviewed rustc", &reviewed.rustc_version)?;
+    require_portable_version_match("rustc", &current_rustc, &reviewed_rustc, target_host, &[])
+}
+
+struct VersionRecord<'a> {
+    header: &'a str,
+    fields: BTreeMap<&'a str, &'a str>,
+}
+
+impl<'a> VersionRecord<'a> {
+    fn required(&self, key: &str) -> Result<&'a str, ReleaseError> {
+        self.fields.get(key).copied().ok_or_else(|| {
+            ReleaseError::ToolchainIdentity(format!("toolchain version output is missing {key:?}"))
+        })
+    }
+}
+
+fn parse_version_record<'a>(label: &str, text: &'a str) -> Result<VersionRecord<'a>, ReleaseError> {
+    let body = text.strip_suffix('\n').ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!("{label} version output is not LF terminated"))
+    })?;
+    if body.contains('\r') || body.is_empty() {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "{label} version output has invalid record framing"
+        )));
+    }
+    let mut lines = body.split('\n');
+    let header = lines.next().unwrap_or_default();
+    if header.is_empty() || header.contains(':') {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "{label} version output has an invalid header"
+        )));
+    }
+    let mut fields = BTreeMap::new();
+    for line in lines {
+        let (key, value) = line.split_once(": ").ok_or_else(|| {
+            ReleaseError::ToolchainIdentity(format!("{label} version output has an invalid field"))
+        })?;
+        if key.is_empty() || value.is_empty() || fields.insert(key, value).is_some() {
+            return Err(ReleaseError::ToolchainIdentity(format!(
+                "{label} version output has an empty or duplicate field"
+            )));
+        }
+    }
+    Ok(VersionRecord { header, fields })
+}
+
+fn parse_active_toolchain<'a>(label: &str, text: &'a str) -> Result<&'a str, ReleaseError> {
+    let body = text.strip_suffix('\n').ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "{label} active-toolchain output is not LF terminated"
+        ))
+    })?;
+    let (name, reason) = body.split_once(" (overridden by '").ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "{label} active toolchain is not bound to rust-toolchain.toml"
+        ))
+    })?;
+    let override_path = reason.strip_suffix("')").ok_or_else(|| {
+        ReleaseError::ToolchainIdentity(format!(
+            "{label} active-toolchain output has invalid framing"
+        ))
+    })?;
+    let override_path = Path::new(override_path);
+    if name.is_empty()
+        || !override_path.is_absolute()
+        || override_path.file_name() != Some(OsStr::new("rust-toolchain.toml"))
+    {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "{label} active-toolchain output has an invalid source override"
+        )));
+    }
+    Ok(name)
+}
+
+fn require_toolchain_program(
+    label: &str,
+    program: &str,
+    expected_name: &str,
+    binary: &str,
+) -> Result<(), ReleaseError> {
+    let path = Path::new(program);
+    let expected_suffix = Path::new("toolchains")
+        .join(expected_name)
+        .join("bin")
+        .join(binary);
+    if !path.is_absolute() || !path.ends_with(&expected_suffix) {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "reviewed {label} program is not from {expected_name:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn require_portable_version_match(
+    label: &str,
+    current: &VersionRecord<'_>,
+    reviewed: &VersionRecord<'_>,
+    target_host: &str,
+    platform_fields: &[&str],
+) -> Result<(), ReleaseError> {
+    if current.header != reviewed.header {
+        return Err(ReleaseError::ToolchainIdentity(format!(
+            "reviewed {label} version record differs from the current pinned toolchain"
+        )));
+    }
+    for (key, reviewed_value) in &reviewed.fields {
+        let matches = if *key == "host" {
+            *reviewed_value == target_host
+        } else if platform_fields.contains(key) {
+            !reviewed_value.is_empty()
+        } else {
+            current.fields.get(key) == Some(reviewed_value)
+        };
+        if !matches {
+            return Err(ReleaseError::ToolchainIdentity(format!(
+                "reviewed {label} field {key:?} differs from the expected pinned identity"
+            )));
+        }
+    }
+    for key in current.fields.keys() {
+        if !platform_fields.contains(key) && !reviewed.fields.contains_key(key) {
+            return Err(ReleaseError::ToolchainIdentity(format!(
+                "reviewed {label} version record is missing expected field {key:?}"
+            )));
+        }
     }
     Ok(())
 }

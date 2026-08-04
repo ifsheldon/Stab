@@ -14,6 +14,7 @@ mod artifact;
 mod authorization;
 mod cancellation;
 mod cargo;
+mod credentials;
 mod error;
 mod github;
 mod package;
@@ -80,6 +81,7 @@ pub fn print_publish_order() -> Result<(), ReleaseError> {
 }
 
 pub fn publish_reviewed(preflight: &Path, confirmation: &str) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::PublishReviewed)?;
     let root = repository_root()?;
     publish::publish_reviewed(&root, preflight, confirmation)
 }
@@ -111,6 +113,7 @@ pub fn create_verified_draft(
     tag: &str,
     confirmation: &str,
 ) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::CreateDraft)?;
     let root = repository_root()?;
     github::create_verified_draft(&root, assets, tag, confirmation)?;
     println!("[stab-release] created and verified private draft {tag} with exact reviewed assets");
