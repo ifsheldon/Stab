@@ -6,6 +6,7 @@ use crate::qualification::runtime::run::sha256_hex;
 const DESCRIPTOR_HELPER: &str =
     "qualification::runtime::artifact::retained::tests::release_matrix_descriptor_helper";
 const DESCRIPTOR_ENV: &str = "STAB_BENCH_RETAINED_DESCRIPTOR_HELPER";
+const SIMULATED_CORRECTNESS_DESCRIPTORS: usize = 192;
 
 fn direct(path: &Path) -> DirectQualificationArtifactPath {
     DirectQualificationArtifactPath::try_new(path).expect("direct qualification artifact path")
@@ -200,7 +201,7 @@ fn release_matrix_descriptor_helper() {
     for index in 0..177 {
         write_fixture(&root, &format!("release-artifact-{index:03}"));
     }
-    let simulated_correctness_descriptors = (0..170)
+    let simulated_correctness_descriptors = (0..SIMULATED_CORRECTNESS_DESCRIPTORS)
         .map(|_| {
             rustix::fs::open(
                 "/dev/null",
@@ -226,5 +227,8 @@ fn release_matrix_descriptor_helper() {
             .expect("artifact remains current");
     }
     assert_eq!(bindings.len(), 177);
-    assert_eq!(simulated_correctness_descriptors.len(), 170);
+    assert_eq!(
+        simulated_correctness_descriptors.len(),
+        SIMULATED_CORRECTNESS_DESCRIPTORS
+    );
 }

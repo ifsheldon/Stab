@@ -584,7 +584,7 @@ pub(super) fn require_current_repository(
     require_current_repository_state(&current, expected)
 }
 
-fn require_current_repository_state(
+pub(super) fn require_current_repository_state(
     current: &super::git::RepositoryState,
     expected: &RepositoryEvidence,
 ) -> Result<(), super::artifact::ArtifactError> {

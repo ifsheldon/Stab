@@ -5,9 +5,10 @@ use super::{
     COMPLETION_SCHEMA_VERSION, CompletionError, CompletionManifest, CompletionReportArgs,
     CompletionReportValidation, DirectQualificationArtifactPath, LEGACY_COMPLETION_SCHEMA_VERSIONS,
     MAX_COMPLETION_MARKDOWN_BYTES, MAX_COMPLETION_PREFLIGHT_BYTES, MAX_COMPLETION_REPORT_BYTES,
-    ReconstructedCompletion, ReplayedCompletion, RepositoryBinding, RetainedArtifactContext,
-    canonical_json, completion_preflight, legacy, parse_canonical, read_completion_artifact,
-    reconstruct, render_markdown, schema_version, scope, sha256_hex, validate_manifest_boundary,
+    ReconstructedCompletion, ReplayedCompletion, RepositoryBinding, RepositoryEvidence,
+    RetainedArtifactContext, canonical_json, completion_preflight, legacy, parse_canonical,
+    read_completion_artifact, reconstruct, render_markdown, schema_version, scope, sha256_hex,
+    validate_manifest_boundary,
 };
 use crate::root::RepoRoot;
 
@@ -84,13 +85,23 @@ pub(in crate::qualification::runtime) fn run_report_with_repository(
     require_reconstructed_artifacts(&reconstructed, &report_json, &preflight_json, &markdown)?;
     reconstructed.require_sources_current(root)?;
     completion_binding.require_current(root)?;
-    repository.require_current(root)?;
+    require_final_repository_state(root, repository, &reconstructed.manifest.repository)?;
 
     Ok(CompletionReportValidation::Replayed(ReplayedCompletion {
         path: input.into_path_buf(),
         report_json,
         _artifact_binding: completion_binding,
     }))
+}
+
+fn require_final_repository_state(
+    root: &RepoRoot,
+    repository: &RepositoryBinding,
+    expected: &RepositoryEvidence,
+) -> Result<(), CompletionError> {
+    let current = super::super::run::bound_repository_state(root, repository)?;
+    super::super::run::require_current_repository_state(&current, expected)?;
+    Ok(())
 }
 
 fn validate_legacy(
@@ -141,4 +152,59 @@ fn require_reconstructed_artifacts(
         return Err(CompletionError::Reconstruction);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use super::*;
+
+    fn git(root: &Path, args: &[&str]) {
+        let status = Command::new("/usr/bin/git")
+            .args(args)
+            .current_dir(root)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "Stab Test")
+            .env("GIT_AUTHOR_EMAIL", "stab-test@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Stab Test")
+            .env("GIT_COMMITTER_EMAIL", "stab-test@example.invalid")
+            .status()
+            .expect("git command");
+        assert!(status.success());
+    }
+
+    #[test]
+    fn final_repository_state_rejects_late_tracked_mutation() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        std::fs::write(repository.path().join("tracked.txt"), b"clean\n")
+            .expect("write tracked fixture");
+        git(repository.path(), &["init", "--quiet"]);
+        git(repository.path(), &["add", "tracked.txt"]);
+        git(repository.path(), &["commit", "--quiet", "-m", "fixture"]);
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let live_repository = RepositoryBinding::open(&root).expect("bind repository");
+        let clean = super::super::super::run::bound_repository_state(&root, &live_repository)
+            .expect("clean repository state");
+        let expected = RepositoryEvidence {
+            commit_before: clean.commit.clone(),
+            commit_after: clean.commit,
+            local_modifications_before: false,
+            local_modifications_after: false,
+        };
+        require_final_repository_state(&root, &live_repository, &expected)
+            .expect("clean repository remains current");
+
+        std::fs::write(repository.path().join("tracked.txt"), b"late mutation\n")
+            .expect("mutate tracked fixture");
+        assert!(matches!(
+            require_final_repository_state(&root, &live_repository, &expected),
+            Err(CompletionError::Artifact(
+                super::super::super::artifact::ArtifactError::ExternalSourceChanged(
+                    "repository state"
+                )
+            ))
+        ));
+    }
 }
