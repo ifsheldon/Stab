@@ -18,7 +18,17 @@ const VISIBILITY_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const VISIBILITY_POLL: Duration = Duration::from_secs(10);
 
 pub(crate) trait RegistryLookup {
-    fn checksum(&self, package: &str, version: &str) -> Result<Option<String>, ReleaseError>;
+    fn version(
+        &self,
+        package: &str,
+        version: &str,
+    ) -> Result<Option<RegistryVersion>, ReleaseError>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct RegistryVersion {
+    checksum: String,
+    yanked: bool,
 }
 
 #[derive(Debug)]
@@ -106,7 +116,11 @@ impl CratesIo {
 }
 
 impl RegistryLookup for CratesIo {
-    fn checksum(&self, package: &str, version: &str) -> Result<Option<String>, ReleaseError> {
+    fn version(
+        &self,
+        package: &str,
+        version: &str,
+    ) -> Result<Option<RegistryVersion>, ReleaseError> {
         self.cancellation.check("crates.io checksum query")?;
         validate_identifier(package)?;
         validate_identifier(version)?;
@@ -141,7 +155,7 @@ impl RegistryLookup for CratesIo {
                 ))
             })?;
         self.cancellation.check("crates.io checksum query")?;
-        parse_checksum(&body, package, version).map(Some)
+        parse_version(&body, package, version).map(Some)
     }
 }
 
@@ -218,14 +232,18 @@ pub(crate) fn require_absent_or_matching(
     version: &str,
     expected: &str,
 ) -> Result<bool, ReleaseError> {
-    match registry.checksum(package, version)? {
+    match registry.version(package, version)? {
         None => Ok(false),
-        Some(actual) if actual == expected => Ok(true),
+        Some(actual) if actual.yanked => Err(ReleaseError::RegistryYanked {
+            package: package.to_string(),
+            version: version.to_string(),
+        }),
+        Some(actual) if actual.checksum == expected => Ok(true),
         Some(actual) => Err(ReleaseError::RegistryChecksum {
             package: package.to_string(),
             version: version.to_string(),
             expected: expected.to_string(),
-            actual,
+            actual: actual.checksum,
         }),
     }
 }
@@ -240,14 +258,20 @@ pub(crate) fn wait_for_matching_checksum(
     let started = Instant::now();
     while started.elapsed() < VISIBILITY_TIMEOUT {
         cancellation.check("crates.io visibility polling")?;
-        match registry.checksum(package, version)? {
-            Some(actual) if actual == expected => return Ok(()),
+        match registry.version(package, version)? {
+            Some(actual) if actual.yanked => {
+                return Err(ReleaseError::RegistryYanked {
+                    package: package.to_string(),
+                    version: version.to_string(),
+                });
+            }
+            Some(actual) if actual.checksum == expected => return Ok(()),
             Some(actual) => {
                 return Err(ReleaseError::RegistryChecksum {
                     package: package.to_string(),
                     version: version.to_string(),
                     expected: expected.to_string(),
-                    actual,
+                    actual: actual.checksum,
                 });
             }
             None => cancellation.sleep(VISIBILITY_POLL, "crates.io visibility polling")?,
@@ -344,7 +368,11 @@ fn require_no_warnings(warnings: Warnings) -> Result<(), ReleaseError> {
     )))
 }
 
-fn parse_checksum(body: &str, package: &str, version: &str) -> Result<String, ReleaseError> {
+fn parse_version(
+    body: &str,
+    package: &str,
+    version: &str,
+) -> Result<RegistryVersion, ReleaseError> {
     let response: VersionResponse = serde_json::from_str(body).map_err(|error| {
         ReleaseError::Registry(format!(
             "invalid crates.io response for {package} {version}: {error}"
@@ -367,7 +395,10 @@ fn parse_checksum(body: &str, package: &str, version: &str) -> Result<String, Re
             "crates.io returned an invalid checksum for {package} {version}"
         )));
     }
-    Ok(response.version.checksum)
+    Ok(RegistryVersion {
+        checksum: response.version.checksum,
+        yanked: response.version.yanked,
+    })
 }
 
 fn validate_identifier(value: &str) -> Result<(), ReleaseError> {
@@ -488,6 +519,7 @@ struct VersionRecord {
     #[serde(rename = "num")]
     number: String,
     checksum: String,
+    yanked: bool,
 }
 
 #[derive(Clone)]
@@ -575,13 +607,26 @@ mod tests {
     fn registry_checksum_response_is_identity_checked() {
         let checksum = "a".repeat(64);
         let body = format!(
-            "{{\"version\":{{\"crate\":\"stab-core\",\"num\":\"0.2.0\",\"checksum\":\"{checksum}\"}}}}"
+            "{{\"version\":{{\"crate\":\"stab-core\",\"num\":\"0.2.0\",\"checksum\":\"{checksum}\",\"yanked\":false}}}}"
         );
         assert_eq!(
-            parse_checksum(&body, "stab-core", "0.2.0").expect("checksum"),
-            checksum
+            parse_version(&body, "stab-core", "0.2.0").expect("version"),
+            RegistryVersion {
+                checksum,
+                yanked: false,
+            }
         );
-        assert!(parse_checksum(&body, "stab-cli", "0.2.0").is_err());
+        assert!(parse_version(&body, "stab-cli", "0.2.0").is_err());
+    }
+
+    #[test]
+    fn registry_version_response_preserves_yanked_state() {
+        let checksum = "a".repeat(64);
+        let body = format!(
+            "{{\"version\":{{\"crate\":\"stab-core\",\"num\":\"0.2.0\",\"checksum\":\"{checksum}\",\"yanked\":true}}}}"
+        );
+        let version = parse_version(&body, "stab-core", "0.2.0").expect("version");
+        assert!(version.yanked);
     }
 
     #[test]
@@ -641,11 +686,11 @@ mod tests {
     fn visibility_wait_is_interruptible() {
         struct Missing;
         impl RegistryLookup for Missing {
-            fn checksum(
+            fn version(
                 &self,
                 _package: &str,
                 _version: &str,
-            ) -> Result<Option<String>, ReleaseError> {
+            ) -> Result<Option<RegistryVersion>, ReleaseError> {
                 Ok(None)
             }
         }
@@ -663,12 +708,20 @@ mod tests {
         ));
     }
 
-    struct FixedRegistry(Option<String>);
+    struct FixedRegistry(Option<RegistryVersion>);
 
     impl RegistryLookup for FixedRegistry {
-        fn checksum(&self, _package: &str, _version: &str) -> Result<Option<String>, ReleaseError> {
+        fn version(
+            &self,
+            _package: &str,
+            _version: &str,
+        ) -> Result<Option<RegistryVersion>, ReleaseError> {
             Ok(self.0.clone())
         }
+    }
+
+    fn registry_version(checksum: String, yanked: bool) -> RegistryVersion {
+        RegistryVersion { checksum, yanked }
     }
 
     #[test]
@@ -680,7 +733,7 @@ mod tests {
         );
         assert!(
             require_absent_or_matching(
-                &FixedRegistry(Some(expected.clone())),
+                &FixedRegistry(Some(registry_version(expected.clone(), false))),
                 "stab-core",
                 "0.2.0",
                 &expected
@@ -689,12 +742,31 @@ mod tests {
         );
         assert!(matches!(
             require_absent_or_matching(
-                &FixedRegistry(Some("d".repeat(64))),
+                &FixedRegistry(Some(registry_version("d".repeat(64), false))),
                 "stab-core",
                 "0.2.0",
                 &expected
             ),
             Err(ReleaseError::RegistryChecksum { .. })
+        ));
+        assert!(matches!(
+            require_absent_or_matching(
+                &FixedRegistry(Some(registry_version(expected.clone(), true))),
+                "stab-core",
+                "0.2.0",
+                &expected
+            ),
+            Err(ReleaseError::RegistryYanked { .. })
+        ));
+        assert!(matches!(
+            wait_for_matching_checksum(
+                &FixedRegistry(Some(registry_version(expected.clone(), true))),
+                &ReleaseCancellation::for_test(),
+                "stab-core",
+                "0.2.0",
+                &expected,
+            ),
+            Err(ReleaseError::RegistryYanked { .. })
         ));
     }
 

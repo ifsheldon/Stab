@@ -63,6 +63,8 @@ pub enum ReleaseError {
         expected: String,
         actual: String,
     },
+    #[error("crates.io version {package} {version} is yanked and cannot satisfy release recovery")]
+    RegistryYanked { package: String, version: String },
     #[error(
         "crates.io did not expose {package} {version} with checksum {checksum} before the visibility deadline"
     )]

@@ -18,6 +18,7 @@ const RELEASE_OPERATOR_PATH: &str =
     "${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release";
 const RELEASE_OPERATOR_TARGET: &str = "${{ runner.temp }}/stab-release-operator-${{ github.sha }}";
 const RELEASE_OPERATOR_BUILD_COMMAND: &str = "cargo build -q --locked -p stab-release";
+const DRAFT_OPERATOR_STEP_NAME: &str = "Verify retained assets and create digest-checked draft";
 const GITHUB_TOKEN_SECRET: &str = "${{ secrets.GITHUB_TOKEN }}";
 const RELEASE_REVISION_COMMAND: &str = concat!(
     "test \"$RELEASE_TAG\" = \"v0.2.0\"\n",
@@ -200,9 +201,13 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
         return;
     };
     inspect_release_revision_binding(path, root, report);
-    let workflow_secrets = mapping_value(root, "env")
-        .map(release_secrets)
-        .unwrap_or_default();
+    let workflow_environment = mapping_value(root, "env");
+    if workflow_environment.is_some_and(release_scope_declared) {
+        release_secret_violation(path, "workflow env", report);
+    }
+    if mapping_contains_release_token_expression_except(root, &["env", "jobs"]) {
+        release_secret_violation(path, "workflow metadata", report);
+    }
     let Some(jobs) = mapping_value(root, "jobs") else {
         return;
     };
@@ -219,11 +224,12 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
         let Some(job) = job.as_hash() else {
             continue;
         };
-        let inherited_secrets = workflow_secrets.merged(
-            mapping_value(job, "env")
-                .map(release_secrets)
-                .unwrap_or_default(),
-        );
+        if mapping_value(job, "env").is_some_and(release_scope_declared) {
+            release_secret_violation(path, &format!("job {job_name} env"), report);
+        }
+        if mapping_contains_release_token_expression_except(job, &["env", "steps"]) {
+            release_secret_violation(path, &format!("job {job_name} metadata"), report);
+        }
         if let Some(reference) = mapping_value(job, "uses") {
             inspect_action_reference(path, job_name, reference, report);
         }
@@ -249,13 +255,15 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
             let step_secrets = mapping_value(step, "env")
                 .map(release_secrets)
                 .unwrap_or_default();
-            if inherited_secrets.any() || step_secrets.any() {
+            if step_secrets.any() || mapping_contains_release_token_expression_except(step, &[]) {
                 inspect_secret_bearing_step(
                     path,
                     &location,
                     step,
-                    inherited_secrets,
                     step_secrets,
+                    path == Path::new(RELEASE_WORKFLOW_PATH)
+                        && job_name == "draft"
+                        && index.saturating_add(1) == steps.len(),
                     report,
                 );
             }
@@ -359,14 +367,19 @@ fn inspect_release_job_revision(
         );
         return;
     };
-    let checkout_ref = mapping_value(checkout, "with")
-        .and_then(Yaml::as_hash)
-        .and_then(|options| mapping_value(options, "ref"))
-        .and_then(yaml_scalar);
-    if checkout_ref != Some(RELEASE_CHECKOUT_REF) {
+    let checkout_options = mapping_value(checkout, "with").and_then(Yaml::as_hash);
+    let exact_checkout = checkout_options.is_some_and(|options| {
+        options.len() == 3
+            && mapping_value(options, "ref").and_then(yaml_scalar) == Some(RELEASE_CHECKOUT_REF)
+            && mapping_value(options, "fetch-depth") == Some(&Yaml::Integer(0))
+            && mapping_value(options, "persist-credentials") == Some(&Yaml::Boolean(false))
+    });
+    if !exact_checkout {
         release_revision_violation(
             path,
-            &format!("job {job_name} checkout must use immutable github.sha"),
+            &format!(
+                "job {job_name} checkout must use immutable github.sha, full history, and disabled credential persistence"
+            ),
             report,
         );
     }
@@ -381,12 +394,27 @@ fn inspect_release_job_revision(
             report,
         );
     }
-    if job_name == "draft" && !steps.iter().any(exact_release_operator_build_step) {
-        release_revision_violation(
-            path,
-            "job draft must build the release operator into the exact SHA-scoped runner target",
-            report,
-        );
+    if job_name == "draft" {
+        let build_indices = steps
+            .iter()
+            .enumerate()
+            .filter_map(|(index, step)| exact_release_operator_build_step(step).then_some(index))
+            .collect::<Vec<_>>();
+        let final_index = steps.len().checked_sub(1);
+        let ordered_operator = matches!(build_indices.as_slice(), [build_index]
+        if final_index.is_some_and(|final_index| {
+            build_index.saturating_add(1) == final_index
+                && steps
+                    .get(final_index)
+                    .is_some_and(exact_release_operator_invocation_step)
+        }));
+        if !ordered_operator {
+            release_revision_violation(
+                path,
+                "job draft must build one SHA-scoped release operator before the exact final draft invocation",
+                report,
+            );
+        }
     }
 }
 
@@ -451,13 +479,6 @@ impl ReleaseSecrets {
     fn any(self) -> bool {
         self.github_token || self.unexpected
     }
-
-    fn merged(self, other: Self) -> Self {
-        Self {
-            github_token: self.github_token || other.github_token,
-            unexpected: self.unexpected || other.unexpected,
-        }
-    }
 }
 
 fn release_secrets(value: &Yaml) -> ReleaseSecrets {
@@ -476,41 +497,107 @@ fn release_secrets(value: &Yaml) -> ReleaseSecrets {
     }
 }
 
+fn release_scope_declared(value: &Yaml) -> bool {
+    release_secrets(value).any() || yaml_contains_release_token_expression(value)
+}
+
+fn mapping_contains_release_token_expression_except(
+    mapping: &yaml_rust2::yaml::Hash,
+    excluded: &[&str],
+) -> bool {
+    mapping.iter().any(|(key, value)| {
+        let excluded = yaml_scalar(key).is_some_and(|key| excluded.contains(&key));
+        !excluded && yaml_contains_release_token_expression(value)
+    })
+}
+
+fn yaml_contains_release_token_expression(value: &Yaml) -> bool {
+    match value {
+        Yaml::String(value) => scalar_contains_release_token_expression(value),
+        Yaml::Array(values) => values.iter().any(yaml_contains_release_token_expression),
+        Yaml::Hash(mapping) => mapping.iter().any(|(key, value)| {
+            yaml_contains_release_token_expression(key)
+                || yaml_contains_release_token_expression(value)
+        }),
+        _ => false,
+    }
+}
+
+fn scalar_contains_release_token_expression(value: &str) -> bool {
+    let compact = value
+        .chars()
+        .filter(|character| !character.is_ascii_whitespace())
+        .flat_map(char::to_lowercase)
+        .collect::<String>();
+    [
+        "secrets.github_token",
+        "secrets['github_token']",
+        "secrets[\"github_token\"]",
+        "secrets.gh_token",
+        "secrets['gh_token']",
+        "secrets[\"gh_token\"]",
+        "secrets.cargo_registry_token",
+        "secrets['cargo_registry_token']",
+        "secrets[\"cargo_registry_token\"]",
+        "secrets.cargo_registries_crates_io_token",
+        "secrets['cargo_registries_crates_io_token']",
+        "secrets[\"cargo_registries_crates_io_token\"]",
+        "github.token",
+    ]
+    .iter()
+    .any(|needle| compact.contains(needle))
+}
+
 fn inspect_secret_bearing_step(
     path: &Path,
     location: &str,
     step: &yaml_rust2::yaml::Hash,
-    inherited_secrets: ReleaseSecrets,
     step_secrets: ReleaseSecrets,
+    is_final_draft_step: bool,
     report: &mut WorkflowActionReport,
 ) {
-    let command = mapping_value(step, "run").and_then(yaml_scalar);
-    let exact_environment = mapping_value(step, "env")
-        .and_then(Yaml::as_hash)
-        .is_some_and(|environment| {
-            environment.len() == 3
-                && mapping_value(environment, "GITHUB_TOKEN").and_then(yaml_scalar)
-                    == Some(GITHUB_TOKEN_SECRET)
-                && mapping_value(environment, "RELEASE_OPERATOR").and_then(yaml_scalar)
-                    == Some(RELEASE_OPERATOR_PATH)
-                && mapping_value(environment, "RELEASE_TAG").and_then(yaml_scalar)
-                    == Some(RELEASE_TAG_INPUT)
-        });
-    let exact_operator = !inherited_secrets.any()
+    let exact_operator = is_final_draft_step
         && step_secrets.github_token
         && !step_secrets.unexpected
-        && exact_environment
-        && mapping_value(step, "uses").is_none()
-        && command == Some(DRAFT_OPERATOR_COMMAND);
+        && exact_release_operator_invocation_mapping(step);
     if !exact_operator {
-        report.violations.push(Violation::new(
-            "workflow-release-secret-scope",
-            format!(
-                "workflow {} step {location} exposes an explicit release-token environment variable outside the prebuilt draft operator",
-                path.display()
-            ),
-        ));
+        release_secret_violation(path, &format!("step {location}"), report);
     }
+}
+
+fn exact_release_operator_invocation_step(step: &Yaml) -> bool {
+    step.as_hash()
+        .is_some_and(exact_release_operator_invocation_mapping)
+}
+
+fn exact_release_operator_invocation_mapping(step: &yaml_rust2::yaml::Hash) -> bool {
+    if step.len() != 3
+        || mapping_value(step, "name").and_then(yaml_scalar) != Some(DRAFT_OPERATOR_STEP_NAME)
+        || mapping_value(step, "run").and_then(yaml_scalar) != Some(DRAFT_OPERATOR_COMMAND)
+        || mapping_value(step, "uses").is_some()
+    {
+        return false;
+    }
+    let Some(environment) = mapping_value(step, "env").and_then(Yaml::as_hash) else {
+        return false;
+    };
+    environment.len() == 3
+        && mapping_value(environment, "GITHUB_TOKEN").and_then(yaml_scalar)
+            == Some(GITHUB_TOKEN_SECRET)
+        && mapping_value(environment, "RELEASE_OPERATOR").and_then(yaml_scalar)
+            == Some(RELEASE_OPERATOR_PATH)
+        && mapping_value(environment, "RELEASE_TAG").and_then(yaml_scalar)
+            == Some(RELEASE_TAG_INPUT)
+}
+
+fn release_secret_violation(path: &Path, location: &str, report: &mut WorkflowActionReport) {
+    report.violations.push(Violation::new(
+        "workflow-release-secret-scope",
+        format!(
+            "workflow {} {location} exposes a release credential outside the exact final draft operator",
+            path.display()
+        ),
+    ));
 }
 
 fn mapping_value<'a>(mapping: &'a yaml_rust2::yaml::Hash, key: &str) -> Option<&'a Yaml> {
@@ -655,6 +742,12 @@ jobs:
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}
         run: cargo build -q --locked -p stab-release
+      - name: Verify retained assets and create digest-checked draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_OPERATOR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: '"$RELEASE_OPERATOR" create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0'
 "#;
 
     #[test]
@@ -737,6 +830,23 @@ jobs:
     }
 
     #[test]
+    fn release_workflow_requires_full_history_without_persisted_credentials() {
+        for source in [
+            REVISION_BOUND_RELEASE_WORKFLOW.replace("fetch-depth: 0", "fetch-depth: 1"),
+            REVISION_BOUND_RELEASE_WORKFLOW
+                .replace("persist-credentials: false", "persist-credentials: true"),
+        ] {
+            let report = inspect_at(Path::new(".github/workflows/release.yml"), &source);
+            assert!(
+                report
+                    .violations
+                    .iter()
+                    .any(|violation| violation.code == "workflow-release-revision-binding")
+            );
+        }
+    }
+
+    #[test]
     fn release_workflow_rejects_shared_operator_target() {
         let source = REVISION_BOUND_RELEASE_WORKFLOW.replace(
             "${{ runner.temp }}/stab-release-operator-${{ github.sha }}",
@@ -750,6 +860,32 @@ jobs:
                 .iter()
                 .any(|violation| violation.code == "workflow-release-revision-binding")
         );
+    }
+
+    #[test]
+    fn release_workflow_requires_build_immediately_before_final_invocation() {
+        let invocation = r#"      - name: Verify retained assets and create digest-checked draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_OPERATOR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: '"$RELEASE_OPERATOR" create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0'
+"#;
+        for source in [
+            REVISION_BOUND_RELEASE_WORKFLOW.replace(invocation, ""),
+            REVISION_BOUND_RELEASE_WORKFLOW.replace(
+                invocation,
+                &format!("      - run: echo replace-operator\n{invocation}"),
+            ),
+        ] {
+            let report = inspect_at(Path::new(".github/workflows/release.yml"), &source);
+            assert!(
+                report
+                    .violations
+                    .iter()
+                    .any(|violation| violation.code == "workflow-release-revision-binding")
+            );
+        }
     }
 
     #[test]
@@ -899,20 +1035,41 @@ jobs:
     }
 
     #[test]
-    fn release_credential_is_accepted_only_for_the_prebuilt_draft_operator() {
-        let report = inspect(
+    fn release_credential_aliases_and_inline_expressions_are_rejected() {
+        for source in [
             r#"
 jobs:
   draft:
     steps:
       - env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_OPERATOR: ${{ runner.temp }}/stab-release-operator-${{ github.sha }}/debug/stab-release
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: '"$RELEASE_OPERATOR" create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0'
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo build
 "#,
-        );
-        assert!(report.violations.is_empty(), "{:?}", report.violations);
+            r#"
+jobs:
+  draft:
+    steps:
+      - run: 'echo ${{ secrets.GITHUB_TOKEN }}'
+"#,
+            r#"
+jobs:
+  draft:
+    steps:
+      - uses: owner/action@0123456789abcdef0123456789abcdef01234567
+        with:
+          token: ${{ github.token }}
+"#,
+        ] {
+            let report = inspect(source);
+            assert_eq!(
+                report
+                    .violations
+                    .iter()
+                    .filter(|violation| violation.code == "workflow-release-secret-scope")
+                    .count(),
+                1
+            );
+        }
     }
 
     #[test]
