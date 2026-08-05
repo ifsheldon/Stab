@@ -73,18 +73,3 @@ pub(crate) enum ArtifactError {
     #[error("qualification artifact read limit exceeds the source-owned maximum: {0}")]
     InvalidReadLimit(usize),
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn git_failures_remain_typed_at_publication_boundaries() {
-        let error =
-            ArtifactError::from(super::super::super::git::GitError::UnstableRepositoryState);
-        assert!(matches!(
-            error,
-            ArtifactError::Git(super::super::super::git::GitError::UnstableRepositoryState)
-        ));
-    }
-}

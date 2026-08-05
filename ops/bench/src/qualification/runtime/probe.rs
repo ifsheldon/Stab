@@ -10,7 +10,7 @@ use super::host::HostGuard;
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
-    parse_worker_json_lines,
+    Sha256Digest, parse_worker_json_lines,
 };
 use super::statistics::{PairOrder, pair_measurements};
 use super::worker;
@@ -629,14 +629,14 @@ fn run_adapter_probe(
             work_items: probe_work_items(&args),
             work_count: stim.work_count,
             input_bytes: stim.input_bytes,
-            input_digest: stim.input_digest.as_str().to_string(),
-            output_digest: stim.output_digest.as_str().to_string(),
-            stim_source_sha256: stim.source_digest.as_str().to_string(),
-            stim_build_fingerprint: stim.build_fingerprint.as_str().to_string(),
-            stim_binary_sha256: adapter.binary_digest.as_str().to_string(),
-            stab_source_sha256: stab.source_digest.as_str().to_string(),
-            stab_build_fingerprint: stab.build_fingerprint.as_str().to_string(),
-            stab_binary_sha256: private_worker.binary_sha256().to_string(),
+            input_digest: stim.input_digest.clone(),
+            output_digest: stim.output_digest.clone(),
+            stim_source_sha256: stim.source_digest.clone(),
+            stim_build_fingerprint: stim.build_fingerprint.clone(),
+            stim_binary_sha256: adapter.binary_digest.clone(),
+            stab_source_sha256: stab.source_digest.clone(),
+            stab_build_fingerprint: stab.build_fingerprint.clone(),
+            stab_binary_sha256: Sha256Digest::try_new(private_worker.binary_sha256())?,
         },
         dem_accepted_maximum_memory,
     })

@@ -6,7 +6,9 @@ use super::super::artifact::{
     DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding,
 };
 use super::super::host::HostEvidence;
-use super::super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
+use super::super::protocol::{
+    InputDigest, RAW_WORK_TIMING_BOUNDARY, SemanticDigest, Sha256Digest, TimingBoundary,
+};
 use super::super::run::RepositoryEvidence;
 use super::super::run::sha256_hex;
 use super::super::worker;
@@ -29,14 +31,14 @@ pub(in crate::qualification::runtime) struct AdapterProbeReceipt {
     pub(super) work_items: u64,
     pub(super) work_count: u64,
     pub(super) input_bytes: u64,
-    pub(super) input_digest: String,
-    pub(super) output_digest: String,
-    pub(in crate::qualification::runtime) stim_source_sha256: String,
-    pub(in crate::qualification::runtime) stim_build_fingerprint: String,
-    pub(in crate::qualification::runtime) stim_binary_sha256: String,
-    pub(in crate::qualification::runtime) stab_source_sha256: String,
-    pub(in crate::qualification::runtime) stab_build_fingerprint: String,
-    pub(in crate::qualification::runtime) stab_binary_sha256: String,
+    pub(super) input_digest: InputDigest,
+    pub(super) output_digest: SemanticDigest,
+    pub(in crate::qualification::runtime) stim_source_sha256: Sha256Digest,
+    pub(in crate::qualification::runtime) stim_build_fingerprint: Sha256Digest,
+    pub(in crate::qualification::runtime) stim_binary_sha256: Sha256Digest,
+    pub(in crate::qualification::runtime) stab_source_sha256: Sha256Digest,
+    pub(in crate::qualification::runtime) stab_build_fingerprint: Sha256Digest,
+    pub(in crate::qualification::runtime) stab_binary_sha256: Sha256Digest,
 }
 
 #[cfg(test)]
@@ -55,14 +57,16 @@ impl AdapterProbeReceipt {
             work_items: 1,
             work_count: 1,
             input_bytes: 1,
-            input_digest: "1".repeat(64),
-            output_digest: "2".repeat(64),
-            stim_source_sha256: "3".repeat(64),
-            stim_build_fingerprint: "4".repeat(64),
-            stim_binary_sha256: "5".repeat(64),
-            stab_source_sha256: "6".repeat(64),
-            stab_build_fingerprint: "7".repeat(64),
-            stab_binary_sha256: "8".repeat(64),
+            input_digest: InputDigest::try_new("1".repeat(64)).expect("input digest"),
+            output_digest: SemanticDigest::try_new("2".repeat(64)).expect("output digest"),
+            stim_source_sha256: Sha256Digest::try_new("3".repeat(64)).expect("Stim source digest"),
+            stim_build_fingerprint: Sha256Digest::try_new("4".repeat(64))
+                .expect("Stim build fingerprint"),
+            stim_binary_sha256: Sha256Digest::try_new("5".repeat(64)).expect("Stim binary digest"),
+            stab_source_sha256: Sha256Digest::try_new("6".repeat(64)).expect("Stab source digest"),
+            stab_build_fingerprint: Sha256Digest::try_new("7".repeat(64))
+                .expect("Stab build fingerprint"),
+            stab_binary_sha256: Sha256Digest::try_new("8".repeat(64)).expect("Stab binary digest"),
         }
     }
 }
@@ -330,18 +334,6 @@ fn valid_probe_identity(receipt: &AdapterProbeReceipt) -> bool {
         && receipt.work_items > 0
         && receipt.work_count > 0
         && receipt.input_bytes > 0
-        && [
-            &receipt.input_digest,
-            &receipt.output_digest,
-            &receipt.stim_source_sha256,
-            &receipt.stim_build_fingerprint,
-            &receipt.stim_binary_sha256,
-            &receipt.stab_source_sha256,
-            &receipt.stab_build_fingerprint,
-            &receipt.stab_binary_sha256,
-        ]
-        .into_iter()
-        .all(|digest| valid_sha256(digest))
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -378,14 +370,20 @@ mod tests {
                 work_items: 64,
                 work_count: 64,
                 input_bytes: 1,
-                input_digest: "a".repeat(64),
-                output_digest: "b".repeat(64),
-                stim_source_sha256: "c".repeat(64),
-                stim_build_fingerprint: "d".repeat(64),
-                stim_binary_sha256: "e".repeat(64),
-                stab_source_sha256: "f".repeat(64),
-                stab_build_fingerprint: "0".repeat(64),
-                stab_binary_sha256: "3".repeat(64),
+                input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
+                output_digest: SemanticDigest::try_new("b".repeat(64)).expect("output digest"),
+                stim_source_sha256: Sha256Digest::try_new("c".repeat(64))
+                    .expect("Stim source digest"),
+                stim_build_fingerprint: Sha256Digest::try_new("d".repeat(64))
+                    .expect("Stim build fingerprint"),
+                stim_binary_sha256: Sha256Digest::try_new("e".repeat(64))
+                    .expect("Stim binary digest"),
+                stab_source_sha256: Sha256Digest::try_new("f".repeat(64))
+                    .expect("Stab source digest"),
+                stab_build_fingerprint: Sha256Digest::try_new("0".repeat(64))
+                    .expect("Stab build fingerprint"),
+                stab_binary_sha256: Sha256Digest::try_new("3".repeat(64))
+                    .expect("Stab binary digest"),
             },
             dem_accepted_maximum_memory: worker::dem_model::DemFamily::ALL
                 .into_iter()
@@ -492,13 +490,6 @@ mod tests {
             validate_execution(&inverted_rss),
             Err(ProbeError::MemoryReceipt)
         ));
-
-        let mut missing_worker_binary = execution();
-        missing_worker_binary.receipt.stab_binary_sha256.clear();
-        assert!(matches!(
-            validate_execution(&missing_worker_binary),
-            Err(ProbeError::MemoryReceipt)
-        ));
     }
 
     #[test]
@@ -527,13 +518,13 @@ mod tests {
                 work_items: probe.work_items,
                 work_count: probe.work_count,
                 input_bytes: probe.input_bytes,
-                input_digest: probe.input_digest,
-                output_digest: probe.output_digest,
-                stim_source_sha256: probe.stim_source_sha256,
-                stim_build_fingerprint: probe.stim_build_fingerprint,
-                stim_binary_sha256: probe.stim_binary_sha256,
-                stab_source_sha256: probe.stab_source_sha256,
-                stab_build_fingerprint: probe.stab_build_fingerprint,
+                input_digest: probe.input_digest.as_str().to_string(),
+                output_digest: probe.output_digest.as_str().to_string(),
+                stim_source_sha256: probe.stim_source_sha256.as_str().to_string(),
+                stim_build_fingerprint: probe.stim_build_fingerprint.as_str().to_string(),
+                stim_binary_sha256: probe.stim_binary_sha256.as_str().to_string(),
+                stab_source_sha256: probe.stab_source_sha256.as_str().to_string(),
+                stab_build_fingerprint: probe.stab_build_fingerprint.as_str().to_string(),
             },
             accepted_maximum_memory: execution.dem_accepted_maximum_memory,
         };
@@ -568,5 +559,18 @@ mod tests {
 
         let decoded = decode_current_receipt(&canonical_bytes(&receipt)).expect("current receipt");
         assert_eq!(decoded.probe.stab_binary_sha256, expected_binary);
+
+        let mut malformed = serde_json::to_value(&receipt).expect("receipt value");
+        malformed
+            .get_mut("probe")
+            .and_then(serde_json::Value::as_object_mut)
+            .expect("probe object")
+            .insert("stab_binary_sha256".to_string(), serde_json::json!(""));
+        let mut malformed = serde_json::to_vec_pretty(&malformed).expect("malformed receipt");
+        malformed.push(b'\n');
+        assert!(matches!(
+            decode_current_receipt(&malformed),
+            Err(ProbeError::Json(_))
+        ));
     }
 }

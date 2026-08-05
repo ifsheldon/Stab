@@ -87,12 +87,12 @@ pub(super) fn validate_identity(
         || receipt.host.operating_system != shared.operating_system
         || receipt.host.architecture != shared.architecture
         || receipt.host.cpu_identity != shared.cpu_identity
-        || receipt.probe.stim_source_sha256 != shared.workers.stim_source_sha256
-        || receipt.probe.stim_build_fingerprint != shared.workers.stim_build_fingerprint
-        || receipt.probe.stim_binary_sha256 != shared.workers.stim_binary_sha256
-        || receipt.probe.stab_source_sha256 != shared.workers.stab_source_sha256
-        || receipt.probe.stab_build_fingerprint != shared.workers.stab_build_fingerprint
-        || receipt.probe.stab_binary_sha256 != shared.workers.stab_binary_sha256
+        || receipt.probe.stim_source_sha256.as_str() != shared.workers.stim_source_sha256
+        || receipt.probe.stim_build_fingerprint.as_str() != shared.workers.stim_build_fingerprint
+        || receipt.probe.stim_binary_sha256.as_str() != shared.workers.stim_binary_sha256
+        || receipt.probe.stab_source_sha256.as_str() != shared.workers.stab_source_sha256
+        || receipt.probe.stab_build_fingerprint.as_str() != shared.workers.stab_build_fingerprint
+        || receipt.probe.stab_binary_sha256.as_str() != shared.workers.stab_binary_sha256
     {
         return Err(CompletionError::MemoryReceiptIdentity(group_id.to_string()));
     }

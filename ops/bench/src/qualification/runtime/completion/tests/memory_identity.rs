@@ -3,6 +3,7 @@ use crate::qualification::runtime::{
     git::RepositoryState,
     host::HostEvidence,
     probe::{AdapterProbeReceipt, DemMemoryReceiptEvidence},
+    protocol::Sha256Digest,
 };
 
 fn memory_receipt_evidence(shared: &RollupReplayEvidence) -> DemMemoryReceiptEvidence {
@@ -48,15 +49,19 @@ fn memory_receipt_evidence(shared: &RollupReplayEvidence) -> DemMemoryReceiptEvi
         },
         probe: {
             let mut probe = AdapterProbeReceipt::test_fixture(DEM_PARSE_GROUP);
-            probe.stim_source_sha256 = shared.workers.stim_source_sha256.clone();
-            probe.stim_build_fingerprint = shared.workers.stim_build_fingerprint.clone();
-            probe.stim_binary_sha256 = shared.workers.stim_binary_sha256.clone();
-            probe.stab_source_sha256 = shared.workers.stab_source_sha256.clone();
-            probe.stab_build_fingerprint = shared.workers.stab_build_fingerprint.clone();
-            probe.stab_binary_sha256 = shared.workers.stab_binary_sha256.clone();
+            probe.stim_source_sha256 = digest(&shared.workers.stim_source_sha256);
+            probe.stim_build_fingerprint = digest(&shared.workers.stim_build_fingerprint);
+            probe.stim_binary_sha256 = digest(&shared.workers.stim_binary_sha256);
+            probe.stab_source_sha256 = digest(&shared.workers.stab_source_sha256);
+            probe.stab_build_fingerprint = digest(&shared.workers.stab_build_fingerprint);
+            probe.stab_binary_sha256 = digest(&shared.workers.stab_binary_sha256);
             probe
         },
     }
+}
+
+fn digest(value: &str) -> Sha256Digest {
+    Sha256Digest::try_new(value).expect("SHA-256 digest")
 }
 
 #[test]
@@ -87,14 +92,14 @@ fn completion_rejects_each_mismatched_private_worker_memory_identity() {
     };
 
     let mut wrong_source = memory_receipt_evidence(&shared);
-    wrong_source.probe.stab_source_sha256 = "0".repeat(64);
+    wrong_source.probe.stab_source_sha256 = digest(&"0".repeat(64));
     assert_rejected(&wrong_source);
 
     let mut wrong_build = memory_receipt_evidence(&shared);
-    wrong_build.probe.stab_build_fingerprint = "0".repeat(64);
+    wrong_build.probe.stab_build_fingerprint = digest(&"0".repeat(64));
     assert_rejected(&wrong_build);
 
     let mut wrong_binary = memory_receipt_evidence(&shared);
-    wrong_binary.probe.stab_binary_sha256 = "0".repeat(64);
+    wrong_binary.probe.stab_binary_sha256 = digest(&"0".repeat(64));
     assert_rejected(&wrong_binary);
 }
