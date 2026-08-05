@@ -193,7 +193,7 @@ impl GitHubToken {
     fn from_environment() -> Result<Self, ReleaseError> {
         let token = std::env::var_os("GITHUB_TOKEN").ok_or_else(|| {
             ReleaseError::GitHubRelease(
-                "GITHUB_TOKEN is required for draft release publication".to_string(),
+                "GITHUB_TOKEN is required for GitHub release operations".to_string(),
             )
         })?;
         let token = token.into_string().map_err(|_| {
@@ -412,7 +412,7 @@ impl DraftPublisher for GitHubApi {
     ) -> Result<RemoteRelease, ReleaseError> {
         require_release_tag(tag)?;
         let url = format!("{}/repos/{REPOSITORY}/releases/tags/{tag}", self.api_host);
-        self.get_json(&url, token, "GitHub draft verification")
+        self.get_json(&url, token, "GitHub release query")
     }
 }
 

@@ -22,6 +22,7 @@ pub(crate) struct ReviewedAsset {
     path: PathBuf,
     file: File,
     identity: safe_fs::FileIdentity,
+    read_limit: u64,
     bytes: u64,
     sha256: String,
 }
@@ -47,6 +48,25 @@ impl ReviewedAsset {
             .try_clone()
             .map_err(|source| ReleaseError::io(&self.path, source))
     }
+
+    fn revalidate(&self) -> Result<(), ReleaseError> {
+        safe_fs::require_same_path_identity(&self.path, self.identity)?;
+        let reader = self
+            .file
+            .try_clone()
+            .map_err(|source| ReleaseError::io(&self.path, source))?;
+        let bytes = safe_fs::read_bounded_file(reader, &self.path, self.read_limit)?;
+        safe_fs::require_same_path_identity(&self.path, self.identity)?;
+        if u64::try_from(bytes.len()).ok() != Some(self.bytes)
+            || archive::sha256_bytes(&bytes) != self.sha256
+        {
+            return Err(ReleaseError::BinaryContract(format!(
+                "reviewed release asset {} changed after validation",
+                self.name
+            )));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) struct ReviewedAssets {
@@ -71,7 +91,31 @@ impl ReviewedAssets {
     pub(crate) fn revalidate(&self) -> Result<(), ReleaseError> {
         self.directory.revalidate()?;
         for asset in &self.assets {
-            safe_fs::require_same_path_identity(&asset.path, asset.identity)?;
+            asset.revalidate()?;
+        }
+        self.require_exact_entry_set()?;
+        self.directory.revalidate()
+    }
+
+    fn require_exact_entry_set(&self) -> Result<(), ReleaseError> {
+        let expected = self
+            .assets
+            .iter()
+            .map(|asset| asset.name.clone())
+            .collect::<BTreeSet<_>>();
+        let actual = self
+            .directory
+            .entry_names(expected.len().saturating_add(1))?
+            .into_iter()
+            .map(|name| {
+                name.into_string()
+                    .map_err(|name| ReleaseError::InvalidPath(self.directory.path().join(name)))
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        if actual != expected {
+            return Err(ReleaseError::BinaryContract(format!(
+                "release asset set differs: expected {expected:?}, found {actual:?}"
+            )));
         }
         Ok(())
     }
@@ -332,6 +376,7 @@ fn retain_asset(
             path,
             file,
             identity,
+            read_limit: limit,
             bytes: byte_count,
             sha256,
         },
@@ -431,6 +476,7 @@ fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::Write as _;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt as _;
     use std::process::Command;
@@ -875,6 +921,70 @@ mod tests {
         assert!(matches!(
             reviewed.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_detect_same_inode_overwrite() {
+        let (root, assets) = tagged_asset_repository();
+        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        let path = root.path().join(&assets).join("stab-linux-aarch64");
+        let byte_count = fs::metadata(&path).expect("asset metadata").len();
+        let byte_count = usize::try_from(byte_count).expect("asset size fits usize");
+        fs::write(&path, vec![0x5a; byte_count]).expect("overwrite asset");
+
+        assert!(matches!(
+            reviewed.revalidate(),
+            Err(ReleaseError::BinaryContract(detail))
+                if detail.contains("changed after validation")
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_detect_same_inode_truncation() {
+        let (root, assets) = tagged_asset_repository();
+        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        let path = root.path().join(&assets).join("stab-linux-aarch64");
+        let byte_count = fs::metadata(&path).expect("asset metadata").len();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .expect("open asset")
+            .set_len(byte_count - 1)
+            .expect("truncate asset");
+
+        assert!(matches!(
+            reviewed.revalidate(),
+            Err(ReleaseError::BinaryContract(detail))
+                if detail.contains("changed after validation")
+        ));
+    }
+
+    #[test]
+    fn reviewed_assets_detect_same_inode_append() {
+        let (root, assets) = tagged_asset_repository();
+        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        let path = root.path().join(&assets).join("stab-linux-aarch64");
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .expect("open asset")
+            .write_all(b"appended")
+            .expect("append asset");
+
+        assert!(reviewed.revalidate().is_err());
+    }
+
+    #[test]
+    fn reviewed_assets_detect_extra_directory_entry() {
+        let (root, assets) = tagged_asset_repository();
+        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        fs::write(root.path().join(&assets).join("unexpected"), b"extra").expect("extra entry");
+
+        assert!(matches!(
+            reviewed.revalidate(),
+            Err(ReleaseError::BinaryContract(detail))
+                if detail.contains("release asset set differs")
         ));
     }
 
