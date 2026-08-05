@@ -3,6 +3,8 @@ use crate::qualification::runtime::correctness::{
     CorrectnessError, CorrectnessPreflightEvidence, CorrectnessPreflightStatus,
 };
 
+mod memory_identity;
+
 fn workers() -> WorkerIdentityEvidence {
     WorkerIdentityEvidence {
         stim_source_sha256: "a".repeat(64),

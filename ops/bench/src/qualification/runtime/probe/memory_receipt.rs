@@ -39,6 +39,34 @@ pub(in crate::qualification::runtime) struct AdapterProbeReceipt {
     pub(in crate::qualification::runtime) stab_binary_sha256: String,
 }
 
+#[cfg(test)]
+impl AdapterProbeReceipt {
+    pub(in crate::qualification::runtime) fn test_fixture(runtime_group_id: &str) -> Self {
+        let probe_id = match runtime_group_id {
+            super::DEM_PARSE_RUNTIME_GROUP_ID => super::DEM_PARSE_PROBE_ID,
+            super::DEM_CANONICAL_PRINT_RUNTIME_GROUP_ID => super::DEM_CANONICAL_PRINT_PROBE_ID,
+            _ => "test-probe",
+        };
+        Self {
+            probe_id: probe_id.to_string(),
+            runtime_group_id: runtime_group_id.to_string(),
+            evidence_mode: ProbeEvidenceMode::Memory.as_str().to_string(),
+            iteration_count: 1,
+            work_items: 1,
+            work_count: 1,
+            input_bytes: 1,
+            input_digest: "1".repeat(64),
+            output_digest: "2".repeat(64),
+            stim_source_sha256: "3".repeat(64),
+            stim_build_fingerprint: "4".repeat(64),
+            stim_binary_sha256: "5".repeat(64),
+            stab_source_sha256: "6".repeat(64),
+            stab_build_fingerprint: "7".repeat(64),
+            stab_binary_sha256: "8".repeat(64),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct HistoricalAdapterProbeReceiptV2 {

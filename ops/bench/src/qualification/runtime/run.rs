@@ -563,9 +563,17 @@ pub(super) fn bound_repository_state(
     root: &RepoRoot,
     repository: &RepositoryBinding,
 ) -> Result<super::git::RepositoryState, super::artifact::ArtifactError> {
+    bound_repository_state_with(root, repository, super::git::repository_state)
+}
+
+fn bound_repository_state_with(
+    root: &RepoRoot,
+    repository: &RepositoryBinding,
+    audit: impl FnOnce(&RepoRoot) -> Result<super::git::RepositoryState, super::git::GitError>,
+) -> Result<super::git::RepositoryState, super::artifact::ArtifactError> {
     repository.require_current(root)?;
     let descriptor_root = repository.descriptor_root(root)?;
-    let state = super::git::repository_state(&descriptor_root)?;
+    let state = audit(&descriptor_root)?;
     repository.require_current(root)?;
     Ok(state)
 }

@@ -32,12 +32,15 @@ mod tests;
 
 pub(super) use error::CompletionError;
 use group_correctness::{CompletionCorrectness, collect as completion_correctness};
-#[cfg(test)]
-use memory::validate_nofile_limit as validate_completion_nofile_limit;
 use memory::{
     ACCEPTED_MAXIMUM_MEMORY_GROUPS, CompletionAcceptedMaximumMemoryReceipt,
     RELEASE_SOFT_NOFILE_LIMIT, admit_paths as admit_memory_receipt_paths,
     collect as collect_memory_receipts, require_nofile_limit as require_completion_nofile_limit,
+};
+#[cfg(test)]
+use memory::{
+    validate_identity as validate_memory_receipt_identity,
+    validate_nofile_limit as validate_completion_nofile_limit,
 };
 use scope::{CompletionScope, MAX_ROLLUPS, RELEASE_SCOPE_ID, expected_rollup_keys};
 #[cfg(test)]

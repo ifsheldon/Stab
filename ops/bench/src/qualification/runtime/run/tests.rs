@@ -272,6 +272,25 @@ fn retained_repository_binding_rejects_root_swap_after_output_admission() {
 }
 
 #[test]
+fn bound_repository_state_preserves_typed_git_failures() {
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let root = RepoRoot::resolve(repository.path()).expect("repository root");
+    let binding = RepositoryBinding::open(&root).expect("bind repository");
+
+    let error = bound_repository_state_with(&root, &binding, |_| {
+        Err(super::super::git::GitError::UnstableRepositoryState)
+    })
+    .expect_err("unstable Git audit must fail publication");
+
+    assert!(matches!(
+        error,
+        super::super::artifact::ArtifactError::Git(
+            super::super::git::GitError::UnstableRepositoryState
+        )
+    ));
+}
+
+#[test]
 fn publication_repository_binding_rejects_commit_and_dirty_state_drift() {
     let expected = RepositoryEvidence {
         commit_before: "a".repeat(40),

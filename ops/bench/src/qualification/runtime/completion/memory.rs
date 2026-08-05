@@ -65,28 +65,38 @@ pub(super) fn collect(
         let receipt = by_group
             .remove(group_id)
             .ok_or_else(|| CompletionError::MissingMemoryReceipt(group_id.to_string()))?;
-        if receipt.repository.commit_before != repository_state.commit
-            || receipt.repository.commit_after != repository_state.commit
-            || receipt.host.policy_sha256 != shared.host_policy_sha256
-            || receipt.host.profile_id != shared.host_profile_id
-            || receipt.host.operating_system != shared.operating_system
-            || receipt.host.architecture != shared.architecture
-            || receipt.host.cpu_identity != shared.cpu_identity
-            || receipt.probe.stim_source_sha256 != shared.workers.stim_source_sha256
-            || receipt.probe.stim_build_fingerprint != shared.workers.stim_build_fingerprint
-            || receipt.probe.stim_binary_sha256 != shared.workers.stim_binary_sha256
-            || receipt.probe.stab_source_sha256 != shared.workers.stab_source_sha256
-            || receipt.probe.stab_build_fingerprint != shared.workers.stab_build_fingerprint
-            || receipt.probe.stab_binary_sha256 != shared.workers.stab_binary_sha256
-        {
-            return Err(CompletionError::MemoryReceiptIdentity(group_id.to_string()));
-        }
+        validate_identity(group_id, &receipt, shared, repository_state)?;
         ordered.push(receipt);
     }
     if !by_group.is_empty() {
         return Err(CompletionError::MemoryReceiptCount(paths.len()));
     }
     Ok(ordered)
+}
+
+pub(super) fn validate_identity(
+    group_id: &str,
+    receipt: &DemMemoryReceiptEvidence,
+    shared: &RollupReplayEvidence,
+    repository_state: &RepositoryState,
+) -> Result<(), CompletionError> {
+    if receipt.repository.commit_before != repository_state.commit
+        || receipt.repository.commit_after != repository_state.commit
+        || receipt.host.policy_sha256 != shared.host_policy_sha256
+        || receipt.host.profile_id != shared.host_profile_id
+        || receipt.host.operating_system != shared.operating_system
+        || receipt.host.architecture != shared.architecture
+        || receipt.host.cpu_identity != shared.cpu_identity
+        || receipt.probe.stim_source_sha256 != shared.workers.stim_source_sha256
+        || receipt.probe.stim_build_fingerprint != shared.workers.stim_build_fingerprint
+        || receipt.probe.stim_binary_sha256 != shared.workers.stim_binary_sha256
+        || receipt.probe.stab_source_sha256 != shared.workers.stab_source_sha256
+        || receipt.probe.stab_build_fingerprint != shared.workers.stab_build_fingerprint
+        || receipt.probe.stab_binary_sha256 != shared.workers.stab_binary_sha256
+    {
+        return Err(CompletionError::MemoryReceiptIdentity(group_id.to_string()));
+    }
+    Ok(())
 }
 
 pub(super) fn require_nofile_limit(scope: &CompletionScope) -> Result<u64, CompletionError> {
