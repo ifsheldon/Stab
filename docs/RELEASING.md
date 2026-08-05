@@ -69,17 +69,49 @@ test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
 
 The local and remote peel checks are mandatory. Stop if either tag does not resolve to `RELEASE_COMMIT`; do not move or replace a published release tag.
 
+Repository ruleset `20419793`, named `Protect Stab v0.2.0 release tag`, must remain active throughout tag and release work. It targets only `refs/tags/v0.2.0`, rejects tag update and deletion, and has no bypass actor; the release operator reads that exact ruleset before and after every draft or release verification and fails closed if its identity, target, rules, enforcement, or bypass state changes.
+
 Dispatch the `Release` workflow from the existing tag ref, not from the default branch, and record the resulting run identity:
 
 ```text
-gh workflow run release.yml --ref "$RELEASE_TAG" -f tag="$RELEASE_TAG"
-gh run list --workflow release.yml --limit 1 --json databaseId,headSha,status,conclusion,url
+RELEASE_RUN_URL="$(gh workflow run release.yml --ref "$RELEASE_TAG" -f tag="$RELEASE_TAG")"
+RELEASE_RUN_ID="${RELEASE_RUN_URL##*/}"
+test "$RELEASE_RUN_URL" = "https://github.com/ifsheldon/Stab/actions/runs/$RELEASE_RUN_ID"
+printf '%s\n' "$RELEASE_RUN_ID" | grep -Eq '^[0-9]+$'
+gh run view "$RELEASE_RUN_ID" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
+gh run watch "$RELEASE_RUN_ID" --exit-status
+gh run view "$RELEASE_RUN_ID" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
 ```
 
-Do not accept the run unless its `headSha` equals `RELEASE_COMMIT`. Every third-party action in the workflow is pinned to a reviewed full commit SHA, including the checkout action used by the `contents: write` draft job; `just architecture::check` opens workflow files through no-follow descriptors and rejects mutable action refs across all tracked workflows. Each native runner checks out immutable `github.sha`, verifies that the input is exactly `v0.2.0`, the event ref is exactly `refs/tags/v0.2.0`, and the local tag, event ref, and `HEAD` all resolve to that SHA. It then invokes the Rust release operation, which builds into a new isolated target, requires `stab --version` to report exactly `0.2.0` with one LF, validates the runnable AArch64 executable format for the target operating system, and emits the binary, checksum sidecar, and source-provenance manifest.
+Do not discover the run with `gh run list`; a concurrent dispatch could make a latest-run query select unrelated work. Do not accept the captured run unless its database ID and URL agree with `RELEASE_RUN_ID` and `RELEASE_RUN_URL`, `workflowName` is `Release`, `event` is `workflow_dispatch`, `headBranch` is `v0.2.0`, `headSha` equals `RELEASE_COMMIT`, and the final status and conclusion are `completed` and `success`. Every third-party action in the workflow is pinned to a reviewed full commit SHA, including the checkout action used by the `contents: write` draft job; `just architecture::check` opens workflow files through no-follow descriptors and rejects mutable action refs across all tracked workflows. The architecture contract also freezes the complete release workflow execution context: exact jobs, runners, timeout, permissions, environment, shell-bearing steps, action inputs, and commands. Each native runner checks out immutable `github.sha`, verifies that the input is exactly `v0.2.0`, the event ref is exactly `refs/tags/v0.2.0`, and the local tag, event ref, and `HEAD` all resolve to that SHA. It then invokes the Rust release operation, which builds into a new isolated target, requires `stab --version` to report exactly `0.2.0` with one LF, validates the runnable AArch64 executable format for the target operating system, and emits the binary, checksum sidecar, and source-provenance manifest.
 
-The final job builds `stab-release` without explicit publication-token variables into `${{ runner.temp }}/stab-release-operator-${{ github.sha }}`, then exposes a step-local `GITHUB_TOKEN` binding only while invoking that SHA-scoped prebuilt operator with the exact `create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0` argv as the final job step. The step declares no Cargo token or `GH_TOKEN`, and the binary rejects a direct draft invocation carrying any of them. `just architecture::check` requires immutable checkout with full history and credential persistence disabled, requires the operator build immediately before the final invocation, and recursively rejects recognized release-token expressions hidden under aliases, action inputs, or inline commands. The reviewed full-SHA actions still execute under the draft job's declared GitHub permission model. The draft operation verifies the machine-owned A9 completion before reading `GITHUB_TOKEN`, opens and retains the exact six expected regular files before any remote mutation, rejects missing or extra entries and every manifest, checksum, architecture, version, commit, complete target-aware pinned-toolchain identity, or path-identity mismatch, and verifies that the existing remote tag is annotated and resolves to the reviewed commit before mutation and again immediately before success. It creates only a private draft through the GitHub API, uploads the retained bytes without reopening workspace paths, and checks the returned and final GitHub asset names, upload states, sizes, and `sha256:` digests. An existing release or duplicate asset causes failure; the operation has no replace or publish path.
+The final job builds `stab-release` without explicit publication-token variables into `${{ runner.temp }}/stab-release-operator-${{ github.sha }}`, then exposes a step-local `GITHUB_TOKEN` binding only while invoking that SHA-scoped prebuilt operator with the exact `create-draft --assets target/releases/assets --tag "$RELEASE_TAG" --confirm-version 0.2.0` argv as the final job step. The step declares no Cargo token or `GH_TOKEN`, and the binary rejects a direct draft invocation carrying any of them. `just architecture::check` requires immutable checkout with full history and credential persistence disabled, requires the operator build immediately before the final invocation, and recursively rejects recognized release-token expressions hidden under aliases, action inputs, or inline commands. The reviewed full-SHA actions still execute under the draft job's declared GitHub permission model. The draft operation verifies the machine-owned A9 completion before reading `GITHUB_TOKEN`, opens and retains the exact six expected regular files before any remote mutation, rejects missing or extra entries and every manifest, checksum, architecture, version, commit, complete target-aware pinned-toolchain identity, or path-identity mismatch, and verifies that the exact release-tag ruleset is active and the existing remote tag is annotated and resolves to the reviewed commit before mutation and again immediately before success. It creates only a private draft through the GitHub API, uploads the retained bytes without reopening workspace paths, and checks the returned and final GitHub asset names, upload states, sizes, and `sha256:` digests. An existing release or duplicate asset causes failure; the operation has no replace or publish path.
 
-Inspect the private draft, verify its source identity, both binaries, both checksum files, both provenance manifests, and all GitHub-recorded asset digests, then publish the draft manually. A failed workflow can leave an incomplete private draft; delete that draft only after reviewing its assets, then rerun. Existing release assets are never replaced.
+Download the two exact workflow artifacts from the captured run into a new local directory, then run the read-only remote verifier immediately before manual publication:
+
+```text
+RELEASE_ASSETS="target/releases/v0.2.0-<commit>-workflow-assets"
+test ! -e "$RELEASE_ASSETS"
+mkdir "$RELEASE_ASSETS"
+gh run download "$RELEASE_RUN_ID" --name stab-linux-aarch64 --dir "$RELEASE_ASSETS"
+gh run download "$RELEASE_RUN_ID" --name stab-macos-aarch64 --dir "$RELEASE_ASSETS"
+export GITHUB_TOKEN="$(gh auth token)"
+just release::verify-remote-draft --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
+unset GITHUB_TOKEN
+```
+
+Inspect the private draft, verify its source identity, both binaries, both checksum files, both provenance manifests, and all GitHub-recorded asset digests, then publish the draft manually. Do not publish if time or unrelated activity intervenes after the read-only verification; run `release::verify-remote-draft` again immediately before publication. A failed workflow can leave an incomplete private draft; delete that draft only after reviewing its assets, then rerun. Existing release assets are never replaced.
+
+Immediately after manual publication, verify the exact public state and retained assets, then repeat the remote annotated-tag peel:
+
+```text
+export GITHUB_TOKEN="$(gh auth token)"
+just release::verify-published-release --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
+unset GITHUB_TOKEN
+REMOTE_RELEASE_COMMIT="$(git ls-remote --exit-code origin 'refs/tags/v0.2.0^{}' | cut -f1)"
+test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
+```
+
+Both read-only verifiers rerun the A9 machine authorization before reading `GITHUB_TOKEN`, retain and revalidate the local six-file asset set, require the exact active no-bypass release-tag ruleset, bracket the GitHub read with remote annotated-tag checks, and require exact release state, names, sizes, successful upload states, and GitHub-recorded SHA-256 digests. The post-publication verifier additionally requires a nonempty publication timestamp.
 
 The single status descendant is the final source revision for this release. Do not edit the A9 progress report or create a post-publication source commit to record release results. Preserve the final release URL, crates.io package URLs and reviewed checksums, GitHub Actions workflow run identity, remote annotated-tag peel, and release-asset digests in external release records outside the source tree. Crates.io, the remote tag, the published GitHub release and its assets, and the GitHub Actions run remain the authoritative public records; retain any consolidated operator ledger outside the repository. Keep the immutable local preflight report and final qualification checkpoint with the release records according to the project's artifact-retention policy.

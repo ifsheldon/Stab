@@ -120,6 +120,22 @@ pub fn create_verified_draft(
     Ok(())
 }
 
+pub fn verify_remote_draft(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
+    let root = repository_root()?;
+    github::verify_remote_release(&root, assets, tag, github::RemoteReleaseState::Draft)?;
+    println!("[stab-release] verified private draft {tag} with exact reviewed assets");
+    Ok(())
+}
+
+pub fn verify_published_release(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
+    let root = repository_root()?;
+    github::verify_remote_release(&root, assets, tag, github::RemoteReleaseState::Published)?;
+    println!("[stab-release] verified published release {tag} with exact reviewed assets");
+    Ok(())
+}
+
 fn repository_root() -> Result<PathBuf, ReleaseError> {
     let candidate = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     std::fs::canonicalize(&candidate).map_err(|source| ReleaseError::ResolveRoot {

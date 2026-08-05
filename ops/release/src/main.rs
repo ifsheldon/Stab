@@ -84,6 +84,24 @@ enum Command {
         #[arg(long)]
         confirm_version: String,
     },
+    /// Revalidate the private GitHub draft immediately before publication.
+    VerifyRemoteDraft {
+        /// Directory containing both targets' reviewed release assets.
+        #[arg(long)]
+        assets: PathBuf,
+        /// Annotated release tag that must resolve locally and remotely to this revision.
+        #[arg(long)]
+        tag: String,
+    },
+    /// Verify the public GitHub release and exact assets after publication.
+    VerifyPublishedRelease {
+        /// Directory containing both targets' reviewed release assets.
+        #[arg(long)]
+        assets: PathBuf,
+        /// Annotated release tag that must resolve locally and remotely to this revision.
+        #[arg(long)]
+        tag: String,
+    },
 }
 
 fn main() {
@@ -124,6 +142,12 @@ fn main() {
             tag,
             confirm_version,
         } => stab_release::create_verified_draft(&assets, &tag, &confirm_version),
+        Command::VerifyRemoteDraft { assets, tag } => {
+            stab_release::verify_remote_draft(&assets, &tag)
+        }
+        Command::VerifyPublishedRelease { assets, tag } => {
+            stab_release::verify_published_release(&assets, &tag)
+        }
     };
     if let Err(error) = result {
         eprintln!("[stab-release] error: {error}");

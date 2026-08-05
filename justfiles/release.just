@@ -48,3 +48,15 @@ verify-assets assets tag:
 [arg("confirm_version", long="confirm-version", pattern="0\\.2\\.0")]
 create-draft assets tag confirm_version: build-operator
     exec /usr/bin/env -u CARGO_REGISTRY_TOKEN -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GH_TOKEN {{quote(operator_binary)}} create-draft --assets {{quote(assets)}} --tag {{quote(tag)}} --confirm-version {{quote(confirm_version)}}
+
+# Revalidate the exact private draft and retained assets immediately before publication.
+[arg("assets", long)]
+[arg("tag", long, pattern="v0\\.2\\.0")]
+verify-remote-draft assets tag: build-operator
+    exec /usr/bin/env -u CARGO_REGISTRY_TOKEN -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GH_TOKEN {{quote(operator_binary)}} verify-remote-draft --assets {{quote(assets)}} --tag {{quote(tag)}}
+
+# Verify the exact public release and retained assets after publication.
+[arg("assets", long)]
+[arg("tag", long, pattern="v0\\.2\\.0")]
+verify-published-release assets tag: build-operator
+    exec /usr/bin/env -u CARGO_REGISTRY_TOKEN -u CARGO_REGISTRIES_CRATES_IO_TOKEN -u GH_TOKEN {{quote(operator_binary)}} verify-published-release --assets {{quote(assets)}} --tag {{quote(tag)}}

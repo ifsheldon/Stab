@@ -9,6 +9,7 @@ const GH_TOKEN: &str = "GH_TOKEN";
 pub(crate) enum CredentialScope {
     PublishReviewed,
     CreateDraft,
+    VerifyRemoteRelease,
 }
 
 impl CredentialScope {
@@ -16,13 +17,14 @@ impl CredentialScope {
         match self {
             Self::PublishReviewed => "publish-reviewed",
             Self::CreateDraft => "create-draft",
+            Self::VerifyRemoteRelease => "verify-remote-release",
         }
     }
 
     fn forbidden(self) -> &'static [&'static str] {
         match self {
             Self::PublishReviewed => &[CARGO_REGISTRIES_CRATES_IO_TOKEN, GITHUB_TOKEN, GH_TOKEN],
-            Self::CreateDraft => &[
+            Self::CreateDraft | Self::VerifyRemoteRelease => &[
                 CARGO_REGISTRY_TOKEN,
                 CARGO_REGISTRIES_CRATES_IO_TOKEN,
                 GH_TOKEN,
@@ -105,28 +107,30 @@ mod tests {
 
     #[test]
     fn draft_scope_allows_only_the_github_token() {
-        require_fixture_scope(
+        for scope in [
             CredentialScope::CreateDraft,
-            &[("GITHUB_TOKEN", "reviewed-github-secret")],
-        )
-        .expect("primary GitHub token is allowed");
-
-        for forbidden in [
-            "CARGO_REGISTRY_TOKEN",
-            "CARGO_REGISTRIES_CRATES_IO_TOKEN",
-            "GH_TOKEN",
+            CredentialScope::VerifyRemoteRelease,
         ] {
-            let error = require_fixture_scope(
-                CredentialScope::CreateDraft,
-                &[
-                    ("GITHUB_TOKEN", "reviewed-github-secret"),
-                    (forbidden, "must-not-appear-in-diagnostics"),
-                ],
-            )
-            .expect_err("unrelated publication credential must be rejected");
-            let diagnostic = error.to_string();
-            assert!(diagnostic.contains(forbidden));
-            assert!(!diagnostic.contains("must-not-appear-in-diagnostics"));
+            require_fixture_scope(scope, &[("GITHUB_TOKEN", "reviewed-github-secret")])
+                .expect("primary GitHub token is allowed");
+
+            for forbidden in [
+                "CARGO_REGISTRY_TOKEN",
+                "CARGO_REGISTRIES_CRATES_IO_TOKEN",
+                "GH_TOKEN",
+            ] {
+                let error = require_fixture_scope(
+                    scope,
+                    &[
+                        ("GITHUB_TOKEN", "reviewed-github-secret"),
+                        (forbidden, "must-not-appear-in-diagnostics"),
+                    ],
+                )
+                .expect_err("unrelated publication credential must be rejected");
+                let diagnostic = error.to_string();
+                assert!(diagnostic.contains(forbidden));
+                assert!(!diagnostic.contains("must-not-appear-in-diagnostics"));
+            }
         }
     }
 }

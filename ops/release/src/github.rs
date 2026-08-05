@@ -10,6 +10,8 @@ use crate::{
     cancellation::ReleaseCancellation, repository,
 };
 
+mod ruleset;
+
 const API_HOST: &str = "https://api.github.com";
 const UPLOAD_HOST: &str = "https://uploads.github.com";
 const API_VERSION: &str = "2022-11-28";
@@ -18,6 +20,12 @@ const MAX_RESPONSE_BYTES: u64 = 1 << 20;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const RELEASE_TITLE: &str = "Stab 0.2.0";
 const RELEASE_NOTES: &str = "Stab 0.2.0";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RemoteReleaseState {
+    Draft,
+    Published,
+}
 
 pub(crate) fn create_verified_draft(
     root: &Path,
@@ -66,7 +74,7 @@ fn publish_draft(
     with_stable_remote_tag(publisher, tag, commit, token, |publisher| {
         reviewed.revalidate()?;
         let created = publisher.create_draft(tag, commit, token)?;
-        validate_release(&created, tag, &[])?;
+        validate_release(&created, tag, &[], RemoteReleaseState::Draft)?;
 
         for asset in reviewed.assets_mut() {
             cancellation.check("GitHub asset upload")?;
@@ -91,8 +99,42 @@ fn publish_draft(
                 sha256: asset.sha256().to_string(),
             })
             .collect::<Vec<_>>();
-        validate_release(&recorded, tag, &expected_assets)
+        validate_release(&recorded, tag, &expected_assets, RemoteReleaseState::Draft)
     })
+}
+
+pub(crate) fn verify_remote_release(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+    expected_state: RemoteReleaseState,
+) -> Result<(), ReleaseError> {
+    let reviewed = artifact::review_assets(root, assets, tag)?;
+    let commit = reviewed.commit().to_string();
+    let cancellation = ReleaseCancellation::for_signals()?;
+    authorization::require_a9_release(root, &cancellation)?;
+    reviewed.revalidate()?;
+    repository::require_unchanged(root, &commit)?;
+
+    let token = GitHubToken::from_environment()?;
+    let expected_assets = reviewed
+        .assets()
+        .iter()
+        .map(|asset| ExpectedAsset {
+            name: asset.name().to_string(),
+            bytes: asset.bytes(),
+            sha256: asset.sha256().to_string(),
+        })
+        .collect::<Vec<_>>();
+    let mut verifier = GitHubApi::new(cancellation.clone());
+    with_stable_remote_tag(&mut verifier, tag, &commit, &token, |verifier| {
+        cancellation.check("GitHub release verification")?;
+        let recorded = verifier.release_by_tag(tag, &token)?;
+        validate_release(&recorded, tag, &expected_assets, expected_state)
+    })?;
+    drop(token);
+    reviewed.revalidate()?;
+    repository::require_unchanged(root, &commit)
 }
 
 fn with_stable_remote_tag<P, F>(
@@ -106,12 +148,16 @@ where
     P: DraftPublisher,
     F: FnOnce(&mut P) -> Result<(), ReleaseError>,
 {
+    publisher.require_release_tag_ruleset(token)?;
     publisher.require_remote_annotated_tag(tag, commit, token)?;
     operation(publisher)?;
-    publisher.require_remote_annotated_tag(tag, commit, token)
+    publisher.require_remote_annotated_tag(tag, commit, token)?;
+    publisher.require_release_tag_ruleset(token)
 }
 
 trait DraftPublisher {
+    fn require_release_tag_ruleset(&mut self, token: &GitHubToken) -> Result<(), ReleaseError>;
+
     fn require_remote_annotated_tag(
         &mut self,
         tag: &str,
@@ -289,6 +335,17 @@ impl GitHubApi {
 }
 
 impl DraftPublisher for GitHubApi {
+    fn require_release_tag_ruleset(&mut self, token: &GitHubToken) -> Result<(), ReleaseError> {
+        let url = format!(
+            "{}/repos/{REPOSITORY}/rulesets/{}",
+            self.api_host,
+            ruleset::ID,
+        );
+        let ruleset: ruleset::RemoteRuleset =
+            self.get_json(&url, token, "GitHub release-tag ruleset verification")?;
+        ruleset::validate(&ruleset)
+    }
+
     fn require_remote_annotated_tag(
         &mut self,
         tag: &str,
@@ -363,17 +420,32 @@ fn validate_release(
     release: &RemoteRelease,
     tag: &str,
     expected_assets: &[ExpectedAsset],
+    expected_state: RemoteReleaseState,
 ) -> Result<(), ReleaseError> {
+    let valid_state = match expected_state {
+        RemoteReleaseState::Draft => release.draft && release.published_at.is_none(),
+        RemoteReleaseState::Published => {
+            !release.draft
+                && release
+                    .published_at
+                    .as_deref()
+                    .is_some_and(|value| !value.is_empty())
+        }
+    };
     if release.id == 0
         || release.tag_name != tag
         || release.name.as_deref() != Some(RELEASE_TITLE)
         || release.body.as_deref() != Some(RELEASE_NOTES)
-        || !release.draft
+        || !valid_state
         || release.prerelease
     {
-        return Err(ReleaseError::GitHubRelease(
-            "GitHub release is not the exact requested private draft".to_string(),
-        ));
+        return Err(ReleaseError::GitHubRelease(format!(
+            "GitHub release is not the exact requested {} state",
+            match expected_state {
+                RemoteReleaseState::Draft => "private draft",
+                RemoteReleaseState::Published => "published release",
+            }
+        )));
     }
     let expected = expected_assets
         .iter()
@@ -525,6 +597,8 @@ struct RemoteRelease {
     draft: bool,
     prerelease: bool,
     #[serde(default)]
+    published_at: Option<String>,
+    #[serde(default)]
     assets: Vec<RemoteAsset>,
 }
 
@@ -626,6 +700,14 @@ mod tests {
     }
 
     impl DraftPublisher for MovingTagPublisher {
+        fn require_release_tag_ruleset(
+            &mut self,
+            _token: &GitHubToken,
+        ) -> Result<(), ReleaseError> {
+            self.events.push("ruleset-check");
+            Ok(())
+        }
+
         fn require_remote_annotated_tag(
             &mut self,
             _tag: &str,
@@ -708,11 +790,45 @@ mod tests {
         assert_eq!(
             publisher.events,
             [
+                "ruleset-check",
                 "tag-check",
                 "draft-created",
                 "assets-uploaded",
                 "final-release-validated",
                 "tag-check",
+            ]
+        );
+    }
+
+    #[test]
+    fn release_protection_and_tag_identity_bracket_remote_verification() {
+        let reviewed_commit = "1".repeat(40);
+        let mut publisher = MovingTagPublisher {
+            remote_commit: reviewed_commit.clone(),
+            events: Vec::new(),
+        };
+        let token = GitHubToken("reviewed-token".to_string());
+
+        with_stable_remote_tag(
+            &mut publisher,
+            RELEASE_TAG,
+            &reviewed_commit,
+            &token,
+            |publisher| {
+                publisher.events.push("release-validated");
+                Ok(())
+            },
+        )
+        .expect("stable protected release tag");
+
+        assert_eq!(
+            publisher.events,
+            [
+                "ruleset-check",
+                "tag-check",
+                "release-validated",
+                "tag-check",
+                "ruleset-check",
             ]
         );
     }
@@ -742,21 +858,41 @@ mod tests {
             body: Some(RELEASE_NOTES.to_string()),
             draft: true,
             prerelease: false,
+            published_at: None,
             assets: identities
                 .iter()
                 .map(|(name, bytes)| remote_asset(name, bytes))
                 .collect(),
         };
-        validate_release(&release, RELEASE_TAG, &expected).expect("complete draft");
+        validate_release(&release, RELEASE_TAG, &expected, RemoteReleaseState::Draft)
+            .expect("complete draft");
 
         release.assets.pop();
-        assert!(validate_release(&release, RELEASE_TAG, &expected).is_err());
+        assert!(
+            validate_release(&release, RELEASE_TAG, &expected, RemoteReleaseState::Draft).is_err()
+        );
         release.assets = identities
             .iter()
             .map(|(name, bytes)| remote_asset(name, bytes))
             .collect();
         release.draft = false;
-        assert!(validate_release(&release, RELEASE_TAG, &expected).is_err());
+        assert!(
+            validate_release(
+                &release,
+                RELEASE_TAG,
+                &expected,
+                RemoteReleaseState::Published
+            )
+            .is_err()
+        );
+        release.published_at = Some("2026-08-04T00:00:00Z".to_string());
+        validate_release(
+            &release,
+            RELEASE_TAG,
+            &expected,
+            RemoteReleaseState::Published,
+        )
+        .expect("complete published release");
     }
 
     #[test]
@@ -839,7 +975,8 @@ mod tests {
                 &GitHubToken("reviewed-token".to_string()),
             )
             .expect("create draft");
-        validate_release(&release, RELEASE_TAG, &[]).expect("private draft");
+        validate_release(&release, RELEASE_TAG, &[], RemoteReleaseState::Draft)
+            .expect("private draft");
         server.join().expect("server");
     }
 
