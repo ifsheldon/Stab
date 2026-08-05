@@ -810,6 +810,22 @@ mod tests {
     }
 
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    fn execute_generated_fixture(path: &Path) -> std::io::Result<std::process::ExitStatus> {
+        let mut retries = 4_u8;
+        loop {
+            match Command::new(path).status() {
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::ExecutableFileBusy && retries > 0 =>
+                {
+                    retries = retries.saturating_sub(1);
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                result => return result,
+            }
+        }
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     #[test]
     fn accepted_linux_fixtures_execute_successfully() {
         for (name, kind) in [
@@ -818,12 +834,17 @@ mod tests {
         ] {
             let root = tempfile::tempdir().expect("root");
             let path = root.path().join(name);
-            fs::write(&path, elf_aarch64(kind, object::elf::EM_AARCH64.0)).expect("write fixture");
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+            let mut fixture = fs::File::create(&path).expect("create fixture");
+            fixture
+                .write_all(&elf_aarch64(kind, object::elf::EM_AARCH64.0))
+                .expect("write fixture");
+            fixture
+                .set_permissions(fs::Permissions::from_mode(0o755))
                 .expect("fixture permissions");
+            fixture.sync_all().expect("sync fixture");
+            drop(fixture);
             assert!(
-                std::process::Command::new(&path)
-                    .status()
+                execute_generated_fixture(&path)
                     .expect("execute fixture")
                     .success(),
                 "{name} fixture did not execute successfully"
