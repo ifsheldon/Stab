@@ -34,6 +34,10 @@ pub(in crate::qualification::runtime) enum ProbeError {
     RepositoryChanged { before: String, after: String },
     #[error("DEM accepted-maximum memory receipt is incomplete or malformed")]
     MemoryReceipt,
+    #[error("DEM accepted-maximum memory receipt schema {0} is historical and nonpromotable")]
+    HistoricalMemoryReceipt(u32),
+    #[error("DEM accepted-maximum memory receipt schema {0} is unsupported")]
+    MemoryReceiptSchema(u32),
     #[error("qualification probe semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to serialize the qualification probe receipt: {0}")]

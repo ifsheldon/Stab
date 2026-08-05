@@ -15,7 +15,8 @@ use super::{ProbeArgs, ProbeError, ProbeEvidenceMode, ProbeGroup};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-const MEMORY_RECEIPT_SCHEMA_VERSION: u32 = 2;
+const MEMORY_RECEIPT_SCHEMA_VERSION: u32 = 3;
+const HISTORICAL_MEMORY_RECEIPT_SCHEMA_VERSION: u32 = 2;
 pub(in crate::qualification::runtime) const MAX_MEMORY_RECEIPT_BYTES: usize = 4 << 20;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -38,6 +39,25 @@ pub(in crate::qualification::runtime) struct AdapterProbeReceipt {
     pub(in crate::qualification::runtime) stab_binary_sha256: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct HistoricalAdapterProbeReceiptV2 {
+    probe_id: String,
+    runtime_group_id: String,
+    evidence_mode: String,
+    iteration_count: u64,
+    work_items: u64,
+    work_count: u64,
+    input_bytes: u64,
+    input_digest: String,
+    output_digest: String,
+    stim_source_sha256: String,
+    stim_build_fingerprint: String,
+    stim_binary_sha256: String,
+    stab_source_sha256: String,
+    stab_build_fingerprint: String,
+}
+
 #[derive(Debug)]
 pub(super) struct AdapterProbeExecution {
     pub(super) receipt: AdapterProbeReceipt,
@@ -46,7 +66,7 @@ pub(super) struct AdapterProbeExecution {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct DemAcceptedMaximumMemoryReceipt {
+struct DemAcceptedMaximumMemoryReceipt<ProbeReceipt> {
     schema_version: u32,
     output: String,
     repository: RepositoryEvidence,
@@ -55,8 +75,16 @@ struct DemAcceptedMaximumMemoryReceipt {
     stim_tag: String,
     stim_commit: String,
     host: HostEvidence,
-    probe: AdapterProbeReceipt,
+    probe: ProbeReceipt,
     accepted_maximum_memory: Vec<DemAcceptedMaximumMemory>,
+}
+
+type CurrentMemoryReceipt = DemAcceptedMaximumMemoryReceipt<AdapterProbeReceipt>;
+type HistoricalMemoryReceiptV2 = DemAcceptedMaximumMemoryReceipt<HistoricalAdapterProbeReceiptV2>;
+
+#[derive(Deserialize)]
+struct MemoryReceiptEnvelope {
+    schema_version: u32,
 }
 
 #[derive(Debug)]
@@ -140,7 +168,7 @@ pub(super) fn publish(
     execution: AdapterProbeExecution,
 ) -> Result<(), ProbeError> {
     validate_execution(&execution)?;
-    let receipt = DemAcceptedMaximumMemoryReceipt {
+    let receipt = CurrentMemoryReceipt {
         schema_version: MEMORY_RECEIPT_SCHEMA_VERSION,
         output: output_path.as_path().display().to_string(),
         repository: repository_evidence.clone(),
@@ -183,12 +211,8 @@ pub(in crate::qualification::runtime) fn inspect_memory_receipt(
     if bytes.is_empty() || !bytes.ends_with(b"\n") {
         return Err(ProbeError::MemoryReceipt);
     }
-    let receipt: DemAcceptedMaximumMemoryReceipt = serde_json::from_slice(&bytes)?;
-    let mut canonical = serde_json::to_vec_pretty(&receipt)?;
-    canonical.push(b'\n');
-    if canonical != bytes
-        || receipt.schema_version != MEMORY_RECEIPT_SCHEMA_VERSION
-        || Path::new(&receipt.output) != path.as_path()
+    let receipt = decode_current_receipt(&bytes)?;
+    if Path::new(&receipt.output) != path.as_path()
         || receipt.repository.commit_before != receipt.repository.commit_after
         || receipt.repository.local_modifications_before
         || receipt.repository.local_modifications_after
@@ -212,6 +236,35 @@ pub(in crate::qualification::runtime) fn inspect_memory_receipt(
         host: receipt.host,
         probe: receipt.probe,
     })
+}
+
+fn decode_current_receipt(bytes: &[u8]) -> Result<CurrentMemoryReceipt, ProbeError> {
+    let envelope: MemoryReceiptEnvelope = serde_json::from_slice(bytes)?;
+    match envelope.schema_version {
+        HISTORICAL_MEMORY_RECEIPT_SCHEMA_VERSION => {
+            let receipt: HistoricalMemoryReceiptV2 = serde_json::from_slice(bytes)?;
+            require_canonical(bytes, &receipt)?;
+            Err(ProbeError::HistoricalMemoryReceipt(
+                HISTORICAL_MEMORY_RECEIPT_SCHEMA_VERSION,
+            ))
+        }
+        MEMORY_RECEIPT_SCHEMA_VERSION => {
+            let receipt: CurrentMemoryReceipt = serde_json::from_slice(bytes)?;
+            require_canonical(bytes, &receipt)?;
+            Ok(receipt)
+        }
+        version => Err(ProbeError::MemoryReceiptSchema(version)),
+    }
+}
+
+fn require_canonical(bytes: &[u8], receipt: &impl Serialize) -> Result<(), ProbeError> {
+    let mut canonical = serde_json::to_vec_pretty(receipt)?;
+    canonical.push(b'\n');
+    if canonical == bytes {
+        Ok(())
+    } else {
+        Err(ProbeError::MemoryReceipt)
+    }
 }
 
 fn validate_execution(execution: &AdapterProbeExecution) -> Result<(), ProbeError> {
@@ -275,6 +328,7 @@ mod tests {
     use std::num::NonZeroU64;
 
     use super::*;
+    use crate::qualification::runtime::host::ThermalReading;
 
     fn args(group: ProbeGroup, evidence_mode: ProbeEvidenceMode) -> ProbeArgs {
         ProbeArgs {
@@ -324,6 +378,53 @@ mod tests {
         }
     }
 
+    fn host_evidence() -> HostEvidence {
+        HostEvidence {
+            policy_sha256: "4".repeat(64),
+            profile_id: "test".to_string(),
+            operating_system: "linux".to_string(),
+            architecture: "aarch64".to_string(),
+            allowed_cpus: vec![0],
+            logical_cpu_count: 1,
+            selected_cpu: 0,
+            cpu_identity: "test-cpu".to_string(),
+            load_one_before: 0.0,
+            load_one_after: 0.0,
+            maximum_load_one: 1.0,
+            available_memory_before_bytes: 1,
+            available_memory_after_bytes: 1,
+            minimum_available_memory_bytes: 1,
+            swap_in_before: 0,
+            swap_in_after: 0,
+            swap_out_before: 0,
+            swap_out_after: 0,
+            frequency_governor_before: Some("performance".to_string()),
+            frequency_governor_after: Some("performance".to_string()),
+            frequency_khz_before: Some(1),
+            frequency_khz_after: Some(1),
+            maximum_temperature_millidegrees_celsius: 100_000,
+            thermal_readings_before: vec![ThermalReading {
+                zone: "zone0".to_string(),
+                kind: "cpu".to_string(),
+                millidegrees_celsius: 50_000,
+            }],
+            thermal_readings_after: vec![ThermalReading {
+                zone: "zone0".to_string(),
+                kind: "cpu".to_string(),
+                millidegrees_celsius: 50_000,
+            }],
+            thermal_probe_available: true,
+            verified: true,
+            violations: Vec::new(),
+        }
+    }
+
+    fn canonical_bytes(receipt: &impl Serialize) -> Vec<u8> {
+        let mut bytes = serde_json::to_vec_pretty(receipt).expect("serialize receipt");
+        bytes.push(b'\n');
+        bytes
+    }
+
     #[test]
     fn publication_is_limited_to_dem_memory_evidence() {
         let mut dem = args(ProbeGroup::DemParseAdapter, ProbeEvidenceMode::Memory);
@@ -370,5 +471,74 @@ mod tests {
             validate_execution(&missing_worker_binary),
             Err(ProbeError::MemoryReceipt)
         ));
+    }
+
+    #[test]
+    fn schema_two_receipts_remain_readable_but_nonpromotable() {
+        let execution = execution();
+        let probe = execution.receipt;
+        let receipt = HistoricalMemoryReceiptV2 {
+            schema_version: HISTORICAL_MEMORY_RECEIPT_SCHEMA_VERSION,
+            output: "target/benchmarks/qualification/historical-memory".to_string(),
+            repository: RepositoryEvidence {
+                commit_before: "1".repeat(40),
+                commit_after: "1".repeat(40),
+                local_modifications_before: false,
+                local_modifications_after: false,
+            },
+            runtime_group_id: probe.runtime_group_id.clone(),
+            timing_boundary: RAW_WORK_TIMING_BOUNDARY,
+            stim_tag: STIM_TAG.to_string(),
+            stim_commit: STIM_COMMIT.to_string(),
+            host: host_evidence(),
+            probe: HistoricalAdapterProbeReceiptV2 {
+                probe_id: probe.probe_id,
+                runtime_group_id: probe.runtime_group_id,
+                evidence_mode: probe.evidence_mode,
+                iteration_count: probe.iteration_count,
+                work_items: probe.work_items,
+                work_count: probe.work_count,
+                input_bytes: probe.input_bytes,
+                input_digest: probe.input_digest,
+                output_digest: probe.output_digest,
+                stim_source_sha256: probe.stim_source_sha256,
+                stim_build_fingerprint: probe.stim_build_fingerprint,
+                stim_binary_sha256: probe.stim_binary_sha256,
+                stab_source_sha256: probe.stab_source_sha256,
+                stab_build_fingerprint: probe.stab_build_fingerprint,
+            },
+            accepted_maximum_memory: execution.dem_accepted_maximum_memory,
+        };
+
+        assert!(matches!(
+            decode_current_receipt(&canonical_bytes(&receipt)),
+            Err(ProbeError::HistoricalMemoryReceipt(2))
+        ));
+    }
+
+    #[test]
+    fn schema_three_receipts_require_the_private_worker_binary_identity() {
+        let execution = execution();
+        let expected_binary = execution.receipt.stab_binary_sha256.clone();
+        let receipt = CurrentMemoryReceipt {
+            schema_version: MEMORY_RECEIPT_SCHEMA_VERSION,
+            output: "target/benchmarks/qualification/current-memory".to_string(),
+            repository: RepositoryEvidence {
+                commit_before: "1".repeat(40),
+                commit_after: "1".repeat(40),
+                local_modifications_before: false,
+                local_modifications_after: false,
+            },
+            runtime_group_id: execution.receipt.runtime_group_id.clone(),
+            timing_boundary: RAW_WORK_TIMING_BOUNDARY,
+            stim_tag: STIM_TAG.to_string(),
+            stim_commit: STIM_COMMIT.to_string(),
+            host: host_evidence(),
+            probe: execution.receipt,
+            accepted_maximum_memory: execution.dem_accepted_maximum_memory,
+        };
+
+        let decoded = decode_current_receipt(&canonical_bytes(&receipt)).expect("current receipt");
+        assert_eq!(decoded.probe.stab_binary_sha256, expected_binary);
     }
 }

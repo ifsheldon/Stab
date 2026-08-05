@@ -815,9 +815,7 @@ fn publish(
     output.commit_new_with_source_validation(|bound_repository| {
         bound_repository.require_current(root)?;
         let retained_root = bound_repository.descriptor_root(root)?;
-        let state = super::git::repository_state(&retained_root).map_err(|_| {
-            super::artifact::ArtifactError::ExternalSourceChanged("completion repository")
-        })?;
+        let state = super::git::repository_state(&retained_root)?;
         if state.commit != expected_commit || state.local_modifications {
             return Err(super::artifact::ArtifactError::ExternalSourceChanged(
                 "completion repository",

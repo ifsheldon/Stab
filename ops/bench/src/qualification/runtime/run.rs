@@ -565,8 +565,7 @@ pub(super) fn bound_repository_state(
 ) -> Result<super::git::RepositoryState, super::artifact::ArtifactError> {
     repository.require_current(root)?;
     let descriptor_root = repository.descriptor_root(root)?;
-    let state = super::git::repository_state(&descriptor_root)
-        .map_err(|_| super::artifact::ArtifactError::ExternalSourceChanged("repository state"))?;
+    let state = super::git::repository_state(&descriptor_root)?;
     repository.require_current(root)?;
     Ok(state)
 }
@@ -578,8 +577,7 @@ pub(super) fn require_current_repository(
 ) -> Result<(), super::artifact::ArtifactError> {
     repository.require_current(root)?;
     let descriptor_root = repository.descriptor_root(root)?;
-    let current = super::git::repository_state(&descriptor_root)
-        .map_err(|_| super::artifact::ArtifactError::ExternalSourceChanged("repository state"))?;
+    let current = super::git::repository_state(&descriptor_root)?;
     repository.require_current(root)?;
     require_current_repository_state(&current, expected)
 }
