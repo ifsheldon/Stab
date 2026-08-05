@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete. A9 is pre-evidence after the final milestone and code reviews and their confirmed repairs; synchronized documentation, broad verification, push, and exact-revision CI remain before formal evidence may start.
+Status: Active. Milestones A0 through A8 are complete. A9 is pre-evidence after the final reviews, confirmed repairs, synchronized documentation, and complete local non-timing verification; push and exact-revision CI remain before formal evidence may start.
 
 ## Objective
 
@@ -14,13 +14,14 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - The rejected completion replay reopened validated report paths, did not recompute final Git cleanliness, and was followed by confirmed release argument, revision-binding, toolchain-provenance, and late remote-tag defects. None of its artifacts authorizes release.
 - Focused repairs now retain replay and correctness inputs through checked-status publication, authenticate the exact soft `RLIMIT_NOFILE=1024` boundary, bind verified-host schema-version-3 DEM memory receipts from the formal sealed private worker into schema-version-4 completion, require the current 11 shared correctness artifacts, and preserve typed Git failures through publication. Release repairs freeze the complete workflow execution context, validate toolchains across targets, require protected ruleset `20419793`, capture the exact dispatch run, verify the private draft immediately before publication, verify the public release immediately afterward, quote typed `just` arguments, reject yanked registry recovery, and build each local operator in a fresh owner-only target.
 - The final reviews found no P0 or P1 issue. Commit `47f68446` closes the remaining P2 retained-asset gap by rehashing every retained descriptor, checking its reviewed length and digest, and rechecking the exact six-entry set. Commit `5a17c86c` uses validated protocol digest types for current formal memory receipts without changing their schema-version-3 wire format and removes one derive-only error-conversion test.
+- The first broad workspace run exposed one test-harness-only Linux `ETXTBSY` failure while executing a generated AArch64 fixture. Commit `9904e03f` explicitly syncs and closes the writer and permits only four 10-millisecond retries for that one transient OS error. The complete local non-timing verification then passed from the clean `9904e03f` source tree.
 - The controlled host ceiling is 100000 millidegrees Celsius. Firmware throttling and critical trips remain authoritative, and every other host-policy check remains unchanged.
 - Swap configuration is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Used bytes may change during ordinary host activity; formal timing must disable swap immediately before measurement and restore this exact configuration afterward.
 - There is no source-current correctness chain, performance chain, completion checkpoint, final package preflight, crates.io publication, `v0.2.0` tag, draft, or public GitHub release.
 
 ## Next Actions
 
-1. Commit this synchronized review checkpoint, run the complete non-timing verification from the resulting clean revision, push it, and require exact-revision `Rust` and `Qualification Contracts` CI.
+1. Commit this final documentation synchronization, push the resulting clean revision, and require exact-revision `Rust` and `Qualification Contracts` CI.
 2. Regenerate and replay PR, full, and soak correctness, all 11 exact prerequisites, the live result-format corpus, the implemented oracle matrix, and 46 worker reproducibility receipts at unique paths.
 3. Produce fresh controlled AArch64 full and soak evidence for all 19 release groups, both verified-host accepted-maximum DEM memory receipts, 38 rollups, and one 138-report schema-version-4 `a9-release` completion; run creation and replay through `prlimit --nofile=1024:1024 --`.
 4. Preserve every failed, noisy, host-rejected, or resource-rejected outcome. Never reuse an artifact path, relax a threshold, add a waiver, or rerun a stable product failure.
