@@ -23,6 +23,33 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-08-04 - A9: Draft-To-Public Release Handoff
+
+Status: Resolved
+Revealed by: milestone audit and independent release-boundary review
+Current text: A9 required exact private-draft creation and human publication but did not define protection or revalidation during the interval, or require verification of the final public state.
+Gap: the remote tag, ruleset, release state, or asset set could change after workflow verification and before or after the manual publication action without failing an A9-owned check.
+Proposed amendment: protect the exact release tag against update and deletion with an active no-bypass ruleset, revalidate the private draft immediately before publication, and verify the exact public release, retained assets, annotated tag, and ruleset immediately afterward.
+Resolution: repository ruleset `20419793` protects only `refs/tags/v0.2.0` against update and deletion without bypass. `release::verify-remote-draft` and `release::verify-published-release` rerun A9 authorization before reading `GITHUB_TOKEN`, retain and revalidate the six local assets, bracket each GitHub read with exact ruleset and annotated-tag checks, and require the expected private or public release state and GitHub-recorded digests.
+
+## 2026-08-04 - A9: Workflow Execution And Dispatch Identity
+
+Status: Resolved
+Revealed by: independent release workflow review
+Current text: A9 pinned third-party action SHAs and required the release run to use the exact tag commit, but did not freeze runner labels and other executable workflow context or define race-free identification of the dispatched run.
+Gap: a mutable runner label, permission, environment, shell step, action input, or command could change release semantics without violating the action-SHA rule, while `gh run list --limit 1` could select a concurrent unrelated run.
+Proposed amendment: freeze the complete release workflow semantic model and derive the run ID only from the URL returned by exact-tag dispatch.
+Resolution: architecture policy now checks exact jobs, runners, permissions, timeouts, environment, steps, actions, inputs, and commands; the draft runner is fixed to `ubuntu-24.04`. The release procedure captures and validates the dispatch-returned run URL and rejects latest-run discovery.
+
+## 2026-08-04 - A9: Promotable Memory-Probe Identity
+
+Status: Resolved
+Revealed by: local full-code-review of the first authenticated memory-receipt implementation
+Current text: A9 required controlled-host memory receipts to bind exact worker identities, but did not say that policy-consistent diagnostic host evidence remained nonpromotable or require the receipt producer to use the same sealed private Stab worker as formal timing.
+Gap: a replayed receipt with `verified=false` and no policy mismatch could pass policy validation, while a receipt produced by the Cargo-launched diagnostic binary carried the all-zero diagnostic build fingerprint and therefore could never agree with a legitimate formal rollup. The first condition could promote diagnostic evidence; the second made literal formal completion impossible.
+Proposed amendment: require affirmative verified-host evidence with no violations, produce the Stab memory probe through the formal sealed private-worker constructor, verify its source and build identity after execution, bind its binary digest, and require all three Stab identities to match the rollups.
+Resolution: `HostEvidence::require_verified` makes diagnostic evidence nonpromotable. The DEM memory probe now uses `StabWorkerExecutable::prepare`, verifies the private worker after execution, records its binary SHA-256, and completion compares source, build, and binary identities. Focused tests reject unverified host evidence and missing or mismatched worker binary identities.
+
 ## 2026-08-04 - A9: Completion Authorization Of Resource Evidence
 
 Status: Resolved
@@ -30,7 +57,7 @@ Revealed by: final pre-evidence review of the release completion manifest
 Current text: A9 required accepted-maximum DEM memory probes and completion under soft `RLIMIT_NOFILE=1024`, but the completion manifest authenticated neither the standalone probe artifacts nor the limit under which creation and replay ran.
 Gap: a completion could claim recorded memory and bounded descriptor behavior while omitting the required parse and print maxima or while being created and replayed only under a raised limit. The checked dashboard and irreversible release authorization could not distinguish that weaker result.
 Proposed amendment: require exactly one controlled-host parse receipt and one print receipt from the measured revision, bind their exact worker and family evidence into completion, record the observed soft descriptor limit, and require release creation, offline replay, checkpoint replay, and checked status to enforce 1024.
-Resolution: memory-receipt schema version 2 binds the clean repository, verified host policy, `raw-work-v2`, Stim binary, both worker source and build identities, and every family maximum. Completion and preflight schema version 4 require and retain both receipt digests, record `soft_nofile_limit`, and reject release-scope creation, replay, checkpointing, or checked status unless it is exactly 1024. Completion schemas 1 through 3 remain historical readers only.
+Resolution: memory-receipt schema version 2 first bound the clean repository, host policy, `raw-work-v2`, Stim binary, both worker source and build identities, and every family maximum. The source-current schema version 3 additionally requires affirmative verified-host evidence and binds the sealed Stab worker binary identity; schema version 2 is historical and nonpromotable. Completion and preflight schema version 4 require and retain both schema-version-3 receipt digests, record `soft_nofile_limit`, and reject release-scope creation, replay, checkpointing, or checked status unless it is exactly 1024. Completion schemas 1 through 3 remain historical readers only.
 
 ## 2026-08-04 - A9: Replay Publication Lifetime And Final Git State
 

@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete. A9 is pre-evidence while the authenticated completion-closure and release-boundary repairs await focused commits, push, exact-revision CI, and one clean audit pass.
+Status: Active. Milestones A0 through A8 are complete. A9 is pre-evidence while the committed completion and release-boundary repairs await synchronized contracts, final broad verification, push, exact-revision CI, and one clean audit pass.
 
 ## Objective
 
@@ -12,27 +12,28 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - The release matrix contains 19 promotable groups, 138 full and soak reports, 38 rollups, and 21 unique exact correctness parents across 11 prerequisite sets.
 - Revision `d424175c6620549086fb4ee358077632bdab97d9` passed exact-revision CI and produced a complete 138-report AArch64 chain. All reports passed Stim parity, with 122 median speedups and 16 median slowdowns, but the chain is historical and review-rejected under the repaired contracts.
 - The rejected completion replay reopened validated report paths, did not recompute final Git cleanliness, and was followed by confirmed release argument, revision-binding, toolchain-provenance, and late remote-tag defects. None of its artifacts authorizes release.
-- Focused repairs now retain replay and correctness inputs through checked-status publication, authenticate the exact soft `RLIMIT_NOFILE=1024` boundary, bind verified-host schema-version-2 DEM memory receipts into schema-version-4 completion, require the current 11 shared correctness artifacts, and reject mixed-time final Git state. Release repairs validate toolchains across targets, recheck the remote tag after upload, bind workflow dispatch to the exact tag commit, quote typed `just` arguments, reject yanked registry recovery, and build each local operator in a fresh owner-only target.
+- Focused repairs now retain replay and correctness inputs through checked-status publication, authenticate the exact soft `RLIMIT_NOFILE=1024` boundary, bind verified-host schema-version-3 DEM memory receipts from the formal sealed private worker into schema-version-4 completion, require the current 11 shared correctness artifacts, and preserve typed Git failures through publication. Release repairs freeze the complete workflow execution context, validate toolchains across targets, require protected ruleset `20419793`, capture the exact dispatch run, verify the private draft immediately before publication, verify the public release immediately afterward, quote typed `just` arguments, reject yanked registry recovery, and build each local operator in a fresh owner-only target.
 - The controlled host ceiling is 100000 millidegrees Celsius. Firmware throttling and critical trips remain authoritative, and every other host-policy check remains unchanged.
 - Swap configuration is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Used bytes may change during ordinary host activity; formal timing must disable swap immediately before measurement and restore this exact configuration afterward.
 - There is no source-current correctness chain, performance chain, completion checkpoint, final package preflight, crates.io publication, `v0.2.0` tag, draft, or public GitHub release.
 
 ## Next Actions
 
-1. Commit the authenticated completion code/tests and synchronized contracts as focused changes.
-2. Run `milestone-audit` and `full-code-review`; fix every confirmed implementation, test, workflow, benchmark, or documentation finding before evidence.
+1. Commit the synchronized schema, release-handoff, progress, and specification-gap documentation after its focused checks pass.
+2. Re-run `milestone-audit` and `full-code-review`; fix every confirmed implementation, test, workflow, benchmark, or documentation finding before evidence.
 3. Run the complete non-timing verification from a clean committed revision, push it, and require exact-revision `Rust` and `Qualification Contracts` CI.
 4. Regenerate and replay PR, full, and soak correctness, all 11 exact prerequisites, the live result-format corpus, the implemented oracle matrix, and 46 worker reproducibility receipts at unique paths.
 5. Produce fresh controlled AArch64 full and soak evidence for all 19 release groups, both verified-host accepted-maximum DEM memory receipts, 38 rollups, and one 138-report schema-version-4 `a9-release` completion; run creation and replay through `prlimit --nofile=1024:1024 --`.
 6. Preserve every failed, noisy, host-rejected, or resource-rejected outcome. Never reuse an artifact path, relax a threshold, add a waiver, or rerun a stable product failure.
 7. Re-run both audits. If no source fix is required, create the authenticated completion checkpoint and exactly one seven-path status descendant, push it, and require exact-revision CI.
-8. Create and inspect one final immutable schema-version-4 package preflight, publish the reviewed crates, create and push the annotated tag, dispatch the release workflow from that exact tag ref, verify the private draft, and publish it manually.
+8. Create and inspect one final immutable schema-version-4 package preflight, publish the reviewed crates, create and push the protected annotated tag, capture the release workflow run returned by exact-tag dispatch, verify the private draft immediately before manual publication, and verify the public release immediately afterward.
 
 ## Release Gates
 
 - Keep the `1.25x` Stim parity threshold, `1.15x` Stab self-regression threshold, workload equivalence, memory limits, and controlled-host policy unchanged.
 - Formal completion and replay must pass with soft `RLIMIT_NOFILE=1024`; raising the limit is diagnostic only.
 - `release::publish-reviewed` and `release::create-draft` must pass `qualification-status --check --require-release-completion` before reading a credential or making an irreversible request.
+- The exact active no-bypass tag ruleset, annotated remote tag, six retained assets, private draft state, and published release state must pass their source-owned checks at the handoff points documented in [RELEASING.md](../RELEASING.md); a latest-run query is never an acceptable workflow identity.
 - Run irreversible local release commands in an isolated user session. Repository controls prevent accidental shared-path reuse and shell interpolation, but they do not claim to protect environment credentials from a malicious same-UID process with host-level process access.
 - Keep ops and test-support crates unpublished. Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR remain outside `0.2.0`.
 
