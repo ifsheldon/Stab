@@ -839,6 +839,70 @@ fn detection_sampling_supports_product_measurements_with_pauli_observables() {
 }
 
 #[test]
+fn product_measurement_collapse_lands_on_the_whole_measured_product() {
+    // Each circuit measures an anticommuting product and then a product that stabilizes the
+    // prepared state. The second detector stays silent only when the first collapse multiplies
+    // the frame by the whole measured product; randomizing a single term multiplies the
+    // deviation by a Pauli outside the measured group and fires it roughly half the time.
+    for circuit_text in [
+        "HERALDED_ERASE(0) 2\nR 0 1\nMXX 0 1\nMZZ 0 1\nDETECTOR rec[-1]\n",
+        "HERALDED_ERASE(0) 2\nR 0 1\nMYY 0 1\nMZZ 0 1\nDETECTOR rec[-1]\n",
+        "HERALDED_ERASE(0) 2\nR 0 1\nMPP X0*X1\nMPP Z0*Z1\nDETECTOR rec[-1]\n",
+    ] {
+        for seed in [1_u64, 7, 42, 20260805] {
+            let circuit = Circuit::from_stim_str(circuit_text).expect("parse");
+            let output = sample_detection_events(&circuit, 4096, Some(seed)).expect("detect");
+            let hits = output
+                .records
+                .iter()
+                .filter(|record| record.detectors[0])
+                .count();
+            assert_eq!(hits, 0, "seed {seed}: {circuit_text:?}");
+        }
+    }
+}
+
+#[test]
+fn whole_product_collapse_keeps_commuting_products_deterministic_and_stays_random() {
+    // Statistical contract: 4 fixed seeds x 4096 shots. The MXX record is physically random
+    // (the Z-basis reset randomizes the frame z-parity it reads) and the observable reads the
+    // X-frame bit that the MXX collapse randomizes, so both counts are Binomial(4096, 1/2);
+    // the band 1856..=2240 is the mean plus or minus 6 sigma (sigma = 32), a false-positive
+    // budget of roughly 2e-9 per assertion. The MZZ zero assertion is an exact invariant.
+    let circuit = Circuit::from_stim_str(
+        "HERALDED_ERASE(0) 2\nR 0 1\nMXX 0 1\nMZZ 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) Z0\n",
+    )
+    .expect("parse");
+    for seed in [1_u64, 7, 42, 20260805] {
+        let output = sample_detection_events(&circuit, 4096, Some(seed)).expect("detect");
+        let mzz_hits = output
+            .records
+            .iter()
+            .filter(|record| record.detectors[0])
+            .count();
+        let mxx_hits = output
+            .records
+            .iter()
+            .filter(|record| record.detectors[1])
+            .count();
+        let observable_hits = output
+            .records
+            .iter()
+            .filter(|record| record.observables[0])
+            .count();
+        assert_eq!(mzz_hits, 0, "seed {seed}: MZZ stabilizer detector fired");
+        assert!(
+            (1856..=2240).contains(&mxx_hits),
+            "seed {seed}: random MXX hits {mxx_hits} outside the 6-sigma band"
+        );
+        assert!(
+            (1856..=2240).contains(&observable_hits),
+            "seed {seed}: observable hits {observable_hits} outside the 6-sigma band"
+        );
+    }
+}
+
+#[test]
 fn detection_sampling_frame_path_ignores_reference_sample_measurement_bits() {
     let circuit = Circuit::from_stim_str(
         "M !0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",

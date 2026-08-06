@@ -330,8 +330,38 @@ impl ScalarDetectionFrame {
             result ^= self.frame_measurement_bit(*qubit, *basis)?;
         }
         self.measurements.push(result);
-        if let Some((qubit, basis)) = terms.first() {
-            self.randomize_measured_basis(*qubit, *basis, rng)?;
+        match terms {
+            [] => {}
+            [(qubit, basis)] => self.randomize_measured_basis(*qubit, *basis, rng)?,
+            _ => self.xor_random_measured_product(terms, rng)?,
+        }
+        Ok(())
+    }
+
+    /// Multiplies the frame by the measured product with probability one half.
+    ///
+    /// Measuring a Pauli product only defines the frame deviation modulo the whole product, so
+    /// the collapse bit must land on every term together; randomizing a single term would
+    /// multiply the deviation by a Pauli outside the measured stabilizer group and corrupt
+    /// later commuting measurements.
+    fn xor_random_measured_product(
+        &mut self,
+        terms: &[(usize, PauliBasis)],
+        rng: &mut impl Rng,
+    ) -> CircuitResult<()> {
+        if !rng.random_bool(0.5) {
+            return Ok(());
+        }
+        for (qubit, basis) in terms {
+            match basis {
+                PauliBasis::I => {}
+                PauliBasis::X => self.xor_x_bit(*qubit, true)?,
+                PauliBasis::Z => self.xor_z_bit(*qubit, true)?,
+                PauliBasis::Y => {
+                    self.xor_x_bit(*qubit, true)?;
+                    self.xor_z_bit(*qubit, true)?;
+                }
+            }
         }
         Ok(())
     }
