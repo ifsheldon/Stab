@@ -1,3 +1,4 @@
+use secrecy::{ExposeSecret, SecretString};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::Path;
@@ -38,7 +39,7 @@ pub(crate) struct CratesIo {
     cancellation: ReleaseCancellation,
 }
 
-pub(crate) struct CratesIoToken(String);
+pub(crate) struct CratesIoToken(SecretString);
 
 impl CratesIoToken {
     pub(crate) fn from_environment() -> Result<Self, ReleaseError> {
@@ -57,11 +58,25 @@ impl CratesIoToken {
                 "CARGO_REGISTRY_TOKEN must not be empty".to_string(),
             ));
         }
-        Ok(Self(token))
+        Ok(Self(SecretString::from(token)))
     }
 
+    /// The only exposure point; call it solely where the value is transmitted.
     fn expose(&self) -> &str {
-        &self.0
+        self.0.expose_secret()
+    }
+}
+
+impl CratesIoToken {
+    #[cfg(test)]
+    pub(crate) fn for_redaction_test(value: &str) -> Self {
+        Self(SecretString::from(value))
+    }
+}
+
+impl std::fmt::Debug for CratesIoToken {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
     }
 }
 
@@ -676,7 +691,7 @@ mod tests {
             .publish_reviewed(
                 &metadata_fixture(),
                 &archive,
-                &CratesIoToken("reviewed-token".to_string()),
+                &CratesIoToken(SecretString::from("reviewed-token")),
             )
             .expect("reviewed upload");
         server.join().expect("server");

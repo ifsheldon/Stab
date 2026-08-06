@@ -3,6 +3,7 @@ use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
@@ -216,7 +217,7 @@ trait DraftPublisher {
     ) -> Result<RemoteRelease, ReleaseError>;
 }
 
-struct GitHubToken(String);
+struct GitHubToken(SecretString);
 
 impl GitHubToken {
     fn from_environment() -> Result<Self, ReleaseError> {
@@ -233,11 +234,18 @@ impl GitHubToken {
                 "GITHUB_TOKEN must not be empty".to_string(),
             ));
         }
-        Ok(Self(token))
+        Ok(Self(SecretString::from(token)))
     }
 
+    /// The only exposure point; call it solely where the value is transmitted.
     fn expose(&self) -> &str {
-        &self.0
+        self.0.expose_secret()
+    }
+}
+
+impl std::fmt::Debug for GitHubToken {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
     }
 }
 

@@ -71,17 +71,24 @@ The local and remote peel checks are mandatory. Stop if either tag does not reso
 
 Repository ruleset `20419793`, named `Protect Stab v0.2.0 release tag`, must remain active throughout tag and release work. It targets only `refs/tags/v0.2.0`, rejects tag update and deletion, and has no bypass actor; the release operator reads that exact ruleset before and after every draft or release verification and fails closed if its identity, target, rules, enforcement, or bypass state changes.
 
-Dispatch the `Release` workflow from the existing tag ref, not from the default branch, and record the resulting run identity:
+Dispatch the `Release` workflow from the existing tag ref, not from the default branch, then capture the run identity by polling the workflow-scoped run list filtered to the dispatch event and the exact reviewed head SHA, requiring exactly one match:
 
 ```text
-RELEASE_RUN_URL="$(gh workflow run release.yml --ref "$RELEASE_TAG" -f tag="$RELEASE_TAG")"
-RELEASE_RUN_ID="${RELEASE_RUN_URL##*/}"
-test "$RELEASE_RUN_URL" = "https://github.com/ifsheldon/Stab/actions/runs/$RELEASE_RUN_ID"
+gh workflow run release.yml --ref "$RELEASE_TAG" -f tag="$RELEASE_TAG"
+RELEASE_RUN_ID=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  sleep 5
+  RELEASE_RUN_ID="$(gh api "repos/ifsheldon/Stab/actions/workflows/release.yml/runs?event=workflow_dispatch&head_sha=$RELEASE_COMMIT" --jq '[.workflow_runs[].id] | if length == 1 then .[0] else empty end')"
+  test -n "$RELEASE_RUN_ID" && break
+done
 printf '%s\n' "$RELEASE_RUN_ID" | grep -Eq '^[0-9]+$'
+RELEASE_RUN_URL="https://github.com/ifsheldon/Stab/actions/runs/$RELEASE_RUN_ID"
 gh run view "$RELEASE_RUN_ID" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
 gh run watch "$RELEASE_RUN_ID" --exit-status
 gh run view "$RELEASE_RUN_ID" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
 ```
+
+The capture must resolve to exactly one dispatch-event run for the reviewed SHA: zero matches keeps polling and fails after the bounded loop, and several matches (for example a duplicate dispatch) produce the empty string so the identity check fails closed instead of guessing; investigate and delete the unwanted run before retrying. `gh workflow run` prints no run identity on stdout, so capture never relies on its output.
 
 Do not discover the run with `gh run list`; a concurrent dispatch could make a latest-run query select unrelated work. Do not accept the captured run unless its database ID and URL agree with `RELEASE_RUN_ID` and `RELEASE_RUN_URL`, `workflowName` is `Release`, `event` is `workflow_dispatch`, `headBranch` is `v0.2.0`, `headSha` equals `RELEASE_COMMIT`, and the final status and conclusion are `completed` and `success`. Every third-party action in the workflow is pinned to a reviewed full commit SHA, including the checkout action used by the `contents: write` draft job; `just architecture::check` opens workflow files through no-follow descriptors and rejects mutable action refs across all tracked workflows. The architecture contract also freezes the complete release workflow execution context: exact jobs, runners, timeout, permissions, environment, shell-bearing steps, action inputs, and commands. Each native runner checks out immutable `github.sha`, verifies that the input is exactly `v0.2.0`, the event ref is exactly `refs/tags/v0.2.0`, and the local tag, event ref, and `HEAD` all resolve to that SHA. It then invokes the Rust release operation, which builds into a new isolated target, requires `stab --version` to report exactly `0.2.0` with one LF, validates the runnable AArch64 executable format for the target operating system, and emits the binary, checksum sidecar, and source-provenance manifest.
 

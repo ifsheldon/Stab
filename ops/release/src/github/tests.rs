@@ -159,7 +159,7 @@ fn late_remote_tag_change_is_rejected_after_final_validation() {
         remote_commit: reviewed_commit.clone(),
         events: Vec::new(),
     };
-    let token = GitHubToken("reviewed-token".to_string());
+    let token = GitHubToken(SecretString::from("reviewed-token"));
 
     let result = with_stable_remote_tag(
         &mut publisher,
@@ -200,7 +200,7 @@ fn release_protection_and_tag_identity_bracket_remote_verification() {
         remote_commit: reviewed_commit.clone(),
         events: Vec::new(),
     };
-    let token = GitHubToken("reviewed-token".to_string());
+    let token = GitHubToken(SecretString::from("reviewed-token"));
 
     with_stable_remote_tag(
         &mut publisher,
@@ -362,7 +362,7 @@ fn draft_creation_sends_the_private_release_contract() {
         .create_draft(
             RELEASE_TAG,
             &commit,
-            &GitHubToken("reviewed-token".to_string()),
+            &GitHubToken(SecretString::from("reviewed-token")),
         )
         .expect("create draft");
     validate_release(&release, RELEASE_TAG, &[], RemoteReleaseState::Draft).expect("private draft");
@@ -416,7 +416,7 @@ fn asset_upload_sends_exact_file_bytes_and_scopes_the_token_to_the_header() {
             42,
             "stab-linux-aarch64",
             file,
-            &GitHubToken("reviewed-token".to_string()),
+            &GitHubToken(SecretString::from("reviewed-token")),
         )
         .expect("upload");
     validate_asset(&asset, "stab-linux-aarch64", payload.len() as u64, &digest)
@@ -479,7 +479,7 @@ fn draft_verification_survives_the_published_only_by_tag_endpoint() {
     let cancellation = ReleaseCancellation::for_test();
     let host = format!("http://{address}");
     let mut api = GitHubApi::with_hosts(host.clone(), host, cancellation);
-    let token = GitHubToken("reviewed-token".to_string());
+    let token = GitHubToken(SecretString::from("reviewed-token"));
 
     let by_tag = api.published_release_by_tag(RELEASE_TAG, &token);
     assert!(
@@ -563,7 +563,7 @@ impl DraftPublisher for StateRoutingPublisher {
 
 #[test]
 fn draft_state_routes_to_the_list_lookup_and_published_state_to_by_tag() {
-    let token = GitHubToken("reviewed-token".to_string());
+    let token = GitHubToken(SecretString::from("reviewed-token"));
     let mut publisher = StateRoutingPublisher { events: Vec::new() };
 
     let draft = release_in_state(
@@ -620,7 +620,10 @@ fn unique_draft_lookup_scans_full_pages_and_filters_on_tag_and_draft_state() {
     let mut api = GitHubApi::with_hosts(host.clone(), host, cancellation);
 
     let release = api
-        .unique_draft_release(RELEASE_TAG, &GitHubToken("reviewed-token".to_string()))
+        .unique_draft_release(
+            RELEASE_TAG,
+            &GitHubToken(SecretString::from("reviewed-token")),
+        )
         .expect("draft on the second page");
     assert_eq!(release.id, 77);
     assert_eq!(
@@ -664,7 +667,10 @@ fn unique_draft_lookup_fails_closed_when_the_release_list_never_ends() {
     let mut api = GitHubApi::with_hosts(host.clone(), host, cancellation);
 
     let error = api
-        .unique_draft_release(RELEASE_TAG, &GitHubToken("reviewed-token".to_string()))
+        .unique_draft_release(
+            RELEASE_TAG,
+            &GitHubToken(SecretString::from("reviewed-token")),
+        )
         .expect_err("an unbounded release list must fail closed");
     assert!(error.to_string().contains("cannot be verified"), "{error}");
     assert_eq!(
@@ -684,7 +690,10 @@ fn published_release_by_tag_still_verifies_published_releases() {
     let mut api = GitHubApi::with_hosts(host.clone(), host, cancellation);
 
     let release = api
-        .published_release_by_tag(RELEASE_TAG, &GitHubToken("reviewed-token".to_string()))
+        .published_release_by_tag(
+            RELEASE_TAG,
+            &GitHubToken(SecretString::from("reviewed-token")),
+        )
         .expect("published release");
     validate_release(&release, RELEASE_TAG, &[], RemoteReleaseState::Published)
         .expect("published state");
@@ -702,7 +711,10 @@ fn unique_draft_error(responses: Vec<(u16, String)>) -> String {
     let host = format!("http://{address}");
     let mut api = GitHubApi::with_hosts(host.clone(), host, cancellation);
     let error = api
-        .unique_draft_release(RELEASE_TAG, &GitHubToken("reviewed-token".to_string()))
+        .unique_draft_release(
+            RELEASE_TAG,
+            &GitHubToken(SecretString::from("reviewed-token")),
+        )
         .expect_err("draft lookup must reject this release list");
     server.join().expect("server");
     error.to_string()
@@ -785,4 +797,23 @@ fn read_request_headers(stream: &mut std::net::TcpStream) -> String {
         request.extend_from_slice(buffer.get(..read).expect("bounded read"));
     }
     String::from_utf8_lossy(&request).into_owned()
+}
+
+#[test]
+fn token_debug_output_redacts_the_secret_value() {
+    let github = GitHubToken(SecretString::from("github-secret-value"));
+    let github_debug = format!("{github:?}");
+    assert!(
+        !github_debug.contains("github-secret-value"),
+        "{github_debug}"
+    );
+    assert!(github_debug.contains("REDACTED"), "{github_debug}");
+
+    let crates_io = crate::registry::CratesIoToken::for_redaction_test("crates-secret-value");
+    let crates_debug = format!("{crates_io:?}");
+    assert!(
+        !crates_debug.contains("crates-secret-value"),
+        "{crates_debug}"
+    );
+    assert!(crates_debug.contains("REDACTED"), "{crates_debug}");
 }
