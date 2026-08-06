@@ -12,10 +12,7 @@ struct FailingWriter;
 
 impl std::io::Write for FailingWriter {
     fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::BrokenPipe,
-            "intentional write stop",
-        ))
+        Err(std::io::Error::other("intentional write stop"))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -931,4 +928,48 @@ fn sample_dem_validates_replay_path_before_streaming_output() {
     let stderr = String::from_utf8(stderr).unwrap();
     assert!(stderr.contains("failed to read"), "{stderr}");
     assert!(stderr.contains("missing.01"), "{stderr}");
+}
+
+#[test]
+fn sample_dem_observable_routing_flags_are_hidden_but_functional() {
+    // Decision D4: pinned Stim's sample_dem exposes neither observable-routing
+    // flag, so both stay out of --help while remaining functional
+    // compatibility conveniences.
+    let mut help_stdout = Vec::new();
+    let mut help_stderr = Vec::new();
+    let help_status = run_from(
+        ["stab", "sample_dem", "--help"].map(OsString::from),
+        b"".as_slice(),
+        &mut help_stdout,
+        &mut help_stderr,
+    );
+    assert_eq!(help_status, 0);
+    let help_text = String::from_utf8(help_stdout).expect("utf-8 help");
+    assert!(!help_text.contains("--append_observables"), "{help_text}");
+    assert!(!help_text.contains("--prepend_observables"), "{help_text}");
+
+    for (flag, expected) in [
+        ("--append_observables", "shot D0 L0\n"),
+        ("--prepend_observables", "shot L0 D0\n"),
+    ] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "sample_dem",
+                "--shots",
+                "1",
+                "--out_format",
+                "dets",
+                flag,
+            ]
+            .map(OsString::from),
+            b"error(1) D0 L0\n".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, 0, "{flag}");
+        assert_eq!(String::from_utf8(stdout).unwrap(), expected, "{flag}");
+    }
 }

@@ -371,12 +371,34 @@ where
     match result {
         Ok(()) => 0,
         Err(error) => {
+            // Pinned Stim dies silently via SIGPIPE when its output pipe
+            // closes, observable as status 141 with empty stderr (decision
+            // D2), so broken-pipe-rooted failures exit 141 without a
+            // diagnostic while every other I/O failure keeps its report.
+            if error_chain_is_broken_pipe(&error) {
+                return BROKEN_PIPE_EXIT_CODE;
+            }
             if write_cli_error(&mut stderr, error_format, &error).is_err() {
                 return 1;
             }
             1
         }
     }
+}
+
+const BROKEN_PIPE_EXIT_CODE: i32 = 141;
+
+fn error_chain_is_broken_pipe(error: &CliError) -> bool {
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(error);
+    while let Some(current) = source {
+        if let Some(io_error) = current.downcast_ref::<std::io::Error>()
+            && io_error.kind() == std::io::ErrorKind::BrokenPipe
+        {
+            return true;
+        }
+        source = current.source();
+    }
+    false
 }
 
 fn normalize_legacy_args<I, S>(args: I) -> Vec<OsString>
@@ -403,6 +425,7 @@ where
     if legacy_index >= args.len() {
         return args;
     }
+    relocate_single_legacy_mode_flag(&mut args, legacy_index);
 
     let legacy_arg = args
         .get(legacy_index)
@@ -448,13 +471,21 @@ where
         if let Some(arg) = args.get_mut(legacy_index) {
             *arg = OsString::from("sample");
         }
-        args.insert(legacy_index + 1, OsString::from("--shots"));
-        if args
-            .get(legacy_index + 2)
-            .map(|arg| arg.to_string_lossy().starts_with('-'))
-            .unwrap_or(true)
-        {
-            args.insert(legacy_index + 2, OsString::from("1"));
+        // An explicit --shots elsewhere in the vector keeps the shot count,
+        // matching pinned Stim's `--shots 2 --sample` behavior.
+        let has_explicit_shots = args.iter().any(|arg| {
+            let arg = arg.to_string_lossy();
+            arg == "--shots" || arg.starts_with("--shots=")
+        });
+        if !has_explicit_shots {
+            args.insert(legacy_index + 1, OsString::from("--shots"));
+            if args
+                .get(legacy_index + 2)
+                .map(|arg| arg.to_string_lossy().starts_with('-'))
+                .unwrap_or(true)
+            {
+                args.insert(legacy_index + 2, OsString::from("1"));
+            }
         }
     } else if let Some(shots) = legacy_arg.strip_prefix("--detect=") {
         args.splice(
@@ -486,6 +517,60 @@ where
         *arg = OsString::from("analyze_errors");
     }
     args
+}
+
+fn is_legacy_mode_flag(arg: &str) -> bool {
+    matches!(
+        arg,
+        "--convert" | "--sample" | "--detect" | "--m2d" | "--analyze_errors"
+    ) || arg.starts_with("--gen=")
+        || arg.starts_with("--sample=")
+        || arg.starts_with("--detect=")
+}
+
+/// Pinned Stim accepts its legacy mode flag anywhere in the argument vector,
+/// so when exactly one appears after other flags it moves (with its adjacent
+/// shot-count value for bare `--sample`/`--detect`) to the normalization
+/// position; zero or several mode flags leave the vector unchanged so the
+/// parser keeps rejecting ambiguous invocations.
+fn relocate_single_legacy_mode_flag(args: &mut Vec<OsString>, legacy_index: usize) {
+    let boundary = args
+        .iter()
+        .position(|arg| arg == "--")
+        .unwrap_or(args.len());
+    if legacy_index >= boundary {
+        return;
+    }
+    let at_index = args
+        .get(legacy_index)
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if !at_index.starts_with("--") || is_legacy_mode_flag(&at_index) {
+        return;
+    }
+    let mode_positions = (legacy_index + 1..boundary)
+        .filter(|&index| {
+            args.get(index)
+                .is_some_and(|arg| is_legacy_mode_flag(&arg.to_string_lossy()))
+        })
+        .collect::<Vec<_>>();
+    let [position] = mode_positions.as_slice() else {
+        return;
+    };
+    let mut end = position + 1;
+    let takes_adjacent_count = args
+        .get(*position)
+        .is_some_and(|arg| matches!(arg.to_string_lossy().as_ref(), "--sample" | "--detect"));
+    if takes_adjacent_count
+        && end < boundary
+        && args
+            .get(end)
+            .is_some_and(|arg| !arg.to_string_lossy().starts_with('-'))
+    {
+        end += 1;
+    }
+    let moved = args.drain(*position..end).collect::<Vec<_>>();
+    args.splice(legacy_index..legacy_index, moved);
 }
 
 fn run_gen<W>(args: GenArgs, stdout: &mut W) -> Result<(), CliError>

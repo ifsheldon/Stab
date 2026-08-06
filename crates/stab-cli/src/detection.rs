@@ -128,6 +128,13 @@ where
     W: Write,
     E: Write,
 {
+    // Pinned Stim emits the flag-driven deprecation warning while reading
+    // flags, before any routing validation can reject the combination, so
+    // the warning precedes every detect error.
+    if args.prepend_observables {
+        crate::write_prepend_observables_deprecation(stderr, error_format)
+            .map_err(CliError::WriteOutput)?;
+    }
     validate_detect_observable_routing(&args)?;
     validate_detect_ptb64_shots(&args)?;
     let mut io = PendingIo::preflight(
@@ -137,10 +144,6 @@ where
             (FileRole::ObservableOutput, args.obs_output.as_deref()),
         ],
     )?;
-    if args.prepend_observables {
-        crate::write_prepend_observables_deprecation(stderr, error_format)
-            .map_err(CliError::WriteOutput)?;
-    }
     if args.shots == 0 {
         let mut outputs = io.activate()?;
         let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);

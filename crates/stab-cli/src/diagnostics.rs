@@ -26,7 +26,7 @@ pub(crate) enum CliError {
     },
 
     #[error("failed to write output: {0}")]
-    WriteOutput(std::io::Error),
+    WriteOutput(#[source] std::io::Error),
 
     #[error("failed to write {path}: {source}")]
     WritePath {

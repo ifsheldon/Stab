@@ -84,7 +84,7 @@ pub(super) struct SampleDemArgs {
     seed: Option<u64>,
 
     /// Append observable flips after detector-event bits.
-    #[arg(long = "append_observables")]
+    #[arg(long = "append_observables", hide = true)]
     append_observables: bool,
 
     /// Deprecated Stim alias that writes observable flips before detector bits.

@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "9267f25988116bdf35aeff0ff1ca12bdd93126cea18e691f021897d152378ef4",
+  "semantic_digest": "0e08ad6a26e02393cc4371d9dd0042969f31559ebf814ccc446e2084e5e84b60",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -57026,7 +57026,7 @@
       "path": "stab_algebra::FlexPauliString",
       "kind": "struct",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 622,
+      "source_line": 629,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57039,7 +57039,7 @@
       "path": "stab_algebra::FlexPauliString as Clone for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 621,
+      "source_line": 628,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57052,7 +57052,7 @@
       "path": "stab_algebra::FlexPauliString as Debug for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 621,
+      "source_line": 628,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57065,7 +57065,7 @@
       "path": "stab_algebra::FlexPauliString as Display for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 784,
+      "source_line": 791,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57078,7 +57078,7 @@
       "path": "stab_algebra::FlexPauliString as Eq for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 621,
+      "source_line": 628,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57091,7 +57091,7 @@
       "path": "stab_algebra::FlexPauliString as FromStr for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 794,
+      "source_line": 801,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57104,7 +57104,7 @@
       "path": "stab_algebra::FlexPauliString as PartialEq for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 621,
+      "source_line": 628,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57117,7 +57117,7 @@
       "path": "stab_algebra::FlexPauliString as StructuralPartialEq for@320b6551a77b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 621,
+      "source_line": 628,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57130,7 +57130,7 @@
       "path": "stab_algebra::FlexPauliString::from_phase_and_bases",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 675,
+      "source_line": 682,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57143,7 +57143,7 @@
       "path": "stab_algebra::FlexPauliString::get",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 652,
+      "source_line": 659,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57156,7 +57156,7 @@
       "path": "stab_algebra::FlexPauliString::identity",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 629,
+      "source_line": 636,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57169,7 +57169,7 @@
       "path": "stab_algebra::FlexPauliString::is_empty",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 648,
+      "source_line": 655,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57182,7 +57182,7 @@
       "path": "stab_algebra::FlexPauliString::len",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 644,
+      "source_line": 651,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57195,7 +57195,7 @@
       "path": "stab_algebra::FlexPauliString::multiply",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 656,
+      "source_line": 663,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57208,7 +57208,7 @@
       "path": "stab_algebra::FlexPauliString::phase",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 640,
+      "source_line": 647,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57221,7 +57221,7 @@
       "path": "stab_algebra::FlexPauliString::try_into_real",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 665,
+      "source_line": 672,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -57234,7 +57234,7 @@
       "path": "stab_algebra::FlexPauliString::value",
       "kind": "method",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 636,
+      "source_line": 643,
       "owner_case_id": "cq-evidence-qualification-3e7f1069cdca9659",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -58235,7 +58235,7 @@
       "path": "stab_algebra::PauliString as Display for@3541354da14b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 603,
+      "source_line": 610,
       "owner_case_id": "cq-evidence-qualification-d442bf57d5b0f76e",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -58261,7 +58261,7 @@
       "path": "stab_algebra::PauliString as FromStr for@3541354da14b",
       "kind": "trait-impl",
       "source_path": "crates/stab-algebra/src/pauli.rs",
-      "source_line": 613,
+      "source_line": 620,
       "owner_case_id": "cq-evidence-qualification-d442bf57d5b0f76e",
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
@@ -194341,6 +194341,45 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DEM-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-oracle-a38e71d8a5ba4fbc",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m8-sample-legacy-mode-flag-position",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m8-sample-legacy-mode-flag-position"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
       ],
       "status": "implemented"
     },

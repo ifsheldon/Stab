@@ -216,6 +216,27 @@ fn cq2_algebra_flex_pauli_contract_tracks_all_four_phases() {
             offset: 1,
         })
     );
+    // Pinned Stim rejects a second sign after the flex phase prefix, so the
+    // dense body parser must not consume another `+`/`-` (WS3 item 11).
+    for (rejected, character) in [
+        ("+-X", '-'),
+        ("--X", '-'),
+        ("-+X", '+'),
+        ("i-X", '-'),
+        ("-i+X", '+'),
+    ] {
+        assert_eq!(
+            FlexPauliString::from_str(rejected),
+            Err(StabilizerError::InvalidPauliCharacter {
+                character,
+                offset: 0,
+            }),
+            "{rejected:?}"
+        );
+    }
+    for accepted in ["+X", "-X", "iX", "-iX", "+iX", "-XYZ_"] {
+        FlexPauliString::from_str(accepted).expect("single-sign forms stay accepted");
+    }
 }
 
 #[test]

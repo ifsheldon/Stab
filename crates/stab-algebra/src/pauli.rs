@@ -538,8 +538,15 @@ impl PauliString {
 
     fn parse_dense(text: &str, allow_lowercase: bool) -> StabilizerResult<Self> {
         let (sign, body) = parse_real_prefix(text);
-        let mut result = Self::identity(body.chars().count())?;
+        let mut result = Self::parse_dense_body(body, allow_lowercase)?;
         result.sign = sign;
+        Ok(result)
+    }
+
+    /// Parses a dense Pauli body whose sign prefix was already consumed, so a
+    /// second sign character rejects like pinned Stim's `+-X` and `i-X`.
+    fn parse_dense_body(body: &str, allow_lowercase: bool) -> StabilizerResult<Self> {
+        let mut result = Self::identity(body.chars().count())?;
         for (offset, character) in body.chars().enumerate() {
             result.set(
                 offset,
@@ -800,7 +807,9 @@ impl FromStr for FlexPauliString {
         if sparse_size > 0 {
             Self::parse_sparse_body(phase, body, sparse_size, text)
         } else {
-            let mut value = PauliString::parse_dense(body, true)?;
+            // The flex prefix already consumed the phase, so the dense body
+            // must not carry a second sign (Stim rejects `+-X` and friends).
+            let mut value = PauliString::parse_dense_body(body, true)?;
             value.sign = phase.sign();
             Ok(Self {
                 value,

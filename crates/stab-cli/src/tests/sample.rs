@@ -160,3 +160,72 @@ fn zero_shot_sample_ignores_invalid_stdin() {
     assert_eq!(stdout, b"");
     assert_eq!(stderr, b"");
 }
+
+struct FailingWriter {
+    kind: std::io::ErrorKind,
+}
+
+impl std::io::Write for FailingWriter {
+    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::from(self.kind))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::from(self.kind))
+    }
+}
+
+#[test]
+fn broken_output_pipe_exits_141_with_empty_stderr_like_stim() {
+    // Pinned Stim dies silently via SIGPIPE when its stdout pipe closes
+    // (decision D2); a broken-pipe-rooted failure must report nothing and
+    // exit with the same shell-visible 141 status.
+    for argv in [
+        vec!["stab", "sample", "--shots", "4"],
+        vec!["stab", "detect", "--shots", "4"],
+        vec![
+            "stab",
+            "gen",
+            "--code",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+        ],
+    ] {
+        let mut stderr = Vec::new();
+        let code = run_from(
+            argv.iter().map(OsString::from),
+            "X 0\nM 0\nDETECTOR rec[-1]\n".as_bytes(),
+            FailingWriter {
+                kind: std::io::ErrorKind::BrokenPipe,
+            },
+            &mut stderr,
+        );
+        assert_eq!(code, 141, "{argv:?}");
+        assert!(stderr.is_empty(), "{argv:?}: {stderr:?}");
+    }
+}
+
+#[test]
+fn genuine_output_write_failures_still_report_a_diagnostic() {
+    let mut stderr = Vec::new();
+    let code = run_from(
+        ["stab", "sample", "--shots", "4"]
+            .iter()
+            .map(OsString::from),
+        "X 0\nM 0\n".as_bytes(),
+        FailingWriter {
+            kind: std::io::ErrorKind::StorageFull,
+        },
+        &mut stderr,
+    );
+    assert_eq!(code, 1);
+    assert!(
+        !stderr.is_empty(),
+        "non-pipe output failures must keep their diagnostics"
+    );
+}

@@ -5,6 +5,7 @@ use super::run_from;
 use tempfile::tempdir;
 
 mod batch_formats;
+mod deprecation;
 mod path_io;
 mod pf7_cli;
 mod sweep;
@@ -18,10 +19,10 @@ struct FailingWriter;
 
 impl std::io::Write for FailingWriter {
     fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::BrokenPipe,
-            "intentional write stop",
-        ))
+        // Deliberately not BrokenPipe: pipe-rooted failures take the silent
+        // status-141 path (decision D2), and this writer pins the diagnostic
+        // path for every other streaming write failure.
+        Err(std::io::Error::other("intentional write stop"))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {

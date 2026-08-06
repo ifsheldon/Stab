@@ -18,10 +18,7 @@ struct FailingWriter;
 
 impl std::io::Write for FailingWriter {
     fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::BrokenPipe,
-            "intentional write stop",
-        ))
+        Err(std::io::Error::other("intentional write stop"))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -38,10 +35,7 @@ impl std::io::Write for FailAfterOneWrite {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         self.writes += 1;
         if self.writes > 1 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::BrokenPipe,
-                "intentional second-batch stop",
-            ));
+            return Err(std::io::Error::other("intentional second-batch stop"));
         }
         Ok(buffer.len())
     }
@@ -63,10 +57,7 @@ impl std::io::Write for FlushFailWriter {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::BrokenPipe,
-            "intentional finish failure",
-        ))
+        Err(std::io::Error::other("intentional finish failure"))
     }
 }
 

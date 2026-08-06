@@ -474,7 +474,20 @@ impl OracleRunner {
             value if value.starts_with("--gen=") || value.starts_with("--sample=") => {
                 Some(Self::StimCli)
             }
-            _ => None,
+            // Pinned Stim accepts its legacy mode flag anywhere in argv, so a
+            // fixture pinning that grammar carries the mode flag off the
+            // first position.
+            _ => argv
+                .split('|')
+                .any(|token| {
+                    matches!(
+                        token,
+                        "--sample" | "--detect" | "--m2d" | "--analyze_errors" | "--convert"
+                    ) || token.starts_with("--gen=")
+                        || token.starts_with("--sample=")
+                        || token.starts_with("--detect=")
+                })
+                .then_some(Self::StimCli),
         }
     }
 }

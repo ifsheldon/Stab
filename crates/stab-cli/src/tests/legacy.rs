@@ -201,3 +201,36 @@ fn legacy_dispatch_rejects_unselected_legacy_modes() {
         );
     }
 }
+
+#[test]
+fn legacy_mode_flags_are_accepted_anywhere_before_the_separator_like_stim() {
+    // Pinned Stim scans the whole argument vector for its mode flag, probed
+    // via `--in <file> --sample` and `--detect 3 --in <file>` against the
+    // v1.16.0 binary.
+    let circuit = b"X 0\nM 0\nDETECTOR rec[-1]\n".as_slice();
+
+    let (status, stdout, stderr) = run_cli(&["stab", "--shots", "2", "--sample"], circuit);
+    assert_eq!(
+        (status, stdout.as_str(), stderr.as_str()),
+        (0, "1\n1\n", "")
+    );
+
+    let (status, stdout, stderr) = run_cli(&["stab", "--shots", "3", "--detect"], circuit);
+    assert_eq!(
+        (status, stdout.as_str(), stderr.as_str()),
+        (0, "0\n0\n0\n", "")
+    );
+
+    let (status, stdout, _stderr) = run_cli(
+        &["stab", "--append_observables", "--detect", "2"],
+        b"X 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    );
+    assert_eq!(status, 0);
+    assert_eq!(stdout, "00\n00\n");
+
+    // Several mode flags keep rejecting with a diagnostic and no output.
+    let (status, stdout, stderr) = run_cli(&["stab", "--sample", "--detect"], circuit);
+    assert_eq!(status, 1);
+    assert_eq!(stdout, "");
+    assert!(!stderr.is_empty());
+}
