@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "3431c1f8b621e6925917a009ff5cbd7ea841016a678bf207d0d16600fcfa7a87",
+  "semantic_digest": "b7a8fc122a4d0b238667fb9aca4f8d2cd31d5164bf1b65222d8e9110fc11ffad",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -187889,6 +187889,45 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-oracle-4a61fc399e3c3058",
+      "feature_id": "CQ-DETECTION",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m9-detect-flip-reference-dets",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m9-detect-flip-reference-dets"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-DETECTION"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-oracle-4ca18d22c2c6d6fc",
       "feature_id": "CQ-SEARCH",
       "behavioral_surface": "engine",
@@ -193648,6 +193687,45 @@
           ]
         }
       ],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-oracle-a0691478d932e01f",
+      "feature_id": "CQ-SAMPLING",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m8-sample-skip-reference-flip",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m8-sample-skip-reference-flip"
+        ]
+      },
+      "supporting_selectors": [],
       "resource_contract": {
         "kind": "not-applicable",
         "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
