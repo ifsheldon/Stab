@@ -155,3 +155,29 @@ fn assert_h_s_cx_base(circuit: &Circuit) {
         }
     }
 }
+
+#[test]
+fn huge_single_line_mpp_reduces_without_quadratic_order_scanning() {
+    // Parse limits deliberately do not bound targets per instruction, so one
+    // hostile MPP line with 100k distinct targets must reduce in linear-ish
+    // time; the old per-target `order` scan was quadratic (WS6 item 1).
+    let mut text = String::from("MPP ");
+    for index in 0..200_000_u32 {
+        if index > 0 {
+            text.push('*');
+        }
+        text.push('X');
+        text.push_str(&index.to_string());
+    }
+    text.push('\n');
+    let circuit = Circuit::from_stim_str(&text).expect("hostile MPP line parses");
+
+    let started = std::time::Instant::now();
+    let decomposed = decomposed_circuit(&circuit).expect("hostile MPP line decomposes");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(20),
+        "quadratic reduction returned: {:?}",
+        started.elapsed()
+    );
+    assert!(!decomposed.items().is_empty());
+}

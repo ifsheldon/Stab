@@ -585,6 +585,7 @@ struct ReducedProduct {
 fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
     let mut phase = 0_u8;
     let mut terms = BTreeMap::<QubitId, Pauli>::new();
+    let mut seen = BTreeSet::<QubitId>::new();
     let mut order = Vec::<QubitId>::new();
 
     for target in group {
@@ -597,7 +598,10 @@ fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
                 if *inverted {
                     phase = (phase + 2) % 4;
                 }
-                if !terms.contains_key(id) && !order.contains(id) {
+                // `terms` loses cancelled qubits, so first-appearance order
+                // needs its own seen-set; scanning `order` per target made
+                // one large MPP line quadratic.
+                if seen.insert(*id) {
                     order.push(*id);
                 }
                 let current = terms.remove(id);

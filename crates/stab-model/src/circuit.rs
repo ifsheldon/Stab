@@ -19,9 +19,38 @@ pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIt
 
 use self::iter::{checked_item_range, circuit_item_range_error};
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Default)]
 pub struct Circuit {
     items: Vec<CircuitItem>,
+}
+
+impl std::fmt::Debug for Circuit {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        // Nested bodies are elided so debug-formatting a deeply nested
+        // API-built circuit cannot recurse off the stack.
+        formatter
+            .debug_struct("Circuit")
+            .field("top_level_items", &self.items.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Clone for Circuit {
+    fn clone(&self) -> Self {
+        drop_impl::clone_circuit(self)
+    }
+}
+
+impl PartialEq for Circuit {
+    fn eq(&self, other: &Self) -> bool {
+        drop_impl::circuits_equal(self, other)
+    }
+}
+
+impl Drop for Circuit {
+    fn drop(&mut self) {
+        drop_impl::drop_items(&mut self.items);
+    }
 }
 
 #[derive(Debug)]
@@ -760,6 +789,7 @@ impl Display for Circuit {
 
 pub(crate) mod printing;
 
+mod drop_impl;
 mod parser;
 
 fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {

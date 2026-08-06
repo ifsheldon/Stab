@@ -96,5 +96,6 @@ The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-
 - Legacy mode flags (`--sample`, `--detect`, `--m2d`, `--analyze_errors`, `--convert`, `--gen=`) are accepted anywhere before a `--` separator like pinned Stim, with an adjacent shot count following the flag and an explicit `--shots` elsewhere retained; several mode flags still reject.
 - The Stab-specific `sample_dem` observable-routing flags `--append_observables` and `--prepend_observables` are hidden from `--help` (decision D4) but stay functional as compatibility conveniences.
 - `FlexPauliString::from_str` rejects doubled sign prefixes (`+-X`, `--X`, `-+X`, `i-X`, `-i+X`) with typed invalid-character errors mirroring pinned Stim instead of silently corrupting the sign.
+- `Circuit` now implements `Drop`, `Clone`, and `PartialEq` iteratively (mirroring `DetectorErrorModel`), so deeply nested API-built circuits no longer abort the process; its `Debug` output elides nested bodies (`Circuit { top_level_items: N, .. }`), and moving `items` out of a `Circuit` by value is no longer possible because the type implements `Drop`.
 
 The detailed decision ledger remains [architecture/0.2-api-migration-inventory.md](architecture/0.2-api-migration-inventory.md). The frozen pre-0.2 inventory remains historical and is not rewritten.

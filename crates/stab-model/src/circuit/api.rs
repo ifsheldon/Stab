@@ -26,8 +26,9 @@ impl Circuit {
     /// the existing circuit unchanged. Appended instructions use the normal append path, including
     /// Stim-style fusion with the previous instruction when applicable.
     pub fn append_from_stim_text(&mut self, input: &str) -> ModelResult<()> {
-        let parsed = Self::from_stim_str(input)?;
-        for item in parsed.items {
+        let mut parsed = Self::from_stim_str(input)?;
+        // Circuit implements Drop, so drain instead of moving the items out.
+        for item in parsed.items.drain(..) {
             self.append_item(item);
         }
         Ok(())

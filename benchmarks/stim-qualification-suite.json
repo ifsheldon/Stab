@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "0e08ad6a26e02393cc4371d9dd0042969f31559ebf814ccc446e2084e5e84b60",
-  "semantic_digest": "b23d3ab144e30b5f150961294a4e3c916d4ea9fb29e5318d5c5d1691e21856c2",
+  "correctness_digest": "69bcdea50c3c9b7ea6b39e31eb69eb8f7ff4e9ced7e338416c8426d492b98281",
+  "semantic_digest": "57ab3c2eb2737f839aaf12c247b1b3d9d55555f94ac6093f36a4fe180ff0dc21",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -1728,10 +1728,10 @@
     {
       "id": "PERFC-62e1399a85e9a96e",
       "source_line": 78,
-      "anchor_digest": "b09d75c802e4d59b26b6d04cd1b64e5cca39bfbfb49992ad9951b0f6521927dd",
+      "anchor_digest": "ae211e2c8f44a342ff2a26bd2e3fe844db04ba2c1fa5346515225eac32500558",
       "section": "4. Core Circuit Features",
       "feature": "Programmatic mutation",
-      "raw_status": "Reopened",
+      "raw_status": "Done for selected Rust API scope",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -19561,8 +19561,8 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-648795c2eb6742cd",
-      "path": "stab_core::Circuit as PartialEq for@365131fdb4ac",
+      "id": "cq-api-item-072c1b48d8a47711",
+      "path": "stab_core::Circuit as Drop for@365131fdb4ac",
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [
@@ -19574,8 +19574,8 @@
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
-      "id": "cq-api-item-c914daf9bae25db9",
-      "path": "stab_core::Circuit as StructuralPartialEq for@365131fdb4ac",
+      "id": "cq-api-item-648795c2eb6742cd",
+      "path": "stab_core::Circuit as PartialEq for@365131fdb4ac",
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [
@@ -73704,8 +73704,8 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-96bfe245bc948bd9",
-      "path": "stab_model::Circuit as PartialEq for@365131fdb4ac",
+      "id": "cq-api-item-37bb193ac9cfaba3",
+      "path": "stab_model::Circuit as Drop for@365131fdb4ac",
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [
@@ -73717,8 +73717,8 @@
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
-      "id": "cq-api-item-c694c1832be2bf2f",
-      "path": "stab_model::Circuit as StructuralPartialEq for@365131fdb4ac",
+      "id": "cq-api-item-96bfe245bc948bd9",
+      "path": "stab_model::Circuit as PartialEq for@365131fdb4ac",
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [
