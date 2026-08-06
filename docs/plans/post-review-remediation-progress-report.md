@@ -30,7 +30,14 @@ Each Pass 1 finding gains a row here when its fix lands: finding, owner, witness
 
 | Finding | Owner | Witness | Commit | Evidence |
 | --- | --- | --- | --- | --- |
-| (pending Batch A) | | | | |
+| Detector frame collapses only the first Pauli term of product measurements | `crates/stab-engine/src/detection/frame.rs` | `HERALDED_ERASE(0) 2` / `R 0 1` / `MXX 0 1` / `MZZ 0 1` / `DETECTOR rec[-1]` never fires; fails pre-fix | `957af5a9` | X/Y/MPP invariant regressions plus 6-sigma joint statistical test, all failing against pre-fix logic via stash run; engine suite green |
+| Reference sample applies `p == 1` measurement flips that pinned Stim drops | `crates/stab-engine/src/sampling/measurement_flip.rs` | `MR(1) 0` / `DETECTOR rec[-1]` fires every shot in pinned Stim; Stab inverted pre-fix | `648279a5` | `reference_flip_semantics` suite (reference_sample, detect, m2d, skip-reference; general and direct-Z paths) fails 3/3 pre-fix; detect/m2d outputs verified against the pinned Stim binary; core, cli, engine, M8, and M9 oracle lanes green |
+
+### Pending within Batch A
+
+- WS1 ride-along items (de-panic and Stim-align `count_determined_measurements`, MPAD counting consolidation, determinism-path documentation).
+- Committed oracle fixture manifest rows for the `M(1)`/`MR(1)` witnesses (planned alongside the WS3 fixture-row additions, which edit the same manifest).
+- WS3 items 1 through 3 and WS4 item 1.
 
 ## Deferred Backlog
 
