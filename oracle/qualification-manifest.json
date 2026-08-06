@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "69bcdea50c3c9b7ea6b39e31eb69eb8f7ff4e9ced7e338416c8426d492b98281",
+  "semantic_digest": "280364765623fe59a7b11ee50d9fa8dd74aad8ee2f08f9cfe99b00f8d8529c70",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -187197,6 +187197,45 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-oracle-3ba61b2c5642ac9f",
+      "feature_id": "CQ-ANALYZER",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m10-analyze-errors-decompose-remnant",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m10-analyze-errors-decompose-remnant"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-oracle-3bc7ee3bb5f17bd4",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "cli",
@@ -199711,6 +199750,45 @@
         "PERF-DETECTION"
       ],
       "status": "planned"
+    },
+    {
+      "id": "cq-evidence-oracle-f3ab008b7999c042",
+      "feature_id": "CQ-ANALYZER",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m10-analyze-errors-decompose-pair-single",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m10-analyze-errors-decompose-pair-single"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
     },
     {
       "id": "cq-evidence-oracle-f3de2f300019c3f4",
