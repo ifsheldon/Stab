@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Args)]
 pub(crate) struct ConvertArgs {
     /// Input record format.
-    #[arg(long = "in_format", value_enum, default_value = "01")]
+    #[arg(long = "in_format", value_enum)]
     in_format: RecordFormatArg,
 
     /// Output record format.

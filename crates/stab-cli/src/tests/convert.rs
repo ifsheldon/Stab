@@ -176,6 +176,8 @@ fn convert_detection_observable_records_with_circuit_and_obs_out() {
         &[
             "stab",
             "convert",
+            "--in_format",
+            "01",
             "--out_format",
             "dets",
             "--circuit",
@@ -197,6 +199,8 @@ fn convert_detection_observable_records_with_circuit_and_obs_out() {
         &[
             "stab",
             "convert",
+            "--in_format",
+            "01",
             "--out_format",
             "dets",
             "--circuit",
@@ -339,6 +343,8 @@ fn convert_ptb64_observable_side_output_round_trips() {
         &[
             "stab",
             "convert",
+            "--in_format",
+            "01",
             "--out_format",
             "01",
             "--num_detectors",
@@ -426,6 +432,8 @@ fn convert_rejects_incomplete_ptb64_output_group() {
         &[
             "stab",
             "convert",
+            "--in_format",
+            "01",
             "--out_format",
             "ptb64",
             "--bits_per_shot",
@@ -444,7 +452,14 @@ fn convert_rejects_layout_and_format_failures() {
     let (_dir, circuit_path) = write_fixture("layout.stim", "M 0\n");
     let failure_cases: Vec<(Vec<&str>, &[u8], &str)> = vec![
         (
-            vec!["stab", "convert", "--circuit", &circuit_path],
+            vec![
+                "stab",
+                "convert",
+                "--in_format",
+                "01",
+                "--circuit",
+                &circuit_path,
+            ],
             b"0\n",
             "--circuit requires --types",
         ),
@@ -452,6 +467,8 @@ fn convert_rejects_layout_and_format_failures() {
             vec![
                 "stab",
                 "convert",
+                "--in_format",
+                "01",
                 "--circuit",
                 &circuit_path,
                 "--types",
@@ -464,6 +481,8 @@ fn convert_rejects_layout_and_format_failures() {
             vec![
                 "stab",
                 "convert",
+                "--in_format",
+                "01",
                 "--circuit",
                 &circuit_path,
                 "--types",
@@ -473,7 +492,7 @@ fn convert_rejects_layout_and_format_failures() {
             "duplicate result type",
         ),
         (
-            vec!["stab", "convert", "--out_format", "b8"],
+            vec!["stab", "convert", "--in_format", "01", "--out_format", "b8"],
             b"10\n",
             "not enough information",
         ),
@@ -481,6 +500,8 @@ fn convert_rejects_layout_and_format_failures() {
             vec![
                 "stab",
                 "convert",
+                "--in_format",
+                "01",
                 "--out_format",
                 "dets",
                 "--bits_per_shot",
@@ -490,7 +511,14 @@ fn convert_rejects_layout_and_format_failures() {
             "to write to dets",
         ),
         (
-            vec!["stab", "convert", "--num_measurements", "3"],
+            vec![
+                "stab",
+                "convert",
+                "--in_format",
+                "01",
+                "--num_measurements",
+                "3",
+            ],
             b"10\n",
             "expected 3 bits",
         ),
@@ -647,9 +675,57 @@ fn stim_extension_rejects_irrelevant_roles_without_touching_them() {
 
 #[test]
 fn convert_preserves_successful_record_prefix_before_later_parse_error() {
-    let (status, stdout, stderr) = run_cli(&["stab", "convert", "--bits_per_shot=3"], b"101\n1");
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "convert", "--in_format=01", "--bits_per_shot=3"],
+        b"101\n1",
+    );
 
     assert_eq!(status, 1);
     assert_eq!(stdout, b"101\n");
     assert!(!stderr.is_empty());
+}
+
+#[test]
+fn convert_requires_explicit_in_format_like_stim() {
+    // Pinned Stim rejects convert without --in_format ("Must specify a value for enum flag
+    // '--in_format'."); the previous silent 01 default turned that error into output
+    // (docs/plans/post-review-remediation-plan.md, WS3).
+    let (status, stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "convert",
+            "--bits_per_shot",
+            "2",
+            "--out_format",
+            "b8",
+        ],
+        b"01\n10\n",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, Vec::<u8>::new());
+    assert!(stderr.contains("--in_format"), "{stderr}");
+
+    // The failing invocation must not open or truncate an existing --out target.
+    let dir = tempdir().expect("temp dir");
+    let out_path = dir.path().join("existing.b8");
+    std::fs::write(&out_path, b"sentinel").expect("write sentinel");
+    let out = out_path.to_str().expect("utf-8 path");
+    let (status, _, _) = run_cli(
+        &[
+            "stab",
+            "convert",
+            "--bits_per_shot",
+            "2",
+            "--out_format",
+            "b8",
+            "--out",
+            out,
+        ],
+        b"01\n",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(
+        std::fs::read(&out_path).expect("read sentinel"),
+        b"sentinel"
+    );
 }

@@ -45,8 +45,22 @@ fn legacy_dispatch_accepts_selected_aliases() {
             b"".as_slice(),
         ),
         (
-            &["stab", "--convert", "--bits_per_shot", "2"][..],
-            &["stab", "convert", "--bits_per_shot", "2"][..],
+            &[
+                "stab",
+                "--convert",
+                "--in_format",
+                "01",
+                "--bits_per_shot",
+                "2",
+            ][..],
+            &[
+                "stab",
+                "convert",
+                "--in_format",
+                "01",
+                "--bits_per_shot",
+                "2",
+            ][..],
             b"10\n01\n".as_slice(),
         ),
         (

@@ -295,14 +295,16 @@ pub(crate) fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> M
         }
         return Ok(());
     }
+    // Stim tokenizes '*' as a combiner wherever it appears, attached or spaced, and rejects
+    // misplaced combiners at gate validation ("combiners that aren't between other targets"),
+    // which validate_combiners mirrors; empty split parts therefore emit only the combiner.
     for (index, part) in token.split('*').enumerate() {
-        if part.is_empty() {
-            return Err(ModelError::invalid_domain_value("target combiner", token));
-        }
         if index > 0 {
             targets.push(Target::combiner());
         }
-        targets.push(Target::from_str(part)?);
+        if !part.is_empty() {
+            targets.push(Target::from_str(part)?);
+        }
     }
     Ok(())
 }

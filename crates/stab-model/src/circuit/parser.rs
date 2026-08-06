@@ -4,8 +4,8 @@ use crate::model_parse::{line_error, validation_error};
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{
-    ByteSpan, Gate, ModelDialect, ModelError, ModelResult, ParseErrorCode, ParseErrorContext,
-    ParseLimits, RepeatCount, Target, ValidationError,
+    ByteSpan, Gate, GateCategory, ModelDialect, ModelError, ModelResult, ParseErrorCode,
+    ParseErrorContext, ParseLimits, RepeatCount, Target, ValidationError,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
@@ -302,6 +302,21 @@ fn parse_instruction_fully_generic_from_parts(
             },
         )
     })?;
+    if gate.category() == GateCategory::ControlFlow {
+        let message = format!("missing '{{' at start of {} block", gate.canonical_name());
+        return Err(line_error(
+            ModelDialect::StimCircuit,
+            line_number,
+            ParseErrorCode::InvalidRepeatBlock,
+            message.clone(),
+            message,
+            name.span(),
+            ParseErrorContext::Instruction {
+                dialect: ModelDialect::StimCircuit,
+                instruction: bounded_parse_diagnostic_text(name.text()),
+            },
+        ));
+    }
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
     let targets = parse_targets(line_number, name.text(), rest, end_error_span)?;

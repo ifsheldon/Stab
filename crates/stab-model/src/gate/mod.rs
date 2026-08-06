@@ -106,6 +106,15 @@ impl Gate {
     }
 
     pub(crate) fn validate(self, args: &[f64], targets: &[Target]) -> ModelResult<()> {
+        // Block-only control-flow gates such as REPEAT exist in the gate table for name
+        // resolution but must never become ordinary instructions; pinned Stim rejects a
+        // braceless REPEAT at parse time and blocks never validate as instructions.
+        if self.category() == GateCategory::ControlFlow {
+            return Err(crate::ModelError::invalid_domain_value(
+                "instruction gate",
+                self.info.name,
+            ));
+        }
         self.info.arg_rule.validate(self.info.name, args)?;
         self.info.target_rule.validate(self.info.name, targets)
     }

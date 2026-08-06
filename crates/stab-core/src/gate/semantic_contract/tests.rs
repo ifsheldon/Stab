@@ -81,12 +81,16 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
         let contract = gate.surface_contract();
         for &pattern in contract.target_patterns() {
             let targets = representative_targets(pattern);
-            super::super::validate_gate(gate, &args, &targets).unwrap_or_else(|error| {
-                panic!(
-                    "{} pattern {pattern:?} must satisfy its canonical parser rule: {error}",
-                    gate.canonical_name()
-                )
-            });
+            // Block-only control-flow gates never validate as instructions since the WS3
+            // grammar repair; their patterns stay classified for surface-contract coverage.
+            if gate.category() != crate::GateCategory::ControlFlow {
+                super::super::validate_gate(gate, &args, &targets).unwrap_or_else(|error| {
+                    panic!(
+                        "{} pattern {pattern:?} must satisfy its canonical parser rule: {error}",
+                        gate.canonical_name()
+                    )
+                });
+            }
             let classified = contract
                 .classify_target_groups(&targets)
                 .expect("parser-accepted targets must be classified");
