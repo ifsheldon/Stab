@@ -893,9 +893,36 @@ mod tests {
         fs::set_permissions(&original_path, fs::Permissions::from_mode(0o755))
             .expect("replacement permissions");
 
-        let version = capture_version_from_descriptor(root.path(), &retained, &original_path)
-            .expect("descriptor version");
+        let version = capture_version_retrying_forked_writable_descriptors(
+            root.path(),
+            &retained,
+            &original_path,
+        )
+        .expect("descriptor version");
         assert_eq!(version, "stab 0.2.0\n");
+    }
+
+    /// Parallel tests fork children (git, fixture builds) that inherit this
+    /// file's transient writable descriptor between their fork and exec, so a
+    /// bare exec intermittently fails with ETXTBSY; a bounded retry on exactly
+    /// that error keeps the descriptor contract under test intact.
+    #[cfg(unix)]
+    fn capture_version_retrying_forked_writable_descriptors(
+        root: &Path,
+        binary: &File,
+        display_path: &Path,
+    ) -> Result<String, ReleaseError> {
+        for _ in 0..50 {
+            match capture_version_from_descriptor(root, binary, display_path) {
+                Err(ReleaseError::CommandIo { source, .. })
+                    if source.kind() == std::io::ErrorKind::ExecutableFileBusy =>
+                {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                outcome => return outcome,
+            }
+        }
+        capture_version_from_descriptor(root, binary, display_path)
     }
 
     #[test]
