@@ -368,13 +368,10 @@ impl TargetRule {
                 validate_combiners(gate, targets)
             }
             Self::PauliList => validate_targets(gate, targets, |target| {
-                matches!(
-                    target,
-                    Target::Pauli {
-                        inverted: false,
-                        ..
-                    }
-                )
+                // Pinned Stim's correlated-error handlers consult only the
+                // Pauli X/Z bits, so combiner targets and inversion bits are
+                // accepted as ignored decoration (frame_simulator.inl:767-775).
+                matches!(target, Target::Pauli { .. } | Target::Combiner)
             }),
         }
     }

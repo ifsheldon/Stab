@@ -953,8 +953,11 @@ fn compile_correlated_error(
     let probability = single_probability_argument(instruction)?.get();
     let mut terms = Vec::new();
     for target in instruction.targets() {
-        if target.is_inverted_result_target() || target.is_combiner() {
-            return Err(unsupported_sampler_instruction(instruction));
+        // Pinned Stim consults only the Pauli X/Z bits here, so combiner
+        // targets and inversion bits are ignored decoration
+        // (frame_simulator.inl:767-775).
+        if target.is_combiner() {
+            continue;
         }
         let Some(pauli) = target.pauli_type() else {
             return Err(unsupported_sampler_instruction(instruction));

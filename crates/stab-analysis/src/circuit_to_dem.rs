@@ -293,6 +293,12 @@ impl Analyzer {
         }
         let mut effects_by_qubit = BTreeMap::new();
         for target in instruction.targets() {
+            // Pinned Stim's correlated-error handlers consult only the Pauli
+            // X/Z bits, so combiner targets and inversion bits are ignored
+            // decoration (frame_simulator.inl:767-775).
+            if target.is_combiner() {
+                continue;
+            }
             let Some(pauli) = target.pauli_type() else {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
                     "E target {target} is not a Pauli target"

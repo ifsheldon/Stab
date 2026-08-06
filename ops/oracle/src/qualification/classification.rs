@@ -446,7 +446,9 @@ pub(super) fn classify_public_api_source(
     {
         return Some(FeatureId::DemFormat);
     }
-    if api_path_mentions_item(&api_lower, "probability") {
+    if api_path_mentions_item(&api_lower, "probability")
+        || api_path_mentions_item(&api_lower, "probabilitystimtext")
+    {
         return Some(FeatureId::Sampling);
     }
     if api_path_mentions_item(&api_lower, "measurerecordoffset") {

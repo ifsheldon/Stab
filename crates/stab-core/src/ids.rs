@@ -1,4 +1,4 @@
 pub use stab_model::{
-    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
-    RepeatCount,
+    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability,
+    ProbabilityStimText, QubitId, RepeatCount,
 };

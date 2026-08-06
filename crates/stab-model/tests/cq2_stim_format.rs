@@ -487,6 +487,9 @@ fn cq2_stim_format_instruction_validation_matches_stim() {
         CircuitInstruction::new(correlated, vec![0.1, 0.2], vec![pauli(Pauli::X, 0)], None,)
             .is_err()
     );
+    // Pinned Stim accepts inverted Pauli and combiner targets on correlated
+    // errors as ignored decoration (frame_simulator.inl:767-775), probed via
+    // `E(0.1) !X0` and `E(0.1) X0*X1` against the v1.16.0 binary.
     assert!(
         CircuitInstruction::new(
             correlated,
@@ -494,7 +497,16 @@ fn cq2_stim_format_instruction_validation_matches_stim() {
             vec![Target::pauli(Pauli::X, QubitId::new(0).unwrap(), true)],
             None,
         )
-        .is_err()
+        .is_ok()
+    );
+    assert!(
+        CircuitInstruction::new(
+            correlated,
+            vec![0.1],
+            vec![pauli(Pauli::X, 0), Target::combiner(), pauli(Pauli::Z, 1)],
+            None,
+        )
+        .is_ok()
     );
 
     assert!(

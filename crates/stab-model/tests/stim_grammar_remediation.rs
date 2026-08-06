@@ -51,3 +51,60 @@ fn misplaced_combiners_are_rejected_like_stim() {
         Circuit::from_stim_str(text).expect_err("misplaced combiners must not validate");
     }
 }
+
+#[test]
+fn repeat_headers_accept_and_drop_parenthesized_arguments_like_stim() {
+    // Pinned Stim lexes parens arguments for block gates and then discards
+    // them (circuit.cc:213-218), probed against the v1.16.0 binary for each
+    // spelling here.
+    for (text, canonical) in [
+        ("REPEAT(0.5) 3 {\nM 0\n}\n", "REPEAT 3 {\n    M 0\n}\n"),
+        ("REPEAT() 2 {\nM 0\n}\n", "REPEAT 2 {\n    M 0\n}\n"),
+        ("REPEAT(-1) 2 {\nM 0\n}\n", "REPEAT 2 {\n    M 0\n}\n"),
+        (
+            "REPEAT[t](1,2) 2 {\nM 0\n}\n",
+            "REPEAT[t] 2 {\n    M 0\n}\n",
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(text).expect("Stim-legal repeat header parses");
+        assert_eq!(circuit.to_stim_string(), canonical, "{text:?}");
+    }
+
+    for rejected in ["REPEAT(abc) 2 {\nM 0\n}\n", "REPEAT(0.5)3 {\nM 0\n}\n"] {
+        Circuit::from_stim_str(rejected)
+            .expect_err("malformed repeat argument spellings must reject like Stim");
+    }
+}
+
+#[test]
+fn correlated_error_decorations_parse_and_reprint_like_stim() {
+    // Pinned Stim consults only the Pauli X/Z bits of E and
+    // ELSE_CORRELATED_ERROR targets, so combiners and inversion bits are
+    // accepted decoration, and write_targets reprints them as stored
+    // (gate_target.cc:214-226); probed per spelling against v1.16.0.
+    for (text, canonical) in [
+        ("E(0.1) X0*X1\n", "E(0.1) X0*X1\n"),
+        ("E(0.1) X0 * X1\n", "E(0.1) X0*X1\n"),
+        ("E(0.1) !X0\n", "E(0.1) !X0\n"),
+        ("E(0.1) *X0\n", "E(0.1)*X0\n"),
+        ("E(0.1)*X0\n", "E(0.1)*X0\n"),
+        ("E(0.1) X0*\n", "E(0.1) X0*\n"),
+        ("E(0.1) X0**X1\n", "E(0.1) X0**X1\n"),
+        ("E(0.1) *\n", "E(0.1)*\n"),
+        (
+            "E(0.3) X0\nELSE_CORRELATED_ERROR(0.2) !Z0 * Z1\n",
+            "E(0.3) X0\nELSE_CORRELATED_ERROR(0.2) !Z0*Z1\n",
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(text).expect("decorated correlated error parses");
+        assert_eq!(circuit.to_stim_string(), canonical, "{text:?}");
+        let reparsed = Circuit::from_stim_str(&circuit.to_stim_string())
+            .expect("printed decorated form must reparse");
+        assert_eq!(reparsed, circuit, "{text:?}");
+    }
+
+    for rejected in ["X_ERROR(0.1) X0\n", "M*0\n", "MPP*Z0\n", "E(0.1) 0\n"] {
+        Circuit::from_stim_str(rejected)
+            .expect_err("decoration tolerance must stay scoped to correlated errors");
+    }
+}

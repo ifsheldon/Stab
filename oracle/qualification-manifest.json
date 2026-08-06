@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "b7a8fc122a4d0b238667fb9aca4f8d2cd31d5164bf1b65222d8e9110fc11ffad",
+  "semantic_digest": "9267f25988116bdf35aeff0ff1ca12bdd93126cea18e691f021897d152378ef4",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -95615,6 +95615,19 @@
       ]
     },
     {
+      "id": "cq-api-item-e4c75e44c83271b9",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_core",
+      "path": "stab_core::Probability::stim_text",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 105,
+      "owner_case_id": "cq-evidence-api-473c68d9a14d5343",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
       "id": "cq-api-item-00c06c54c041b693",
       "feature_id": "CQ-SAMPLING",
       "crate_name": "stab_core",
@@ -95628,13 +95641,52 @@
       ]
     },
     {
+      "id": "cq-api-item-e7ad0e0c9f869cd8",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_core",
+      "path": "stab_core::ProbabilityStimText",
+      "kind": "struct",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-514102f4f938a431",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_core",
+      "path": "stab_core::ProbabilityStimText as Debug for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-b2ad502e5785bcb5",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_core",
+      "path": "stab_core::ProbabilityStimText as Display for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-core/src/lib.rs",
+      "source_line": 106,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
       "id": "cq-api-item-bbe988116dc67bdd",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::QubitId",
       "kind": "struct",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95648,7 +95700,7 @@
       "path": "stab_core::QubitId as Clone for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95662,7 +95714,7 @@
       "path": "stab_core::QubitId as Copy for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95676,7 +95728,7 @@
       "path": "stab_core::QubitId as Debug for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95690,7 +95742,7 @@
       "path": "stab_core::QubitId as Eq for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95704,7 +95756,7 @@
       "path": "stab_core::QubitId as Ord for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95718,7 +95770,7 @@
       "path": "stab_core::QubitId as PartialEq for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95732,7 +95784,7 @@
       "path": "stab_core::QubitId as PartialOrd for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95746,7 +95798,7 @@
       "path": "stab_core::QubitId as StructuralPartialEq for@7681640cce62",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95760,7 +95812,7 @@
       "path": "stab_core::QubitId::get",
       "kind": "method",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -95774,7 +95826,7 @@
       "path": "stab_core::QubitId::new",
       "kind": "method",
       "source_path": "crates/stab-core/src/lib.rs",
-      "source_line": 105,
+      "source_line": 106,
       "owner_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -143336,7 +143388,7 @@
       "path": "stab_model::MeasureRecordOffset as Debug for@9c5344758e2c",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 174,
+      "source_line": 192,
       "owner_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143427,7 +143479,7 @@
       "path": "stab_model::MeasureRecordOffset::is_negative_zero",
       "kind": "method",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 158,
+      "source_line": 176,
       "owner_case_id": "cq-evidence-api-4fb8b3d6e2e1c01e",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143440,7 +143492,7 @@
       "path": "stab_model::MeasureRecordOffset::stim_text",
       "kind": "method",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 163,
+      "source_line": 181,
       "owner_case_id": "cq-evidence-api-7df2eca8a3e32363",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143466,7 +143518,7 @@
       "path": "stab_model::MeasureRecordOffsetText",
       "kind": "struct",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 183,
+      "source_line": 201,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143479,7 +143531,7 @@
       "path": "stab_model::MeasureRecordOffsetText as Clone for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143492,7 +143544,7 @@
       "path": "stab_model::MeasureRecordOffsetText as Copy for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143505,7 +143557,7 @@
       "path": "stab_model::MeasureRecordOffsetText as Debug for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143518,7 +143570,7 @@
       "path": "stab_model::MeasureRecordOffsetText as Display for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 185,
+      "source_line": 203,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143531,7 +143583,7 @@
       "path": "stab_model::MeasureRecordOffsetText as Eq for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143544,7 +143596,7 @@
       "path": "stab_model::MeasureRecordOffsetText as PartialEq for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -143557,7 +143609,7 @@
       "path": "stab_model::MeasureRecordOffsetText as StructuralPartialEq for@e1837cda6962",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/ids.rs",
-      "source_line": 182,
+      "source_line": 200,
       "owner_case_id": "cq-evidence-api-736fd36e92ee56c1",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -145955,6 +146007,19 @@
       ]
     },
     {
+      "id": "cq-api-item-242051625d1fc0f8",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_model",
+      "path": "stab_model::Probability::stim_text",
+      "kind": "method",
+      "source_path": "crates/stab-model/src/ids.rs",
+      "source_line": 138,
+      "owner_case_id": "cq-evidence-api-473c68d9a14d5343",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
       "id": "cq-api-item-be82df042deba49f",
       "feature_id": "CQ-SAMPLING",
       "crate_name": "stab_model",
@@ -145963,6 +146028,45 @@
       "source_path": "crates/stab-model/src/ids.rs",
       "source_line": 115,
       "owner_case_id": "cq-evidence-api-7d28998ddb840f73",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-03dea93fd27cae5d",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_model",
+      "path": "stab_model::ProbabilityStimText",
+      "kind": "struct",
+      "source_path": "crates/stab-model/src/ids.rs",
+      "source_line": 145,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-e2382f748584250a",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_model",
+      "path": "stab_model::ProbabilityStimText as Debug for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-model/src/ids.rs",
+      "source_line": 144,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ]
+    },
+    {
+      "id": "cq-api-item-6135ba44f366b584",
+      "feature_id": "CQ-SAMPLING",
+      "crate_name": "stab_model",
+      "path": "stab_model::ProbabilityStimText as Display for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "source_path": "crates/stab-model/src/ids.rs",
+      "source_line": 147,
+      "owner_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
       "performance_groups": [
         "PERF-SAMPLING"
       ]
@@ -159210,6 +159314,12 @@
     },
     {
       "crate_name": "stab_core",
+      "alias_path": "stab_core::ProbabilityStimText",
+      "canonical_crate_name": "stab_model",
+      "canonical_path": "stab_model::ProbabilityStimText"
+    },
+    {
+      "crate_name": "stab_core",
       "alias_path": "stab_core::QubitId",
       "canonical_crate_name": "stab_model",
       "canonical_path": "stab_model::QubitId"
@@ -163539,6 +163649,54 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "feature_id": "CQ-SAMPLING",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_model::ProbabilityStimText",
+      "comparator": "statistical",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": {
+        "state": "planned",
+        "source": "qualification-case",
+        "id": "cq-evidence-api-38af8cc40a9b1ef6"
+      },
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_38af8cc40a9b1ef6",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-SAMPLING"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-3a0af0624b317753",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "rust-api",
@@ -164183,6 +164341,54 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-473c68d9a14d5343",
+      "feature_id": "CQ-SAMPLING",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_model::Probability::stim_text",
+      "comparator": "statistical",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": {
+        "state": "planned",
+        "source": "qualification-case",
+        "id": "cq-evidence-api-473c68d9a14d5343"
+      },
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_473c68d9a14d5343",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-SAMPLING"
       ],
       "status": "planned"
     },
@@ -190352,6 +190558,45 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-oracle-6c19c56f2f53d6d5",
+      "feature_id": "CQ-ANALYZER",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m4-parser-correlated-error-decorations",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m4-parser-correlated-error-decorations"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-oracle-6ca2babd6c580d23",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "cli",
@@ -190930,7 +191175,7 @@
           "seeds": [],
           "case_count": 1,
           "corpus_path": "crates/stab-model/tests/value_boundaries.rs",
-          "corpus_sha256": "c1fa793e937d67fd7b3b15cca439faead50ee60f9794d71ba773b35ffba5b526",
+          "corpus_sha256": "c85c07bc98d9c462c2b9332e4c7fa9409288ff71cf0cea029833772860ec0038",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -192296,6 +192541,45 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-oracle-84e49d4fc939af47",
+      "feature_id": "CQ-GENERATION",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m7-gen-probability-header-scientific",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m7-gen-probability-header-scientific"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-GENERATION"
       ],
       "status": "implemented"
     },
@@ -195315,6 +195599,45 @@
       "status": "implemented"
     },
     {
+      "id": "cq-evidence-oracle-b58dc0387e18945d",
+      "feature_id": "CQ-ANALYZER",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m4-parser-repeat-args-accept",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m4-parser-repeat-args-accept"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "implemented"
+    },
+    {
       "id": "cq-evidence-oracle-b656fba2a526624f",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -197108,6 +197431,45 @@
         "PERF-ERROR-ANALYSIS"
       ],
       "status": "planned"
+    },
+    {
+      "id": "cq-evidence-oracle-d379cba404bf2c9e",
+      "feature_id": "CQ-GENERATION",
+      "behavioral_surface": "cli",
+      "provenance": "oracle-fixture",
+      "source_id": "m7-gen-probability-header-six-digits",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "oracle-fixture",
+        "value": [
+          "m7-gen-probability-header-six-digits"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-GENERATION"
+      ],
+      "status": "implemented"
     },
     {
       "id": "cq-evidence-oracle-d382eb338cd2cf5d",
@@ -211190,7 +211552,7 @@
           "seeds": [],
           "case_count": 10,
           "corpus_path": "crates/stab-model/tests/value_boundaries.rs",
-          "corpus_sha256": "c1fa793e937d67fd7b3b15cca439faead50ee60f9794d71ba773b35ffba5b526",
+          "corpus_sha256": "c85c07bc98d9c462c2b9332e4c7fa9409288ff71cf0cea029833772860ec0038",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }

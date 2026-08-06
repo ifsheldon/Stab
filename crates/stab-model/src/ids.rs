@@ -130,6 +130,24 @@ impl Probability {
     pub fn get(self) -> f64 {
         self.0
     }
+
+    /// Formats this probability exactly as pinned Stim prints doubles in
+    /// generated-circuit headers and instruction arguments (C++ ostream
+    /// default formatting: six significant digits, scientific outside the
+    /// fixed range).
+    pub fn stim_text(self) -> ProbabilityStimText {
+        ProbabilityStimText(self)
+    }
+}
+
+/// Stim-canonical text form of a [`Probability`].
+#[derive(Debug)]
+pub struct ProbabilityStimText(Probability);
+
+impl std::fmt::Display for ProbabilityStimText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(crate::circuit::printing::format_float(self.0.get()).as_str())
+    }
 }
 
 impl MeasureRecordOffset {

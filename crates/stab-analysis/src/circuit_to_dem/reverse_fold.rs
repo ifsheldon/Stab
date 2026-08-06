@@ -518,6 +518,12 @@ impl ReverseFoldAnalyzer {
     fn composite_error_targets(&self, targets: &[Target]) -> AnalysisResult<BTreeSet<DemTarget>> {
         let mut result = BTreeSet::new();
         for target in targets {
+            // Pinned Stim's correlated-error handlers consult only the Pauli
+            // X/Z bits, so combiner targets and inversion bits are ignored
+            // decoration (frame_simulator.inl:767-775).
+            if target.is_combiner() {
+                continue;
+            }
             let pauli = target.pauli_type().ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(format!(
                     "correlated error target {target} is not a Pauli target"

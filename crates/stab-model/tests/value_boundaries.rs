@@ -50,6 +50,36 @@ fn probability_typed_boundary_matches_stim_argument_validation() {
 #[test]
 #[allow(
     clippy::expect_used,
+    reason = "every probability spelling is a fixed test fixture"
+)]
+fn probability_stim_text_matches_pinned_ostream_formatting() {
+    // Pinned Stim prints gen-header probabilities with C++ ostream defaults
+    // (six significant digits, scientific below 1e-4), probed against the
+    // v1.16.0 binary for each spelling here.
+    for (value, expected) in [
+        (0.0, "0"),
+        (1.0, "1"),
+        (0.125, "0.125"),
+        (0.00001, "1e-05"),
+        (0.0001, "0.0001"),
+        (0.123456789, "0.123457"),
+        (0.999999999, "1"),
+        (2.5e-7, "2.5e-07"),
+    ] {
+        assert_eq!(
+            Probability::try_new(value)
+                .expect("fixture probability")
+                .stim_text()
+                .to_string(),
+            expected,
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+#[allow(
+    clippy::expect_used,
     reason = "the test must inspect the typed error returned by exact rejected model fixtures"
 )]
 fn model_errors_expose_validation_from_real_model_failures() {

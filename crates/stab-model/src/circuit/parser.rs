@@ -135,6 +135,11 @@ impl<'a> Parser<'a> {
             ));
         }
         let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
+        // Pinned Stim lexes parenthesized arguments for every gate before the
+        // block brace check and then drops them for block gates, so REPEAT
+        // headers accept and discard well-formed arguments while malformed
+        // ones keep the shared argument diagnostics (circuit.cc:213-218).
+        let (_args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
         if !rest
             .text()
             .as_bytes()
@@ -606,11 +611,13 @@ fn parse_targets(
             region: end_error_span,
         });
     }
+    // Pinned Stim waives the target spacing requirement for combiners
+    // (circuit.h:302-310), so `E(0.1)*X0` lexes while `E(0.1)X0` rejects.
     if !rest
         .text()
         .as_bytes()
         .first()
-        .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\r'))
+        .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'*'))
     {
         let span = first_character_span(rest);
         return Err(line_error(

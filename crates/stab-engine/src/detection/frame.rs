@@ -571,6 +571,12 @@ impl ScalarDetectionFrame {
         }
         self.correlated_error_occurred = true;
         for target in instruction.targets() {
+            // Pinned Stim consults only the Pauli X/Z bits here, so combiner
+            // targets and inversion bits are ignored decoration
+            // (frame_simulator.inl:767-775).
+            if target.is_combiner() {
+                continue;
+            }
             let Some(pauli) = target.pauli_type() else {
                 return Err(unsupported_frame_instruction(instruction));
             };

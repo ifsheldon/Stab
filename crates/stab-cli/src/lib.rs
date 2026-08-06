@@ -667,7 +667,7 @@ fn write_probability_header(out: &mut String, name: &str, value: Probability) {
     out.push_str("# ");
     out.push_str(name);
     out.push_str(": ");
-    out.push_str(&value.get().to_string());
+    out.push_str(&value.stim_text().to_string());
     out.push('\n');
 }
 

@@ -102,8 +102,8 @@ pub use execution::{
     count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
 pub use ids::{
-    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability, QubitId,
-    RepeatCount,
+    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability,
+    ProbabilityStimText, QubitId, RepeatCount,
 };
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,

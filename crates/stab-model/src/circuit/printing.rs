@@ -55,13 +55,11 @@ fn repeat_text_capacity(repeat: &RepeatBlock, indent: usize) -> usize {
 }
 
 fn targets_text_len(targets: &[Target]) -> usize {
+    // Slight overcount for combiners, which suppress adjacent separators;
+    // this only sizes the output reservation.
     targets.iter().fold(0usize, |len, target| {
-        if target.is_combiner() {
-            len
-        } else {
-            len.saturating_add(1)
-                .saturating_add(target_text_len(target))
-        }
+        len.saturating_add(1)
+            .saturating_add(target_text_len(target))
     })
 }
 
@@ -250,7 +248,7 @@ fn escaped_tag_len(tag: &[u8]) -> usize {
     })
 }
 
-pub(super) struct FormattedFloat {
+pub(crate) struct FormattedFloat {
     text: StackText<FLOAT_BUFFER_BYTES>,
 }
 
@@ -259,7 +257,7 @@ impl FormattedFloat {
         self.text.as_bytes()
     }
 
-    pub(super) fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         self.text.as_str()
     }
 
@@ -272,7 +270,7 @@ impl FormattedFloat {
     clippy::expect_used,
     reason = "Stim's six-significant-digit f64 forms fit in the fixed 32-byte buffers"
 )]
-pub(super) fn format_float(value: f64) -> FormattedFloat {
+pub(crate) fn format_float(value: f64) -> FormattedFloat {
     let mut result = StackText::new();
     if let Some(integer) = stim_integer_like_i64(value) {
         write!(&mut result, "{integer}").expect("integer fits in float buffer");

@@ -1,0 +1,9 @@
+R 0 1
+E(0.1) X0*X1
+M 0 1
+DETECTOR rec[-1]
+DETECTOR rec[-2]
+R 0
+E(0.1) !X0
+M 0
+DETECTOR rec[-1]

@@ -39,7 +39,7 @@ pub use gate::{
 };
 pub use ids::{
     CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText,
-    ObservableId, Probability, QubitId, RepeatCount,
+    ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
 };
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
 pub use resource_limit::{

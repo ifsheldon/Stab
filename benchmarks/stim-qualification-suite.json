@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "b7a8fc122a4d0b238667fb9aca4f8d2cd31d5164bf1b65222d8e9110fc11ffad",
-  "semantic_digest": "74c204a72a7a1967759bd10673d9d2a24227356ec56b84507e85565c0c64c81f",
+  "correctness_digest": "9267f25988116bdf35aeff0ff1ca12bdd93126cea18e691f021897d152378ef4",
+  "semantic_digest": "a09f507bc8e83cd280a0a8d554ae86ef41930677eea6c3044f5545915f97f906",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -447,7 +447,7 @@
     {
       "id": "PERFC-1451be08d4caacb8",
       "source_line": 104,
-      "anchor_digest": "58b71e760061928cda06ba076c9f6edf6b1ed92c926b23f629685d8e44308ffe",
+      "anchor_digest": "fef9ed03be83da67b0557d010d9830c5dc3b92f920ed6cc3b87c1de6a8fb2a35",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Compiled measurement sampling",
       "raw_status": "Reopened",
@@ -1788,10 +1788,10 @@
     {
       "id": "PERFC-6316a8cb3a98fc44",
       "source_line": 33,
-      "anchor_digest": "ef92a331fe8bb16c731b39466c5e680698199de31f602807644de77e66fc5d7d",
+      "anchor_digest": "6405e4361693b50469996b9eeb4c8dadd13e217b9444ef9e98c57dce173fc4ba",
       "section": "2. File Formats And IO Contracts",
       "feature": "Line-based `.stim` parsing, comments, tags, args, targets, and repeat blocks",
-      "raw_status": "Reopened",
+      "raw_status": "Done",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2997,10 +2997,10 @@
     {
       "id": "PERFC-ba7551d3078c0efc",
       "source_line": 36,
-      "anchor_digest": "de1e75596ed1ff9d2a48c1100752745196a1962d0393e8b389e694825be3de5f",
+      "anchor_digest": "7689f5adc0f1706a1d9a4b16d5584f471dc70562ea67363b5818aee1e24ec040",
       "section": "2. File Formats And IO Contracts",
       "feature": "Broadcast and validation behavior",
-      "raw_status": "Reopened",
+      "raw_status": "Done",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3708,7 +3708,7 @@
     {
       "id": "PERFC-e78daef9f77f3f2a",
       "source_line": 167,
-      "anchor_digest": "6d901200cc977e06ab7d62e15d3d443b56c822995590022a6c6c07dbe4b2baa7",
+      "anchor_digest": "e7bae8525afba1087ed893505fac9d4fcd003d975c41150af1f25b1495b1b2f7",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
       "raw_status": "Reopened",
@@ -3740,10 +3740,10 @@
     {
       "id": "PERFC-e9ea7ae3015ccb24",
       "source_line": 165,
-      "anchor_digest": "77c6b2f18ea42f79d64ae7cf9c0975b62e57c2165d07cf1ca83a9f935f3f6558",
+      "anchor_digest": "5e78a41610f0d67e156705e637ba54af7bdc3d78d576d7061996382d799fc519",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
-      "raw_status": "Reopened",
+      "raw_status": "Done for selected CLI scope",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -37993,12 +37993,56 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-e4c75e44c83271b9",
+      "path": "stab_core::Probability::stim_text",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-473c68d9a14d5343",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-00c06c54c041b693",
       "path": "stab_core::Probability::try_new",
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-7d28998ddb840f73",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e7ad0e0c9f869cd8",
+      "path": "stab_core::ProbabilityStimText",
+      "kind": "struct",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-514102f4f938a431",
+      "path": "stab_core::ProbabilityStimText as Debug for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-b2ad502e5785bcb5",
+      "path": "stab_core::ProbabilityStimText as Display for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -81615,12 +81659,56 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-242051625d1fc0f8",
+      "path": "stab_model::Probability::stim_text",
+      "kind": "method",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-473c68d9a14d5343",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-be82df042deba49f",
       "path": "stab_model::Probability::try_new",
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-7d28998ddb840f73",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-03dea93fd27cae5d",
+      "path": "stab_model::ProbabilityStimText",
+      "kind": "struct",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e2382f748584250a",
+      "path": "stab_model::ProbabilityStimText as Debug for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-6135ba44f366b584",
+      "path": "stab_model::ProbabilityStimText as Display for@c57a5c2496c2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-38af8cc40a9b1ef6",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

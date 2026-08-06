@@ -758,7 +758,7 @@ impl Display for Circuit {
     }
 }
 
-mod printing;
+pub(crate) mod printing;
 
 mod parser;
 
@@ -790,15 +790,16 @@ fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
 }
 
 fn write_targets(out: &mut String, targets: &[Target]) {
-    let mut pending_combiner = false;
+    // Mirrors pinned Stim's write_targets (gate_target.cc:214-226): a
+    // combiner prints immediately with no space before it and suppresses the
+    // space before the following target, so dangling and doubled combiners
+    // reprint exactly as stored.
+    let mut skip_space = false;
     for target in targets {
         if target.is_combiner() {
-            pending_combiner = true;
-            continue;
-        }
-        if pending_combiner {
-            out.push('*');
-            pending_combiner = false;
+            skip_space = true;
+        } else if skip_space {
+            skip_space = false;
         } else {
             out.push(' ');
         }
@@ -807,15 +808,12 @@ fn write_targets(out: &mut String, targets: &[Target]) {
 }
 
 fn write_targets_io(out: &mut impl Write, targets: &[Target]) -> io::Result<()> {
-    let mut pending_combiner = false;
+    let mut skip_space = false;
     for target in targets {
         if target.is_combiner() {
-            pending_combiner = true;
-            continue;
-        }
-        if pending_combiner {
-            out.write_all(b"*")?;
-            pending_combiner = false;
+            skip_space = true;
+        } else if skip_space {
+            skip_space = false;
         } else {
             out.write_all(b" ")?;
         }

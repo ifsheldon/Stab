@@ -81,7 +81,7 @@ Every publishable Stab product package is versioned `0.2.0`, and every publishab
 
 ## Post-Review Remediation Changes
 
-The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
+The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1 and WS3) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
 
 - `CompiledSampler::count_determined_measurements` and `CompiledSampler::reference_sample` now return `CircuitResult`; the duplicate `try_count_determined_measurements` and `try_reference_sample` methods are removed. Append `?` or `.expect(...)` at call sites.
 - The panicking `SamplingPlan::count_determined_measurements` and `SamplingPlan::reference_sample` compatibility methods are removed; use `try_count_determined_measurements` and `try_reference_sample`. A parseable hostile circuit can no longer panic a public entry point.
@@ -89,5 +89,8 @@ The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-
 - `count_determined_measurements` now matches pinned Stim v1.16.0 semantics: measurement flip arguments are ignored (determinism is a state property), and circuits containing `MPAD` or heralded noise records are rejected with a typed error, mirroring Stim's `count_determined_measurements` rejection of unhandled measurement types.
 - `Circuit::count_qubits` now excludes `MPAD` pad values, matching Stim v1.16.0 (`circuit_instruction.cc`); pad values reserve measurement records, not qubits. The previously distinct internal simulated-qubit count is consolidated onto this one owner.
 - Reference samples are strictly noiseless: `p == 1` measurement flips invert sampled shots but never the reference bit, matching Stim's dropped-flip reference contract.
+- `E`/`ELSE_CORRELATED_ERROR` now accept combiner and inverted Pauli targets as ignored decoration, matching pinned Stim's frame simulator, and every analysis and sampling consumer skips combiners while dropping inversion bits; previously such circuits were rejected at validation.
+- Circuit printing now mirrors Stim's `write_targets` exactly: dangling and doubled combiners reprint as stored instead of being dropped or collapsed, and a leading combiner attaches to the preceding header just as pinned Stim prints it.
+- `Probability::stim_text()` (with the `ProbabilityStimText` display wrapper) is new API formatting probabilities exactly as pinned Stim prints doubles in generated-circuit headers; `stab gen` headers now use it, so probabilities needing scientific notation or more than six significant digits render byte-identically to Stim.
 
 The detailed decision ledger remains [architecture/0.2-api-migration-inventory.md](architecture/0.2-api-migration-inventory.md). The frozen pre-0.2 inventory remains historical and is not rewritten.
