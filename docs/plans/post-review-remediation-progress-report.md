@@ -34,11 +34,12 @@ Each Pass 1 finding gains a row here when its fix lands: finding, owner, witness
 | Reference sample applies `p == 1` measurement flips that pinned Stim drops | `crates/stab-engine/src/sampling/measurement_flip.rs` | `MR(1) 0` / `DETECTOR rec[-1]` fires every shot in pinned Stim; Stab inverted pre-fix | `648279a5` | `reference_flip_semantics` suite (reference_sample, detect, m2d, skip-reference; general and direct-Z paths) fails 3/3 pre-fix; detect/m2d outputs verified against the pinned Stim binary; core, cli, engine, M8, and M9 oracle lanes green |
 | Public count/reference helpers panic on parseable circuits; count semantics diverge from Stim; MPAD inflates public qubit counts | `crates/stab-engine/src/sampling/{mod,execute,direct_z_measurement}.rs`, `crates/stab-core/src/sampling.rs`, `crates/stab-model/src/circuit/counts.rs` | `M 16000000` returns a typed error through every public entry point; `M(0.5) 0` counts determined like Stim; `MPAD`/heralded reject like Stim's unhandled-type throw; `count_qubits("H 0\nMPAD 1")` is 1 per `circuit_instruction.cc:64-69` | (this change set) | Panicking wrappers deleted; flip arguments ignored in the count path with physical-outcome reset conditioning; one qubit-count owner; new engine pins for flip-ignoring and typed rejection; renamed core pin corrected against vendor source; MIGRATING-0.2.md records the API changes; model, engine, core, cli, analysis, records, decoder, bits, and algebra suites green |
 
+| Bare `REPEAT` accepted as an instruction; Stim-legal spaced combiners rejected; `convert --in_format` silently defaulted | `crates/stab-model/src/circuit/parser.rs`, `crates/stab-model/src/target.rs`, `crates/stab-model/src/gate/mod.rs`, `crates/stab-cli/src/convert.rs` | `REPEAT` parses pre-fix where pinned Stim errors "Missing '{'"; `MPP Z0 *Z1` rejects pre-fix where pinned Stim accepts; `convert` without `--in_format` emitted output pre-fix where pinned Stim exits 1 | `49f87330` | `stim_grammar_remediation` suite plus the required-flag regression (exit status, stderr class, untouched output path); combiner accept/reject set matched to the pinned binary probe matrix; parser fuzz smoke green; model, cli, core, engine, and analysis suites green |
+
 ### Pending within Batch A
 
-- WS1 ride-along items (de-panic and Stim-align `count_determined_measurements`, MPAD counting consolidation, determinism-path documentation).
-- Committed oracle fixture manifest rows for the `M(1)`/`MR(1)` witnesses (planned alongside the WS3 fixture-row additions, which edit the same manifest).
-- WS3 items 1 through 3 and WS4 item 1.
+- Committed oracle fixture manifest rows for the `M(1)`/`MR(1)`, bare-`REPEAT`, spaced-combiner, and `convert --in_format` witnesses (one manifest-editing pass).
+- WS4 item 1 (draft-release endpoint fix with the 404-faithful mock).
 
 ## Deferred Backlog
 
