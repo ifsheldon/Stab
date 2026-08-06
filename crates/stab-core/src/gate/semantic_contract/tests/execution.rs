@@ -237,12 +237,19 @@ fn gate_surface_contract_measure_reset() {
         ("R 0 1", "M !0 1", [true, false]),
         ("RX 0 1", "MX !0 1", [true, false]),
         ("RY 0 1", "MY !0 1", [true, false]),
-        ("R 0 1", "M(1) !0 1", [false, true]),
-        ("RX 0 1", "MX(1) !0 1", [false, true]),
-        ("RY 0 1", "MY(1) !0 1", [false, true]),
     ] {
         let text = format!("{prepare}\n{measure}\n");
         assert_exact_reference_and_samples(&text, &expected);
+        assert_all_semantic_surfaces_execute(&text);
+    }
+
+    for (prepare, measure) in [
+        ("R 0 1", "M(1) !0 1"),
+        ("RX 0 1", "MX(1) !0 1"),
+        ("RY 0 1", "MY(1) !0 1"),
+    ] {
+        let text = format!("{prepare}\n{measure}\n");
+        assert_noiseless_reference_and_flipped_samples(&text, &[true, false], &[false, true]);
         assert_all_semantic_surfaces_execute(&text);
     }
 
@@ -298,7 +305,7 @@ fn gate_surface_contract_pair_measurement_inversion() {
         assert_all_semantic_surfaces_execute(&text);
 
         let probability_flipped = format!("{prepare}\n{gate}(1) !0 1\n");
-        assert_exact_reference_and_samples(&probability_flipped, &[false]);
+        assert_noiseless_reference_and_flipped_samples(&probability_flipped, &[true], &[false]);
         assert_all_semantic_surfaces_execute(&probability_flipped);
     }
 
@@ -437,7 +444,7 @@ fn gate_surface_contract_mpp_deterministic() {
     assert_all_semantic_surfaces_execute(bell);
 
     let flipped = "H 0\nCX 0 1\nMPP(1) X0*X1 !Z0*Z1\n";
-    assert_exact_reference_and_samples(flipped, &[true, false]);
+    assert_noiseless_reference_and_flipped_samples(flipped, &[false, true], &[true, false]);
     assert_all_semantic_surfaces_execute(flipped);
     assert_empty_target_semantic_noop("MPP", "");
 }
@@ -482,7 +489,7 @@ fn gate_surface_contract_mpad_deterministic() {
     assert_all_semantic_surfaces_execute(text);
 
     let flipped = "MPAD(1) 0 1\n";
-    assert_exact_reference_and_samples(flipped, &[true, false]);
+    assert_noiseless_reference_and_flipped_samples(flipped, &[false, true], &[true, false]);
     assert_all_semantic_surfaces_execute(flipped);
     assert_empty_target_semantic_noop("MPAD", "");
 }
@@ -837,6 +844,28 @@ fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
     assert_eq!(
         sampler.sample_zero_one_with_seed(4, Some(5)),
         vec![expected.to_vec(); 4]
+    );
+}
+
+/// Asserts a circuit whose deterministic samples differ from its reference sample.
+///
+/// Stim's reference sample is strictly noiseless (`aliased_noiseless_circuit` drops result-flip
+/// probabilities), so a `p == 1` measurement flip inverts every sampled shot without touching
+/// the reference bit.
+fn assert_noiseless_reference_and_flipped_samples(
+    text: &str,
+    expected_reference: &[bool],
+    expected_samples: &[bool],
+) {
+    let circuit = circuit(text);
+    assert_eq!(
+        circuit_reference_sample(&circuit).expect("reference sample"),
+        expected_reference
+    );
+    let sampler = CompiledSampler::compile(&circuit).expect("compile deterministic sampler");
+    assert_eq!(
+        sampler.sample_zero_one_with_seed(4, Some(5)),
+        vec![expected_samples.to_vec(); 4]
     );
 }
 
