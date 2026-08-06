@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "afec1b7090cc1254d6414ec4e10333e3d43976bbb5cc680822797ef231f4c676",
-  "semantic_digest": "5d35927f8518a6df5de141b674af8d38858b16338437f1e033897b0419090f20",
+  "correctness_digest": "3431c1f8b621e6925917a009ff5cbd7ea841016a678bf207d0d16600fcfa7a87",
+  "semantic_digest": "37385e6a28f48d0a0e6f2bdda716b45f68d7deca3f5ee9e4a29601a1e174fe52",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -224,10 +224,10 @@
     {
       "id": "PERFC-03d7d6a50d2629d8",
       "source_line": 176,
-      "anchor_digest": "3e058d65ddac267c048f82e210a979c40a7a1c5a1b772c4553f0a557e166a6d1",
+      "anchor_digest": "40c1766962269f1f733890302a2ec64fe6c4b960c2604dcd5bcb8b74c2403818",
       "section": "11. Command-Line API",
       "feature": "Legacy top-level command flags",
-      "raw_status": "Done for selected PF7 surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -447,10 +447,10 @@
     {
       "id": "PERFC-1451be08d4caacb8",
       "source_line": 104,
-      "anchor_digest": "3dd7045b7590d5c4b4d9fea044216a7079d8e2272f5cce444daf6f7093ba8c0b",
+      "anchor_digest": "58b71e760061928cda06ba076c9f6edf6b1ed92c926b23f629685d8e44308ffe",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Compiled measurement sampling",
-      "raw_status": "Done for current Rust and CLI surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -772,10 +772,10 @@
     {
       "id": "PERFC-32f5951f3b880cdf",
       "source_line": 168,
-      "anchor_digest": "3b3c663f266690c6d499924297aee84f03dfb2efe46df07f86bede24cca1e1f5",
+      "anchor_digest": "2c5b6efe1bb705dbd3ad89ca86be58327a79f263484ff1b9cd264ea3b7d81b34",
       "section": "11. Command-Line API",
       "feature": "`stim detect`",
-      "raw_status": "Done for current M9/M12 surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -987,7 +987,7 @@
     {
       "id": "PERFC-40c76b4240bbf849",
       "source_line": 106,
-      "anchor_digest": "0977b4264f87998f12d94ba753ed84945517d46fce5e250d0dd811b5bfc333c4",
+      "anchor_digest": "b26f0b2eaaf91304cfc6f4175769b8ab4b9f56b829131fa3ccb09cedf2ebc65c",
       "section": "6. Sampling, Conversion, And Simulation Features",
       "feature": "Detector sampling",
       "raw_status": "Done for selected Rust and CLI surface",
@@ -1218,7 +1218,7 @@
     {
       "id": "PERFC-4846f2fef3985a73",
       "source_line": 35,
-      "anchor_digest": "78c1420ef30dde70ac111dfea3977747cc6372b7743cc320d9495dc961f3eb5d",
+      "anchor_digest": "14078ba67108f4207793993dfd74be7fa8d07c696d687059d308a8ae11672a9c",
       "section": "2. File Formats And IO Contracts",
       "feature": "Target kinds",
       "raw_status": "Partial",
@@ -1411,7 +1411,7 @@
     {
       "id": "PERFC-4f5163dc1aa08da7",
       "source_line": 84,
-      "anchor_digest": "e351bc9c2f45aa9b12786cb6c3d4a02e8509f5b2f67367b236fbf6500d77322b",
+      "anchor_digest": "77729f0f98a049e21c9eade2edf369f1207107f2be150a7d3ad14e0a34c3603e",
       "section": "4. Core Circuit Features",
       "feature": "Reference samples and determined measurements",
       "raw_status": "Done for current Rust API surface",
@@ -1728,10 +1728,10 @@
     {
       "id": "PERFC-62e1399a85e9a96e",
       "source_line": 78,
-      "anchor_digest": "352db2e4598c40574b383ec43320e1d4869aa9c5f95e2bf9b061c1f7a21f1a14",
+      "anchor_digest": "b09d75c802e4d59b26b6d04cd1b64e5cca39bfbfb49992ad9951b0f6521927dd",
       "section": "4. Core Circuit Features",
       "feature": "Programmatic mutation",
-      "raw_status": "Done for current Rust API surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -1788,10 +1788,10 @@
     {
       "id": "PERFC-6316a8cb3a98fc44",
       "source_line": 33,
-      "anchor_digest": "318296cb8a196505b05506a914af9acd09031585f9ac4358a29fca0a2471ef20",
+      "anchor_digest": "ef92a331fe8bb16c731b39466c5e680698199de31f602807644de77e66fc5d7d",
       "section": "2. File Formats And IO Contracts",
       "feature": "Line-based `.stim` parsing, comments, tags, args, targets, and repeat blocks",
-      "raw_status": "Done",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -1818,7 +1818,7 @@
     {
       "id": "PERFC-63dc29187590a0fa",
       "source_line": 58,
-      "anchor_digest": "1b091efc932745cbe208e018adf30bd51b5490093bcb18c8d2c408bcf54ec436",
+      "anchor_digest": "bd7544fb7c149a1b053697b280526191687633d1bbf21168ad575fd49ba7fda7",
       "section": "2. File Formats And IO Contracts",
       "feature": "Format conversion command coverage",
       "raw_status": "Done for selected CLI scope",
@@ -1994,10 +1994,10 @@
     {
       "id": "PERFC-6c45d9f27cd36d16",
       "source_line": 118,
-      "anchor_digest": "bedbe2e817a90616103b60a67147dc33bf36798326179599b3e1012cdf77e55d",
+      "anchor_digest": "268c7aa89e2b938fbb8d316ff21ef89b831633b2061b30f541605c4e3d27569e",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Circuit-to-DEM analysis",
-      "raw_status": "Done for selected Rust and CLI semantics",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2024,10 +2024,10 @@
     {
       "id": "PERFC-702926993d50456f",
       "source_line": 83,
-      "anchor_digest": "969f01f207943bcd112664b7362c9b73e500f8d237b5cdd9128d6bb3fd4f2616",
+      "anchor_digest": "b36b0244e1fb750d844e5a988a3111419ab319ec9e9f3970579641258562c929",
       "section": "4. Core Circuit Features",
       "feature": "Typed circuit-pass extension seam",
-      "raw_status": "Done for the implemented A8 surface; formal qualification pending",
+      "raw_status": "Done and source-current qualified for the implemented A8 surface",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2156,10 +2156,10 @@
     {
       "id": "PERFC-83a09d1335d9c916",
       "source_line": 120,
-      "anchor_digest": "a7515c8c7970503b17033c0a8b34fb3f18613493cabb2b2281b531402b198ff7",
+      "anchor_digest": "5c6d71d9f33e6f67f4b8733780cb8baf5b27a76899f7f65667ec5b615a4785f7",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
-      "raw_status": "Done for selected Rust and CLI scope",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2453,7 +2453,7 @@
     {
       "id": "PERFC-94bd1a1c7045a109",
       "source_line": 166,
-      "anchor_digest": "3cab43b0000fe22fa3918217891ebe4570a7548de3369743f7c3f94a7f106204",
+      "anchor_digest": "7c1ccfb0b330ff88b068f04dab0c134ce6fb2abdbafdafbd95ac6058fe9bc115",
       "section": "11. Command-Line API",
       "feature": "`stim convert`",
       "raw_status": "Done for selected CLI scope",
@@ -2749,7 +2749,7 @@
     {
       "id": "PERFC-a8a7e6dd54bc6357",
       "source_line": 169,
-      "anchor_digest": "9549f38c3bb427aaa2c9871dc1dbd3737eccf461549c502d65ab0152df91b387",
+      "anchor_digest": "a10f763184769f7ece576d2dccb8c295c9f1ec441129f97b99a15badec21222a",
       "section": "11. Command-Line API",
       "feature": "`stim m2d`",
       "raw_status": "Done for selected PF7 CLI surface",
@@ -2937,7 +2937,7 @@
     {
       "id": "PERFC-ad2012543fb57e70",
       "source_line": 79,
-      "anchor_digest": "1989e81e9d47de3f53ba902fb6d317064183658f23681fc2ca12c8c666604685",
+      "anchor_digest": "b74f181f45ff33048664f9a13ddd5d76466b02dc4e557d985327e0c3428fa124",
       "section": "4. Core Circuit Features",
       "feature": "Core introspection",
       "raw_status": "Done for current Rust API surface",
@@ -2997,10 +2997,10 @@
     {
       "id": "PERFC-ba7551d3078c0efc",
       "source_line": 36,
-      "anchor_digest": "9d3366a8de2114e5562975311a097334f18135168b21f1fae6af541d74c9b353",
+      "anchor_digest": "de1e75596ed1ff9d2a48c1100752745196a1962d0393e8b389e694825be3de5f",
       "section": "2. File Formats And IO Contracts",
       "feature": "Broadcast and validation behavior",
-      "raw_status": "Done for parser and gate validation",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3553,10 +3553,10 @@
     {
       "id": "PERFC-dbdd023fd3d2ad04",
       "source_line": 171,
-      "anchor_digest": "ed73f693ec55c7e66fac46078602910437bdb1bc4875c82b3616f248c07c1bad",
+      "anchor_digest": "e0976a4d976f000a3a78859b5eefdc8a7cd01f7c95a2861d5fd6ddd40091aee9",
       "section": "11. Command-Line API",
       "feature": "`stim sample_dem`",
-      "raw_status": "Done for current M11/M12 surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3678,10 +3678,10 @@
     {
       "id": "PERFC-e506fabb116fcd08",
       "source_line": 20,
-      "anchor_digest": "e37adece3aab948dbe19e98a8be27ac0ce1febbdfbb34c94d10183af7500f227",
+      "anchor_digest": "3c0a625921b79d7cfbd20b55247867e5f3ee78de94e0dd8421bfaeb9191dde33",
       "section": "1. Top-Level Product Surface",
       "feature": "CLI binary",
-      "raw_status": "Done for selected Stab CLI surface; A8 backend-selection qualification pending",
+      "raw_status": "Done for selected Stab CLI surface, including qualified A8 backend selection",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3708,10 +3708,10 @@
     {
       "id": "PERFC-e78daef9f77f3f2a",
       "source_line": 167,
-      "anchor_digest": "5e57a3460a4437b641bbf4fd0d1f46846151c9b5b1ad034169973254c1e2ed32",
+      "anchor_digest": "6d901200cc977e06ab7d62e15d3d443b56c822995590022a6c6c07dbe4b2baa7",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
-      "raw_status": "Done for current M8/M12 surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3740,10 +3740,10 @@
     {
       "id": "PERFC-e9ea7ae3015ccb24",
       "source_line": 165,
-      "anchor_digest": "d315a6f3374c95dbe937e2192167f620583dc216bf860f180ef0ead2530f76be",
+      "anchor_digest": "77c6b2f18ea42f79d64ae7cf9c0975b62e57c2165d07cf1ca83a9f935f3f6558",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
-      "raw_status": "Done for supported M7 families and tasks with an explicit resource difference",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3772,10 +3772,10 @@
     {
       "id": "PERFC-ec64113cdae0cd99",
       "source_line": 132,
-      "anchor_digest": "1536b5d7e0c2104c100f62b2234aec61d5a765f0beb6a3e043c73efca03d5e1a",
+      "anchor_digest": "22e32071fc200f565808d0708055880045f3883f3847a7caf45c1246bd08ab9a",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flexible Pauli strings",
-      "raw_status": "Done for scoped Rust algebra surface",
+      "raw_status": "Reopened",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -3862,7 +3862,7 @@
     {
       "id": "PERFC-f291ccb446656fb5",
       "source_line": 68,
-      "anchor_digest": "5021b640ba854eb010877b24e69c70bb5665c396c871f1025b1923f2c26fa497",
+      "anchor_digest": "30529dab8a848ed1928c4713eb1b3cbafd028928c5a5c508bb9bd6a2245571e0",
       "section": "3. Gate And Instruction Surface",
       "feature": "Gate semantic execution",
       "raw_status": "Done for selected Rust/CLI scope",
@@ -20416,6 +20416,19 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
+      "id": "cq-api-item-f4f635a5b0f989cb",
+      "path": "stab_core::CircuitError as From@405fede196bf for@d79af8854017",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-CIRCUIT-MODEL",
+      "supporting_performance_features": [
+        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
       "id": "cq-api-item-6fd2e9e8fdf8ab92",
       "path": "stab_core::CircuitError as From@48886be26354 for@d79af8854017",
       "kind": "trait-impl",
@@ -23648,6 +23661,116 @@
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-20e667091fcdacc5",
+      "path": "stab_core::CountDeterminedMeasurementsError",
+      "kind": "enum",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2d55e0f4079b1647",
+      "path": "stab_core::CountDeterminedMeasurementsError as Debug for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ada3e5e13305b00a",
+      "path": "stab_core::CountDeterminedMeasurementsError as Display for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-389250656e04a805",
+      "path": "stab_core::CountDeterminedMeasurementsError as Error for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-5ff13a1b0295b690",
+      "path": "stab_core::CountDeterminedMeasurementsError as From@4f575007c5ec for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-e149174af04b1f9e",
+      "path": "stab_core::CountDeterminedMeasurementsError as From@b8ce7950ddda for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-c3b31d6a72833402",
+      "path": "stab_core::CountDeterminedMeasurementsError::Compile",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2f42648edac19645",
+      "path": "stab_core::CountDeterminedMeasurementsError::Compile::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-deb1846c7e43ef0a",
+      "path": "stab_core::CountDeterminedMeasurementsError::Execution",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-be2b7553f6c4107b",
+      "path": "stab_core::CountDeterminedMeasurementsError::Execution::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
       "id": "cq-api-item-10267efb2ced184c",
@@ -42089,6 +42212,28 @@
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-1837d7ed799128da",
+      "path": "stab_core::SamplingExecutionError::UnsupportedDeterminedMeasurementGate",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-f30f13503e8cf4db",
+      "path": "stab_core::SamplingExecutionError::UnsupportedDeterminedMeasurementGate::gate",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-ab9214e73e7d37b0",
       "path": "stab_core::SamplingPlan",
       "kind": "struct",
@@ -42155,17 +42300,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-0c174e2880acc8ff",
-      "path": "stab_core::SamplingPlan::count_determined_measurements",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-50e4920d62b07b9f",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-82d58f44315ce7e6",
       "path": "stab_core::SamplingPlan::fingerprint",
       "kind": "method",
@@ -42194,17 +42328,6 @@
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-40c0b70adab78edd",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-bd7fb36f97a496b3",
-      "path": "stab_core::SamplingPlan::reference_sample",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-f4d50e7d38ced074",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -48882,34 +49005,12 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-04e48f92c80ba401",
-      "path": "stab_core::advanced::compat::CompiledSampler::try_count_determined_measurements",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-99d148a9128c02a7",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-cccf658797c599ca",
       "path": "stab_core::advanced::compat::CompiledSampler::try_for_each_sample_with_seed_and_reference_mode",
       "kind": "method",
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-228dcace19fa73bd",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-57cb95c65e8cc1f5",
-      "path": "stab_core::advanced::compat::CompiledSampler::try_reference_sample",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-99d148a9128c02a7",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -55149,6 +55250,116 @@
       "reason": "Behavioral operation is covered by the listed executable Stab-only product diagnostic."
     },
     {
+      "id": "cq-api-item-fb51a9245ceb67ae",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError",
+      "kind": "enum",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-15dc2d84025a31f9",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError as Debug for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-d73e72989c2ce5c7",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError as Display for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-1b419bd88936237c",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError as Error for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-201337fc22ea8126",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError as From@4f575007c5ec for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-aff46dbbedd6e35f",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError as From@b8ce7950ddda for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-d2bc0c51f67fe36c",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError::Compile",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e9e982a90a7fa1d8",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError::Compile::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-4818904af855432c",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError::Execution",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-8197e326dd23476e",
+      "path": "stab_core::execution::CountDeterminedMeasurementsError::Execution::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-c851537e66f45165",
       "path": "stab_core::execution::DemReplayBatchStatus",
       "kind": "enum",
@@ -59640,6 +59851,28 @@
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-b480da415e7a6742",
+      "path": "stab_core::execution::SamplingExecutionError::UnsupportedDeterminedMeasurementGate",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-ee0bae0879124f58",
+      "path": "stab_core::execution::SamplingExecutionError::UnsupportedDeterminedMeasurementGate::gate",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-c909ca1dcddab5eb",
       "path": "stab_core::execution::SamplingPlan",
       "kind": "struct",
@@ -59706,17 +59939,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-62dc80bbe15a148d",
-      "path": "stab_core::execution::SamplingPlan::count_determined_measurements",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-50e4920d62b07b9f",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-3c89a8f3a264152f",
       "path": "stab_core::execution::SamplingPlan::fingerprint",
       "kind": "method",
@@ -59745,17 +59967,6 @@
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-40c0b70adab78edd",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-e5c0b28291c96559",
-      "path": "stab_core::execution::SamplingPlan::reference_sample",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-f4d50e7d38ced074",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
@@ -65185,6 +65396,116 @@
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-0f6054a59afe5824",
+      "path": "stab_engine::CountDeterminedMeasurementsError",
+      "kind": "enum",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-2a18d5fbd0898632",
+      "path": "stab_engine::CountDeterminedMeasurementsError as Debug for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-aac9f4b7d53c3822",
+      "path": "stab_engine::CountDeterminedMeasurementsError as Display for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-92614be971a3f454",
+      "path": "stab_engine::CountDeterminedMeasurementsError as Error for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-daf9dbcef2717303",
+      "path": "stab_engine::CountDeterminedMeasurementsError as From@4f575007c5ec for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-37fdbf4fbf538c50",
+      "path": "stab_engine::CountDeterminedMeasurementsError as From@b8ce7950ddda for@851bd77466a2",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "future-candidate",
+      "parent_group_ids": [],
+      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
+    },
+    {
+      "id": "cq-api-item-968020ecc0c23305",
+      "path": "stab_engine::CountDeterminedMeasurementsError::Compile",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-3e1176b726cc8665",
+      "path": "stab_engine::CountDeterminedMeasurementsError::Compile::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e9acc594d3f20477",
+      "path": "stab_engine::CountDeterminedMeasurementsError::Execution",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-25bf65bfe21cb713",
+      "path": "stab_engine::CountDeterminedMeasurementsError::Execution::0",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-9a95efabf6ebe90a",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
       "id": "cq-api-item-b683f867d43c07b6",
@@ -71985,6 +72306,28 @@
       "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
     },
     {
+      "id": "cq-api-item-cdfd98b4ce0f4756",
+      "path": "stab_engine::SamplingExecutionError::UnsupportedDeterminedMeasurementGate",
+      "kind": "variant",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
+      "id": "cq-api-item-e8e92b24cf10f111",
+      "path": "stab_engine::SamplingExecutionError::UnsupportedDeterminedMeasurementGate::gate",
+      "kind": "field",
+      "performance_feature": "PERF-SAMPLING",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-qualification-dc7d8cd47300de56",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, derived, marker, accessor, error-plumbing, or boundary-support operation has no independent runtime workload."
+    },
+    {
       "id": "cq-api-item-b35afcfe9c75a4f2",
       "path": "stab_engine::SamplingPlan",
       "kind": "struct",
@@ -72051,17 +72394,6 @@
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
     },
     {
-      "id": "cq-api-item-5305c0e222bafb55",
-      "path": "stab_engine::SamplingPlan::count_determined_measurements",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-50e4920d62b07b9f",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
       "id": "cq-api-item-fc702f188d9264d4",
       "path": "stab_engine::SamplingPlan::fingerprint",
       "kind": "method",
@@ -72090,17 +72422,6 @@
       "performance_feature": "PERF-SAMPLING",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-qualification-40c0b70adab78edd",
-      "disposition": "future-candidate",
-      "parent_group_ids": [],
-      "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."
-    },
-    {
-      "id": "cq-api-item-5655f1cb0216ac33",
-      "path": "stab_engine::SamplingPlan::reference_sample",
-      "kind": "method",
-      "performance_feature": "PERF-SAMPLING",
-      "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-qualification-f4d50e7d38ced074",
       "disposition": "future-candidate",
       "parent_group_ids": [],
       "reason": "Behavioral operation remains visible as a future workload candidate without creating a speculative benchmark product."

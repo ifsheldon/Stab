@@ -4769,10 +4769,6 @@
         "public_api_owners": [
           {
             "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingPlan::count_determined_measurements"
-          },
-          {
-            "crate_name": "stab_engine",
             "owner_path": "stab_engine::count_determined_measurements"
           },
           {
@@ -4810,10 +4806,6 @@
           "compatibility-adapter-drift"
         ],
         "public_api_owners": [
-          {
-            "crate_name": "stab_engine",
-            "owner_path": "stab_engine::SamplingPlan::reference_sample"
-          },
           {
             "crate_name": "stab_core",
             "owner_path": "stab_core::advanced::compat::CompiledSampler::reference_sample"
@@ -4902,7 +4894,7 @@
         "standalone": true
       },
       {
-        "id": "a6-core-fallible-reference-adapter-contract",
+        "id": "a6-engine-determined-measurement-rejection-contract",
         "feature_id": "CQ-SAMPLING",
         "comparator": "exact-value",
         "primary_selector": {
@@ -4912,31 +4904,30 @@
             "cargo",
             "test",
             "-p",
-            "stab-core",
-            "--test",
-            "sampling_plan_session",
-            "fallible_reference_helpers_preserve_sparse_direct_z_admission",
+            "stab-engine",
+            "--lib",
+            "sampling::tests::count_determined_measurements_rejects_pad_and_heralded_records_like_stim",
             "--quiet",
             "--exact"
           ]
         },
         "resource_contract": {
           "kind": "constant-scratch",
-          "detail": "The compatibility sampler exposes fallible reference and determined-count helpers without losing the maximum-id sparse Direct-Z backend admission."
+          "detail": "MPAD and heralded records reject through the typed determined-count error without executing determined-count work, matching the pinned Stim unhandled-measurement-type throw instead of panicking or counting silently."
         },
         "negative_axes": [
-          "facade-infallible-allocation",
-          "facade-backend-drift",
-          "unknown-input-count-drift"
+          "unhandled-type-panic",
+          "silent-pad-count",
+          "heralded-record-acceptance"
         ],
         "public_api_owners": [
           {
-            "crate_name": "stab_core",
-            "owner_path": "stab_core::advanced::compat::CompiledSampler::try_reference_sample"
+            "crate_name": "stab_engine",
+            "owner_path": "stab_engine::CountDeterminedMeasurementsError"
           },
           {
             "crate_name": "stab_core",
-            "owner_path": "stab_core::advanced::compat::CompiledSampler::try_count_determined_measurements"
+            "owner_path": "stab_core::CountDeterminedMeasurementsError"
           }
         ],
         "standalone": true

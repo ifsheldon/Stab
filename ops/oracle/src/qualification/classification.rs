@@ -323,6 +323,7 @@ pub(super) fn classify_public_api_source(
     if api_lower.ends_with("::reference_sample")
         || api_lower.ends_with("::reference_sample_tree")
         || api_lower.ends_with("::count_determined_measurements")
+        || api_path_mentions_item(&api_lower, "countdeterminedmeasurementserror")
     {
         return Some(FeatureId::Sampling);
     }
