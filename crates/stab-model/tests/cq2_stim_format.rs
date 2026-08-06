@@ -425,6 +425,13 @@ fn cq2_stim_format_validation_edges_match_stim() {
         )
         .is_err()
     );
+    assert!(
+        CircuitInstruction::new(Gate::from_name("MPAD").unwrap(), vec![], vec![q(2)], None)
+            .is_err()
+    );
+    assert!(
+        CircuitInstruction::new(Gate::from_name("MPAD").unwrap(), vec![], vec![q(1)], None).is_ok()
+    );
 }
 
 #[test]
