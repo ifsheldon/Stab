@@ -46,12 +46,18 @@ fn detect_deprecation_warning_precedes_routing_errors_in_both_modes() {
     );
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
-    let stderr = String::from_utf8(stderr).unwrap();
-    let warning_at = stderr
-        .find("\"code\":\"deprecated-prepend-observables\"")
-        .expect("warning present");
-    let error_at = stderr
-        .find("\"code\":\"conflicting-observable-routing\"")
-        .expect("error present");
-    assert!(warning_at < error_at, "{stderr}");
+    assert_eq!(
+        String::from_utf8(stderr).unwrap(),
+        concat!(
+            "{\"schema_version\":1,\"code\":\"deprecated-prepend-observables\",",
+            "\"severity\":\"warning\",\"message\":\"`--prepend_observables` is deprecated\",",
+            "\"span\":null,\"labels\":[],",
+            "\"help\":\"Use appended observables or `--obs_out` instead.\",",
+            "\"context\":{\"flag\":\"--prepend_observables\",\"replacement\":\"--obs_out\"}}\n",
+            "{\"schema_version\":1,\"code\":\"conflicting-observable-routing\",",
+            "\"severity\":\"error\",",
+            "\"message\":\"cannot combine --prepend_observables, --append_observables, or --obs_out\",",
+            "\"span\":null,\"labels\":[],\"help\":null,\"context\":{}}\n",
+        )
+    );
 }

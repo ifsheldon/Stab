@@ -228,6 +228,40 @@ fn legacy_mode_flags_are_accepted_anywhere_before_the_separator_like_stim() {
     assert_eq!(status, 0);
     assert_eq!(stdout, "00\n00\n");
 
+    // Bare --gen with its adjacent code value relocates too, matching the
+    // pinned binary's find_argument scan (main_namespaced.cc).
+    let (status, gen_stdout, stderr) = run_cli(
+        &[
+            "stab",
+            "--task",
+            "memory",
+            "--gen",
+            "repetition_code",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+        ],
+        b"",
+    );
+    assert_eq!((status, stderr.as_str()), (0, ""));
+    let (first_status, first_stdout, _) = run_cli(
+        &[
+            "stab",
+            "--gen",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+        ],
+        b"",
+    );
+    assert_eq!(first_status, 0);
+    assert_eq!(gen_stdout, first_stdout);
+
     // Several mode flags keep rejecting with a diagnostic and no output.
     let (status, stdout, stderr) = run_cli(&["stab", "--sample", "--detect"], circuit);
     assert_eq!(status, 1);

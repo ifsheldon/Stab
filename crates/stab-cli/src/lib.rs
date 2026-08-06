@@ -522,7 +522,7 @@ where
 fn is_legacy_mode_flag(arg: &str) -> bool {
     matches!(
         arg,
-        "--convert" | "--sample" | "--detect" | "--m2d" | "--analyze_errors"
+        "--convert" | "--sample" | "--detect" | "--m2d" | "--analyze_errors" | "--gen"
     ) || arg.starts_with("--gen=")
         || arg.starts_with("--sample=")
         || arg.starts_with("--detect=")
@@ -558,10 +558,13 @@ fn relocate_single_legacy_mode_flag(args: &mut Vec<OsString>, legacy_index: usiz
         return;
     };
     let mut end = position + 1;
-    let takes_adjacent_count = args
-        .get(*position)
-        .is_some_and(|arg| matches!(arg.to_string_lossy().as_ref(), "--sample" | "--detect"));
-    if takes_adjacent_count
+    let takes_adjacent_value = args.get(*position).is_some_and(|arg| {
+        matches!(
+            arg.to_string_lossy().as_ref(),
+            "--sample" | "--detect" | "--gen"
+        )
+    });
+    if takes_adjacent_value
         && end < boundary
         && args
             .get(end)
