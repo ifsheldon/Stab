@@ -9,6 +9,7 @@ CapabilitySet
 Circuit
 CircuitDetectorId
 CircuitError
+CountDeterminedMeasurementsError
 CircuitErrorLocation
 CircuitErrorLocationStackFrame
 CircuitFlattenLimits
@@ -112,6 +113,7 @@ PauliSign
 PauliString
 PlanFingerprint
 Probability
+ProbabilityStimText
 QubitId
 RandomPolicy
 RecordEncoding

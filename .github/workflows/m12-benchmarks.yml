@@ -19,6 +19,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          persist-credentials: false
           fetch-tags: true
 
       - name: Install native build prerequisites
@@ -27,7 +28,7 @@ jobs:
           sudo apt-get install --no-install-recommends --yes build-essential cmake
 
       - name: Install just
-        run: cargo install just --locked
+        run: cargo install just --version 1.58.0 --locked
 
       - name: Show toolchain
         run: rustup show active-toolchain

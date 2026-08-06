@@ -233,6 +233,13 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
                     reference,
                     report,
                 );
+                inspect_checkout_credentials(
+                    path,
+                    &format!("{job_name}.steps[{index}]"),
+                    reference,
+                    step,
+                    report,
+                );
             }
             let location = format!("{job_name}.steps[{index}]");
             let step_secrets = mapping_value(step, "env")
@@ -373,6 +380,36 @@ fn yaml_scalar(value: &Yaml) -> Option<&str> {
     }
 }
 
+/// Every checkout must disable credential persistence so later steps cannot
+/// reuse the ephemeral token through the on-disk git configuration.
+fn inspect_checkout_credentials(
+    path: &Path,
+    location: &str,
+    reference: &Yaml,
+    step: &yaml_rust2::yaml::Hash,
+    report: &mut WorkflowActionReport,
+) {
+    let Some(reference) = yaml_scalar(reference) else {
+        return;
+    };
+    if !reference.starts_with("actions/checkout@") {
+        return;
+    }
+    let persists = mapping_value(step, "with")
+        .and_then(Yaml::as_hash)
+        .and_then(|with| mapping_value(with, "persist-credentials"))
+        .and_then(Yaml::as_bool);
+    if persists != Some(false) {
+        report.violations.push(Violation::new(
+            "workflow-checkout-persists-credentials",
+            format!(
+                "workflow {} {location} checkout must set persist-credentials: false",
+                path.display()
+            ),
+        ));
+    }
+}
+
 fn inspect_action_reference(
     path: &Path,
     location: &str,
@@ -464,6 +501,8 @@ jobs:
   build:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
   delegated:
     uses: owner/repository/.github/workflows/reuse.yml@ABCDEF0123456789abcdef0123456789ABCDEF01
 "#,
@@ -486,13 +525,54 @@ jobs:
 "#,
         );
         assert_eq!(report.action_use_count, 4);
-        assert_eq!(report.violations.len(), 4);
-        assert!(
+        assert_eq!(report.violations.len(), 5);
+        assert_eq!(
             report
                 .violations
                 .iter()
-                .all(|violation| violation.code == "workflow-action-mutable-ref")
+                .filter(|violation| violation.code == "workflow-action-mutable-ref")
+                .count(),
+            4
         );
+        assert_eq!(
+            report
+                .violations
+                .iter()
+                .filter(|violation| violation.code == "workflow-checkout-persists-credentials")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn checkouts_must_disable_credential_persistence() {
+        let flagged = inspect(
+            r#"
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+"#,
+        );
+        assert_eq!(flagged.violations.len(), 1);
+        assert_eq!(
+            flagged.violations.first().map(|violation| violation.code),
+            Some("workflow-checkout-persists-credentials")
+        );
+
+        let accepted = inspect(
+            r#"
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+"#,
+        );
+        assert!(accepted.violations.is_empty(), "{:?}", accepted.violations);
     }
 
     #[test]
@@ -724,7 +804,7 @@ jobs:
         let path = workflows.join("ci.yml");
         std::fs::write(
             &path,
-            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n        with:\n          persist-credentials: false\n",
         )
         .expect("write initial workflow");
         let malicious = repository.path().join("malicious.yml");
