@@ -101,19 +101,19 @@ fn fallible_reference_helpers_preserve_sparse_direct_z_admission() {
 
     assert_eq!(
         sampler
-            .try_reference_sample()
+            .reference_sample()
             .expect("compute facade reference sample"),
         vec![false]
     );
     assert_eq!(
         sampler
-            .try_count_determined_measurements(false)
+            .count_determined_measurements(false)
             .expect("count known-input measurements"),
         1
     );
     assert_eq!(
         sampler
-            .try_count_determined_measurements(true)
+            .count_determined_measurements(true)
             .expect("count unknown-input measurements"),
         0
     );

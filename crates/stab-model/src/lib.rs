@@ -140,8 +140,11 @@ pub mod advanced {
     }
 
     /// Returns the qubit width required to simulate a circuit.
+    ///
+    /// This equals [`Circuit::count_qubits`]: MPAD pad values are excluded from both counts,
+    /// matching Stim v1.16.0.
     pub fn circuit_simulated_qubit_count(circuit: &Circuit) -> usize {
-        circuit.count_simulated_qubits()
+        circuit.count_qubits()
     }
 
     /// Returns the number of measurement results produced by one instruction.

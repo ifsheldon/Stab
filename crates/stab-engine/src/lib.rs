@@ -33,11 +33,11 @@ pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows};
 pub use sampling::{
-    BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
-    count_determined_measurements,
+    BackendPreference, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
+    ReferenceSampleMode, RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,
+    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
+    SinkFailurePhase, count_determined_measurements,
 };
 pub use sampling::{COMPILATION_DESCRIPTOR, REGISTERED_BACKENDS};
 

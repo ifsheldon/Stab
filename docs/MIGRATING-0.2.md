@@ -79,4 +79,15 @@ The A6 source-current diagnostic found dense XOR effectively neutral and non-ide
 
 Every publishable Stab product package is versioned `0.2.0`, and every publishable path dependency requires exactly `=0.2.0`. This prevents a coordinated release from silently resolving a sibling crate from an incompatible pre-1.0 minor version.
 
+## Post-Review Remediation Changes
+
+The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
+
+- `CompiledSampler::count_determined_measurements` and `CompiledSampler::reference_sample` now return `CircuitResult`; the duplicate `try_count_determined_measurements` and `try_reference_sample` methods are removed. Append `?` or `.expect(...)` at call sites.
+- The panicking `SamplingPlan::count_determined_measurements` and `SamplingPlan::reference_sample` compatibility methods are removed; use `try_count_determined_measurements` and `try_reference_sample`. A parseable hostile circuit can no longer panic a public entry point.
+- The free `count_determined_measurements` now returns `Result<u64, CountDeterminedMeasurementsError>`, a two-variant enum over compile and execution errors that converts into `CircuitError`.
+- `count_determined_measurements` now matches pinned Stim v1.16.0 semantics: measurement flip arguments are ignored (determinism is a state property), and circuits containing `MPAD` or heralded noise records are rejected with a typed error, mirroring Stim's `count_determined_measurements` rejection of unhandled measurement types.
+- `Circuit::count_qubits` now excludes `MPAD` pad values, matching Stim v1.16.0 (`circuit_instruction.cc`); pad values reserve measurement records, not qubits. The previously distinct internal simulated-qubit count is consolidated onto this one owner.
+- Reference samples are strictly noiseless: `p == 1` measurement flips invert sampled shots but never the reference bit, matching Stim's dropped-flip reference contract.
+
 The detailed decision ledger remains [architecture/0.2-api-migration-inventory.md](architecture/0.2-api-migration-inventory.md). The frozen pre-0.2 inventory remains historical and is not rewritten.

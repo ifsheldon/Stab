@@ -53,7 +53,7 @@ impl TestSampler {
     }
 
     fn reference_sample(&self) -> Vec<bool> {
-        self.plan.reference_sample()
+        self.plan.try_reference_sample().expect("reference sample")
     }
 }
 
@@ -771,8 +771,47 @@ fn count_determined_measurements_matches_convergence_subset() {
         ("MXX 0 1\nMX 0 1", 1),
         ("MYY 0 1\nMY 0 1", 1),
         ("RX 0 1\nMZZ 0 1\nMZ 0 1", 1),
-        ("MPAD 1 0 1 0", 4),
     ] {
         assert_eq!(count_determined(input, false), expected, "{input}");
+    }
+}
+
+#[test]
+fn count_determined_measurements_ignores_flip_arguments_like_stim() {
+    // Stim strips measurement arguments before counting (count_determined_measurements.inl
+    // re-dispatches every measurement with empty args), so noisy flips never change
+    // determinism.
+    for (input, expected) in [
+        ("M(0.5) 0", 1),
+        ("R 0\nM(1) 0", 1),
+        ("MXX(0.25) 0 1 0 1", 1),
+        ("H 0\nM(1) 0", 0),
+    ] {
+        assert_eq!(count_determined(input, false), expected, "{input}");
+    }
+}
+
+#[test]
+fn count_determined_measurements_rejects_pad_and_heralded_records_like_stim() {
+    // Stim's count_determined_measurements throws "unhandled measurement type" for every
+    // result-producing gate outside its M/MR/MXX/MPP families, which covers MPAD and the
+    // heralded channels.
+    for input in [
+        "MPAD 1 0 1 0",
+        "HERALDED_ERASE(0.25) 0",
+        "HERALDED_PAULI_CHANNEL_1(0.1, 0.05, 0, 0) 0",
+    ] {
+        let circuit = Circuit::from_stim_str(input).expect("parse circuit");
+        let error = count_determined_measurements(&circuit, false)
+            .expect_err("pad and heralded records must be rejected");
+        assert!(
+            matches!(
+                error,
+                CountDeterminedMeasurementsError::Execution(
+                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate { .. }
+                )
+            ),
+            "{input}: {error}"
+        );
     }
 }

@@ -77,49 +77,12 @@ impl SamplingPlan {
             self.inner.measurement_count,
             "determined measurement record",
         )?;
-        Ok(count_determined_operations(
-            &self.inner.operations,
-            &mut frame,
-            &mut record,
-            &mut rng,
-        ))
-    }
-
-    /// Compatibility convenience for callers that cannot propagate execution-storage failures.
-    ///
-    /// # Panics
-    ///
-    /// Panics when the analysis exceeds the bounded storage contract or storage allocation fails.
-    #[allow(
-        clippy::panic,
-        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_count_determined_measurements"
-    )]
-    pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {
-        match self.try_count_determined_measurements(unknown_input) {
-            Ok(count) => count,
-            Err(error) => panic!("could not count determined measurements: {error}"),
-        }
+        count_determined_operations(&self.inner.operations, &mut frame, &mut record, &mut rng)
     }
 
     /// Computes the deterministic reference sample with bounded, fallible storage.
     pub fn try_reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
         api::compute_reference_sample(&self.inner)
-    }
-
-    /// Compatibility convenience for callers that cannot propagate execution-storage failures.
-    ///
-    /// # Panics
-    ///
-    /// Panics when reference sampling exceeds the bounded storage contract or allocation fails.
-    #[allow(
-        clippy::panic,
-        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reference_sample"
-    )]
-    pub fn reference_sample(&self) -> Vec<bool> {
-        match self.try_reference_sample() {
-            Ok(sample) => sample,
-            Err(error) => panic!("could not compute reference sample: {error}"),
-        }
     }
 
     /// Compatibility bridge for facade-owned reference-sampling adapters.
@@ -204,13 +167,22 @@ fn general_frame_work_storage_bytes(qubit_count: usize, measurement_count: usize
         .saturating_add(measurements)
 }
 
+/// Error from [`count_determined_measurements`], covering compilation and bounded execution.
+#[derive(Debug, thiserror::Error)]
+pub enum CountDeterminedMeasurementsError {
+    #[error(transparent)]
+    Compile(#[from] SamplingCompileError),
+    #[error(transparent)]
+    Execution(#[from] SamplingExecutionError),
+}
+
 pub fn count_determined_measurements(
     circuit: &Circuit,
     unknown_input: bool,
-) -> Result<u64, SamplingCompileError> {
+) -> Result<u64, CountDeterminedMeasurementsError> {
     Ok(SamplingCompiler::new()
         .compile_allowing_sweep(circuit)?
-        .count_determined_measurements(unknown_input))
+        .try_count_determined_measurements(unknown_input)?)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

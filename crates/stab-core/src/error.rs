@@ -178,6 +178,15 @@ impl From<stab_engine::SamplingExecutionError> for CircuitError {
     }
 }
 
+impl From<stab_engine::CountDeterminedMeasurementsError> for CircuitError {
+    fn from(error: stab_engine::CountDeterminedMeasurementsError) -> Self {
+        match error {
+            stab_engine::CountDeterminedMeasurementsError::Compile(error) => error.into(),
+            stab_engine::CountDeterminedMeasurementsError::Execution(error) => error.into(),
+        }
+    }
+}
+
 impl From<stab_engine::DetectionError> for CircuitError {
     fn from(error: stab_engine::DetectionError) -> Self {
         match error {

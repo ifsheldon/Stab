@@ -461,7 +461,7 @@ mod tests {
             .expect("compile sampling plan");
         assert_eq!(
             tree.decompress().expect("decompress reference tree"),
-            plan.reference_sample()
+            plan.try_reference_sample().expect("reference sample")
         );
         assert_eq!(tree.size(), 2);
         assert_eq!(tree.stim_string(), "1*('01')");

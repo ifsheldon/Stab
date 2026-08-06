@@ -9,14 +9,6 @@ impl Circuit {
             .max()
             .unwrap_or(0)
     }
-
-    pub(crate) fn count_simulated_qubits(&self) -> usize {
-        self.items
-            .iter()
-            .map(CircuitItem::count_simulated_qubits)
-            .max()
-            .unwrap_or(0)
-    }
 }
 
 impl CircuitItem {
@@ -24,13 +16,6 @@ impl CircuitItem {
         match self {
             Self::Instruction(instruction) => instruction.count_qubits(),
             Self::RepeatBlock(repeat) => repeat.body().count_qubits(),
-        }
-    }
-
-    fn count_simulated_qubits(&self) -> usize {
-        match self {
-            Self::Instruction(instruction) => instruction.count_simulated_qubits(),
-            Self::RepeatBlock(repeat) => repeat.body().count_simulated_qubits(),
         }
     }
 }
@@ -53,19 +38,16 @@ impl CircuitInstruction {
     }
 
     fn count_qubits(&self) -> usize {
+        // Stim excludes MPAD pad values from qubit counting (circuit_instruction.cc:64-69):
+        // pads reserve measurement records, and their 0/1 targets are values, not qubits.
+        if self.gate.target_rule() == GateTargetRule::MeasurementPads {
+            return 0;
+        }
         self.targets
             .iter()
             .filter_map(Target::qubit_id)
             .map(|qubit| qubit.get() as usize + 1)
             .max()
             .unwrap_or(0)
-    }
-
-    fn count_simulated_qubits(&self) -> usize {
-        if self.gate.target_rule() == GateTargetRule::MeasurementPads {
-            0
-        } else {
-            self.count_qubits()
-        }
     }
 }

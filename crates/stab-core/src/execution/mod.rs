@@ -15,13 +15,14 @@ pub use crate::sampling::{
 pub use circuit_adapters::{circuit_reference_sample, circuit_reference_sample_tree};
 pub use sampled_flow::sample_if_circuit_has_stabilizer_flows;
 pub use stab_engine::{
-    DemReplayBatchStatus, DemReplaySession, DemSamplingCancellation, DemSamplingCompiler,
-    DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress,
-    DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession, DetectionCompileError,
-    DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
-    DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
-    MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter, ReferenceSampleTree,
+    CountDeterminedMeasurementsError, DemReplayBatchStatus, DemReplaySession,
+    DemSamplingCancellation, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan,
+    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
+    DemSamplingSession, DetectionCompileError, DetectionExecutionError, DetectionRunError,
+    DetectionRunProgress, DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler,
+    DetectionSamplingPlan, DetectionSamplingSession, MeasurementToDetectionCompiler,
+    MeasurementToDetectionPlan, MeasurementToDetectionSession, MeasurementToDetectionSinkAdapter,
+    ReferenceSampleTree,
 };
 
 use crate::sampling::CompiledSampler;

@@ -536,6 +536,9 @@ pub enum SamplingExecutionError {
     #[error("sampling session could not allocate bounded storage: {message}")]
     SessionStorageAllocation { message: String },
 
+    #[error("count_determined_measurements unhandled measurement type {gate}")]
+    UnsupportedDeterminedMeasurementGate { gate: &'static str },
+
     #[error("sweep record expected {expected} bits, got {actual}")]
     InvalidSweepRecordWidth { expected: usize, actual: usize },
 

@@ -129,16 +129,25 @@ fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
 }
 
 #[test]
-fn circuit_public_qubit_count_includes_mpad_numeric_targets_like_stim() {
+fn circuit_public_qubit_count_excludes_mpad_pad_values_like_stim() {
+    // Stim v1.16.0 excludes MPAD targets from qubit counting (circuit_instruction.cc:64-69):
+    // pad values reserve measurement records, not qubits.
     let circuit = Circuit::from_stim_str("H 0\nMPAD 1\n").expect("parse MPAD circuit");
-    assert_eq!(circuit.count_qubits(), 2);
+    assert_eq!(circuit.count_qubits(), 1);
+
+    let pad_only = Circuit::from_stim_str("MPAD 0 1 0\n").expect("parse pad-only circuit");
+    assert_eq!(pad_only.count_qubits(), 0);
+
+    let nested = Circuit::from_stim_str("REPEAT 3 {\n    MPAD 1\n    M 4\n}\n")
+        .expect("parse repeat-nested MPAD circuit");
+    assert_eq!(nested.count_qubits(), 5);
 }
 
 #[test]
 fn cq2_circuit_api_qubit_count_contract_matches_selected_stim_semantics() {
     assert_eq!(Circuit::new().count_qubits(), 0);
     pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics();
-    circuit_public_qubit_count_includes_mpad_numeric_targets_like_stim();
+    circuit_public_qubit_count_excludes_mpad_pad_values_like_stim();
 
     let huge_repeat = Circuit::from_stim_str(
         "H 0\nREPEAT 999999 {\n    REPEAT 999999 {\n        REPEAT 999999 {\n            REPEAT 999999 {\n                X 1\n                REPEAT 999999 {\n                    Y 2\n                    M 2\n                }\n            }\n        }\n    }\n}\n",
@@ -877,7 +886,8 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
     .expect("parse circuit");
     let expected = CompiledSampler::compile(&circuit)
         .expect("compile sampler")
-        .reference_sample();
+        .reference_sample()
+        .expect("reference sample");
 
     assert_eq!(
         circuit_reference_sample(&circuit).expect("reference sample"),

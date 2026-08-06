@@ -93,6 +93,7 @@ pub use error::{
     CircuitError, CircuitResult, ModelError, ModelResult, ValidationError, ValidationErrorCode,
 };
 pub use error_matcher::explain_errors_from_circuit;
+pub use execution::CountDeterminedMeasurementsError;
 pub use execution::{
     PlanFingerprint, RandomPolicy, ReferenceSampleMode, ReferenceSampleTree, RunError,
     SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,

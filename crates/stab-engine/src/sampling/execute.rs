@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use super::api::SamplingExecutionError;
 use super::operation::SampleOperation;
 use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame, reset_correction};
 use super::{ExecutionMode, measurement_flip, noise};
@@ -17,7 +18,7 @@ pub(super) fn count_determined_operations<R>(
     frame: &mut StabilizerFrame,
     record: &mut Vec<bool>,
     rng: &mut R,
-) -> u64
+) -> Result<u64, SamplingExecutionError>
 where
     R: Rng,
 {
@@ -45,54 +46,46 @@ where
                 qubit,
                 basis,
                 inverted,
-                flip_probability,
+                flip_probability: _,
                 reset,
             } => {
-                if frame.measure_is_deterministic(*qubit, *basis)
-                    && measurement_flip::is_deterministic(*flip_probability)
-                {
+                // Stim's count_determined_measurements strips measurement arguments, so flip
+                // probabilities never affect determinism or the propagated record values.
+                if frame.measure_is_deterministic(*qubit, *basis) {
                     count += 1;
                 }
-                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
                 let measured = frame.measure(
                     *qubit,
                     *basis,
-                    *inverted ^ noisy_flip,
+                    *inverted,
                     rng,
                     MeasurementRandomness::DeterministicFalse,
                 );
                 record.push(measured);
-                if *reset && measured {
+                if *reset && (measured ^ *inverted) {
                     frame.apply_pauli(*qubit, reset_correction(*basis));
                 }
             }
             SampleOperation::MeasureProduct {
                 terms,
                 inverted,
-                flip_probability,
+                flip_probability: _,
             } => {
-                if frame.pauli_product_measurement_is_deterministic(terms)
-                    && measurement_flip::is_deterministic(*flip_probability)
-                {
+                if frame.pauli_product_measurement_is_deterministic(terms) {
                     count += 1;
                 }
-                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
                 let measured = frame.measure_pauli_product(
                     terms,
-                    *inverted ^ noisy_flip,
+                    *inverted,
                     rng,
                     MeasurementRandomness::DeterministicFalse,
                 );
                 record.push(measured);
             }
-            SampleOperation::Pad {
-                value,
-                flip_probability,
-            } => {
-                if measurement_flip::is_deterministic(*flip_probability) {
-                    count += 1;
-                }
-                record.push(*value ^ measurement_flip::deterministic_value(*flip_probability));
+            SampleOperation::Pad { .. } => {
+                return Err(
+                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate { gate: "MPAD" },
+                );
             }
             SampleOperation::FeedbackPauli {
                 offset,
@@ -106,16 +99,22 @@ where
             SampleOperation::SweepPauli { .. } => {}
             SampleOperation::Repeat { count: reps, body } => {
                 for _ in 0..*reps {
-                    count += count_determined_operations(body, frame, record, rng);
+                    count += count_determined_operations(body, frame, record, rng)?;
                 }
+            }
+            SampleOperation::HeraldedPauliChannel { .. } => {
+                return Err(
+                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate {
+                        gate: "heralded noise",
+                    },
+                );
             }
             SampleOperation::SingleQubitPauliChannel { .. }
             | SampleOperation::TwoQubitPauliChannel { .. }
-            | SampleOperation::CorrelatedError { .. }
-            | SampleOperation::HeraldedPauliChannel { .. } => {}
+            | SampleOperation::CorrelatedError { .. } => {}
         }
     }
-    count
+    Ok(count)
 }
 
 pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {

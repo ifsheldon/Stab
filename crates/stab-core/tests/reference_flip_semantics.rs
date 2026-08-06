@@ -32,12 +32,19 @@ fn measurement_flip_probabilities_never_reach_the_reference_sample() {
         "MPP(1) Z0\n",
     ] {
         let sampler = CompiledSampler::compile(&parse(text)).expect("compile sampler");
-        assert_eq!(sampler.reference_sample(), vec![false], "{text:?}");
+        assert_eq!(
+            sampler.reference_sample().expect("reference sample"),
+            vec![false],
+            "{text:?}"
+        );
     }
 
     // Static target inversion belongs to the noiseless circuit and stays in the reference.
     let inverted = CompiledSampler::compile(&parse("M(1) !0\n")).expect("compile sampler");
-    assert_eq!(inverted.reference_sample(), vec![true]);
+    assert_eq!(
+        inverted.reference_sample().expect("reference sample"),
+        vec![true]
+    );
 }
 
 #[test]

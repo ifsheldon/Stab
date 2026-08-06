@@ -143,7 +143,11 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             STAB_COMPARE_ITERATIONS,
             || {
                 for sampler in &samplers {
-                    black_box(sampler.reference_sample());
+                    black_box(
+                        sampler
+                            .reference_sample()
+                            .map_err(|error| stab_runner_error(&row.id, error))?,
+                    );
                 }
                 Ok(())
             },

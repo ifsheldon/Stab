@@ -2,7 +2,6 @@ use rand::{Rng, RngExt as _};
 
 use stab_algebra::PauliBasis;
 
-use super::measurement_flip;
 use super::operation::SampleOperation;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,9 +62,9 @@ impl DirectZMeasurementPlan {
     }
 
     pub(super) fn determined_measurement_count(self, unknown_input: bool) -> u64 {
-        u64::from(
-            !unknown_input && measurement_flip::is_deterministic(self.measurement_flip_probability),
-        )
+        // Stim's count strips measurement arguments, so the flip probability is irrelevant:
+        // a fresh Z measurement is determined exactly when the input state is known.
+        u64::from(!unknown_input)
     }
 
     #[inline(always)]
