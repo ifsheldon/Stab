@@ -14,6 +14,8 @@ mod measurements;
 mod mpp;
 mod options;
 mod probabilities;
+#[cfg(test)]
+mod reverse_differential;
 mod reverse_fold;
 
 use stab_algebra::SingleQubitClifford;
