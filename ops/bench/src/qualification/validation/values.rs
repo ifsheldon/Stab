@@ -1,4 +1,5 @@
 use super::Issues;
+use crate::qualification::Sha256Digest;
 use crate::qualification::model::FixtureLocator;
 
 const MAX_TEXT_BYTES: usize = 4_096;
@@ -15,13 +16,9 @@ pub(super) fn validate_identifier(label: &str, value: &str, issues: &mut Issues)
 }
 
 pub(super) fn validate_digest(label: &str, value: &str, issues: &mut Issues) {
-    if !is_digest(value) {
+    if !Sha256Digest::is_valid_str(value) {
         issues.push(format!("{label} has invalid SHA-256 digest {value:?}"));
     }
-}
-
-pub(super) fn is_digest(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 pub(super) fn validate_text(label: &str, value: &str, issues: &mut Issues) {

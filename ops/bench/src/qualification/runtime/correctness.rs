@@ -5,6 +5,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::identity::{GitCommit, Sha256Digest};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
@@ -188,10 +189,10 @@ fn validate_required(
         expected_completion_sha256,
     } = validation;
     validate_output_path(output)?;
-    if !valid_sha256(expected_manifest_sha256)
-        || !valid_git_commit(expected_stab_commit)
-        || !valid_sha256(expected_request_sha256)
-        || !valid_sha256(expected_completion_sha256)
+    if !Sha256Digest::is_valid_str(expected_manifest_sha256)
+        || !GitCommit::is_canonical_str(expected_stab_commit)
+        || !Sha256Digest::is_valid_str(expected_request_sha256)
+        || !Sha256Digest::is_valid_str(expected_completion_sha256)
     {
         return Err(CorrectnessError::InvalidExpectation);
     }
@@ -286,7 +287,7 @@ fn validate_request<'a>(
         || request.allow_deferred
         || !request.planned_case_ids.is_empty()
         || !request.deferred_case_ids.is_empty()
-        || !valid_sha256(&request.execution_environment_sha256)
+        || !Sha256Digest::is_valid_str(&request.execution_environment_sha256)
         || request.executables.is_empty()
     {
         return Err(CorrectnessError::RequestContract);
@@ -297,7 +298,9 @@ fn validate_request<'a>(
         return Err(CorrectnessError::RequestContract);
     }
     for executable in &request.executables {
-        if executable.role.is_empty() || executable.bytes == 0 || !valid_sha256(&executable.sha256)
+        if executable.role.is_empty()
+            || executable.bytes == 0
+            || !Sha256Digest::is_valid_str(&executable.sha256)
         {
             return Err(CorrectnessError::RequestContract);
         }
@@ -305,8 +308,8 @@ fn validate_request<'a>(
     let mut requested = BTreeMap::new();
     for case in &request.selected_cases {
         if !valid_case_id(&case.case_id)
-            || !valid_sha256(&case.selector_sha256)
-            || !valid_sha256(&case.case_contract_sha256)
+            || !Sha256Digest::is_valid_str(&case.selector_sha256)
+            || !Sha256Digest::is_valid_str(&case.case_contract_sha256)
             || requested.insert(case.case_id.as_str(), case).is_some()
         {
             return Err(CorrectnessError::RequestContract);
@@ -358,9 +361,15 @@ fn validate_report<'a>(
         if result.outcome != "passed"
             || result.selector_sha256 != expected.selector_sha256
             || !selector_digest_matches_contract(result, &selector_bytes)
-            || !valid_sha256(&result.execution_receipt_sha256)
-            || !result.stdout_sha256.as_deref().is_some_and(valid_sha256)
-            || !result.stderr_sha256.as_deref().is_some_and(valid_sha256)
+            || !Sha256Digest::is_valid_str(&result.execution_receipt_sha256)
+            || !result
+                .stdout_sha256
+                .as_deref()
+                .is_some_and(Sha256Digest::is_valid_str)
+            || !result
+                .stderr_sha256
+                .as_deref()
+                .is_some_and(Sha256Digest::is_valid_str)
             || !result.artifacts.is_empty()
             || results.insert(result.case_id.as_str(), result).is_some()
         {
@@ -491,7 +500,7 @@ fn validate_completion(
     let mut actual_cases = BTreeMap::new();
     for case in &completion.cases {
         if !valid_case_id(&case.case_id)
-            || !valid_sha256(&case.execution_receipt_sha256)
+            || !Sha256Digest::is_valid_str(&case.execution_receipt_sha256)
             || actual_cases
                 .insert(case.case_id.clone(), case.execution_receipt_sha256.clone())
                 .is_some()
@@ -556,7 +565,7 @@ fn validate_execution_receipts(
 }
 
 fn complete_stream(stream: Option<&StreamReceipt>) -> bool {
-    stream.is_some_and(|stream| stream.complete && valid_sha256(&stream.sha256))
+    stream.is_some_and(|stream| stream.complete && Sha256Digest::is_valid_str(&stream.sha256))
 }
 
 fn statistical_attempts_match(
@@ -660,17 +669,6 @@ fn validate_output_path(path: &Path) -> Result<(), CorrectnessError> {
         return Err(CorrectnessError::InvalidOutput(path.to_path_buf()));
     }
     Ok(())
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn valid_git_commit(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn valid_case_id(value: &str) -> bool {

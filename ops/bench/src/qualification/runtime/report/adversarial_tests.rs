@@ -1,5 +1,5 @@
 use super::super::protocol::{
-    GitCommit, PROTOCOL_SCHEMA_VERSION, RAW_WORK_TIMING_BOUNDARY, Sha256Digest, WorkerMeasurement,
+    PROTOCOL_SCHEMA_VERSION, RAW_WORK_TIMING_BOUNDARY, WorkerMeasurement,
 };
 use super::super::run::{
     CalibrationEvidence, CalibrationProbeEvidence, CommonBatchMode, ImplementationCalibration,

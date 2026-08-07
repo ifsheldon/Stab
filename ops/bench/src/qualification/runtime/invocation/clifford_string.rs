@@ -1,13 +1,15 @@
-use std::ffi::OsString;
+use std::time::Duration;
 
 use super::super::clifford_vectors::{CliffordRequestVector, checked_file, request_for_runtime};
 use super::super::process::ProcessResult;
+use super::super::protocol::EvidenceMode;
 use super::super::protocol::Implementation;
 use super::super::worker::clifford_string::{
     CLIFFORD_FIXTURE_SCHEMA, CLIFFORD_GATE_COUNT, CLIFFORD_NON_IDENTITY_CYCLE, CLIFFORD_PUBLIC_CAP,
     CliffordDescriptor, CliffordWorkloadKind,
 };
 use super::InvocationError;
+use super::request::{WorkerRequestSpec, matches_rejection};
 
 pub(in crate::qualification::runtime) const CLIFFORD_IDENTITY_GROUP_ID: &str =
     "PERFQ-M6-CLIFFORD-STRING";
@@ -28,25 +30,20 @@ pub(super) fn runtime_descriptor(
     Ok(Some(request.descriptor_hex.clone()))
 }
 
-pub(in crate::qualification::runtime) fn clifford_arguments(
+pub(in crate::qualification::runtime) fn clifford_request_spec(
     request: &CliffordRequestVector,
-) -> Vec<OsString> {
-    vec![
-        OsString::from("--workload"),
-        OsString::from(&request.workload),
-        OsString::from("--measurement-id"),
-        OsString::from(&request.measurement_id),
-        OsString::from("--iterations"),
-        OsString::from(request.iterations.to_string()),
-        OsString::from("--work-items"),
-        OsString::from(request.work_items.to_string()),
-        OsString::from("--input-descriptor-hex"),
-        OsString::from(&request.descriptor_hex),
-        OsString::from("--evidence-mode"),
-        OsString::from("contract"),
-        OsString::from("--start-barrier"),
-        OsString::from("true"),
-    ]
+    timeout: Duration,
+) -> WorkerRequestSpec {
+    WorkerRequestSpec::new(
+        request.workload.clone(),
+        request.measurement_id.clone(),
+        request.iterations,
+        request.work_items,
+        EvidenceMode::Contract,
+        timeout,
+    )
+    .start_barrier(true)
+    .input_descriptor_hex(request.descriptor_hex.clone())
 }
 
 pub(in crate::qualification::runtime) fn checked_clifford_rejection(
@@ -56,10 +53,7 @@ pub(in crate::qualification::runtime) fn checked_clifford_rejection(
 ) -> Result<(), InvocationError> {
     let (expected_status, expected_stderr) =
         clifford_rejection_expectation(implementation, request)?;
-    if output.status != Some(expected_status)
-        || !output.stdout.is_empty()
-        || output.stderr != expected_stderr.as_bytes()
-    {
+    if !matches_rejection(output, expected_status, &expected_stderr) {
         return Err(InvocationError::CliffordWorkRejection {
             implementation,
             case_id: request.id.clone(),

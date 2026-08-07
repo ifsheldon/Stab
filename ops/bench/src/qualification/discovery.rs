@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 
 use super::checklist::{RawChecklistItem, parse as parse_checklist};
 use super::model::{
@@ -754,22 +753,7 @@ fn owner(feature: &str) -> &'static str {
     }
 }
 
-pub(super) fn sha256_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(bytes);
-    let mut encoded = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        let Some(high) = HEX.get(usize::from(byte >> 4)).copied() else {
-            unreachable!("a four-bit hexadecimal digit is within the lookup table");
-        };
-        let Some(low) = HEX.get(usize::from(byte & 0x0f)).copied() else {
-            unreachable!("a four-bit hexadecimal digit is within the lookup table");
-        };
-        encoded.push(char::from(high));
-        encoded.push(char::from(low));
-    }
-    encoded
-}
+pub(super) use super::runtime::identity::sha256_hex;
 
 fn read_repo_text_bounded(root: &RepoRoot, path: &Path) -> Result<String, BenchError> {
     let bytes = crate::source_file::read_repo_regular_file_bounded(root, path, MAX_INPUT_BYTES)?;

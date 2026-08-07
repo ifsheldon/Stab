@@ -268,7 +268,7 @@ fn valid_graduated_fixture(fixture: &FixtureLocator) -> bool {
     match fixture {
         FixtureLocator::Generated { id } => !id.is_empty(),
         FixtureLocator::RepositoryFile { path, sha256 } => {
-            !path.is_empty() && super::values::is_digest(sha256)
+            !path.is_empty() && crate::qualification::Sha256Digest::is_valid_str(sha256)
         }
         FixtureLocator::Inline { .. } => false,
     }

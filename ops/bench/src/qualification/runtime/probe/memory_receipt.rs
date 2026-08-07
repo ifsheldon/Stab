@@ -316,8 +316,8 @@ fn valid_accepted_maximum_memory(values: &[DemAcceptedMaximumMemory]) -> bool {
             actual.family_id == family.id()
                 && actual.work_items == family.maximum_items()
                 && actual.input_bytes > 0
-                && valid_sha256(&actual.input_digest)
-                && valid_sha256(&actual.output_digest)
+                && Sha256Digest::is_valid_str(&actual.input_digest)
+                && Sha256Digest::is_valid_str(&actual.output_digest)
                 && actual.stim_peak_rss_bytes >= actual.stim_setup_rss_bytes
                 && actual.stab_peak_rss_bytes >= actual.stab_setup_rss_bytes
         })
@@ -334,13 +334,6 @@ fn valid_probe_identity(receipt: &AdapterProbeReceipt) -> bool {
         && receipt.work_items > 0
         && receipt.work_count > 0
         && receipt.input_bytes > 0
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[cfg(test)]

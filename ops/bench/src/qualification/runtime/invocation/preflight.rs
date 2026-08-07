@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 
 use super::super::group::{GroupContract, ScaleContract};
 use super::super::process::ProcessResult;
@@ -148,7 +147,7 @@ pub(super) fn worker_contract_preflight_digest(
         worker_identity,
         probes,
     })?;
-    sha256_hex_bytes(&material)
+    Ok(super::super::identity::sha256_hex(&material))
 }
 
 pub(super) fn accepted_case_id(
@@ -265,17 +264,6 @@ fn accepted_output_digest(
     }
 }
 
-fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
-    use std::fmt::Write as _;
-
-    let mut output = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
-        write!(&mut output, "{byte:02x}")
-            .map_err(|_| InvocationError::ContractPreflightDefinition)?;
-    }
-    Ok(output)
-}
-
 #[cfg(test)]
 pub(super) fn expected_accepted_probe(
     case_id: &str,
@@ -310,8 +298,10 @@ pub(super) fn expected_rejected_probe(
         implementation,
         evidence_mode: EvidenceMode::Contract,
         exit_status,
-        stdout_sha256: Sha256Digest::try_new(sha256_hex_bytes(&[])?)?,
-        stderr_sha256: Sha256Digest::try_new(sha256_hex_bytes(stderr.as_bytes())?)?,
+        stdout_sha256: Sha256Digest::try_new(super::super::identity::sha256_hex(&[]))?,
+        stderr_sha256: Sha256Digest::try_new(super::super::identity::sha256_hex(
+            stderr.as_bytes(),
+        ))?,
     })
 }
 
@@ -344,7 +334,7 @@ pub(super) fn rejected_probe(
         exit_status: output
             .status
             .ok_or(InvocationError::ContractPreflightDefinition)?,
-        stdout_sha256: Sha256Digest::try_new(sha256_hex_bytes(&output.stdout)?)?,
-        stderr_sha256: Sha256Digest::try_new(sha256_hex_bytes(&output.stderr)?)?,
+        stdout_sha256: Sha256Digest::try_new(super::super::identity::sha256_hex(&output.stdout))?,
+        stderr_sha256: Sha256Digest::try_new(super::super::identity::sha256_hex(&output.stderr))?,
     })
 }

@@ -407,7 +407,9 @@ fn validate_completion_checkpoint(
             is_current: false,
         });
     };
-    if current.manifest_path != COMPLETION_MANIFEST_PATH || !valid_sha256(&current.report_sha256) {
+    if current.manifest_path != COMPLETION_MANIFEST_PATH
+        || !super::Sha256Digest::is_valid_str(&current.report_sha256)
+    {
         return Err(BenchError::Qualification(
             "qualification completion checkpoint is malformed".to_string(),
         ));
@@ -467,10 +469,10 @@ fn valid_completion_summary(summary: &CurrentCompletion) -> bool {
     matches!(
         summary.scope_id.as_str(),
         HISTORICAL_DEM_COMPLETION_SCOPE | RELEASE_COMPLETION_SCOPE
-    ) && valid_sha256(&summary.report_sha256)
-        && valid_sha256(&summary.performance_inventory_sha256)
-        && valid_sha256(&summary.correctness_inventory_sha256)
-        && valid_git_commit(&summary.stab_commit)
+    ) && super::Sha256Digest::is_valid_str(&summary.report_sha256)
+        && super::Sha256Digest::is_valid_str(&summary.performance_inventory_sha256)
+        && super::Sha256Digest::is_valid_str(&summary.correctness_inventory_sha256)
+        && super::GitCommit::is_canonical_str(&summary.stab_commit)
         && valid_identity_token(&summary.architecture)
         && super::runtime::validate_status_artifact_path(Path::new(&summary.path)).is_ok()
 }
@@ -727,7 +729,7 @@ fn status_git_head(root: &RepoRoot) -> Result<String, BenchError> {
         BenchError::Qualification(format!("Git returned a non-UTF-8 HEAD commit: {error}"))
     })?;
     let commit = text.strip_suffix('\n').unwrap_or(text);
-    if !valid_git_commit(commit) {
+    if !super::GitCommit::is_canonical_str(commit) {
         return Err(BenchError::Qualification(
             "Git returned a malformed HEAD commit for A9 completion status".to_string(),
         ));
@@ -744,20 +746,6 @@ fn git_contract_error(context: &str, result: &ProcessResult) -> BenchError {
             .map_or_else(|| "signal".to_string(), |status| status.to_string()),
         diagnostic.trim()
     ))
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn valid_git_commit(value: &str) -> bool {
-    value.len() == 40
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn valid_identity_token(value: &str) -> bool {

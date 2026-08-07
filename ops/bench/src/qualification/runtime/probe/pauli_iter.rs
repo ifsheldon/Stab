@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::path::Path;
 
-use super::{ProbeError, ProbeGroup, checked_process, probe_environment, probe_limits};
+use super::{PROBE_TIMEOUT, ProbeError, ProbeGroup, checked_process};
 use crate::root::RepoRoot;
 
 use super::super::adapter::AdapterExecutable;
@@ -10,6 +9,7 @@ use super::super::invocation::pauli_iter::{
     PAULI_ITER_INPUT_BYTES, PauliIterContractKind, PauliIterRejectionClass,
     checked_pauli_iter_rejection,
 };
+use super::super::invocation::request::WorkerRequestSpec;
 use super::super::process::{ProcessRequest, run_bounded_process};
 use super::super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
@@ -171,34 +171,23 @@ fn request(
     iterations: &str,
     work_items: &str,
 ) -> ProcessRequest {
-    let mut args = Vec::with_capacity(11);
-    if implementation == Implementation::Stab {
-        args.push(OsString::from("qualification-worker"));
-    }
-    args.extend([
-        OsString::from("--workload"),
-        OsString::from(workload),
-        OsString::from("--measurement-id"),
-        OsString::from(measurement),
-        OsString::from("--iterations"),
-        OsString::from(iterations),
-        OsString::from("--work-items"),
-        OsString::from(work_items),
-        OsString::from("--evidence-mode"),
-        OsString::from("timing"),
-    ]);
-    ProcessRequest {
-        program: match implementation {
+    WorkerRequestSpec::new(
+        workload,
+        measurement,
+        iterations,
+        work_items,
+        EvidenceMode::Timing,
+        PROBE_TIMEOUT,
+    )
+    .process_request(
+        implementation,
+        match implementation {
             Implementation::Stim => adapter.path.clone(),
             Implementation::Stab => worker_program.to_path_buf(),
         },
-        args,
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: probe_limits(),
-    }
+        root.path.clone(),
+        None,
+    )
 }
 
 const fn contract_kind(group: ProbeGroup) -> Option<PauliIterContractKind> {

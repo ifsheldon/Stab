@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::root::RepoRoot;
 
 use super::super::artifact::RepositoryBinding;
+use super::super::identity::{GitCommit, Sha256Digest};
 use super::super::protocol::TimingBoundary;
 use super::super::self_regression::SelfRegressionOutcome;
 use super::super::statistics::GateOutcome;
@@ -86,12 +87,12 @@ pub(super) fn inspect(
         || manifest.memory_scaling_status != MemoryScalingStatus::Recorded
         || manifest.environment.soft_nofile_limit != RELEASE_SOFT_NOFILE_LIMIT
         || manifest.timing_boundary != TimingBoundary::RawWorkV2
-        || !valid_sha256(&manifest.performance_inventory_sha256)
-        || !valid_sha256(&manifest.correctness_inventory_sha256)
-        || !valid_sha256(&manifest.parity_policy_sha256)
-        || !valid_sha256(&manifest.regression_policy_sha256)
-        || !valid_sha256(&manifest.regression_baselines_sha256)
-        || !valid_git_commit(&manifest.repository.commit_after)
+        || !Sha256Digest::is_valid_str(&manifest.performance_inventory_sha256)
+        || !Sha256Digest::is_valid_str(&manifest.correctness_inventory_sha256)
+        || !Sha256Digest::is_valid_str(&manifest.parity_policy_sha256)
+        || !Sha256Digest::is_valid_str(&manifest.regression_policy_sha256)
+        || !Sha256Digest::is_valid_str(&manifest.regression_baselines_sha256)
+        || !GitCommit::is_canonical_str(&manifest.repository.commit_after)
         || manifest.environment.architecture.is_empty()
         || super::super::validate_status_artifact_path(Path::new(&manifest.output)).is_err()
     {
@@ -132,18 +133,4 @@ pub(super) fn inspect(
         },
         matches_current_contract,
     })
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-}
-
-fn valid_git_commit(value: &str) -> bool {
-    value.len() == 40
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }

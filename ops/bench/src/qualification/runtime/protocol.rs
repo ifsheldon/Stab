@@ -87,27 +87,7 @@ impl<'de> Deserialize<'de> for ProtocolId {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(transparent)]
-pub(crate) struct Sha256Digest(Box<str>);
-
-impl Sha256Digest {
-    pub(super) fn try_new(value: impl Into<String>) -> Result<Self, ProtocolError> {
-        let value = value.into();
-        if value.len() != 64
-            || !value
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            return Err(ProtocolError::InvalidSha256(value));
-        }
-        Ok(Self(value.into_boxed_str()))
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+pub(crate) use super::identity::{GitCommit, Sha256Digest};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
@@ -116,11 +96,7 @@ pub(crate) struct InputDigest(Box<str>);
 impl InputDigest {
     pub(super) fn try_new(value: impl Into<String>) -> Result<Self, ProtocolError> {
         let value = value.into();
-        if value.len() != 64
-            || !value
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
+        if !Sha256Digest::is_valid_str(&value) {
             return Err(ProtocolError::InvalidInputDigest(value));
         }
         Ok(Self(value.into_boxed_str()))
@@ -148,11 +124,7 @@ pub(crate) struct SemanticDigest(Box<str>);
 impl SemanticDigest {
     pub(super) fn try_new(value: impl Into<String>) -> Result<Self, ProtocolError> {
         let value = value.into();
-        if value.len() != 64
-            || !value
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
+        if !Sha256Digest::is_valid_str(&value) {
             return Err(ProtocolError::InvalidSemanticDigest(value));
         }
         Ok(Self(value.into_boxed_str()))
@@ -164,44 +136,6 @@ impl SemanticDigest {
 }
 
 impl<'de> Deserialize<'de> for SemanticDigest {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Self::try_new(value).map_err(serde::de::Error::custom)
-    }
-}
-
-impl<'de> Deserialize<'de> for Sha256Digest {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Self::try_new(value).map_err(serde::de::Error::custom)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(transparent)]
-pub(crate) struct GitCommit(Box<str>);
-
-impl GitCommit {
-    pub(super) fn try_new(value: impl Into<String>) -> Result<Self, ProtocolError> {
-        let value = value.into();
-        if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(ProtocolError::InvalidGitCommit(value));
-        }
-        Ok(Self(value.to_ascii_lowercase().into_boxed_str()))
-    }
-
-    pub(super) fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for GitCommit {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

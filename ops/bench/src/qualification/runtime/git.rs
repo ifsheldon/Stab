@@ -168,7 +168,7 @@ impl GitView {
             commit: String::new(),
         };
         let commit = view.command_text(&["rev-parse", "--verify", "HEAD^{commit}"], None)?;
-        if !valid_commit(&commit) {
+        if !super::identity::GitCommit::is_canonical_str(&commit) {
             return Err(GitError::InvalidCommit(commit));
         }
         view.commit = commit.to_ascii_lowercase();
@@ -507,7 +507,7 @@ fn is_shared_index_name(name: &OsStr) -> bool {
     let Some(digest) = name.strip_prefix("sharedindex.") else {
         return false;
     };
-    valid_commit(digest)
+    super::identity::GitCommit::is_canonical_str(digest)
 }
 
 fn link_git_directory(
@@ -595,13 +595,6 @@ fn directory_flags() -> rustix::fs::OFlags {
         | rustix::fs::OFlags::CLOEXEC
         | rustix::fs::OFlags::DIRECTORY
         | rustix::fs::OFlags::NOFOLLOW
-}
-
-fn valid_commit(value: &str) -> bool {
-    value.len() == 40
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Error)]

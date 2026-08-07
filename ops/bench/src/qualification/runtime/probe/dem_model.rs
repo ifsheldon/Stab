@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use super::super::adapter::AdapterExecutable;
+use super::super::invocation::request::WorkerRequestSpec;
 use super::super::process::{ProcessRequest, ProcessResult, run_bounded_process};
 use super::super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
@@ -12,7 +12,7 @@ use super::super::protocol::{
 };
 use super::super::worker::WorkerIdentity;
 use super::super::worker::dem_model::{DEM_CYCLE_ITEMS, DemFamily, DemFixture, parse, serialize};
-use super::{ProbeError, ProbeGroup, checked_process, probe_environment, probe_limits};
+use super::{PROBE_TIMEOUT, ProbeError, ProbeGroup, checked_process};
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
@@ -87,13 +87,8 @@ pub(super) fn validate_work_items(group: ProbeGroup, items: u64) -> Result<(), P
     Ok(())
 }
 
-pub(super) fn append_default_family_arguments(group: ProbeGroup, arguments: &mut Vec<OsString>) {
-    if kind(group).is_some() {
-        arguments.extend([
-            OsString::from("--input-family"),
-            OsString::from(DemFamily::FlatErrors.id()),
-        ]);
-    }
+pub(super) fn default_family(group: ProbeGroup) -> Option<&'static str> {
+    kind(group).map(|_| DemFamily::FlatErrors.id())
 }
 
 pub(super) fn validate_boundaries(
@@ -398,42 +393,25 @@ fn request(
     items: u64,
     start_barrier: bool,
 ) -> ProcessRequest {
-    let mut args = Vec::with_capacity(13);
-    if implementation == Implementation::Stab {
-        args.push(OsString::from("qualification-worker"));
-    }
-    args.extend([
-        OsString::from("--workload"),
-        OsString::from(kind.workload()),
-        OsString::from("--measurement-id"),
-        OsString::from(measurement),
-        OsString::from("--iterations"),
-        OsString::from(iterations.to_string()),
-        OsString::from("--work-items"),
-        OsString::from(items.to_string()),
-        OsString::from("--input-family"),
-        OsString::from(family.id()),
-        OsString::from("--evidence-mode"),
-        OsString::from(match evidence_mode {
-            EvidenceMode::Contract => "contract",
-            EvidenceMode::Timing => "timing",
-            EvidenceMode::Memory => "memory",
-        }),
-        OsString::from("--start-barrier"),
-        OsString::from(start_barrier.to_string()),
-    ]);
-    ProcessRequest {
-        program: match implementation {
+    WorkerRequestSpec::new(
+        kind.workload(),
+        measurement,
+        iterations,
+        items,
+        evidence_mode,
+        PROBE_TIMEOUT,
+    )
+    .start_barrier(start_barrier)
+    .input_family(family.id())
+    .process_request(
+        implementation,
+        match implementation {
             Implementation::Stim => adapter.path.clone(),
             Implementation::Stab => worker_program.to_path_buf(),
         },
-        args,
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: probe_limits(),
-    }
+        root.path.clone(),
+        None,
+    )
 }
 
 fn guard_request(
@@ -546,10 +524,7 @@ fn verify_rejection(
             ),
         ),
     };
-    if output.status == Some(expected_status)
-        && output.stdout.is_empty()
-        && output.stderr == expected.as_bytes()
-    {
+    if super::super::invocation::request::matches_rejection(output, expected_status, &expected) {
         Ok(())
     } else {
         Err(ProbeError::Contract(format!(

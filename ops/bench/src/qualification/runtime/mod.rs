@@ -11,6 +11,7 @@ mod executable;
 mod git;
 mod group;
 mod host;
+pub(super) mod identity;
 mod invocation;
 mod markdown;
 mod parity;
@@ -41,6 +42,7 @@ pub(crate) use rollup::{RollupArgs, RollupReportArgs};
 pub(crate) use run::RunArgs;
 pub(crate) use self_regression::{BaselineCandidateArgs, SelfRegressionArgs};
 pub(crate) use simd_compare::{SimdCompareArgs, SimdReportArgs};
+pub(crate) use statistics::median as exact_median;
 pub(crate) use worker::WorkerArgs;
 
 pub(super) struct QualificationSession {

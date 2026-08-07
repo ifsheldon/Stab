@@ -104,7 +104,7 @@ pub(super) fn validate_binding(label: &str, binding: &ArtifactBinding, issues: &
             binding.path
         ));
     }
-    if !valid_sha256(&binding.sha256) {
+    if !crate::qualification::Sha256Digest::is_valid_str(&binding.sha256) {
         issues.push(format!("{label} has invalid SHA-256 {:?}", binding.sha256));
     }
 }
@@ -140,27 +140,13 @@ pub(super) fn validate_profile_receipt_path(value: &str, issues: &mut Vec<String
 }
 
 pub(super) fn validate_revision(revision: &str, issues: &mut Vec<String>) {
-    if !valid_revision(revision) {
+    if !crate::qualification::GitCommit::is_canonical_str(revision) {
         issues.push("source_revision must be a lowercase 40-byte Git object id".to_string());
     }
 }
 
-pub(super) fn valid_revision(revision: &str) -> bool {
-    revision.len() == 40
-        && revision
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
 pub(super) fn path_ends_with(value: &str, expected: &str) -> bool {
     Path::new(value).ends_with(expected)
-}
-
-pub(super) fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn valid_relative_path(value: &str) -> bool {

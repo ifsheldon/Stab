@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use super::calibration::{CalibrationProbe, calibrate};
 use super::correctness::CorrectnessPreflightStatus;
+use super::identity::{GitCommit, Sha256Digest};
 use super::protocol::{EvidenceMode, Implementation, InputDigest, ProtocolId, SemanticDigest};
 #[cfg(test)]
 use super::run::TimingAttemptKind;
@@ -188,7 +189,7 @@ pub(super) fn validate_report(
         return Err(ReportError::StabBuildReceipt);
     }
     if report.repository.commit_before != report.repository.commit_after
-        || !valid_git_commit(&report.repository.commit_before)
+        || !GitCommit::is_canonical_str(&report.repository.commit_before)
     {
         return Err(ReportError::RepositoryIdentity);
     }
@@ -329,7 +330,7 @@ fn validate_correctness_evidence(
                     evidence.preflight_sha256.as_deref(),
                 ]
                 .into_iter()
-                .any(|value| value.is_none_or(|value| validate_sha256_value(value).is_err()))
+                .any(|value| value.is_none_or(|value| !Sha256Digest::is_valid_str(value)))
             {
                 return Err(ReportError::CorrectnessEvidence);
             }
@@ -878,10 +879,6 @@ fn expected_pair_count(tier: QualificationTier) -> usize {
     }
 }
 
-fn valid_git_commit(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
-
 fn valid_output_path(value: &str) -> bool {
     let path = std::path::Path::new(value);
     let mut components = path.components();
@@ -894,18 +891,10 @@ fn valid_output_path(value: &str) -> bool {
 }
 
 fn validate_sha256(field: &'static str, value: &str) -> Result<(), ReportError> {
-    validate_sha256_value(value).map_err(|()| ReportError::Digest(field))
-}
-
-fn validate_sha256_value(value: &str) -> Result<(), ()> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
+    if Sha256Digest::is_valid_str(value) {
         Ok(())
     } else {
-        Err(())
+        Err(ReportError::Digest(field))
     }
 }
 

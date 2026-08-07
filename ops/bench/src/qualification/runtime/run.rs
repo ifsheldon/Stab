@@ -4,7 +4,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
@@ -1007,23 +1006,7 @@ fn render_json(value: &impl Serialize) -> Result<Vec<u8>, RunError> {
     Ok(bytes)
 }
 
-pub(super) fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut output = String::with_capacity(digest.len().saturating_mul(2));
-    for byte in digest {
-        output.push(hex_digit(byte >> 4));
-        output.push(hex_digit(byte & 0x0f));
-    }
-    output
-}
-
-fn hex_digit(value: u8) -> char {
-    char::from(if value < 10 {
-        b'0' + value
-    } else {
-        b'a' + (value - 10)
-    })
-}
+pub(super) use super::identity::sha256_hex;
 
 pub(super) fn unix_epoch_seconds() -> Result<u64, RunError> {
     SystemTime::now()

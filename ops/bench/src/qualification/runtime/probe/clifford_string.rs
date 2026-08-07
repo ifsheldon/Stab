@@ -1,16 +1,16 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::path::Path;
-use std::time::Duration;
 
-use super::{ProbeError, ProbeGroup, checked_process, probe_environment};
+use super::{PROBE_TIMEOUT, ProbeError, ProbeGroup, checked_process};
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
 use super::super::adapter::AdapterExecutable;
 use super::super::clifford_vectors::{CliffordRequestResult, checked_file};
-use super::super::invocation::clifford_string::{checked_clifford_rejection, clifford_arguments};
-use super::super::process::{ProcessLimits, ProcessRequest, run_bounded_process};
+use super::super::invocation::clifford_string::{
+    checked_clifford_rejection, clifford_request_spec,
+};
+use super::super::process::{ProcessRequest, run_bounded_process};
 use super::super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
     SemanticDigest, parse_worker_json_lines,
@@ -24,7 +24,6 @@ pub(super) const IDENTITY_RUNTIME_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING";
 pub(super) const NON_IDENTITY_RUNTIME_GROUP_ID: &str = "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY";
 const IDENTITY_PROBE_ID: &str = "pq2-clifford-string-identity-adapter-smoke";
 const NON_IDENTITY_PROBE_ID: &str = "pq2-clifford-string-non-identity-adapter-smoke";
-const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 
 pub(super) fn probe_contract(
     group: ProbeGroup,
@@ -37,20 +36,9 @@ pub(super) fn probe_contract(
     Some((probe_id, kind.workload(), kind.measurement()))
 }
 
-pub(super) fn append_descriptor_arguments(
-    group: ProbeGroup,
-    work_items: u64,
-    arguments: &mut Vec<OsString>,
-) -> Result<(), ProbeError> {
-    let Some(kind) = contract_kind(group) else {
-        return Ok(());
-    };
-    let descriptor = CliffordDescriptor::canonical(kind, work_items);
-    arguments.extend([
-        OsString::from("--input-descriptor-hex"),
-        OsString::from(descriptor.to_string()),
-    ]);
-    Ok(())
+pub(super) fn canonical_descriptor(group: ProbeGroup, work_items: u64) -> Option<String> {
+    let kind = contract_kind(group)?;
+    Some(CliffordDescriptor::canonical(kind, work_items).to_string())
 }
 
 pub(super) fn validate_work_items(group: ProbeGroup, work_items: u64) -> Result<(), ProbeError> {
@@ -162,32 +150,19 @@ fn request(
     vector: &super::super::clifford_vectors::CliffordRequestVector,
     release_barrier: bool,
 ) -> ProcessRequest {
-    let mut arguments = clifford_arguments(vector);
-    if implementation == Implementation::Stab {
-        arguments.insert(0, OsString::from("qualification-worker"));
+    let mut spec = clifford_request_spec(vector, PROBE_TIMEOUT);
+    if release_barrier {
+        spec = spec.release_barrier();
     }
-    ProcessRequest {
-        program: match implementation {
+    spec.process_request(
+        implementation,
+        match implementation {
             Implementation::Stim => adapter.path.clone(),
             Implementation::Stab => worker_program.to_path_buf(),
         },
-        args: arguments,
-        stdin: if release_barrier {
-            vec![b'\n']
-        } else {
-            Vec::new()
-        },
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: ProcessLimits {
-            stdin_bytes: usize::from(release_barrier),
-            stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-            stderr: (64 << 10).into(),
-            regular_file_bytes: None,
-            timeout: Duration::from_secs(30),
-        },
-    }
+        root.path.clone(),
+        None,
+    )
 }
 
 const fn contract_kind(group: ProbeGroup) -> Option<CliffordWorkloadKind> {
@@ -218,16 +193,9 @@ mod tests {
             ),
         ] {
             assert_eq!(group.runtime_group_id(), Some(expected_id));
-            let mut arguments = Vec::new();
-            append_descriptor_arguments(group, DEFAULT_CLIFFORD_WORK_ITEMS, &mut arguments)
-                .expect("descriptor arguments");
             assert_eq!(
-                arguments.get(1).and_then(|value| value.to_str()),
-                Some(
-                    CliffordDescriptor::canonical(kind, DEFAULT_CLIFFORD_WORK_ITEMS)
-                        .to_string()
-                        .as_str()
-                )
+                canonical_descriptor(group, DEFAULT_CLIFFORD_WORK_ITEMS),
+                Some(CliffordDescriptor::canonical(kind, DEFAULT_CLIFFORD_WORK_ITEMS).to_string())
             );
         }
     }

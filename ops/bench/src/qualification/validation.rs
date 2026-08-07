@@ -23,8 +23,8 @@ use counts::{validate_classification_count, validate_decision_count, validate_pa
 use issues::Issues;
 use planned::validate_planned_workload;
 use values::{
-    filter_matches_any, filter_selects_symbol, is_digest, validate_digest,
-    validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
+    filter_matches_any, filter_selects_symbol, validate_digest, validate_fixture_locator,
+    validate_identifier, validate_relative_path, validate_text,
 };
 
 const CORRECTNESS_DIGEST: &str = "2e204f9e48efcf389667718830d66c574454d7b4c8289b6280a0499ff34b74f2";
@@ -578,7 +578,7 @@ fn validate_groups(
                     let fixture_matches = matches!(
                         &group.workload_family.fixture,
                         FixtureLocator::RepositoryFile { path, sha256 }
-                            if path == &row.stdin_path && is_digest(sha256)
+                            if path == &row.stdin_path && crate::qualification::Sha256Digest::is_valid_str(sha256)
                     );
                     if !fixture_matches
                         || group.workload_family.deterministic_seed != "corpus-digest-owned"
@@ -762,7 +762,7 @@ fn validate_groups(
                 if scale
                     .input_digest
                     .as_deref()
-                    .is_none_or(|digest| !is_digest(digest))
+                    .is_none_or(|digest| !crate::qualification::Sha256Digest::is_valid_str(digest))
                 {
                     issues.push(format!(
                         "implemented group {} scale {} lacks a valid input digest",

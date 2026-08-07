@@ -7,6 +7,7 @@ use super::artifact::{
     DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding,
     RetainedArtifactContext, RetainedArtifactDirectory,
 };
+use super::identity::Sha256Digest;
 use super::invocation::WorkerIdentityEvidence;
 use super::protocol::TimingBoundary;
 use super::rollup::{RollupReplayEvidence, RollupSourceEvidence};
@@ -972,7 +973,7 @@ fn validate_manifest(
             .iter()
             .any(|receipt| {
                 DirectQualificationArtifactPath::try_new(Path::new(&receipt.path)).is_err()
-                    || !valid_sha256(&receipt.report_sha256)
+                    || !Sha256Digest::is_valid_str(&receipt.report_sha256)
             })
         || manifest
             .rollups
@@ -1167,13 +1168,6 @@ fn path_text(path: &Path) -> Result<String, CompletionError> {
     path.to_str()
         .map(ToString::to_string)
         .ok_or_else(|| CompletionError::PathEncoding(path.to_path_buf()))
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn current_unix_epoch_seconds() -> Result<u64, CompletionError> {

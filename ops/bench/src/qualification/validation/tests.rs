@@ -441,7 +441,7 @@ fn dem_parse_and_print_groups_freeze_independent_direct_contracts() {
                 && scale
                     .input_digest
                     .as_ref()
-                    .is_some_and(|digest| digest.len() == 64)
+                    .is_some_and(|digest| crate::qualification::Sha256Digest::is_valid_str(digest))
         }));
         assert_eq!(group.output_contract.digest_state, EvidenceState::Existing);
         assert_eq!(group.output_contract.comparator_sources.len(), 2);
@@ -899,6 +899,39 @@ fn validation_rejects_cartesian_checklist_children_and_missing_fixture_digest() 
     let message = error.to_string();
     assert!(message.contains("owns unrelated feature"));
     assert!(message.contains("lacks a typed path, byte length, or corpus digest"));
+}
+
+#[test]
+fn validation_rejects_uppercase_hex_in_ledger_digest_fields() {
+    let (mut suite, manifest, references) = fixture();
+    let corpus_digest = suite
+        .qualification_groups
+        .iter_mut()
+        .find_map(|group| match &mut group.workload_family.fixture {
+            FixtureLocator::RepositoryFile { sha256, .. } => Some(sha256),
+            FixtureLocator::Generated { .. } | FixtureLocator::Inline { .. } => None,
+        })
+        .expect("repository-file fixture group");
+    *corpus_digest = corpus_digest.to_ascii_uppercase();
+    let scale_digest = suite
+        .qualification_groups
+        .iter_mut()
+        .filter(|group| group.status != QualificationStatus::Planned)
+        .find_map(|group| {
+            group
+                .workload_family
+                .scales
+                .iter_mut()
+                .find_map(|scale| scale.input_digest.as_mut())
+        })
+        .expect("implemented scale input digest");
+    *scale_digest = scale_digest.to_ascii_uppercase();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("uppercase hexadecimal ledger digests must fail validation");
+    let message = error.to_string();
+    assert!(message.contains("qualification fixture corpus has invalid SHA-256 digest"));
+    assert!(message.contains("lacks a valid input digest"));
 }
 
 #[test]

@@ -1,19 +1,18 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use super::super::process::{ProcessLimits, ProcessRequest, run_bounded_process};
+use super::super::process::run_bounded_process;
 use super::super::protocol::{
     EvidenceMode, GitCommit, Implementation, ProtocolExpectation, SemanticDigest,
     parse_worker_json_lines,
 };
 use super::{
-    InvocationError, InvocationRecord, PROTOCOL_OUTPUT_LIMIT, checked_process, checked_work_count,
-    protocol_arguments, supports_group, worker_environment,
+    InvocationError, InvocationRecord, checked_process, checked_work_count, request_spec,
+    supports_group,
 };
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
@@ -126,30 +125,21 @@ impl PreparedDiagnosticWorker {
         let measurement_id = group.single_measurement()?;
         let expected_cpu = u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu))?;
         let expected_work_count = checked_work_count(iterations, scale.work_items)?;
-        let mut arguments = protocol_arguments(
+        let spec = request_spec(
             group,
             measurement_id,
             evidence_mode,
             iterations,
             scale,
             Some(expected_cpu),
+            timeout,
         )?;
-        arguments.insert(0, OsString::from("qualification-worker"));
-        let process = run_bounded_process(&ProcessRequest {
-            program: self.worker.program(),
-            args: arguments,
-            stdin: vec![b'\n'],
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: Some(cpu),
-            limits: ProcessLimits {
-                stdin_bytes: 1,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout,
-            },
-        })?;
+        let process = run_bounded_process(&spec.process_request(
+            Implementation::Stab,
+            self.worker.program(),
+            self.root.clone(),
+            Some(cpu),
+        ))?;
         let process = checked_process(process, Implementation::Stab)?;
         let rows = parse_worker_json_lines(&process.stdout)?;
         ProtocolExpectation {

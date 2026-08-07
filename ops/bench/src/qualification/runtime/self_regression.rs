@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
+use super::identity::Sha256Digest;
 use super::protocol::{RAW_WORK_TIMING_BOUNDARY, TimingBoundary};
 use super::rollup::{RollupRegressionScale, RollupReplayEvidence};
 use super::run::QualificationTier;
@@ -636,11 +637,11 @@ fn validate_baselines(
     for entry in &baselines.entries {
         let encoded = serde_json::to_vec(&entry.key)?;
         if !unique.insert(encoded)
-            || !valid_sha256(&entry.key.toolchain_sha256)
-            || !valid_sha256(&entry.key.stim_build_fingerprint)
-            || !valid_sha256(&entry.key.workload_contract_sha256)
-            || !valid_sha256(&entry.full_rollup_sha256)
-            || !valid_sha256(&entry.soak_rollup_sha256)
+            || !Sha256Digest::is_valid_str(&entry.key.toolchain_sha256)
+            || !Sha256Digest::is_valid_str(&entry.key.stim_build_fingerprint)
+            || !Sha256Digest::is_valid_str(&entry.key.workload_contract_sha256)
+            || !Sha256Digest::is_valid_str(&entry.full_rollup_sha256)
+            || !Sha256Digest::is_valid_str(&entry.soak_rollup_sha256)
         {
             return Err(SelfRegressionError::BaselineIdentity);
         }
@@ -759,13 +760,6 @@ fn render_json<T: Serialize>(value: &T) -> Result<Vec<u8>, SelfRegressionError> 
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
     Ok(bytes)
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Error)]

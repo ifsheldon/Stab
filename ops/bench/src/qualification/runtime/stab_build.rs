@@ -324,11 +324,11 @@ impl StabBuildReceipt {
             && super::adapter::sha256_regular_file(Path::new(&self.linker_path), 512 << 20)
                 .is_ok_and(|digest| digest == self.linker_sha256)
             && self.build_arguments == normalized_build_arguments(self.variant)
-            && valid_receipt_digest(&self.cargo_lock_sha256)
-            && valid_receipt_digest(&self.workspace_manifest_sha256)
-            && valid_receipt_digest(&self.package_manifest_sha256)
-            && valid_receipt_digest(&self.linker_sha256)
-            && valid_receipt_digest(&self.binary_sha256)
+            && Sha256Digest::is_valid_str(&self.cargo_lock_sha256)
+            && Sha256Digest::is_valid_str(&self.workspace_manifest_sha256)
+            && Sha256Digest::is_valid_str(&self.package_manifest_sha256)
+            && Sha256Digest::is_valid_str(&self.linker_sha256)
+            && Sha256Digest::is_valid_str(&self.binary_sha256)
             && normalized_build_environment(
                 toolchain,
                 Path::new(&self.linker_path),
@@ -391,7 +391,7 @@ impl StabBuildReceipt {
             "build_arguments": self.build_arguments,
             "build_environment": self.build_environment,
         }))?;
-        Ok(hex_digest(&Sha256::digest(material)))
+        Ok(super::identity::sha256_hex(&material))
     }
 }
 
@@ -449,7 +449,7 @@ fn normalized_build_environment(
     linker: &Path,
     linker_sha256: &str,
 ) -> Result<Vec<BuildEnvironmentEntry>, StabBuildError> {
-    if !valid_receipt_digest(linker_sha256) {
+    if !Sha256Digest::is_valid_str(linker_sha256) {
         return Err(StabBuildError::InvalidDigest("linker_sha256"));
     }
     let rustc_library = rustc_library_path(Path::new(&toolchain.rustc_path))?;
@@ -610,7 +610,7 @@ fn digest_repository_file(root: &RepoRoot, relative_path: &str) -> Result<String
             .map_err(|_| StabBuildError::SourceInput("source byte limit".to_string()))?,
     )
     .map_err(|error| StabBuildError::SourceInput(error.to_string()))?;
-    Ok(hex_digest(&Sha256::digest(bytes)))
+    Ok(super::identity::sha256_hex(&bytes))
 }
 
 fn digest_worker_source(source: &RepoRoot) -> Result<String, StabBuildError> {
@@ -637,31 +637,7 @@ fn digest_worker_source(source: &RepoRoot) -> Result<String, StabBuildError> {
         );
         digest.update(bytes);
     }
-    Ok(hex_digest(&digest.finalize()))
-}
-
-fn valid_receipt_digest(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn hex_digest(bytes: &[u8]) -> String {
-    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
-    for byte in bytes {
-        output.push(hex_digit(byte >> 4));
-        output.push(hex_digit(byte & 0x0f));
-    }
-    output
-}
-
-fn hex_digit(value: u8) -> char {
-    char::from(if value < 10 {
-        b'0' + value
-    } else {
-        b'a' + (value - 10)
-    })
+    Ok(super::identity::hex_lower(&digest.finalize()))
 }
 
 #[derive(Debug, Error)]

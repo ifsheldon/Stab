@@ -19,6 +19,8 @@ mod runtime;
 mod status;
 mod validation;
 
+pub(crate) use runtime::exact_median;
+pub(crate) use runtime::identity::{GitCommit, Sha256Digest};
 pub(crate) use runtime::{
     BaselineCandidateArgs, CompletionArgs, CompletionCheckpointArgs, CompletionReportArgs,
     DiagnosticArgs, ParityArgs, ProbeArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs,

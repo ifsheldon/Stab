@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::artifacts::{
-    valid_sha256, validate_baseline_report_path, validate_binding, validate_compare_report_path,
+    validate_baseline_report_path, validate_binding, validate_compare_report_path,
     validate_profile_receipt_path, validate_revision,
 };
 use super::{
@@ -21,7 +21,7 @@ pub(super) fn validate_structure(ledger: &FocusedEvidenceLedger) -> Result<(), B
         ));
     }
     validate_revision(&ledger.source_revision, &mut issues);
-    if !valid_sha256(&ledger.predecessor_registry_sha256) {
+    if !crate::qualification::Sha256Digest::is_valid_str(&ledger.predecessor_registry_sha256) {
         issues.push("predecessor_registry_sha256 is not a lowercase SHA-256".to_string());
     }
     validate_binding("baseline_report", &ledger.baseline_report, &mut issues);

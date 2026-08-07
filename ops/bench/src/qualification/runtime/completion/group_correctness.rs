@@ -1,3 +1,4 @@
+use super::super::identity::Sha256Digest;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -116,12 +117,5 @@ fn valid_evidence(
             evidence.preflight_sha256.as_deref(),
         ]
         .into_iter()
-        .all(|digest| digest.is_some_and(valid_sha256))
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        .all(|digest| digest.is_some_and(Sha256Digest::is_valid_str))
 }

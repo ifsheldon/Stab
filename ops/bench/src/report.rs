@@ -59,21 +59,13 @@ pub(crate) struct StabMetadata {
 
 impl StabMetadata {
     pub(crate) fn has_bound_executable(&self) -> bool {
-        self.executable_sha256.len() == 64
-            && self
-                .executable_sha256
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        crate::qualification::Sha256Digest::is_valid_str(&self.executable_sha256)
     }
 }
 
 impl MachineMetadata {
     pub(crate) fn has_private_host_fingerprint(&self) -> bool {
-        self.host_fingerprint.len() == 64
-            && self
-                .host_fingerprint
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        crate::qualification::Sha256Digest::is_valid_str(&self.host_fingerprint)
     }
 }
 

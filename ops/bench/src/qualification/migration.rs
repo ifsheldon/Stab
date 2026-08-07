@@ -361,11 +361,7 @@ fn require_memory_baseline(root: &RepoRoot, expected_id: &str) -> Result<(), Ben
 }
 
 fn validate_digest(name: &str, value: &str) -> Result<(), BenchError> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
+    if super::Sha256Digest::is_valid_str(value) {
         Ok(())
     } else {
         qualification_error(format!(
@@ -375,11 +371,7 @@ fn validate_digest(name: &str, value: &str) -> Result<(), BenchError> {
 }
 
 fn validate_revision(name: &str, value: &str) -> Result<(), BenchError> {
-    if value.len() == 40
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
+    if super::GitCommit::is_canonical_str(value) {
         Ok(())
     } else {
         qualification_error(format!("threshold-migration {name} is not a Git revision"))

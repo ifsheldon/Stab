@@ -6,6 +6,7 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use super::group::ParityEligibility;
+use super::identity::Sha256Digest;
 use super::run::ClaimClass;
 use super::statistics::GateOutcome;
 use super::{artifact::DirectQualificationArtifactPath, artifact::RepositoryBinding};
@@ -309,7 +310,7 @@ fn validate_policy(
             expected: PARITY_POLICY_SCHEMA_VERSION,
         });
     }
-    if !valid_sha256(&policy.performance_inventory_sha256) {
+    if !Sha256Digest::is_valid_str(&policy.performance_inventory_sha256) {
         return Err(ParityError::InvalidInventoryDigest);
     }
     let contract_by_id = contracts
@@ -373,13 +374,6 @@ fn parse_ratio(field: &'static str, value: &str) -> Result<f64, ParityError> {
             value: value.to_string(),
         })
     }
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Error)]

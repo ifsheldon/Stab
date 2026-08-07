@@ -174,10 +174,7 @@ pub(in crate::qualification::runtime) fn checked_pauli_iter_rejection(
 ) -> Result<(), InvocationError> {
     let (expected_status, expected_stderr) =
         pauli_iter_rejection_expectation(implementation, kind, class);
-    if output.status != Some(expected_status)
-        || !output.stdout.is_empty()
-        || output.stderr != expected_stderr.as_bytes()
-    {
+    if !super::request::matches_rejection(output, expected_status, expected_stderr) {
         return Err(InvocationError::PauliIterWorkRejection {
             implementation,
             workload: kind.workload(),

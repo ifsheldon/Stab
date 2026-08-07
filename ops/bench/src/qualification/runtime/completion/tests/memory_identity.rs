@@ -3,7 +3,6 @@ use crate::qualification::runtime::{
     git::RepositoryState,
     host::HostEvidence,
     probe::{AdapterProbeReceipt, DemMemoryReceiptEvidence},
-    protocol::Sha256Digest,
 };
 
 fn memory_receipt_evidence(shared: &RollupReplayEvidence) -> DemMemoryReceiptEvidence {

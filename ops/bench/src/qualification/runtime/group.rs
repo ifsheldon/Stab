@@ -591,7 +591,7 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
     if file.timing_boundary != RAW_WORK_TIMING_BOUNDARY {
         return Err(GroupError::TimingBoundary);
     }
-    if !valid_sha256(expected_inventory_sha256)
+    if !Sha256Digest::is_valid_str(expected_inventory_sha256)
         || file.performance_inventory_sha256 != expected_inventory_sha256
     {
         return Err(GroupError::Inventory {
@@ -765,13 +765,6 @@ fn valid_case_id(value: &str) -> bool {
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':' | b'/')
         })
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Error)]

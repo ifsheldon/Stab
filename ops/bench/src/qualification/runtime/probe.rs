@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -7,7 +6,8 @@ use std::time::Duration;
 use super::adapter::prepare_adapter;
 use super::artifact::RepositoryBinding;
 use super::host::HostGuard;
-use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
+use super::invocation::request::WorkerRequestSpec;
+use super::process::{ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
     Sha256Digest, parse_worker_json_lines,
@@ -52,7 +52,7 @@ const DEM_PARSE_PROBE_ID: &str = "pq2-dem-parse-adapter-smoke";
 const DEM_CANONICAL_PRINT_PROBE_ID: &str = "pq2-dem-canonical-print-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
-const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
+const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_PROBE_WORK_ITEMS: u64 = 4_096;
 const DEFAULT_GATE_HASH_WORK_ITEMS: u64 = 5_248;
 const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
@@ -321,15 +321,12 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     let expected_work_count = expected_work_count(&args)?;
     let identity = worker::current_identity()?;
     let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
-    let request = ProcessRequest {
-        program: current_exe,
-        args: worker_arguments(&args),
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: probe_limits(),
-    };
+    let request = protocol_smoke_spec(&args).process_request(
+        Implementation::Stab,
+        current_exe,
+        root.path.clone(),
+        None,
+    );
     let output = checked_process(run_bounded_process(&request)?, "Stab worker")?;
     let rows = parse_worker_json_lines(&output.stdout)?;
     ProtocolExpectation {
@@ -464,44 +461,34 @@ fn run_adapter_probe(
         super::stab_build::StabWorkerExecutable::prepare(root, &repository.commit, &toolchain)?;
     let worker_identity = private_worker.identity().clone();
     let worker_program = private_worker.program();
-    let mut common_arguments = vec![
-        OsString::from("--workload"),
-        OsString::from(workload),
-        OsString::from("--measurement-id"),
-        OsString::from(measurement),
-        OsString::from("--iterations"),
-        OsString::from(args.iterations.get().to_string()),
-        OsString::from("--work-items"),
-        OsString::from(probe_work_items(&args).to_string()),
-        OsString::from("--evidence-mode"),
-        OsString::from(args.evidence_mode.as_str()),
-    ];
-    clifford_string::append_descriptor_arguments(
-        args.group,
+    let mut spec = WorkerRequestSpec::new(
+        workload,
+        measurement,
+        args.iterations.get(),
         probe_work_items(&args),
-        &mut common_arguments,
-    )?;
-    dem_model::append_default_family_arguments(args.group, &mut common_arguments);
-    let adapter_request = ProcessRequest {
-        program: adapter.path.clone(),
-        args: common_arguments.clone(),
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: probe_limits(),
-    };
-    let mut worker_arguments = vec![OsString::from("qualification-worker")];
-    worker_arguments.extend(common_arguments);
-    let worker_request = ProcessRequest {
-        program: worker_program.clone(),
-        args: worker_arguments,
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: probe_environment().into(),
-        affinity_cpu: None,
-        limits: probe_limits(),
-    };
+        args.evidence_mode.into(),
+        PROBE_TIMEOUT,
+    );
+    if let Some(descriptor) =
+        clifford_string::canonical_descriptor(args.group, probe_work_items(&args))
+    {
+        spec = spec.input_descriptor_hex(descriptor);
+    }
+    if let Some(family) = dem_model::default_family(args.group) {
+        spec = spec.input_family(family);
+    }
+    let adapter_request = spec.process_request(
+        Implementation::Stim,
+        adapter.path.clone(),
+        root.path.clone(),
+        None,
+    );
+    let worker_request = spec.process_request(
+        Implementation::Stab,
+        worker_program.clone(),
+        root.path.clone(),
+        None,
+    );
 
     let stim_output = checked_process(run_bounded_process(&adapter_request)?, "Stim adapter")?;
     let stab_output = checked_process(run_bounded_process(&worker_request)?, "Stab worker")?;
@@ -642,20 +629,15 @@ fn run_adapter_probe(
     })
 }
 
-fn worker_arguments(args: &ProbeArgs) -> Vec<OsString> {
-    vec![
-        OsString::from("qualification-worker"),
-        OsString::from("--workload"),
-        OsString::from("protocol-smoke"),
-        OsString::from("--measurement-id"),
-        OsString::from("main"),
-        OsString::from("--iterations"),
-        OsString::from(args.iterations.get().to_string()),
-        OsString::from("--work-items"),
-        OsString::from(probe_work_items(args).to_string()),
-        OsString::from("--evidence-mode"),
-        OsString::from(args.evidence_mode.as_str()),
-    ]
+fn protocol_smoke_spec(args: &ProbeArgs) -> WorkerRequestSpec {
+    WorkerRequestSpec::new(
+        "protocol-smoke",
+        "main",
+        args.iterations.get(),
+        probe_work_items(args),
+        args.evidence_mode.into(),
+        PROBE_TIMEOUT,
+    )
 }
 
 fn expected_work_count(args: &ProbeArgs) -> Result<u64, ProbeError> {
@@ -818,24 +800,6 @@ fn checked_process(output: ProcessResult, name: &'static str) -> Result<ProcessR
     Ok(output)
 }
 
-fn probe_limits() -> ProcessLimits {
-    ProcessLimits {
-        stdin_bytes: 0,
-        stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-        stderr: (64 << 10).into(),
-        regular_file_bytes: None,
-        timeout: Duration::from_secs(30),
-    }
-}
-
-fn probe_environment() -> Vec<(OsString, OsString)> {
-    vec![
-        (OsString::from("LANG"), OsString::from("C")),
-        (OsString::from("LC_ALL"), OsString::from("C")),
-        (OsString::from("TZ"), OsString::from("UTC")),
-    ]
-}
-
 fn display_rss(value: Option<u64>) -> String {
     value.map_or_else(|| "unobserved".to_string(), |value| value.to_string())
 }
@@ -843,15 +807,6 @@ fn display_rss(value: Option<u64>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn probe_limits_bound_every_protocol_stream() {
-        let limits = probe_limits();
-        assert_eq!(limits.stdin_bytes, 0);
-        assert_eq!(limits.stdout, PROTOCOL_OUTPUT_LIMIT.into());
-        assert_eq!(limits.stderr, (64 << 10).into());
-        assert!(limits.timeout > Duration::ZERO);
-    }
 
     #[test]
     fn probe_ids_are_valid_protocol_ids() {

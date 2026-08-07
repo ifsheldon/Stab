@@ -257,7 +257,7 @@ pub(super) fn validate_positive_finite(values: &[f64]) -> Result<(), StatisticsE
     }
 }
 
-pub(super) fn median(values: &[f64]) -> Result<f64, StatisticsError> {
+pub(crate) fn median(values: &[f64]) -> Result<f64, StatisticsError> {
     if values.is_empty() {
         return Err(StatisticsError::MissingSamples);
     }

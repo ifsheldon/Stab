@@ -323,6 +323,25 @@ fn report_replay_rejects_refingerprinted_preflight_from_another_worker_pair() {
 }
 
 #[test]
+fn registered_group_table_is_unique_and_derives_the_count() {
+    let mut group_ids = BTreeSet::new();
+    let mut identities = BTreeSet::new();
+    for registered in &REGISTERED_GROUPS {
+        assert!(
+            group_ids.insert(registered.group_id),
+            "duplicate registered group id {}",
+            registered.group_id
+        );
+        assert!(identities.insert((
+            registered.group_id,
+            registered.workload_id,
+            registered.measurement_id
+        )));
+    }
+    assert_eq!(registered_group_count(), REGISTERED_GROUPS.len());
+}
+
+#[test]
 fn parent_rejects_semantic_work_overflow_before_invocation() {
     let maximum = NonZeroU64::new(u64::MAX).expect("positive maximum");
     let two = NonZeroU64::new(2).expect("positive two");

@@ -3,10 +3,11 @@ use std::path::{Component, Path};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::artifacts::{read_bounded, valid_revision, verify_binding};
+use super::artifacts::{read_bounded, verify_binding};
 use super::{ArtifactBinding, focused_error};
 use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
+use crate::qualification::{GitCommit, Sha256Digest};
 use crate::report::CompareReport;
 use crate::root::RepoRoot;
 
@@ -121,7 +122,7 @@ impl ProfileReceiptIdentity {
             )));
         }
         validate_artifact_binding("focused report", &self.focused_report, Some("compare.json"))?;
-        if !valid_revision(&self.source_revision) {
+        if !GitCommit::is_canonical_str(&self.source_revision) {
             return Err(profile_error(
                 "source revision must be a lowercase 40-byte Git object id",
             ));
@@ -565,11 +566,7 @@ fn validate_target_benchmark_path(
 }
 
 fn validate_sha256(label: &str, value: &str) -> Result<(), BenchError> {
-    if value.len() != 64
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
+    if !Sha256Digest::is_valid_str(value) {
         return Err(profile_error(format!(
             "{label} must be a lowercase 64-byte SHA-256"
         )));

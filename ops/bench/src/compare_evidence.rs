@@ -79,7 +79,7 @@ pub(crate) fn aggregate_measurement_runs(
         }) {
             return Err(inconsistent_measurement_runs(row_id));
         }
-        let mut seconds = runs
+        let seconds = runs
             .iter()
             .map(|run| {
                 run.get(index)
@@ -88,7 +88,6 @@ pub(crate) fn aggregate_measurement_runs(
             })
             .collect::<Result<Vec<_>, _>>()?;
         let variance_seconds = variance_seconds(&seconds);
-        seconds.sort_by(f64::total_cmp);
         if runs.iter().any(|run| {
             run.get(index).is_none_or(|measurement| {
                 measurement.observations != first_measurement.observations
@@ -98,10 +97,8 @@ pub(crate) fn aggregate_measurement_runs(
         }
         measurements.push(Measurement {
             name: name.clone(),
-            seconds: seconds
-                .get(seconds.len() / 2)
-                .copied()
-                .unwrap_or(first_measurement.seconds),
+            seconds: crate::qualification::exact_median(&seconds)
+                .map_err(|_| inconsistent_measurement_runs(row_id))?,
             variance_seconds,
             allocation: aggregate_allocations(&runs, index),
             resident_bytes: aggregate_resident_bytes(&runs, index),

@@ -164,12 +164,7 @@ fn validate_report_shape(
         || report.command.suite_timeout_seconds != super::SUITE_TIMEOUT.as_secs()
         || !output_matches
         || report.repository.commit_before != report.repository.commit_after
-        || report.repository.commit_before.len() != 40
-        || !report
-            .repository
-            .commit_before
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
+        || !crate::qualification::GitCommit::is_canonical_str(&report.repository.commit_before)
         || report.repository.local_modifications_before
         || report.repository.local_modifications_after
         || !report.host.verified && !report.command.allow_unverified_host

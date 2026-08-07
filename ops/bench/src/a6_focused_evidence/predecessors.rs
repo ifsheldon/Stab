@@ -6,7 +6,6 @@ use std::time::Duration;
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 
-use super::artifacts::valid_revision;
 use super::focused_error;
 use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
@@ -14,6 +13,7 @@ use crate::process::{
     OutputPolicy, ProcessEnvironment, ProcessLimits, ProcessRequest, ProcessResult,
     run_bounded_process,
 };
+use crate::qualification::{GitCommit, Sha256Digest};
 use crate::root::RepoRoot;
 use crate::source_file::read_repo_regular_file_bounded;
 
@@ -182,7 +182,7 @@ impl PredecessorRegistry {
                     record.instrumentation_backport_commit
                 ));
             }
-            if !valid_sha256(&record.patch_sha256) {
+            if !Sha256Digest::is_valid_str(&record.patch_sha256) {
                 issues.push(format!(
                     "backport {} has invalid patch_sha256 {:?}",
                     record.instrumentation_backport_commit, record.patch_sha256
@@ -245,7 +245,7 @@ pub(super) fn read_and_validate(
     source_revision: &str,
     expected_phases: &BTreeSet<PhaseKey>,
 ) -> Result<ValidatedPredecessorRegistry, BenchError> {
-    if !valid_revision(source_revision) {
+    if !GitCommit::is_canonical_str(source_revision) {
         return Err(focused_error(format!(
             "predecessor registry source revision {source_revision:?} is not a lowercase 40-byte Git object id"
         )));
@@ -436,7 +436,10 @@ fn commit_with_parents(root: &RepoRoot, revision: &str) -> Result<Vec<String>, B
         )));
     }
     let parents = words.map(str::to_string).collect::<Vec<_>>();
-    if parents.iter().any(|parent| !valid_revision(parent)) {
+    if parents
+        .iter()
+        .any(|parent| !GitCommit::is_canonical_str(parent))
+    {
         return Err(focused_error(format!(
             "Git rev-list returned an invalid parent for {revision}"
         )));
@@ -571,7 +574,7 @@ fn one_revision(bytes: &[u8], label: &str) -> Result<String, BenchError> {
     let revision = lines
         .next()
         .ok_or_else(|| focused_error(format!("{label} omitted its revision")))?;
-    if lines.next().is_some() || !valid_revision(revision) {
+    if lines.next().is_some() || !GitCommit::is_canonical_str(revision) {
         return Err(focused_error(format!(
             "{label} returned invalid revision output {text:?}"
         )));
@@ -580,7 +583,7 @@ fn one_revision(bytes: &[u8], label: &str) -> Result<String, BenchError> {
 }
 
 fn validate_revision_field(label: &str, value: &str, issues: &mut Vec<String>) {
-    if !valid_revision(value) {
+    if !GitCommit::is_canonical_str(value) {
         issues.push(format!(
             "{label}={value:?} is not a lowercase 40-byte Git object id"
         ));
@@ -606,13 +609,6 @@ fn validate_phase(phase: &PhaseKey, issues: &mut Vec<String>) {
             phase.display()
         ));
     }
-}
-
-fn valid_sha256(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn finish_validation(issues: Vec<String>) -> Result<(), BenchError> {

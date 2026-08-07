@@ -112,7 +112,7 @@ impl SealedExecutable {
             role,
             descriptor,
             bytes: copied,
-            sha256: hex_digest(&hasher.finalize()),
+            sha256: super::identity::hex_lower(&hasher.finalize()),
         })
     }
 
@@ -165,24 +165,7 @@ fn digest_descriptor(file: &std::fs::File) -> Result<(u64, String), ExecutableEr
         let chunk = buffer.get(..count).ok_or(ExecutableError::SizeOverflow)?;
         hasher.update(chunk);
     }
-    Ok((offset, hex_digest(&hasher.finalize())))
-}
-
-fn hex_digest(bytes: &[u8]) -> String {
-    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
-    for byte in bytes {
-        output.push(hex_digit(byte >> 4));
-        output.push(hex_digit(byte & 0x0f));
-    }
-    output
-}
-
-fn hex_digit(value: u8) -> char {
-    char::from(if value < 10 {
-        b'0' + value
-    } else {
-        b'a' + (value - 10)
-    })
+    Ok((offset, super::identity::hex_lower(&hasher.finalize())))
 }
 
 #[derive(Debug, Error)]

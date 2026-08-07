@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
 use crate::root::RepoRoot;
@@ -733,22 +732,7 @@ fn parse_nonnegative_finite(field: &'static str, value: &str) -> Result<f64, Hos
     }
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut output = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
-        output.push(hex_digit(byte >> 4));
-        output.push(hex_digit(byte & 0x0f));
-    }
-    output
-}
-
-fn hex_digit(value: u8) -> char {
-    char::from(if value < 10 {
-        b'0' + value
-    } else {
-        b'a' + (value - 10)
-    })
-}
+use super::identity::sha256_hex;
 
 fn ensure_linux() -> Result<(), HostError> {
     if cfg!(target_os = "linux") {

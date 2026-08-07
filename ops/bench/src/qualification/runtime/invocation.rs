@@ -1,11 +1,10 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use super::adapter::{AdapterExecutable, prepare_adapter};
-use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
+use super::process::{ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, ProtocolExpectation, SemanticDigest, Sha256Digest,
     WorkerMeasurement, parse_worker_json_lines,
@@ -19,6 +18,7 @@ mod diagnostic;
 mod error;
 pub(super) mod pauli_iter;
 mod preflight;
+pub(in crate::qualification::runtime) mod request;
 
 pub(super) use diagnostic::{
     DiagnosticInvocationRequest, DiagnosticWorkerIdentityEvidence, PreparedDiagnosticWorker,
@@ -28,8 +28,8 @@ pub(crate) use error::InvocationError;
 use preflight::worker_contract_preflight_digest;
 pub(crate) use preflight::{WorkerContractIdentityEvidence, WorkerContractPreflightEvidence};
 use preflight::{WorkerContractProbeEvidence, accepted_probe, rejected_probe};
+use request::{WorkerRequestSpec, matches_rejection};
 
-const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const IDENTITY_PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const CAP_REJECTION_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS: &str = "1000001";
@@ -71,105 +71,177 @@ pub(super) const DEM_PARSE_GROUP_ID: &str = "PERFQ-M10-DEM-PARSE-CONTRACT";
 pub(super) const DEM_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M10-DEM-PRINT-CONTRACT";
 pub(super) use clifford_string::{CLIFFORD_IDENTITY_GROUP_ID, CLIFFORD_NON_IDENTITY_GROUP_ID};
 
+/// One registered runtime group: the exact `(group, workload, measurement)`
+/// identity this parent can invoke. `registered_group_count` is derived from
+/// this table, so adding a row here is the single registration step.
+struct RegisteredGroup {
+    group_id: &'static str,
+    workload_id: &'static str,
+    measurement_id: &'static str,
+}
+
+const REGISTERED_GROUPS: [RegisteredGroup; 28] = [
+    RegisteredGroup {
+        group_id: PQ1_GROUP_ID,
+        workload_id: "protocol-smoke",
+        measurement_id: "main",
+    },
+    RegisteredGroup {
+        group_id: CIRCUIT_PARSE_GROUP_ID,
+        workload_id: "circuit-parse",
+        measurement_id: "parse",
+    },
+    RegisteredGroup {
+        group_id: CIRCUIT_CANONICAL_PRINT_GROUP_ID,
+        workload_id: "circuit-canonical-print",
+        measurement_id: "serialize",
+    },
+    RegisteredGroup {
+        group_id: A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID,
+        workload_id: "circuit-model-fingerprint",
+        measurement_id: "fingerprint",
+    },
+    RegisteredGroup {
+        group_id: A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID,
+        workload_id: "sampling-request-fingerprint",
+        measurement_id: "fingerprint-inclusive",
+    },
+    RegisteredGroup {
+        group_id: A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID,
+        workload_id: "sampling-request-estimate",
+        measurement_id: "estimate",
+    },
+    RegisteredGroup {
+        group_id: A2_SAMPLER_COMPILE_GROUP_ID,
+        workload_id: "sampler-compile",
+        measurement_id: "compile-and-release",
+    },
+    RegisteredGroup {
+        group_id: A7_EXACT_ML_COMPILE_GROUP_ID,
+        workload_id: "exact-ml-compile",
+        measurement_id: "compile-and-release",
+    },
+    RegisteredGroup {
+        group_id: A7_EXACT_ML_REUSED_DECODE_GROUP_ID,
+        workload_id: "exact-ml-reused-decode",
+        measurement_id: "decode-batch",
+    },
+    RegisteredGroup {
+        group_id: A7_PIPELINE_GROUP_ID,
+        workload_id: "sample-detect-decode-pipeline",
+        measurement_id: "sample-detect-decode",
+    },
+    RegisteredGroup {
+        group_id: A8_EXTERNAL_NOISE_PASS_GROUP_ID,
+        workload_id: "external-noise-pass",
+        measurement_id: "run-and-release",
+    },
+    RegisteredGroup {
+        group_id: GATE_NAME_HASH_GROUP_ID,
+        workload_id: "gate-name-hash",
+        measurement_id: "hash-all-names",
+    },
+    RegisteredGroup {
+        group_id: SIMD_WORD_POPCOUNT_GROUP_ID,
+        workload_id: "simd-word-popcount",
+        measurement_id: "toggle-popcount",
+    },
+    RegisteredGroup {
+        group_id: SIMD_BITS_XOR_GROUP_ID,
+        workload_id: "simd-bits-xor",
+        measurement_id: "xor-complete-vector",
+    },
+    RegisteredGroup {
+        group_id: SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
+        workload_id: "simd-bits-not-zero-early",
+        measurement_id: "not-zero",
+    },
+    RegisteredGroup {
+        group_id: SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID,
+        workload_id: "simd-bits-not-zero-zero",
+        measurement_id: "not-zero",
+    },
+    RegisteredGroup {
+        group_id: SIMD_BITS_NOT_ZERO_LATE_GROUP_ID,
+        workload_id: "simd-bits-not-zero-late",
+        measurement_id: "not-zero",
+    },
+    RegisteredGroup {
+        group_id: SPARSE_XOR_ROW_GROUP_ID,
+        workload_id: "sparse-xor-row",
+        measurement_id: "row-xor",
+    },
+    RegisteredGroup {
+        group_id: SPARSE_XOR_ITEM_GROUP_ID,
+        workload_id: "sparse-xor-item",
+        measurement_id: "xor-item",
+    },
+    RegisteredGroup {
+        group_id: BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID,
+        workload_id: "bit-matrix-transpose-in-place",
+        measurement_id: "in-place-transpose",
+    },
+    RegisteredGroup {
+        group_id: BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID,
+        workload_id: "bit-matrix-transpose-allocating",
+        measurement_id: "allocating-transpose",
+    },
+    RegisteredGroup {
+        group_id: PAULI_STRING_MULTIPLY_GROUP_ID,
+        workload_id: "pauli-string-right-multiply",
+        measurement_id: "right-multiply-in-place",
+    },
+    RegisteredGroup {
+        group_id: PAULI_STRING_ITER_RANGE_GROUP_ID,
+        workload_id: "pauli-string-iter-range",
+        measurement_id: "construct-and-iterate-borrowed",
+    },
+    RegisteredGroup {
+        group_id: PAULI_STRING_ITER_SINGLETON_GROUP_ID,
+        workload_id: "pauli-string-iter-singleton",
+        measurement_id: "construct-and-iterate-borrowed",
+    },
+    RegisteredGroup {
+        group_id: CLIFFORD_IDENTITY_GROUP_ID,
+        workload_id: "clifford-string-right-multiply-identity",
+        measurement_id: "right-multiply-identity",
+    },
+    RegisteredGroup {
+        group_id: CLIFFORD_NON_IDENTITY_GROUP_ID,
+        workload_id: "clifford-string-right-multiply-non-identity",
+        measurement_id: "right-multiply-non-identity",
+    },
+    RegisteredGroup {
+        group_id: DEM_PARSE_GROUP_ID,
+        workload_id: "dem-parse",
+        measurement_id: "parse",
+    },
+    RegisteredGroup {
+        group_id: DEM_CANONICAL_PRINT_GROUP_ID,
+        workload_id: "dem-canonical-print",
+        measurement_id: "serialize",
+    },
+];
+
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
-    let identity = (
-        contract.id.to_string(),
-        contract.workload_id.to_string(),
-        contract.measurement_ids.first().map(ToString::to_string),
-        contract.measurement_ids.len(),
-    );
-    matches!(
-        identity,
-        (group, workload, Some(measurement), 1)
-            if (group == PQ1_GROUP_ID
-                && workload == "protocol-smoke"
-                && measurement == "main")
-                || (group == CIRCUIT_PARSE_GROUP_ID
-                    && workload == "circuit-parse"
-                    && measurement == "parse")
-                || (group == CIRCUIT_CANONICAL_PRINT_GROUP_ID
-                    && workload == "circuit-canonical-print"
-                    && measurement == "serialize")
-                || (group == A2_CIRCUIT_MODEL_FINGERPRINT_GROUP_ID
-                    && workload == "circuit-model-fingerprint"
-                    && measurement == "fingerprint")
-                || (group == A2_SAMPLING_REQUEST_FINGERPRINT_GROUP_ID
-                    && workload == "sampling-request-fingerprint"
-                    && measurement == "fingerprint-inclusive")
-                || (group == A2_SAMPLING_REQUEST_ESTIMATE_GROUP_ID
-                    && workload == "sampling-request-estimate"
-                    && measurement == "estimate")
-                || (group == A2_SAMPLER_COMPILE_GROUP_ID
-                    && workload == "sampler-compile"
-                    && measurement == "compile-and-release")
-                || (group == A7_EXACT_ML_COMPILE_GROUP_ID
-                    && workload == "exact-ml-compile"
-                    && measurement == "compile-and-release")
-                || (group == A7_EXACT_ML_REUSED_DECODE_GROUP_ID
-                    && workload == "exact-ml-reused-decode"
-                    && measurement == "decode-batch")
-                || (group == A7_PIPELINE_GROUP_ID
-                    && workload == "sample-detect-decode-pipeline"
-                    && measurement == "sample-detect-decode")
-                || (group == A8_EXTERNAL_NOISE_PASS_GROUP_ID
-                    && workload == "external-noise-pass"
-                    && measurement == "run-and-release")
-                || (group == GATE_NAME_HASH_GROUP_ID
-                    && workload == "gate-name-hash"
-                    && measurement == "hash-all-names")
-                || (group == SIMD_WORD_POPCOUNT_GROUP_ID
-                    && workload == "simd-word-popcount"
-                    && measurement == "toggle-popcount")
-                || (group == SIMD_BITS_XOR_GROUP_ID
-                    && workload == "simd-bits-xor"
-                    && measurement == "xor-complete-vector")
-                || (group == SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID
-                    && workload == "simd-bits-not-zero-early"
-                    && measurement == "not-zero")
-                || (group == SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID
-                    && workload == "simd-bits-not-zero-zero"
-                    && measurement == "not-zero")
-                || (group == SIMD_BITS_NOT_ZERO_LATE_GROUP_ID
-                    && workload == "simd-bits-not-zero-late"
-                    && measurement == "not-zero")
-                || (group == SPARSE_XOR_ROW_GROUP_ID
-                    && workload == "sparse-xor-row"
-                    && measurement == "row-xor")
-                || (group == SPARSE_XOR_ITEM_GROUP_ID
-                    && workload == "sparse-xor-item"
-                    && measurement == "xor-item")
-                || (group == BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID
-                    && workload == "bit-matrix-transpose-in-place"
-                    && measurement == "in-place-transpose")
-                || (group == BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID
-                    && workload == "bit-matrix-transpose-allocating"
-                    && measurement == "allocating-transpose")
-                || (group == PAULI_STRING_MULTIPLY_GROUP_ID
-                    && workload == "pauli-string-right-multiply"
-                    && measurement == "right-multiply-in-place")
-                || (group == PAULI_STRING_ITER_RANGE_GROUP_ID
-                    && workload == "pauli-string-iter-range"
-                    && measurement == "construct-and-iterate-borrowed")
-                || (group == PAULI_STRING_ITER_SINGLETON_GROUP_ID
-                    && workload == "pauli-string-iter-singleton"
-                    && measurement == "construct-and-iterate-borrowed")
-                || (group == CLIFFORD_IDENTITY_GROUP_ID
-                    && workload == "clifford-string-right-multiply-identity"
-                    && measurement == "right-multiply-identity")
-                || (group == CLIFFORD_NON_IDENTITY_GROUP_ID
-                    && workload == "clifford-string-right-multiply-non-identity"
-                    && measurement == "right-multiply-non-identity")
-                || (group == DEM_PARSE_GROUP_ID
-                    && workload == "dem-parse"
-                    && measurement == "parse")
-                || (group == DEM_CANONICAL_PRINT_GROUP_ID
-                    && workload == "dem-canonical-print"
-                    && measurement == "serialize")
-    )
+    if contract.measurement_ids.len() != 1 {
+        return false;
+    }
+    let Some(measurement) = contract.measurement_ids.first() else {
+        return false;
+    };
+    let group = contract.id.to_string();
+    let workload = contract.workload_id.to_string();
+    let measurement = measurement.to_string();
+    REGISTERED_GROUPS.iter().any(|registered| {
+        group == registered.group_id
+            && workload == registered.workload_id
+            && measurement == registered.measurement_id
+    })
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    28
+    REGISTERED_GROUPS.len()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -257,52 +329,42 @@ pub(super) struct InvocationRequest<'a> {
     pub(super) timeout: Duration,
 }
 
-fn protocol_arguments(
+fn request_spec(
     group: &super::group::GroupContract,
     measurement_id: &super::protocol::ProtocolId,
     evidence_mode: EvidenceMode,
     iterations: NonZeroU64,
     scale: &super::group::ScaleContract,
     expected_cpu: Option<u32>,
-) -> Result<Vec<OsString>, InvocationError> {
-    let mut arguments = vec![
-        OsString::from("--workload"),
-        OsString::from(group.workload_id.to_string()),
-        OsString::from("--measurement-id"),
-        OsString::from(measurement_id.to_string()),
-        OsString::from("--iterations"),
-        OsString::from(iterations.get().to_string()),
-        OsString::from("--work-items"),
-        OsString::from(scale.work_items.get().to_string()),
-        OsString::from("--evidence-mode"),
-        OsString::from(match evidence_mode {
-            EvidenceMode::Contract => "contract",
-            EvidenceMode::Timing => "timing",
-            EvidenceMode::Memory => "memory",
-        }),
-        OsString::from("--start-barrier"),
-        OsString::from("true"),
-    ];
+    timeout: Duration,
+) -> Result<WorkerRequestSpec, InvocationError> {
+    let mut spec = WorkerRequestSpec::new(
+        group.workload_id.to_string(),
+        measurement_id.to_string(),
+        iterations.get(),
+        scale.work_items.get(),
+        evidence_mode,
+        timeout,
+    )
+    .start_barrier(true)
+    .release_barrier();
     if let Some(expected_cpu) = expected_cpu {
-        arguments.push(OsString::from("--expected-cpu"));
-        arguments.push(OsString::from(expected_cpu.to_string()));
+        spec = spec.expected_cpu(expected_cpu);
     }
     if let Some(descriptor) = clifford_string::runtime_descriptor(
         &group.id.to_string(),
         &group.workload_id.to_string(),
         scale.work_items.get(),
     )? {
-        arguments.push(OsString::from("--input-descriptor-hex"));
-        arguments.push(OsString::from(descriptor));
+        spec = spec.input_descriptor_hex(descriptor);
     }
     if matches!(
         group.id.to_string().as_str(),
         DEM_PARSE_GROUP_ID | DEM_CANONICAL_PRINT_GROUP_ID
     ) {
-        arguments.push(OsString::from("--input-family"));
-        arguments.push(OsString::from(scale.family_id.to_string()));
+        spec = spec.input_family(scale.family_id.to_string());
     }
-    Ok(arguments)
+    Ok(spec)
 }
 
 impl PreparedWorkers {
@@ -438,13 +500,14 @@ impl PreparedWorkers {
             .map(|cpu| u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu)))
             .transpose()?;
         let expected_work_count = checked_work_count(iterations, scale.work_items)?;
-        let mut arguments = protocol_arguments(
+        let spec = request_spec(
             group,
             measurement_id,
             evidence_mode,
             iterations,
             scale,
             expected_cpu,
+            timeout,
         )?;
         let (program, source_digest, build_fingerprint) = match implementation {
             Implementation::Stim => (
@@ -452,30 +515,18 @@ impl PreparedWorkers {
                 self.adapter.source_digest.clone(),
                 self.adapter.build_fingerprint.clone(),
             ),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                (
-                    self.worker.program(),
-                    self.worker.identity().source_digest.clone(),
-                    self.worker.identity().build_fingerprint.clone(),
-                )
-            }
+            Implementation::Stab => (
+                self.worker.program(),
+                self.worker.identity().source_digest.clone(),
+                self.worker.identity().build_fingerprint.clone(),
+            ),
         };
-        let process = run_bounded_process(&ProcessRequest {
+        let process = run_bounded_process(&spec.process_request(
+            implementation,
             program,
-            args: arguments,
-            stdin: vec![b'\n'],
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
+            self.root.clone(),
             affinity_cpu,
-            limits: ProcessLimits {
-                stdin_bytes: 1,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout,
-            },
-        })?;
+        ))?;
         let process = checked_process(process, implementation)?;
         let rows = parse_worker_json_lines(&process.stdout)?;
         ProtocolExpectation {
@@ -578,42 +629,13 @@ impl PreparedWorkers {
         &self,
         implementation: Implementation,
     ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let mut arguments = vec![
-            OsString::from("--workload"),
-            OsString::from("circuit-parse"),
-            OsString::from("--measurement-id"),
-            OsString::from("parse"),
-            OsString::from("--iterations"),
-            OsString::from("1"),
-            OsString::from("--work-items"),
-            OsString::from(FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS),
-            OsString::from("--evidence-mode"),
-            OsString::from("contract"),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-        ];
-        let program = match implementation {
-            Implementation::Stim => self.adapter.path.clone(),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                self.worker.program()
-            }
-        };
-        let output = run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: Vec::new(),
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 0,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout: CAP_REJECTION_TIMEOUT,
-            },
-        })?;
+        let output = self.invoke_invalid_work(
+            implementation,
+            "circuit-parse",
+            "parse",
+            "1",
+            FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS,
+        )?;
         checked_cap_rejection(&output, implementation)?;
         rejected_probe(CIRCUIT_CAP_CASE_ID, implementation, &output)
     }
@@ -622,42 +644,13 @@ impl PreparedWorkers {
         &self,
         implementation: Implementation,
     ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let mut arguments = vec![
-            OsString::from("--workload"),
-            OsString::from("gate-name-hash"),
-            OsString::from("--measurement-id"),
-            OsString::from("hash-all-names"),
-            OsString::from("--iterations"),
-            OsString::from("1"),
-            OsString::from("--work-items"),
-            OsString::from(FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS),
-            OsString::from("--evidence-mode"),
-            OsString::from("contract"),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-        ];
-        let program = match implementation {
-            Implementation::Stim => self.adapter.path.clone(),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                self.worker.program()
-            }
-        };
-        let output = run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: Vec::new(),
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 0,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout: CAP_REJECTION_TIMEOUT,
-            },
-        })?;
+        let output = self.invoke_invalid_work(
+            implementation,
+            "gate-name-hash",
+            "hash-all-names",
+            "1",
+            FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS,
+        )?;
         checked_gate_partial_sweep_rejection(&output, implementation)?;
         rejected_probe(GATE_PARTIAL_SWEEP_CASE_ID, implementation, &output)
     }
@@ -694,43 +687,21 @@ impl PreparedWorkers {
         iterations: &'static str,
         work_items: &'static str,
     ) -> Result<ProcessResult, InvocationError> {
-        let mut arguments = vec![
-            OsString::from("--workload"),
-            OsString::from(workload),
-            OsString::from("--measurement-id"),
-            OsString::from(measurement),
-            OsString::from("--iterations"),
-            OsString::from(iterations),
-            OsString::from("--work-items"),
-            OsString::from(work_items),
-            OsString::from("--evidence-mode"),
-            OsString::from("contract"),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-        ];
+        let spec = WorkerRequestSpec::new(
+            workload,
+            measurement,
+            iterations,
+            work_items,
+            EvidenceMode::Contract,
+            CAP_REJECTION_TIMEOUT,
+        )
+        .start_barrier(true);
         let program = match implementation {
             Implementation::Stim => self.adapter.path.clone(),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                self.worker.program()
-            }
+            Implementation::Stab => self.worker.program(),
         };
-        run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: Vec::new(),
-            working_directory: self.root.clone(),
-            environment: worker_environment().into(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 0,
-                stdout: (PROTOCOL_OUTPUT_LIMIT).into(),
-                stderr: (64 << 10).into(),
-                regular_file_bytes: None,
-                timeout: CAP_REJECTION_TIMEOUT,
-            },
-        })
-        .map_err(InvocationError::Process)
+        run_bounded_process(&spec.process_request(implementation, program, self.root.clone(), None))
+            .map_err(InvocationError::Process)
     }
 
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
@@ -816,10 +787,7 @@ fn checked_cap_rejection(
     implementation: Implementation,
 ) -> Result<(), InvocationError> {
     let (expected_status, expected_stderr) = cap_rejection_expectation(implementation);
-    if output.status != Some(expected_status)
-        || !output.stdout.is_empty()
-        || output.stderr != expected_stderr.as_bytes()
-    {
+    if !matches_rejection(output, expected_status, expected_stderr) {
         return Err(InvocationError::CapRejection {
             implementation,
             status: output.status,
@@ -849,10 +817,7 @@ fn checked_gate_partial_sweep_rejection(
 ) -> Result<(), InvocationError> {
     let (expected_status, expected_stderr) =
         gate_partial_sweep_rejection_expectation(implementation);
-    if output.status != Some(expected_status)
-        || !output.stdout.is_empty()
-        || output.stderr != expected_stderr.as_bytes()
-    {
+    if !matches_rejection(output, expected_status, expected_stderr) {
         return Err(InvocationError::GatePartialSweepRejection {
             implementation,
             status: output.status,
@@ -881,10 +846,7 @@ fn checked_popcount_cap_rejection(
     implementation: Implementation,
 ) -> Result<(), InvocationError> {
     let (expected_status, expected_stderr) = popcount_cap_rejection_expectation(implementation);
-    if output.status != Some(expected_status)
-        || !output.stdout.is_empty()
-        || output.stderr != expected_stderr.as_bytes()
-    {
+    if !matches_rejection(output, expected_status, expected_stderr) {
         return Err(InvocationError::PopcountCapRejection {
             implementation,
             status: output.status,
@@ -906,14 +868,6 @@ fn popcount_cap_rejection_expectation(implementation: Implementation) -> (i32, &
             "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 268435712 bits exceeds the maximum 268435456\n",
         ),
     }
-}
-
-fn worker_environment() -> Vec<(OsString, OsString)> {
-    vec![
-        (OsString::from("LANG"), OsString::from("C")),
-        (OsString::from("LC_ALL"), OsString::from("C")),
-        (OsString::from("TZ"), OsString::from("UTC")),
-    ]
 }
 
 fn checked_work_count(

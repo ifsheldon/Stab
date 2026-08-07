@@ -7,7 +7,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 
 use self::artifacts::{
-    normalize_repo_relative_path, path_ends_with, valid_revision, validate_binding, verify_binding,
+    normalize_repo_relative_path, path_ends_with, validate_binding, verify_binding,
 };
 use self::policy::require_matrix_policies;
 use self::structure::validate_structure;
@@ -17,6 +17,7 @@ use crate::error::BenchError;
 use crate::manifest::{
     BenchmarkManifest, BenchmarkRow, Milestone, Runner, ThresholdClass, is_safe_benchmark_id,
 };
+use crate::qualification::GitCommit;
 use crate::report::{
     BaselineReport, BaselineRowResult, COMPARE_REPORT_SCHEMA_VERSION, COMPARE_TIMING_BOUNDARY,
     CompareReport, CompareRowResult, Measurement,
@@ -273,7 +274,7 @@ fn load_source_current_ledger(
                     object.relative_path.display()
                 ))
             })?;
-        if !valid_revision(&header.source_revision) {
+        if !GitCommit::is_canonical_str(&header.source_revision) {
             return Err(focused_error(format!(
                 "A6 evidence object {} has an invalid source revision",
                 object.relative_path.display()
@@ -871,7 +872,7 @@ fn require_predecessor_contract(
         || !predecessor.stab.has_bound_executable()
         || predecessor.stab.commit != identity.instrumentation_backport_commit
         || predecessor.stab.commit == matrix.stab.commit
-        || !valid_revision(&predecessor.stab.commit)
+        || !GitCommit::is_canonical_str(&predecessor.stab.commit)
         || predecessor.generated_unix_epoch_seconds > matrix.generated_unix_epoch_seconds
         || predecessor.machine != matrix.machine
         || predecessor.stim.expected_tag != STIM_TAG

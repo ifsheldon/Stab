@@ -137,8 +137,8 @@ impl AdapterBuildReceipt {
             && valid_comparator_sources(&self.comparator_sources)
             && self.build_fingerprint == build_fingerprint
             && self.binary_sha256 == binary_sha256
-            && valid_digest(&self.stim_library_sha256)
-            && valid_digest(binary_sha256)
+            && Sha256Digest::is_valid_str(&self.stim_library_sha256)
+            && Sha256Digest::is_valid_str(binary_sha256)
             && tool_matches("cmake", &self.cmake)
             && tool_matches("cc", &self.cc)
             && tool_matches("c++", &self.cxx)
@@ -222,7 +222,7 @@ impl AdapterBuildReceipt {
             "compile_arguments": pending_arguments,
             "build_environment": self.build_environment,
         }))?;
-        sha256_bytes(&material)
+        Ok(super::identity::sha256_hex(&material))
     }
 }
 
@@ -239,7 +239,7 @@ fn valid_comparator_sources(sources: &[AdapterComparatorSource]) -> bool {
             .iter()
             .zip(COMPARATOR_SOURCES)
             .all(|(source, expected_path)| {
-                source.path == expected_path && valid_digest(&source.sha256)
+                source.path == expected_path && Sha256Digest::is_valid_str(&source.sha256)
             })
 }
 
@@ -658,7 +658,7 @@ fn resolve_tool(name: &str) -> Result<PathBuf, AdapterError> {
 
 fn tool_matches(name: &str, identity: &ToolIdentity) -> bool {
     !identity.version.is_empty()
-        && valid_digest(&identity.sha256)
+        && Sha256Digest::is_valid_str(&identity.sha256)
         && resolve_tool(name).is_ok_and(|path| path == Path::new(&identity.path))
         && sha256_regular_file(Path::new(&identity.path), MAX_TOOL_BYTES)
             .is_ok_and(|digest| digest == identity.sha256)
@@ -731,28 +731,7 @@ pub(super) fn sha256_regular_file(path: &Path, maximum: u64) -> Result<String, A
         let chunk = buffer.get(..count).ok_or(AdapterError::SizeOverflow)?;
         hasher.update(chunk);
     }
-    hex_digest(&hasher.finalize())
-}
-
-fn sha256_bytes(bytes: &[u8]) -> Result<String, AdapterError> {
-    hex_digest(&Sha256::digest(bytes))
-}
-
-fn hex_digest(bytes: &[u8]) -> Result<String, AdapterError> {
-    use std::fmt::Write as _;
-
-    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
-    for byte in bytes {
-        write!(&mut output, "{byte:02x}").map_err(|_| AdapterError::DigestEncoding)?;
-    }
-    Ok(output)
-}
-
-fn valid_digest(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    Ok(super::identity::hex_lower(&hasher.finalize()))
 }
 
 fn ensure_linux() -> Result<(), AdapterError> {
@@ -811,8 +790,6 @@ pub(crate) enum AdapterError {
     SafeFile(String),
     #[error("adapter file size accounting overflowed")]
     SizeOverflow,
-    #[error("failed to encode adapter SHA-256 digest")]
-    DigestEncoding,
     #[error(transparent)]
     Git(#[from] super::git::GitError),
     #[error(transparent)]

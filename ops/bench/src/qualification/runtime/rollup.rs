@@ -9,6 +9,7 @@ use thiserror::Error;
 use super::artifact::{DirectQualificationArtifactPath, QualificationOutput, RepositoryBinding};
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessPreflightStatus};
 use super::group::{GroupContract, ParityEligibility, ProfilerNoteContract, ScaleContract};
+use super::identity::{GitCommit, Sha256Digest};
 use super::invocation::WorkerIdentityEvidence;
 use super::protocol::TimingBoundary;
 use super::run::{
@@ -970,17 +971,17 @@ fn validate_shared(
         || identity.correctness_inventory_sha256 != expected_correctness_inventory_sha256
         || identity.stim_tag != STIM_TAG
         || identity.stim_commit != STIM_COMMIT
-        || identity.stab_commit.len() != 40
+        || !GitCommit::is_canonical_str(&identity.stab_commit)
         || identity.local_modifications
         || !identity.host_verified
-        || identity.host_policy_sha256.len() != 64
+        || !Sha256Digest::is_valid_str(&identity.host_policy_sha256)
         || identity.host_profile_id.is_empty()
         || identity.operating_system.is_empty()
         || identity.architecture.is_empty()
         || identity.cpu_identity.is_empty()
         || identity.rust_toolchain.is_empty()
         || identity.target_triple.is_empty()
-        || identity.toolchain_sha256.len() != 64
+        || !Sha256Digest::is_valid_str(&identity.toolchain_sha256)
         || !valid_worker_identity(&identity.workers)
         || identity.correctness_preflight.status != CorrectnessPreflightStatus::Passed
         || identity.correctness_preflight.case_ids != contract.correctness_case_ids
@@ -1001,12 +1002,7 @@ fn valid_worker_identity(identity: &WorkerIdentityEvidence) -> bool {
         &identity.contract_preflight_sha256,
     ]
     .into_iter()
-    .all(|digest| {
-        digest.len() == 64
-            && digest
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    })
+    .all(|digest| Sha256Digest::is_valid_str(digest))
 }
 
 fn validate_scale(
