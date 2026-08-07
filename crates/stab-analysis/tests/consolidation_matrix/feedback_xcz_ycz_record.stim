@@ -1,0 +1,7 @@
+R 0 1
+M 0
+XCZ 1 rec[-1]
+YCZ 1 rec[-1]
+X_ERROR(0.125) 1
+M 1
+DETECTOR rec[-1]

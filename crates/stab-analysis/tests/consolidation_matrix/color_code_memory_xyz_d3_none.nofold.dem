@@ -1,0 +1,11 @@
+detector(2, 0, 0) D0
+detector(0.5, 1, 0) D1
+detector(2, 2, 0) D2
+shift_detectors(0, 0, 1) 0
+detector(2, 0, 0) D3
+detector(0.5, 1, 0) D4
+detector(2, 2, 0) D5
+detector(2, 0, 1) D6
+detector(0.5, 1, 1) D7
+detector(2, 2, 1) D8
+logical_observable L0

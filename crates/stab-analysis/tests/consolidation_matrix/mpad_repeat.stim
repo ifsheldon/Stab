@@ -1,0 +1,8 @@
+R 0
+REPEAT 3 {
+MPAD 1
+X_ERROR(0.125) 0
+M 0
+DETECTOR rec[-1]
+R 0
+}

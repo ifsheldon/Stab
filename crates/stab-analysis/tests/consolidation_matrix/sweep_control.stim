@@ -1,0 +1,5 @@
+R 0
+CX sweep[0] 0
+X_ERROR(0.125) 0
+M 0
+DETECTOR rec[-1]
