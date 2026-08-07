@@ -337,6 +337,10 @@ impl DemRepeatBlock {
         out.push(' ');
         out.push_str(&self.repeat_count.get().to_string());
         out.push_str(" {\n");
+        // Pinned Stim prints one blank line inside an empty repeat body.
+        if self.body.items.is_empty() {
+            out.push('\n');
+        }
         self.body.write_dem(out, indent + 4);
         write_indent(out, indent);
         out.push_str("}\n");
@@ -347,6 +351,9 @@ impl DemRepeatBlock {
         out.write_all(b"repeat")?;
         write_optional_tag_io(out, self.tag.as_ref())?;
         writeln!(out, " {} {{", self.repeat_count.get())?;
+        if self.body.items.is_empty() {
+            out.write_all(b"\n")?;
+        }
         self.body.write_dem_io(out, indent + 4)?;
         write_indent_io(out, indent)?;
         out.write_all(b"}\n")

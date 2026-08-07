@@ -710,7 +710,7 @@ fn dem_byte_tags_expose_and_serialize_exact_opaque_bytes() {
         })
         .expect("fixture repeat");
     assert_eq!(repeat.tag_bytes(), Some(b"\xff".as_slice()));
-    assert_eq!(dem_repeat.to_dem_bytes(), b"repeat[\xff] 1 {\n}\n");
+    assert_eq!(dem_repeat.to_dem_bytes(), b"repeat[\xff] 1 {\n\n}\n");
 }
 
 #[test]

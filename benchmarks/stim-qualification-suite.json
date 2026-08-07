@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "280364765623fe59a7b11ee50d9fa8dd74aad8ee2f08f9cfe99b00f8d8529c70",
-  "semantic_digest": "a5f9e01ae03518f68b1353e0fb69a8a69eadcde286da2d6838116bd904a205a4",
+  "correctness_digest": "b1a321a3f5100843f3d2cdf3666bbfd7060d455540fa07580bcd853d44ad22f2",
+  "semantic_digest": "f2d8dfa7e0e7b598d789752d2130da643ba258f2f3f454676762761d6a3e3842",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2156,7 +2156,7 @@
     {
       "id": "PERFC-83a09d1335d9c916",
       "source_line": 120,
-      "anchor_digest": "5c6d71d9f33e6f67f4b8733780cb8baf5b27a76899f7f65667ec5b615a4785f7",
+      "anchor_digest": "8389e848a4756f53a7a88bf50386d66c7a26a1a3b965492df8b334e6974d7ab5",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
       "raw_status": "Reopened",

@@ -517,7 +517,7 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    fn pop_record_sensitivity(&mut self) -> AnalysisResult<BTreeSet<DemTarget>> {
+    pub(crate) fn pop_record_sensitivity(&mut self) -> AnalysisResult<BTreeSet<DemTarget>> {
         self.measurement_count = self.measurement_count.checked_sub(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "measurement count underflowed during sparse reverse tracking",

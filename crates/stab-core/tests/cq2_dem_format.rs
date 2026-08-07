@@ -306,11 +306,16 @@ fn cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim() {
     let maximum_text = format!(
         "shift_detectors {max_text_integer}\nerror(0.25) D{max_text_integer}\nrepeat {max_text_integer} {{\n}}\n"
     );
+    // Pinned Stim prints one blank line inside an empty repeat body, so the
+    // canonical reprint gains it.
+    let maximum_reprint = format!(
+        "shift_detectors {max_text_integer}\nerror(0.25) D{max_text_integer}\nrepeat {max_text_integer} {{\n\n}}\n"
+    );
     assert_eq!(
         DetectorErrorModel::from_dem_str(&maximum_text)
             .expect("parse Stim's maximum textual DEM integer")
             .to_dem_string(),
-        maximum_text
+        maximum_reprint
     );
 
     for rejected in [

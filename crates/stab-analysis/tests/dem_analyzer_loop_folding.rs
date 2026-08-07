@@ -464,6 +464,10 @@ fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
 
 #[test]
 fn pf6_dem_analyzer_fallback_preserves_unsupported_instruction_semantics() {
+    // WS2b Stage 0 removed the heralded forward-engine fallback: the fold
+    // path now analyzes heralded families natively and emits the folded form
+    // pinned Stim prints for this circuit (probed against v1.16.0). The old
+    // fallback flattened the loop, which diverged from the pinned binary.
     let circuit = Circuit::from_stim_str(
         "\
 REPEAT 2 {
@@ -472,7 +476,7 @@ REPEAT 2 {
 }
 ",
     )
-    .expect("valid heralded fallback circuit");
+    .expect("valid heralded folded circuit");
     let model = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
@@ -483,12 +487,17 @@ REPEAT 2 {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect("bounded heralded fallback");
-    assert_eq!(model.to_dem_string(), "error(0.125) D0\nerror(0.125) D1\n");
+    .expect("folded heralded analysis");
+    assert_eq!(
+        model.to_dem_string(),
+        "repeat 2 {\n    error(0.125) D0\n    shift_detectors 1\n}\n"
+    );
 }
 
 #[test]
 fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
+    // The direct unroll path (fold_loops off) keeps every expansion cap the
+    // retired heralded fallback used to exercise.
     let cases = [
         (
             "REPEAT 100001 {\n    HERALDED_ERASE(0.125) 0\n}\n".to_string(),
@@ -509,15 +518,18 @@ fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
     ];
 
     for (text, expected) in cases {
-        let circuit = Circuit::from_stim_str(&text).expect("valid fallback budget circuit");
+        let circuit = Circuit::from_stim_str(&text).expect("valid unroll budget circuit");
         let error = circuit_to_detector_error_model(
             &circuit,
             ErrorAnalyzerOptions {
-                fold_loops: true,
+                fold_loops: false,
+                approximate_disjoint_errors_threshold: Some(
+                    Probability::try_new(1.0).expect("valid threshold"),
+                ),
                 ..ErrorAnalyzerOptions::default()
             },
         )
-        .expect_err("fallback expansion must be preflighted");
+        .expect_err("unrolled expansion must be preflighted");
         assert!(
             error.to_string().contains(expected),
             "expected {expected:?} for:\n{text}\ngot: {error}"
@@ -678,7 +690,8 @@ fn pf6_dem_analyzer_folds_nested_measurement_only_repeats() {
     .expect("fold nested measurement-only repeats")
     .to_dem_string();
 
-    assert_eq!(actual, "repeat 10000 {\n    repeat 101 {\n    }\n}\n");
+    // Pinned Stim prints one blank line inside an empty repeat body.
+    assert_eq!(actual, "repeat 10000 {\n    repeat 101 {\n\n    }\n}\n");
 }
 
 #[test]
@@ -714,5 +727,5 @@ fn pf6_dem_analyzer_folds_measurement_only_instruction_volume() {
     .expect("fold measurement-only instruction volume")
     .to_dem_string();
 
-    assert_eq!(actual, "repeat 100000 {\n}\n");
+    assert_eq!(actual, "repeat 100000 {\n\n}\n");
 }

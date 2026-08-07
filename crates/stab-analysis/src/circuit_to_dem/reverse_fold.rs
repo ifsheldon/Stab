@@ -45,13 +45,8 @@ type ErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 pub(super) fn try_analyze(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
-) -> AnalysisResult<Option<DetectorErrorModel>> {
-    if contains_unsupported_reverse_fold_instruction(circuit) {
-        return Ok(None);
-    }
-    ReverseFoldAnalyzer::new(circuit, options)?
-        .analyze(circuit)
-        .map(Some)
+) -> AnalysisResult<DetectorErrorModel> {
+    ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
 }
 
 struct ReverseFoldAnalyzer {
@@ -61,6 +56,9 @@ struct ReverseFoldAnalyzer {
     reversed_model: DetectorErrorModel,
     error_probabilities: BTreeMap<ErrorKey, Probability>,
     probe_budget: AnalyzerProbeBudget,
+    /// ELSE_CORRELATED_ERROR instructions seen (in reverse) since the last
+    /// unrelated instruction, awaiting their leading E (error_analyzer.cc:673).
+    stacked_else_correlated: Vec<CircuitInstruction>,
 }
 
 impl ReverseFoldAnalyzer {
@@ -83,6 +81,7 @@ impl ReverseFoldAnalyzer {
             reversed_model: DetectorErrorModel::new(),
             error_probabilities: BTreeMap::new(),
             probe_budget: AnalyzerProbeBudget::new(MAX_LOOP_CYCLE_STEPS),
+            stacked_else_correlated: Vec::new(),
         })
     }
 
@@ -103,15 +102,25 @@ impl ReverseFoldAnalyzer {
                     self.undo_instruction(instruction)?;
                 }
                 CircuitItem::RepeatBlock(repeat) => {
+                    self.require_no_pending_else_chain()?;
                     self.run_loop(repeat.body(), repeat.repeat_count(), repeat.tag_bytes())?;
                 }
             }
         }
+        // Pinned Stim scopes the pending chain to each circuit body and drops
+        // a leading unconsumed ELSE stack silently (error_analyzer.cc:673-692).
+        self.stacked_else_correlated.clear();
         Ok(())
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let gate_name = instruction.gate().canonical_name();
+        if !matches!(
+            gate_name,
+            "ELSE_CORRELATED_ERROR" | "E" | "CORRELATED_ERROR"
+        ) {
+            self.require_no_pending_else_chain()?;
+        }
         match gate_name {
             "X_ERROR" => self.record_single_pauli_errors(instruction, Pauli::X)?,
             "Y_ERROR" => self.record_single_pauli_errors(instruction, Pauli::Y)?,
@@ -120,7 +129,12 @@ impl ReverseFoldAnalyzer {
             "DEPOLARIZE2" => self.record_depolarize2(instruction)?,
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction)?,
             "PAULI_CHANNEL_2" => self.record_pauli_channel2(instruction)?,
-            "E" | "CORRELATED_ERROR" => self.record_correlated_error(instruction)?,
+            "E" | "CORRELATED_ERROR" => self.record_correlated_error_block(instruction)?,
+            "ELSE_CORRELATED_ERROR" => {
+                self.stacked_else_correlated.push(instruction.clone());
+            }
+            "HERALDED_ERASE" => self.record_heralded_erase(instruction)?,
+            "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction)?,
             "I_ERROR" | "II_ERROR" => {}
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
                 self.record_measurement_errors(instruction, instruction.targets().len())?;
@@ -229,12 +243,160 @@ impl ReverseFoldAnalyzer {
         Ok(())
     }
 
-    fn record_correlated_error(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let Some(probability) = instruction.probability_argument()? else {
-            return Ok(());
+    /// Records a reverse-encountered `E`, folding any stacked
+    /// `ELSE_CORRELATED_ERROR` chain into disjoint components exactly like
+    /// pinned Stim's `correlated_error_block` (error_analyzer.cc:784-809).
+    fn record_correlated_error_block(
+        &mut self,
+        leading: &CircuitInstruction,
+    ) -> AnalysisResult<()> {
+        if self.stacked_else_correlated.is_empty() {
+            let Some(probability) = leading.probability_argument()? else {
+                return Ok(());
+            };
+            return self.record_correlated_error(leading, probability);
+        }
+        let stacked = std::mem::take(&mut self.stacked_else_correlated);
+        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+            return Err(AnalysisError::invalid_detector_error_model(
+                "ELSE_CORRELATED_ERROR requires approximate_disjoint_errors during error analysis",
+            ));
         };
+        let mut remaining = 1.0_f64;
+        for instruction in std::iter::once(leading).chain(stacked.iter().rev()) {
+            let Some(probability) = instruction.probability_argument()? else {
+                continue;
+            };
+            let actual = probability.get() * remaining;
+            remaining *= 1.0 - probability.get();
+            if actual > threshold.get() {
+                return Err(AnalysisError::invalid_detector_error_model(format!(
+                    "CORRELATED_ERROR/ELSE_CORRELATED_ERROR block has a component probability '{actual}' larger than the approximate_disjoint_errors threshold of '{}'.",
+                    threshold.get()
+                )));
+            }
+            let actual = Probability::try_new(actual).map_err(|_| {
+                AnalysisError::invalid_detector_error_model(
+                    "ELSE_CORRELATED_ERROR chain produced an invalid component probability",
+                )
+            })?;
+            self.record_correlated_error(instruction, actual)?;
+        }
+        Ok(())
+    }
+
+    fn record_correlated_error(
+        &mut self,
+        instruction: &CircuitInstruction,
+        probability: Probability,
+    ) -> AnalysisResult<()> {
         let targets = self.composite_error_targets(instruction.targets())?;
         self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))
+    }
+
+    fn require_no_pending_else_chain(&self) -> AnalysisResult<()> {
+        if self.stacked_else_correlated.is_empty() {
+            Ok(())
+        } else {
+            Err(AnalysisError::invalid_detector_error_model(
+                "ELSE_CORRELATED_ERROR wasn't preceded by ELSE_CORRELATED_ERROR or CORRELATED_ERROR (E)",
+            ))
+        }
+    }
+
+    /// Port of pinned Stim's `undo_HERALDED_ERASE` (error_analyzer.cc:321-340):
+    /// each heralded record combines the herald symptom with the qubit's X and
+    /// Z sensitivity regions under four equal disjoint erase channels.
+    fn record_heralded_erase(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+        let Some(argument) = instruction.probability_argument()? else {
+            return Ok(());
+        };
+        self.validate_disjoint_threshold("HERALDED_ERASE", &[argument])?;
+        let channel = Probability::try_new(argument.get() * 0.25).map_err(|_| {
+            AnalysisError::invalid_detector_error_model(
+                "HERALDED_ERASE channel probability is invalid",
+            )
+        })?;
+        let identity = Probability::try_new((1.0 - argument.get()).max(0.0)).map_err(|_| {
+            AnalysisError::invalid_detector_error_model(
+                "HERALDED_ERASE identity probability is invalid",
+            )
+        })?;
+        self.record_heralded_channels(instruction, [identity, channel, channel, channel, channel])
+    }
+
+    /// Port of pinned Stim's `undo_HERALDED_PAULI_CHANNEL_1`
+    /// (error_analyzer.cc:342-365) with the vendor slot order `hi, hz, hx, hy`.
+    fn record_heralded_pauli_channel1(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> AnalysisResult<()> {
+        let Some(probabilities) = instruction.probability_arguments()? else {
+            return Ok(());
+        };
+        let [hi, hx, hy, hz] = probabilities.as_slice() else {
+            return Err(AnalysisError::invalid_detector_error_model(
+                "HERALDED_PAULI_CHANNEL_1 expects four probability arguments",
+            ));
+        };
+        let specified = probabilities
+            .iter()
+            .filter(|probability| probability.get() > 0.0)
+            .count();
+        if specified > 1 {
+            self.validate_disjoint_threshold("HERALDED_PAULI_CHANNEL_1", &probabilities)?;
+        }
+        let identity =
+            Probability::try_new((1.0 - hi.get() - hx.get() - hy.get() - hz.get()).max(0.0))
+                .map_err(|_| {
+                    AnalysisError::invalid_detector_error_model(
+                        "HERALDED_PAULI_CHANNEL_1 identity probability is invalid",
+                    )
+                })?;
+        self.record_heralded_channels(instruction, [identity, *hi, *hz, *hx, *hy])
+    }
+
+    /// Shared heralded-record recorder: `channels` holds the no-herald
+    /// identity slot followed by the herald-only, herald-plus-Z-sensitivity,
+    /// herald-plus-X-sensitivity, and herald-plus-both slots, matching the
+    /// vendor basis order `{xs, zs, herald}`.
+    fn record_heralded_channels(
+        &mut self,
+        instruction: &CircuitInstruction,
+        channels: [Probability; 5],
+    ) -> AnalysisResult<()> {
+        let zero = Probability::try_new(0.0).map_err(|_| {
+            AnalysisError::invalid_detector_error_model("zero probability is invalid")
+        })?;
+        for target in instruction.targets().iter().rev() {
+            let qubit = target.qubit_id().ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                ))
+            })?;
+            let herald = self.tracker.pop_record_sensitivity()?;
+            self.record_error_combinations(
+                vec![
+                    channels[0],
+                    zero,
+                    zero,
+                    zero,
+                    channels[1],
+                    channels[2],
+                    channels[3],
+                    channels[4],
+                ],
+                vec![
+                    self.tracker.error_sensitivity(qubit, Pauli::Z)?,
+                    self.tracker.error_sensitivity(qubit, Pauli::X)?,
+                    herald,
+                ],
+                true,
+                instruction.tag_bytes(),
+            )?;
+        }
+        Ok(())
     }
 
     fn record_depolarize1(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
@@ -771,18 +933,6 @@ impl ReverseFoldAnalyzer {
         }
         Ok(())
     }
-}
-
-fn contains_unsupported_reverse_fold_instruction(circuit: &Circuit) -> bool {
-    circuit.items().iter().any(|item| match item {
-        CircuitItem::Instruction(instruction) => matches!(
-            instruction.gate().canonical_name(),
-            "ELSE_CORRELATED_ERROR" | "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-        ),
-        CircuitItem::RepeatBlock(repeat) => {
-            contains_unsupported_reverse_fold_instruction(repeat.body())
-        }
-    })
 }
 
 fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {

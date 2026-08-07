@@ -64,8 +64,8 @@ Exit criteria: differential green across the matrix; the exception list matches 
 
 ## Stage Ledger
 
-- Stage 0: not started.
+- Stage 0: complete. The reverse tracker analyzes `ELSE_CORRELATED_ERROR` chains (telescoping disjoint components exactly like the vendor `correlated_error_block`), `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1` (three-basis disjoint combinations over the popped herald record and the qubit's Z/X sensitivity regions, vendor slot order `hi, hz, hx, hy`); the fold-path fallback and its predicate are deleted; ten binary comparisons (five fixtures, both fold modes) byte-match pinned Stim; the `reverse_heralded_families` suite pins the outputs and the requires-approximate error classes across fold modes; oracle rows `m10-analyze-errors-{heralded-erase,heralded-pauli,else-chain,else-chain-repeat}-fold` are committed and pass; the previously-diverging folded heralded loop output (`repeat 2 { error(0.125) D0; shift_detectors 1 }`) now byte-matches pinned Stim where the old fallback flattened it; and the DEM printer emits pinned Stim's blank line inside empty repeat bodies, a byte divergence the heralded folding made reachable.
 - Stage 1: this document exists (gate for Batch C code); matrix fixtures not yet captured.
-- Stage 2: blocked on Stages 0-1 and the baseline-divergence diagnosis.
+- Stage 2: blocked on Stage 1 and the baseline-divergence diagnosis.
 - Stage 3: blocked on Stage 2.
 - Stage 4: Pass 2 (Batch D).

@@ -27,7 +27,7 @@ pub(crate) use runtime::{
 pub(crate) use status::StatusArgs;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "a5f9e01ae03518f68b1353e0fb69a8a69eadcde286da2d6838116bd904a205a4";
+    "f2d8dfa7e0e7b598d789752d2130da643ba258f2f3f454676762761d6a3e3842";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
