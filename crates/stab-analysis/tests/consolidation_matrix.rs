@@ -15,18 +15,38 @@ use stab_model::{Circuit, Probability};
 /// Entries in `KNOWN_DIVERGENCES` reproduce the baseline analyzer divergence
 /// recorded in docs/plans/analyzer-consolidation-plan.md and must flip to
 /// byte-equal at Stage 3; everything else must byte-match today.
-const KNOWN_DIVERGENCES: &[&str] = &[
-    // The two executed review witnesses for the forward engine's
-    // Pauli-target OBSERVABLE_INCLUDE direction bug.
-    "pauli_include_after_error",
-    "pauli_include_before_error",
-    // The depolarizing-channel baseline divergence recorded in the
-    // consolidation plan: every entry with DEPOLARIZE-bearing noise, on both
-    // fold paths, independent of decomposition.
+/// Entries whose FORWARD-engine (`nofold`) output diverges from the
+/// pinned-Stim capture; the forward engine keeps its pre-consolidation
+/// rounding until Stage 4 deletes it, so this list shrinks at Stage 3.
+const KNOWN_NOFOLD_DIVERGENCES: &[&str] = &[
     "color_code_memory_xyz_d3_acd",
     "color_code_memory_xyz_d3_brd",
     "color_code_memory_xyz_d5_acd",
     "color_code_memory_xyz_d5_brd",
+    "pauli_include_after_error",
+    "pauli_include_before_error",
+    "repetition_code_memory_d3_acd",
+    "repetition_code_memory_d5_acd",
+    "surface_code_rotated_memory_x_d3_acd",
+    "surface_code_rotated_memory_x_d3_brd",
+    "surface_code_rotated_memory_x_d5_acd",
+    "surface_code_rotated_memory_x_d5_brd",
+    "surface_code_rotated_memory_z_d3_acd",
+    "surface_code_rotated_memory_z_d3_brd",
+    "surface_code_rotated_memory_z_d5_acd",
+    "surface_code_rotated_memory_z_d5_brd",
+    "surface_code_unrotated_memory_z_d3_acd",
+    "surface_code_unrotated_memory_z_d5_acd",
+];
+
+/// Entries whose reverse-path (`fold`) output diverges from the pinned-Stim
+/// capture; the residual entries reproduce the loop-folding merge rounding
+/// recorded in the consolidation plan's diagnosis.
+const KNOWN_FOLD_DIVERGENCES: &[&str] = &[
+    "color_code_memory_xyz_d3_acd",
+    "color_code_memory_xyz_d5_acd",
+    "pauli_include_after_error",
+    "pauli_include_before_error",
     "repetition_code_memory_d3_acd",
     "repetition_code_memory_d5_acd",
     "surface_code_rotated_memory_x_d3_acd",
@@ -78,37 +98,37 @@ fn consolidation_matrix_is_complete_and_classified() {
         names.len()
     );
 
-    let mut unexpected_divergences = Vec::new();
-    let mut healed_divergences = Vec::new();
+    let mut unexpected = Vec::new();
+    let mut healed = Vec::new();
     for name in &names {
         let stim_text =
             std::fs::read_to_string(dir.join(format!("{name}.stim"))).expect("matrix circuit");
         let circuit = Circuit::from_stim_str(&stim_text).expect("matrix circuit parses");
-        let mut entry_diverges = false;
-        for (mode, fold_loops) in [("nofold", false), ("fold", true)] {
+        for (mode, fold_loops, listed) in [
+            ("nofold", false, KNOWN_NOFOLD_DIVERGENCES),
+            ("fold", true, KNOWN_FOLD_DIVERGENCES),
+        ] {
             let expected = std::fs::read_to_string(dir.join(format!("{name}.{mode}.dem")))
                 .expect("matrix capture exists");
             let actual = circuit_to_detector_error_model(&circuit, options_for(name, fold_loops))
                 .unwrap_or_else(|error| panic!("{name} ({mode}) analyzes: {error}"))
                 .to_dem_string();
-            if actual != expected {
-                entry_diverges = true;
+            let diverges = actual != expected;
+            let is_listed = listed.contains(&name.as_str());
+            if diverges && !is_listed {
+                unexpected.push(format!("{name} ({mode})"));
             }
-        }
-        let listed = KNOWN_DIVERGENCES.contains(&name.as_str());
-        if entry_diverges && !listed {
-            unexpected_divergences.push(name.clone());
-        }
-        if !entry_diverges && listed {
-            healed_divergences.push(name.clone());
+            if !diverges && is_listed {
+                healed.push(format!("{name} ({mode})"));
+            }
         }
     }
     assert!(
-        unexpected_divergences.is_empty(),
-        "matrix entries diverge from their pinned-Stim captures without being listed: {unexpected_divergences:?}"
+        unexpected.is_empty(),
+        "matrix entries diverge from their pinned-Stim captures without being listed: {unexpected:?}"
     );
     assert!(
-        healed_divergences.is_empty(),
-        "listed divergences now byte-match; remove them from KNOWN_DIVERGENCES: {healed_divergences:?}"
+        healed.is_empty(),
+        "listed divergences now byte-match; remove them from the mode list: {healed:?}"
     );
 }

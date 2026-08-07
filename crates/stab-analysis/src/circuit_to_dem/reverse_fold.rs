@@ -15,7 +15,9 @@ use super::{
         pauli_channel2_components,
     },
     owned_tag,
-    probabilities::{merge_disjoint_probability, merge_independent_probability},
+    probabilities::{
+        merge_disjoint_probability, merge_independent_probability, within_call_xor_probability,
+    },
     try_disjoint_to_independent_xyz_errors,
 };
 use crate::sparse_rev_frame_tracker::{
@@ -671,7 +673,19 @@ impl ReverseFoldAnalyzer {
         if probabilities_are_disjoint {
             merge_indistinguishable_disjoint_probabilities(&target_vectors, &mut probabilities)?;
         }
+        // Pinned Stim combines slots that share one symptom class within the
+        // call before the class merges into the accumulated map (probed: the
+        // four DEPOLARIZE2 slots hitting one detector reproduce Stim's bytes
+        // only when pre-combined here, not when chained through the map).
+        let mut subtotal = Vec::<(Vec<DemTarget>, Probability)>::new();
         for (probability, targets) in probabilities.into_iter().zip(target_vectors).skip(1) {
+            if let Some((_, existing)) = subtotal.iter_mut().find(|(seen, _)| *seen == targets) {
+                *existing = within_call_xor_probability(*existing, probability)?;
+            } else {
+                subtotal.push((targets, probability));
+            }
+        }
+        for (targets, probability) in subtotal {
             self.add_independent_error_targets(probability, targets, owned_tag(tag))?;
         }
         Ok(())

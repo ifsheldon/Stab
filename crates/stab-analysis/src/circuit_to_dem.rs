@@ -42,7 +42,7 @@ use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
 use instructions::{is_measurement_instruction, is_noise_instruction, pair_measurement_basis};
 pub use options::ErrorAnalyzerOptions;
-use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
+use probabilities::{merge_disjoint_probability, merge_independent_probability_legacy, toggle_all};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
@@ -1092,7 +1092,7 @@ impl Analyzer {
                     pending.probability,
                 )?;
             } else {
-                merge_independent_probability(
+                merge_independent_probability_legacy(
                     &mut merged_error_probabilities,
                     (targets, pending.tag),
                     pending.probability,
@@ -1101,14 +1101,14 @@ impl Analyzer {
         }
 
         for ((_group_id, targets, tag), probability) in disjoint_error_probabilities {
-            merge_independent_probability(
+            merge_independent_probability_legacy(
                 &mut merged_error_probabilities,
                 (targets, tag),
                 probability,
             )?;
         }
         for targets in self.gauge_errors {
-            merge_independent_probability(
+            merge_independent_probability_legacy(
                 &mut merged_error_probabilities,
                 (targets, None),
                 Probability::try_new(0.5)?,

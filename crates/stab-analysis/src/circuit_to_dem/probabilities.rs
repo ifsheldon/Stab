@@ -38,11 +38,42 @@ pub(super) fn merge_disjoint_probability<K: Ord>(
     Ok(())
 }
 
-pub(super) fn xor_probability(
+/// The forward analyzer keeps its pre-consolidation `l + r - 2lr` rounding
+/// for every merge until Stage 4 deletes it; only the reverse path carries
+/// the site-split vendor-matched forms.
+pub(super) fn merge_independent_probability_legacy<K: Ord>(
+    probabilities: &mut BTreeMap<K, Probability>,
+    targets: K,
+    probability: Probability,
+) -> AnalysisResult<()> {
+    if let Some(existing) = probabilities.get_mut(&targets) {
+        *existing = within_call_xor_probability(*existing, probability)?;
+    } else {
+        probabilities.insert(targets, probability);
+    }
+    Ok(())
+}
+
+/// Same-class slot subtotals inside one combination call round like
+/// `l + r - 2lr` in pinned Stim (probed via the four-slot DEPOLARIZE2 case),
+/// unlike the cross-call map merge above.
+pub(super) fn within_call_xor_probability(
     left: Probability,
     right: Probability,
 ) -> AnalysisResult<Probability> {
     Ok(Probability::try_new(
         left.get() + right.get() - 2.0 * left.get() * right.get(),
+    )?)
+}
+
+pub(super) fn xor_probability(
+    left: Probability,
+    right: Probability,
+) -> AnalysisResult<Probability> {
+    // Pinned Stim evaluates `old * (1 - p) + (1 - old) * p`
+    // (error_analyzer.cc:1088); the algebraically equal `l + r - 2lr` differs
+    // in the final ulp and drifts byte-exact DEM probabilities.
+    Ok(Probability::try_new(
+        left.get() * (1.0 - right.get()) + (1.0 - left.get()) * right.get(),
     )?)
 }
