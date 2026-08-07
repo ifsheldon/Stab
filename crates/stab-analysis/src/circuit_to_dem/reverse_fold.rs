@@ -46,6 +46,12 @@ pub(super) fn try_analyze(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
+    if !options.fold_loops {
+        // Unrolled analysis admits the same documented expansion budget the
+        // retired forward path enforced; folded analysis keeps its own
+        // per-loop recurrence and bounded-unroll limits.
+        super::budget::validate_analyzer_expansion_budget(circuit)?;
+    }
     ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
 }
 
@@ -107,10 +113,10 @@ impl ReverseFoldAnalyzer {
                 }
             }
         }
-        // Pinned Stim scopes the pending chain to each circuit body and drops
-        // a leading unconsumed ELSE stack silently (error_analyzer.cc:673-692).
-        self.stacked_else_correlated.clear();
-        Ok(())
+        // Pinned Stim scopes the pending chain to each circuit body and
+        // rejects an ELSE stack left unconsumed at the body's start
+        // (error_analyzer.cc:719-722).
+        self.require_no_pending_else_chain()
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {

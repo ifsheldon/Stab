@@ -12,40 +12,13 @@ use stab_model::{Circuit, Probability};
 
 /// WS2b Stage 1: every equivalence-matrix entry is a committed pinned-Stim
 /// byte-exact DEM capture (`<name>.stim` + `<name>.{nofold,fold}.dem`).
-/// Entries in `KNOWN_DIVERGENCES` reproduce the baseline analyzer divergence
-/// recorded in docs/plans/analyzer-consolidation-plan.md and must flip to
-/// byte-equal at Stage 3; everything else must byte-match today.
-/// Entries whose FORWARD-engine (`nofold`) output diverges from the
-/// pinned-Stim capture; the forward engine keeps its pre-consolidation
-/// rounding until Stage 4 deletes it, so this list shrinks at Stage 3.
-const KNOWN_NOFOLD_DIVERGENCES: &[&str] = &[
-    "color_code_memory_xyz_d3_acd",
-    "color_code_memory_xyz_d3_brd",
-    "color_code_memory_xyz_d5_acd",
-    "color_code_memory_xyz_d5_brd",
-    "pauli_include_after_error",
-    "pauli_include_before_error",
-    "repetition_code_memory_d3_acd",
-    "repetition_code_memory_d5_acd",
-    "surface_code_rotated_memory_x_d3_acd",
-    "surface_code_rotated_memory_x_d3_brd",
-    "surface_code_rotated_memory_x_d5_acd",
-    "surface_code_rotated_memory_x_d5_brd",
-    "surface_code_rotated_memory_z_d3_acd",
-    "surface_code_rotated_memory_z_d3_brd",
-    "surface_code_rotated_memory_z_d5_acd",
-    "surface_code_rotated_memory_z_d5_brd",
-    "surface_code_unrotated_memory_z_d3_acd",
-    "surface_code_unrotated_memory_z_d5_acd",
-];
+/// Since the Stage 3 flip both fold modes run on the reverse engine and every
+/// entry must byte-match its capture; the divergence lists are empty, and any
+/// entry that stops matching fails as an unexpected divergence.
+const KNOWN_NOFOLD_DIVERGENCES: &[&str] = &[];
 
-/// Entries whose reverse-path (`fold`) output diverges from the pinned-Stim
-/// capture. The DEPOLARIZE-rounding residue healed when the reverse merge
-/// replicated the pinned binary's fused `fma` contraction; the two remaining
-/// entries are the loop-free Pauli-include witnesses, which the public fold
-/// dispatch still routes to the forward engine until Stage 3.
-const KNOWN_FOLD_DIVERGENCES: &[&str] =
-    &["pauli_include_after_error", "pauli_include_before_error"];
+/// Fold-mode divergences, empty for the same reason as the `nofold` list.
+const KNOWN_FOLD_DIVERGENCES: &[&str] = &[];
 
 fn matrix_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/consolidation_matrix")

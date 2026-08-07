@@ -66,21 +66,7 @@ pub fn try_disjoint_to_independent_xyz_errors(
     y: Probability,
     z: Probability,
 ) -> AnalysisResult<Option<IndependentPauliProbabilities>> {
-    let x = x.get();
-    let y = y.get();
-    let z = z.get();
-    match solve_disjoint_to_independent_xyz_exact(x, y, z) {
-        Some(ExactXyzSolution::Solved([x, y, z])) => {
-            return Ok(Some(IndependentPauliProbabilities {
-                x: stab_model::advanced::probability_from_valid(x),
-                y: stab_model::advanced::probability_from_valid(y),
-                z: stab_model::advanced::probability_from_valid(z),
-            }));
-        }
-        Some(ExactXyzSolution::Impossible) => return Ok(None),
-        None => {}
-    }
-    let Some(solution) = solve_disjoint_to_independent_xyz(x, y, z, 50) else {
+    let Some(solution) = solve_disjoint_to_independent_xyz(x.get(), y.get(), z.get(), 50) else {
         return Ok(None);
     };
     let [x, y, z] = solution.probabilities;
@@ -105,12 +91,14 @@ struct XyzSolution {
     proven_probability_bounds: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum ExactXyzSolution {
-    Solved([f64; 3]),
-    Impossible,
-}
-
+/// Faithful port of pinned Stim's `try_disjoint_to_independent_xyz_errors_approx`
+/// (`vendor/stim/src/stim/util_bot/error_decomp.cc:29-114`), preserving the
+/// vendor's `dc = ab_i - ac` Newton step even though the mathematically
+/// correct step reads `ab_i - ab`: the broken `c` derivative is what makes
+/// near-boundary channels such as `PAULI_CHANNEL_1(0.1792, 0.1008, 0.2592)`
+/// fail to converge in pinned Stim, so replicating it is required for the
+/// analyzer's accept/reject and byte parity. A previous corrected-step port
+/// accepted channels pinned Stim rejects.
 #[inline(always)]
 fn solve_disjoint_to_independent_xyz(
     x: f64,
@@ -118,17 +106,7 @@ fn solve_disjoint_to_independent_xyz(
     z: f64,
     max_steps: usize,
 ) -> Option<XyzSolution> {
-    match solve_disjoint_to_independent_xyz_exact(x, y, z) {
-        Some(ExactXyzSolution::Solved(probabilities)) => {
-            return Some(XyzSolution {
-                probabilities,
-                proven_probability_bounds: true,
-            });
-        }
-        Some(ExactXyzSolution::Impossible) => return None,
-        None => {}
-    }
-
+    // Re-arrange the problem so identity is the most likely case.
     let identity = (1.0 - x - y - z).max(0.0);
     if identity < x {
         let solution = solve_disjoint_to_independent_xyz(identity, z, y, max_steps)?;
@@ -155,6 +133,24 @@ fn solve_disjoint_to_independent_xyz(
         });
     }
 
+    // Solve analytically if an exact solution exists.
+    if x + z < 0.5 && x + y < 0.5 && y + z < 0.5 {
+        let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
+        let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
+        let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
+        let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
+        let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
+        let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
+        if a >= 0.0 && b >= 0.0 && c >= 0.0 {
+            debug_assert!(a <= 1.0 && b <= 1.0 && c <= 1.0);
+            return Some(XyzSolution {
+                probabilities: [a, b, c],
+                proven_probability_bounds: true,
+            });
+        }
+    }
+
+    // If no exact solution exists, resort to approximations.
     let mut a = x;
     let mut b = y;
     let mut c = z;
@@ -168,7 +164,9 @@ fn solve_disjoint_to_independent_xyz(
         let ab_i = a_i * b_i;
         let ac_i = a_i * c_i;
         let bc_i = b_i * c_i;
-        let [x2, y2, z2] = independent_to_disjoint_xyz_raw(a, b, c);
+        let x2 = a * bc_i + a_i * bc;
+        let y2 = b * ac_i + b_i * ac;
+        let z2 = c * ab_i + c_i * ab;
         let dx = x2 - x;
         let dy = y2 - y;
         let dz = z2 - z;
@@ -179,43 +177,16 @@ fn solve_disjoint_to_independent_xyz(
             });
         }
 
+        // Make a Newton-Raphson step towards the solution.
         let da = bc_i - bc;
         let db = ac_i - ac;
-        let dc = ab_i - ab;
+        // Vendor typo preserved on purpose (see the function doc comment).
+        let dc = ab_i - ac;
         a = (a - dx / da).max(0.0);
         b = (b - dy / db).max(0.0);
         c = (c - dz / dc).max(0.0);
     }
     None
-}
-
-#[inline(always)]
-fn solve_disjoint_to_independent_xyz_exact(x: f64, y: f64, z: f64) -> Option<ExactXyzSolution> {
-    if !(x + z < 0.5 && x + y < 0.5 && y + z < 0.5) {
-        return None;
-    }
-    if (x == 0.0 || y == 0.0 || z == 0.0) && has_impossible_zero_disjoint_component(x, y, z) {
-        return Some(ExactXyzSolution::Impossible);
-    }
-    let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
-    let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
-    let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
-    let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
-    let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
-    let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
-    if a >= 0.0 && b >= 0.0 && c >= 0.0 {
-        debug_assert!(a <= 1.0 && b <= 1.0 && c <= 1.0);
-        Some(ExactXyzSolution::Solved([a, b, c]))
-    } else {
-        None
-    }
-}
-
-#[inline(always)]
-fn has_impossible_zero_disjoint_component(x: f64, y: f64, z: f64) -> bool {
-    (x == 0.0 && y > 0.0 && z > 0.0)
-        || (y == 0.0 && x > 0.0 && z > 0.0)
-        || (z == 0.0 && x > 0.0 && y > 0.0)
 }
 
 #[inline(always)]

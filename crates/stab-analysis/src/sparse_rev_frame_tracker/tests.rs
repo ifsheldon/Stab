@@ -391,23 +391,27 @@ fn sparse_rev_frame_tracker_feedback_into_measurement_subset() {
 
 #[test]
 fn sparse_rev_frame_tracker_rejects_invalid_feedback_target_positions() {
-    for text in [
-        "CX 0 rec[-5]\n",
-        "CY 0 rec[-5]\n",
-        "XCZ rec[-5] 0\n",
-        "YCZ rec[-5] 0\n",
+    for (text, expected) in [
+        ("CX 0 rec[-5]\n", "CX target rec[-5] is not a qubit"),
+        ("CY 0 rec[-5]\n", "CY target rec[-5] is not a qubit"),
+        ("XCZ rec[-5] 0\n", "XCZ target rec[-5] is not a qubit"),
+        ("YCZ rec[-5] 0\n", "YCZ target rec[-5] is not a qubit"),
     ] {
-        let mut tracker = tracker_from_pauli_text("ZII");
+        // Only the analyzer surface pins the vendor tracker's rejection of a
+        // non-qubit Pauli slot; flow-mode trackers keep the PFM-B4 contract.
+        let mut tracker = SparseReverseFrameTracker::new_for_error_analysis(3, 12, 0, false);
         tracker.measurement_count = 12;
         let error = match tracker.undo_instruction(&instruction(text)) {
             Ok(_) => panic!("accepted invalid feedback target position in {text:?}"),
             Err(error) => error,
         };
+        assert!(error.to_string().contains(expected), "{error}");
+
+        let mut flow_tracker = tracker_from_pauli_text("ZII");
+        flow_tracker.measurement_count = 12;
         assert!(
-            error
-                .to_string()
-                .contains("measurement-record feedback target in this position"),
-            "{error}"
+            flow_tracker.undo_instruction(&instruction(text)).is_ok(),
+            "flow-mode tracker keeps the lenient PFM-B4 contract for {text:?}"
         );
     }
 }

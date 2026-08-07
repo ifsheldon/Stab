@@ -1,7 +1,7 @@
 {
   "schema_version": 10,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "f2d8dfa7e0e7b598d789752d2130da643ba258f2f3f454676762761d6a3e3842",
+  "performance_inventory_sha256": "6fabde720728ac3da4e7d2e1fc839bbab647fa99b48c565f6b304687ca4f7d0d",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -395,9 +395,9 @@
           "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
         }
       ],
-  "correctness_case_ids": [
-    "cq-evidence-qualification-7bcf8fcdbbfa6d68"
-  ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-7bcf8fcdbbfa6d68"
+      ],
       "owner": "stab-engine/sampling-compiler",
       "profiler_note": null
     },
@@ -521,7 +521,7 @@
           "size_class": "small",
           "work_items": 1024,
           "input_bytes": 776,
-          "input_digest": "727aaea332dc3b6655f5233cec7ed4d5ba47fba1a8f70316e496a4165df7e518"
+          "input_digest": "e4dadf1d21d1a6436e45d29c4cfa326d7d8688b9179d8a6be4c71836c048a65a"
         },
         {
           "id": "medium",
@@ -529,7 +529,7 @@
           "size_class": "medium",
           "work_items": 16384,
           "input_bytes": 776,
-          "input_digest": "d0e7b29774458576150c08bace932ebd9cadbc17ec3efd6a880e88b46831b044"
+          "input_digest": "cfb86cf50f4fac7b2adbbeb1d979a5fafe39c158c7ee0040b0f00808fe1c8f08"
         },
         {
           "id": "large",
@@ -537,7 +537,7 @@
           "size_class": "large",
           "work_items": 262144,
           "input_bytes": 776,
-          "input_digest": "6b247b780447aad7eb3df7800834aa0528776aba97d529878fdacc59872c76e2"
+          "input_digest": "9596b7650792622f05d17e69618c6cf096019210fee5453da728f026ae2bdaa7"
         }
       ],
       "correctness_case_ids": [
@@ -1551,11 +1551,11 @@
           "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
         }
       ],
-  "correctness_case_ids": [
-    "cq-evidence-qualification-0908c21b917526e3",
-    "cq-evidence-qualification-2f6a06e3fffcf5c0",
-    "cq-evidence-qualification-966ab53fd109b7b3",
-    "cq-evidence-qualification-ae2cf29058be84b0"
+      "correctness_case_ids": [
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-2f6a06e3fffcf5c0",
+        "cq-evidence-qualification-966ab53fd109b7b3",
+        "cq-evidence-qualification-ae2cf29058be84b0"
       ],
       "owner": "stab-model/dem-parser",
       "profiler_note": {
@@ -1656,11 +1656,11 @@
           "input_digest": "2dab06c78e9a7c41ceb5799b84fb83487db68d7e18b9ffd8796114e16fa4a77e"
         }
       ],
-  "correctness_case_ids": [
-    "cq-evidence-qualification-0908c21b917526e3",
-    "cq-evidence-qualification-2f6a06e3fffcf5c0",
-    "cq-evidence-qualification-966ab53fd109b7b3",
-    "cq-evidence-qualification-ae2cf29058be84b0"
+      "correctness_case_ids": [
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-2f6a06e3fffcf5c0",
+        "cq-evidence-qualification-966ab53fd109b7b3",
+        "cq-evidence-qualification-ae2cf29058be84b0"
       ],
       "owner": "stab-model/dem-printer",
       "profiler_note": {

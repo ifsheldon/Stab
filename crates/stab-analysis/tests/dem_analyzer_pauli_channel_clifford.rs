@@ -54,7 +54,7 @@ fn dem_analyzer_pauli_channel1_crosses_controlled_pauli_gates_like_stim() {
 }
 
 #[test]
-fn dem_analyzer_pauli_channel1_accepts_exact_newton_edge_case() {
+fn dem_analyzer_pauli_channel1_newton_edge_case_requires_approximate_like_pinned_stim() {
     let circuit = Circuit::from_stim_str(
         "R 0\n\
          PAULI_CHANNEL_1(0.1792, 0.1008, 0.2592) 0\n\
@@ -62,24 +62,40 @@ fn dem_analyzer_pauli_channel1_accepts_exact_newton_edge_case() {
          DETECTOR rec[-1]\n",
     )
     .expect("circuit");
-    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
-        .expect("exact disjoint channel")
-        .to_dem_string();
 
-    assert_eq!(dem, "error(0.2800000000000003042011087472928921) D0\n");
+    // Pinned Stim's Newton fallback fails to converge for this channel (the
+    // vendor `dc = ab_i - ac` step), so analysis without the approximation
+    // option rejects; a previous exact-Newton port accepted it.
+    let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect_err("pinned Stim requires approximate_disjoint_errors here")
+        .to_string();
+    assert!(
+        error.contains("requires approximate_disjoint_errors"),
+        "{error}"
+    );
+
+    // With the option enabled the vendor keeps the raw disjoint components,
+    // so the X and Y symptoms sum into one class, byte-matching pinned Stim.
+    let dem = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("approximate analysis")
+    .to_dem_string();
+    assert_eq!(dem, "error(0.280000000000000026645352591003757) D0\n");
 }
 
 #[test]
-fn disjoint_to_independent_pauli_channel1_solves_newton_edge_case() {
+fn disjoint_to_independent_pauli_channel1_newton_edge_case_fails_like_pinned_stim() {
     let actual = try_disjoint_to_independent_xyz_errors(
         Probability::try_new(0.1792).unwrap(),
         Probability::try_new(0.1008).unwrap(),
         Probability::try_new(0.2592).unwrap(),
     )
-    .expect("solve")
-    .expect("exact solution");
+    .expect("solve");
 
-    assert!((actual.x().get() - 0.28).abs() < 1e-12);
-    assert!(actual.y().get().abs() < 1e-12);
-    assert!((actual.z().get() - 0.36).abs() < 1e-12);
+    assert!(actual.is_none());
 }

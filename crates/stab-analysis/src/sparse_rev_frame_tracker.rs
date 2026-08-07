@@ -589,27 +589,65 @@ impl SparseReverseFrameTracker {
     fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         for group in instruction.target_groups().into_iter().rev() {
             let gate_name = instruction.gate().canonical_name();
-            let [control, target] = group else {
+            let [first, second] = group else {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
                     "{gate_name} expected paired targets during sparse reverse tracking",
                 )));
             };
-            if control.is_measurement_record_target() && target.qubit_id().is_some() {
-                validate_feedback_record_position(gate_name, true)?;
-                self.undo_classical_feedback(instruction, control, target)?;
-            } else if target.is_measurement_record_target() && control.qubit_id().is_some() {
-                validate_feedback_record_position(gate_name, false)?;
-                self.undo_classical_feedback(instruction, target, control)?;
-            } else if let (Some(left), Some(right)) = (control.qubit_id(), target.qubit_id()) {
+            // Vendor orientation (sparse_rev_frame_tracker.cc,
+            // undo_ZC{X,Y,Z}_single): CX/CY carry the classical-capable
+            // control first, XCZ/YCZ carry the Pauli side first, and CZ
+            // accepts a classical bit in either slot.
+            let (control, target) = match gate_name {
+                "XCZ" | "YCZ" => (second, first),
+                _ => (first, second),
+            };
+            if let (Some(left), Some(right)) = (first.qubit_id(), second.qubit_id()) {
                 if matches!(gate_name, "CX" | "CY" | "CZ") {
                     self.undo_quantum_controlled_pauli(instruction, control, target)?;
                 } else {
                     let inverse_tableau = two_qubit_inverse_tableau(instruction, gate_name)?;
                     self.undo_two_qubit_tableau_group(gate_name, &inverse_tableau, left, right)?;
                 }
+            } else if gate_name == "CZ" {
+                // A classical bit in either CZ slot Z-controls the other
+                // slot; two classical bits have no effect (undo_ZCZ_single).
+                if target.qubit_id().is_some() {
+                    self.undo_classical_pauli(instruction, control, target)?;
+                } else if control.qubit_id().is_some() {
+                    self.undo_classical_pauli(instruction, target, control)?;
+                }
+            } else if target.qubit_id().is_none() {
+                // Vendor undo_ZC{X,Y}_single throws whenever the Pauli slot
+                // is not a qubit; the analyzer surface pins that rejection.
+                // The flow solver and checker keep the pinned PFM-B4 contract
+                // of ignoring classical-control groups instead, so only
+                // error-analysis mode rejects here.
+                if self.error_analysis_mode {
+                    return Err(AnalysisError::invalid_detector_error_model(format!(
+                        "{gate_name} target {target} is not a qubit"
+                    )));
+                }
+            } else {
+                self.undo_classical_pauli(instruction, control, target)?;
             }
         }
         Ok(())
+    }
+
+    /// A classical control either has no effect on error propagation (sweep
+    /// bits) or toggles the record's sensitivity by the target qubit's
+    /// flipped bases (measurement records); vendor `undo_classical_pauli`.
+    fn undo_classical_pauli(
+        &mut self,
+        instruction: &CircuitInstruction,
+        control: &Target,
+        target: &Target,
+    ) -> AnalysisResult<()> {
+        if control.is_sweep_bit_target() {
+            return Ok(());
+        }
+        self.undo_classical_feedback(instruction, control, target)
     }
 
     fn undo_classical_feedback(
@@ -956,7 +994,7 @@ impl SparseReverseFrameTracker {
             })?;
         if index < 0 || index > measurement_count {
             return Err(AnalysisError::invalid_detector_error_model(format!(
-                "measurement record offset rec[{offset}] is outside the sparse reverse tracker history"
+                "measurement record offset rec[{offset}] is out of range"
             )));
         }
         usize::try_from(index).map_err(|_| {
@@ -1088,22 +1126,6 @@ fn two_qubit_inverse_tableau(
         )));
     }
     Ok(inverse_tableau)
-}
-
-fn validate_feedback_record_position(gate_name: &str, record_is_first: bool) -> AnalysisResult<()> {
-    let valid = match gate_name {
-        "CX" | "CY" => record_is_first,
-        "XCZ" | "YCZ" => !record_is_first,
-        "CZ" => true,
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(AnalysisError::invalid_detector_error_model(format!(
-            "{gate_name} does not support a measurement-record feedback target in this position"
-        )))
-    }
 }
 
 fn xor_sets(left: &BTreeSet<DemTarget>, right: &BTreeSet<DemTarget>) -> BTreeSet<DemTarget> {

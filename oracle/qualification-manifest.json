@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "b1a321a3f5100843f3d2cdf3666bbfd7060d455540fa07580bcd853d44ad22f2",
+  "semantic_digest": "8423de93bdde8d4c21704fe347e15b2170a7643d96fd99a8c0d8d08daedffd13",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -70881,7 +70881,7 @@
       "path": "stab_analysis::circuit_to_detector_error_model",
       "kind": "function",
       "source_path": "crates/stab-analysis/src/circuit_to_dem.rs",
-      "source_line": 55,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-api-76393aede5c55f24",
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"

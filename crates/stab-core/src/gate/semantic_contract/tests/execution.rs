@@ -971,11 +971,19 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         sample_detection_events(&expected_frame, 16, Some(37)).expect("expected frame samples"),
         "detector frame: {label}"
     );
+    // Pinned Stim requires `approximate_disjoint_errors` before it analyzes
+    // heralded or disjoint Pauli channels at all, so the analyzer half of the
+    // contract compares both circuits the way the pinned binary must be
+    // driven; the requirement itself is pinned by the analyzer suites.
+    let analyzer_options = ErrorAnalyzerOptions {
+        approximate_disjoint_errors_threshold: Some(
+            Probability::try_new(1.0).expect("unit threshold"),
+        ),
+        ..ErrorAnalyzerOptions::default()
+    };
     assert_eq!(
-        circuit_to_detector_error_model(actual, ErrorAnalyzerOptions::default())
-            .expect("actual analysis"),
-        circuit_to_detector_error_model(expected, ErrorAnalyzerOptions::default())
-            .expect("expected analysis"),
+        circuit_to_detector_error_model(actual, analyzer_options).expect("actual analysis"),
+        circuit_to_detector_error_model(expected, analyzer_options).expect("expected analysis"),
         "error analyzer: {label}"
     );
     assert_eq!(

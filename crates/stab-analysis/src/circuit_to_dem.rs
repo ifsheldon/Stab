@@ -40,7 +40,6 @@ use error_decomp::{
     depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
     pauli_channel2_components,
 };
-use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
 use instructions::{is_measurement_instruction, is_noise_instruction, pair_measurement_basis};
 pub use options::ErrorAnalyzerOptions;
@@ -58,15 +57,10 @@ pub fn circuit_to_detector_error_model(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
-    if options.fold_loops
-        && circuit
-            .items()
-            .iter()
-            .any(|item| matches!(item, CircuitItem::RepeatBlock(_)))
-    {
-        return FoldedAnalyzer::new(options).analyze(circuit);
-    }
-    Analyzer::new(options).analyze(circuit)
+    // WS2b Stage 3: the reverse tracker is the only public analysis path.
+    // With `fold_loops` off it unrolls loops under the expansion budget; the
+    // forward `Analyzer` below is scheduled for Stage 4 deletion (Batch D).
+    reverse_fold::try_analyze(circuit, options)
 }
 
 struct Analyzer {

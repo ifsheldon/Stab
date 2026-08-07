@@ -87,27 +87,24 @@ impl SparseReverseFrameTracker {
         if gauge.is_empty() {
             return Ok(());
         }
-        if self.eliminate_detector_gauges {
-            if gauge
-                .iter()
-                .any(|target| matches!(target, DemTarget::LogicalObservable(_)))
-            {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "collapse anti-commuted with a logical observable during error analysis",
-                ));
-            }
+        let has_observables = gauge
+            .iter()
+            .any(|target| matches!(target, DemTarget::LogicalObservable(_)));
+        if self.eliminate_detector_gauges && !has_observables {
             self.eliminate_detector_gauge(&gauge);
             self.gauge_errors.push(gauge);
             return Ok(());
         }
-        if self.fail_on_anticommute {
+        if self.fail_on_anticommute || self.eliminate_detector_gauges {
             if self.error_analysis_mode {
-                let has_observables = gauge
-                    .iter()
-                    .any(|target| matches!(target, DemTarget::LogicalObservable(_)));
-                let has_detectors = gauge
-                    .iter()
-                    .any(|target| matches!(target, DemTarget::RelativeDetector(_)));
+                // Vendor check_for_gauge (error_analyzer.cc:408-437): gauge
+                // observables are never eliminated even with gauge detectors
+                // allowed, and allowing gauge detectors suppresses only the
+                // detector line of the failure message.
+                let has_detectors = !self.eliminate_detector_gauges
+                    && gauge
+                        .iter()
+                        .any(|target| matches!(target, DemTarget::RelativeDetector(_)));
                 let mut message = String::new();
                 if has_observables {
                     message.push_str("The circuit contains non-deterministic observables.\n");

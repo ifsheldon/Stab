@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "b1a321a3f5100843f3d2cdf3666bbfd7060d455540fa07580bcd853d44ad22f2",
-  "semantic_digest": "f2d8dfa7e0e7b598d789752d2130da643ba258f2f3f454676762761d6a3e3842",
+  "correctness_digest": "8423de93bdde8d4c21704fe347e15b2170a7643d96fd99a8c0d8d08daedffd13",
+  "semantic_digest": "6fabde720728ac3da4e7d2e1fc839bbab647fa99b48c565f6b304687ca4f7d0d",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -93836,7 +93836,7 @@
               "bytes": 776
             },
             "semantic_work": 1024,
-            "input_digest": "727aaea332dc3b6655f5233cec7ed4d5ba47fba1a8f70316e496a4165df7e518"
+            "input_digest": "e4dadf1d21d1a6436e45d29c4cfa326d7d8688b9179d8a6be4c71836c048a65a"
           },
           {
             "id": "medium",
@@ -93848,7 +93848,7 @@
               "bytes": 776
             },
             "semantic_work": 16384,
-            "input_digest": "d0e7b29774458576150c08bace932ebd9cadbc17ec3efd6a880e88b46831b044"
+            "input_digest": "cfb86cf50f4fac7b2adbbeb1d979a5fafe39c158c7ee0040b0f00808fe1c8f08"
           },
           {
             "id": "large",
@@ -93860,7 +93860,7 @@
               "bytes": 776
             },
             "semantic_work": 262144,
-            "input_digest": "6b247b780447aad7eb3df7800834aa0528776aba97d529878fdacc59872c76e2"
+            "input_digest": "9596b7650792622f05d17e69618c6cf096019210fee5453da728f026ae2bdaa7"
           }
         ]
       },

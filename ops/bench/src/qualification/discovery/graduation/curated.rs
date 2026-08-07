@@ -443,7 +443,7 @@ fn pipeline_family() -> WorkloadFamily {
                 "shots=1024; distance=3; rounds=3; seed=0xA7D3C0DE",
                 1_024,
                 776,
-                "727aaea332dc3b6655f5233cec7ed4d5ba47fba1a8f70316e496a4165df7e518",
+                "e4dadf1d21d1a6436e45d29c4cfa326d7d8688b9179d8a6be4c71836c048a65a",
             ),
             scale(
                 "medium",
@@ -451,7 +451,7 @@ fn pipeline_family() -> WorkloadFamily {
                 "shots=16384; distance=3; rounds=3; seed=0xA7D3C0DE",
                 16_384,
                 776,
-                "d0e7b29774458576150c08bace932ebd9cadbc17ec3efd6a880e88b46831b044",
+                "cfb86cf50f4fac7b2adbbeb1d979a5fafe39c158c7ee0040b0f00808fe1c8f08",
             ),
             scale(
                 "large",
@@ -459,7 +459,7 @@ fn pipeline_family() -> WorkloadFamily {
                 "shots=262144; distance=3; rounds=3; seed=0xA7D3C0DE",
                 262_144,
                 776,
-                "6b247b780447aad7eb3df7800834aa0528776aba97d529878fdacc59872c76e2",
+                "9596b7650792622f05d17e69618c6cf096019210fee5453da728f026ae2bdaa7",
             ),
         ],
     )

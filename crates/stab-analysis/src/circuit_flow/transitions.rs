@@ -85,10 +85,8 @@ pub fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowT
 }
 
 pub(crate) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInstruction) -> bool {
-    if !matches!(
-        instruction.gate().canonical_name(),
-        "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
-    ) {
+    let gate_name = instruction.gate().canonical_name();
+    if !matches!(gate_name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ") {
         return false;
     }
     let groups = instruction.target_groups();
@@ -99,7 +97,21 @@ pub(crate) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInst
             };
             let left_is_sweep = left.is_sweep_bit_target();
             let right_is_sweep = right.is_sweep_bit_target();
-            (left_is_sweep ^ right_is_sweep)
-                && left.qubit_id().is_some() != right.qubit_id().is_some()
+            if !(left_is_sweep ^ right_is_sweep)
+                || left.qubit_id().is_some() == right.qubit_id().is_some()
+            {
+                return false;
+            }
+            // A sweep bit is a sign-only no-op only in the classical-control
+            // slot (vendor sparse_rev_frame_tracker.cc undo_ZC{X,Y,Z}_single):
+            // CX/CY take the control first, XCZ/YCZ take the Pauli side
+            // first, and CZ accepts a classical bit in either slot. A sweep
+            // bit in the Pauli slot must fall through to the tracker's
+            // not-a-qubit rejection instead of classifying as a no-op.
+            match gate_name {
+                "CX" | "CY" => left_is_sweep,
+                "XCZ" | "YCZ" => right_is_sweep,
+                _ => true,
+            }
         })
 }
