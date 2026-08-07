@@ -14,10 +14,6 @@ mod circuit_missing_detectors;
 mod circuit_pass;
 mod circuit_simplify;
 mod circuit_tableau;
-#[allow(
-    dead_code,
-    reason = "the retired forward analyzer and its helpers stay unreferenced between the WS2b Stage 3 public-path flip and their Stage 4 (Batch D) deletion"
-)]
 mod circuit_to_dem;
 mod circuit_transforms;
 mod dem;

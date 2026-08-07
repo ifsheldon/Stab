@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "8423de93bdde8d4c21704fe347e15b2170a7643d96fd99a8c0d8d08daedffd13",
-  "semantic_digest": "6fabde720728ac3da4e7d2e1fc839bbab647fa99b48c565f6b304687ca4f7d0d",
+  "correctness_digest": "2e204f9e48efcf389667718830d66c574454d7b4c8289b6280a0499ff34b74f2",
+  "semantic_digest": "2d4c9092c436b22bbfb02c451dc6ab7e29bdafb943554bf1ddf92d9c9c35cadb",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -1994,10 +1994,10 @@
     {
       "id": "PERFC-6c45d9f27cd36d16",
       "source_line": 118,
-      "anchor_digest": "268c7aa89e2b938fbb8d316ff21ef89b831633b2061b30f541605c4e3d27569e",
+      "anchor_digest": "a27c496fbcee12a7cbbfeb7423e3876c269b5ff629307e77341a1f731d689e17",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "Circuit-to-DEM analysis",
-      "raw_status": "Reopened",
+      "raw_status": "Done for selected M10 and PF7 scope",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
@@ -2156,10 +2156,10 @@
     {
       "id": "PERFC-83a09d1335d9c916",
       "source_line": 120,
-      "anchor_digest": "8389e848a4756f53a7a88bf50386d66c7a26a1a3b965492df8b334e6974d7ab5",
+      "anchor_digest": "79d95600a6642a97d5b7024eb4b3d84fc995e05e706ac264ed438fadfd480c72",
       "section": "7. Error Analysis, Search, And Decoder Configuration",
       "feature": "`analyze_errors --decompose_errors` and related flags",
-      "raw_status": "Reopened",
+      "raw_status": "Done for selected M10 and PF7 scope",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
