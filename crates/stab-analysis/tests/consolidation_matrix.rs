@@ -51,10 +51,10 @@ fn consolidation_matrix_is_complete_and_classified() {
             names.insert(name.to_string());
         }
     }
-    assert!(
-        names.len() >= 60,
-        "expected the full equivalence matrix, found {} entries",
-        names.len()
+    assert_eq!(
+        names.len(),
+        63,
+        "the committed equivalence matrix owns exactly sixty-three entries"
     );
 
     let mut unexpected = Vec::new();

@@ -62,6 +62,17 @@ fn decomposition_components_xor_back_and_never_repeat() {
         .collect::<Vec<_>>();
     plain_symptoms.sort();
     let mut decomposed_symptoms = Vec::new();
+    // Non-composite graphlike lines are the known-component set; a composite
+    // line may introduce at most one remnant component, which then joins the
+    // known set exactly like the vendor's decompose_and_append_component_to_tail.
+    let mut known_components = decomposed
+        .lines()
+        .filter(|line| line.starts_with("error(") && !line.contains(" ^ "))
+        .filter_map(|line| {
+            line.split_once(") ")
+                .map(|(_, targets)| targets.to_string())
+        })
+        .collect::<std::collections::BTreeSet<_>>();
     for line in decomposed.lines().filter(|line| line.starts_with("error(")) {
         decomposed_symptoms.push(symptom_set(line));
         let components = line
@@ -76,6 +87,19 @@ fn decomposition_components_xor_back_and_never_repeat() {
                 seen.insert(component.to_string()),
                 "component {component:?} repeats in {line:?}"
             );
+        }
+        if components.len() > 1 {
+            let unknown = components
+                .iter()
+                .filter(|component| !known_components.contains(**component))
+                .collect::<Vec<_>>();
+            assert!(
+                unknown.len() <= 1,
+                "decomposition {line:?} uses more than one component outside the known set: {unknown:?}"
+            );
+            for component in unknown {
+                known_components.insert((*component).to_string());
+            }
         }
     }
     decomposed_symptoms.sort();
