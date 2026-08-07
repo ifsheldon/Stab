@@ -29,42 +29,14 @@ fn circuit_to_detector_error_model_via_reverse(
 }
 
 /// Matrix entries whose unrolled reverse (`nofold`) output diverges from the
-/// pinned-Stim `nofold` capture.
-const KNOWN_REVERSE_NOFOLD_DIVERGENCES: &[&str] = &[
-    "color_code_memory_xyz_d3_acd",
-    "color_code_memory_xyz_d5_acd",
-    "repetition_code_memory_d3_acd",
-    "repetition_code_memory_d5_acd",
-    "surface_code_rotated_memory_x_d3_acd",
-    "surface_code_rotated_memory_x_d3_brd",
-    "surface_code_rotated_memory_x_d5_acd",
-    "surface_code_rotated_memory_x_d5_brd",
-    "surface_code_rotated_memory_z_d3_acd",
-    "surface_code_rotated_memory_z_d3_brd",
-    "surface_code_rotated_memory_z_d5_acd",
-    "surface_code_rotated_memory_z_d5_brd",
-    "surface_code_unrotated_memory_z_d3_acd",
-    "surface_code_unrotated_memory_z_d5_acd",
-];
+/// pinned-Stim `nofold` capture. Empty since the reverse path replicated the
+/// pinned binary's fused `fma(old, 1 - p, (1 - old) * p)` merge contraction;
+/// any regression fails the differential as an unexpected divergence.
+const KNOWN_REVERSE_NOFOLD_DIVERGENCES: &[&str] = &[];
 
 /// Matrix entries whose reverse `fold` output diverges from the pinned-Stim
-/// `fold` capture (mirrors the external harness's fold list).
-const KNOWN_REVERSE_FOLD_DIVERGENCES: &[&str] = &[
-    "color_code_memory_xyz_d3_acd",
-    "color_code_memory_xyz_d5_acd",
-    "repetition_code_memory_d3_acd",
-    "repetition_code_memory_d5_acd",
-    "surface_code_rotated_memory_x_d3_acd",
-    "surface_code_rotated_memory_x_d3_brd",
-    "surface_code_rotated_memory_x_d5_acd",
-    "surface_code_rotated_memory_x_d5_brd",
-    "surface_code_rotated_memory_z_d3_acd",
-    "surface_code_rotated_memory_z_d3_brd",
-    "surface_code_rotated_memory_z_d5_acd",
-    "surface_code_rotated_memory_z_d5_brd",
-    "surface_code_unrotated_memory_z_d3_acd",
-    "surface_code_unrotated_memory_z_d5_acd",
-];
+/// `fold` capture. Empty for the same reason as the `nofold` list.
+const KNOWN_REVERSE_FOLD_DIVERGENCES: &[&str] = &[];
 
 fn matrix_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/consolidation_matrix")

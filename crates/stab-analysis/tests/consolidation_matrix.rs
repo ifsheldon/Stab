@@ -40,26 +40,12 @@ const KNOWN_NOFOLD_DIVERGENCES: &[&str] = &[
 ];
 
 /// Entries whose reverse-path (`fold`) output diverges from the pinned-Stim
-/// capture; the residual entries reproduce the loop-folding merge rounding
-/// recorded in the consolidation plan's diagnosis.
-const KNOWN_FOLD_DIVERGENCES: &[&str] = &[
-    "color_code_memory_xyz_d3_acd",
-    "color_code_memory_xyz_d5_acd",
-    "pauli_include_after_error",
-    "pauli_include_before_error",
-    "repetition_code_memory_d3_acd",
-    "repetition_code_memory_d5_acd",
-    "surface_code_rotated_memory_x_d3_acd",
-    "surface_code_rotated_memory_x_d3_brd",
-    "surface_code_rotated_memory_x_d5_acd",
-    "surface_code_rotated_memory_x_d5_brd",
-    "surface_code_rotated_memory_z_d3_acd",
-    "surface_code_rotated_memory_z_d3_brd",
-    "surface_code_rotated_memory_z_d5_acd",
-    "surface_code_rotated_memory_z_d5_brd",
-    "surface_code_unrotated_memory_z_d3_acd",
-    "surface_code_unrotated_memory_z_d5_acd",
-];
+/// capture. The DEPOLARIZE-rounding residue healed when the reverse merge
+/// replicated the pinned binary's fused `fma` contraction; the two remaining
+/// entries are the loop-free Pauli-include witnesses, which the public fold
+/// dispatch still routes to the forward engine until Stage 3.
+const KNOWN_FOLD_DIVERGENCES: &[&str] =
+    &["pauli_include_after_error", "pauli_include_before_error"];
 
 fn matrix_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/consolidation_matrix")
