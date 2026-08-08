@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Reopened for remediation. Milestones A0 through A8 remain complete, but A9 is frozen: the August 2026 full code review recorded eleven confirmed P1 findings, and [post-review-remediation-plan.md](post-review-remediation-plan.md) is the active execution contract until its Pass 1 closes. The A9 pre-evidence state described below resumes only after that plan restores this document to an active release state.
+Status: Active. The August 2026 [post-review remediation plan](post-review-remediation-plan.md) closed Pass 1 (Gate 0, Batches A through C) and Pass 2 (Batch D), and its Batch E produced fresh full-tier correctness evidence and restored this document in the same change set; its backlog items remain deferred behind their promotion triggers. Milestones A0 through A8 remain complete, and the A9 sequence below is the active execution path.
 
 ## Objective
 
@@ -13,27 +13,13 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - Revision `d424175c6620549086fb4ee358077632bdab97d9` passed exact-revision CI and produced a complete 138-report AArch64 chain. All reports passed Stim parity, with 122 median speedups and 16 median slowdowns, but the chain is historical and review-rejected under the repaired contracts.
 - The rejected completion replay reopened validated report paths, did not recompute final Git cleanliness, and was followed by confirmed release argument, revision-binding, toolchain-provenance, and late remote-tag defects. None of its artifacts authorizes release.
 - Focused repairs now retain replay and correctness inputs through checked-status publication, authenticate the exact soft `RLIMIT_NOFILE=1024` boundary, bind verified-host schema-version-3 DEM memory receipts from the formal sealed private worker into schema-version-4 completion, require the current 11 shared correctness artifacts, and preserve typed Git failures through publication. Release repairs freeze the complete workflow execution context, validate toolchains across targets, require protected ruleset `20419793`, capture the exact dispatch run, verify the private draft immediately before publication, verify the public release immediately afterward, quote typed `just` arguments, reject yanked registry recovery, and build each local operator in a fresh owner-only target.
-- The earlier final reviews found no P0 or P1 issue, but the August 2026 full code review superseded that conclusion with eleven confirmed P1 findings recorded in [post-review-remediation-plan.md](post-review-remediation-plan.md); the affected checklist rows are reopened and their qualification claims withdrawn. Commit `47f68446` closes the remaining P2 retained-asset gap by rehashing every retained descriptor, checking its reviewed length and digest, and rechecking the exact six-entry set. Commit `5a17c86c` uses validated protocol digest types for current formal memory receipts without changing their schema-version-3 wire format and removes one derive-only error-conversion test.
-- The first broad workspace run exposed one test-harness-only Linux `ETXTBSY` failure while executing a generated AArch64 fixture. Commit `9904e03f` explicitly syncs and closes the writer and permits only four 10-millisecond retries for that one transient OS error. The complete local non-timing verification then passed from the clean `9904e03f` source tree.
+- The earlier final reviews found no P0 or P1 issue, but the August 2026 full code review superseded that conclusion with eleven confirmed P1 findings; the [post-review remediation plan](post-review-remediation-plan.md) has since closed every Pass 1 and Pass 2 workstream with independent WS1, WS2, and WS3 milestone audits, retired the forward analyzer so the vendor-diffed sparse reverse tracker is the only sensitivity-propagation engine (all sixty-three consolidation-matrix entries byte-match pinned Stim in both fold modes, including the fused-`fmadd` probability-merge contraction of the frozen baseline), consolidated duplicate invariant owners across the workspace, and restored every reopened checklist row with named fresh evidence.
+- A source-current full-tier correctness chain exists: 961 of 961 cases passed from clean revision `e316d5f8` (request `c6a8fda1...`, report `d84cc124...`, completion `3ba0221c...`). The A9 sequence below still owns the PR and soak correctness tiers at unique paths, the 11 exact prerequisites, the live result-format corpus and oracle-matrix replay, the worker reproducibility receipts, and all controlled performance evidence.
 - The controlled host ceiling is 100000 millidegrees Celsius. Firmware throttling and critical trips remain authoritative, and every other host-policy check remains unchanged.
-- Swap configuration is restored as `/swap.img`, size `137438949376` bytes, priority `-2`. Used bytes may change during ordinary host activity; formal timing must disable swap immediately before measurement and restore this exact configuration afterward.
-- There is no source-current correctness chain, performance chain, completion checkpoint, final package preflight, crates.io publication, `v0.2.0` tag, draft, or public GitHub release.
-
-## Remediation Freeze
-
-Until Pass 1 of [post-review-remediation-plan.md](post-review-remediation-plan.md) closes and that plan restores this document to an active release state, the following actions are prohibited:
-
-- Producing new A9 correctness or performance evidence, rollups, memory receipts, or completion manifests.
-- Creating a completion checkpoint or package preflight.
-- Publishing any crate to crates.io.
-- Creating or pushing the `v0.2.0` tag.
-- Creating a GitHub draft or published release.
-
-Diagnostic and report-only runs remain permitted; nothing produced during the freeze is promotable release evidence.
+- Swap configuration is `/swap.img`, size `137438949376` bytes, priority `-2`. Used bytes may change during ordinary host activity; formal timing must disable swap immediately before measurement and restore this exact configuration afterward.
+- There is no source-current performance chain, completion checkpoint, final package preflight, crates.io publication, `v0.2.0` tag, draft, or public GitHub release, and the WS4 scratch-repository release rehearsal (remediation success criteria 2 and 3) remains pending before release day.
 
 ## Next Actions
-
-The numbered actions below are the frozen A9 sequence; they resume only after the remediation freeze lifts.
 
 1. Commit this final documentation synchronization, push the resulting clean revision, and require exact-revision `Rust` and `Qualification Contracts` CI.
 2. Regenerate and replay PR, full, and soak correctness, all 11 exact prerequisites, the live result-format corpus, the implemented oracle matrix, and 46 worker reproducibility receipts at unique paths.

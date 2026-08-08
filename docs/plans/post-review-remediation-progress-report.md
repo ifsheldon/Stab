@@ -11,8 +11,8 @@ Update this file at each batch completion with the metrics required by the plan'
 
 ## Release-Freeze State
 
-- Frozen since Gate 0 (this entry): A9 evidence production, completion checkpoints, package preflight, crates.io publication, `v0.2.0` tag creation, and GitHub draft or release creation are prohibited per the Remediation Freeze section of [GOAL.md](GOAL.md).
-- The freeze lifts only when the plan's Pass 1 closes and a later entry in this report records the restoration change set.
+- Lifted at this entry's commit: Pass 1 closed at Batch C, Pass 2 closed at Batch D, and the Batch E closure below restored [GOAL.md](GOAL.md) to an active release state in the same change set as the fresh full-tier correctness evidence.
+- The A9 sequence in the restored GOAL.md owns the remaining plan-done residuals: the controlled benchmark-group rerun (host preparation required) and the WS4 scratch-repository release rehearsal.
 
 ## Batch Log
 
@@ -65,6 +65,14 @@ Update this file at each batch completion with the metrics required by the plan'
 - Qualification-chain binding (`0f5c417f`): the case ledger gains four CQ-RESULT-FORMATS cases with exact libtest primaries for the reviewed new public surface, the dead wrapper owner rows are dropped, and both inventories regenerate (correctness `f7bcea53...`, performance `79fa074c...`) with rebound frozen digests.
 - Pass 2 net implementation deletion by crate and owner: stab-analysis −3,690 (forward `Analyzer`, `GaugeTracker`, fallback and differential seams — the retired second and third sensitivity-propagation owners); ops/bench −446 (twenty-one duplicate validators, twelve digest/hex helpers, six inline checks, argv builders, the 28-arm registry `matches!`); stab-model −9 implementation with fourteen deleted classification owners; stab-cli −197 implementation (decoder copies and format matches); stab-core −206 in the consolidated areas (forked encoders, copied Display/equality, panicking wrappers); stab-records grew by the new shared reader module (449 implementation lines) that now owns what the deleted copies reimplemented.
 - Batch D verification from the clean committed tree: `cargo test --workspace` (3,120 tests), all 480 implemented oracle rows, `record --check-clean` (145 rows), `matrix --check`, the 62-case result-format corpus, consumer, architecture, and rustdoc checks, `qualification::correctness-check`, and `bench::qualification-check` all pass. Recorded WS5 residuals: migrating ops/bench report identity structs from validated `String` digests to the typed owners (60-plus field accesses), and the sealed-worker constructor error type stays `ProtocolError` pending a worker-source change with its reproducibility rerun.
+
+### Batch E closure: reruns, fresh correctness evidence, and the freeze lift
+
+- Full oracle corpus rerun from the Batch D revision line: all 480 implemented rows pass, `record --check-clean` is stable at 145 rows, `matrix --check` validates, and the 62-case result-format corpus byte-checks against pinned Stim and Stab.
+- Inventories are regenerated and bound (correctness `6e9219f7...`, performance `97aed315...`, rebound at `e316d5f8` after the 1200-line-policy module splits moved rustdoc spans); the checklist carries no reopened rows and `docs/qualification-status.md` regenerates cleanly.
+- One CQ `--tier full` qualification rerun executed from clean committed revision `e316d5f8`: 961 of 961 selected cases passed with zero failures, request `c6a8fda12795ef9d981d166047fac82ecc5bf1b63108ecf40083c89b81b6dc87`, report `d84cc124f2b9973db2c13669b12e9581fe24da80ca255dd3fd8531551882bfbf`, completion `3ba0221c5be41448a83da992685eb54d3a715765e890ca60e6b9d23eb8889570`, published below `target/qualification/correctness/latest` and revalidated by `qualification::correctness-report`.
+- Verification breadth at the same revision line: `cargo test --workspace` (3,120 tests), the Stable 1.97.1 component suite (1,047 tests across the nine Stable packages), the portable-SIMD feature suite (124 tests), consumer, architecture, and documentation checks, and both qualification inventory checks all pass.
+- Remaining plan-done residuals, owned by the restored A9 sequence rather than this plan's batches: the affected benchmark qualification groups rerun on the controlled host (requires swap-off host preparation), the WS4 scratch-repository release rehearsal (success criteria 2 and 3), and the PR plus soak correctness tiers that A9 step 2 regenerates at unique paths alongside the 11 exact prerequisites.
 
 ## Finding Ledger
 
