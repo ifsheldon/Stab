@@ -2,6 +2,8 @@ use std::io::{self, Write};
 
 use arrayvec::ArrayString;
 
+use crate::model_tag::{write_escaped_tag_bytes, write_escaped_tag_text};
+
 const INLINE_DEM_TAG_BYTES: usize = 16;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -75,27 +77,10 @@ impl DemTag {
     }
 
     pub(super) fn write_escaped_text(&self, out: &mut String) {
-        for ch in self.as_str().chars() {
-            match ch {
-                ']' => out.push_str("\\C"),
-                '\r' => out.push_str("\\r"),
-                '\n' => out.push_str("\\n"),
-                '\\' => out.push_str("\\B"),
-                _ => out.push(ch),
-            }
-        }
+        write_escaped_tag_text(self.as_str(), out);
     }
 
     pub(super) fn write_escaped_bytes(&self, out: &mut impl Write) -> io::Result<()> {
-        for byte in self.as_bytes() {
-            match byte {
-                b']' => out.write_all(b"\\C")?,
-                b'\r' => out.write_all(b"\\r")?,
-                b'\n' => out.write_all(b"\\n")?,
-                b'\\' => out.write_all(b"\\B")?,
-                byte => out.write_all(&[*byte])?,
-            }
-        }
-        Ok(())
+        write_escaped_tag_bytes(self.as_bytes(), out)
     }
 }

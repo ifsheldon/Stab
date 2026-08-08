@@ -542,6 +542,17 @@ impl CircuitInstruction {
         }
     }
 
+    /// Returns [`Self::target_groups`]'s length without materializing the groups.
+    pub(crate) fn target_group_count(&self) -> usize {
+        match self.gate.target_group_kind() {
+            GateTargetGroupKind::None => 0,
+            GateTargetGroupKind::Singles => self.targets.len(),
+            GateTargetGroupKind::Pairs => self.targets.len() / 2,
+            GateTargetGroupKind::PauliProducts => pauli_product_target_group_count(&self.targets),
+            GateTargetGroupKind::AllTargets => usize::from(!self.targets.is_empty()),
+        }
+    }
+
     /// Splits this instruction into maximal segments whose target groups touch disjoint qubits.
     pub fn disjoint_target_segments(&self) -> Vec<Self> {
         let mut segments = Vec::new();
@@ -806,6 +817,26 @@ fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
         start = end;
     }
     groups
+}
+
+/// Counts [`pauli_product_target_groups`]'s groups without materializing them.
+///
+/// A group is one Pauli target followed by any number of combiner-target pairs, so on the
+/// combiner-validated target lists every constructed instruction carries, both walks agree.
+fn pauli_product_target_group_count(targets: &[Target]) -> usize {
+    let mut group_count = 0;
+    let mut previous_was_combiner = false;
+    for target in targets {
+        if target.is_combiner() {
+            previous_was_combiner = true;
+        } else {
+            if !previous_was_combiner {
+                group_count += 1;
+            }
+            previous_was_combiner = false;
+        }
+    }
+    group_count
 }
 
 fn write_indent(out: &mut String, indent: usize) {

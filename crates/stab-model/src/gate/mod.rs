@@ -1,12 +1,14 @@
 mod decomposition;
 mod flows;
 mod metadata;
+mod table;
 mod unitary;
 
 pub use decomposition::GateDecomposition;
 pub(crate) use decomposition::gate_decomposition_text;
 pub(crate) use flows::gate_flow_descriptors;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
+use table::GATES;
 pub use unitary::GateUnitaryRows;
 pub(crate) use unitary::gate_unitary_rows;
 
@@ -57,31 +59,45 @@ impl Gate {
         gate_info_from_simple_plain_name(name).map(|info| Self { info })
     }
 
-    #[inline]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-    )]
-    pub(crate) fn plain_h() -> Self {
-        Self { info: &GATES[25] }
-    }
+    /// Canonical `DETECTOR` gate, resolved from the gate table at compile time.
+    pub(crate) const DETECTOR: Self = Self::table_constant("DETECTOR");
+    /// Canonical `OBSERVABLE_INCLUDE` gate, resolved from the gate table at compile time.
+    pub(crate) const OBSERVABLE_INCLUDE: Self = Self::table_constant("OBSERVABLE_INCLUDE");
+    /// Canonical `TICK` gate, resolved from the gate table at compile time.
+    pub(crate) const TICK: Self = Self::table_constant("TICK");
+    /// Canonical `QUBIT_COORDS` gate, resolved from the gate table at compile time.
+    pub(crate) const QUBIT_COORDS: Self = Self::table_constant("QUBIT_COORDS");
+    /// Canonical `SHIFT_COORDS` gate, resolved from the gate table at compile time.
+    pub(crate) const SHIFT_COORDS: Self = Self::table_constant("SHIFT_COORDS");
+    /// Canonical `H` gate, resolved from the gate table at compile time.
+    pub(crate) const H: Self = Self::table_constant("H");
+    /// Canonical `S` gate, resolved from the gate table at compile time.
+    pub(crate) const S: Self = Self::table_constant("S");
+    /// Canonical `M` gate, resolved from the gate table at compile time.
+    pub(crate) const M: Self = Self::table_constant("M");
+    /// Canonical `CX` gate, resolved from the gate table at compile time.
+    pub(crate) const CX: Self = Self::table_constant("CX");
 
-    #[inline]
+    /// Looks a canonical gate up by name at compile time.
+    ///
+    /// The scan runs during constant evaluation, so a name that is not in the canonical
+    /// gate table fails the build instead of producing a runtime error.
     #[allow(
         clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+        clippy::panic,
+        reason = "compile-time table scan: a missing name or out-of-range index fails the build during const evaluation and cannot panic at runtime"
     )]
-    pub(crate) fn plain_m() -> Self {
-        Self { info: &GATES[9] }
-    }
-
-    #[inline]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-    )]
-    pub(crate) fn plain_cx() -> Self {
-        Self { info: &GATES[22] }
+    const fn table_constant(name: &str) -> Self {
+        let mut index = 0;
+        while index < GATES.len() {
+            if const_name_eq(GATES[index].name, name) {
+                return Self {
+                    info: &GATES[index],
+                };
+            }
+            index += 1;
+        }
+        panic!("gate constant does not name a canonical gate-table entry");
     }
 
     #[inline]
@@ -122,33 +138,26 @@ impl Gate {
     pub(crate) fn validate_targets(self, targets: &[Target]) -> ModelResult<()> {
         self.info.target_rule.validate(self.info.name, targets)
     }
+}
 
-    #[inline]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-    )]
-    pub(crate) fn plain_s() -> Self {
-        Self { info: &GATES[60] }
+/// Compares two gate names byte for byte during constant evaluation.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "indexes are bounded by the compared lengths and run during const evaluation"
+)]
+const fn const_name_eq(left: &str, right: &str) -> bool {
+    let (left, right) = (left.as_bytes(), right.as_bytes());
+    if left.len() != right.len() {
+        return false;
     }
-
-    #[inline]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-    )]
-    pub(crate) fn plain_detector() -> Self {
-        Self { info: &GATES[0] }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
     }
-
-    #[inline]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-    )]
-    pub(crate) fn plain_tick() -> Self {
-        Self { info: &GATES[2] }
-    }
+    true
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -159,47 +168,45 @@ struct GateInfo {
     arg_rule: ArgRule,
     target_rule: TargetRule,
     can_fuse: bool,
+    flags: GateFlags,
+    /// All accepted names in Stim v1.16.0 alias order; empty means the canonical name only.
+    aliases: &'static [&'static str],
 }
 
-const fn gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    gate_with_inverse(name, name, category, arg_rule, target_rule)
-}
+impl GateInfo {
+    const fn with_flags(mut self, flags: GateFlags) -> Self {
+        self.flags = flags;
+        self
+    }
 
-const fn gate_with_inverse(
-    name: &'static str,
-    inverse_name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name,
-        category,
-        arg_rule,
-        target_rule,
-        can_fuse: true,
+    const fn with_aliases(mut self, aliases: &'static [&'static str]) -> Self {
+        self.aliases = aliases;
+        self
     }
 }
 
-const fn not_fusable_gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name: name,
-        category,
-        arg_rule,
-        target_rule,
-        can_fuse: false,
+/// Stim-v1.16.0-style per-gate classification flags stored in the gate table.
+///
+/// Only classifications that cannot be derived from the gate's category, argument rule, or
+/// target rule are stored here; everything else stays derived so each fact has one owner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct GateFlags(u8);
+
+impl GateFlags {
+    const NONE: Self = Self(0);
+    /// Mirrors Stim's `GATE_PRODUCES_RESULTS`: the gate appends measurement records.
+    const PRODUCES_RESULTS: Self = Self(1 << 0);
+    /// Mirrors Stim's `GATE_IS_RESET`: reset or measure-reset gates.
+    const IS_RESET: Self = Self(1 << 1);
+    /// Exchange-symmetric two-qubit gate (Stim derives this set in `Gate::is_symmetric`).
+    const SYMMETRIC_PAIR: Self = Self(1 << 2);
+
+    const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
     }
 }
 
@@ -643,521 +650,3 @@ fn gate_info_from_uppercase_name(name: &str) -> Option<&'static GateInfo> {
         _ => return None,
     })
 }
-
-const GATES: &[GateInfo] = &[
-    not_fusable_gate(
-        "DETECTOR",
-        GateCategory::Annotation,
-        ArgRule::Any,
-        TargetRule::RecOnly,
-    ),
-    not_fusable_gate(
-        "OBSERVABLE_INCLUDE",
-        GateCategory::Annotation,
-        ArgRule::UnsignedInteger,
-        TargetRule::RecOrPauli,
-    ),
-    not_fusable_gate(
-        "TICK",
-        GateCategory::Annotation,
-        ArgRule::Exact(0),
-        TargetRule::None,
-    ),
-    not_fusable_gate(
-        "QUBIT_COORDS",
-        GateCategory::Annotation,
-        ArgRule::Any,
-        TargetRule::QubitCoords,
-    ),
-    not_fusable_gate(
-        "SHIFT_COORDS",
-        GateCategory::Annotation,
-        ArgRule::Any,
-        TargetRule::None,
-    ),
-    not_fusable_gate(
-        "REPEAT",
-        GateCategory::ControlFlow,
-        ArgRule::Exact(0),
-        TargetRule::None,
-    ),
-    gate(
-        "MPAD",
-        GateCategory::Annotation,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementPads,
-    ),
-    gate(
-        "MX",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate(
-        "MY",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate(
-        "M",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate(
-        "MRX",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate(
-        "MRY",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate(
-        "MR",
-        GateCategory::Collapsing,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementQubits,
-    ),
-    gate_with_inverse(
-        "RX",
-        "MX",
-        GateCategory::Collapsing,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "RY",
-        "MY",
-        GateCategory::Collapsing,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "R",
-        "M",
-        GateCategory::Collapsing,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "XCX",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "XCY",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "XCZ",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "YCX",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "YCY",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "YCZ",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "CX",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "CY",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "CZ",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "H",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "H_XY",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "H_YZ",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "H_NXY",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "H_NXZ",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "H_NYZ",
-        GateCategory::HadamardLike,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "DEPOLARIZE1",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "DEPOLARIZE2",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "X_ERROR",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "Y_ERROR",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "Z_ERROR",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "I_ERROR",
-        GateCategory::Noise,
-        ArgRule::AnyProbabilityList,
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "II_ERROR",
-        GateCategory::Noise,
-        ArgRule::AnyProbabilityList,
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "PAULI_CHANNEL_1",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(3),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "PAULI_CHANNEL_2",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(15),
-        TargetRule::PlainPairs,
-    ),
-    not_fusable_gate(
-        "E",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::PauliList,
-    ),
-    not_fusable_gate(
-        "ELSE_CORRELATED_ERROR",
-        GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::PauliList,
-    ),
-    gate(
-        "HERALDED_ERASE",
-        GateCategory::HeraldedNoise,
-        ArgRule::ProbabilityList(1),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "HERALDED_PAULI_CHANNEL_1",
-        GateCategory::HeraldedNoise,
-        ArgRule::ProbabilityList(4),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "I",
-        GateCategory::Pauli,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "X",
-        GateCategory::Pauli,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "Y",
-        GateCategory::Pauli,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "Z",
-        GateCategory::Pauli,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_XYZ",
-        "C_ZYX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_ZYX",
-        "C_XYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_NXYZ",
-        "C_ZYNX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_XNYZ",
-        "C_ZNYX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_XYNZ",
-        "C_NZYX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_NZYX",
-        "C_XYNZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_ZNYX",
-        "C_XNYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "C_ZYNX",
-        "C_NXYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "SQRT_X",
-        "SQRT_X_DAG",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "SQRT_X_DAG",
-        "SQRT_X",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "SQRT_Y",
-        "SQRT_Y_DAG",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "SQRT_Y_DAG",
-        "SQRT_Y",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "S",
-        "S_DAG",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate_with_inverse(
-        "S_DAG",
-        "S",
-        GateCategory::Period4,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "II",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_XX",
-        "SQRT_XX_DAG",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_XX_DAG",
-        "SQRT_XX",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_YY",
-        "SQRT_YY_DAG",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_YY_DAG",
-        "SQRT_YY",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_ZZ",
-        "SQRT_ZZ_DAG",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SQRT_ZZ_DAG",
-        "SQRT_ZZ",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "MPP",
-        GateCategory::PauliProduct,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::PauliProducts,
-    ),
-    gate_with_inverse(
-        "SPP",
-        "SPP_DAG",
-        GateCategory::PauliProduct,
-        ArgRule::Exact(0),
-        TargetRule::PauliProducts,
-    ),
-    gate_with_inverse(
-        "SPP_DAG",
-        "SPP",
-        GateCategory::PauliProduct,
-        ArgRule::Exact(0),
-        TargetRule::PauliProducts,
-    ),
-    gate(
-        "SWAP",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "ISWAP",
-        "ISWAP_DAG",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "CXSWAP",
-        "SWAPCX",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "SWAPCX",
-        "CXSWAP",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "CZSWAP",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate_with_inverse(
-        "ISWAP_DAG",
-        "ISWAP",
-        GateCategory::Swap,
-        ArgRule::Exact(0),
-        TargetRule::PlainPairs,
-    ),
-    gate(
-        "MXX",
-        GateCategory::PairMeasurement,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementPairs,
-    ),
-    gate(
-        "MYY",
-        GateCategory::PairMeasurement,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementPairs,
-    ),
-    gate(
-        "MZZ",
-        GateCategory::PairMeasurement,
-        ArgRule::ZeroOrOneProbability,
-        TargetRule::MeasurementPairs,
-    ),
-];

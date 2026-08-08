@@ -1,4 +1,4 @@
-use super::{ArgRule, Gate, GateCategory, TargetRule};
+use super::{ArgRule, Gate, GateCategory, GateFlags, TargetRule};
 
 /// Public argument validation shape for a Stim gate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,89 +48,10 @@ impl Gate {
     /// Returns all accepted names for this gate, in Stim v1.16.0 alias order.
     #[inline]
     pub fn aliases(self) -> &'static [&'static str] {
-        match self.info.name {
-            "DETECTOR" => &["DETECTOR"],
-            "OBSERVABLE_INCLUDE" => &["OBSERVABLE_INCLUDE"],
-            "TICK" => &["TICK"],
-            "QUBIT_COORDS" => &["QUBIT_COORDS"],
-            "SHIFT_COORDS" => &["SHIFT_COORDS"],
-            "REPEAT" => &["REPEAT"],
-            "MPAD" => &["MPAD"],
-            "MX" => &["MX"],
-            "MY" => &["MY"],
-            "M" => &["M", "MZ"],
-            "MRX" => &["MRX"],
-            "MRY" => &["MRY"],
-            "MR" => &["MR", "MRZ"],
-            "RX" => &["RX"],
-            "RY" => &["RY"],
-            "R" => &["R", "RZ"],
-            "XCX" => &["XCX"],
-            "XCY" => &["XCY"],
-            "XCZ" => &["XCZ"],
-            "YCX" => &["YCX"],
-            "YCY" => &["YCY"],
-            "YCZ" => &["YCZ"],
-            "CX" => &["CNOT", "CX", "ZCX"],
-            "CY" => &["CY", "ZCY"],
-            "CZ" => &["CZ", "ZCZ"],
-            "H" => &["H", "H_XZ"],
-            "H_XY" => &["H_XY"],
-            "H_YZ" => &["H_YZ"],
-            "H_NXY" => &["H_NXY"],
-            "H_NXZ" => &["H_NXZ"],
-            "H_NYZ" => &["H_NYZ"],
-            "DEPOLARIZE1" => &["DEPOLARIZE1"],
-            "DEPOLARIZE2" => &["DEPOLARIZE2"],
-            "X_ERROR" => &["X_ERROR"],
-            "Y_ERROR" => &["Y_ERROR"],
-            "Z_ERROR" => &["Z_ERROR"],
-            "I_ERROR" => &["I_ERROR"],
-            "II_ERROR" => &["II_ERROR"],
-            "PAULI_CHANNEL_1" => &["PAULI_CHANNEL_1"],
-            "PAULI_CHANNEL_2" => &["PAULI_CHANNEL_2"],
-            "E" => &["CORRELATED_ERROR", "E"],
-            "ELSE_CORRELATED_ERROR" => &["ELSE_CORRELATED_ERROR"],
-            "HERALDED_ERASE" => &["HERALDED_ERASE"],
-            "HERALDED_PAULI_CHANNEL_1" => &["HERALDED_PAULI_CHANNEL_1"],
-            "I" => &["I"],
-            "X" => &["X"],
-            "Y" => &["Y"],
-            "Z" => &["Z"],
-            "C_XYZ" => &["C_XYZ"],
-            "C_ZYX" => &["C_ZYX"],
-            "C_NXYZ" => &["C_NXYZ"],
-            "C_XNYZ" => &["C_XNYZ"],
-            "C_XYNZ" => &["C_XYNZ"],
-            "C_NZYX" => &["C_NZYX"],
-            "C_ZNYX" => &["C_ZNYX"],
-            "C_ZYNX" => &["C_ZYNX"],
-            "SQRT_X" => &["SQRT_X"],
-            "SQRT_X_DAG" => &["SQRT_X_DAG"],
-            "SQRT_Y" => &["SQRT_Y"],
-            "SQRT_Y_DAG" => &["SQRT_Y_DAG"],
-            "S" => &["S", "SQRT_Z"],
-            "S_DAG" => &["S_DAG", "SQRT_Z_DAG"],
-            "II" => &["II"],
-            "SQRT_XX" => &["SQRT_XX"],
-            "SQRT_XX_DAG" => &["SQRT_XX_DAG"],
-            "SQRT_YY" => &["SQRT_YY"],
-            "SQRT_YY_DAG" => &["SQRT_YY_DAG"],
-            "SQRT_ZZ" => &["SQRT_ZZ"],
-            "SQRT_ZZ_DAG" => &["SQRT_ZZ_DAG"],
-            "MPP" => &["MPP"],
-            "SPP" => &["SPP"],
-            "SPP_DAG" => &["SPP_DAG"],
-            "SWAP" => &["SWAP"],
-            "ISWAP" => &["ISWAP"],
-            "CXSWAP" => &["CXSWAP"],
-            "SWAPCX" => &["SWAPCX"],
-            "CZSWAP" => &["CZSWAP", "SWAPCZ"],
-            "ISWAP_DAG" => &["ISWAP_DAG"],
-            "MXX" => &["MXX"],
-            "MYY" => &["MYY"],
-            "MZZ" => &["MZZ"],
-            _ => &[],
+        if self.info.aliases.is_empty() {
+            std::slice::from_ref(&self.info.name)
+        } else {
+            self.info.aliases
         }
     }
 
@@ -152,6 +73,8 @@ impl Gate {
     /// Returns true when Stim has a unitary/tableau inverse for this gate.
     #[inline]
     pub fn is_unitary(self) -> bool {
+        // The Pauli-product category splits into the measuring MPP and the unitary
+        // phasing gates SPP/SPP_DAG, so result production decides that category.
         matches!(
             self.info.category,
             GateCategory::Controlled
@@ -161,47 +84,51 @@ impl Gate {
                 | GateCategory::Period4
                 | GateCategory::ParityPhasing
                 | GateCategory::Swap
-        ) || matches!(self.info.name, "SPP" | "SPP_DAG")
+        ) || (matches!(self.info.category, GateCategory::PauliProduct)
+            && !self.produces_measurements())
     }
 
-    /// Returns true for reset or measure-reset gates.
+    /// Returns true for reset or measure-reset gates, mirroring Stim's `GATE_IS_RESET`.
     #[inline]
     pub fn is_reset(self) -> bool {
-        matches!(self.info.name, "RX" | "RY" | "R" | "MRX" | "MRY" | "MR")
+        self.info.flags.contains(GateFlags::IS_RESET)
     }
 
     /// Returns Stim v1.16.0's `GateData.is_noisy_gate` flag.
     ///
-    /// This intentionally excludes `MPAD`, which can take a probability argument but is not flagged as noisy by Stim.
+    /// Noise-channel categories are noisy, and so is every result-producing gate because it
+    /// accepts a flip-probability argument. This intentionally excludes `MPAD`, which can take
+    /// a probability argument but is not flagged as noisy by Stim.
     #[inline]
     pub fn is_noisy(self) -> bool {
         matches!(
             self.info.category,
             GateCategory::Noise | GateCategory::HeraldedNoise | GateCategory::PairMeasurement
-        ) || matches!(
-            self.info.name,
-            "MX" | "MY" | "M" | "MRX" | "MRY" | "MR" | "MPP"
-        )
+        ) || (self.produces_measurements() && !self.targets_are_pad_values())
     }
 
+    /// Returns true when the gate appends results to the measurement record, mirroring
+    /// Stim's `GATE_PRODUCES_RESULTS`.
     #[inline]
     pub fn produces_measurements(self) -> bool {
-        matches!(
-            self.info.name,
-            "MPAD"
-                | "MX"
-                | "MY"
-                | "M"
-                | "MRX"
-                | "MRY"
-                | "MR"
-                | "MPP"
-                | "HERALDED_ERASE"
-                | "HERALDED_PAULI_CHANNEL_1"
-                | "MXX"
-                | "MYY"
-                | "MZZ"
-        )
+        self.info.flags.contains(GateFlags::PRODUCES_RESULTS)
+    }
+
+    /// Returns true when the gate's results are heralds reported by a noise channel rather
+    /// than qubit measurements.
+    #[inline]
+    pub fn produces_heralded_results(self) -> bool {
+        matches!(self.info.category, GateCategory::HeraldedNoise)
+    }
+
+    /// Returns true when this gate's targets play a metadata-only pad role instead of
+    /// naming qubits.
+    ///
+    /// Stim excludes such targets from qubit counting (`circuit_instruction.cc:64-69`):
+    /// `MPAD` pads reserve measurement records, and their 0/1 targets are values, not qubits.
+    #[inline]
+    pub fn targets_are_pad_values(self) -> bool {
+        matches!(self.info.target_rule, TargetRule::MeasurementPads)
     }
 
     #[inline]
@@ -246,28 +173,7 @@ impl Gate {
         ) {
             return true;
         }
-        matches!(
-            self.info.name,
-            "DEPOLARIZE2"
-                | "II_ERROR"
-                | "XCX"
-                | "YCY"
-                | "CZ"
-                | "II"
-                | "SQRT_XX"
-                | "SQRT_XX_DAG"
-                | "SQRT_YY"
-                | "SQRT_YY_DAG"
-                | "SQRT_ZZ"
-                | "SQRT_ZZ_DAG"
-                | "SWAP"
-                | "ISWAP"
-                | "ISWAP_DAG"
-                | "CZSWAP"
-                | "MXX"
-                | "MYY"
-                | "MZZ"
-        )
+        self.info.flags.contains(GateFlags::SYMMETRIC_PAIR)
     }
 
     /// Returns the true unitary inverse, or `None` for non-unitary gates.

@@ -8,26 +8,26 @@ pub(super) fn parse_common_plain_instruction(
 ) -> Option<ModelResult<CircuitInstruction>> {
     if line == "TICK" {
         return Some(Ok(CircuitInstruction::from_validated_parts(
-            Gate::plain_tick(),
+            Gate::TICK,
             Vec::new(),
             TargetVec::new(),
             None,
         )));
     }
     if let Some(rest) = line.strip_prefix("H ") {
-        return parse_common_single_qubit_instruction(Gate::plain_h(), rest);
+        return parse_common_single_qubit_instruction(Gate::H, rest);
     }
     if let Some(rest) = line.strip_prefix("S ") {
-        return parse_common_single_qubit_instruction(Gate::plain_s(), rest);
+        return parse_common_single_qubit_instruction(Gate::S, rest);
     }
     if let Some(rest) = line.strip_prefix("M ").or_else(|| line.strip_prefix("MZ ")) {
-        return parse_common_single_qubit_instruction(Gate::plain_m(), rest);
+        return parse_common_single_qubit_instruction(Gate::M, rest);
     }
     if let Some(rest) = line
         .strip_prefix("CX ")
         .or_else(|| line.strip_prefix("CNOT "))
     {
-        return parse_common_pair_instruction(Gate::plain_cx(), rest);
+        return parse_common_pair_instruction(Gate::CX, rest);
     }
     if let Some(rest) = line.strip_prefix("DETECTOR ") {
         return parse_common_detector_instruction(rest);
@@ -99,7 +99,7 @@ fn parse_common_detector_instruction(rest: &str) -> Option<ModelResult<CircuitIn
     let mut targets = TargetVec::new();
     targets.push(target);
     Some(Ok(CircuitInstruction::from_validated_parts(
-        Gate::plain_detector(),
+        Gate::DETECTOR,
         Vec::new(),
         targets,
         None,

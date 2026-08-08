@@ -313,6 +313,62 @@ fn cq2_circuit_api_qubit_count() {
 }
 
 #[test]
+fn mpad_counting_stays_metadata_driven_standalone_and_repeat_nested() {
+    // MPAD pads reserve measurement records but never qubits, standalone and repeat-nested
+    // (vendor/stim circuit_instruction.cc:64-69); both counts read gate-table metadata.
+    let standalone = circuit("MPAD 0 1 0\n");
+    assert_eq!(standalone.count_qubits(), 0);
+    assert_eq!(standalone.count_measurements().expect("measurements"), 3);
+
+    let nested = circuit(
+        "H 2\n\
+         REPEAT 5 {\n\
+             MPAD 0 1\n\
+             REPEAT 3 {\n\
+                 MPAD 1\n\
+             }\n\
+         }\n",
+    );
+    assert_eq!(nested.count_qubits(), 3);
+    assert_eq!(nested.count_measurements().expect("measurements"), 25);
+}
+
+#[test]
+fn measurement_result_counts_follow_target_or_group_shape_per_gate() {
+    // The old string-matched owner counted targets for single-qubit measurements, pads, and
+    // heralds, and target groups for pair and Pauli-product measurements; the gate-table
+    // owner must preserve those shapes exactly.
+    let circuit = circuit(
+        "M 0 1 2\n\
+         MX !3\n\
+         MR 0 1\n\
+         MPAD 0 1 0\n\
+         HERALDED_ERASE(0.25) 0 1\n\
+         HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 2\n\
+         MXX 0 1 2 3\n\
+         MZZ 4 5\n\
+         MPP X0*X1 Z2 Y3*Y4*Y5\n\
+         DETECTOR rec[-1]\n\
+         E(0.5) X0\n\
+         H 0\n",
+    );
+    let expected = [3, 1, 2, 3, 2, 1, 2, 1, 3, 0, 0, 0];
+    assert_eq!(circuit.items().len(), expected.len());
+    for (item, expected) in circuit.items().iter().zip(expected) {
+        let CircuitItem::Instruction(instruction) = item else {
+            panic!("expected a flat instruction fixture");
+        };
+        assert_eq!(
+            stab_model::advanced::circuit_instruction_measurement_result_count(instruction),
+            expected,
+            "result count for {}",
+            instruction.gate().canonical_name()
+        );
+    }
+    assert_eq!(circuit.count_measurements().expect("measurements"), 18);
+}
+
+#[test]
 fn cq2_circuit_api_clear() {
     let mut circuit = circuit("H[tag] 0\nM[measure] 0\nDETECTOR[det] rec[-1]\n");
     circuit.clear();

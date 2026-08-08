@@ -315,37 +315,37 @@ pub mod advanced {
     /// Returns the common parser fast-path `H` gate.
     #[inline]
     pub fn plain_h_gate() -> Gate {
-        Gate::plain_h()
+        Gate::H
     }
 
     /// Returns the common parser fast-path `M` gate.
     #[inline]
     pub fn plain_m_gate() -> Gate {
-        Gate::plain_m()
+        Gate::M
     }
 
     /// Returns the common parser fast-path `CX` gate.
     #[inline]
     pub fn plain_cx_gate() -> Gate {
-        Gate::plain_cx()
+        Gate::CX
     }
 
     /// Returns the common parser fast-path `S` gate.
     #[inline]
     pub fn plain_s_gate() -> Gate {
-        Gate::plain_s()
+        Gate::S
     }
 
     /// Returns the common parser fast-path `DETECTOR` gate.
     #[inline]
     pub fn plain_detector_gate() -> Gate {
-        Gate::plain_detector()
+        Gate::DETECTOR
     }
 
     /// Returns the common parser fast-path `TICK` gate.
     #[inline]
     pub fn plain_tick_gate() -> Gate {
-        Gate::plain_tick()
+        Gate::TICK
     }
 
     /// Returns the raw pinned flow descriptors for a gate.

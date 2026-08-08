@@ -58,27 +58,41 @@ impl ModelTag {
     }
 
     pub(crate) fn write_escaped_text(&self, out: &mut String) {
-        for ch in self.as_str().chars() {
-            match ch {
-                ']' => out.push_str("\\C"),
-                '\r' => out.push_str("\\r"),
-                '\n' => out.push_str("\\n"),
-                '\\' => out.push_str("\\B"),
-                _ => out.push(ch),
-            }
-        }
+        write_escaped_tag_text(self.as_str(), out);
     }
 
     pub(crate) fn write_escaped_bytes(&self, out: &mut impl Write) -> io::Result<()> {
-        for byte in self.as_bytes() {
-            match byte {
-                b']' => out.write_all(b"\\C")?,
-                b'\r' => out.write_all(b"\\r")?,
-                b'\n' => out.write_all(b"\\n")?,
-                b'\\' => out.write_all(b"\\B")?,
-                byte => out.write_all(&[*byte])?,
-            }
-        }
-        Ok(())
+        write_escaped_tag_bytes(self.as_bytes(), out)
     }
+}
+
+/// Writes tag text with Stim's tag escaping: `]` becomes `\C`, CR becomes `\r`, LF becomes
+/// `\n`, and `\` becomes `\B`.
+///
+/// This is the single owner of the tag escape table for circuit and DEM tags; the byte-level
+/// twin is [`write_escaped_tag_bytes`].
+pub(crate) fn write_escaped_tag_text(tag: &str, out: &mut String) {
+    for ch in tag.chars() {
+        match ch {
+            ']' => out.push_str("\\C"),
+            '\r' => out.push_str("\\r"),
+            '\n' => out.push_str("\\n"),
+            '\\' => out.push_str("\\B"),
+            _ => out.push(ch),
+        }
+    }
+}
+
+/// Byte-level twin of [`write_escaped_tag_text`] for exact opaque-tag round trips.
+pub(crate) fn write_escaped_tag_bytes(tag: &[u8], out: &mut impl Write) -> io::Result<()> {
+    for byte in tag {
+        match byte {
+            b']' => out.write_all(b"\\C")?,
+            b'\r' => out.write_all(b"\\r")?,
+            b'\n' => out.write_all(b"\\n")?,
+            b'\\' => out.write_all(b"\\B")?,
+            byte => out.write_all(&[*byte])?,
+        }
+    }
+    Ok(())
 }

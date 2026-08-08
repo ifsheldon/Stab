@@ -58,6 +58,242 @@ fn canonical_gate_registry_owns_aliases_and_metadata() {
 }
 
 #[test]
+fn gate_classification_views_agree_with_stim_v1_16_lists_for_every_gate() {
+    // Independent expectations: the frozen Stim v1.16.0 classification lists that the
+    // deleted string-matching sites used to encode (WS5 one-owner consolidation).
+    const PRODUCES_RESULTS: &[&str] = &[
+        "MPAD",
+        "MX",
+        "MY",
+        "M",
+        "MRX",
+        "MRY",
+        "MR",
+        "MPP",
+        "HERALDED_ERASE",
+        "HERALDED_PAULI_CHANNEL_1",
+        "MXX",
+        "MYY",
+        "MZZ",
+    ];
+    const RESETS: &[&str] = &["RX", "RY", "R", "MRX", "MRY", "MR"];
+    const NOISY: &[&str] = &[
+        "DEPOLARIZE1",
+        "DEPOLARIZE2",
+        "X_ERROR",
+        "Y_ERROR",
+        "Z_ERROR",
+        "I_ERROR",
+        "II_ERROR",
+        "PAULI_CHANNEL_1",
+        "PAULI_CHANNEL_2",
+        "E",
+        "ELSE_CORRELATED_ERROR",
+        "HERALDED_ERASE",
+        "HERALDED_PAULI_CHANNEL_1",
+        "MX",
+        "MY",
+        "M",
+        "MRX",
+        "MRY",
+        "MR",
+        "MPP",
+        "MXX",
+        "MYY",
+        "MZZ",
+    ];
+    const UNITARY: &[&str] = &[
+        "XCX",
+        "XCY",
+        "XCZ",
+        "YCX",
+        "YCY",
+        "YCZ",
+        "CX",
+        "CY",
+        "CZ",
+        "H",
+        "H_XY",
+        "H_YZ",
+        "H_NXY",
+        "H_NXZ",
+        "H_NYZ",
+        "I",
+        "X",
+        "Y",
+        "Z",
+        "C_XYZ",
+        "C_ZYX",
+        "C_NXYZ",
+        "C_XNYZ",
+        "C_XYNZ",
+        "C_NZYX",
+        "C_ZNYX",
+        "C_ZYNX",
+        "SQRT_X",
+        "SQRT_X_DAG",
+        "SQRT_Y",
+        "SQRT_Y_DAG",
+        "S",
+        "S_DAG",
+        "II",
+        "SQRT_XX",
+        "SQRT_XX_DAG",
+        "SQRT_YY",
+        "SQRT_YY_DAG",
+        "SQRT_ZZ",
+        "SQRT_ZZ_DAG",
+        "SPP",
+        "SPP_DAG",
+        "SWAP",
+        "ISWAP",
+        "CXSWAP",
+        "SWAPCX",
+        "CZSWAP",
+        "ISWAP_DAG",
+    ];
+    const SYMMETRIC_PAIRS: &[&str] = &[
+        "DEPOLARIZE2",
+        "II_ERROR",
+        "XCX",
+        "YCY",
+        "CZ",
+        "II",
+        "SQRT_XX",
+        "SQRT_XX_DAG",
+        "SQRT_YY",
+        "SQRT_YY_DAG",
+        "SQRT_ZZ",
+        "SQRT_ZZ_DAG",
+        "SWAP",
+        "ISWAP",
+        "ISWAP_DAG",
+        "CZSWAP",
+        "MXX",
+        "MYY",
+        "MZZ",
+    ];
+    const HERALDED: &[&str] = &["HERALDED_ERASE", "HERALDED_PAULI_CHANNEL_1"];
+    const PAD_TARGETS: &[&str] = &["MPAD"];
+
+    for list in [
+        PRODUCES_RESULTS,
+        RESETS,
+        NOISY,
+        UNITARY,
+        SYMMETRIC_PAIRS,
+        HERALDED,
+        PAD_TARGETS,
+    ] {
+        for name in list {
+            assert_eq!(
+                Gate::from_name(name)
+                    .expect("expectation names a gate")
+                    .canonical_name(),
+                *name,
+                "classification lists must use canonical gate names"
+            );
+        }
+    }
+
+    assert_eq!(Gate::all().len(), 81);
+    for gate in Gate::all() {
+        let name = gate.canonical_name();
+        assert_eq!(
+            gate.produces_measurements(),
+            PRODUCES_RESULTS.contains(&name),
+            "produces_measurements for {name}"
+        );
+        assert_eq!(
+            gate.is_reset(),
+            RESETS.contains(&name),
+            "is_reset for {name}"
+        );
+        assert_eq!(
+            gate.is_noisy(),
+            NOISY.contains(&name),
+            "is_noisy for {name}"
+        );
+        assert_eq!(
+            gate.is_unitary(),
+            UNITARY.contains(&name),
+            "is_unitary for {name}"
+        );
+        let symmetric = matches!(
+            gate.target_rule(),
+            GateTargetRule::AnySingleQubit | GateTargetRule::MeasurementQubits
+        ) || SYMMETRIC_PAIRS.contains(&name);
+        assert_eq!(
+            gate.is_symmetric_gate(),
+            symmetric,
+            "is_symmetric_gate for {name}"
+        );
+        assert_eq!(
+            gate.produces_heralded_results(),
+            HERALDED.contains(&name),
+            "produces_heralded_results for {name}"
+        );
+        assert_eq!(
+            gate.targets_are_pad_values(),
+            PAD_TARGETS.contains(&name),
+            "targets_are_pad_values for {name}"
+        );
+        if gate.produces_heralded_results() || gate.targets_are_pad_values() {
+            assert!(
+                gate.produces_measurements(),
+                "heralds and pads are results for {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn gate_alias_lists_agree_with_the_gate_table_for_every_gate() {
+    // Independent expectation: the frozen Stim v1.16.0 alias lists that the deleted
+    // per-name aliases() match used to encode; every other gate aliases only itself.
+    const MULTI_ALIAS: &[(&str, &[&str])] = &[
+        ("M", &["M", "MZ"]),
+        ("MR", &["MR", "MRZ"]),
+        ("R", &["R", "RZ"]),
+        ("CX", &["CNOT", "CX", "ZCX"]),
+        ("CY", &["CY", "ZCY"]),
+        ("CZ", &["CZ", "ZCZ"]),
+        ("H", &["H", "H_XZ"]),
+        ("E", &["CORRELATED_ERROR", "E"]),
+        ("S", &["S", "SQRT_Z"]),
+        ("S_DAG", &["S_DAG", "SQRT_Z_DAG"]),
+        ("CZSWAP", &["CZSWAP", "SWAPCZ"]),
+    ];
+
+    let mut seen = std::collections::BTreeSet::new();
+    let mut accepted_names = 0_usize;
+    for gate in Gate::all() {
+        let name = gate.canonical_name();
+        match MULTI_ALIAS.iter().find(|(canonical, _)| *canonical == name) {
+            Some((_, aliases)) => assert_eq!(gate.aliases(), *aliases, "aliases for {name}"),
+            None => assert_eq!(gate.aliases(), [name].as_slice(), "aliases for {name}"),
+        }
+        assert!(
+            gate.aliases().contains(&name),
+            "canonical name is a member of its alias list for {name}"
+        );
+        for alias in gate.aliases() {
+            assert!(
+                seen.insert(*alias),
+                "alias {alias} is claimed by one gate only"
+            );
+            assert_eq!(
+                Gate::from_name(alias).expect("alias resolves"),
+                gate,
+                "alias {alias} resolves to {name}"
+            );
+            accepted_names += 1;
+        }
+    }
+    assert_eq!(accepted_names, 93, "Stim v1.16.0 accepted-name count");
+}
+
+#[test]
 fn gate_validation_reports_model_owned_errors() {
     let h = Gate::from_name("H").expect("H");
     let q0 = Target::qubit(QubitId::new(0).expect("q0"), false);

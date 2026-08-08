@@ -871,8 +871,7 @@ fn parse_simple_plain_instruction(
         Ok(Some(targets)) => targets,
         Ok(None) | Err(_) => return None,
     };
-    let gate_name = gate.canonical_name();
-    if gate_name == "CX" && validate_simple_plain_pairs(gate_name, &targets).is_err() {
+    if gate == Gate::CX && validate_simple_plain_pairs(gate.canonical_name(), &targets).is_err() {
         return None;
     }
     Some(Ok(CircuitInstruction::from_validated_parts(
