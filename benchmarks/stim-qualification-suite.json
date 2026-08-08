@@ -2,8 +2,8 @@
   "schema_version": 3,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "f7bcea532ab78126448f0054c1bf09c9a3edca7d099e6495639d8b968ce0eea8",
-  "semantic_digest": "79fa074c436592af8a3595ce62e09f1900f5feaa386297802158152d9e6e11e2",
+  "correctness_digest": "6e9219f724f3ea343e9a24b1aeefcf9746c80f24c692a01bf13baf234cdd5a23",
+  "semantic_digest": "97aed315c0b8e2847ffa9461e103ecec3307fef878421f06db4ef173090a172f",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",

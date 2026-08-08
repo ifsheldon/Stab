@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "f7bcea532ab78126448f0054c1bf09c9a3edca7d099e6495639d8b968ce0eea8",
+  "semantic_digest": "6e9219f724f3ea343e9a24b1aeefcf9746c80f24c692a01bf13baf234cdd5a23",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -142527,7 +142527,7 @@
       "path": "stab_model::Gate",
       "kind": "struct",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 34,
+      "source_line": 36,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142543,7 +142543,7 @@
       "path": "stab_model::Gate as Clone for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142559,7 +142559,7 @@
       "path": "stab_model::Gate as Copy for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142575,7 +142575,7 @@
       "path": "stab_model::Gate as Debug for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142591,7 +142591,7 @@
       "path": "stab_model::Gate as Eq for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142607,7 +142607,7 @@
       "path": "stab_model::Gate as PartialEq for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142623,7 +142623,7 @@
       "path": "stab_model::Gate as StructuralPartialEq for@faf983fc1f73",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 33,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142655,7 +142655,7 @@
       "path": "stab_model::Gate::all",
       "kind": "method",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 41,
+      "source_line": 43,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142687,7 +142687,7 @@
       "path": "stab_model::Gate::best_candidate_inverse",
       "kind": "method",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 118,
+      "source_line": 120,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142719,7 +142719,7 @@
       "path": "stab_model::Gate::canonical_name",
       "kind": "method",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 102,
+      "source_line": 104,
       "owner_case_id": "cq-evidence-qualification-a1a9447d3f0f3eec",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142735,7 +142735,7 @@
       "path": "stab_model::Gate::category",
       "kind": "method",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 113,
+      "source_line": 115,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -142751,7 +142751,7 @@
       "path": "stab_model::Gate::from_name",
       "kind": "method",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 46,
+      "source_line": 48,
       "owner_case_id": "cq-evidence-qualification-f2e893d5376482c3",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143247,7 +143247,7 @@
       "path": "stab_model::GateCategory",
       "kind": "enum",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 16,
+      "source_line": 18,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143263,7 +143263,7 @@
       "path": "stab_model::GateCategory as Clone for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143279,7 +143279,7 @@
       "path": "stab_model::GateCategory as Copy for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143295,7 +143295,7 @@
       "path": "stab_model::GateCategory as Debug for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143311,7 +143311,7 @@
       "path": "stab_model::GateCategory as Eq for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143327,7 +143327,7 @@
       "path": "stab_model::GateCategory as PartialEq for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143343,7 +143343,7 @@
       "path": "stab_model::GateCategory as StructuralPartialEq for@a1a07482c050",
       "kind": "trait-impl",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 15,
+      "source_line": 17,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143359,7 +143359,7 @@
       "path": "stab_model::GateCategory::Annotation",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 17,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143375,7 +143375,7 @@
       "path": "stab_model::GateCategory::Collapsing",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 19,
+      "source_line": 21,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143391,7 +143391,7 @@
       "path": "stab_model::GateCategory::ControlFlow",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 18,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143407,7 +143407,7 @@
       "path": "stab_model::GateCategory::Controlled",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 20,
+      "source_line": 22,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143423,7 +143423,7 @@
       "path": "stab_model::GateCategory::HadamardLike",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 21,
+      "source_line": 23,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143439,7 +143439,7 @@
       "path": "stab_model::GateCategory::HeraldedNoise",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 23,
+      "source_line": 25,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143455,7 +143455,7 @@
       "path": "stab_model::GateCategory::Noise",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 22,
+      "source_line": 24,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143471,7 +143471,7 @@
       "path": "stab_model::GateCategory::PairMeasurement",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 30,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143487,7 +143487,7 @@
       "path": "stab_model::GateCategory::ParityPhasing",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 27,
+      "source_line": 29,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143503,7 +143503,7 @@
       "path": "stab_model::GateCategory::Pauli",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 24,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143519,7 +143519,7 @@
       "path": "stab_model::GateCategory::PauliProduct",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 28,
+      "source_line": 30,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143535,7 +143535,7 @@
       "path": "stab_model::GateCategory::Period3",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 25,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143551,7 +143551,7 @@
       "path": "stab_model::GateCategory::Period4",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 26,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -143567,7 +143567,7 @@
       "path": "stab_model::GateCategory::Swap",
       "kind": "variant",
       "source_path": "crates/stab-model/src/gate/mod.rs",
-      "source_line": 29,
+      "source_line": 31,
       "owner_case_id": "cq-evidence-oracle-790ea14b3e33c1ac",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
