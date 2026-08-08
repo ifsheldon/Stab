@@ -110,8 +110,12 @@ fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
     let measurement = [false];
     let sweep = [true];
     assert_eq!(converter.sweep_bit_count(), 1);
-    let mut reusable_reference = converter.reusable_reference_sample();
-    let mut reusable_record = converter.reusable_detection_record();
+    let mut reusable_reference = converter
+        .try_reusable_reference_sample()
+        .expect("allocate reusable reference sample");
+    let mut reusable_record = converter
+        .try_reusable_detection_record()
+        .expect("allocate reusable detection record");
     converter
         .convert_record_with_sweep_into(
             &measurement,
@@ -217,9 +221,16 @@ fn compiled_detection_converter_streams_like_materialized_conversion() {
     assert_eq!(converter.sweep_bit_count(), 0);
     assert_eq!(converter.detector_count(), 2);
     assert_eq!(converter.observable_count(), 3);
-    assert_eq!(converter.reusable_reference_sample(), vec![false; 2]);
     assert_eq!(
-        converter.reusable_detection_record(),
+        converter
+            .try_reusable_reference_sample()
+            .expect("allocate reusable reference sample"),
+        vec![false; 2]
+    );
+    assert_eq!(
+        converter
+            .try_reusable_detection_record()
+            .expect("allocate reusable detection record"),
         DetectionEventRecord {
             detectors: vec![false; 2],
             observables: vec![false; 3],

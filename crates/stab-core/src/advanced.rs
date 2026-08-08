@@ -32,6 +32,12 @@ pub mod records {
         for_each_dets_token_record, for_each_packed_record, for_each_ptb64_record,
         for_each_ptb64_record_all, for_each_record, for_each_sparse_record,
     };
+    /// Component-tier record error identity, re-exported so facade consumers can name the typed
+    /// sink and stream-reader failure types (for example `MeasurementCodecSink::Error`) without
+    /// depending on `stab-records` directly.
+    pub use stab_records::{FormatError, FormatErrorCode, RecordResult};
+    /// Per-record streaming decode over byte transports, shared by every CLI record reader.
+    pub use stab_records::{RecordStreamReadError, RecordStreamReader};
 }
 
 /// Explicit backend selection and backend capability descriptors.

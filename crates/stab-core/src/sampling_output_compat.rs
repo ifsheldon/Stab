@@ -4,6 +4,7 @@ use std::convert::Infallible;
 
 use crate::{
     CircuitError, CircuitResult, FormatError, MeasurementCodecSink, RecordFormat, SampleFormat,
+    result_formats::MeasureRecordWriter,
     sampling::{
         CompiledSampler, RunError, SamplingExecutionError, SamplingRunProgress, ShotCount,
         legacy_execution_error, legacy_random_policy, legacy_reference_mode, legacy_shot_count,
@@ -263,7 +264,7 @@ fn validate_materialized_request(
 struct FallibleSampleEncoder {
     format: SampleFormat,
     width: usize,
-    output: Vec<u8>,
+    writer: MeasureRecordWriter,
 }
 
 impl FallibleSampleEncoder {
@@ -287,18 +288,17 @@ impl FallibleSampleEncoder {
                 sample_format_name(format)
             ))
         })?;
-        let mut output = Vec::new();
-        output.try_reserve_exact(minimum_output).map_err(|error| {
-            adapter_allocation_error(
-                sample_format_allocation_label(format),
-                minimum_output,
-                error,
-            )
-        })?;
+        let writer =
+            MeasureRecordWriter::try_with_capacity(format, minimum_output).map_err(|error| {
+                adapter_size_error(format!(
+                    "{} capacity {minimum_output}: {error}",
+                    sample_format_allocation_label(format)
+                ))
+            })?;
         Ok(Self {
             format,
             width,
-            output,
+            writer,
         })
     }
 
@@ -313,216 +313,14 @@ impl FallibleSampleEncoder {
                 ),
             });
         }
-        let encoded_len = encoded_record_len(self.format, record)?;
-        self.output
-            .try_reserve_exact(encoded_len)
-            .map_err(|error| {
-                adapter_allocation_error(
-                    sample_format_allocation_label(self.format),
-                    encoded_len,
-                    error,
-                )
-            })?;
-        let start = self.output.len();
-        match self.format {
-            SampleFormat::ZeroOne => encode_zero_one(&mut self.output, record),
-            SampleFormat::B8 => encode_b8(&mut self.output, record),
-            SampleFormat::R8 => encode_r8(&mut self.output, record),
-            SampleFormat::Hits => encode_hits(&mut self.output, record),
-            SampleFormat::Dets => encode_dets(&mut self.output, record),
-        }
-        let actual_len = self.output.len().checked_sub(start).ok_or_else(|| {
-            SamplingExecutionError::InternalInvariant {
-                message: "sample encoder output length moved backwards".to_owned(),
-            }
-        })?;
-        if actual_len != encoded_len {
-            return Err(SamplingExecutionError::InternalInvariant {
-                message: format!(
-                    "{} sample encoder wrote {actual_len} bytes after reserving {encoded_len}",
-                    sample_format_name(self.format)
-                ),
-            });
-        }
+        self.writer.write_bits(record);
+        self.writer.write_end();
         Ok(())
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        self.output
+        self.writer.into_bytes()
     }
-}
-
-fn encoded_record_len(
-    format: SampleFormat,
-    record: &[bool],
-) -> Result<usize, SamplingExecutionError> {
-    match format {
-        SampleFormat::ZeroOne => record
-            .len()
-            .checked_add(1)
-            .ok_or_else(|| adapter_size_error("01 encoded record length overflowed".to_owned())),
-        SampleFormat::B8 => Ok(record.len().div_ceil(8)),
-        SampleFormat::R8 => r8_record_len(record),
-        SampleFormat::Hits => sparse_record_len(record, false),
-        SampleFormat::Dets => sparse_record_len(record, true),
-    }
-}
-
-fn r8_record_len(record: &[bool]) -> Result<usize, SamplingExecutionError> {
-    let mut encoded_len = 1_usize;
-    let mut false_run = 0_u8;
-    for bit in record {
-        if *bit {
-            if false_run == u8::MAX {
-                encoded_len = checked_encoded_add(encoded_len, 1, "r8")?;
-            }
-            encoded_len = checked_encoded_add(encoded_len, 1, "r8")?;
-            false_run = 0;
-        } else {
-            if false_run == u8::MAX {
-                encoded_len = checked_encoded_add(encoded_len, 1, "r8")?;
-                false_run = 0;
-            }
-            false_run += 1;
-        }
-    }
-    if false_run == u8::MAX {
-        encoded_len = checked_encoded_add(encoded_len, 1, "r8")?;
-    }
-    Ok(encoded_len)
-}
-
-fn sparse_record_len(record: &[bool], dets: bool) -> Result<usize, SamplingExecutionError> {
-    let mut encoded_len = if dets { 5_usize } else { 1_usize };
-    let mut has_hit = false;
-    for (index, bit) in record.iter().copied().enumerate() {
-        if !bit {
-            continue;
-        }
-        let separator_len = if dets || has_hit { 1 } else { 0 };
-        let type_len = usize::from(dets);
-        encoded_len = checked_encoded_add(
-            encoded_len,
-            separator_len + type_len + decimal_len(index),
-            if dets { "dets" } else { "hits" },
-        )?;
-        has_hit = true;
-    }
-    Ok(encoded_len)
-}
-
-fn checked_encoded_add(
-    current: usize,
-    additional: usize,
-    format: &'static str,
-) -> Result<usize, SamplingExecutionError> {
-    current
-        .checked_add(additional)
-        .ok_or_else(|| adapter_size_error(format!("{format} encoded record length overflowed")))
-}
-
-fn encode_zero_one(output: &mut Vec<u8>, record: &[bool]) {
-    output.extend(record.iter().map(|bit| if *bit { b'1' } else { b'0' }));
-    output.push(b'\n');
-}
-
-fn encode_b8(output: &mut Vec<u8>, record: &[bool]) {
-    let mut byte = 0_u8;
-    let mut bit_index = 0_u8;
-    for bit in record {
-        if *bit {
-            byte |= 1_u8 << bit_index;
-        }
-        bit_index += 1;
-        if bit_index == 8 {
-            output.push(byte);
-            byte = 0;
-            bit_index = 0;
-        }
-    }
-    if bit_index != 0 {
-        output.push(byte);
-    }
-}
-
-fn encode_r8(output: &mut Vec<u8>, record: &[bool]) {
-    let mut false_run = 0_u8;
-    for bit in record {
-        if *bit {
-            if false_run == u8::MAX {
-                output.push(u8::MAX);
-                false_run = 0;
-            }
-            output.push(false_run);
-            false_run = 0;
-        } else {
-            if false_run == u8::MAX {
-                output.push(u8::MAX);
-                false_run = 0;
-            }
-            false_run += 1;
-        }
-    }
-    if false_run == u8::MAX {
-        output.push(u8::MAX);
-        false_run = 0;
-    }
-    output.push(false_run);
-}
-
-fn encode_hits(output: &mut Vec<u8>, record: &[bool]) {
-    let mut first = true;
-    for (index, bit) in record.iter().copied().enumerate() {
-        if !bit {
-            continue;
-        }
-        if !first {
-            output.push(b',');
-        }
-        first = false;
-        append_usize_decimal(output, index);
-    }
-    output.push(b'\n');
-}
-
-fn encode_dets(output: &mut Vec<u8>, record: &[bool]) {
-    output.extend_from_slice(b"shot");
-    for (index, bit) in record.iter().copied().enumerate() {
-        if !bit {
-            continue;
-        }
-        output.extend_from_slice(b" M");
-        append_usize_decimal(output, index);
-    }
-    output.push(b'\n');
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "a decimal digit modulo 10 is always representable as u8"
-)]
-fn append_usize_decimal(output: &mut Vec<u8>, mut value: usize) {
-    let mut digits = [0_u8; size_of::<usize>() * 3];
-    let mut used = 0_usize;
-    for digit in digits.iter_mut().rev() {
-        *digit = b'0' + (value % 10) as u8;
-        used += 1;
-        value /= 10;
-        if value == 0 {
-            break;
-        }
-    }
-    let start = digits.len() - used;
-    output.extend(digits.into_iter().skip(start));
-}
-
-fn decimal_len(mut value: usize) -> usize {
-    let mut digits = 1;
-    while value >= 10 {
-        value /= 10;
-        digits += 1;
-    }
-    digits
 }
 
 fn sample_format_name(format: SampleFormat) -> &'static str {

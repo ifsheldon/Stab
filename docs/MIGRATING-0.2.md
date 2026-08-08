@@ -81,7 +81,7 @@ Every publishable Stab product package is versioned `0.2.0`, and every publishab
 
 ## Post-Review Remediation Changes
 
-The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1 and WS3) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
+The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1, WS3, and WS5) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
 
 - `CompiledSampler::count_determined_measurements` and `CompiledSampler::reference_sample` now return `CircuitResult`; the duplicate `try_count_determined_measurements` and `try_reference_sample` methods are removed. Append `?` or `.expect(...)` at call sites.
 - The panicking `SamplingPlan::count_determined_measurements` and `SamplingPlan::reference_sample` compatibility methods are removed; use `try_count_determined_measurements` and `try_reference_sample`. A parseable hostile circuit can no longer panic a public entry point.
@@ -97,5 +97,6 @@ The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-
 - The Stab-specific `sample_dem` observable-routing flags `--append_observables` and `--prepend_observables` are hidden from `--help` (decision D4) but stay functional as compatibility conveniences.
 - `FlexPauliString::from_str` rejects doubled sign prefixes (`+-X`, `--X`, `-+X`, `i-X`, `-i+X`) with typed invalid-character errors mirroring pinned Stim instead of silently corrupting the sign.
 - `Circuit` now implements `Drop`, `Clone`, and `PartialEq` iteratively (mirroring `DetectorErrorModel`), so deeply nested API-built circuits no longer abort the process; its `Debug` output elides nested bodies (`Circuit { top_level_items: N, .. }`), and moving `items` out of a `Circuit` by value is no longer possible because the type implements `Drop`.
+- The panicking `stab_engine::CompiledDetectionConverter::reusable_detection_record` and `stab_engine::CompiledDetectionConverter::reusable_reference_sample` compatibility wrappers are removed, together with their `stab_core::advanced::compat::CompiledDetectionConverter` facade forwards; use `try_reusable_detection_record` and `try_reusable_reference_sample`. Their infallible signatures were panic-free only while the current detection compile caps hold, so scratch allocation failures now surface as typed errors instead of process panics.
 
 The detailed decision ledger remains [architecture/0.2-api-migration-inventory.md](architecture/0.2-api-migration-inventory.md). The frozen pre-0.2 inventory remains historical and is not rewritten.

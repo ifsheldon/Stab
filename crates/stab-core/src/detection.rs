@@ -102,18 +102,10 @@ impl CompiledDetectionConverter {
             .map_err(FacadeVisitError::into_external)
     }
 
-    pub fn reusable_detection_record(&self) -> DetectionEventRecord {
-        self.inner.reusable_detection_record()
-    }
-
     pub fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
         self.inner
             .try_reusable_detection_record()
             .map_err(Into::into)
-    }
-
-    pub fn reusable_reference_sample(&self) -> Vec<bool> {
-        self.inner.reusable_reference_sample()
     }
 
     pub fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {

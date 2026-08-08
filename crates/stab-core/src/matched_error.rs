@@ -86,9 +86,10 @@ pub struct CircuitErrorLocation {
 
 impl CircuitErrorLocation {
     pub fn canonicalize(&mut self) {
-        let mut delegate = self.to_analysis();
-        delegate.canonicalize();
-        *self = Self::from_analysis(delegate);
+        stab_analysis::canonicalize_circuit_error_location_parts(
+            &mut self.flipped_pauli_product,
+            &mut self.flipped_measurement,
+        );
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
@@ -134,11 +135,7 @@ impl CircuitErrorLocation {
 
 impl PartialEq for CircuitErrorLocation {
     fn eq(&self, other: &Self) -> bool {
-        self.tick_offset == other.tick_offset
-            && self.flipped_pauli_product == other.flipped_pauli_product
-            && self.flipped_measurement == other.flipped_measurement
-            && self.instruction_targets == other.instruction_targets
-            && self.stack_frames == other.stack_frames
+        self.as_analysis_view() == other.as_analysis_view()
     }
 }
 
@@ -166,9 +163,14 @@ impl ExplainedError {
     }
 
     pub fn canonicalize(&mut self) {
-        let mut delegate = self.to_analysis();
-        delegate.canonicalize();
-        *self = Self::from_analysis(delegate);
+        for location in &mut self.circuit_error_locations {
+            location.canonicalize();
+        }
+        stab_analysis::canonicalize_dem_error_terms(&mut self.dem_error_terms);
+        self.circuit_error_locations.sort_by(|left, right| {
+            left.as_analysis_view()
+                .canonical_cmp(right.as_analysis_view())
+        });
     }
 
     fn to_analysis(&self) -> stab_analysis::ExplainedError {

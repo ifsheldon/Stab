@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     CircuitError, CircuitResult, SampleFormat,
-    result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
+    result_formats::{DetsResultType, MeasureRecordWriter, write_ptb64_records_checked},
 };
 
 pub fn write_detection_records(
@@ -15,25 +15,17 @@ pub fn write_detection_records(
     let mut writer = MeasureRecordWriter::new(format);
     for record in &output.records {
         validate_record_widths(output, record)?;
-        if format == SampleFormat::Dets {
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                writer.begin_result_type(b'L');
-                writer.write_bits(&record.observables);
-            }
-            writer.begin_result_type(b'D');
-            writer.write_bits(&record.detectors);
-            if observable_mode == DetectionObservableOutputMode::Append {
-                writer.begin_result_type(b'L');
-                writer.write_bits(&record.observables);
-            }
-        } else {
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                writer.write_bits(&record.observables);
-            }
-            writer.write_bits(&record.detectors);
-            if observable_mode == DetectionObservableOutputMode::Append {
-                writer.write_bits(&record.observables);
-            }
+        // `begin_dets_result_type` is a no-op on non-DETS writers, mirroring upstream Stim's
+        // single writer-driving loop in measurements_to_detection_events.cc.
+        if observable_mode == DetectionObservableOutputMode::Prepend {
+            writer.begin_dets_result_type(DetsResultType::Observable);
+            writer.write_bits(&record.observables);
+        }
+        writer.begin_dets_result_type(DetsResultType::Detector);
+        writer.write_bits(&record.detectors);
+        if observable_mode == DetectionObservableOutputMode::Append {
+            writer.begin_dets_result_type(DetsResultType::Observable);
+            writer.write_bits(&record.observables);
         }
         writer.write_end();
     }
@@ -47,9 +39,7 @@ pub fn write_observable_records(
     let mut writer = MeasureRecordWriter::new(format);
     for record in &output.records {
         validate_record_widths(output, record)?;
-        if format == SampleFormat::Dets {
-            writer.begin_result_type(b'L');
-        }
+        writer.begin_dets_result_type(DetsResultType::Observable);
         writer.write_bits(&record.observables);
         writer.write_end();
     }

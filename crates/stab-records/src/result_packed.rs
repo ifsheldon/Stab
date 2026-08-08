@@ -1,6 +1,6 @@
 use crate::{ByteSpan, FormatError, FormatErrorCode, FormatErrorContext, RecordResult};
 
-pub(crate) fn b8_bytes_per_record(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
+pub(crate) fn b8_record_byte_width(bits_per_record: usize) -> RecordResult<usize> {
     let bytes_per_record = bits_per_record.div_ceil(8);
     if bytes_per_record == 0 {
         return Err(format_error(
@@ -13,19 +13,28 @@ pub(crate) fn b8_bytes_per_record(input_len: usize, bits_per_record: usize) -> R
             },
         ));
     }
+    Ok(bytes_per_record)
+}
+
+pub(crate) fn b8_length_multiple_error(input_len: usize, bytes_per_record: usize) -> FormatError {
     let trailing_bytes = input_len % bytes_per_record;
-    if trailing_bytes != 0 {
-        return Err(format_error(
-            FormatErrorCode::InvalidPackedLength,
-            format!(
-                "b8 input length {input_len} is not a multiple of record byte width {bytes_per_record}"
-            ),
-            ByteSpan::try_new(input_len - trailing_bytes, trailing_bytes),
-            FormatErrorContext::InputLengthMultiple {
-                actual_bytes: input_len,
-                byte_multiple: bytes_per_record,
-            },
-        ));
+    format_error(
+        FormatErrorCode::InvalidPackedLength,
+        format!(
+            "b8 input length {input_len} is not a multiple of record byte width {bytes_per_record}"
+        ),
+        ByteSpan::try_new(input_len - trailing_bytes, trailing_bytes),
+        FormatErrorContext::InputLengthMultiple {
+            actual_bytes: input_len,
+            byte_multiple: bytes_per_record,
+        },
+    )
+}
+
+pub(crate) fn b8_bytes_per_record(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
+    let bytes_per_record = b8_record_byte_width(bits_per_record)?;
+    if !input_len.is_multiple_of(bytes_per_record) {
+        return Err(b8_length_multiple_error(input_len, bytes_per_record));
     }
     Ok(bytes_per_record)
 }
@@ -72,32 +81,40 @@ pub(crate) fn ptb64_prefix_layout(
     Ok((bytes_per_group, expected_bytes))
 }
 
+pub(crate) fn ptb64_zero_width_count_error() -> FormatError {
+    format_error(
+        FormatErrorCode::InvalidRecordWidth,
+        "ptb64 input cannot infer a shot count for zero-width records",
+        None,
+        FormatErrorContext::MinimumRecordWidth {
+            actual_bits: 0,
+            minimum_bits: 1,
+        },
+    )
+}
+
+pub(crate) fn ptb64_length_multiple_error(input_len: usize, bytes_per_group: usize) -> FormatError {
+    let trailing_bytes = input_len % bytes_per_group;
+    format_error(
+        FormatErrorCode::InvalidPackedLength,
+        format!(
+            "ptb64 input length {input_len} is not a multiple of shot-group byte width {bytes_per_group}"
+        ),
+        ByteSpan::try_new(input_len - trailing_bytes, trailing_bytes),
+        FormatErrorContext::InputLengthMultiple {
+            actual_bytes: input_len,
+            byte_multiple: bytes_per_group,
+        },
+    )
+}
+
 pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
     if bits_per_record == 0 {
-        return Err(format_error(
-            FormatErrorCode::InvalidRecordWidth,
-            "ptb64 input cannot infer a shot count for zero-width records",
-            None,
-            FormatErrorContext::MinimumRecordWidth {
-                actual_bits: 0,
-                minimum_bits: 1,
-            },
-        ));
+        return Err(ptb64_zero_width_count_error());
     }
     let bytes_per_group = ptb64_bytes_per_group(bits_per_record)?;
-    let trailing_bytes = input_len % bytes_per_group;
-    if trailing_bytes != 0 {
-        return Err(format_error(
-            FormatErrorCode::InvalidPackedLength,
-            format!(
-                "ptb64 input length {input_len} is not a multiple of shot-group byte width {bytes_per_group}"
-            ),
-            ByteSpan::try_new(input_len - trailing_bytes, trailing_bytes),
-            FormatErrorContext::InputLengthMultiple {
-                actual_bytes: input_len,
-                byte_multiple: bytes_per_group,
-            },
-        ));
+    if !input_len.is_multiple_of(bytes_per_group) {
+        return Err(ptb64_length_multiple_error(input_len, bytes_per_group));
     }
     let shot_groups = input_len / bytes_per_group;
     shot_groups.checked_mul(64).ok_or_else(|| {
@@ -110,7 +127,7 @@ pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> Re
     })
 }
 
-fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usize> {
+pub(crate) fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usize> {
     bits_per_record.checked_mul(8).ok_or_else(|| {
         format_error(
             FormatErrorCode::ArithmeticOverflow,
@@ -119,6 +136,30 @@ fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usize> {
             FormatErrorContext::None,
         )
     })
+}
+
+/// Unpacks one b8-packed record chunk into a caller-owned dense record buffer.
+pub(crate) fn unpack_b8_chunk_into(chunk: &[u8], record: &mut [bool]) {
+    for (bit_index, bit) in record.iter_mut().enumerate() {
+        *bit = chunk.get(bit_index / 8).copied().unwrap_or(0) & (1u8 << (bit_index % 8)) != 0;
+    }
+}
+
+/// Reads one ptb64 group's measurement-major words out of its raw group bytes.
+pub(crate) fn extend_ptb64_group_words(group_bytes: &[u8], words: &mut Vec<u64>) {
+    words.clear();
+    words.extend(group_bytes.chunks_exact(8).map(|chunk| {
+        let mut word_bytes = [0u8; 8];
+        word_bytes.copy_from_slice(chunk);
+        u64::from_le_bytes(word_bytes)
+    }));
+}
+
+/// Fills a dense record with one shot's bits from a ptb64 group's measurement-major words.
+pub(crate) fn fill_record_from_ptb64_words(words: &[u64], shot_offset: usize, record: &mut [bool]) {
+    for (bit, word) in record.iter_mut().zip(words) {
+        *bit = word & (1u64 << shot_offset) != 0;
+    }
 }
 
 #[inline]

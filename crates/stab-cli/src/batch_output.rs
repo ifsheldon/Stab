@@ -237,18 +237,16 @@ enum RecordBatchEncoder {
 
 impl RecordBatchEncoder {
     fn try_new(format: RecordFormat, width: usize) -> Result<Self, CliError> {
-        match format {
-            RecordFormat::Ptb64 => Ok(Self::Ptb64 {
+        if format == RecordFormat::Ptb64 {
+            return Ok(Self::Ptb64 {
                 planes: BitPlane64Batch::zeros(64, width)
                     .map_err(|error| CliError::from(CircuitError::from(error)))?,
                 pending_shots: 0,
-            }),
-            RecordFormat::ZeroOne => Ok(Self::records(SampleFormat::ZeroOne, width)),
-            RecordFormat::B8 => Ok(Self::records(SampleFormat::B8, width)),
-            RecordFormat::R8 => Ok(Self::records(SampleFormat::R8, width)),
-            RecordFormat::Hits => Ok(Self::records(SampleFormat::Hits, width)),
-            RecordFormat::Dets => Ok(Self::records(SampleFormat::Dets, width)),
-            _ => Err(invalid_result_format(
+            });
+        }
+        match format.sample_format() {
+            Some(sample_format) => Ok(Self::records(sample_format, width)),
+            None => Err(invalid_result_format(
                 "record format is not supported by the CLI batch encoder",
             )),
         }

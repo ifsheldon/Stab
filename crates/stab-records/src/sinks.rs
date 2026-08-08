@@ -3,8 +3,7 @@ use stab_bits::BitSlice;
 use crate::{
     BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetectorWidth, DetsResultType,
     FormatError, MeasureRecordWriter, MeasurementBatchView, MeasurementWidth, ObservableWidth,
-    PackedShotBatch, RecordFormat, RecordResult, SampleFormat, SampledErrorWidth,
-    write_bit_plane_64_batch,
+    PackedShotBatch, RecordFormat, RecordResult, SampledErrorWidth, write_bit_plane_64_batch,
 };
 
 /// Receives complete batches of measurement records.
@@ -334,7 +333,7 @@ struct PackedRecordEncoder {
 
 impl PackedRecordEncoder {
     fn try_new(format: RecordFormat, width: usize) -> RecordResult<Self> {
-        let (record_writer, ptb64) = match sample_format(format) {
+        let (record_writer, ptb64) = match format.sample_format() {
             Some(format) => (Some(MeasureRecordWriter::new(format)), None),
             None => (
                 None,
@@ -605,17 +604,6 @@ impl Ptb64Buffer {
             }
         }
         Ok(())
-    }
-}
-
-const fn sample_format(format: RecordFormat) -> Option<SampleFormat> {
-    match format {
-        RecordFormat::ZeroOne => Some(SampleFormat::ZeroOne),
-        RecordFormat::B8 => Some(SampleFormat::B8),
-        RecordFormat::R8 => Some(SampleFormat::R8),
-        RecordFormat::Hits => Some(SampleFormat::Hits),
-        RecordFormat::Dets => Some(SampleFormat::Dets),
-        RecordFormat::Ptb64 => None,
     }
 }
 

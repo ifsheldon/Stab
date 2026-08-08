@@ -4,7 +4,10 @@ use crate::{
         DetsLayout, DetsResultType, DetsToken, SparseShot,
         ptb64_record_count as materialized_ptb64_record_count, validate_ptb64_shot_count,
     },
-    result_packed::{b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout},
+    result_packed::{
+        b8_bytes_per_record, decode_next_r8_record, extend_ptb64_group_words,
+        fill_record_from_ptb64_words, ptb64_prefix_layout, unpack_b8_chunk_into,
+    },
     result_text::{DetsEvent, HitsEvent},
 };
 use stab_bits::{BitSlice, BitVec};
@@ -174,21 +177,9 @@ where
     let mut record = vec![false; bits_per_record];
     let mut words = Vec::with_capacity(bits_per_record);
     for group_bytes in input.chunks_exact(bytes_per_group) {
-        words.clear();
-        words.extend(group_bytes.chunks_exact(8).map(|chunk| {
-            let mut word_bytes = [0u8; 8];
-            word_bytes.copy_from_slice(chunk);
-            u64::from_le_bytes(word_bytes)
-        }));
+        extend_ptb64_group_words(group_bytes, &mut words);
         for shot_offset in 0..64 {
-            for (bit_index, word) in words.iter().enumerate() {
-                let Some(bit) = record.get_mut(bit_index) else {
-                    return Err(FormatError::invalid_result_format(
-                        "ptb64 bit index was out of decoded record bounds",
-                    ));
-                };
-                *bit = word & (1u64 << shot_offset) != 0;
-            }
+            fill_record_from_ptb64_words(&words, shot_offset, &mut record);
             visit(&record)?;
         }
     }
@@ -676,12 +667,6 @@ fn finish_bridged_visit<E>(
     match visitor_error {
         Some(error) => Err(RecordStreamError::Visitor(error)),
         None => decode_result.map_err(RecordStreamError::Format),
-    }
-}
-
-fn unpack_b8_chunk_into(chunk: &[u8], record: &mut [bool]) {
-    for (bit_index, bit) in record.iter_mut().enumerate() {
-        *bit = chunk.get(bit_index / 8).copied().unwrap_or(0) & (1u8 << (bit_index % 8)) != 0;
     }
 }
 

@@ -48,8 +48,6 @@ pub(super) fn reverse_flows(
         detector_measurements: BTreeMap::new(),
         target_coordinates: BTreeMap::new(),
         target_tags: BTreeMap::new(),
-        remaining_measurements: measurement_count,
-        remaining_detectors: detector_count,
         new_measurement_count: 0,
         observable_count,
         options,
@@ -75,8 +73,6 @@ struct ReverseFlowEngine {
     detector_measurements: BTreeMap<DemTarget, BTreeSet<usize>>,
     target_coordinates: BTreeMap<DemTarget, Vec<f64>>,
     target_tags: BTreeMap<DemTarget, Option<Box<[u8]>>>,
-    remaining_measurements: usize,
-    remaining_detectors: u64,
     new_measurement_count: usize,
     observable_count: u64,
     options: TimeReversedForFlowsOptions,
@@ -107,7 +103,8 @@ impl ReverseFlowEngine {
         for state in states {
             self.toggle_pauli(state.output, state.target)?;
             for measurement in state.measurements.iter().copied() {
-                let index = absolute_measurement_index(measurement, self.remaining_measurements)?;
+                let index =
+                    absolute_measurement_index(measurement, self.tracker.measurement_count())?;
                 self.tracker
                     .toggle_record_target_absolute(index, state.target)?;
             }
@@ -174,7 +171,8 @@ impl ReverseFlowEngine {
                 reverse_error(format!("measurement target {target} is not a qubit"))
             })?;
             let record_index = self
-                .remaining_measurements
+                .tracker
+                .measurement_count()
                 .checked_sub(1)
                 .ok_or_else(|| reverse_error("measurement count underflowed during reversal"))?;
             let record_targets = self.tracker.record_targets_at(record_index)?;
@@ -208,7 +206,6 @@ impl ReverseFlowEngine {
                 instruction.tag_bytes(),
             )?;
             self.tracker.undo_instruction(&tracker_instruction)?;
-            self.remaining_measurements = record_index;
         }
         self.flush_detectors_and_observables()
     }
@@ -229,12 +226,6 @@ impl ReverseFlowEngine {
         }
 
         self.tracker.undo_instruction(instruction)?;
-        if is_measure_reset {
-            self.remaining_measurements = self
-                .remaining_measurements
-                .checked_sub(targets.len())
-                .ok_or_else(|| reverse_error("measure-reset count underflowed during reversal"))?;
-        }
         self.append_instruction(
             instruction.gate().best_candidate_inverse()?,
             Vec::new(),
@@ -266,19 +257,19 @@ impl ReverseFlowEngine {
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
         let measurement_count = instruction.target_groups().len();
-        if self.remaining_measurements < measurement_count {
+        let remaining_measurements = self.tracker.measurement_count();
+        if remaining_measurements < measurement_count {
             return Err(reverse_error(format!(
                 "measurement count underflowed while reversing {}",
                 instruction_text(instruction)
             )));
         }
         for offset in 0..measurement_count {
-            let record_index = self.remaining_measurements - offset - 1;
+            let record_index = remaining_measurements - offset - 1;
             let record_targets = self.tracker.record_targets_at(record_index)?;
             self.record_new_measurement(&record_targets);
         }
         self.tracker.undo_instruction(instruction)?;
-        self.remaining_measurements -= measurement_count;
         self.append_instruction(
             instruction.gate().best_candidate_inverse()?,
             instruction.args().to_vec(),
@@ -290,11 +281,7 @@ impl ReverseFlowEngine {
 
     fn reverse_detector(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.undo_instruction(instruction)?;
-        self.remaining_detectors = self
-            .remaining_detectors
-            .checked_sub(1)
-            .ok_or_else(|| reverse_error("detector count underflowed during reversal"))?;
-        let target = DemTarget::relative_detector(self.remaining_detectors)?;
+        let target = DemTarget::relative_detector(self.tracker.detector_count())?;
         self.target_coordinates.insert(
             target,
             shifted_coordinates(instruction.args(), &self.coordinate_shift),

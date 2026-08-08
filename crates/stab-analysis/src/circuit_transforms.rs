@@ -12,7 +12,6 @@ const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
 const MAX_MATERIALIZED_FLATTENED_TARGETS: u64 = 32_000_000;
 const MAX_MATERIALIZED_FLATTENED_ARGUMENTS: u64 = 16_000_000;
 const MAX_MATERIALIZED_FLATTENED_BYTES: u64 = 512 * 1024 * 1024;
-const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 
 /// Resource policy for operation-owned circuit flattening.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -363,19 +362,18 @@ impl CircuitFlattenEstimate {
     }
 
     fn materialized_bytes(self) -> AnalysisResult<u64> {
-        let operation_bytes =
-            checked_flatten_product(self.operations, size_of_u64::<CircuitItem>(), "byte count")?;
-        let target_bytes =
-            checked_flatten_product(self.targets, size_of_u64::<Target>(), "byte count")?;
-        let argument_bytes =
-            checked_flatten_product(self.arguments, size_of_u64::<f64>(), "byte count")?;
-        let tag_bytes =
-            checked_flatten_product(self.tag_bytes, OPAQUE_TAG_STORAGE_MULTIPLIER, "byte count")?;
-        checked_flatten_sum(
-            checked_flatten_sum(operation_bytes, target_bytes, "byte count")?,
-            checked_flatten_sum(argument_bytes, tag_bytes, "byte count")?,
-            "byte count",
+        crate::circuit_pass::projected_circuit_payload_bytes(
+            self.operations,
+            self.targets,
+            self.arguments,
+            self.tag_bytes,
         )
+        .ok_or_else(|| {
+            AnalysisError::invalid_domain_value(
+                "flattened circuit resource estimate",
+                "byte count overflowed",
+            )
+        })
     }
 }
 
@@ -442,10 +440,6 @@ fn checked_flatten_product(left: u64, right: u64, resource: &'static str) -> Ana
 fn usize_to_u64(value: usize) -> AnalysisResult<u64> {
     u64::try_from(value)
         .map_err(|_| AnalysisError::invalid_domain_value("flattened circuit count", "exceeds u64"))
-}
-
-fn size_of_u64<T>() -> u64 {
-    u64::try_from(std::mem::size_of::<T>()).unwrap_or(u64::MAX)
 }
 
 fn validate_flattened_repeat_nesting(circuit: &Circuit) -> AnalysisResult<()> {

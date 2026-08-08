@@ -86,6 +86,7 @@ pub use gate::{
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
+    canonicalize_circuit_error_location_parts, canonicalize_dem_error_terms,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, ResourceOperation};

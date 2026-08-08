@@ -637,52 +637,44 @@ fn projected_payload_bytes(
     argument_values: u64,
     tag_bytes: u64,
 ) -> Result<u64, CircuitPassProjectionError> {
-    let item_bytes = checked_resource_product(
+    projected_circuit_payload_bytes(
         represented_items,
-        std::mem::size_of::<CircuitItem>(),
-        ResourceKind::ProjectedPayloadBytes,
-    )?;
-    let target_bytes = checked_resource_product(
         target_occurrences,
-        std::mem::size_of::<Target>(),
-        ResourceKind::ProjectedPayloadBytes,
-    )?;
-    let argument_bytes = checked_resource_product(
         argument_values,
-        std::mem::size_of::<f64>(),
-        ResourceKind::ProjectedPayloadBytes,
-    )?;
-    let tag_bytes =
-        tag_bytes
-            .checked_mul(OPAQUE_TAG_STORAGE_MULTIPLIER)
-            .ok_or(CircuitPassProjectionError {
-                resource: ResourceKind::ProjectedPayloadBytes,
-            })?;
-    checked_resource_add(
-        checked_resource_add(
-            item_bytes,
-            target_bytes,
-            ResourceKind::ProjectedPayloadBytes,
-        )?,
-        checked_resource_add(
-            argument_bytes,
-            tag_bytes,
-            ResourceKind::ProjectedPayloadBytes,
-        )?,
-        ResourceKind::ProjectedPayloadBytes,
+        tag_bytes,
     )
+    .ok_or(CircuitPassProjectionError {
+        resource: ResourceKind::ProjectedPayloadBytes,
+    })
 }
 
-fn checked_resource_product(
-    value: u64,
-    element_size: usize,
-    resource: ResourceKind,
-) -> Result<u64, CircuitPassProjectionError> {
-    let element_size =
-        u64::try_from(element_size).map_err(|_| CircuitPassProjectionError { resource })?;
-    value
-        .checked_mul(element_size)
-        .ok_or(CircuitPassProjectionError { resource })
+/// Projects the logical payload bytes for folded circuit content before allocation.
+///
+/// This is the one owner of the payload-byte estimate shared by the circuit-pass framework and
+/// the flatten transform: represented items, target occurrences, argument floats, and opaque-tag
+/// storage (exact bytes plus lossy-display copies) each contribute their in-memory size, using
+/// checked arithmetic throughout. Returns `None` when the projection overflows `u64`; callers map
+/// that to their own typed overflow error.
+pub(crate) fn projected_circuit_payload_bytes(
+    represented_items: u64,
+    target_occurrences: u64,
+    argument_values: u64,
+    tag_bytes: u64,
+) -> Option<u64> {
+    let item_bytes = represented_items.checked_mul(element_size_u64::<CircuitItem>())?;
+    let target_bytes = target_occurrences.checked_mul(element_size_u64::<Target>())?;
+    let argument_bytes = argument_values.checked_mul(element_size_u64::<f64>())?;
+    let tag_bytes = tag_bytes.checked_mul(OPAQUE_TAG_STORAGE_MULTIPLIER)?;
+    item_bytes
+        .checked_add(target_bytes)?
+        .checked_add(argument_bytes)?
+        .checked_add(tag_bytes)
+}
+
+/// Converts an element size to the estimator's `u64` domain, saturating so that an
+/// unrepresentable size can only overreport and fail closed at the overflow checks.
+fn element_size_u64<T>() -> u64 {
+    u64::try_from(std::mem::size_of::<T>()).unwrap_or(u64::MAX)
 }
 
 fn checked_resource_add(

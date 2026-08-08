@@ -230,38 +230,6 @@ impl CompiledDetectionConverter {
         }
     }
 
-    /// Compatibility convenience for callers that cannot propagate allocation failures.
-    ///
-    /// # Panics
-    ///
-    /// Panics when reusable record storage cannot be allocated.
-    #[allow(
-        clippy::panic,
-        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reusable_detection_record"
-    )]
-    pub fn reusable_detection_record(&self) -> DetectionEventRecord {
-        match self.try_reusable_detection_record() {
-            Ok(record) => record,
-            Err(error) => panic!("could not allocate reusable detection record: {error}"),
-        }
-    }
-
-    /// Compatibility convenience for callers that cannot propagate allocation failures.
-    ///
-    /// # Panics
-    ///
-    /// Panics when reusable reference storage cannot be allocated.
-    #[allow(
-        clippy::panic,
-        reason = "this compatibility method preserves its infallible signature; callers that need resource errors use try_reusable_reference_sample"
-    )]
-    pub fn reusable_reference_sample(&self) -> Vec<bool> {
-        match self.try_reusable_reference_sample() {
-            Ok(reference_sample) => reference_sample,
-            Err(error) => panic!("could not allocate reusable reference sample: {error}"),
-        }
-    }
-
     pub fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
         Ok(DetectionEventRecord {
             detectors: try_false_vec(

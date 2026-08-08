@@ -1,21 +1,27 @@
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_core::{
     Circuit, CircuitError, CircuitItem, DetectorErrorModel, RepeatBlock, SampleFormat,
-    advanced::records::{DetsLayout, MeasureRecordWriter},
-    advanced::records::{for_each_dets_record, for_each_ptb64_record_all, for_each_record},
+    advanced::records::{DetsLayout, DetsResultType, MeasureRecordWriter, RecordStreamReader},
     detection_record_width, measurement_record_count,
 };
 
 use crate::{
-    CliError, MAX_CONVERT_INPUT_BYTES, RecordFormatArg,
-    input::{read_limited_input_file, read_limited_stdin},
+    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg,
+    input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, PendingIo},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink, write_ptb64_group},
 };
+
+/// Upper bound on one framed text record's bytes while streaming conversion input.
+///
+/// Decision D5 (docs/plans/post-review-remediation-plan.md) replaced the whole-input 64 MiB cap
+/// with streaming conversion; this per-record bound keeps memory bounded without rejecting any
+/// input the capped route accepted, because no record in a cap-compliant input could exceed it.
+const MAX_CONVERT_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Args)]
 pub(crate) struct ConvertArgs {
@@ -237,41 +243,13 @@ where
     )?;
 
     let layout = resolve_convert_layout(&args, &mut io)?;
-    let input = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(&mut input_file, MAX_CONVERT_INPUT_BYTES, "convert input")?
-    } else {
-        read_limited_stdin(stdin, MAX_CONVERT_INPUT_BYTES, "convert input")?
+    let input_file = io.take_input(FileRole::Input);
+    let input_path = input_file.as_ref().map(|input| input.path().to_path_buf());
+    let input: Box<dyn Read + '_> = match input_file {
+        Some(input_file) => Box::new(input_file),
+        None => Box::new(stdin),
     };
-    if is_b8_identity(&args, layout, &input)? {
-        write_convert_outputs(io, stdout, &input, None)?;
-        return Ok(());
-    }
-    stream_convert_records(&input, layout, &args, io, stdout)
-}
-
-fn is_b8_identity(
-    args: &ConvertArgs,
-    layout: ConvertLayout,
-    input: &[u8],
-) -> Result<bool, CliError> {
-    if args.in_format != RecordFormatArg::B8
-        || args.out_format != RecordFormatArg::B8
-        || args.obs_output.is_some()
-    {
-        return Ok(false);
-    }
-    let width = layout.input_width()?;
-    if width == 0 || !width.is_multiple_of(8) {
-        return Ok(false);
-    }
-    let bytes_per_record = width / 8;
-    if !input.len().is_multiple_of(bytes_per_record) {
-        return Err(invalid_result_format(format!(
-            "b8 input length {} is not a multiple of record byte width {bytes_per_record}",
-            input.len()
-        )));
-    }
-    Ok(true)
+    stream_convert_records(input, input_path.as_deref(), layout, &args, io, stdout)
 }
 
 fn run_convert_stim<R, W>(mut io: PendingIo, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
@@ -280,13 +258,13 @@ where
     W: Write,
 {
     let input = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(&mut input_file, MAX_CONVERT_INPUT_BYTES, "convert input")?
+        read_limited_input_file(&mut input_file, MAX_CIRCUIT_INPUT_BYTES, "convert input")?
     } else {
-        read_limited_stdin(stdin, MAX_CONVERT_INPUT_BYTES, "convert input")?
+        read_limited_stdin(stdin, MAX_CIRCUIT_INPUT_BYTES, "convert input")?
     };
     let circuit = parse_circuit_bytes(&input)?;
     let output = circuit.to_stim_bytes();
-    write_convert_outputs(io, stdout, &output, None)
+    write_convert_outputs(io, stdout, &output)
 }
 
 fn validate_stim_conversion_options(args: &ConvertArgs) -> Result<(), CliError> {
@@ -349,47 +327,31 @@ fn resolve_convert_layout(
     Ok(layout)
 }
 
-fn visit_convert_records<F>(
-    input: &[u8],
+/// Builds the shared per-record streaming reader for one conversion input.
+fn convert_record_reader<'a>(
+    input: Box<dyn Read + 'a>,
     format: RecordFormatArg,
     layout: ConvertLayout,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
+) -> Result<RecordStreamReader<Box<dyn Read + 'a>>, CliError> {
     let width = layout.input_width()?;
-    let mut callback_error = None;
-    let result = {
-        let mut bridge = |record: &[bool]| {
-            if let Err(error) = visit(record) {
-                callback_error = Some(error);
-                return Err(CircuitError::invalid_result_format(
-                    "convert output visitor stopped after an I/O error",
-                ));
-            }
-            Ok(())
-        };
-        match format {
-            RecordFormatArg::Ptb64 => for_each_ptb64_record_all(input, width, &mut bridge),
-            RecordFormatArg::Dets => {
-                for_each_dets_record(input, layout.dets_layout()?, &mut bridge)
-            }
-            RecordFormatArg::Stim => return Err(CliError::UnsupportedConversion),
-            _ => {
-                let sample_format = format.sample_format()?;
-                for_each_record(input, sample_format, width, &mut bridge)
-            }
+    Ok(match format {
+        RecordFormatArg::Ptb64 => RecordStreamReader::ptb64(input, width),
+        RecordFormatArg::Dets => {
+            RecordStreamReader::dets(input, layout.dets_layout()?, MAX_CONVERT_RECORD_BYTES)
         }
-    };
-    if let Some(error) = callback_error {
-        return Err(error);
-    }
-    result.map_err(CliError::from)
+        RecordFormatArg::Stim => return Err(CliError::UnsupportedConversion),
+        _ => RecordStreamReader::measurements(
+            input,
+            format.sample_format()?,
+            width,
+            MAX_CONVERT_RECORD_BYTES,
+        ),
+    })
 }
 
 fn stream_convert_records<W>(
-    input: &[u8],
+    input: Box<dyn Read + '_>,
+    input_path: Option<&Path>,
     layout: ConvertLayout,
     args: &ConvertArgs,
     io: PendingIo,
@@ -398,6 +360,7 @@ fn stream_convert_records<W>(
 where
     W: Write,
 {
+    let mut reader = convert_record_reader(input, args.in_format, layout)?;
     let mut outputs = io.activate()?;
     let mut primary_sink = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     let mut observable_sink = args
@@ -419,7 +382,12 @@ where
         .map(|_| ConvertOutput::new(args.obs_out_format))
         .transpose()?;
 
-    visit_convert_records(input, args.in_format, layout, |record| {
+    loop {
+        let record = match reader.next_record() {
+            Ok(Some(record)) => record,
+            Ok(None) => break,
+            Err(error) => return Err(record_stream_error(error, input_path)),
+        };
         let parts = layout.parts(record)?;
         primary.write_primary(parts, observables.is_some())?;
         let ready = primary.take_ready();
@@ -438,8 +406,7 @@ where
                     .write_with(|writer| writer.write_all(&ready))?;
             }
         }
-        Ok(())
-    })?;
+    }
 
     let primary_output = primary.finish()?;
     if !primary_output.is_empty() {
@@ -483,10 +450,10 @@ impl ConvertOutput {
     ) -> Result<(), CliError> {
         if self.format == RecordFormatArg::Dets {
             let types = [
-                (b'M', parts.measurements),
-                (b'D', parts.detectors),
+                (DetsResultType::Measurement, parts.measurements),
+                (DetsResultType::Detector, parts.detectors),
                 (
-                    b'L',
+                    DetsResultType::Observable,
                     if split_observables {
                         &[][..]
                     } else {
@@ -516,7 +483,7 @@ impl ConvertOutput {
 
     fn write_observables(&mut self, observables: &[bool]) -> Result<(), CliError> {
         if self.format == RecordFormatArg::Dets {
-            return self.write_typed_dets_record(&[(b'L', observables)]);
+            return self.write_typed_dets_record(&[(DetsResultType::Observable, observables)]);
         }
         self.write_bits_record(observables.to_vec())
     }
@@ -533,10 +500,13 @@ impl ConvertOutput {
         Ok(())
     }
 
-    fn write_typed_dets_record(&mut self, types: &[(u8, &[bool])]) -> Result<(), CliError> {
+    fn write_typed_dets_record(
+        &mut self,
+        types: &[(DetsResultType, &[bool])],
+    ) -> Result<(), CliError> {
         let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
         for (result_type, bits) in types {
-            writer.begin_result_type(*result_type);
+            writer.begin_dets_result_type(*result_type);
             writer.write_bits(bits);
         }
         writer.write_end();
@@ -634,30 +604,16 @@ fn read_side_input(
     let mut input = io.take_input(role).ok_or(CliError::IoPlanInvariant {
         message: "convert preflight omitted a requested side input",
     })?;
-    read_limited_input_file(&mut input, MAX_CONVERT_INPUT_BYTES, kind)
+    read_limited_input_file(&mut input, MAX_CIRCUIT_INPUT_BYTES, kind)
 }
 
-fn write_convert_outputs<W>(
-    io: PendingIo,
-    stdout: &mut W,
-    primary: &[u8],
-    observables: Option<&[u8]>,
-) -> Result<(), CliError>
+fn write_convert_outputs<W>(io: PendingIo, stdout: &mut W, primary: &[u8]) -> Result<(), CliError>
 where
     W: Write,
 {
     let mut outputs = io.activate()?;
     let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     primary_output.write_with(|writer| writer.write_all(primary))?;
-    if let Some(observables) = observables {
-        let output = outputs
-            .take(FileRole::ObservableOutput)
-            .ok_or(CliError::IoPlanInvariant {
-                message: "convert observable bytes have no observable output",
-            })?;
-        let mut output = FileOutputSink::from_output(output);
-        output.write_with(|writer| writer.write_all(observables))?;
-    }
     Ok(())
 }
 

@@ -50,7 +50,6 @@ use stab_core::{
 };
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
-pub(crate) const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -214,15 +213,12 @@ impl RecordFormatArg {
     }
 
     fn sample_format(self) -> Result<SampleFormat, CliError> {
-        match self {
-            Self::ZeroOne => Ok(SampleFormat::ZeroOne),
-            Self::B8 => Ok(SampleFormat::B8),
-            Self::R8 => Ok(SampleFormat::R8),
-            Self::Hits => Ok(SampleFormat::Hits),
-            Self::Dets => Ok(SampleFormat::Dets),
-            Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
-            Self::Stim => Err(CliError::UnsupportedDetectionFormat { format: "stim" }),
-        }
+        let Some(record_format) = self.record_format() else {
+            return Err(CliError::UnsupportedDetectionFormat { format: "stim" });
+        };
+        record_format
+            .sample_format()
+            .ok_or(CliError::UnsupportedDetectionFormat { format: "ptb64" })
     }
 }
 
@@ -255,15 +251,9 @@ impl SampleOutFormatArg {
     }
 
     fn stream_writer(self) -> Option<MeasureRecordWriter> {
-        let format = match self {
-            Self::ZeroOne => SampleFormat::ZeroOne,
-            Self::B8 => SampleFormat::B8,
-            Self::R8 => SampleFormat::R8,
-            Self::Hits => SampleFormat::Hits,
-            Self::Dets => SampleFormat::Dets,
-            Self::Ptb64 => return None,
-        };
-        Some(MeasureRecordWriter::new(format))
+        self.record_format()
+            .sample_format()
+            .map(MeasureRecordWriter::new)
     }
 }
 

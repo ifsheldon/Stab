@@ -63,9 +63,9 @@ pub fn circuit_detecting_regions_for_targets(
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
     validate_supported_subset(circuit)?;
-    let detector_count = detector_count(circuit)?;
-    let observable_count = observable_count(circuit)?;
-    let tick_count = tick_count(circuit)?;
+    let detector_count = circuit.count_detectors()?;
+    let observable_count = circuit.count_observables()?;
+    let tick_count = circuit.count_ticks()?;
     validate_targets(&targets, detector_count, observable_count)?;
     validate_ticks(&ticks, tick_count)?;
 
@@ -76,7 +76,7 @@ pub fn circuit_detecting_regions_for_targets(
         .collect::<DetectingRegionTargetMap>();
 
     let mut tracker = SparseReverseFrameTracker::new(
-        detecting_region_qubit_count(circuit),
+        circuit.count_qubits(),
         detecting_region_measurement_count(circuit)?,
         detector_count,
         fail_on_anticommute,
@@ -95,8 +95,8 @@ pub fn circuit_detecting_regions_for_targets(
 }
 
 pub fn all_detecting_region_targets(circuit: &Circuit) -> AnalysisResult<Vec<DemTarget>> {
-    let detector_count = detector_count(circuit)?;
-    let observable_count = observable_count(circuit)?;
+    let detector_count = circuit.count_detectors()?;
+    let observable_count = circuit.count_observables()?;
     let target_capacity = dense_target_helper_capacity(detector_count, observable_count)?;
     let mut targets = Vec::with_capacity(target_capacity);
     for detector in 0..detector_count {
@@ -136,39 +136,8 @@ fn dense_target_helper_capacity(
     })
 }
 
-fn detecting_region_qubit_count(circuit: &Circuit) -> usize {
-    circuit
-        .items()
-        .iter()
-        .map(detecting_region_item_qubit_count)
-        .max()
-        .unwrap_or(0)
-}
-
-fn detecting_region_item_qubit_count(item: &CircuitItem) -> usize {
-    match item {
-        CircuitItem::Instruction(instruction) => {
-            detecting_region_instruction_qubit_count(instruction)
-        }
-        CircuitItem::RepeatBlock(repeat) => detecting_region_qubit_count(repeat.body()),
-    }
-}
-
-fn detecting_region_instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
-    if instruction.gate().canonical_name() == "MPAD" {
-        return 0;
-    }
-    instruction
-        .targets()
-        .iter()
-        .filter_map(Target::qubit_id)
-        .map(|qubit| qubit.get() as usize + 1)
-        .max()
-        .unwrap_or(0)
-}
-
 pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
-    let tick_count = tick_count(circuit)?;
+    let tick_count = circuit.count_ticks()?;
     if tick_count > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
         return Err(AnalysisError::invalid_detector_error_model(format!(
             "detecting-region all-tick helper currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} ticks, got {tick_count}"
@@ -618,91 +587,12 @@ fn validate_observable_include_targets(instruction: &CircuitInstruction) -> Anal
     Ok(())
 }
 
-fn detector_count(circuit: &Circuit) -> AnalysisResult<u64> {
-    let mut count = 0u64;
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "DETECTOR" {
-                    count = count.checked_add(1).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model("detector count overflowed")
-                    })?;
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_count = detector_count(repeat.body())?;
-                let repeated = body_count
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "repeat detector count overflowed",
-                        )
-                    })?;
-                count = count.checked_add(repeated).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model("detector count overflowed")
-                })?;
-            }
-        }
-    }
-    Ok(count)
-}
-
 fn detecting_region_measurement_count(circuit: &Circuit) -> AnalysisResult<usize> {
     usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::invalid_detector_error_model(
             "detecting-region measurement count does not fit in memory on this platform",
         )
     })
-}
-
-fn observable_count(circuit: &Circuit) -> AnalysisResult<u64> {
-    let mut max_observable = None;
-    visit_observables(circuit, &mut max_observable)?;
-    Ok(max_observable.map_or(0, |id| id.saturating_add(1)))
-}
-
-fn visit_observables(circuit: &Circuit, max_observable: &mut Option<u64>) -> AnalysisResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if let Some(observable) = instruction.observable_id_argument()? {
-                    *max_observable = Some(
-                        max_observable
-                            .map_or(observable.get(), |current| current.max(observable.get())),
-                    );
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => visit_observables(repeat.body(), max_observable)?,
-        }
-    }
-    Ok(())
-}
-
-fn tick_count(circuit: &Circuit) -> AnalysisResult<u64> {
-    let mut count = 0u64;
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "TICK" {
-                    count = count.checked_add(1).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model("tick count overflowed")
-                    })?;
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_count = tick_count(repeat.body())?;
-                let repeated = body_count
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model("repeat tick count overflowed")
-                    })?;
-                count = count.checked_add(repeated).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model("tick count overflowed")
-                })?;
-            }
-        }
-    }
-    Ok(count)
 }
 
 fn validate_targets(

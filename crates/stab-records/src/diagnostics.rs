@@ -182,6 +182,20 @@ impl FormatError {
         self.code
     }
 
+    /// Shifts this diagnostic's byte span by the absolute offset of its decoded window.
+    ///
+    /// Streaming readers decode one record frame at a time, so their component diagnostics carry
+    /// frame-relative spans; rebasing them keeps reported spans identical to whole-input decoding.
+    /// A span whose rebased start would overflow is dropped rather than reported wrongly.
+    pub(crate) fn with_span_offset(mut self, byte_offset: usize) -> Self {
+        self.span = self.span.and_then(|span| {
+            span.byte_start()
+                .checked_add(byte_offset)
+                .and_then(|byte_start| ByteSpan::try_new(byte_start, span.byte_length()))
+        });
+        self
+    }
+
     pub const fn severity(&self) -> DiagnosticSeverity {
         self.severity
     }

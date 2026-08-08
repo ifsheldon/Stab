@@ -3,6 +3,7 @@
 mod batches;
 mod diagnostics;
 mod estimate;
+mod record_stream;
 mod result_formats;
 mod result_packed;
 mod result_streaming;
@@ -19,6 +20,7 @@ pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
 };
 pub use estimate::EncodedSizeEstimate;
+pub use record_stream::{RecordStreamReadError, RecordStreamReader};
 pub use result_formats::{
     CodecCapability, DetsLayout, DetsResultType, DetsToken, MeasureRecord, MeasureRecordBatch,
     MeasureRecordBatchWriter, MeasureRecordWriter, RecordEncoding, RecordFormat, SampleFormat,

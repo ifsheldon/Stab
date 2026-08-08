@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::PathBuf;
 
@@ -7,7 +6,7 @@ use stab_core::{
     ByteSpan, CircuitError, DetectionBatchView, DetectionObservableOutputMode, DetectionSink,
     FormatError, FormatErrorCode, MeasurementBatchView, PackedShotBatch, RandomPolicy,
     ReferenceSampleMode, Seed, ShotCount,
-    advanced::records::{read_measurement_records, validate_ptb64_shot_count},
+    advanced::records::{RecordStreamReader, read_measurement_records, validate_ptb64_shot_count},
     circuit_with_inlined_feedback,
     execution::{
         DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
@@ -18,7 +17,7 @@ use stab_core::{
 use crate::{
     CliError, ErrorFormatArg, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
     batch_output::DetectionBatchEncoder,
-    input::{read_limited_input_file, read_limited_line, read_limited_stdin},
+    input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink},
@@ -510,14 +509,23 @@ fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
     CliError::ReadInput(source)
 }
 
+/// Per-record decode source for one m2d input stream.
+///
+/// The r8 and ptb64 formats decode through the shared
+/// [`stab_core::advanced::records::RecordStreamReader`]; the text and b8 formats keep m2d's
+/// line-framed and zero-width-sweep-aware local transports.
+enum M2dRecordDecoder<'a> {
+    Shared(RecordStreamReader<Box<dyn BufRead + 'a>>),
+    Local(Box<dyn BufRead + 'a>),
+}
+
 struct M2dRecordStream<'a> {
-    reader: Box<dyn BufRead + 'a>,
+    decoder: M2dRecordDecoder<'a>,
     input_path: Option<PathBuf>,
     format: RecordFormatArg,
     bits_per_record: usize,
     kind: &'static str,
     text_byte_offset: usize,
-    ptb64_records: VecDeque<Vec<bool>>,
     empty_b8_zero_width_sweep_checked: bool,
 }
 
@@ -557,14 +565,25 @@ impl<'a> M2dRecordStream<'a> {
         bits_per_record: usize,
         kind: &'static str,
     ) -> Self {
+        let decoder = match format {
+            RecordFormatArg::R8 => M2dRecordDecoder::Shared(RecordStreamReader::measurements(
+                input.reader,
+                stab_core::SampleFormat::R8,
+                bits_per_record,
+                MAX_M2D_TEXT_RECORD_BYTES,
+            )),
+            RecordFormatArg::Ptb64 if bits_per_record > 0 => {
+                M2dRecordDecoder::Shared(RecordStreamReader::ptb64(input.reader, bits_per_record))
+            }
+            _ => M2dRecordDecoder::Local(input.reader),
+        };
         Self {
-            reader: input.reader,
+            decoder,
             input_path: input.input_path,
             format,
             bits_per_record,
             kind,
             text_byte_offset: 0,
-            ptb64_records: VecDeque::new(),
             empty_b8_zero_width_sweep_checked: false,
         }
     }
@@ -589,26 +608,55 @@ impl<'a> M2dRecordStream<'a> {
                 self.next_text_record()
             }
             RecordFormatArg::B8 => self.next_b8_record(),
-            RecordFormatArg::R8 => read_m2d_r8_record(
-                &mut self.reader,
-                self.input_path.as_ref(),
-                self.bits_per_record,
-                self.kind,
-            ),
-            RecordFormatArg::Ptb64 => self.next_ptb64_record(),
+            RecordFormatArg::R8 => self.next_shared_record(),
+            RecordFormatArg::Ptb64 => {
+                if self.bits_per_record == 0 {
+                    return Err(invalid_result_format(format!(
+                        "{} ptb64 input cannot infer a shot count for zero-width records",
+                        self.kind
+                    )));
+                }
+                self.next_shared_record()
+            }
             RecordFormatArg::Stim => Err(CliError::UnsupportedConversion),
+        }
+    }
+
+    fn next_shared_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
+        let M2dRecordDecoder::Shared(reader) = &mut self.decoder else {
+            return Err(CliError::IoPlanInvariant {
+                message: "m2d record stream lost its shared decoder",
+            });
+        };
+        match reader.next_record() {
+            Ok(record) => Ok(record.map(<[bool]>::to_vec)),
+            Err(error) => Err(record_stream_error(error, self.input_path.as_deref())),
+        }
+    }
+
+    fn local_reader<'stream>(
+        decoder: &'stream mut M2dRecordDecoder<'a>,
+    ) -> Result<&'stream mut Box<dyn BufRead + 'a>, CliError> {
+        match decoder {
+            M2dRecordDecoder::Local(reader) => Ok(reader),
+            M2dRecordDecoder::Shared(_) => Err(CliError::IoPlanInvariant {
+                message: "m2d record stream lost its local decoder",
+            }),
         }
     }
 
     fn next_text_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
         loop {
-            let Some(line) = read_limited_line(
-                &mut self.reader,
-                self.input_path.as_deref(),
-                MAX_M2D_TEXT_RECORD_BYTES,
-                self.kind,
-            )?
-            else {
+            let line = {
+                let reader = Self::local_reader(&mut self.decoder)?;
+                read_limited_line(
+                    reader.as_mut(),
+                    self.input_path.as_deref(),
+                    MAX_M2D_TEXT_RECORD_BYTES,
+                    self.kind,
+                )?
+            };
+            let Some(line) = line else {
                 return Ok(None);
             };
             let record_byte_offset = self.text_byte_offset;
@@ -655,12 +703,16 @@ impl<'a> M2dRecordStream<'a> {
             )));
         }
         let mut record_bytes = vec![0u8; bytes_per_record];
-        match read_m2d_exact_record_bytes(
-            &mut self.reader,
-            self.input_path.as_ref(),
-            &mut record_bytes,
-            self.kind,
-        )? {
+        let read = {
+            let reader = Self::local_reader(&mut self.decoder)?;
+            read_m2d_exact_record_bytes(
+                reader.as_mut(),
+                self.input_path.as_ref(),
+                &mut record_bytes,
+                self.kind,
+            )?
+        };
+        match read {
             RecordRead::Complete => decode_single_m2d_record(
                 &record_bytes,
                 stab_core::SampleFormat::B8,
@@ -677,7 +729,8 @@ impl<'a> M2dRecordStream<'a> {
             return Ok(());
         }
         let mut byte = [0u8; 1];
-        match self.reader.read(&mut byte) {
+        let reader = Self::local_reader(&mut self.decoder)?;
+        match reader.read(&mut byte) {
             Ok(0) => {
                 self.empty_b8_zero_width_sweep_checked = true;
                 Ok(())
@@ -686,37 +739,6 @@ impl<'a> M2dRecordStream<'a> {
                 "m2d sweep input b8 zero-width input must be empty",
             )),
             Err(source) => Err(read_error(self.input_path.as_ref(), source)),
-        }
-    }
-
-    fn next_ptb64_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
-        if let Some(record) = self.ptb64_records.pop_front() {
-            return Ok(Some(record));
-        }
-        if self.bits_per_record == 0 {
-            return Err(invalid_result_format(format!(
-                "{} ptb64 input cannot infer a shot count for zero-width records",
-                self.kind
-            )));
-        }
-        let bytes_per_group = self
-            .bits_per_record
-            .checked_mul(8)
-            .ok_or(CliError::MeasurementCountOverflow)?;
-        let mut group_bytes = vec![0u8; bytes_per_group];
-        match read_m2d_exact_record_bytes(
-            &mut self.reader,
-            self.input_path.as_ref(),
-            &mut group_bytes,
-            self.kind,
-        )? {
-            RecordRead::Complete => {
-                self.ptb64_records = decode_ptb64_group(&group_bytes, self.bits_per_record)?
-                    .into_iter()
-                    .collect();
-                Ok(self.ptb64_records.pop_front())
-            }
-            RecordRead::EofBeforeRecord => Ok(None),
         }
     }
 }
@@ -754,63 +776,6 @@ fn decode_single_m2d_record(
     Ok(record)
 }
 
-fn read_m2d_r8_record<R>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    bits_per_record: usize,
-    kind: &'static str,
-) -> Result<Option<Vec<bool>>, CliError>
-where
-    R: Read + ?Sized,
-{
-    let mut record = vec![false; bits_per_record];
-    let mut bit_index = 0usize;
-    let mut read_any = false;
-    loop {
-        let mut byte = [0u8; 1];
-        match reader.read(&mut byte) {
-            Ok(0) if !read_any => return Ok(None),
-            Ok(0) => {
-                return Err(invalid_result_format(format!(
-                    "{kind} r8 input ended before record completed"
-                )));
-            }
-            Ok(_) => read_any = true,
-            Err(source) => return Err(read_error(input_path, source)),
-        }
-
-        if byte[0] == u8::MAX {
-            bit_index = bit_index.checked_add(usize::from(u8::MAX)).ok_or_else(|| {
-                invalid_result_format(format!("{kind} r8 run-length offset overflowed"))
-            })?;
-            if bit_index > bits_per_record {
-                return Err(invalid_result_format(format!(
-                    "{kind} r8 run-length overshot record width"
-                )));
-            }
-            continue;
-        }
-        bit_index = bit_index.checked_add(usize::from(byte[0])).ok_or_else(|| {
-            invalid_result_format(format!("{kind} r8 run-length offset overflowed"))
-        })?;
-        if bit_index > bits_per_record {
-            return Err(invalid_result_format(format!(
-                "{kind} r8 run-length overshot record width"
-            )));
-        }
-        if bit_index == bits_per_record {
-            return Ok(Some(record));
-        }
-        let Some(bit) = record.get_mut(bit_index) else {
-            return Err(invalid_result_format(format!(
-                "{kind} r8 hit index {bit_index} exceeds record width {bits_per_record}"
-            )));
-        };
-        *bit = true;
-        bit_index += 1;
-    }
-}
-
 enum RecordRead {
     Complete,
     EofBeforeRecord,
@@ -844,24 +809,6 @@ where
         }
     }
     Ok(RecordRead::Complete)
-}
-
-fn decode_ptb64_group(input: &[u8], bits_per_record: usize) -> Result<Vec<Vec<bool>>, CliError> {
-    let mut records = vec![vec![false; bits_per_record]; 64];
-    for (bit_index, word_chunk) in input.chunks_exact(8).enumerate() {
-        let mut word_bytes = [0u8; 8];
-        word_bytes.copy_from_slice(word_chunk);
-        let word = u64::from_le_bytes(word_bytes);
-        for (shot_offset, record) in records.iter_mut().enumerate() {
-            if word & (1u64 << shot_offset) != 0 {
-                let bit = record.get_mut(bit_index).ok_or_else(|| {
-                    invalid_result_format("ptb64 bit index was out of decoded record bounds")
-                })?;
-                *bit = true;
-            }
-        }
-    }
-    Ok(records)
 }
 
 enum DeferredDetectOutputs<'a, W>

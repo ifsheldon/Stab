@@ -126,15 +126,10 @@ pub(crate) enum DetectionBufferLimitSubject {
     SweepRecords,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
     Analysis(stab_analysis::ResourceLimitError),
-    CircuitSourceLines,
-    CircuitRepeatNesting {
-        source_line: usize,
-    },
-    DetectorErrorModelSourceLines,
-    DetectorErrorModelRepeatNesting,
+    ModelParse(stab_model::ResourceLimitError),
     DetectionRecordBits {
         subject: DetectionRecordLimitSubject,
     },
@@ -173,25 +168,11 @@ impl ResourceLimitError {
     }
 
     pub(crate) fn from_model_parse(error: stab_model::ResourceLimitError) -> Self {
-        let cause = match error.context() {
-            stab_model::ResourceLimitContext::CircuitSourceLines => {
-                ResourceLimitCause::CircuitSourceLines
-            }
-            stab_model::ResourceLimitContext::CircuitRepeatNesting { source_line } => {
-                ResourceLimitCause::CircuitRepeatNesting { source_line }
-            }
-            stab_model::ResourceLimitContext::DetectorErrorModelSourceLines => {
-                ResourceLimitCause::DetectorErrorModelSourceLines
-            }
-            stab_model::ResourceLimitContext::DetectorErrorModelRepeatNesting => {
-                ResourceLimitCause::DetectorErrorModelRepeatNesting
-            }
-        };
         Self {
-            cause,
             actual: error.actual(),
             limit: error.limit(),
             span: Some(error.span()),
+            cause: ResourceLimitCause::ModelParse(error),
         }
     }
 
@@ -316,7 +297,7 @@ impl ResourceLimitError {
     }
 
     pub const fn operation(&self) -> ResourceOperation {
-        match self.cause {
+        match &self.cause {
             ResourceLimitCause::Analysis(error) => match error.operation() {
                 stab_analysis::ResourceOperation::CircuitFlatten => {
                     ResourceOperation::CircuitFlatten
@@ -332,12 +313,16 @@ impl ResourceLimitError {
                     ResourceOperation::SatMaterialization
                 }
             },
-            ResourceLimitCause::CircuitSourceLines
-            | ResourceLimitCause::CircuitRepeatNesting { .. } => ResourceOperation::CircuitParse,
-            ResourceLimitCause::DetectorErrorModelSourceLines
-            | ResourceLimitCause::DetectorErrorModelRepeatNesting => {
-                ResourceOperation::DetectorErrorModelParse
-            }
+            ResourceLimitCause::ModelParse(error) => match error.context() {
+                stab_model::ResourceLimitContext::CircuitSourceLines
+                | stab_model::ResourceLimitContext::CircuitRepeatNesting { .. } => {
+                    ResourceOperation::CircuitParse
+                }
+                stab_model::ResourceLimitContext::DetectorErrorModelSourceLines
+                | stab_model::ResourceLimitContext::DetectorErrorModelRepeatNesting => {
+                    ResourceOperation::DetectorErrorModelParse
+                }
+            },
             ResourceLimitCause::DetectionRecordBits { .. }
             | ResourceLimitCause::DetectionMaterializedBits { .. }
             | ResourceLimitCause::DetectionRepeatNesting
@@ -356,7 +341,7 @@ impl ResourceLimitError {
     }
 
     pub const fn resource(&self) -> ResourceKind {
-        match self.cause {
+        match &self.cause {
             ResourceLimitCause::Analysis(error) => match error.resource() {
                 stab_analysis::ResourceKind::RepeatNesting => ResourceKind::RepeatNesting,
                 stab_analysis::ResourceKind::RepresentedItems => ResourceKind::RepresentedItems,
@@ -397,11 +382,17 @@ impl ResourceLimitError {
                 stab_analysis::ResourceKind::ClauseLiterals => ResourceKind::ClauseLiterals,
                 stab_analysis::ResourceKind::OutputBytes => ResourceKind::OutputBytes,
             },
-            ResourceLimitCause::CircuitSourceLines
-            | ResourceLimitCause::DetectorErrorModelSourceLines => ResourceKind::SourceLines,
-            ResourceLimitCause::CircuitRepeatNesting { .. }
-            | ResourceLimitCause::DetectorErrorModelRepeatNesting
-            | ResourceLimitCause::DetectionRepeatNesting => ResourceKind::RepeatNesting,
+            ResourceLimitCause::ModelParse(error) => match error.context() {
+                stab_model::ResourceLimitContext::CircuitSourceLines
+                | stab_model::ResourceLimitContext::DetectorErrorModelSourceLines => {
+                    ResourceKind::SourceLines
+                }
+                stab_model::ResourceLimitContext::CircuitRepeatNesting { .. }
+                | stab_model::ResourceLimitContext::DetectorErrorModelRepeatNesting => {
+                    ResourceKind::RepeatNesting
+                }
+            },
+            ResourceLimitCause::DetectionRepeatNesting => ResourceKind::RepeatNesting,
             ResourceLimitCause::DetectionExpandedInstructions => ResourceKind::ExpandedOperations,
             ResourceLimitCause::DetectionRecordBits { .. } => ResourceKind::RecordBits,
             ResourceLimitCause::DetectionMaterializedBits { .. } => ResourceKind::MaterializedBits,
@@ -505,28 +496,9 @@ impl From<stab_engine::DemResourceLimitError> for ResourceLimitError {
 
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.cause {
-            ResourceLimitCause::Analysis(error) => Display::fmt(&error, formatter),
-            ResourceLimitCause::CircuitSourceLines => write!(
-                formatter,
-                "failed to parse line {}: circuit input has more than {} lines",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitRepeatNesting { source_line } => write!(
-                formatter,
-                "failed to parse line {source_line}: repeat nesting exceeds current limit {}",
-                self.limit
-            ),
-            ResourceLimitCause::DetectorErrorModelSourceLines => write!(
-                formatter,
-                "invalid detector error model: DEM input has more than {} lines",
-                self.limit
-            ),
-            ResourceLimitCause::DetectorErrorModelRepeatNesting => write!(
-                formatter,
-                "invalid detector error model: DEM repeat nesting exceeds current limit {}",
-                self.limit
-            ),
+        match &self.cause {
+            ResourceLimitCause::Analysis(error) => Display::fmt(error, formatter),
+            ResourceLimitCause::ModelParse(error) => Display::fmt(error, formatter),
             ResourceLimitCause::DetectionRecordBits { subject } => match subject {
                 DetectionRecordLimitSubject::DetectionRecord => write!(
                     formatter,

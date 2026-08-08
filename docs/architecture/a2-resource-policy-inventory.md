@@ -190,7 +190,7 @@ A future milestone may promote one only after identifying the owning operation, 
 | Owner | Current cap | Classification |
 | --- | --- | --- |
 | `Circuit::from_file` and circuit CLI input | 64 MiB | Fixed hostile-input cap for path-based whole-file parsing. Streaming model parsing is not implemented. |
-| `convert` CLI input | 64 MiB | Fixed cap for the bounded non-streaming conversion route. |
+| `convert` CLI record input | 64 MiB per text record | Result-data conversion streams through the shared per-record reader (decision D5), so total input length is unbounded while memory stays bounded by one record frame; the `--in_format=stim` circuit route keeps the 64 MiB circuit-input cap. |
 | `analyze_errors` CLI input | 64 MiB | Fixed route-level cap before model parsing and analysis. |
 | `sample_dem` CLI model input | 64 MiB | Fixed route-level cap; sampled records themselves stream. |
 | text replay and `m2d` records | 1 MiB per record | Fixed streaming-record cap that bounds one retained line rather than total input length. |

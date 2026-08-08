@@ -781,8 +781,8 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
             let record = if converter.sweep_bit_count() == 0 {
                 converter.convert_record(&reference)?
             } else {
-                let mut output = converter.reusable_detection_record();
-                let mut reference_sample = converter.reusable_reference_sample();
+                let mut output = converter.try_reusable_detection_record()?;
+                let mut reference_sample = converter.try_reusable_reference_sample()?;
                 converter.convert_record_with_sweep_into(
                     &reference,
                     &sweep_record,
@@ -1049,8 +1049,12 @@ fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[
         },
     )
     .expect("compile sweep converter");
-    let mut converted = converter.reusable_detection_record();
-    let mut reference = converter.reusable_reference_sample();
+    let mut converted = converter
+        .try_reusable_detection_record()
+        .expect("allocate reusable detection record");
+    let mut reference = converter
+        .try_reusable_reference_sample()
+        .expect("allocate reusable reference sample");
     converter
         .convert_record_with_sweep_into(expected_true, &[true], &mut reference, &mut converted)
         .expect("convert true sweep reference");

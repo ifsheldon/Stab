@@ -1,4 +1,5 @@
 use crate::EncodedSizeEstimate as Estimate;
+use crate::SampleFormat;
 
 /// Physical encoding used by a registered result-record codec.
 #[non_exhaustive]
@@ -55,6 +56,21 @@ impl RecordFormat {
             Self::B8 => RecordEncoding::BytePacked,
             Self::R8 => RecordEncoding::RunLength,
             Self::Ptb64 => RecordEncoding::BitPlane64,
+        }
+    }
+
+    /// Per-record sample encoding driven through [`crate::MeasureRecordWriter`].
+    ///
+    /// PTB64 is the one registered exception: it interleaves complete 64-record groups into bit
+    /// planes, so it has no per-record writer encoding and returns `None`.
+    pub const fn sample_format(self) -> Option<SampleFormat> {
+        match self {
+            Self::ZeroOne => Some(SampleFormat::ZeroOne),
+            Self::B8 => Some(SampleFormat::B8),
+            Self::R8 => Some(SampleFormat::R8),
+            Self::Hits => Some(SampleFormat::Hits),
+            Self::Dets => Some(SampleFormat::Dets),
+            Self::Ptb64 => None,
         }
     }
 
@@ -138,4 +154,30 @@ const CODECS: [CodecCapability; 6] = [
 
 pub const fn codec_capabilities() -> &'static [CodecCapability; 6] {
     &CODECS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RecordFormat;
+    use crate::SampleFormat;
+
+    #[test]
+    fn sample_format_owns_the_ptb64_per_record_exception() {
+        assert_eq!(
+            RecordFormat::ZeroOne.sample_format(),
+            Some(SampleFormat::ZeroOne)
+        );
+        assert_eq!(RecordFormat::B8.sample_format(), Some(SampleFormat::B8));
+        assert_eq!(RecordFormat::R8.sample_format(), Some(SampleFormat::R8));
+        assert_eq!(RecordFormat::Hits.sample_format(), Some(SampleFormat::Hits));
+        assert_eq!(RecordFormat::Dets.sample_format(), Some(SampleFormat::Dets));
+        assert_eq!(RecordFormat::Ptb64.sample_format(), None);
+        let group_only = RecordFormat::all()
+            .filter(|format| format.sample_format().is_none())
+            .count();
+        assert_eq!(
+            group_only, 1,
+            "ptb64 is the one registered format without a per-record sample encoding"
+        );
+    }
 }

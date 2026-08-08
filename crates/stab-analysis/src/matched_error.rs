@@ -94,7 +94,7 @@ pub struct CircuitTargetsInsideInstruction {
 }
 
 /// Borrowed matched-error instruction context shared with compatibility facades.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CircuitTargetsInsideInstructionView<'a> {
     gate: Option<Gate>,
     gate_tag: Option<&'a str>,
@@ -264,7 +264,17 @@ impl<'a> CircuitErrorLocationView<'a> {
         if self.flipped_pauli_product.len() != other.flipped_pauli_product.len() {
             return self.flipped_pauli_product.len() < other.flipped_pauli_product.len();
         }
-        compare_circuit_error_location_views(self, other) == Ordering::Less
+        self.canonical_cmp(other) == Ordering::Less
+    }
+
+    /// Compares two locations in Stim's canonical explained-error order.
+    ///
+    /// The ordering ranks tick offset, then flipped Pauli product, flipped measurement,
+    /// instruction targets, and stack frames. It is the one owner of matched-error location
+    /// ordering, shared by [`ExplainedError::canonicalize`] and owner facades sorting their own
+    /// location containers in place.
+    pub fn canonical_cmp(self, other: Self) -> Ordering {
+        compare_circuit_error_location_views(self, other)
     }
 }
 
@@ -287,13 +297,25 @@ impl Display for CircuitErrorLocationView<'_> {
     }
 }
 
+impl PartialEq for CircuitErrorLocationView<'_> {
+    // Equality deliberately skips `noise_tag`, mirroring upstream Stim's CircuitErrorLocation
+    // operator==; this view impl is the one owner of that rule for the canonical type and every
+    // owner facade comparing through borrowed views.
+    fn eq(&self, other: &Self) -> bool {
+        self.tick_offset == other.tick_offset
+            && self.flipped_pauli_product == other.flipped_pauli_product
+            && self.flipped_measurement == other.flipped_measurement
+            && self.instruction_targets == other.instruction_targets
+            && self.stack_frames == other.stack_frames
+    }
+}
+
 impl CircuitErrorLocation {
     pub fn canonicalize(&mut self) {
-        self.flipped_pauli_product
-            .sort_by(compare_gate_targets_with_coords);
-        self.flipped_measurement
-            .measured_observable
-            .sort_by(compare_gate_targets_with_coords);
+        canonicalize_circuit_error_location_parts(
+            &mut self.flipped_pauli_product,
+            &mut self.flipped_measurement,
+        );
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
@@ -301,13 +323,33 @@ impl CircuitErrorLocation {
     }
 }
 
+/// Canonicalizes a matched-error location's sortable components in place.
+///
+/// Sorts the flipped Pauli product and the flipped measurement's measured observable into Stim's
+/// canonical target order. This is the one owner of location canonicalization, shared by
+/// [`CircuitErrorLocation::canonicalize`] and owner facades holding the same component types, so
+/// they avoid cloning a whole location to canonicalize it.
+pub fn canonicalize_circuit_error_location_parts(
+    flipped_pauli_product: &mut [GateTargetWithCoords],
+    flipped_measurement: &mut FlippedMeasurement,
+) {
+    flipped_pauli_product.sort_by(compare_gate_targets_with_coords);
+    flipped_measurement
+        .measured_observable
+        .sort_by(compare_gate_targets_with_coords);
+}
+
+/// Sorts explained-error DEM terms into Stim's canonical order in place.
+///
+/// This is the one owner of DEM-term ordering, shared by [`ExplainedError::canonicalize`] and
+/// owner facades canonicalizing their own term containers without a clone round-trip.
+pub fn canonicalize_dem_error_terms(terms: &mut [DemTargetWithCoords]) {
+    terms.sort_by(compare_dem_targets_with_coords);
+}
+
 impl PartialEq for CircuitErrorLocation {
     fn eq(&self, other: &Self) -> bool {
-        self.tick_offset == other.tick_offset
-            && self.flipped_pauli_product == other.flipped_pauli_product
-            && self.flipped_measurement == other.flipped_measurement
-            && self.instruction_targets == other.instruction_targets
-            && self.stack_frames == other.stack_frames
+        CircuitErrorLocationView::from(self) == CircuitErrorLocationView::from(other)
     }
 }
 
@@ -350,10 +392,11 @@ impl ExplainedError {
         for location in &mut self.circuit_error_locations {
             location.canonicalize();
         }
-        self.dem_error_terms
-            .sort_by(compare_dem_targets_with_coords);
-        self.circuit_error_locations
-            .sort_by(compare_circuit_error_locations);
+        canonicalize_dem_error_terms(&mut self.dem_error_terms);
+        self.circuit_error_locations.sort_by(|left, right| {
+            CircuitErrorLocationView::from(left)
+                .canonical_cmp(CircuitErrorLocationView::from(right))
+        });
     }
 }
 
@@ -544,16 +587,6 @@ fn compare_dem_targets_with_coords(
     left.dem_target
         .cmp(&right.dem_target)
         .then_with(|| compare_f64_slices(&left.coords, &right.coords))
-}
-
-fn compare_circuit_error_locations(
-    left: &CircuitErrorLocation,
-    right: &CircuitErrorLocation,
-) -> Ordering {
-    compare_circuit_error_location_views(
-        CircuitErrorLocationView::from(left),
-        CircuitErrorLocationView::from(right),
-    )
 }
 
 fn compare_circuit_error_location_views(
