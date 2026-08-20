@@ -74,6 +74,12 @@ Update this file at each batch completion with the metrics required by the plan'
 - Verification breadth at the same revision line: `cargo test --workspace` (3,120 tests), the Stable 1.97.1 component suite (1,047 tests across the nine Stable packages), the portable-SIMD feature suite (124 tests), consumer, architecture, and documentation checks, and both qualification inventory checks all pass.
 - Remaining plan-done residuals, owned by the restored A9 sequence rather than this plan's batches: the affected benchmark qualification groups rerun on the controlled host (requires swap-off host preparation), the WS4 scratch-repository release rehearsal (success criteria 2 and 3), and the PR plus soak correctness tiers that A9 step 2 regenerates at unique paths alongside the 11 exact prerequisites.
 
+### Post-closure correction: packed B8 identity conversion
+
+- WS5 correctly consolidated record framing into `stab-records`, but commit `65722c1b` accidentally deleted the previously optimized byte-aligned `b8` to `b8` CLI path from commit `7167c826`. Two shared-host trends and one focused clean-source comparison reproduced the wide M7 row above the unchanged `1.25x` gate, reaching `2.616x` locally.
+- Commit `17871e75` repairs the regression through the shared owner instead of reintroducing a CLI decoder: one borrowed validated packed frame is exposed by `RecordStreamReader`, unused non-byte-aligned padding is masked on output, observable splitting keeps the structured path, and malformed tails retain the existing diagnostic.
+- The clean focused comparison measured `0.043610x` against pinned Stim. The new public method has an exact correctness owner, both generated inventories are rebound, and the former `b397052d` correctness reports are historical rather than relabeled under the changed inventory.
+
 ## Finding Ledger
 
 Each Pass 1 finding gains a row here when its fix lands: finding, owner, witness, implementing commit, evidence status.
