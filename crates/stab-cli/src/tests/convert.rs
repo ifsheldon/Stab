@@ -422,8 +422,9 @@ fn convert_b8_to_b8_preserves_byte_aligned_records_exactly() {
 
 #[test]
 fn convert_b8_to_b8_keeps_non_byte_aligned_padding_canonical() {
-    let output = convert_between_formats(&[0xff], "b8", "b8", &["--bits_per_shot", "3"]);
-    assert_eq!(output, vec![0x07]);
+    let output =
+        convert_between_formats(&[0xff, 0xa5, 0x80], "b8", "b8", &["--bits_per_shot", "3"]);
+    assert_eq!(output, vec![0x07, 0x05, 0x00]);
 }
 
 #[test]
@@ -527,6 +528,8 @@ fn convert_rejects_layout_and_format_failures() {
                 "stab",
                 "convert",
                 "--in_format",
+                "b8",
+                "--out_format",
                 "b8",
                 "--bits_per_shot",
                 "9",

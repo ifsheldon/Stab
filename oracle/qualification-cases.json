@@ -25306,6 +25306,42 @@
       "standalone": true
     },
     {
+      "id": "cq2-result-stream-reader-b8-packed",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "record_stream::tests::streamed_b8_packed_records_preserve_frames_across_refills",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Representation-preserving B8 access returns exactly one borrowed packed frame at a time across partial transport reads, while the companion negative test preserves strict trailing-frame and selected-format validation."
+      },
+      "negative_axes": [
+        "frame-split-drift",
+        "truncated-packed-tail",
+        "non-b8-reader-access",
+        "dense-expansion-regression"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_records",
+          "owner_path": "stab_records::RecordStreamReader::next_b8_packed_record"
+        }
+      ],
+      "standalone": true
+    },
+    {
       "id": "cq2-result-stream-reader-differential",
       "feature_id": "CQ-RESULT-FORMATS",
       "comparator": "exact-value",

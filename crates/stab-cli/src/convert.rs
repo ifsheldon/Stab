@@ -363,6 +363,17 @@ where
     let mut reader = convert_record_reader(input, args.in_format, layout)?;
     let mut outputs = io.activate()?;
     let mut primary_sink = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    if args.in_format == RecordFormatArg::B8
+        && args.out_format == RecordFormatArg::B8
+        && args.obs_output.is_none()
+    {
+        return stream_b8_identity_records(
+            &mut reader,
+            input_path,
+            layout.input_width()?,
+            &mut primary_sink,
+        );
+    }
     let mut observable_sink = args
         .obs_output
         .as_ref()
@@ -423,6 +434,44 @@ where
             .write_with(|writer| writer.write_all(&observable_output))?;
     }
     Ok(())
+}
+
+fn stream_b8_identity_records<R, W>(
+    reader: &mut RecordStreamReader<R>,
+    input_path: Option<&Path>,
+    bits_per_record: usize,
+    output: &mut OutputSink<'_, W>,
+) -> Result<(), CliError>
+where
+    R: Read,
+    W: Write,
+{
+    let tail_bits = bits_per_record % 8;
+    let tail_mask = if tail_bits == 0 {
+        u8::MAX
+    } else {
+        u8::MAX >> (8 - tail_bits)
+    };
+    loop {
+        let record = match reader.next_b8_packed_record() {
+            Ok(Some(record)) => record,
+            Ok(None) => return Ok(()),
+            Err(error) => return Err(record_stream_error(error, input_path)),
+        };
+        output.write_with(|writer| {
+            if tail_bits == 0 {
+                return writer.write_all(record);
+            }
+            let Some((last, prefix)) = record.split_last() else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "b8 identity conversion produced an empty record frame",
+                ));
+            };
+            writer.write_all(prefix)?;
+            writer.write_all(&[*last & tail_mask])
+        })?;
+    }
 }
 
 struct ConvertOutput {

@@ -304,7 +304,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
         .filter(|case| case.source_id.starts_with("cq2-result-"))
         .collect::<Vec<_>>();
-    assert_eq!(result_qualification_cases.len(), 43);
+    assert_eq!(result_qualification_cases.len(), 44);
     assert!(
         result_qualification_cases
             .iter()

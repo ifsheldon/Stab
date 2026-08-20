@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "6e9219f724f3ea343e9a24b1aeefcf9746c80f24c692a01bf13baf234cdd5a23",
+  "semantic_digest": "3efea1b341a8fd7b808e58077589840a51999abc5c7771ad82568cedda908c89",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -111804,6 +111804,20 @@
       ]
     },
     {
+      "id": "cq-api-item-e0bc0f1bda5853e0",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_core",
+      "path": "stab_core::advanced::records::RecordStreamReader::next_b8_packed_record",
+      "kind": "method",
+      "source_path": "crates/stab-core/src/advanced.rs",
+      "source_line": 40,
+      "owner_case_id": "cq-evidence-qualification-d656ead0a508e074",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
       "id": "cq-api-item-22a70592860d8183",
       "feature_id": "CQ-RESULT-FORMATS",
       "crate_name": "stab_core",
@@ -158861,6 +158875,20 @@
       "source_path": "crates/stab-records/src/record_stream.rs",
       "source_line": 111,
       "owner_case_id": "cq-evidence-qualification-238f10d92742047c",
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ]
+    },
+    {
+      "id": "cq-api-item-15d5c15d68f7c228",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "crate_name": "stab_records",
+      "path": "stab_records::RecordStreamReader::next_b8_packed_record",
+      "kind": "method",
+      "source_path": "crates/stab-records/src/record_stream.rs",
+      "source_line": 195,
+      "owner_case_id": "cq-evidence-qualification-d656ead0a508e074",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -224297,6 +224325,58 @@
       ],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "cq-evidence-qualification-d656ead0a508e074",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "qualification-plan",
+      "source_id": "cq2-result-stream-reader-b8-packed",
+      "comparator": "exact-value",
+      "execution": {
+        "tiers": [
+          "pr",
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-records",
+          "--lib",
+          "record_stream::tests::streamed_b8_packed_records_preserve_frames_across_refills",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Representation-preserving B8 access returns exactly one borrowed packed frame at a time across partial transport reads, while the companion negative test preserves strict trailing-frame and selected-format validation."
+      },
+      "negative_axes": [
+        "frame-split-drift",
+        "truncated-packed-tail",
+        "non-b8-reader-access",
+        "dense-expansion-regression"
+      ],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "implemented"
     },

@@ -185,6 +185,28 @@ impl<R: Read> RecordStreamReader<R> {
         }
     }
 
+    /// Returns the next raw byte-packed record frame without expanding it into dense bits.
+    ///
+    /// This representation-preserving path is available only when the reader was constructed for
+    /// [`SampleFormat::B8`]. The returned frame borrows the reader's input buffer and remains valid
+    /// until the next mutable reader operation. Padding bits in the final byte are returned exactly
+    /// as supplied; semantic consumers that emit canonical B8 must clear bits beyond the declared
+    /// record width.
+    pub fn next_b8_packed_record(&mut self) -> Result<Option<&[u8]>, RecordStreamReadError> {
+        if !matches!(&self.decoder, StreamDecoder::B8) {
+            return Err(FormatError::invalid_data(
+                "packed b8 record access requires a b8 stream reader",
+            )
+            .into());
+        }
+        let Some((start, end)) = self.next_b8_frame_range()? else {
+            return Ok(None);
+        };
+        self.buffer.get(start..end).map(Some).ok_or_else(|| {
+            FormatError::invalid_data("b8 record frame escaped the stream buffer").into()
+        })
+    }
+
     fn next_text_record(&mut self) -> Result<Option<&[bool]>, RecordStreamReadError> {
         loop {
             let Some(line_len) = self.frame_text_line()? else {
@@ -273,6 +295,17 @@ impl<R: Read> RecordStreamReader<R> {
     }
 
     fn next_b8_record(&mut self) -> Result<Option<&[bool]>, RecordStreamReadError> {
+        let Some((start, end)) = self.next_b8_frame_range()? else {
+            return Ok(None);
+        };
+        let chunk = self.buffer.get(start..end).ok_or_else(|| {
+            FormatError::invalid_data("b8 record frame escaped the stream buffer")
+        })?;
+        unpack_b8_chunk_into(chunk, &mut self.record);
+        Ok(Some(&self.record))
+    }
+
+    fn next_b8_frame_range(&mut self) -> Result<Option<(usize, usize)>, RecordStreamReadError> {
         let bytes_per_record = b8_record_byte_width(self.bits_per_record)?;
         self.fill_at_least(bytes_per_record)?;
         if self.available() == 0 {
@@ -285,12 +318,12 @@ impl<R: Read> RecordStreamReader<R> {
             .start
             .checked_add(bytes_per_record)
             .ok_or_else(|| FormatError::invalid_data("b8 record frame byte range overflowed"))?;
-        let chunk = self.buffer.get(self.start..end).ok_or_else(|| {
+        let start = self.start;
+        self.buffer.get(start..end).ok_or_else(|| {
             FormatError::invalid_data("b8 record frame escaped the stream buffer")
         })?;
-        unpack_b8_chunk_into(chunk, &mut self.record);
         self.start = end;
-        Ok(Some(&self.record))
+        Ok(Some((start, end)))
     }
 
     fn next_r8_record(&mut self) -> Result<Option<&[bool]>, RecordStreamReadError> {
@@ -542,6 +575,81 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn streamed_b8_packed_records_preserve_frames_across_refills() {
+        let input = [0xab, 0x01, 0x34, 0x02, 0xff, 0x00];
+        for step in [1, 2, input.len()] {
+            let mut reader = RecordStreamReader::measurements(
+                Trickle::new(&input, step),
+                SampleFormat::B8,
+                9,
+                TEST_TEXT_LIMIT,
+            );
+            let mut records = Vec::new();
+            while let Some(record) = reader
+                .next_b8_packed_record()
+                .expect("streamed packed b8 record")
+            {
+                records.push(record.to_vec());
+            }
+            assert_eq!(
+                records,
+                vec![vec![0xab, 0x01], vec![0x34, 0x02], vec![0xff, 0x00]],
+                "step {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn streamed_b8_packed_records_keep_validation_and_format_identity() {
+        let mut truncated = RecordStreamReader::measurements(
+            Trickle::new(&[0xab, 0x01, 0x34], 1),
+            SampleFormat::B8,
+            9,
+            TEST_TEXT_LIMIT,
+        );
+        assert_eq!(
+            truncated
+                .next_b8_packed_record()
+                .expect("complete leading record")
+                .expect("leading record"),
+            &[0xab, 0x01]
+        );
+        let expected = read_records(&[0xab, 0x01, 0x34], SampleFormat::B8, 9)
+            .expect_err("truncated whole-buffer b8 input");
+        let actual = match truncated
+            .next_b8_packed_record()
+            .expect_err("truncated streamed b8 input")
+        {
+            RecordStreamReadError::Format(error) => error,
+            other => panic!("expected format error, got {other:?}"),
+        };
+        assert_eq!(actual, expected);
+
+        let mut text = RecordStreamReader::measurements(
+            Trickle::new(b"0\n", 1),
+            SampleFormat::ZeroOne,
+            1,
+            TEST_TEXT_LIMIT,
+        );
+        assert!(matches!(
+            text.next_b8_packed_record(),
+            Err(RecordStreamReadError::Format(_))
+        ));
+
+        let mut zero_width = RecordStreamReader::measurements(
+            Trickle::new(&[0xff], 1),
+            SampleFormat::B8,
+            0,
+            TEST_TEXT_LIMIT,
+        );
+        assert!(matches!(
+            zero_width.next_b8_packed_record(),
+            Err(RecordStreamReadError::Format(error))
+                if error.code() == crate::FormatErrorCode::InvalidRecordWidth
+        ));
     }
 
     #[test]
