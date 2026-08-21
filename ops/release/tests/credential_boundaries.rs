@@ -3,6 +3,7 @@
     reason = "integration tests use concise process fixture assertions"
 )]
 
+use std::fs;
 use std::process::{Command, Output};
 
 const RELEASE_CREDENTIALS: &[&str] = &[
@@ -13,8 +14,8 @@ const RELEASE_CREDENTIALS: &[&str] = &[
 ];
 const SECRET_VALUE: &str = "must-not-appear-in-diagnostics";
 
-fn run_operator(args: &[&str], variables: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_stab-release"));
+fn run_operator(binary: &str, args: &[&str], variables: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(binary);
     command.args(args);
     for name in RELEASE_CREDENTIALS {
         command.env_remove(name);
@@ -23,8 +24,8 @@ fn run_operator(args: &[&str], variables: &[(&str, &str)]) -> Output {
     command.output().expect("run release operator")
 }
 
-fn assert_startup_rejection(args: &[&str], allowed: (&str, &str), forbidden: &str) {
-    let output = run_operator(args, &[allowed, (forbidden, SECRET_VALUE)]);
+fn assert_startup_rejection(binary: &str, args: &[&str], allowed: (&str, &str), forbidden: &str) {
+    let output = run_operator(binary, args, &[allowed, (forbidden, SECRET_VALUE)]);
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).expect("UTF-8 diagnostics");
     assert!(stderr.contains("release credential environment"));
@@ -47,6 +48,7 @@ fn publish_reviewed_rejects_unrelated_credentials_at_startup() {
         "GH_TOKEN",
     ] {
         assert_startup_rejection(
+            env!("CARGO_BIN_EXE_stab-release"),
             &args,
             ("CARGO_REGISTRY_TOKEN", "reviewed-registry-secret"),
             forbidden,
@@ -70,6 +72,112 @@ fn create_draft_rejects_unrelated_credentials_at_startup() {
         "CARGO_REGISTRIES_CRATES_IO_TOKEN",
         "GH_TOKEN",
     ] {
-        assert_startup_rejection(&args, ("GITHUB_TOKEN", "reviewed-github-secret"), forbidden);
+        assert_startup_rejection(
+            env!("CARGO_BIN_EXE_stab-release"),
+            &args,
+            ("GITHUB_TOKEN", "reviewed-github-secret"),
+            forbidden,
+        );
     }
+}
+
+#[test]
+fn rehearsal_draft_rejects_unrelated_credentials_at_startup() {
+    let args = [
+        "create-draft",
+        "--assets",
+        "target/releases/missing-assets",
+        "--tag",
+        "v0.2.0-rehearsal-0123456789abcdef0123456789abcdef01234567",
+        "--confirm-repository",
+        "ifsheldon/Stab-release-rehearsal",
+    ];
+    for forbidden in [
+        "CARGO_REGISTRY_TOKEN",
+        "CARGO_REGISTRIES_CRATES_IO_TOKEN",
+        "GH_TOKEN",
+    ] {
+        assert_startup_rejection(
+            env!("CARGO_BIN_EXE_stab-release-rehearsal"),
+            &args,
+            ("GITHUB_TOKEN", "reviewed-github-secret"),
+            forbidden,
+        );
+    }
+}
+
+#[test]
+fn rehearsal_operator_exposes_no_irreversible_publication_command() {
+    let output = run_operator(
+        env!("CARGO_BIN_EXE_stab-release-rehearsal"),
+        &["--help"],
+        &[],
+    );
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 help");
+    assert!(stdout.contains("create-draft"));
+    for forbidden in [
+        "publish-reviewed",
+        "verify-published-release",
+        "confirm-version",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "unexpected command {forbidden}"
+        );
+    }
+
+    let rejected = run_operator(
+        env!("CARGO_BIN_EXE_stab-release-rehearsal"),
+        &["publish-reviewed"],
+        &[],
+    );
+    assert!(!rejected.status.success());
+    let stderr = String::from_utf8(rejected.stderr).expect("UTF-8 diagnostics");
+    assert!(stderr.contains("unrecognized subcommand"));
+}
+
+#[cfg(unix)]
+#[test]
+fn rehearsal_operator_supports_the_token_free_cargo_reexec_boundary() {
+    let root = tempfile::tempdir().expect("temporary isolated Cargo paths");
+    let home = root.path().join("home");
+    let cargo_home = root.path().join("cargo-home");
+    let target = root.path().join("target");
+    let temporary = root.path().join("tmp");
+    for path in [&home, &cargo_home, &target, &temporary] {
+        fs::create_dir(path).expect("isolated Cargo directory");
+    }
+    let config = cargo_home.join("config.toml");
+    fs::write(&config, "[net]\noffline = true\n").expect("isolated Cargo config");
+    let output = run_operator(
+        env!("CARGO_BIN_EXE_stab-release-rehearsal"),
+        &[
+            "__isolated-cargo",
+            "--cargo",
+            "/bin/true",
+            "--rustc",
+            "/bin/true",
+            "--rustdoc",
+            "/bin/true",
+            "--home",
+            home.to_str().expect("UTF-8 temporary path"),
+            "--cargo-home",
+            cargo_home.to_str().expect("UTF-8 temporary path"),
+            "--target",
+            target.to_str().expect("UTF-8 temporary path"),
+            "--temporary",
+            temporary.to_str().expect("UTF-8 temporary path"),
+            "--config",
+            config.to_str().expect("UTF-8 temporary path"),
+            "--",
+            "--version",
+        ],
+        &[],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

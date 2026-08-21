@@ -7,18 +7,18 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    RELEASE_TAG, RELEASE_VERSION, ReleaseError, artifact, authorization,
-    cancellation::ReleaseCancellation, repository,
+    RELEASE_VERSION, ReleaseError, artifact, authorization, cancellation::ReleaseCancellation,
+    repository,
 };
 
 mod ruleset;
+mod target;
 #[cfg(test)]
 mod tests;
 
 const API_HOST: &str = "https://api.github.com";
 const UPLOAD_HOST: &str = "https://uploads.github.com";
 const API_VERSION: &str = "2022-11-28";
-const REPOSITORY: &str = "ifsheldon/Stab";
 const MAX_RESPONSE_BYTES: u64 = 1 << 20;
 // GitHub's by-tag release endpoint returns published releases only; drafts are
 // visible solely through the paginated release list, so draft verification
@@ -26,8 +26,15 @@ const MAX_RESPONSE_BYTES: u64 = 1 << 20;
 const RELEASE_LIST_PAGE_SIZE: usize = 100;
 const RELEASE_LIST_PAGE_BOUND: usize = 10;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-const RELEASE_TITLE: &str = "Stab 0.2.0";
-const RELEASE_NOTES: &str = "Stab 0.2.0";
+pub(crate) use target::{REHEARSAL_REPOSITORY, rehearsal_tag};
+
+pub(crate) fn require_production_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
+    target::PRODUCTION.require_tag(tag, commit)
+}
+
+pub(crate) fn require_rehearsal_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
+    target::REHEARSAL.require_tag(tag, commit)
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RemoteReleaseState {
@@ -47,27 +54,65 @@ pub(crate) fn create_verified_draft(
             actual: confirmation.to_string(),
         });
     }
+    create_verified_draft_for(
+        root,
+        assets,
+        tag,
+        target::PRODUCTION,
+        authorization::require_a9_release,
+    )
+}
+
+pub(crate) fn create_verified_rehearsal_draft(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+    repository_confirmation: &str,
+) -> Result<(), ReleaseError> {
+    if repository_confirmation != REHEARSAL_REPOSITORY {
+        return Err(ReleaseError::PublicationConfirmation {
+            expected: REHEARSAL_REPOSITORY.to_string(),
+            actual: repository_confirmation.to_string(),
+        });
+    }
+    create_verified_draft_for(
+        root,
+        assets,
+        tag,
+        target::REHEARSAL,
+        authorization::require_rehearsal,
+    )
+}
+
+fn create_verified_draft_for(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+    target: target::GitHubTarget,
+    authorize: fn(&Path, &ReleaseCancellation) -> Result<(), ReleaseError>,
+) -> Result<(), ReleaseError> {
     let mut reviewed = artifact::review_assets(root, assets, tag)?;
     let commit = reviewed.commit().to_string();
+    target.require_tag(tag, &commit)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorization::require_a9_release(root, &cancellation)?;
+    authorize(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 
     let token = GitHubToken::from_environment()?;
-    let mut publisher = GitHubApi::new(cancellation.clone());
+    let mut publisher = GitHubApi::new(target, cancellation.clone());
     publish_draft(
         &mut publisher,
         &mut reviewed,
         tag,
         &commit,
+        target,
         &token,
         &cancellation,
     )?;
     drop(token);
     reviewed.revalidate()?;
-    repository::require_unchanged(root, &commit)?;
-    Ok(())
+    repository::require_unchanged(root, &commit)
 }
 
 fn publish_draft(
@@ -75,6 +120,7 @@ fn publish_draft(
     reviewed: &mut artifact::ReviewedAssets,
     tag: &str,
     commit: &str,
+    target: target::GitHubTarget,
     token: &GitHubToken,
     cancellation: &ReleaseCancellation,
 ) -> Result<(), ReleaseError> {
@@ -82,7 +128,7 @@ fn publish_draft(
     with_stable_remote_tag(publisher, tag, commit, token, |publisher| {
         reviewed.revalidate()?;
         let created = publisher.create_draft(tag, commit, token)?;
-        validate_release(&created, tag, &[], RemoteReleaseState::Draft)?;
+        validate_release(&created, tag, &[], RemoteReleaseState::Draft, target)?;
 
         for asset in reviewed.assets_mut() {
             cancellation.check("GitHub asset upload")?;
@@ -107,7 +153,13 @@ fn publish_draft(
                 sha256: asset.sha256().to_string(),
             })
             .collect::<Vec<_>>();
-        validate_release(&recorded, tag, &expected_assets, RemoteReleaseState::Draft)
+        validate_release(
+            &recorded,
+            tag,
+            &expected_assets,
+            RemoteReleaseState::Draft,
+            target,
+        )
     })
 }
 
@@ -117,10 +169,44 @@ pub(crate) fn verify_remote_release(
     tag: &str,
     expected_state: RemoteReleaseState,
 ) -> Result<(), ReleaseError> {
+    verify_remote_release_for(
+        root,
+        assets,
+        tag,
+        expected_state,
+        target::PRODUCTION,
+        authorization::require_a9_release,
+    )
+}
+
+pub(crate) fn verify_rehearsal_draft(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+) -> Result<(), ReleaseError> {
+    verify_remote_release_for(
+        root,
+        assets,
+        tag,
+        RemoteReleaseState::Draft,
+        target::REHEARSAL,
+        authorization::require_rehearsal,
+    )
+}
+
+fn verify_remote_release_for(
+    root: &Path,
+    assets: &Path,
+    tag: &str,
+    expected_state: RemoteReleaseState,
+    target: target::GitHubTarget,
+    authorize: fn(&Path, &ReleaseCancellation) -> Result<(), ReleaseError>,
+) -> Result<(), ReleaseError> {
     let reviewed = artifact::review_assets(root, assets, tag)?;
     let commit = reviewed.commit().to_string();
+    target.require_tag(tag, &commit)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorization::require_a9_release(root, &cancellation)?;
+    authorize(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 
@@ -134,11 +220,11 @@ pub(crate) fn verify_remote_release(
             sha256: asset.sha256().to_string(),
         })
         .collect::<Vec<_>>();
-    let mut verifier = GitHubApi::new(cancellation.clone());
+    let mut verifier = GitHubApi::new(target, cancellation.clone());
     with_stable_remote_tag(&mut verifier, tag, &commit, &token, |verifier| {
         cancellation.check("GitHub release verification")?;
         let recorded = release_in_state(verifier, tag, expected_state, &token)?;
-        validate_release(&recorded, tag, &expected_assets, expected_state)
+        validate_release(&recorded, tag, &expected_assets, expected_state, target)
     })?;
     drop(token);
     reviewed.revalidate()?;
@@ -253,17 +339,24 @@ struct GitHubApi {
     agent: ureq::Agent,
     api_host: String,
     upload_host: String,
+    target: target::GitHubTarget,
     cancellation: ReleaseCancellation,
 }
 
 impl GitHubApi {
-    fn new(cancellation: ReleaseCancellation) -> Self {
-        Self::with_hosts(API_HOST.to_string(), UPLOAD_HOST.to_string(), cancellation)
+    fn new(target: target::GitHubTarget, cancellation: ReleaseCancellation) -> Self {
+        Self::with_hosts(
+            API_HOST.to_string(),
+            UPLOAD_HOST.to_string(),
+            target,
+            cancellation,
+        )
     }
 
     fn with_hosts(
         api_host: String,
         upload_host: String,
+        target: target::GitHubTarget,
         cancellation: ReleaseCancellation,
     ) -> Self {
         let config = ureq::Agent::config_builder()
@@ -274,6 +367,7 @@ impl GitHubApi {
             agent: config.into(),
             api_host,
             upload_host,
+            target,
             cancellation,
         }
     }
@@ -291,6 +385,23 @@ impl GitHubApi {
             .get(url)
             .header("Accept", "application/vnd.github+json")
             .header("Authorization", &authorization)
+            .header("X-GitHub-Api-Version", API_VERSION)
+            .header("User-Agent", "stab-release/0.2.0")
+            .call()
+            .map_err(|error| transport_error(operation, error))?;
+        self.read_json(response, ureq::http::StatusCode::OK, operation)
+    }
+
+    fn get_public_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        operation: &str,
+    ) -> Result<T, ReleaseError> {
+        self.cancellation.check(operation)?;
+        let response = self
+            .agent
+            .get(url)
+            .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", API_VERSION)
             .header("User-Agent", "stab-release/0.2.0")
             .call()
@@ -372,15 +483,20 @@ impl GitHubApi {
 }
 
 impl DraftPublisher for GitHubApi {
-    fn require_release_tag_ruleset(&mut self, token: &GitHubToken) -> Result<(), ReleaseError> {
+    fn require_release_tag_ruleset(&mut self, _token: &GitHubToken) -> Result<(), ReleaseError> {
+        let repository_url = format!("{}/repos/{}", self.api_host, self.target.repository);
+        let repository: RemoteRepository = self.get_public_json(
+            &repository_url,
+            "GitHub release repository identity verification",
+        )?;
+        validate_repository(&repository, self.target)?;
         let url = format!(
-            "{}/repos/{REPOSITORY}/rulesets/{}",
-            self.api_host,
-            ruleset::ID,
+            "{}/repos/{}/rulesets/{}",
+            self.api_host, self.target.repository, self.target.ruleset.id,
         );
         let ruleset: ruleset::RemoteRuleset =
-            self.get_json(&url, token, "GitHub release-tag ruleset verification")?;
-        ruleset::validate(&ruleset)
+            self.get_public_json(&url, "GitHub release-tag ruleset verification")?;
+        ruleset::validate(&ruleset, self.target.ruleset)
     }
 
     fn require_remote_annotated_tag(
@@ -389,14 +505,17 @@ impl DraftPublisher for GitHubApi {
         commit: &str,
         token: &GitHubToken,
     ) -> Result<(), ReleaseError> {
-        require_release_tag(tag)?;
-        let reference_url = format!("{}/repos/{REPOSITORY}/git/ref/tags/{tag}", self.api_host);
+        self.target.require_tag(tag, commit)?;
+        let reference_url = format!(
+            "{}/repos/{}/git/ref/tags/{tag}",
+            self.api_host, self.target.repository
+        );
         let reference: RemoteReference =
             self.get_json(&reference_url, token, "GitHub tag reference query")?;
         require_annotated_reference(&reference, tag)?;
         let object_url = format!(
-            "{}/repos/{REPOSITORY}/git/tags/{}",
-            self.api_host, reference.object.sha
+            "{}/repos/{}/git/tags/{}",
+            self.api_host, self.target.repository, reference.object.sha
         );
         let object: RemoteTag = self.get_json(&object_url, token, "GitHub tag object query")?;
         require_tag_commit(&object, tag, commit)
@@ -408,15 +527,18 @@ impl DraftPublisher for GitHubApi {
         commit: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        require_release_tag(tag)?;
-        let url = format!("{}/repos/{REPOSITORY}/releases", self.api_host);
+        self.target.require_tag(tag, commit)?;
+        let url = format!(
+            "{}/repos/{}/releases",
+            self.api_host, self.target.repository
+        );
         self.post_json(
             &url,
             &CreateReleaseRequest {
                 tag_name: tag,
                 target_commitish: commit,
-                name: RELEASE_TITLE,
-                body: RELEASE_NOTES,
+                name: self.target.title,
+                body: self.target.notes,
                 draft: true,
                 prerelease: false,
                 generate_release_notes: false,
@@ -436,8 +558,8 @@ impl DraftPublisher for GitHubApi {
     ) -> Result<RemoteAsset, ReleaseError> {
         validate_asset_name(name)?;
         let url = format!(
-            "{}/repos/{REPOSITORY}/releases/{release_id}/assets?name={name}",
-            self.upload_host
+            "{}/repos/{}/releases/{release_id}/assets?name={name}",
+            self.upload_host, self.target.repository
         );
         self.post_file(&url, file, token, "GitHub asset upload")
     }
@@ -447,8 +569,11 @@ impl DraftPublisher for GitHubApi {
         tag: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        require_release_tag(tag)?;
-        let url = format!("{}/repos/{REPOSITORY}/releases/tags/{tag}", self.api_host);
+        self.target.require_tag_shape(tag)?;
+        let url = format!(
+            "{}/repos/{}/releases/tags/{tag}",
+            self.api_host, self.target.repository
+        );
         self.get_json(&url, token, "GitHub published release query")
     }
 
@@ -457,12 +582,12 @@ impl DraftPublisher for GitHubApi {
         tag: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        require_release_tag(tag)?;
+        self.target.require_tag_shape(tag)?;
         let mut matches: Vec<RemoteRelease> = Vec::new();
         for page in 1..=RELEASE_LIST_PAGE_BOUND {
             let url = format!(
-                "{}/repos/{REPOSITORY}/releases?per_page={RELEASE_LIST_PAGE_SIZE}&page={page}",
-                self.api_host
+                "{}/repos/{}/releases?per_page={RELEASE_LIST_PAGE_SIZE}&page={page}",
+                self.api_host, self.target.repository
             );
             let releases: Vec<RemoteRelease> =
                 self.get_json(&url, token, "GitHub draft release listing")?;
@@ -496,6 +621,7 @@ fn validate_release(
     tag: &str,
     expected_assets: &[ExpectedAsset],
     expected_state: RemoteReleaseState,
+    target: target::GitHubTarget,
 ) -> Result<(), ReleaseError> {
     let valid_state = match expected_state {
         RemoteReleaseState::Draft => release.draft && release.published_at.is_none(),
@@ -509,8 +635,8 @@ fn validate_release(
     };
     if release.id == 0
         || release.tag_name != tag
-        || release.name.as_deref() != Some(RELEASE_TITLE)
-        || release.body.as_deref() != Some(RELEASE_NOTES)
+        || release.name.as_deref() != Some(target.title)
+        || release.body.as_deref() != Some(target.notes)
         || !valid_state
         || release.prerelease
     {
@@ -549,6 +675,24 @@ fn validate_release(
         validate_asset(asset, name, bytes, sha256)?;
     }
     Ok(())
+}
+
+fn validate_repository(
+    repository: &RemoteRepository,
+    target: target::GitHubTarget,
+) -> Result<(), ReleaseError> {
+    if repository.id == target.repository_id
+        && repository.full_name == target.repository
+        && !repository.private
+        && !repository.archived
+    {
+        Ok(())
+    } else {
+        Err(ReleaseError::GitHubRelease(format!(
+            "GitHub repository {} does not match its pinned public, active numeric identity",
+            target.repository
+        )))
+    }
 }
 
 fn require_annotated_reference(reference: &RemoteReference, tag: &str) -> Result<(), ReleaseError> {
@@ -590,17 +734,6 @@ fn validate_asset(
     Ok(())
 }
 
-fn require_release_tag(tag: &str) -> Result<(), ReleaseError> {
-    if tag == RELEASE_TAG {
-        Ok(())
-    } else {
-        Err(ReleaseError::TagName {
-            expected: RELEASE_TAG.to_string(),
-            actual: tag.to_string(),
-        })
-    }
-}
-
 fn validate_asset_name(name: &str) -> Result<(), ReleaseError> {
     let known = [
         "stab-linux-aarch64",
@@ -637,6 +770,14 @@ struct CreateReleaseRequest<'a> {
     prerelease: bool,
     generate_release_notes: bool,
     make_latest: &'a str,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct RemoteRepository {
+    id: u64,
+    full_name: String,
+    private: bool,
+    archived: bool,
 }
 
 struct ExpectedAsset {

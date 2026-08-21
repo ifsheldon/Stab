@@ -40,6 +40,12 @@ pub(super) fn scan_workflow_actions(root: &Path) -> Result<WorkflowActionReport,
         action_use_count: 0,
         violations: Vec::new(),
     };
+    let relative_paths = paths
+        .iter()
+        .filter_map(|path| path.strip_prefix(root).ok())
+        .map(Path::to_path_buf)
+        .collect::<Vec<_>>();
+    release::inspect_required_workflow_paths(&relative_paths, &mut report);
     for path in paths {
         inspect_workflow(root, &path, &mut report)?;
     }
@@ -788,10 +794,19 @@ jobs:
         let report = scan_workflow_actions(repository.path()).expect("scan workflows");
 
         assert_eq!(report.action_use_count, 0);
-        assert_eq!(report.violations.len(), 1);
         assert_eq!(
-            report.violations.first().map(|violation| violation.code),
-            Some("workflow-not-regular-file")
+            report
+                .violations
+                .iter()
+                .filter(|violation| violation.code == "workflow-release-missing")
+                .count(),
+            2
+        );
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.code == "workflow-not-regular-file")
         );
     }
 
@@ -832,7 +847,7 @@ jobs:
     fn repository_workflows_use_only_immutable_action_refs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let report = scan_workflow_actions(&root).expect("scan repository workflows");
-        assert_eq!(report.action_use_count, 10);
+        assert_eq!(report.action_use_count, 14);
         assert!(report.violations.is_empty(), "{:?}", report.violations);
     }
 }

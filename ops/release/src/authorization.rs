@@ -13,7 +13,36 @@ pub(crate) fn require_a9_release(
     root: &Path,
     cancellation: &ReleaseCancellation,
 ) -> Result<(), ReleaseError> {
-    cancellation.check("A9 release authorization")?;
+    require(
+        root,
+        cancellation,
+        "A9 release authorization",
+        &[qualification_status_arguments(true)],
+    )
+}
+
+pub(crate) fn require_rehearsal(
+    root: &Path,
+    cancellation: &ReleaseCancellation,
+) -> Result<(), ReleaseError> {
+    require(
+        root,
+        cancellation,
+        "release rehearsal authorization",
+        &[
+            architecture_check_arguments(),
+            qualification_status_arguments(false),
+        ],
+    )
+}
+
+fn require(
+    root: &Path,
+    cancellation: &ReleaseCancellation,
+    operation: &'static str,
+    commands: &[Vec<OsString>],
+) -> Result<(), ReleaseError> {
+    cancellation.check(operation)?;
     let work_name = format!(
         ".authorize-{}-{}",
         std::process::id(),
@@ -24,24 +53,27 @@ pub(crate) fn require_a9_release(
         Path::new("target/releases").join(work_name).as_path(),
         Some(Path::new("target/releases")),
     )?;
-    let authorization = (|| {
+    let authorization: Result<(), ReleaseError> = (|| {
         let cargo_target = work.create_directory(OsStr::new("cargo-target"))?;
         let cargo = cargo::CargoSandbox::create(root, &work, &cargo_target)?;
-        cargo.run(
-            root,
-            qualification_status_arguments(),
-            AUTHORIZATION_TIMEOUT,
-            MAX_AUTHORIZATION_OUTPUT_BYTES,
-        )
+        for arguments in commands {
+            cargo.run(
+                root,
+                arguments.iter().map(OsString::as_os_str),
+                AUTHORIZATION_TIMEOUT,
+                MAX_AUTHORIZATION_OUTPUT_BYTES,
+            )?;
+        }
+        Ok(())
     })();
     let cleanup = work.remove_tree();
     authorization?;
     cleanup?;
-    cancellation.check("A9 release authorization")
+    cancellation.check(operation)
 }
 
-fn qualification_status_arguments() -> Vec<OsString> {
-    [
+fn qualification_status_arguments(require_release_completion: bool) -> Vec<OsString> {
+    let mut arguments = [
         "run",
         "--quiet",
         "--locked",
@@ -50,7 +82,24 @@ fn qualification_status_arguments() -> Vec<OsString> {
         "--",
         "qualification-status",
         "--check",
-        "--require-release-completion",
+    ]
+    .map(OsString::from)
+    .to_vec();
+    if require_release_completion {
+        arguments.push(OsString::from("--require-release-completion"));
+    }
+    arguments
+}
+
+fn architecture_check_arguments() -> Vec<OsString> {
+    [
+        "run",
+        "--quiet",
+        "--locked",
+        "--package",
+        "stab-architecture",
+        "--",
+        "check",
     ]
     .map(OsString::from)
     .to_vec()
@@ -63,7 +112,7 @@ mod tests {
     #[test]
     fn authorization_uses_the_checked_a9_status_contract() {
         assert_eq!(
-            qualification_status_arguments(),
+            qualification_status_arguments(true),
             [
                 "run",
                 "--quiet",
@@ -74,6 +123,37 @@ mod tests {
                 "qualification-status",
                 "--check",
                 "--require-release-completion",
+            ]
+            .map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn rehearsal_uses_architecture_and_non_release_status_contracts() {
+        assert_eq!(
+            architecture_check_arguments(),
+            [
+                "run",
+                "--quiet",
+                "--locked",
+                "--package",
+                "stab-architecture",
+                "--",
+                "check",
+            ]
+            .map(OsString::from)
+        );
+        assert_eq!(
+            qualification_status_arguments(false),
+            [
+                "run",
+                "--quiet",
+                "--locked",
+                "--package",
+                "stab-bench",
+                "--",
+                "qualification-status",
+                "--check",
             ]
             .map(OsString::from)
         );

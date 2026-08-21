@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RELEASE_TAG, ReleaseError, process};
+use crate::{ReleaseError, process};
 
 const MAX_COMMAND_OUTPUT: usize = 8 << 20;
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -89,12 +89,6 @@ pub(crate) fn require_unchanged(root: &Path, before: &str) -> Result<(), Release
 }
 
 pub(crate) fn require_clean_tag(root: &Path, tag: &str) -> Result<String, ReleaseError> {
-    if tag != RELEASE_TAG {
-        return Err(ReleaseError::TagName {
-            expected: RELEASE_TAG.to_string(),
-            actual: tag.to_string(),
-        });
-    }
     let head = require_clean(root)?;
     let tag_ref = format!("refs/tags/{tag}");
     let kind = run_capture(
@@ -670,6 +664,7 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use crate::RELEASE_TAG;
 
     fn git(root: &Path, args: &[&str]) {
         let status = Command::new("git")
@@ -715,16 +710,17 @@ mod tests {
     }
 
     #[test]
-    fn lightweight_and_wrong_release_tags_are_rejected() {
+    fn lightweight_tags_are_rejected_and_other_annotated_tags_are_supported() {
         let root = repository();
         git(root.path(), &["tag", RELEASE_TAG]);
         assert!(matches!(
             require_clean_tag(root.path(), RELEASE_TAG),
             Err(ReleaseError::TagKind { .. })
         ));
-        assert!(matches!(
-            require_clean_tag(root.path(), "v0.2.1"),
-            Err(ReleaseError::TagName { .. })
-        ));
+        git(
+            root.path(),
+            &["tag", "-a", "rehearsal-tag", "-m", "rehearsal"],
+        );
+        require_clean_tag(root.path(), "rehearsal-tag").expect("alternate annotated tag");
     }
 }

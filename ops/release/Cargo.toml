@@ -7,6 +7,15 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 publish = false
+default-run = "stab-release"
+
+[[bin]]
+name = "stab-release"
+path = "src/main.rs"
+
+[[bin]]
+name = "stab-release-rehearsal"
+path = "src/bin/stab-release-rehearsal.rs"
 
 [lints]
 workspace = true

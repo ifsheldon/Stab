@@ -88,6 +88,8 @@ pub fn publish_reviewed(preflight: &Path, confirmation: &str) -> Result<(), Rele
 
 pub fn build_binary(target: &str, output: &Path, tag: &str) -> Result<(), ReleaseError> {
     let root = repository_root()?;
+    let commit = repository::require_clean(&root)?;
+    github::require_production_tag(tag, &commit)?;
     let packaged = artifact::build_binary(&root, target, output, tag)?;
     println!(
         "[stab-release] wrote {}, {}, and {}",
@@ -100,9 +102,43 @@ pub fn build_binary(target: &str, output: &Path, tag: &str) -> Result<(), Releas
 
 pub fn verify_assets(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
     let root = repository_root()?;
+    let commit = repository::require_clean(&root)?;
+    github::require_production_tag(tag, &commit)?;
     artifact::verify_assets(&root, assets, tag)?;
     println!(
         "[stab-release] verified release assets in {}",
+        assets.display()
+    );
+    Ok(())
+}
+
+pub fn rehearsal_tag() -> Result<String, ReleaseError> {
+    let root = repository_root()?;
+    let commit = repository::require_clean(&root)?;
+    github::rehearsal_tag(&commit)
+}
+
+pub fn build_rehearsal_binary(target: &str, output: &Path, tag: &str) -> Result<(), ReleaseError> {
+    let root = repository_root()?;
+    let commit = repository::require_clean(&root)?;
+    github::require_rehearsal_tag(tag, &commit)?;
+    let packaged = artifact::build_binary(&root, target, output, tag)?;
+    println!(
+        "[stab-release-rehearsal] wrote {}, {}, and {}",
+        packaged.binary.display(),
+        packaged.checksum.display(),
+        packaged.manifest.display()
+    );
+    Ok(())
+}
+
+pub fn verify_rehearsal_assets(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    let root = repository_root()?;
+    let commit = repository::require_clean(&root)?;
+    github::require_rehearsal_tag(tag, &commit)?;
+    artifact::verify_assets(&root, assets, tag)?;
+    println!(
+        "[stab-release-rehearsal] verified rehearsal assets in {}",
         assets.display()
     );
     Ok(())
@@ -133,6 +169,32 @@ pub fn verify_published_release(assets: &Path, tag: &str) -> Result<(), ReleaseE
     let root = repository_root()?;
     github::verify_remote_release(&root, assets, tag, github::RemoteReleaseState::Published)?;
     println!("[stab-release] verified published release {tag} with exact reviewed assets");
+    Ok(())
+}
+
+pub fn create_verified_rehearsal_draft(
+    assets: &Path,
+    tag: &str,
+    repository_confirmation: &str,
+) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::CreateDraft)?;
+    let root = repository_root()?;
+    github::create_verified_rehearsal_draft(&root, assets, tag, repository_confirmation)?;
+    println!(
+        "[stab-release-rehearsal] created and verified private draft {tag} in {}",
+        github::REHEARSAL_REPOSITORY
+    );
+    Ok(())
+}
+
+pub fn verify_rehearsal_draft(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
+    credentials::require_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
+    let root = repository_root()?;
+    github::verify_rehearsal_draft(&root, assets, tag)?;
+    println!(
+        "[stab-release-rehearsal] verified private draft {tag} in {}",
+        github::REHEARSAL_REPOSITORY
+    );
     Ok(())
 }
 
