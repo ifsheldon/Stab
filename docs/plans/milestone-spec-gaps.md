@@ -1774,3 +1774,21 @@ Current text: performance qualification required every failed or noisy promotabl
 Gap: a new group cannot own an evidence-based profiler note before its first failure is observed. The report validator therefore rejected the complete result before immutable publication, leaving only operator-observed, non-replayable history and allowing every other note-less promotable group to encounter the same loss.
 Proposed amendment: retain the first failed or noisy report under its exact source contract with the already source-owned group owner, a null profiler-note binding, explicit pending-analysis status, and `promotable=false`. Require parity, rollup, and completion to reject it. Add the profiler note in a focused source commit, then require fresh evidence under the new runtime-contract identity instead of relabeling the retained report.
 Resolution: report promotion now includes failure-analysis completeness. A failed or noisy report without a note validates, publishes, replays, and renders as `pending-source-owned-profiler-note`, but its non-promotable preflight is rejected by the existing parity and rollup boundaries. A report with no unfavorable attempt remains promotable without a speculative note, and a failed or noisy report becomes promotable only when its exact source contract already binds a validated note. Focused tests cover stable failure, noisy-then-passing rerun, source-owned-note promotion, and the exact late-hit note path.
+
+## 2026-08-21 - A9: Prepublication Attempted-Path Ledger
+
+Status: Resolved
+Revealed by: milestone audit of the source-current replacement timing interruption
+Current text: A9 required every failed or noisy formal result to remain visible and prohibited artifact-path reuse.
+Gap: a host or controller can reject a command before an artifact directory materializes. Without recording the exact attempted output argument, later agents cannot distinguish that retired path from a never-attempted path and can accidentally satisfy the prose while reusing it.
+Proposed amendment: record every attempted formal output path, failure class, materialization state, and replacement path before continuing, including prepublication host and controller failures.
+Resolution: A9 now makes that ledger mandatory. The progress report names the non-materialized Clifford host rejection, its fresh accepted replacement, and the non-materialized DEM rollup rejection; all three path identities remain explicit.
+
+## 2026-08-21 - A9: Clean DEM Probe Sequencing
+
+Status: Resolved
+Revealed by: milestone audit of the active short execution contract
+Current text: the DEM profiler note required both adapter probes after a parser or runtime-contract change, but A9 and `GOAL.md` named only worker reproducibility before formal timing.
+Gap: an agent following only the active milestone sequence could begin timing after worker reproduction without independently executing the complete parse and print adapter contracts from the exact clean revision.
+Proposed amendment: require both `pq2-dem-parse-adapter-smoke` and `pq2-dem-canonical-print-adapter-smoke` from the exact clean source revision before formal timing; dirty-tree probes remain diagnostic.
+Resolution: the A9 task list and `GOAL.md` now name both selectors alongside the clean worker prerequisite. The current dirty parse probe remains explicitly nonpromotable and cannot satisfy the clean-revision gate.

@@ -14,7 +14,7 @@ use crate::{
 mod fast;
 mod items;
 
-use items::ParsedDemItems;
+use items::{ParsedDemItemStorage, ParsedNestedDemItems};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
@@ -43,19 +43,17 @@ impl<'a> DemParser<'a> {
     }
 
     fn parse(mut self) -> ModelResult<DetectorErrorModel> {
-        self.parse_block(false, 0)
+        let items = Vec::with_capacity(self.top_level_capacity);
+        self.parse_block(items, 0)
     }
 
-    fn parse_block(
+    // Keep the top-level Vec and nested inline-storage loops in separate compact code paths.
+    #[inline(never)]
+    fn parse_block<S: ParsedDemItemStorage>(
         &mut self,
-        stop_on_terminator: bool,
+        mut items: S,
         depth: usize,
     ) -> ModelResult<DetectorErrorModel> {
-        let mut items = if stop_on_terminator {
-            ParsedDemItems::nested()
-        } else {
-            ParsedDemItems::top_level(self.top_level_capacity)
-        };
         while let Some(command) = self.next_command()? {
             let line_number = command.line_number();
             let line = command.source().trim_ascii_start();
@@ -64,7 +62,7 @@ impl<'a> DemParser<'a> {
                 continue;
             }
             if semantic_line.text() == "}" {
-                if stop_on_terminator {
+                if S::STOPS_ON_TERMINATOR {
                     return Ok(items.into_model());
                 }
                 return Err(unexpected_repeat_terminator(
@@ -98,8 +96,8 @@ impl<'a> DemParser<'a> {
                         semantic_line.span(),
                     ));
                 }
-                let body = self.parse_block(true, depth + 1)?;
-                items.push(super::DemItem::RepeatBlock(DemRepeatBlock::from_parts(
+                let body = self.parse_block(ParsedNestedDemItems::nested(), depth + 1)?;
+                items.push_item(super::DemItem::RepeatBlock(DemRepeatBlock::from_parts(
                     repeat.count,
                     body,
                     repeat.tag,
@@ -111,11 +109,11 @@ impl<'a> DemParser<'a> {
                     } else {
                         parse_dem_instruction(line_number, line, command.end_error_span())?
                     };
-                items.push(super::DemItem::Instruction(instruction));
+                items.push_item(super::DemItem::Instruction(instruction));
             }
         }
 
-        if stop_on_terminator {
+        if S::STOPS_ON_TERMINATOR {
             Err(unterminated_repeat_block(
                 ModelDialect::DetectorErrorModel,
                 self.input_len,
