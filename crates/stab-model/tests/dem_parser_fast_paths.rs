@@ -178,3 +178,41 @@ fn representative_flat_and_coordinate_families_avoid_per_instruction_allocations
         );
     }
 }
+
+#[test]
+fn representative_folded_family_bounds_nested_body_storage() {
+    const TOP_LEVEL_ITEMS: usize = 4_096;
+    const NESTED_BODIES_PER_ITEM: usize = 2;
+    const MAX_FIXED_ALLOCATIONS: u64 = 2;
+    const MAX_ALLOCATED_BYTES: u64 = 6_500_000;
+    const CYCLE: &str = concat!(
+        "repeat[outer] 1000000 {\n",
+        "    repeat[inner] 1024 {\n",
+        "        error(0.125) D0 D1000000 L100000\n",
+        "        shift_detectors 1000001\n",
+        "    }\n",
+        "}\n",
+    );
+
+    let input = CYCLE.repeat(TOP_LEVEL_ITEMS);
+    let warm = DetectorErrorModel::from_dem_str(&input).expect("warm folded-family parse");
+    assert_eq!(warm.items().len(), TOP_LEVEL_ITEMS);
+    std::hint::black_box(warm);
+
+    let allocations = allocation_counter::measure(|| {
+        let model = DetectorErrorModel::from_dem_str(&input).expect("measured folded-family parse");
+        std::hint::black_box(model.items().len());
+    });
+    let maximum_allocations = u64::try_from(TOP_LEVEL_ITEMS * NESTED_BODIES_PER_ITEM)
+        .expect("allocation count fits u64")
+        + MAX_FIXED_ALLOCATIONS;
+
+    assert!(
+        allocations.count_total <= maximum_allocations,
+        "folded parser exceeded {maximum_allocations} allocations: {allocations:?}"
+    );
+    assert!(
+        allocations.bytes_total <= MAX_ALLOCATED_BYTES,
+        "folded parser requested more than {MAX_ALLOCATED_BYTES} bytes: {allocations:?}"
+    );
+}

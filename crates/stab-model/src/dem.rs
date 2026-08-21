@@ -87,10 +87,8 @@ impl DetectorErrorModel {
         ModelFingerprint::for_dem(self)
     }
 
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            items: Vec::with_capacity(capacity),
-        }
+    fn from_items(items: Vec<DemItem>) -> Self {
+        Self { items }
     }
 
     pub fn items(&self) -> &[DemItem] {

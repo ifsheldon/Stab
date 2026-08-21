@@ -12,6 +12,9 @@ use crate::{
 };
 
 mod fast;
+mod items;
+
+use items::ParsedDemItems;
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
@@ -48,10 +51,10 @@ impl<'a> DemParser<'a> {
         stop_on_terminator: bool,
         depth: usize,
     ) -> ModelResult<DetectorErrorModel> {
-        let mut model = if stop_on_terminator {
-            DetectorErrorModel::new()
+        let mut items = if stop_on_terminator {
+            ParsedDemItems::nested()
         } else {
-            DetectorErrorModel::with_capacity(self.top_level_capacity)
+            ParsedDemItems::top_level(self.top_level_capacity)
         };
         while let Some(command) = self.next_command()? {
             let line_number = command.line_number();
@@ -62,7 +65,7 @@ impl<'a> DemParser<'a> {
             }
             if semantic_line.text() == "}" {
                 if stop_on_terminator {
-                    return Ok(model);
+                    return Ok(items.into_model());
                 }
                 return Err(unexpected_repeat_terminator(
                     ModelDialect::DetectorErrorModel,
@@ -96,7 +99,11 @@ impl<'a> DemParser<'a> {
                     ));
                 }
                 let body = self.parse_block(true, depth + 1)?;
-                model.push_repeat_block(DemRepeatBlock::from_parts(repeat.count, body, repeat.tag));
+                items.push(super::DemItem::RepeatBlock(DemRepeatBlock::from_parts(
+                    repeat.count,
+                    body,
+                    repeat.tag,
+                )));
             } else {
                 let instruction =
                     if let Some(instruction) = fast::parse_canonical_instruction(line.text()) {
@@ -104,7 +111,7 @@ impl<'a> DemParser<'a> {
                     } else {
                         parse_dem_instruction(line_number, line, command.end_error_span())?
                     };
-                model.push_instruction(instruction);
+                items.push(super::DemItem::Instruction(instruction));
             }
         }
 
@@ -114,7 +121,7 @@ impl<'a> DemParser<'a> {
                 self.input_len,
             ))
         } else {
-            Ok(model)
+            Ok(items.into_model())
         }
     }
 
