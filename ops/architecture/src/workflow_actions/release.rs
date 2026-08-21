@@ -47,7 +47,7 @@ jobs:
           - name: linux-aarch64
             os: ubuntu-24.04-arm
           - name: macos-aarch64
-            os: macos-15-arm64
+            os: macos-15
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -157,7 +157,7 @@ jobs:
           - name: linux-aarch64
             os: ubuntu-24.04-arm
           - name: macos-aarch64
-            os: macos-15-arm64
+            os: macos-15
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -560,7 +560,7 @@ mod tests {
         let path = Path::new(REHEARSAL_WORKFLOW_PATH);
         for source in [
             EXPECTED_REHEARSAL_WORKFLOW.replace("ubuntu-24.04-arm", "ubuntu-latest"),
-            EXPECTED_REHEARSAL_WORKFLOW.replace("macos-15-arm64", "macos-latest"),
+            EXPECTED_REHEARSAL_WORKFLOW.replace("macos-15", "macos-latest"),
             EXPECTED_REHEARSAL_WORKFLOW.replace(
                 "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
                 "actions/checkout@1111111111111111111111111111111111111111",
