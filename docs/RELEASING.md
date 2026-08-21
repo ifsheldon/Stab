@@ -19,6 +19,65 @@ Stab product crates are published as one coordinated version because their pre-1
 
 Ops and test-support crates remain unpublished. Every product package must be version `0.2.0`, include `README.crates.md`, carry complete crates.io metadata, and require internal publishable path dependencies with exact version `=0.2.0`.
 
+## Reversible Release Rehearsal
+
+Complete this gate before formal A9 evidence. It exercises the native Linux and macOS builds, artifact transfer, GitHub draft creation, six-asset upload and digest verification, immutable annotated-tag checks, active ruleset checks, unique workflow-run capture, and the read-only remote verifier without publishing crates or a public release. The dedicated `stab-release-rehearsal` binary has no registry publication, production-tag, draft-to-publication, or published-release command. Do not redirect or repurpose the production `stab-release` operator for this rehearsal.
+
+The rehearsal destination is fixed in source: public scratch repository `ifsheldon/Stab-release-rehearsal`, numeric repository ID `1342241032`, and active ruleset `21169813` named `Protect Stab rehearsal tags`. The ruleset targets `refs/tags/v0.2.0-rehearsal-*`, prevents update and deletion, has an explicitly empty bypass list, and reports `current_user_can_bypass=never`. GitHub's public ruleset response omits those bypass fields, so the source contract pins its GitHub-owned node ID and creation/update timestamps to the authenticated empty-bypass inspection; an authenticated complete response must agree, a partial response rejects, and any mutation changes the fingerprint. Repository and ruleset identity reads carry no release credential. The workflow's reviewed full-SHA actions still execute under the draft job's declared GitHub permission model; the final operator invocation is the only explicit workflow expression that binds `GITHUB_TOKEN`, and checkout never persists its automatic job credential. The scratch repository is public because GitHub does not apply repository rulesets to a private personal repository without a paid plan; it contains only source and binaries already intended for Stab's public repository and release.
+
+Start from the exact clean `main` revision that has passed both required GitHub CI jobs. Mirror it to the scratch repository without force, then create a unique annotated tag derived from the full lowercase commit identity:
+
+```text
+REHEARSAL_REPOSITORY="ifsheldon/Stab-release-rehearsal"
+REHEARSAL_COMMIT="$(git rev-parse HEAD^{commit})"
+REHEARSAL_TAG="v0.2.0-rehearsal-$REHEARSAL_COMMIT"
+test -z "$(git status --porcelain=v1 --untracked-files=normal --ignore-submodules=none)"
+test "$(git rev-parse main^{commit})" = "$REHEARSAL_COMMIT"
+test "$(git rev-parse origin/main^{commit})" = "$REHEARSAL_COMMIT"
+git push "https://github.com/$REHEARSAL_REPOSITORY.git" "$REHEARSAL_COMMIT:refs/heads/main"
+git tag -a "$REHEARSAL_TAG" "$REHEARSAL_COMMIT" -m "Stab 0.2.0 release rehearsal at $REHEARSAL_COMMIT"
+test "$(git cat-file -t "refs/tags/$REHEARSAL_TAG")" = "tag"
+test "$(git rev-parse "refs/tags/$REHEARSAL_TAG^{commit}")" = "$REHEARSAL_COMMIT"
+git push "https://github.com/$REHEARSAL_REPOSITORY.git" "refs/tags/$REHEARSAL_TAG"
+REMOTE_REHEARSAL_COMMIT="$(git ls-remote --exit-code "https://github.com/$REHEARSAL_REPOSITORY.git" "refs/tags/$REHEARSAL_TAG^{}" | cut -f1)"
+test "$REMOTE_REHEARSAL_COMMIT" = "$REHEARSAL_COMMIT"
+```
+
+The main-branch push is deliberately non-forced. A non-fast-forward rejection means the scratch history no longer represents an append-only mirror and must be investigated instead of overwritten. The tag pattern is commit-derived, so a failed or superseded rehearsal receives a new source commit and new tag; never move, delete, or reuse a rehearsal tag.
+
+Dispatch only the frozen rehearsal workflow from the annotated tag. Poll the workflow-scoped API for the exact source commit and require exactly one dispatch run:
+
+```text
+gh workflow run release-rehearsal.yml -R "$REHEARSAL_REPOSITORY" --ref "$REHEARSAL_TAG"
+REHEARSAL_RUN_ID=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  sleep 5
+  REHEARSAL_RUN_ID="$(gh api "repos/$REHEARSAL_REPOSITORY/actions/workflows/release-rehearsal.yml/runs?event=workflow_dispatch&head_sha=$REHEARSAL_COMMIT" --jq '[.workflow_runs[].id] | if length == 1 then .[0] else empty end')"
+  test -n "$REHEARSAL_RUN_ID" && break
+done
+printf '%s\n' "$REHEARSAL_RUN_ID" | grep -Eq '^[0-9]+$'
+REHEARSAL_RUN_URL="https://github.com/$REHEARSAL_REPOSITORY/actions/runs/$REHEARSAL_RUN_ID"
+gh run view "$REHEARSAL_RUN_ID" -R "$REHEARSAL_REPOSITORY" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
+gh run watch "$REHEARSAL_RUN_ID" -R "$REHEARSAL_REPOSITORY" --exit-status
+gh run view "$REHEARSAL_RUN_ID" -R "$REHEARSAL_REPOSITORY" --json databaseId,event,headBranch,headSha,status,conclusion,url,workflowName
+```
+
+Accept the run only when its database ID and URL match the captured values, `workflowName` is `Release Rehearsal`, `event` is `workflow_dispatch`, `headBranch` is the exact rehearsal tag, `headSha` is `REHEARSAL_COMMIT`, and final status and conclusion are `completed` and `success`. Zero or multiple matching runs fail closed. Do not substitute latest-run discovery or dispatch a second run under the same commit.
+
+Download both exact artifacts into a new path, verify the live private draft with the rehearsal-only operator, and record all six local digests:
+
+```text
+REHEARSAL_ASSETS="target/releases/rehearsal-<commit>-workflow-assets"
+test ! -e "$REHEARSAL_ASSETS"
+mkdir "$REHEARSAL_ASSETS"
+gh run download "$REHEARSAL_RUN_ID" -R "$REHEARSAL_REPOSITORY" --name stab-linux-aarch64 --dir "$REHEARSAL_ASSETS"
+gh run download "$REHEARSAL_RUN_ID" -R "$REHEARSAL_REPOSITORY" --name stab-macos-aarch64 --dir "$REHEARSAL_ASSETS"
+GITHUB_TOKEN="$(gh auth token)" just release::verify-rehearsal-draft --assets "$REHEARSAL_ASSETS" --tag "$REHEARSAL_TAG"
+sha256sum "$REHEARSAL_ASSETS"/*
+```
+
+Record the exact source commit, tag, workflow ID and URL, repository and ruleset identities, and six digests in the architecture progress report. Never publish the rehearsal draft. The reversible rehearsal deliberately excludes `release::publish-reviewed`, production `v0.2.0` tag creation or push, manual publication, and `release::verify-published-release`; those operations belong only to the authenticated production procedure below.
+
 ## Preflight
 
 The A9 procedure permits exactly one status-only descendant after the measured source revision. Once that descendant exists, set `RELEASE_COMMIT` to its full commit identity and verify that the worktree is clean. The release procedure then requires the human operator to verify that every required GitHub CI check for that exact revision has passed. This external exact-revision CI check is mandatory: the local Rust release commands validate source and qualification identities, but they do not query GitHub CI and do not replace this check. Do not continue from the measured evidence parent, an earlier status revision, or a revision whose required CI is pending or failed.
@@ -69,7 +128,7 @@ test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
 
 The local and remote peel checks are mandatory. Stop if either tag does not resolve to `RELEASE_COMMIT`; do not move or replace a published release tag.
 
-Repository ruleset `20419793`, named `Protect Stab v0.2.0 release tag`, must remain active throughout tag and release work. It targets only `refs/tags/v0.2.0`, rejects tag update and deletion, and has no bypass actor; the release operator reads that exact ruleset before and after every draft or release verification and fails closed if its identity, target, rules, enforcement, or bypass state changes.
+Repository ruleset `20419793`, named `Protect Stab v0.2.0 release tag`, must remain active throughout tag and release work. It targets only `refs/tags/v0.2.0`, rejects tag update and deletion, and has no bypass actor; the release operator reads that exact ruleset before and after every draft or release verification and fails closed if its identity, GitHub-owned fingerprint, target, rules, enforcement, or authenticated bypass state changes.
 
 Dispatch the `Release` workflow from the existing tag ref, not from the default branch, then capture the run identity by polling the workflow-scoped run list filtered to the dispatch event and the exact reviewed head SHA, requiring exactly one match:
 
@@ -102,9 +161,7 @@ test ! -e "$RELEASE_ASSETS"
 mkdir "$RELEASE_ASSETS"
 gh run download "$RELEASE_RUN_ID" --name stab-linux-aarch64 --dir "$RELEASE_ASSETS"
 gh run download "$RELEASE_RUN_ID" --name stab-macos-aarch64 --dir "$RELEASE_ASSETS"
-export GITHUB_TOKEN="$(gh auth token)"
-just release::verify-remote-draft --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
-unset GITHUB_TOKEN
+GITHUB_TOKEN="$(gh auth token)" just release::verify-remote-draft --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
 ```
 
 Inspect the private draft, verify its source identity, both binaries, both checksum files, both provenance manifests, and all GitHub-recorded asset digests, then publish the draft manually. Do not publish if time or unrelated activity intervenes after the read-only verification; run `release::verify-remote-draft` again immediately before publication. A failed workflow can leave an incomplete private draft; delete that draft only after reviewing its assets, then rerun. Existing release assets are never replaced.
@@ -112,9 +169,7 @@ Inspect the private draft, verify its source identity, both binaries, both check
 Immediately after manual publication, verify the exact public state and retained assets, then repeat the remote annotated-tag peel:
 
 ```text
-export GITHUB_TOKEN="$(gh auth token)"
-just release::verify-published-release --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
-unset GITHUB_TOKEN
+GITHUB_TOKEN="$(gh auth token)" just release::verify-published-release --assets "$RELEASE_ASSETS" --tag "$RELEASE_TAG"
 REMOTE_RELEASE_COMMIT="$(git ls-remote --exit-code origin 'refs/tags/v0.2.0^{}' | cut -f1)"
 test "$REMOTE_RELEASE_COMMIT" = "$RELEASE_COMMIT"
 ```
