@@ -27,6 +27,22 @@ pub(crate) struct FileIdentity {
     inode: u64,
 }
 
+#[cfg(unix)]
+impl FileIdentity {
+    // Match MetadataExt's portable u64 representation of platform dev_t and ino_t.
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::unnecessary_cast,
+        reason = "std::os::unix::fs::MetadataExt normalizes dev_t and ino_t to u64 the same way"
+    )]
+    fn from_stat(metadata: &rustix::fs::Stat) -> Self {
+        Self {
+            device: metadata.st_dev as u64,
+            inode: metadata.st_ino as u64,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct DescriptorProgram {
     path: PathBuf,
@@ -735,10 +751,7 @@ fn identity_at(
 ) -> Result<FileIdentity, ReleaseError> {
     let metadata = rustix::fs::statat(directory, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
         .map_err(|source| ReleaseError::io(display_path, source.into()))?;
-    Ok(FileIdentity {
-        device: metadata.st_dev,
-        inode: metadata.st_ino,
-    })
+    Ok(FileIdentity::from_stat(&metadata))
 }
 
 #[cfg(test)]
@@ -817,10 +830,7 @@ fn remove_directory_contents(
         let path = display_path.join(&name);
         let metadata = rustix::fs::statat(directory, &name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
             .map_err(|source| ReleaseError::io(&path, source.into()))?;
-        let expected_identity = FileIdentity {
-            device: metadata.st_dev,
-            inode: metadata.st_ino,
-        };
+        let expected_identity = FileIdentity::from_stat(&metadata);
         #[cfg(test)]
         run_remove_tree_hook(RemoveTreeHookEvent {
             point: RemoveTreeHookPoint::BeforeEntry,
@@ -923,6 +933,22 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn descriptor_and_path_stats_share_file_identity_normalization() {
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("artifact");
+        fs::write(&path, b"artifact").expect("artifact");
+        let file = File::open(&path).expect("file");
+        let directory = File::open(root.path()).expect("directory");
+
+        let descriptor_identity = file_identity(&file, &path).expect("descriptor identity");
+        let path_identity =
+            identity_at(&directory, OsStr::new("artifact"), &path).expect("path identity");
+
+        assert_eq!(descriptor_identity, path_identity);
+    }
 
     #[test]
     fn retained_directory_rejects_replacement_and_symlink_entries() {
