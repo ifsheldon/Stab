@@ -11,6 +11,8 @@ use crate::{
     repository,
 };
 
+#[cfg(test)]
+mod retry_tests;
 mod ruleset;
 mod target;
 #[cfg(test)]
@@ -26,6 +28,8 @@ const MAX_RESPONSE_BYTES: u64 = 1 << 20;
 const RELEASE_LIST_PAGE_SIZE: usize = 100;
 const RELEASE_LIST_PAGE_BOUND: usize = 10;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const GET_MAX_ATTEMPTS: u32 = 3;
+const GET_RETRY_BASE_DELAY: Duration = Duration::from_secs(1);
 pub(crate) use target::{REHEARSAL_REPOSITORY, rehearsal_tag};
 
 pub(crate) fn require_production_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
@@ -341,23 +345,42 @@ struct GitHubApi {
     upload_host: String,
     target: target::GitHubTarget,
     cancellation: ReleaseCancellation,
+    get_retry_base_delay: Duration,
 }
 
 impl GitHubApi {
     fn new(target: target::GitHubTarget, cancellation: ReleaseCancellation) -> Self {
-        Self::with_hosts(
+        Self::with_hosts_and_retry_delay(
             API_HOST.to_string(),
             UPLOAD_HOST.to_string(),
             target,
             cancellation,
+            GET_RETRY_BASE_DELAY,
         )
     }
 
+    #[cfg(test)]
     fn with_hosts(
         api_host: String,
         upload_host: String,
         target: target::GitHubTarget,
         cancellation: ReleaseCancellation,
+    ) -> Self {
+        Self::with_hosts_and_retry_delay(
+            api_host,
+            upload_host,
+            target,
+            cancellation,
+            Duration::ZERO,
+        )
+    }
+
+    fn with_hosts_and_retry_delay(
+        api_host: String,
+        upload_host: String,
+        target: target::GitHubTarget,
+        cancellation: ReleaseCancellation,
+        get_retry_base_delay: Duration,
     ) -> Self {
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(REQUEST_TIMEOUT))
@@ -369,6 +392,7 @@ impl GitHubApi {
             upload_host,
             target,
             cancellation,
+            get_retry_base_delay,
         }
     }
 
@@ -380,16 +404,16 @@ impl GitHubApi {
     ) -> Result<T, ReleaseError> {
         self.cancellation.check(operation)?;
         let authorization = format!("Bearer {}", token.expose());
-        let response = self
-            .agent
-            .get(url)
-            .header("Accept", "application/vnd.github+json")
-            .header("Authorization", &authorization)
-            .header("X-GitHub-Api-Version", API_VERSION)
-            .header("User-Agent", "stab-release/0.2.0")
-            .call()
-            .map_err(|error| transport_error(operation, error))?;
-        self.read_json(response, ureq::http::StatusCode::OK, operation)
+        let bytes = self.get_bytes_with_retry(ureq::http::StatusCode::OK, operation, || {
+            self.agent
+                .get(url)
+                .header("Accept", "application/vnd.github+json")
+                .header("Authorization", &authorization)
+                .header("X-GitHub-Api-Version", API_VERSION)
+                .header("User-Agent", "stab-release/0.2.0")
+                .call()
+        })?;
+        serde_json::from_slice(&bytes).map_err(ReleaseError::from)
     }
 
     fn get_public_json<T: DeserializeOwned>(
@@ -398,15 +422,64 @@ impl GitHubApi {
         operation: &str,
     ) -> Result<T, ReleaseError> {
         self.cancellation.check(operation)?;
-        let response = self
-            .agent
-            .get(url)
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", API_VERSION)
-            .header("User-Agent", "stab-release/0.2.0")
-            .call()
-            .map_err(|error| transport_error(operation, error))?;
-        self.read_json(response, ureq::http::StatusCode::OK, operation)
+        let bytes = self.get_bytes_with_retry(ureq::http::StatusCode::OK, operation, || {
+            self.agent
+                .get(url)
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", API_VERSION)
+                .header("User-Agent", "stab-release/0.2.0")
+                .call()
+        })?;
+        serde_json::from_slice(&bytes).map_err(ReleaseError::from)
+    }
+
+    fn get_bytes_with_retry(
+        &self,
+        expected_status: ureq::http::StatusCode,
+        operation: &str,
+        mut request: impl FnMut() -> Result<ureq::http::Response<ureq::Body>, ureq::Error>,
+    ) -> Result<Vec<u8>, ReleaseError> {
+        let mut attempt = 1;
+        loop {
+            self.cancellation.check(operation)?;
+            let mut response = match request() {
+                Ok(response) => response,
+                Err(error) if attempt < GET_MAX_ATTEMPTS && is_retryable_get_error(&error) => {
+                    self.wait_for_get_retry(attempt, operation)?;
+                    attempt += 1;
+                    continue;
+                }
+                Err(error) => return Err(transport_error(operation, error)),
+            };
+            if response.status() != expected_status {
+                if attempt < GET_MAX_ATTEMPTS && is_retryable_get_status(response.status()) {
+                    self.wait_for_get_retry(attempt, operation)?;
+                    attempt += 1;
+                    continue;
+                }
+                return Err(unexpected_status(
+                    operation,
+                    response.status(),
+                    expected_status,
+                ));
+            }
+            match read_response_bytes(&mut response) {
+                Ok(bytes) => {
+                    self.cancellation.check(operation)?;
+                    return Ok(bytes);
+                }
+                Err(error) if attempt < GET_MAX_ATTEMPTS && is_retryable_get_error(&error) => {
+                    self.wait_for_get_retry(attempt, operation)?;
+                    attempt += 1;
+                }
+                Err(error) => return Err(response_read_error(operation, error)),
+            }
+        }
+    }
+
+    fn wait_for_get_retry(&self, attempt: u32, operation: &str) -> Result<(), ReleaseError> {
+        self.cancellation
+            .sleep(self.get_retry_base_delay.saturating_mul(attempt), operation)
     }
 
     fn post_json<T: DeserializeOwned, B: Serialize>(
@@ -462,24 +535,58 @@ impl GitHubApi {
     ) -> Result<T, ReleaseError> {
         self.cancellation.check(operation)?;
         if response.status() != expected_status {
-            return Err(ReleaseError::GitHubRelease(format!(
-                "{operation} returned HTTP {}, expected {expected_status}",
-                response.status()
-            )));
+            return Err(unexpected_status(
+                operation,
+                response.status(),
+                expected_status,
+            ));
         }
-        let bytes = response
-            .body_mut()
-            .with_config()
-            .limit(MAX_RESPONSE_BYTES)
-            .read_to_vec()
-            .map_err(|error| {
-                ReleaseError::GitHubRelease(format!(
-                    "{operation} response exceeded its bound or could not be read: {error}"
-                ))
-            })?;
+        let bytes = read_response_bytes(&mut response)
+            .map_err(|error| response_read_error(operation, error))?;
         self.cancellation.check(operation)?;
         serde_json::from_slice(&bytes).map_err(ReleaseError::from)
     }
+}
+
+fn read_response_bytes(
+    response: &mut ureq::http::Response<ureq::Body>,
+) -> Result<Vec<u8>, ureq::Error> {
+    response
+        .body_mut()
+        .with_config()
+        .limit(MAX_RESPONSE_BYTES)
+        .read_to_vec()
+}
+
+fn unexpected_status(
+    operation: &str,
+    status: ureq::http::StatusCode,
+    expected_status: ureq::http::StatusCode,
+) -> ReleaseError {
+    ReleaseError::GitHubRelease(format!(
+        "{operation} returned HTTP {status}, expected {expected_status}"
+    ))
+}
+
+fn response_read_error(operation: &str, error: ureq::Error) -> ReleaseError {
+    ReleaseError::GitHubRelease(format!(
+        "{operation} response exceeded its bound or could not be read: {error}"
+    ))
+}
+
+fn is_retryable_get_status(status: ureq::http::StatusCode) -> bool {
+    matches!(status.as_u16(), 408 | 500 | 502 | 503 | 504)
+}
+
+fn is_retryable_get_error(error: &ureq::Error) -> bool {
+    matches!(
+        error,
+        ureq::Error::Protocol(_)
+            | ureq::Error::Io(_)
+            | ureq::Error::Timeout(_)
+            | ureq::Error::HostNotFound
+            | ureq::Error::ConnectionFailed
+    )
 }
 
 impl DraftPublisher for GitHubApi {
