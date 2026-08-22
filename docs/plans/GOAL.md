@@ -1,39 +1,39 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete. The reversible A9 release rehearsal passed; its one permitted documentation-only record and exact-head CI are the gate before replacement formal evidence.
+Status: Active. Milestones A0 through A8 are complete. The first reversible release rehearsal passed, but A9 formal evidence is blocked until the DEM parser regression fix and its replacement rehearsal pass.
 
 ## Objective
 
-Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): produce source-current correctness and controlled performance evidence, authenticate one release completion, publish the ten reviewed product crates, publish `v0.2.0`, and close the architecture migration without weakening compatibility, resource, or performance policy.
+Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): repair the folded-repeat DEM parse regression, produce one source-current correctness and controlled-performance chain, authenticate release completion, publish the ten reviewed crates, publish `v0.2.0`, and close the architecture migration without weakening compatibility, resource, or performance policy.
 
 ## Current State
 
-- Ten product packages are versioned `0.2.0` with exact sibling requirements and a source-owned publication order.
-- The release matrix contains 19 promotable groups, 138 full and soak reports, 38 rollups, and 21 unique exact correctness parents across 11 prerequisite sets.
-- Every correctness and timing artifact from revisions before the final rehearsal record is immutable historical evidence and cannot authorize A9 completion.
-- Rehearsal source `a57910ee00f53cb59253b91df31176cc9ec371b6` passed exact-head CI run `32550073066`. Protected annotated tag `v0.2.0-rehearsal-a57910ee00f53cb59253b91df31176cc9ec371b6` produced the single successful scratch workflow run `32551080518`; both native AArch64 builds, the private draft, all six asset digests, and the live read-only verifier passed.
-- Scratch repository `ifsheldon/Stab-release-rehearsal` has numeric ID `1342241032`; active ruleset `21169813` protects the rehearsal tags without bypass. Private draft `374797341` must never be published. Every failed protected tag and run is retained in the architecture progress report and is never reused.
-- This documentation change is the one permitted descendant of the exercised rehearsal source. No product, workflow, release-tool, qualification-contract, fixture, or policy change accompanies it.
-- The controlled thermal ceiling is exactly `100000` millidegrees Celsius for both profiles. Firmware throttling and critical trips remain authoritative, and every other host-policy check remains unchanged.
-- Swap configuration is `/swap.img`, size `137438949376` bytes, priority `-2`. Formal timing disables swap immediately before each report and restores this exact configuration afterward, including failure paths; used swap is mutable host state rather than part of the configuration identity.
-- There is no source-current correctness chain, complete performance chain, completion checkpoint, final package preflight, crates.io publication, production tag, draft, or public GitHub release.
+- Historical rehearsal source `a57910ee00f53cb59253b91df31176cc9ec371b6`, its protected tag, native AArch64 assets, private scratch draft, and live verification passed. Scratch draft `374797341` must never be published. The product-source fix requires a new source-derived rehearsal before replacement evidence.
+- Clean revision `e74458691eeec46807cfdbf17e0ee940cbd02095` passed exact-head CI, PR/full/soak correctness, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, both DEM probes, all 102 non-DEM reports, 34 non-DEM rollups, and all 18 DEM parse parity reports.
+- The `e7445869` chain is historical because seeded self-regression rejected `folded-repeats-small/parse`: median deterioration `1.220460x`, upper-bound deterioration `1.254744x`, limit `1.15x`. It was not rerun, waived, or hidden. DEM print did not start.
+- The source-current candidate replaces the nested `ArrayVec`-then-copy builder with one retained `Vec` that reserves two slots on first use. Empty bodies remain allocation-free; one- and two-item bodies avoid completion copying.
+- Focused model tests and warnings-denied Clippy pass. Seven alternating exact-shape pairs per scale preserve output identity and show candidate-to-committed medians of `0.843705x`, `0.820535x`, and `0.860373x` across folded small, medium, and large. These diagnostics are not formal evidence.
+- The active thermal ceiling is exactly `100000` millidegrees Celsius. Firmware throttling and critical trips remain authoritative. Swap configuration is `/swap.img`, size `137438949376` bytes, priority `-2`, and no qualification process is running.
+- There is no source-current A9 evidence chain, authenticated completion, final package preflight, crates.io publication, production tag, draft, or public release.
 
 ## Next Actions
 
-1. Commit and push only this permitted rehearsal record, then require exact-head `Rust` and `Qualification Contracts` CI.
-2. From that final clean revision, regenerate PR, full, soak, all 11 exact prerequisites, live oracle suites, 46 worker receipts, and both DEM adapter probes at unique paths.
-3. Produce all 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion. Creation and replay run through `prlimit --nofile=1024:1024 --`; every failed, noisy, host-rejected, or resource-rejected path remains visible and is never reused.
-4. Run milestone-audit and full-code-review. Fix confirmed source defects before promotion; any source change restarts the affected evidence from a new clean revision.
-5. If no source fix is required, publish the authenticated completion checkpoint and exactly one permitted status descendant, push it, and require exact-head CI.
-6. Follow [RELEASING.md](../RELEASING.md): produce one immutable final package preflight, publish the reviewed crates, create and push protected annotated `v0.2.0`, capture the exact workflow run, verify the private draft immediately before manual publication, and verify the public release immediately afterward.
+1. Bind the parser fix, regression coverage, profiler note, progress checkpoint, and regenerated qualification identities without changing either performance threshold.
+2. Run milestone-audit, full-code-review, broad local verification, focused commits, push, and exact-head `Rust` and `Qualification Contracts` CI.
+3. From that exact clean revision, create a new protected source-derived rehearsal tag, dispatch the exact-SHA scratch workflow, verify all six assets and the new private draft, and record the immutable identities in the one permitted documentation-only descendant. Push that record and require exact-head CI.
+4. From the final rehearsal-record revision, regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, and both DEM adapter probes at unique paths.
+5. Produce all 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion. Disable swap immediately before each formal report and restore the exact prior configuration afterward, including failures.
+6. Run milestone-audit and full-code-review against the completed evidence. Any confirmed source or contract defect invalidates affected evidence and requires fresh paths from a replacement clean revision.
+7. If no source fix is required, publish the authenticated completion checkpoint and its one permitted status descendant, push it, and require exact-head CI.
+8. Follow [RELEASING.md](../RELEASING.md): produce one immutable package preflight, publish the reviewed crates, create and push protected annotated `v0.2.0`, verify the private draft immediately before manual publication, and verify the public release immediately afterward.
 
 ## Gates
 
-- Keep Stim parity at `1.25x`, Stab self-regression at `1.15x`, all workload-equivalence checks, memory limits, and the controlled-host policy unchanged.
+- Keep Stim parity at `1.25x`, Stab self-regression at `1.15x`, workload equivalence, memory limits, and controlled-host policy unchanged.
 - Formal completion and replay must pass with soft `RLIMIT_NOFILE=1024`; a raised limit is diagnostic only.
-- The production mutators must pass `qualification-status --check --require-release-completion` before reading credentials. The rehearsal mutator instead passes architecture and ordinary checked-status validation and is mechanically unable to publish crates or a public release.
-- Run irreversible local release commands in an isolated user session. Repository controls prevent accidental credential propagation and path reuse, not inspection by a malicious same-UID host process.
-- Keep ops and test-support crates unpublished. Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and a public execution IR remain outside `0.2.0`.
+- Never reuse a failed, noisy, controller-rejected, or host-rejected artifact path. Preserve historical evidence under its exact source contract.
+- Production mutators must pass `qualification-status --check --require-release-completion` before reading credentials. Run irreversible local release commands only from the documented isolated user session.
+- Keep ops and test-support crates unpublished. Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and public execution IR remain outside `0.2.0`.
 
 ## Sources Of Truth
 
@@ -46,4 +46,4 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 
 ## Done
 
-A9 is complete only when the fixed scratch rehearsal, source-current evidence, and audits pass; all ten exact reviewed archives are visible with matching crates.io checksums; the protected annotated production tag and verified GitHub assets bind the release commit; the draft is manually published and reverified; swap is restored; no qualification process remains; and the worktree is clean.
+A9 is complete only when the fixed rehearsal, source-current evidence, final audits, all ten exact reviewed archives, protected production tag, verified release assets, and public GitHub release pass; swap is restored; no qualification process remains; and the worktree is clean.
