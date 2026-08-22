@@ -17,6 +17,25 @@ pub(crate) struct ProcessOutput {
     pub(crate) stdout: Vec<u8>,
 }
 
+#[derive(Clone, Copy)]
+struct ProgramInvocation<'a> {
+    path: &'a OsStr,
+    name: Option<&'a OsStr>,
+}
+
+impl<'a> ProgramInvocation<'a> {
+    fn inferred(path: &'a OsStr) -> Self {
+        Self { path, name: None }
+    }
+
+    fn named(path: &'a OsStr, name: &'a OsStr) -> Self {
+        Self {
+            path,
+            name: Some(name),
+        }
+    }
+}
+
 pub(crate) fn run<I, S>(
     working_directory: &Path,
     program: &OsStr,
@@ -32,7 +51,32 @@ where
     let cancellation = ReleaseCancellation::for_signals()?;
     run_with_cancellation(
         working_directory,
-        program,
+        ProgramInvocation::inferred(program),
+        args,
+        environment,
+        timeout,
+        output_limit,
+        &cancellation,
+    )
+}
+
+pub(crate) fn run_with_name<I, S>(
+    working_directory: &Path,
+    program: &OsStr,
+    program_name: &OsStr,
+    args: I,
+    environment: &[(OsString, OsString)],
+    timeout: Duration,
+    output_limit: usize,
+) -> Result<ProcessOutput, ReleaseError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let cancellation = ReleaseCancellation::for_signals()?;
+    run_with_cancellation(
+        working_directory,
+        ProgramInvocation::named(program, program_name),
         args,
         environment,
         timeout,
@@ -43,7 +87,7 @@ where
 
 fn run_with_cancellation<I, S>(
     working_directory: &Path,
-    program: &OsStr,
+    program: ProgramInvocation<'_>,
     args: I,
     environment: &[(OsString, OsString)],
     timeout: Duration,
@@ -54,20 +98,20 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let program_text = program.to_string_lossy().into_owned();
+    let program_text = program.path.to_string_lossy().into_owned();
     if cancellation.is_cancelled() {
         return Err(ReleaseError::CommandInterrupted {
             program: program_text,
         });
     }
-    let retained_program = if is_descriptor_program(program) {
+    let retained_program = if is_descriptor_program(program.path) {
         None
     } else {
-        Some(retain_program(program)?)
+        Some(retain_program(program.path)?)
     };
     let execution_program = retained_program
         .as_ref()
-        .map_or_else(|| Path::new(program), safe_fs::DescriptorProgram::path);
+        .map_or_else(|| Path::new(program.path), safe_fs::DescriptorProgram::path);
     let mut command = Command::new(execution_program);
     command
         .args(args)
@@ -92,9 +136,11 @@ where
     {
         use std::os::unix::process::CommandExt as _;
 
-        if !is_descriptor_program(program)
-            && let Some(name) = Path::new(program).file_name()
-        {
+        if let Some(name) = program.name.or_else(|| {
+            (!is_descriptor_program(program.path))
+                .then(|| Path::new(program.path).file_name())
+                .flatten()
+        }) {
             command.arg0(name);
         }
         command.process_group(0);
@@ -646,6 +692,24 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn explicit_program_name_survives_retained_execution() {
+        let (program, args, environment) = helper_request("argv0");
+        let output = run_with_name(
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            &program,
+            OsStr::new("rustup"),
+            &args,
+            &environment,
+            Duration::from_secs(5),
+            4096,
+        )
+        .expect("named helper succeeds");
+
+        assert!(String::from_utf8_lossy(&output.stdout).contains("argv0=rustup"));
+    }
+
     #[test]
     fn explicit_cancellation_prevents_mock_publication() {
         let directory = tempfile::tempdir().expect("temporary marker directory");
@@ -663,7 +727,7 @@ mod tests {
 
         let result = run_with_cancellation(
             Path::new(env!("CARGO_MANIFEST_DIR")),
-            &program,
+            ProgramInvocation::inferred(&program),
             &args,
             &environment,
             Duration::from_secs(10),
@@ -916,6 +980,10 @@ mod tests {
                 std::io::stdout()
                     .write_all(&vec![0xa5; 128 << 10])
                     .expect("write bounded helper output");
+            }
+            Ok("argv0") => {
+                let argument_zero = std::env::args_os().next().expect("argv0");
+                println!("argv0={}", argument_zero.to_string_lossy());
             }
             Ok("mock-publication") => {
                 let started = required_marker_path(STARTED_PATH_ENV);

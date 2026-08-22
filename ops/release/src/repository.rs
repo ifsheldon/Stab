@@ -153,9 +153,10 @@ pub(crate) fn capture_toolchain(root: &Path) -> Result<ToolchainIdentity, Releas
             TOOLCHAIN_TIMEOUT,
             MAX_COMMAND_OUTPUT,
         )?,
-        active_toolchain: run_capture_with_environment(
+        active_toolchain: run_capture_with_name_and_environment(
             root,
             rustup.source_path().as_os_str(),
+            OsStr::new("rustup"),
             [OsStr::new("show"), OsStr::new("active-toolchain")],
             &rustup_environment,
             TOOLCHAIN_TIMEOUT,
@@ -545,9 +546,10 @@ fn valid_version_token(value: &str) -> bool {
 
 pub(crate) fn toolchain_program(root: &Path, program: &str) -> Result<PathBuf, ReleaseError> {
     let rustup = rustup_program()?;
-    let output = run_capture_with_environment(
+    let output = run_capture_with_name_and_environment(
         root,
         rustup.source_path().as_os_str(),
+        OsStr::new("rustup"),
         [OsStr::new("which"), OsStr::new(program)],
         &rustup_environment()?,
         TOOLCHAIN_TIMEOUT,
@@ -627,6 +629,31 @@ where
     S: AsRef<OsStr>,
 {
     let output = process::run(root, program, args, environment, timeout, limit)?;
+    String::from_utf8(output.stdout).map_err(ReleaseError::from)
+}
+
+fn run_capture_with_name_and_environment<I, S>(
+    root: &Path,
+    program: &OsStr,
+    program_name: &OsStr,
+    args: I,
+    environment: &[(OsString, OsString)],
+    timeout: Duration,
+    limit: usize,
+) -> Result<String, ReleaseError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = process::run_with_name(
+        root,
+        program,
+        program_name,
+        args,
+        environment,
+        timeout,
+        limit,
+    )?;
     String::from_utf8(output.stdout).map_err(ReleaseError::from)
 }
 
