@@ -148,6 +148,10 @@ impl CargoSandbox {
     }
 
     fn revalidate(&self) -> Result<(), ReleaseError> {
+        self.launcher.revalidate()?;
+        self.cargo.revalidate()?;
+        self.rustc.revalidate()?;
+        self.rustdoc.revalidate()?;
         self.home.revalidate()?;
         self.cargo_home.revalidate()?;
         self.temporary.revalidate()?;

@@ -100,11 +100,23 @@ where
         command.process_group(0);
     }
 
-    let child = command.spawn().map_err(|source| ReleaseError::CommandIo {
+    if let Some(program) = retained_program.as_ref() {
+        program.revalidate()?;
+    }
+    let child_result = command.spawn();
+    if child_result.is_err()
+        && let Some(program) = retained_program.as_ref()
+    {
+        program.revalidate()?;
+    }
+    let child = child_result.map_err(|source| ReleaseError::CommandIo {
         program: program_text.clone(),
         source,
     })?;
     let mut child = ManagedChild::new(child, program_text.clone());
+    if let Some(program) = retained_program.as_ref() {
+        program.revalidate()?;
+    }
     child.start_readers(output_limit)?;
     let started = Instant::now();
 

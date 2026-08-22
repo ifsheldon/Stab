@@ -46,12 +46,18 @@ impl FileIdentity {
 #[derive(Debug)]
 pub(crate) struct DescriptorProgram {
     path: PathBuf,
+    source_path: PathBuf,
+    source_identity: FileIdentity,
     _descriptor: std::os::fd::OwnedFd,
 }
 
 impl DescriptorProgram {
     pub(crate) fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub(crate) fn revalidate(&self) -> Result<(), ReleaseError> {
+        require_same_path_identity(&self.source_path, self.source_identity)
     }
 }
 
@@ -391,12 +397,15 @@ pub(crate) fn descriptor_program(
             .map_err(|source| ReleaseError::io(display_path, source.into()))?;
         rustix::io::fcntl_setfd(&descriptor, rustix::io::FdFlags::empty())
             .map_err(|source| ReleaseError::io(display_path, source.into()))?;
+        let source_identity = file_identity(file, display_path)?;
         #[cfg(target_os = "linux")]
         let path = PathBuf::from(format!("/proc/self/fd/{}", descriptor.as_raw_fd()));
         #[cfg(not(target_os = "linux"))]
-        let path = PathBuf::from(format!("/dev/fd/{}", descriptor.as_raw_fd()));
+        let path = display_path.to_path_buf();
         Ok(DescriptorProgram {
             path,
+            source_path: display_path.to_path_buf(),
+            source_identity,
             _descriptor: descriptor,
         })
     }
@@ -948,6 +957,24 @@ mod tests {
             identity_at(&directory, OsStr::new("artifact"), &path).expect("path identity");
 
         assert_eq!(descriptor_identity, path_identity);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn retained_program_rejects_source_path_replacement() {
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("program");
+        fs::write(&path, b"original").expect("program");
+        let file = open_regular_file(&path).expect("file");
+        let program = descriptor_program(&file, &path).expect("retained program");
+
+        fs::rename(&path, root.path().join("displaced")).expect("displace program");
+        fs::write(&path, b"replacement").expect("replacement program");
+
+        assert!(matches!(
+            program.revalidate(),
+            Err(ReleaseError::FileIdentityChanged(_))
+        ));
     }
 
     #[test]

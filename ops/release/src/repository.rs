@@ -608,7 +608,10 @@ where
         OsString::from("RUSTC"),
         rustc.path().as_os_str().to_os_string(),
     )];
-    run_capture_with_environment(root, cargo.as_os_str(), args, &environment, timeout, limit)
+    let result =
+        run_capture_with_environment(root, cargo.as_os_str(), args, &environment, timeout, limit);
+    rustc.revalidate()?;
+    result
 }
 
 fn run_capture_with_environment<I, S>(
