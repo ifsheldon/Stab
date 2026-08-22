@@ -17,7 +17,7 @@ pub(crate) fn require_a9_release(
         root,
         cancellation,
         "A9 release authorization",
-        &[qualification_status_arguments(true)],
+        &[qualification_status_arguments(root, true)],
     )
 }
 
@@ -31,7 +31,7 @@ pub(crate) fn require_rehearsal(
         "release rehearsal authorization",
         &[
             architecture_check_arguments(root),
-            qualification_status_arguments(false),
+            qualification_status_arguments(root, false),
         ],
     )
 }
@@ -72,7 +72,7 @@ fn require(
     cancellation.check(operation)
 }
 
-fn qualification_status_arguments(require_release_completion: bool) -> Vec<OsString> {
+fn qualification_status_arguments(root: &Path, require_release_completion: bool) -> Vec<OsString> {
     let mut arguments = [
         "run",
         "--quiet",
@@ -80,11 +80,13 @@ fn qualification_status_arguments(require_release_completion: bool) -> Vec<OsStr
         "--package",
         "stab-bench",
         "--",
-        "qualification-status",
-        "--check",
+        "--root",
     ]
     .map(OsString::from)
     .to_vec();
+    arguments.push(root.as_os_str().to_os_string());
+    arguments.push(OsString::from("qualification-status"));
+    arguments.push(OsString::from("--check"));
     if require_release_completion {
         arguments.push(OsString::from("--require-release-completion"));
     }
@@ -114,8 +116,9 @@ mod tests {
 
     #[test]
     fn authorization_uses_the_checked_a9_status_contract() {
+        let root = Path::new("/source");
         assert_eq!(
-            qualification_status_arguments(true),
+            qualification_status_arguments(root, true),
             [
                 "run",
                 "--quiet",
@@ -123,6 +126,8 @@ mod tests {
                 "--package",
                 "stab-bench",
                 "--",
+                "--root",
+                "/source",
                 "qualification-status",
                 "--check",
                 "--require-release-completion",
@@ -150,7 +155,7 @@ mod tests {
             .map(OsString::from)
         );
         assert_eq!(
-            qualification_status_arguments(false),
+            qualification_status_arguments(root, false),
             [
                 "run",
                 "--quiet",
@@ -158,6 +163,8 @@ mod tests {
                 "--package",
                 "stab-bench",
                 "--",
+                "--root",
+                "/source",
                 "qualification-status",
                 "--check",
             ]
