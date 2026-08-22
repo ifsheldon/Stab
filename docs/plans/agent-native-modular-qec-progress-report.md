@@ -1516,3 +1516,24 @@ The eighth optimization's `ArrayVec` nested-body builder had reduced requested a
 All `stab-model` tests and warnings-denied package Clippy pass. Seven alternating CPU-0-pinned Stab-only diagnostic pairs per scale preserved exact work and output identities; candidate-to-committed median elapsed ratios were `0.843705x`, `0.820535x`, and `0.860373x` for folded-small, folded-medium, and folded-large respectively. These are nonpromotable optimization diagnostics. Source-current identities, broad verification, milestone audit, full code review, focused commits, push, and exact-head CI are required next. Because the parser fix is a substantive descendant of the successful scratch rehearsal, that clean replacement revision must then complete a new source-derived protected rehearsal tag, exact-SHA workflow run, six-asset verification, private draft, and live read-only verification before the entire formal chain restarts at fresh paths.
 
 The enforced controlled-host ceiling was already `100000` millidegrees Celsius in both active host profiles and benchmark instructions. No 85-degree active gate blocked this run; surviving `85000` strings are historical records or rejection-test fixtures. Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`, and no qualification process is running.
+
+## A9 Replacement Release Rehearsal Closure
+
+Focused commits `9a9821c8` and `4e71ccff` bind the direct retained-`Vec` DEM parser repair and the historical self-regression checkpoint. Exact pushed revision `4e71ccff0fb275e25f5ae546855003075d0a6608` passed both jobs in GitHub Actions run `32583810067`, including the complete Rust and qualification-contract surfaces.
+
+The scratch mirror advanced by non-forced fast-forward from `a57910ee` to `4e71ccff`. Protected annotated tag `v0.2.0-rehearsal-4e71ccff0fb275e25f5ae546855003075d0a6608`, tag object `5e7f96dae872724134c0eefad34a8da4c0efca82`, peels to the exact reviewed source revision. The workflow-scoped API returned exactly one dispatch run for that commit: [32584757407](https://github.com/ifsheldon/Stab-release-rehearsal/actions/runs/32584757407), whose workflow name, event, tag branch, head SHA, final status, and conclusion all matched the frozen rehearsal contract. Both native AArch64 builds and the verified private-draft job passed.
+
+The fixed destination remained public scratch repository `ifsheldon/Stab-release-rehearsal`, numeric ID `1342241032`. Active ruleset `21169813`, node `RRS_lACqUmVwb3NpdG9yec5QAPkIzgFDBpU`, still targets only `refs/tags/v0.2.0-rehearsal-*`, rejects update and deletion, has an empty bypass list, and reports `current_user_can_bypass=never` under its pinned creation and update identity.
+
+Private draft `374979714` is unpublished, is not a prerelease, targets `4e71ccff0fb275e25f5ae546855003075d0a6608`, and contains exactly the following six uploaded assets. The workflow artifacts were downloaded to unique local path `target/releases/rehearsal-4e71ccff-workflow-assets`; local hashes matched GitHub's remote digests, and the live read-only `release::verify-rehearsal-draft` operation passed.
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `stab-linux-aarch64` | 3,766,536 | `8b4804875805664449472bd8bef5a7fa46934fa54ab8fb3d0272c3e3484e383b` |
+| `stab-linux-aarch64.json` | 1,387 | `0b30d5b2b28d20e2594dcb5bd34eb441b0700d3eaf43f5ab230a614cb18d6576` |
+| `stab-linux-aarch64.sha256` | 85 | `3e471ce6f8542c8c2f89e7b308d3332880bf0e5db69747a74f98c88132b15331` |
+| `stab-macos-aarch64` | 3,477,976 | `146fa0ac0ff48439addabfa645ee29271140607a6ea9c5f17cae91de1001c34c` |
+| `stab-macos-aarch64.json` | 1,369 | `7d6a2d819a3e2ba335e947884faaa165e6fd0f7a9465a739c4426a3f74fcb3ff` |
+| `stab-macos-aarch64.sha256` | 85 | `4fc4da452bb947ae98f203d690ab7a3d07f9b18ff6ead254e8c088d4326baf1a` |
+
+Draft `374979714` must never be published. This record is the one permitted documentation-only descendant of the replacement rehearsal source; it changes no product, test, workflow, release tool, qualification contract, fixture, policy, or normative procedure. Formal evidence may restart only after this record is committed, pushed, and accepted by exact-head `Rust` and `Qualification Contracts` CI. The checked thermal ceiling remains `100000` millidegrees Celsius, swap remains restored as `/swap.img` with size `137438949376` bytes and priority `-2`, and no qualification process is running.
