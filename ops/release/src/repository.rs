@@ -155,7 +155,7 @@ pub(crate) fn capture_toolchain(root: &Path) -> Result<ToolchainIdentity, Releas
         )?,
         active_toolchain: run_capture_with_environment(
             root,
-            rustup.as_os_str(),
+            rustup.source_path().as_os_str(),
             [OsStr::new("show"), OsStr::new("active-toolchain")],
             &rustup_environment,
             TOOLCHAIN_TIMEOUT,
@@ -547,7 +547,7 @@ pub(crate) fn toolchain_program(root: &Path, program: &str) -> Result<PathBuf, R
     let rustup = rustup_program()?;
     let output = run_capture_with_environment(
         root,
-        rustup.as_os_str(),
+        rustup.source_path().as_os_str(),
         [OsStr::new("which"), OsStr::new(program)],
         &rustup_environment()?,
         TOOLCHAIN_TIMEOUT,
@@ -630,7 +630,7 @@ where
     String::from_utf8(output.stdout).map_err(ReleaseError::from)
 }
 
-fn rustup_program() -> Result<PathBuf, ReleaseError> {
+fn rustup_program() -> Result<crate::safe_fs::DescriptorProgram, ReleaseError> {
     let mut candidates = Vec::new();
     if let Some(cargo_home) = std::env::var_os("CARGO_HOME") {
         candidates.push(PathBuf::from(cargo_home).join("bin/rustup"));
@@ -638,15 +638,32 @@ fn rustup_program() -> Result<PathBuf, ReleaseError> {
     if let Some(home) = std::env::var_os("HOME") {
         candidates.push(PathBuf::from(home).join(".cargo/bin/rustup"));
     }
-    candidates.push(PathBuf::from("/usr/bin/rustup"));
-    for candidate in candidates {
-        if crate::safe_fs::open_regular_file(&candidate).is_ok() {
-            return Ok(candidate);
-        }
+    candidates.extend([
+        PathBuf::from("/opt/homebrew/bin/rustup"),
+        PathBuf::from("/usr/local/bin/rustup"),
+        PathBuf::from("/usr/bin/rustup"),
+    ]);
+    if let Some(program) = retain_first_regular_program(candidates)? {
+        return Ok(program);
     }
     Err(ReleaseError::ToolchainIdentity(
-        "could not resolve rustup from CARGO_HOME, HOME, or /usr/bin".to_string(),
+        "could not resolve rustup from CARGO_HOME, HOME, Homebrew, or /usr/bin".to_string(),
     ))
+}
+
+fn retain_first_regular_program(
+    candidates: impl IntoIterator<Item = PathBuf>,
+) -> Result<Option<crate::safe_fs::DescriptorProgram>, ReleaseError> {
+    for candidate in candidates {
+        let Ok(resolved) = std::fs::canonicalize(&candidate) else {
+            continue;
+        };
+        let Ok(file) = crate::safe_fs::open_regular_file(&resolved) else {
+            continue;
+        };
+        return crate::safe_fs::descriptor_program(&file, &resolved).map(Some);
+    }
+    Ok(None)
 }
 
 fn rustup_environment() -> Result<Vec<(OsString, OsString)>, ReleaseError> {
@@ -668,6 +685,29 @@ mod tests {
 
     use super::*;
     use crate::RELEASE_TAG;
+
+    #[cfg(unix)]
+    #[test]
+    fn retained_program_discovery_binds_a_symlink_referent() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().expect("root");
+        let target = root.path().join("rustup-real");
+        let link = root.path().join("rustup");
+        fs::write(&target, b"tool").expect("tool");
+        symlink(&target, &link).expect("symlink");
+
+        let program = retain_first_regular_program([link])
+            .expect("discovery")
+            .expect("program");
+        fs::rename(&target, root.path().join("rustup-displaced")).expect("displace tool");
+        fs::write(&target, b"replacement").expect("replacement tool");
+
+        assert!(matches!(
+            program.revalidate(),
+            Err(ReleaseError::FileIdentityChanged(_))
+        ));
+    }
 
     fn git(root: &Path, args: &[&str]) {
         let status = Command::new("git")

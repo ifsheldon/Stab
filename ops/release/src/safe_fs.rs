@@ -56,6 +56,10 @@ impl DescriptorProgram {
         &self.path
     }
 
+    pub(crate) fn source_path(&self) -> &Path {
+        &self.source_path
+    }
+
     pub(crate) fn revalidate(&self) -> Result<(), ReleaseError> {
         require_same_path_identity(&self.source_path, self.source_identity)
     }
@@ -384,6 +388,7 @@ pub(crate) fn descriptor_program(
 ) -> Result<DescriptorProgram, ReleaseError> {
     #[cfg(unix)]
     {
+        #[cfg(target_os = "linux")]
         use std::os::fd::AsRawFd as _;
 
         if !file
