@@ -29,21 +29,22 @@ Start from the exact clean `main` revision that has passed both required GitHub 
 
 ```text
 REHEARSAL_REPOSITORY="ifsheldon/Stab-release-rehearsal"
+REHEARSAL_GIT_REMOTE="git@github.com:$REHEARSAL_REPOSITORY.git"
 REHEARSAL_COMMIT="$(git rev-parse HEAD^{commit})"
 REHEARSAL_TAG="v0.2.0-rehearsal-$REHEARSAL_COMMIT"
 test -z "$(git status --porcelain=v1 --untracked-files=normal --ignore-submodules=none)"
 test "$(git rev-parse main^{commit})" = "$REHEARSAL_COMMIT"
 test "$(git rev-parse origin/main^{commit})" = "$REHEARSAL_COMMIT"
-git push "https://github.com/$REHEARSAL_REPOSITORY.git" "$REHEARSAL_COMMIT:refs/heads/main"
+git push "$REHEARSAL_GIT_REMOTE" "$REHEARSAL_COMMIT:refs/heads/main"
 git tag -a "$REHEARSAL_TAG" "$REHEARSAL_COMMIT" -m "Stab 0.2.0 release rehearsal at $REHEARSAL_COMMIT"
 test "$(git cat-file -t "refs/tags/$REHEARSAL_TAG")" = "tag"
 test "$(git rev-parse "refs/tags/$REHEARSAL_TAG^{commit}")" = "$REHEARSAL_COMMIT"
-git push "https://github.com/$REHEARSAL_REPOSITORY.git" "refs/tags/$REHEARSAL_TAG"
-REMOTE_REHEARSAL_COMMIT="$(git ls-remote --exit-code "https://github.com/$REHEARSAL_REPOSITORY.git" "refs/tags/$REHEARSAL_TAG^{}" | cut -f1)"
+git push "$REHEARSAL_GIT_REMOTE" "refs/tags/$REHEARSAL_TAG"
+REMOTE_REHEARSAL_COMMIT="$(git ls-remote --exit-code "$REHEARSAL_GIT_REMOTE" "refs/tags/$REHEARSAL_TAG^{}" | cut -f1)"
 test "$REMOTE_REHEARSAL_COMMIT" = "$REHEARSAL_COMMIT"
 ```
 
-The main-branch push is deliberately non-forced. A non-fast-forward rejection means the scratch history no longer represents an append-only mirror and must be investigated instead of overwritten. The tag pattern is commit-derived, so a failed or superseded rehearsal receives a new source commit and new tag; never move, delete, or reuse a rehearsal tag.
+The mirror uses authenticated SSH so workflow-bearing pushes do not depend on an OAuth token carrying GitHub's `workflow` scope. The main-branch push is deliberately non-forced. A non-fast-forward rejection means the scratch history no longer represents an append-only mirror and must be investigated instead of overwritten. The tag pattern is commit-derived, so a failed or superseded rehearsal receives a new source commit and new tag; never move, delete, or reuse a rehearsal tag.
 
 Dispatch only the frozen rehearsal workflow from the annotated tag. Poll the workflow-scoped API for the exact source commit and require exactly one dispatch run:
 
