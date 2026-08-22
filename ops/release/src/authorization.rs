@@ -30,7 +30,7 @@ pub(crate) fn require_rehearsal(
         cancellation,
         "release rehearsal authorization",
         &[
-            architecture_check_arguments(),
+            architecture_check_arguments(root),
             qualification_status_arguments(false),
         ],
     )
@@ -91,18 +91,21 @@ fn qualification_status_arguments(require_release_completion: bool) -> Vec<OsStr
     arguments
 }
 
-fn architecture_check_arguments() -> Vec<OsString> {
-    [
+fn architecture_check_arguments(root: &Path) -> Vec<OsString> {
+    let mut arguments = [
         "run",
         "--quiet",
         "--locked",
         "--package",
         "stab-architecture",
         "--",
-        "check",
+        "--root",
     ]
     .map(OsString::from)
-    .to_vec()
+    .to_vec();
+    arguments.push(root.as_os_str().to_os_string());
+    arguments.push(OsString::from("check"));
+    arguments
 }
 
 #[cfg(test)]
@@ -130,8 +133,9 @@ mod tests {
 
     #[test]
     fn rehearsal_uses_architecture_and_non_release_status_contracts() {
+        let root = Path::new("/source");
         assert_eq!(
-            architecture_check_arguments(),
+            architecture_check_arguments(root),
             [
                 "run",
                 "--quiet",
@@ -139,6 +143,8 @@ mod tests {
                 "--package",
                 "stab-architecture",
                 "--",
+                "--root",
+                "/source",
                 "check",
             ]
             .map(OsString::from)
