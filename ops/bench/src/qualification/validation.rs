@@ -4,7 +4,7 @@ use super::discovery::{self, PERFORMANCE_FEATURE_IDS, SourceReferences};
 use super::model::{
     ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
     PerformanceDisposition, QualificationStatus, QualificationSuite, RowClassification,
-    RowDecision, RowOrigin, SCHEMA_VERSION, StimMapping, ThresholdPolicy,
+    RowDecision, RowOrigin, SCHEMA_VERSION, StimMapping, ThresholdPolicy, WaiverKind,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -34,7 +34,7 @@ const EXPECTED_CHECKLIST_ROWS: usize = 129;
 const EXPECTED_MANIFEST_ROWS: usize = 167;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
-const EXPECTED_WAIVERS: usize = 3;
+const EXPECTED_WAIVERS: usize = 4;
 
 pub(super) fn validate(
     suite: &QualificationSuite,
@@ -52,6 +52,7 @@ pub(super) fn validate(
     validate_rows(suite, manifest, references, &mut issues);
     source::validate_upstream_sources(suite, &mut issues);
     source::validate_waivers(suite, references, &mut issues);
+    source::validate_waiver_classifications(suite, references, &mut issues);
     issues.finish()?;
 
     let computed = discovery::semantic_digest(suite)?;
@@ -1105,16 +1106,6 @@ fn validate_rows(
                 ));
             }
         }
-        if !row.waiver_refs.is_empty()
-            && !row
-                .classifications
-                .contains(&RowClassification::AdapterCandidate)
-        {
-            issues.push(format!(
-                "waived row {} does not name an adapter retirement path",
-                row.id
-            ));
-        }
     }
     for missing in expected.difference(&seen) {
         issues.push(format!("manifest row {missing} has no disposition"));
@@ -1150,14 +1141,14 @@ fn validate_rows(
             "manifest primary performance ownership is stale: {primary_owners:?}"
         ));
     }
-    validate_decision_count(suite, RowDecision::Retained, 9, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 139, issues);
+    validate_decision_count(suite, RowDecision::Retained, 8, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 140, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 13, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
-    validate_classification_count(suite, RowClassification::Faithful, 14, issues);
+    validate_classification_count(suite, RowClassification::Faithful, 13, issues);
     validate_classification_count(suite, RowClassification::Diagnostic, 141, issues);
-    validate_classification_count(suite, RowClassification::Proxy, 10, issues);
+    validate_classification_count(suite, RowClassification::Proxy, 11, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 129, issues);

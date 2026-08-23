@@ -9,7 +9,7 @@ use super::model::{
     MeasurementPair, MemoryMethod, MemoryPolicy, OutputContract, PerformanceDisposition,
     PerformanceFeature, QualificationGroup, QualificationStatus, QualificationSuite,
     RowClassification, RowDecision, RowOrigin, SCHEMA_VERSION, ThresholdPolicy, TimingPolicy,
-    UpstreamPerfSource, WaiverDisposition, WaiverReason,
+    UpstreamPerfSource, WaiverDisposition, WaiverKind, WaiverPair, WaiverSourcePolicy,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -103,8 +103,18 @@ struct MeasurementThreshold {
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct WaiverRow {
+struct BetaWaiverRow {
     id: String,
+    reason: String,
+    follow_up: String,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegressionWaiverRow {
+    id: String,
+    kind: WaiverKind,
+    measurement_pairs: Vec<WaiverPair>,
     reason: String,
     follow_up: String,
 }
@@ -116,7 +126,9 @@ pub(super) struct SourceReferences {
     pub(super) threshold_pairs: BTreeMap<String, BTreeSet<(String, String, String)>>,
     pub(super) beta_waivers: BTreeSet<String>,
     pub(super) regression_waivers: BTreeSet<String>,
-    pub(super) waiver_reasons: BTreeMap<(String, String), String>,
+    pub(super) adapter_regression_waivers: BTreeSet<String>,
+    pub(super) unstable_pair_waivers: BTreeSet<String>,
+    pub(super) waiver_policies: BTreeMap<(String, String), WaiverSourcePolicy>,
     pub(super) public_api: BTreeMap<String, ApiReference>,
 }
 
@@ -132,10 +144,10 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
         read_repo_json_bounded(root, &root.correctness_manifest())?;
     let thresholds: IdRows<ThresholdRow> =
         read_repo_json_bounded(root, &root.primary_thresholds())?;
-    let beta: IdRows<WaiverRow> = read_repo_json_bounded(root, &root.primary_beta_waivers())?;
-    let regression: IdRows<WaiverRow> =
+    let beta: IdRows<BetaWaiverRow> = read_repo_json_bounded(root, &root.primary_beta_waivers())?;
+    let regression: IdRows<RegressionWaiverRow> =
         read_repo_json_bounded(root, &root.primary_regression_waivers())?;
-    if thresholds.schema_version != 2 || beta.schema_version != 1 || regression.schema_version != 1
+    if thresholds.schema_version != 2 || beta.schema_version != 1 || regression.schema_version != 2
     {
         return Err(BenchError::Qualification(format!(
             "qualification threshold or waiver schema version is unsupported: thresholds={} beta={} regression={}",
@@ -158,6 +170,18 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
         "regression waiver",
         regression.rows.iter().map(|row| row.id.as_str()),
     )?;
+    let adapter_regression_waivers = regression
+        .rows
+        .iter()
+        .filter(|row| row.kind == WaiverKind::NoComparableBaseline)
+        .map(|row| row.id.clone())
+        .collect();
+    let unstable_pair_waivers = regression
+        .rows
+        .iter()
+        .filter(|row| row.kind == WaiverKind::UnstableFaithfulPairs)
+        .map(|row| row.id.clone())
+        .collect();
     unique_ids(
         "public API",
         correctness
@@ -214,19 +238,38 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
             .collect(),
         beta_waivers,
         regression_waivers,
-        waiver_reasons: [
-            ("benchmarks/m12-primary-beta-waivers.json", &beta.rows),
-            (
-                "benchmarks/m12-primary-regression-waivers.json",
-                &regression.rows,
-            ),
-        ]
-        .into_iter()
-        .flat_map(|(file, rows)| {
-            rows.iter()
-                .map(move |row| ((file.to_string(), row.id.clone()), row.reason.clone()))
-        })
-        .collect(),
+        adapter_regression_waivers,
+        unstable_pair_waivers,
+        waiver_policies: beta
+            .rows
+            .iter()
+            .map(|row| {
+                let file = "benchmarks/m12-primary-beta-waivers.json".to_string();
+                (
+                    (file.clone(), row.id.clone()),
+                    WaiverSourcePolicy {
+                        waiver_file: file,
+                        kind: WaiverKind::NoComparableBaseline,
+                        reason: row.reason.clone(),
+                        follow_up: row.follow_up.clone(),
+                        measurement_pairs: Vec::new(),
+                    },
+                )
+            })
+            .chain(regression.rows.iter().map(|row| {
+                let file = "benchmarks/m12-primary-regression-waivers.json".to_string();
+                (
+                    (file.clone(), row.id.clone()),
+                    WaiverSourcePolicy {
+                        waiver_file: file,
+                        kind: row.kind,
+                        reason: row.reason.clone(),
+                        follow_up: row.follow_up.clone(),
+                        measurement_pairs: row.measurement_pairs.clone(),
+                    },
+                )
+            }))
+            .collect(),
         public_api,
     })
 }
@@ -254,13 +297,13 @@ pub(super) fn generate(
         read_repo_json_bounded(root, &root.correctness_manifest())?;
     let thresholds: IdRows<ThresholdRow> =
         read_repo_json_bounded(root, &root.primary_thresholds())?;
-    let beta_waivers: IdRows<WaiverRow> =
+    let beta_waivers: IdRows<BetaWaiverRow> =
         read_repo_json_bounded(root, &root.primary_beta_waivers())?;
-    let regression_waivers: IdRows<WaiverRow> =
+    let regression_waivers: IdRows<RegressionWaiverRow> =
         read_repo_json_bounded(root, &root.primary_regression_waivers())?;
     if thresholds.schema_version != 2
         || beta_waivers.schema_version != 1
-        || regression_waivers.schema_version != 1
+        || regression_waivers.schema_version != 2
     {
         return Err(BenchError::Qualification(format!(
             "qualification threshold or waiver schema version is unsupported: thresholds={} beta={} regression={}",
@@ -294,12 +337,16 @@ pub(super) fn generate(
         let feature_id = classify_manifest_row(row)?;
         let group_id = format!("PERFQ-{}", row.id.to_ascii_uppercase());
         let threshold = threshold_by_id.get(row.id.as_str()).copied();
-        let waived = beta_by_id.contains_key(row.id.as_str())
-            || regression_by_id.contains_key(row.id.as_str());
+        let regression_waiver = regression_by_id.get(row.id.as_str()).copied();
+        let adapter_waived = beta_by_id.contains_key(row.id.as_str())
+            || regression_waiver.is_some_and(is_adapter_waiver);
+        let threshold_waived =
+            beta_by_id.contains_key(row.id.as_str()) || regression_waiver.is_some();
         let selected_stim_symbols = selected_stim_symbols(row, &upstream_perf_sources);
         let correctness_cases = Vec::new();
         let correctness_binding = CorrectnessBinding::Unresolved;
-        let classifications = row_classifications(row, threshold, waived, &selected_stim_symbols);
+        let classifications =
+            row_classifications(row, threshold, adapter_waived, &selected_stim_symbols);
         let decision = row_decision(row);
         let disposition = if decision == RowDecision::Removed
             || row.threshold_class == ThresholdClass::BaselineMetadata
@@ -308,11 +355,11 @@ pub(super) fn generate(
         } else {
             PerformanceDisposition::Measured
         };
-        let stim_mapping = stim_mapping(row, waived);
+        let stim_mapping = stim_mapping(row, adapter_waived);
         let threshold_policy = threshold_policy(
             row,
             threshold.is_some(),
-            waived,
+            threshold_waived,
             classifications.contains(&RowClassification::UnmatchedSubmeasurement),
         );
         let supporting_performance_features = if (row.runner == Runner::StimCli
@@ -360,7 +407,7 @@ pub(super) fn generate(
             public_api_items: Vec::new(),
             disposition,
             phase: classify_phase(row),
-            runner_fidelity: runner_fidelity(row, waived),
+            runner_fidelity: runner_fidelity(row, adapter_waived),
             correctness_cases,
             correctness_binding,
             planned_correctness_case_id: Some(format!("CQPLANNED-{group_id}")),
@@ -652,42 +699,55 @@ fn extract_benchmark_symbol(line: &str) -> Option<String> {
     .then(|| symbol.to_string())
 }
 
-fn merge_waivers(beta: &[WaiverRow], regression: &[WaiverRow]) -> Vec<WaiverDisposition> {
-    let mut by_id = BTreeMap::<String, (BTreeMap<String, String>, String)>::new();
-    for (name, rows) in [
-        ("benchmarks/m12-primary-beta-waivers.json", beta),
-        ("benchmarks/m12-primary-regression-waivers.json", regression),
-    ] {
-        for row in rows {
-            let entry = by_id
-                .entry(row.id.clone())
-                .or_insert_with(|| (BTreeMap::new(), row.follow_up.clone()));
-            entry.0.insert(name.to_string(), row.reason.clone());
-            if entry.1 != row.follow_up
-                || row.reason.trim().is_empty()
-                || row.follow_up.trim().is_empty()
-            {
-                entry.1 = "SOURCE-WAIVER-MISMATCH".to_string();
-            }
-        }
+fn merge_waivers(
+    beta: &[BetaWaiverRow],
+    regression: &[RegressionWaiverRow],
+) -> Vec<WaiverDisposition> {
+    let mut by_id = BTreeMap::<String, Vec<WaiverSourcePolicy>>::new();
+    for row in beta {
+        by_id
+            .entry(row.id.clone())
+            .or_default()
+            .push(WaiverSourcePolicy {
+                waiver_file: "benchmarks/m12-primary-beta-waivers.json".to_string(),
+                kind: WaiverKind::NoComparableBaseline,
+                reason: row.reason.clone(),
+                follow_up: row.follow_up.clone(),
+                measurement_pairs: Vec::new(),
+            });
+    }
+    for row in regression {
+        by_id
+            .entry(row.id.clone())
+            .or_default()
+            .push(WaiverSourcePolicy {
+                waiver_file: "benchmarks/m12-primary-regression-waivers.json".to_string(),
+                kind: row.kind,
+                reason: row.reason.clone(),
+                follow_up: row.follow_up.clone(),
+                measurement_pairs: row.measurement_pairs.clone(),
+            });
     }
     by_id
         .into_iter()
-        .map(|(id, (reasons, follow_up))| WaiverDisposition {
-            retirement_mapping: waiver_retirement_mapping(&id).to_string(),
-            id,
-            waiver_files: reasons.keys().cloned().collect(),
-            reasons: reasons
-                .into_iter()
-                .map(|(waiver_file, reason)| WaiverReason {
-                    waiver_file,
-                    reason,
-                })
-                .collect(),
-            qualification_disposition: PerformanceDisposition::Measured,
-            follow_up,
+        .map(|(id, mut policies)| {
+            policies.sort_by(|left, right| left.waiver_file.cmp(&right.waiver_file));
+            let retirement_mapping = policies
+                .iter()
+                .all(|policy| policy.kind == WaiverKind::NoComparableBaseline)
+                .then(|| waiver_retirement_mapping(&id).to_string());
+            WaiverDisposition {
+                id,
+                policies,
+                qualification_disposition: PerformanceDisposition::Measured,
+                retirement_mapping,
+            }
         })
         .collect()
+}
+
+fn is_adapter_waiver(row: &RegressionWaiverRow) -> bool {
+    row.kind == WaiverKind::NoComparableBaseline
 }
 
 fn waiver_retirement_mapping(id: &str) -> &'static str {
@@ -703,8 +763,8 @@ fn waiver_retirement_mapping(id: &str) -> &'static str {
 
 fn waiver_refs(
     row: &BenchmarkRow,
-    beta: &BTreeMap<&str, &WaiverRow>,
-    regression: &BTreeMap<&str, &WaiverRow>,
+    beta: &BTreeMap<&str, &BetaWaiverRow>,
+    regression: &BTreeMap<&str, &RegressionWaiverRow>,
 ) -> Vec<String> {
     let mut refs = Vec::new();
     if beta.contains_key(row.id.as_str()) {
@@ -810,6 +870,42 @@ mod tests {
         let error = result.err().expect("threshold parse error");
 
         assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn regression_waiver_schema_requires_a_kind_and_pair_list() {
+        let missing_kind = r#"{
+            "schema_version": 2,
+            "rows": [{
+                "id": "row",
+                "measurement_pairs": [],
+                "reason": "reason",
+                "follow_up": "follow-up"
+            }]
+        }"#;
+        let missing_pairs = r#"{
+            "schema_version": 2,
+            "rows": [{
+                "id": "row",
+                "kind": "no-comparable-baseline",
+                "reason": "reason",
+                "follow_up": "follow-up"
+            }]
+        }"#;
+
+        let kind_error = serde_json::from_str::<IdRows<RegressionWaiverRow>>(missing_kind)
+            .err()
+            .expect("schema-v2 regression waiver kind must be required");
+        let pair_error = serde_json::from_str::<IdRows<RegressionWaiverRow>>(missing_pairs)
+            .err()
+            .expect("schema-v2 regression waiver pairs must be required");
+
+        assert!(kind_error.to_string().contains("missing field `kind`"));
+        assert!(
+            pair_error
+                .to_string()
+                .contains("missing field `measurement_pairs`")
+        );
     }
 
     #[test]

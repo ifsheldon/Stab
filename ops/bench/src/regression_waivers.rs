@@ -18,8 +18,24 @@ pub(crate) struct RegressionWaivers {
 #[serde(deny_unknown_fields)]
 struct RegressionWaiverRow {
     id: String,
+    kind: RegressionWaiverKind,
+    measurement_pairs: Vec<RegressionMeasurementPair>,
     reason: String,
     follow_up: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(deny_unknown_fields)]
+struct RegressionMeasurementPair {
+    stim_name: String,
+    stab_name: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum RegressionWaiverKind {
+    NoComparableBaseline,
+    UnstableFaithfulPairs,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -61,7 +77,7 @@ pub(crate) fn apply_regression_waivers(
         let Some(waiver) = waiver_rows.get(row.id.as_str()) else {
             continue;
         };
-        if regression_waiver_applies(row) {
+        if regression_waiver_applies(row, waiver) {
             row.regression_threshold_status = "waived-not-thresholdable".to_string();
             row.regression_threshold_waiver_reason = Some(waiver.reason.clone());
             row.regression_threshold_waiver_follow_up = Some(waiver.follow_up.clone());
@@ -77,6 +93,14 @@ pub(crate) fn apply_regression_waivers(
                 row.relative_ratio
                     .map_or_else(|| "none".to_string(), |ratio| format!("{ratio:.3}x")),
             );
+            let message = if waiver.kind == RegressionWaiverKind::UnstableFaithfulPairs {
+                format!(
+                    "{message}; paired measurements must be the exact source-owned set of {} pairs",
+                    waiver.measurement_pairs.len()
+                )
+            } else {
+                message
+            };
             row.regression_threshold_status = "fail".to_string();
             row.regression_threshold_error = Some(message.clone());
             findings.blockers.push(format!("{}: {message}", row.id));
@@ -85,21 +109,73 @@ pub(crate) fn apply_regression_waivers(
 
     for id in waiver_rows.keys() {
         if !used_waivers.contains(*id) {
-            findings.blockers.push(format!(
-                "{id}: regression waiver did not match a selected measured contract-only no-ratio row without threshold coverage"
-            ));
+            let expected = waiver_rows
+                .get(*id)
+                .map_or("an eligible row", |waiver| waiver.kind.expected_row());
+            findings
+                .blockers
+                .push(format!("{id}: regression waiver did not match {expected}"));
         }
     }
 
     findings
 }
 
-fn regression_waiver_applies(row: &CompareRowResult) -> bool {
-    row.regression_threshold_status == "not-configured"
-        && row.pass_fail_status == "not-comparable"
-        && row.runner == Runner::ContractOnly
-        && row.status == "measured"
-        && row.relative_ratio.is_none()
+fn regression_waiver_applies(row: &CompareRowResult, waiver: &RegressionWaiverRow) -> bool {
+    if row.regression_threshold_status != "not-configured" || row.status != "measured" {
+        return false;
+    }
+    match waiver.kind {
+        RegressionWaiverKind::NoComparableBaseline => {
+            row.pass_fail_status == "not-comparable"
+                && row.runner == Runner::ContractOnly
+                && row.relative_ratio.is_none()
+                && waiver.measurement_pairs.is_empty()
+        }
+        RegressionWaiverKind::UnstableFaithfulPairs => {
+            row.pass_fail_status == "pass"
+                && matches!(row.runner, Runner::StimCli | Runner::StimPerf)
+                && row.comparability == crate::comparability::ComparabilityClass::PartialMatch
+                && row.relative_ratio.is_some_and(|ratio| {
+                    ratio.is_finite() && ratio <= crate::report::BETA_GATE_MAX_RELATIVE_RATIO
+                })
+                && !row.measurement_ratios.is_empty()
+                && row.measurement_ratios.iter().all(|ratio| {
+                    ratio.relative_ratio.is_finite()
+                        && ratio.relative_ratio <= crate::report::BETA_GATE_MAX_RELATIVE_RATIO
+                })
+                && measurement_pairs_match(row, &waiver.measurement_pairs)
+        }
+    }
+}
+
+fn measurement_pairs_match(row: &CompareRowResult, expected: &[RegressionMeasurementPair]) -> bool {
+    if row.measurement_ratios.len() != expected.len() {
+        return false;
+    }
+    let actual = row
+        .measurement_ratios
+        .iter()
+        .map(|ratio| (ratio.stim_name.as_str(), ratio.stab_name.as_str()))
+        .collect::<BTreeSet<_>>();
+    let expected = expected
+        .iter()
+        .map(|pair| (pair.stim_name.as_str(), pair.stab_name.as_str()))
+        .collect::<BTreeSet<_>>();
+    actual.len() == row.measurement_ratios.len() && actual == expected
+}
+
+impl RegressionWaiverKind {
+    fn expected_row(self) -> &'static str {
+        match self {
+            Self::NoComparableBaseline => {
+                "a selected measured contract-only no-ratio row without threshold coverage"
+            }
+            Self::UnstableFaithfulPairs => {
+                "a selected measured passing partial-match row with faithful paired evidence and no threshold coverage"
+            }
+        }
+    }
 }
 
 impl RegressionWaivers {
@@ -112,8 +188,8 @@ impl RegressionWaivers {
 
     fn validate(&self, path: &Path) -> Result<(), BenchError> {
         let mut violations = Vec::new();
-        if self.schema_version != 1 {
-            violations.push(format!("schema_version={} expected 1", self.schema_version));
+        if self.schema_version != 2 {
+            violations.push(format!("schema_version={} expected 2", self.schema_version));
         }
         let mut ids = BTreeSet::new();
         for row in &self.rows {
@@ -129,6 +205,42 @@ impl RegressionWaivers {
             }
             if row.follow_up.trim().is_empty() {
                 violations.push(format!("{} has empty follow_up", row.id));
+            }
+            let mut pairs = BTreeSet::new();
+            for pair in &row.measurement_pairs {
+                if pair.stim_name.is_empty() || !is_safe_benchmark_id(&pair.stim_name) {
+                    violations.push(format!(
+                        "{} has unsafe Stim measurement name {:?}",
+                        row.id, pair.stim_name
+                    ));
+                }
+                if pair.stab_name.is_empty() || !is_safe_benchmark_id(&pair.stab_name) {
+                    violations.push(format!(
+                        "{} has unsafe Stab measurement name {:?}",
+                        row.id, pair.stab_name
+                    ));
+                }
+                if !pairs.insert(pair) {
+                    violations.push(format!(
+                        "{} has duplicate measurement pair {} -> {}",
+                        row.id, pair.stim_name, pair.stab_name
+                    ));
+                }
+            }
+            match row.kind {
+                RegressionWaiverKind::NoComparableBaseline if !row.measurement_pairs.is_empty() => {
+                    violations.push(format!(
+                        "{} no-comparable-baseline waiver names measurement pairs",
+                        row.id
+                    ));
+                }
+                RegressionWaiverKind::UnstableFaithfulPairs if row.measurement_pairs.is_empty() => {
+                    violations.push(format!(
+                        "{} unstable-faithful-pairs waiver names no measurement pairs",
+                        row.id
+                    ));
+                }
+                _ => {}
             }
         }
         if violations.is_empty() {
@@ -156,10 +268,12 @@ mod tests {
     fn regression_waivers_mark_only_measured_contract_only_no_ratio_rows() {
         let waivers = serde_json::from_str::<RegressionWaivers>(
             r#"{
-                "schema_version": 1,
+                "schema_version": 2,
                 "rows": [
                     {
                         "id": "contract-row",
+                        "kind": "no-comparable-baseline",
+                        "measurement_pairs": [],
                         "reason": "Pinned Stim has no comparable timing surface.",
                         "follow_up": "Replace this waiver if a comparable Stim filter appears."
                     }
@@ -211,18 +325,174 @@ mod tests {
     }
 
     #[test]
+    fn regression_waivers_allow_only_passing_partial_matches_with_faithful_pairs() {
+        let waivers = serde_json::from_str::<RegressionWaivers>(
+            r#"{
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "id": "partial-row",
+                        "kind": "unstable-faithful-pairs",
+                        "measurement_pairs": [
+                            {
+                                "stim_name": "faithful_stim_exact",
+                                "stab_name": "faithful_stab_exact"
+                            },
+                            {
+                                "stim_name": "faithful_stim_independent",
+                                "stab_name": "faithful_stab_independent"
+                            }
+                        ],
+                        "reason": "The faithful pairs are too small for a stable threshold.",
+                        "follow_up": "Add thresholds after repeated clean headroom."
+                    }
+                ]
+            }"#,
+        )
+        .expect("parse waivers");
+        let mut eligible = row(
+            "partial-row",
+            Runner::StimPerf,
+            "measured",
+            "pass",
+            Some(1.2),
+            "not-configured",
+        );
+        eligible.comparability = ComparabilityClass::PartialMatch;
+        eligible.measurement_ratios = vec![
+            crate::report::MeasurementRatio {
+                stim_name: "faithful_stim_exact".to_string(),
+                stab_name: "faithful_stab_exact".to_string(),
+                stim_seconds: 1.0,
+                stab_seconds: 1.2,
+                relative_ratio: 1.2,
+            },
+            crate::report::MeasurementRatio {
+                stim_name: "faithful_stim_independent".to_string(),
+                stab_name: "faithful_stab_independent".to_string(),
+                stim_seconds: 1.0,
+                stab_seconds: 1.1,
+                relative_ratio: 1.1,
+            },
+        ];
+
+        let findings = apply_regression_waivers(std::slice::from_mut(&mut eligible), &waivers);
+
+        assert!(findings.blockers.is_empty());
+        assert_eq!(
+            eligible.regression_threshold_status,
+            "waived-not-thresholdable"
+        );
+
+        for (name, mut ineligible) in [
+            (
+                "direct match",
+                row(
+                    "partial-row",
+                    Runner::StimPerf,
+                    "measured",
+                    "pass",
+                    Some(1.2),
+                    "not-configured",
+                ),
+            ),
+            ("missing faithful pairs", {
+                let mut value = row(
+                    "partial-row",
+                    Runner::StimPerf,
+                    "measured",
+                    "pass",
+                    Some(1.2),
+                    "not-configured",
+                );
+                value.comparability = ComparabilityClass::PartialMatch;
+                value
+            }),
+            ("failed beta parity", {
+                let mut value = eligible.clone();
+                value.pass_fail_status = "fail".to_string();
+                value.regression_threshold_status = "not-configured".to_string();
+                value
+            }),
+            ("slow faithful pair with stale pass status", {
+                let mut value = eligible.clone();
+                value.regression_threshold_status = "not-configured".to_string();
+                value.relative_ratio = Some(1.2);
+                value
+                    .measurement_ratios
+                    .first_mut()
+                    .expect("faithful pair")
+                    .relative_ratio = 1.3;
+                value
+            }),
+            ("different faithful pair", {
+                let mut value = eligible.clone();
+                value.regression_threshold_status = "not-configured".to_string();
+                value
+                    .measurement_ratios
+                    .first_mut()
+                    .expect("faithful pair")
+                    .stim_name = "unexpected_stim".to_string();
+                value
+            }),
+            ("duplicate faithful pair", {
+                let mut value = eligible.clone();
+                value.regression_threshold_status = "not-configured".to_string();
+                let first = value
+                    .measurement_ratios
+                    .first()
+                    .map(|ratio| (ratio.stim_name.clone(), ratio.stab_name.clone()))
+                    .expect("first faithful pair");
+                let second = value
+                    .measurement_ratios
+                    .get_mut(1)
+                    .expect("second faithful pair");
+                second.stim_name = first.0;
+                second.stab_name = first.1;
+                value
+            }),
+            ("extra faithful pair", {
+                let mut value = eligible.clone();
+                value.regression_threshold_status = "not-configured".to_string();
+                value
+                    .measurement_ratios
+                    .push(crate::report::MeasurementRatio {
+                        stim_name: "extra_stim".to_string(),
+                        stab_name: "extra_stab".to_string(),
+                        stim_seconds: 1.0,
+                        stab_seconds: 1.0,
+                        relative_ratio: 1.0,
+                    });
+                value
+            }),
+        ] {
+            let findings =
+                apply_regression_waivers(std::slice::from_mut(&mut ineligible), &waivers);
+            assert_eq!(
+                ineligible.regression_threshold_status, "fail",
+                "{name} must not consume the waiver"
+            );
+            assert!(!findings.blockers.is_empty(), "{name} must fail closed");
+        }
+    }
+
+    #[test]
     fn regression_waivers_reject_stale_and_misapplied_rows() {
         let waivers = serde_json::from_str::<RegressionWaivers>(
             r#"{
-                "schema_version": 1,
+                "schema_version": 2,
                 "rows": [
                     {
                         "id": "comparable-row",
+                        "kind": "no-comparable-baseline",
+                        "measurement_pairs": [],
                         "reason": "bad waiver",
                         "follow_up": "remove"
                     },
                     {
                         "id": "stale-row",
+                        "kind": "no-comparable-baseline",
+                        "measurement_pairs": [],
                         "reason": "stale",
                         "follow_up": "remove"
                     }
@@ -259,11 +529,11 @@ mod tests {
     fn regression_waivers_validate_schema_ids_and_required_text() {
         let waivers = serde_json::from_str::<RegressionWaivers>(
             r#"{
-                "schema_version": 2,
+                "schema_version": 1,
                 "rows": [
-                    {"id": "../bad", "reason": "", "follow_up": "x"},
-                    {"id": "duplicate-row", "reason": "x", "follow_up": "x"},
-                    {"id": "duplicate-row", "reason": "x", "follow_up": ""}
+                    {"id": "../bad", "kind": "no-comparable-baseline", "measurement_pairs": [{"stim_name": "bad", "stab_name": "bad"}], "reason": "", "follow_up": "x"},
+                    {"id": "duplicate-row", "kind": "no-comparable-baseline", "measurement_pairs": [], "reason": "x", "follow_up": "x"},
+                    {"id": "duplicate-row", "kind": "unstable-faithful-pairs", "measurement_pairs": [], "reason": "x", "follow_up": ""}
                 ]
             }"#,
         )
@@ -274,10 +544,16 @@ mod tests {
             .expect_err("reject invalid waivers");
 
         let text = error.to_string();
-        assert!(text.contains("schema_version=2 expected 1"));
+        assert!(text.contains("schema_version=1 expected 2"));
         assert!(text.contains("../bad has unsafe id"));
         assert!(text.contains("../bad has empty reason"));
+        assert!(text.contains("../bad no-comparable-baseline waiver names measurement pairs"));
         assert!(text.contains("duplicate regression waiver row duplicate-row"));
+        assert!(
+            text.contains(
+                "duplicate-row unstable-faithful-pairs waiver names no measurement pairs"
+            )
+        );
         assert!(text.contains("duplicate-row has empty follow_up"));
     }
 
@@ -299,8 +575,30 @@ mod tests {
             .map(|row| row.id.as_str())
             .collect::<BTreeSet<_>>();
 
-        assert_eq!(waivers.schema_version, 1);
-        assert_eq!(waivers.rows.len(), 3);
+        assert_eq!(waivers.schema_version, 2);
+        assert_eq!(waivers.rows.len(), 4);
+        let m10 = waivers
+            .rows
+            .iter()
+            .find(|row| row.id == "m10-error-decomp")
+            .expect("M10 waiver");
+        assert_eq!(m10.kind, super::RegressionWaiverKind::UnstableFaithfulPairs);
+        assert_eq!(
+            m10.measurement_pairs
+                .iter()
+                .map(|pair| (pair.stim_name.as_str(), pair.stab_name.as_str()))
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                (
+                    "disjoint_to_independent_xyz_errors_approx_exact",
+                    "stab_disjoint_to_independent_xyz_errors_approx_exact",
+                ),
+                (
+                    "independent_to_disjoint_xyz_errors",
+                    "stab_independent_to_disjoint_xyz_errors",
+                ),
+            ])
+        );
         assert!(
             waivers
                 .rows

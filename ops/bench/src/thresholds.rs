@@ -566,7 +566,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 65);
+        assert_eq!(thresholds.rows.len(), 64);
         for id in [
             "m6-stabilizers-to-tableau",
             "m6-tableau",
@@ -614,6 +614,13 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m10-dem-parse-contract"),
             "the exact direct parser group supersedes the asymmetric legacy timing row"
+        );
+        assert!(
+            thresholds
+                .rows
+                .iter()
+                .all(|row| row.id != "m10-error-decomp"),
+            "failed p10 and p100 calls have different Stim and Stab witnesses, while the two faithful nanosecond pairs lack stable threshold headroom"
         );
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)

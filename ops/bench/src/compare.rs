@@ -987,6 +987,55 @@ mod tests {
     }
 
     #[test]
+    fn error_decomp_partial_match_excludes_failed_iterate_witnesses() {
+        let row = benchmark_row("m10-error-decomp");
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: Some(
+                "partial-match: successful public conversions pair; failed attempts are report-only"
+                    .to_string(),
+            ),
+            stim_measurements: vec![
+                measurement("disjoint_to_independent_xyz_errors_approx_exact", 1.0),
+                measurement("disjoint_to_independent_xyz_errors_approx_p10", 1.0),
+                measurement("disjoint_to_independent_xyz_errors_approx_p100", 1.0),
+                measurement("independent_to_disjoint_xyz_errors", 1.0),
+            ],
+            stab_measurements: vec![
+                measurement("stab_independent_to_disjoint_xyz_errors", 0.5),
+                measurement("stab_disjoint_to_independent_xyz_errors_approx_exact", 0.75),
+                measurement(
+                    "stab_disjoint_to_independent_xyz_errors_public_none_p10",
+                    0.25,
+                ),
+                measurement(
+                    "stab_disjoint_to_independent_xyz_errors_public_none_p100",
+                    0.25,
+                ),
+            ],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.relative_ratio, Some(0.75));
+        assert_eq!(result.measurement_ratios.len(), 2);
+        assert_eq!(
+            result
+                .measurement_ratios
+                .iter()
+                .map(|ratio| ratio.stab_name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "stab_disjoint_to_independent_xyz_errors_approx_exact",
+                "stab_independent_to_disjoint_xyz_errors",
+            ]
+        );
+    }
+
+    #[test]
     fn allocation_instrumentation_preserves_ratios_without_claiming_timing_evidence() {
         let mut rows = vec![
             compare_row("fast-row", Some(0.5)),

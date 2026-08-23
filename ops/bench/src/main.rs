@@ -254,7 +254,7 @@ enum Command {
         #[arg(long)]
         thresholds: Option<PathBuf>,
 
-        /// JSON waiver file for measured contract-only rows with no faithful regression ratio.
+        /// JSON waiver file for no-comparator rows or exact unstable partial-match pairs.
         #[arg(long)]
         regression_waivers: Option<PathBuf>,
 

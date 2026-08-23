@@ -795,7 +795,7 @@ fn validation_rejects_changed_threshold_ratio_and_waiver_reason() {
     suite
         .waiver_rows
         .first_mut()
-        .and_then(|waiver| waiver.reasons.first_mut())
+        .and_then(|waiver| waiver.policies.first_mut())
         .expect("waiver reason")
         .reason = "changed waiver reason".to_string();
 
@@ -804,6 +804,34 @@ fn validation_rejects_changed_threshold_ratio_and_waiver_reason() {
     let message = error.to_string();
     assert!(message.contains("expected 1.25"));
     assert!(message.contains("differs from the source waiver ledger"));
+}
+
+#[test]
+fn unstable_pair_waiver_binds_exact_measurements_and_has_no_adapter_mapping() {
+    let (mut suite, manifest, references) = fixture();
+    let waiver = suite
+        .waiver_rows
+        .iter_mut()
+        .find(|waiver| waiver.id == "m10-error-decomp")
+        .expect("M10 unstable-pair waiver");
+    assert_eq!(waiver.retirement_mapping, None);
+    let policy = waiver.policies.first_mut().expect("M10 source policy");
+    assert_eq!(policy.kind, WaiverKind::UnstableFaithfulPairs);
+    assert_eq!(policy.measurement_pairs.len(), 2);
+    policy
+        .measurement_pairs
+        .first_mut()
+        .expect("M10 exact pair")
+        .stim_name = "unexpected_measurement".to_string();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("changed unstable-pair policy must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("differs from the source waiver ledger")
+    );
 }
 
 #[test]

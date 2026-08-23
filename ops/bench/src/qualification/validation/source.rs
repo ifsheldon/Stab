@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 
 use super::{
-    EXPECTED_PERF_SYMBOLS, Issues, PerformanceDisposition, QualificationSuite, SourceReferences,
-    StimMapping, filter_selects_symbol, validate_identifier, validate_text,
+    EXPECTED_PERF_SYMBOLS, Issues, PerformanceDisposition, QualificationSuite, RowClassification,
+    SourceReferences, StimMapping, WaiverKind, filter_selects_symbol, validate_identifier,
+    validate_text,
 };
 
 pub(super) fn validate_upstream_sources(suite: &QualificationSuite, issues: &mut Issues) {
@@ -84,6 +85,7 @@ pub(super) fn validate_waivers(
         .map(|row| row.id.as_str())
         .collect::<BTreeSet<_>>();
     let mut ids = BTreeSet::new();
+    let mut policy_keys = BTreeSet::new();
     for waiver in &suite.waiver_rows {
         if !ids.insert(waiver.id.as_str()) {
             issues.push(format!("duplicate waiver row {}", waiver.id));
@@ -91,45 +93,75 @@ pub(super) fn validate_waivers(
         if !rows.contains(waiver.id.as_str()) {
             issues.push(format!("stale waiver row {}", waiver.id));
         }
-        if waiver.waiver_files.is_empty() {
-            issues.push(format!("waiver {} names no source waiver file", waiver.id));
+        if waiver.policies.is_empty() {
+            issues.push(format!("waiver {} names no source policy", waiver.id));
         }
-        let reason_files = waiver
-            .reasons
-            .iter()
-            .map(|reason| reason.waiver_file.as_str())
-            .collect::<BTreeSet<_>>();
-        let waiver_files = waiver
-            .waiver_files
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        if reason_files != waiver_files {
-            issues.push(format!(
-                "waiver {} reason sources disagree with waiver files",
-                waiver.id
-            ));
-        }
-        for reason in &waiver.reasons {
-            validate_text("waiver reason", &reason.reason, issues);
-            let key = (reason.waiver_file.clone(), waiver.id.clone());
-            if references.waiver_reasons.get(&key) != Some(&reason.reason) {
+        let mut kinds = BTreeSet::new();
+        for policy in &waiver.policies {
+            let key = (policy.waiver_file.clone(), waiver.id.clone());
+            if !policy_keys.insert(key.clone()) {
                 issues.push(format!(
-                    "waiver {} reason for {} differs from the source waiver ledger",
-                    waiver.id, reason.waiver_file
+                    "waiver {} repeats source policy {}",
+                    waiver.id, policy.waiver_file
                 ));
             }
+            validate_text("waiver reason", &policy.reason, issues);
+            validate_text("waiver follow-up", &policy.follow_up, issues);
+            let expected = references.waiver_policies.get(&key);
+            if expected != Some(policy) {
+                issues.push(format!(
+                    "waiver {} policy for {} differs from the source waiver ledger",
+                    waiver.id, policy.waiver_file
+                ));
+            }
+            kinds.insert(policy.kind);
+            let mut pairs = BTreeSet::new();
+            for pair in &policy.measurement_pairs {
+                validate_identifier("waiver Stim measurement", &pair.stim_name, issues);
+                validate_identifier("waiver Stab measurement", &pair.stab_name, issues);
+                if !pairs.insert((pair.stim_name.as_str(), pair.stab_name.as_str())) {
+                    issues.push(format!(
+                        "waiver {} repeats measurement pair {} -> {}",
+                        waiver.id, pair.stim_name, pair.stab_name
+                    ));
+                }
+            }
+            match policy.kind {
+                WaiverKind::NoComparableBaseline if !policy.measurement_pairs.is_empty() => {
+                    issues.push(format!(
+                        "no-comparable waiver {} names measurement pairs",
+                        waiver.id
+                    ));
+                }
+                WaiverKind::UnstableFaithfulPairs if policy.measurement_pairs.is_empty() => {
+                    issues.push(format!(
+                        "unstable faithful-pair waiver {} names no measurement pairs",
+                        waiver.id
+                    ));
+                }
+                WaiverKind::UnstableFaithfulPairs
+                    if policy.waiver_file != "benchmarks/m12-primary-regression-waivers.json" =>
+                {
+                    issues.push(format!(
+                        "unstable faithful-pair waiver {} comes from {}",
+                        waiver.id, policy.waiver_file
+                    ));
+                }
+                _ => {}
+            }
         }
-        if waiver.retirement_mapping == "UNMAPPED-WAIVER"
-            || !waiver.retirement_mapping.starts_with("stim_adapter::")
-        {
-            issues.push(format!(
-                "waiver {} lacks an adapter retirement mapping",
+        if kinds.len() > 1 {
+            issues.push(format!("waiver {} mixes policy kinds", waiver.id));
+        }
+        let adapter_waiver = kinds.contains(&WaiverKind::NoComparableBaseline);
+        match (&waiver.retirement_mapping, adapter_waiver) {
+            (Some(mapping), true)
+                if mapping != "UNMAPPED-WAIVER" && mapping.starts_with("stim_adapter::") => {}
+            (None, false) => {}
+            _ => issues.push(format!(
+                "waiver {} has a retirement mapping inconsistent with its policy kind",
                 waiver.id
-            ));
-        }
-        if waiver.follow_up.trim().is_empty() || waiver.follow_up == "SOURCE-WAIVER-MISMATCH" {
-            issues.push(format!("waiver {} has an invalid follow-up", waiver.id));
+            )),
         }
         if waiver.qualification_disposition == PerformanceDisposition::NoFaithfulStimComparator {
             issues.push(format!(
@@ -145,5 +177,39 @@ pub(super) fn validate_waivers(
         .collect::<BTreeSet<_>>();
     if ids != expected {
         issues.push("waiver disposition ids do not exactly match source waiver ledgers");
+    }
+    let expected_policy_keys = references
+        .waiver_policies
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if policy_keys != expected_policy_keys {
+        issues.push("waiver source policies do not exactly match source waiver ledgers");
+    }
+}
+
+pub(super) fn validate_waiver_classifications(
+    suite: &QualificationSuite,
+    references: &SourceReferences,
+    issues: &mut Issues,
+) {
+    for row in &suite.manifest_rows {
+        let adapter_waived = references.beta_waivers.contains(&row.id)
+            || references.adapter_regression_waivers.contains(&row.id);
+        let adapter_candidate = row
+            .classifications
+            .contains(&RowClassification::AdapterCandidate);
+        if adapter_waived && !adapter_candidate {
+            issues.push(format!(
+                "waived row {} does not name an adapter retirement path",
+                row.id
+            ));
+        }
+        if references.unstable_pair_waivers.contains(&row.id) && adapter_candidate {
+            issues.push(format!(
+                "unstable faithful-pair waiver {} is incorrectly classified as an adapter candidate",
+                row.id
+            ));
+        }
     }
 }

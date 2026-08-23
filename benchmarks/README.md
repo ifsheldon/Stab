@@ -89,9 +89,9 @@ Schema version 1 rows use only row-level thresholds:
 ```
 
 Every threshold id must match a selected benchmark row, and every selected benchmark row not present in the threshold file is reported as `not-configured`.
-If `--regression-waivers <path>` is also passed, selected measured `contract-only` rows that are not configured in the threshold file, have no comparable ratio, and have source-owned waiver entries are reported as `waived-not-thresholdable` instead of ambiguous `not-configured`.
-Timing-regression waivers do not apply to comparable rows, rows with ratios, unselected rows, pending rows, or configured threshold rows, and unused waivers fail the gate so the waiver file cannot drift when a row becomes comparable.
-`m12-primary-regression-waivers.json` is the source-owned M12 timing-regression waiver file for primary no-ratio rows that are measured but cannot have a faithful pinned-Stim 1.25x threshold.
+If `--regression-waivers <path>` is also passed, schema-version-2 waivers may classify either a selected measured `contract-only` row with no comparable baseline as `no-comparable-baseline`, or a selected measured passing `partial-match` row with at least one faithful pair as `unstable-faithful-pairs`. Both kinds require absent threshold coverage and report `waived-not-thresholdable` instead of ambiguous `not-configured`.
+The `unstable-faithful-pairs` kind does not weaken beta: the row must already pass the unchanged 1.25x gate from its paired evidence, and direct-match, CLI-baseline, failed, pending, unpaired, configured, or unselected rows cannot consume it. Unused or misclassified waivers fail closed.
+`m12-primary-regression-waivers.json` is the source-owned M12 timing-regression waiver file for measured primary rows that lack an honest stable 1.25x threshold.
 Schema version 2 is backward compatible with row-level thresholds and additionally supports exact submeasurement thresholds for rows whose stable direct measurements can be guarded before the whole mixed row is stable:
 
 ```json
@@ -99,11 +99,11 @@ Schema version 2 is backward compatible with row-level thresholds and additional
   "schema_version": 2,
   "rows": [
     {
-      "id": "m10-error-decomp",
+      "id": "m4-circuit-parse",
       "measurement_thresholds": [
         {
-          "stim_name": "disjoint_to_independent_xyz_errors_approx_p10",
-          "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p10",
+          "stim_name": "circuit_parse",
+          "stab_name": "stab_circuit_parse",
           "max_relative_ratio": 1.25
         }
       ]
@@ -115,14 +115,16 @@ Schema version 2 is backward compatible with row-level thresholds and additional
 Submeasurement thresholds fail when the selected compare report lacks the named paired evidence or when the paired ratio exceeds the configured ratio.
 The timing-regression report is the authoritative completion evidence for configured schema-version-2 threshold pairs because threshold application materializes any configured explicit pair that was not already produced by automatic exact-name or positional pairing.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
-Beta and timing-regression waiver files are JSON with schema version 1:
+Beta waiver files use schema version 1. Timing-regression waiver files use schema version 2 and require a typed `kind`:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rows": [
     {
       "id": "m8-measure-reader-ptb64-contract",
+      "kind": "no-comparable-baseline",
+      "measurement_pairs": [],
       "reason": "Pinned Stim has no isolated public ptb64 reader timing surface for this exact workload.",
       "follow_up": "Replace the waiver if a faithful ptb64 reader baseline becomes available."
     }
@@ -130,8 +132,7 @@ Beta and timing-regression waiver files are JSON with schema version 1:
 }
 ```
 
-Waiver ids must be benchmark-id safe.
-Reasons and follow-up text must be non-empty because they are copied into the compare report as durable beta-gate evidence.
+Waiver ids and measurement names must be benchmark-id safe. Reasons and follow-up text must be non-empty because they are copied into the compare report as durable gate evidence. `no-comparable-baseline` requires an empty `measurement_pairs` list. `unstable-faithful-pairs` requires the exact nonempty Stim/Stab pair set; missing, extra, duplicate, renamed, above-gate, or threshold-configured pairs fail closed.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.
 Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts, maximum live allocated bytes, sampled resident bytes, and sampled resident-byte deltas in `compare.json`. Its raw timing ratios are contextual only, and the report marks parity timing as `not-evaluated-instrumented`; the CLI rejects beta or regression timing gates combined with `--track-allocations`. Use plain `just bench::compare` for timing-gate evidence.
 Pass `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` to compare selected rows against the first complete Stab memory report.
@@ -149,7 +150,7 @@ Pinned Stim v1.16.0 rejects `convert --in_format=01 --out_format=ptb64`, so `m7-
 When a row is contract-only, compare may report Stab-side timing with `stim=contract-only`; that is not a Stab-vs-Stim performance comparison for the row.
 Pass `--strict` to fail when any selected row is still pending, missing from the selected baseline report, backed by an invalid placeholder baseline row, contract-only without a Stab-side measurement, or backed by baseline metadata that does not match pinned Stim v1.16.0. The sole exception to the runtime-measurement requirement is a row explicitly classified as `baseline-metadata`: it validates pinned baseline provenance and must not be misrepresented as executable timing evidence.
 
-Performance qualification inventory schema version 3 treats the complete API and checklist inventory as a coverage map, not a benchmark obligation. Unselected plausible workloads use `future-candidate`; selected APIs otherwise map to `covered-by-parent` or `not-performance-relevant`. The active matrix is capped at 40 release groups and 60 diagnostic groups. PQ1 and later executable groups are owned by `qualification-runtime-groups.json`. Runtime-group schema version 10 binds the explicit `raw-work-v2` timing boundary, group claim class, parity eligibility, source-owned timing batch policy, the enforced 600-second product-diagnostic measurement-suite deadline, workload and measurement IDs, immutable scales with `family_id` and `size_class`, semantic work, exact input identities, correctness cases, ownership, profiler notes, and comparator-source digests. Every product diagnostic must have an exact policy for every scale; each scale names its correctness witness, freezes the reviewed output digest, chooses calibrated-repeat or single-pass execution, and may attach an accepted-maximum worker peak-RSS cap. `qualification-diagnostic` runs a one-iteration `contract` preflight against that frozen witness before calibration, then reports timing samples, normalized per-work-item medians, explicit host validity, and any owned memory verdict without parity, self-regression, rollup, completion, or legacy-row claims. Callers cannot replace source-owned work, input identity, output witness, memory cap, family, size class, or timing policy, and every producer rejects an existing output directory.
+Performance qualification inventory schema version 4 treats the complete API and checklist inventory as a coverage map, not a benchmark obligation, and binds every source waiver's file, typed kind, reason, follow-up, and exact measurement-pair set into its semantic digest. Unselected plausible workloads use `future-candidate`; selected APIs otherwise map to `covered-by-parent` or `not-performance-relevant`. The active matrix is capped at 40 release groups and 60 diagnostic groups. PQ1 and later executable groups are owned by `qualification-runtime-groups.json`. Runtime-group schema version 10 binds the explicit `raw-work-v2` timing boundary, group claim class, parity eligibility, source-owned timing batch policy, the enforced 600-second product-diagnostic measurement-suite deadline, workload and measurement IDs, immutable scales with `family_id` and `size_class`, semantic work, exact input identities, correctness cases, ownership, profiler notes, and comparator-source digests. Every product diagnostic must have an exact policy for every scale; each scale names its correctness witness, freezes the reviewed output digest, chooses calibrated-repeat or single-pass execution, and may attach an accepted-maximum worker peak-RSS cap. `qualification-diagnostic` runs a one-iteration `contract` preflight against that frozen witness before calibration, then reports timing samples, normalized per-work-item medians, explicit host validity, and any owned memory verdict without parity, self-regression, rollup, completion, or legacy-row claims. Callers cannot replace source-owned work, input identity, output witness, memory cap, family, size class, or timing policy, and every producer rejects an existing output directory.
 
 The three A7 product diagnostics are `PERFQ-A7-EXACT-ML-COMPILE`, `PERFQ-A7-EXACT-ML-REUSED-DECODE`, and `PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE`. They respectively time complete exact-ML compile-and-release work, decode through one precompiled reusable session, and the public sampling-to-detection-to-decoding pipeline. Deterministic small, medium, and large scales have exact input identities and source-owned output digests that calibration cannot redefine. Compilation's large scale reaches 20 detectors and the exact-dyadic tie fallback after directed-interval certification while remaining inside the independent workspace and limb-weighted work admissions. Reused decoding's large scale is the 262,144-shot maximum for the shared 14-detector fixture, not the decoder-width admission maximum. The pipeline's large scale processes 262,144 seeded shots. Their separate memory invocations must remain below 64 MiB, 32 MiB, and 32 MiB worker peak RSS respectively. Reused decoding separately proves zero allocation after preparation. The stateful pipeline is single-pass at every scale, and its witness binds the complete report. These rows deliberately have no Stim comparator, parity policy entry, profiler note, rollup, or current self-regression result. Their source-owned reasons and raw diagnostic reports document the workloads; A9 may seed architecture-specific regression baselines only after reviewed controlled full and soak evidence for the same identities.
 

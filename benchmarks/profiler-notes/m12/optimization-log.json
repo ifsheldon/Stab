@@ -307,18 +307,18 @@
         "gate_status": "pass",
         "relative_ratio": 1.25,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The clean focused report measured all four paired filters at or below 1.25x after the Stab runner adopted pinned Stim's numeric output accumulator and one batch-level compiler fence; no product implementation, waiver, threshold, or paired measurement changed."
+        "evidence_note": "The clean focused report measured the two semantically faithful successful pairs at 1.0x and 1.25x after the Stab runner adopted a numeric output accumulator and one batch-level compiler fence. Its historical p10 and p100 pairings were later review-rejected because failed Stab calls return None while pinned Stim retains the final Newton iterate."
       },
-      "dominant_cost": "The nanosecond-scale Stab runner fenced a full Result on every conversion, while pinned Stim accumulates the three numeric outputs and fences only the completed batch witness. The additional compiler barrier was benchmark overhead, not public error-decomposition work.",
-      "optimization_summary": "Retained all four direct paired measurements and enlarged batches, changed each Stab operation to return the sum of its public numeric outputs, accumulated that witness across the batch, and applied black_box once after the batch. The faithful pinned-Stim Newton implementation and every public API remained unchanged.",
+      "dominant_cost": "The nanosecond-scale Stab runner fenced a full Result on every conversion, while pinned Stim accumulates numeric outputs and fences only the completed batch witness. Numeric accumulation is faithful for successful exact and independent conversions, but failed p10 and p100 calls have different observable result contracts and cannot be paired.",
+      "optimization_summary": "Enlarged the batches and accumulated successful public numeric outputs behind one batch-level black_box. Reclassified the row as partial-match, renamed failed Stab measurements as public-None report-only timings, and removed the invalid p10 threshold without changing the product API or probability algorithm.",
       "semantic_checks": [
         "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
-        "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
-        "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ",
+        "cargo test -p stab-bench error_decomp_partial_match_excludes_failed_iterate_witnesses",
+        "cargo test -p stab-bench regression_waivers_allow_only_passing_partial_matches_with_faithful_pairs",
         "cargo test -p stab-bench",
         "cargo clippy -p stab-bench --all-targets -- -D warnings"
       ],
-      "follow_up": "Keep all four direct pairs in beta evidence, retain numeric accumulation as the pinned workload witness, and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the exact, p100, and independent filters remain stable with enough headroom."
+      "follow_up": "Keep exact and independent conversions in beta evidence, keep failed p10 and p100 calls report-only, and replace the unstable-faithful-pairs waiver with exact submeasurement thresholds only after repeated clean reports show stable headroom."
     }
   ]
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(super) const SCHEMA_VERSION: u32 = 3;
+pub(super) const SCHEMA_VERSION: u32 = 4;
 pub(super) const PRODUCT_DIAGNOSTIC_GATE_STATISTIC: &str = "median Stab batch seconds and normalized seconds per semantic work item, reported independently per operation and scale";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -386,16 +386,31 @@ pub(super) struct UpstreamPerfSource {
 #[serde(deny_unknown_fields)]
 pub(super) struct WaiverDisposition {
     pub(super) id: String,
-    pub(super) waiver_files: Vec<String>,
-    pub(super) reasons: Vec<WaiverReason>,
+    pub(super) policies: Vec<WaiverSourcePolicy>,
     pub(super) qualification_disposition: PerformanceDisposition,
-    pub(super) retirement_mapping: String,
-    pub(super) follow_up: String,
+    pub(super) retirement_mapping: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct WaiverReason {
+pub(super) struct WaiverSourcePolicy {
     pub(super) waiver_file: String,
+    pub(super) kind: WaiverKind,
     pub(super) reason: String,
+    pub(super) follow_up: String,
+    pub(super) measurement_pairs: Vec<WaiverPair>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum WaiverKind {
+    NoComparableBaseline,
+    UnstableFaithfulPairs,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct WaiverPair {
+    pub(super) stim_name: String,
+    pub(super) stab_name: String,
 }

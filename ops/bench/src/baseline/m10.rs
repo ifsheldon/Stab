@@ -177,8 +177,8 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("m10-error-decomp", "stab_independent_to_disjoint_xyz_errors")
         | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_exact")
-        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_p10")
-        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_p100") => {
+        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_public_none_p10")
+        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_public_none_p100") => {
             Some((1.0, "conversions/s"))
         }
         ("m10-graphlike-search", "stab_graphlike_search_chain") => {
@@ -224,7 +224,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
         ),
         "m10-error-decomp" => Some(
-            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters using enlarged pinned-case in-process batches and one numeric output accumulator per batch",
+            "partial-match: Stab pairs successful exact and independent/disjoint XYZ conversions with pinned Stim; failed p10 and p100 Option-returning calls remain visible as report-only public-API timings because Stab does not expose Stim's final Newton iterate",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -819,7 +819,7 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
             },
         )?,
         measure_error_decomp_cases(
-            "stab_disjoint_to_independent_xyz_errors_approx_p10",
+            "stab_disjoint_to_independent_xyz_errors_public_none_p10",
             &[[p10, p20, zero]],
             |[x, y, z]| {
                 let output = try_disjoint_to_independent_xyz_errors(
@@ -834,7 +834,7 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
             },
         )?,
         measure_error_decomp_cases(
-            "stab_disjoint_to_independent_xyz_errors_approx_p100",
+            "stab_disjoint_to_independent_xyz_errors_public_none_p100",
             &[[p01, p02, zero]],
             |[x, y, z]| {
                 let output = try_disjoint_to_independent_xyz_errors(

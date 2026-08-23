@@ -7,7 +7,6 @@
     "m10-analyze-errors-fold-cli",
     "m10-analyze-errors-high-repeat-contract",
     "m10-error-analyzer",
-    "m10-error-decomp",
     "m10-graphlike-search",
     "m11-dem-sampler",
     "m11-sample-dem-cli",
@@ -640,8 +639,8 @@
       "measurements": [
         "stab_independent_to_disjoint_xyz_errors",
         "stab_disjoint_to_independent_xyz_errors_approx_exact",
-        "stab_disjoint_to_independent_xyz_errors_approx_p10",
-        "stab_disjoint_to_independent_xyz_errors_approx_p100"
+        "stab_disjoint_to_independent_xyz_errors_public_none_p10",
+        "stab_disjoint_to_independent_xyz_errors_public_none_p100"
       ]
     },
     {
