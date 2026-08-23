@@ -1565,3 +1565,24 @@ The M10 failure was a benchmark-work mismatch, not a product regression. Pinned 
 Because these benchmark and qualification-source commits descend from the measured revision, every `515e4a04` correctness, worker, timing, memory, rollup, and completion artifact is immutable historical evidence and cannot authorize release. No completion checkpoint was published. A replacement protected rehearsal and the entire source-current correctness and performance chain must restart from the final reviewed documentation revision at fresh paths.
 
 The audit additionally revealed a proof-boundary gap: sealed host evidence records swap counters but not the active swap-device set, so it cannot independently reconstruct the operator's per-report `swapoff`. For this historical run, the operator disabled swap immediately before each formal timing command, restored the exact prior `/swap.img` configuration through failure-safe traps, observed no counter movement, and verified no qualification process remained. The future schema gap is logged separately rather than misrepresenting those operator observations as machine-authenticated device-state evidence.
+
+## A9 Post-Audit Replacement Release Rehearsal
+
+Focused benchmark-source commits `e64f3a94` and `946a5d0c` plus audit-record commit `4882f55b` produced exact clean revision `4882f55bacd0c403cf6d5f94d6e8335b034c6f57`. It matched `origin/main` and passed both jobs in GitHub Actions run [32623055871](https://github.com/ifsheldon/Stab/actions/runs/32623055871), including the complete Rust and qualification-contract surfaces.
+
+The scratch mirror advanced by non-forced fast-forward from `4e71ccff` to `4882f55b`. Protected annotated tag `v0.2.0-rehearsal-4882f55bacd0c403cf6d5f94d6e8335b034c6f57`, tag object `5bd68e2b524313c11a8dfa28e5bdf57c2bba49da`, peels to the exact reviewed source revision. The workflow-scoped API returned exactly one dispatch run for that commit: [32623915146](https://github.com/ifsheldon/Stab-release-rehearsal/actions/runs/32623915146), whose workflow name, event, tag branch, head SHA, final status, and conclusion all matched the frozen rehearsal contract. Both native AArch64 builds and the verified private-draft job passed.
+
+The fixed destination remained public scratch repository `ifsheldon/Stab-release-rehearsal`, numeric ID `1342241032`. Active ruleset `21169813`, node `RRS_lACqUmVwb3NpdG9yec5QAPkIzgFDBpU`, still targets only `refs/tags/v0.2.0-rehearsal-*`, rejects update and deletion, has an empty bypass list, and reports `current_user_can_bypass=never` under its pinned creation and update identity.
+
+Private draft `375137275` is unpublished, is not a prerelease, targets `4882f55bacd0c403cf6d5f94d6e8335b034c6f57`, and contains exactly the following six uploaded assets. The workflow artifacts were downloaded to unique local path `target/releases/rehearsal-4882f55b-r1-workflow-assets`; local hashes matched GitHub's remote digests, and the live read-only `release::verify-rehearsal-draft` operation passed.
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `stab-linux-aarch64` | 3,766,536 | `8b4804875805664449472bd8bef5a7fa46934fa54ab8fb3d0272c3e3484e383b` |
+| `stab-linux-aarch64.json` | 1,387 | `4c9d2f8c8af20497458297dffef565753e8f96cf08d5d4612aefd5616c17f16b` |
+| `stab-linux-aarch64.sha256` | 85 | `3e471ce6f8542c8c2f89e7b308d3332880bf0e5db69747a74f98c88132b15331` |
+| `stab-macos-aarch64` | 3,477,976 | `146fa0ac0ff48439addabfa645ee29271140607a6ea9c5f17cae91de1001c34c` |
+| `stab-macos-aarch64.json` | 1,369 | `d025c34715a260e957876b43ba3ce0a3848d4c05326c63bc7cfde6a821317875` |
+| `stab-macos-aarch64.sha256` | 85 | `4fc4da452bb947ae98f203d690ab7a3d07f9b18ff6ead254e8c088d4326baf1a` |
+
+Draft `375137275` must never be published. This is the one permitted three-document rehearsal-record descendant of the exercised source revision; it changes no product, test, workflow, release tool, qualification contract, fixture, policy, or normative procedure. Formal evidence may restart only after this record is committed, pushed, and accepted by exact-head `Rust` and `Qualification Contracts` CI. The active controlled-host ceiling remains exactly `100000` millidegrees Celsius, swap remains restored as `/swap.img` with size `137438949376` bytes and priority `-2`, and no qualification process is running.

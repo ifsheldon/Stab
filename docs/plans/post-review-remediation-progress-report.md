@@ -121,3 +121,9 @@ Each Pass 1 finding gains a row here when its fix lands: finding, owner, witness
 ## Deferred Backlog
 
 The plan's WS6 items 2 through 6 and 8, WS7, and WS8 are deferred behind the promotion triggers named in the plan's Execution Overlay; none have been promoted at this entry.
+
+## A9 Post-Audit Rehearsal Record
+
+Exact clean revision `4882f55bacd0c403cf6d5f94d6e8335b034c6f57` passed both required jobs in GitHub Actions run `32623055871`. Its protected source-derived annotated tag produced exactly one workflow-scoped rehearsal run, `32623915146`, in fixed public scratch repository `ifsheldon/Stab-release-rehearsal`; the Linux and macOS AArch64 builds and private-draft job all passed. Live read-only verification confirmed private draft `375137275`, the unchanged no-bypass tag ruleset `21169813`, and exact local-to-remote identity for all six assets. The complete tag-object, run URL, artifact path, lengths, and SHA-256 ledger is recorded in the architecture progress report.
+
+Draft `375137275` must never be published. This entry is status-only, changes none of the remediation implementation or normative contracts, and authorizes formal A9 evidence only after this three-document descendant passes exact-head `Rust` and `Qualification Contracts` CI.

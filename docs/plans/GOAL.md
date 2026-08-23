@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete. Post-evidence review rejected the first A9 closure because the legacy M10 beta row measured mismatched benchmark work; the runner is repaired and replacement rehearsal and formal evidence are required.
+Status: Active. Milestones A0 through A8 are complete. The post-audit M10 benchmark repair and its replacement release rehearsal passed; this permitted rehearsal record and exact-head CI are the final gates before formal A9 evidence restarts.
 
 ## Objective
 
@@ -14,18 +14,18 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 - `946a5d0c` corrects the M10 work mismatch by accumulating public numeric outputs like pinned Stim instead of black-boxing a full `Result` per call. Clean focused beta evidence at `target/benchmarks/a9-946a5d0c-r2-m10-error-decomp-clean-beta` passes all four pairs with worst ratio exactly `1.25x` and `local_modifications=false`.
 - The legacy memory diagnostic preserves 14 old-limit failures and seven missing baselines. It is diagnostic continuity, not promotable A9 memory evidence; do not rewrite baselines or add closure waivers.
 - The active thermal ceiling is exactly `100000` millidegrees Celsius. Historical A9 maximum was 85500. Swap is restored as `/swap.img` with priority `-2`, and no qualification process is running.
-- There is no source-current rehearsal, formal evidence, authenticated checkpoint, final package preflight, crates.io publication, production tag, draft, or public release after the benchmark repair.
+- Exact clean rehearsal source `4882f55bacd0c403cf6d5f94d6e8335b034c6f57` passed both jobs in GitHub Actions run `32623055871`. Protected annotated tag `v0.2.0-rehearsal-4882f55bacd0c403cf6d5f94d6e8335b034c6f57` produced exactly one workflow run, `32623915146`; both native AArch64 builds, private draft `375137275`, all six local and remote asset digests, and the live read-only verifier passed. The draft must never be published.
+- There is no source-current formal evidence, authenticated checkpoint, final package preflight, crates.io publication, production tag, production draft, or public release after the benchmark repair.
 
 ## Next Actions
 
-1. Finish the focused documentation and benchmark-evidence commit, run complete local verification, push the exact clean revision, and require both exact-head CI jobs.
-2. From that revision, run one new protected replacement rehearsal with a source-derived tag, exactly one workflow run, both native AArch64 builds, six local and remote digest matches, an unpublished private scratch draft, and the live read-only verifier. Commit only the permitted rehearsal record and require exact-head CI again.
-3. From that final rehearsal-record revision, regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, and both complete DEM adapter probes at unique paths.
-4. Produce all 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion. Disable swap immediately before each formal timing command and restore the exact prior configuration through failure-safe traps.
-5. Rerun legacy primary timing and memory diagnostics. Preserve failures; investigate comparable timing regressions, but do not invent ratios for non-comparable rows or rewrite memory baselines merely to close A9.
-6. Run milestone-audit and full-code-review against the completed evidence. Fix confirmed implementation or contract defects; log genuine under-specification. Any source fix requires fresh rehearsal and evidence paths.
-7. If review passes, replay and publish the completion checkpoint under soft `RLIMIT_NOFILE=1024`, create exactly one seven-path status descendant, push it, and require exact-head CI.
-8. Follow [RELEASING.md](../RELEASING.md): create one immutable package preflight, publish the reviewed ten-crate set, create and push protected annotated `v0.2.0`, capture exactly one production workflow run, verify the six-asset private draft immediately before human publication, and verify the public release immediately afterward.
+1. Commit and push only this permitted three-document rehearsal record, then require both exact-head CI jobs.
+2. From that final rehearsal-record revision, regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, and both complete DEM adapter probes at unique paths.
+3. Produce all 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion. Disable swap immediately before each formal timing command and restore the exact prior configuration through failure-safe traps.
+4. Rerun legacy primary timing and memory diagnostics. Preserve failures; investigate comparable timing regressions, but do not invent ratios for non-comparable rows or rewrite memory baselines merely to close A9.
+5. Run milestone-audit and full-code-review against the completed evidence. Fix confirmed implementation or contract defects; log genuine under-specification. Any source fix requires fresh rehearsal and evidence paths.
+6. If review passes, replay and publish the completion checkpoint under soft `RLIMIT_NOFILE=1024`, create exactly one seven-path status descendant, push it, and require exact-head CI.
+7. Follow [RELEASING.md](../RELEASING.md): create one immutable package preflight, publish the reviewed ten-crate set, create and push protected annotated `v0.2.0`, capture exactly one production workflow run, verify the six-asset private draft immediately before human publication, and verify the public release immediately afterward.
 
 ## Gates
 
