@@ -224,7 +224,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
         ),
         "m10-error-decomp" => Some(
-            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters using enlarged pinned-case in-process batches; impossible zero-component disjoint cases use a semantic fast reject",
+            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters using enlarged pinned-case in-process batches and one numeric output accumulator per batch",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -797,52 +797,55 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
             "stab_independent_to_disjoint_xyz_errors",
             &independent_cases,
             |[x, y, z]| {
-                black_box(independent_to_disjoint_xyz_errors(
-                    black_box(x),
-                    black_box(y),
-                    black_box(z),
-                ))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                Ok(())
+                let output =
+                    independent_to_disjoint_xyz_errors(black_box(x), black_box(y), black_box(z))
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                Ok(output.x().get() + output.y().get() + output.z().get())
             },
         )?,
         measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_exact",
             &exact_cases,
             |[x, y, z]| {
-                black_box(try_disjoint_to_independent_xyz_errors(
+                let output = try_disjoint_to_independent_xyz_errors(
                     black_box(x),
                     black_box(y),
                     black_box(z),
-                ))
+                )
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-                Ok(())
+                Ok(output.map_or(0.0, |probabilities| {
+                    probabilities.x().get() + probabilities.y().get() + probabilities.z().get()
+                }))
             },
         )?,
         measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_p10",
             &[[p10, p20, zero]],
             |[x, y, z]| {
-                black_box(try_disjoint_to_independent_xyz_errors(
+                let output = try_disjoint_to_independent_xyz_errors(
                     black_box(x),
                     black_box(y),
                     black_box(z),
-                ))
+                )
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-                Ok(())
+                Ok(output.map_or(0.0, |probabilities| {
+                    probabilities.x().get() + probabilities.y().get() + probabilities.z().get()
+                }))
             },
         )?,
         measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_p100",
             &[[p01, p02, zero]],
             |[x, y, z]| {
-                black_box(try_disjoint_to_independent_xyz_errors(
+                let output = try_disjoint_to_independent_xyz_errors(
                     black_box(x),
                     black_box(y),
                     black_box(z),
-                ))
+                )
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-                Ok(())
+                Ok(output.map_or(0.0, |probabilities| {
+                    probabilities.x().get() + probabilities.y().get() + probabilities.z().get()
+                }))
             },
         )?,
     ])
@@ -997,7 +1000,7 @@ fn benchmark_probability(row_id: &str, value: f64) -> Result<Probability, BenchE
 fn measure_error_decomp_cases(
     name: &str,
     cases: &[[Probability; 3]],
-    mut operation: impl FnMut([Probability; 3]) -> Result<(), BenchError>,
+    mut operation: impl FnMut([Probability; 3]) -> Result<f64, BenchError>,
 ) -> Result<Measurement, BenchError> {
     let operation_count = ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS
         .checked_mul(cases.len())
@@ -1034,13 +1037,15 @@ fn measure_error_decomp_cases(
 
 fn run_error_decomp_case_batch(
     cases: &[[Probability; 3]],
-    operation: &mut impl FnMut([Probability; 3]) -> Result<(), BenchError>,
+    operation: &mut impl FnMut([Probability; 3]) -> Result<f64, BenchError>,
 ) -> Result<(), BenchError> {
+    let mut witness = 0.0;
     for _ in 0..ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS {
         for case in cases {
-            operation(black_box(*case))?;
+            witness += operation(black_box(*case))?;
         }
     }
+    black_box(witness);
     Ok(())
 }
 
