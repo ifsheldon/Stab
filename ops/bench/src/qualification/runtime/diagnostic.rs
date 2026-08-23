@@ -24,6 +24,7 @@ use super::protocol::{
 use super::run::{
     ClaimClass, INVOCATION_TIMEOUT, QualificationTier, RepositoryEvidence, WARMUP_BATCHES,
 };
+use super::statistics::median_in_place;
 use crate::qualification::model::SizeClass;
 use crate::root::RepoRoot;
 
@@ -681,28 +682,11 @@ fn summarize_samples(
         seconds_per_work_item.push(row.elapsed_seconds / row.work_count as f64);
     }
     Ok(DiagnosticScaleSummary {
-        median_batch_seconds: median(&mut batch_seconds)?,
-        median_seconds_per_work_item: median(&mut seconds_per_work_item)?,
+        median_batch_seconds: median_in_place(&mut batch_seconds)
+            .map_err(|_| DiagnosticError::Report)?,
+        median_seconds_per_work_item: median_in_place(&mut seconds_per_work_item)
+            .map_err(|_| DiagnosticError::Report)?,
     })
-}
-
-fn median(values: &mut [f64]) -> Result<f64, DiagnosticError> {
-    if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
-        return Err(DiagnosticError::Report);
-    }
-    values.sort_by(f64::total_cmp);
-    let middle = values.len() / 2;
-    let upper = values.get(middle).copied().ok_or(DiagnosticError::Report)?;
-    if values.len() % 2 == 1 {
-        Ok(upper)
-    } else {
-        let lower = middle
-            .checked_sub(1)
-            .and_then(|index| values.get(index))
-            .copied()
-            .ok_or(DiagnosticError::Report)?;
-        Ok((lower + upper) / 2.0)
-    }
 }
 
 fn summaries_match(left: &DiagnosticScaleSummary, right: &DiagnosticScaleSummary) -> bool {

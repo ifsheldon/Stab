@@ -258,24 +258,31 @@ pub(super) fn validate_positive_finite(values: &[f64]) -> Result<(), StatisticsE
 }
 
 pub(crate) fn median(values: &[f64]) -> Result<f64, StatisticsError> {
+    let mut sorted = values.to_vec();
+    median_in_place(&mut sorted)
+}
+
+pub(super) fn median_in_place(values: &mut [f64]) -> Result<f64, StatisticsError> {
     if values.is_empty() {
         return Err(StatisticsError::MissingSamples);
     }
-    let mut sorted = values.to_vec();
-    sorted.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
-    let middle = sorted.len() / 2;
-    if sorted.len().is_multiple_of(2) {
-        let left = sorted
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(StatisticsError::InvalidSample);
+    }
+    values.sort_by(f64::total_cmp);
+    let middle = values.len() / 2;
+    if values.len().is_multiple_of(2) {
+        let left = values
             .get(middle.saturating_sub(1))
             .copied()
             .ok_or(StatisticsError::InternalIndex)?;
-        let right = sorted
+        let right = values
             .get(middle)
             .copied()
             .ok_or(StatisticsError::InternalIndex)?;
         Ok((left + right) / 2.0)
     } else {
-        sorted
+        values
             .get(middle)
             .copied()
             .ok_or(StatisticsError::InternalIndex)
@@ -641,6 +648,23 @@ mod tests {
         assert!(summary.stab_relative_mad > NOISY_RELATIVE_MAD);
         assert_eq!(summary.ratio_relative_mad, 0.0);
         assert_eq!(summary.outcome, GateOutcome::Passed);
+    }
+
+    #[test]
+    fn shared_median_kernel_is_exact_and_rejects_non_finite_samples() {
+        let mut even = [4.0, 1.0, 3.0, 2.0];
+        assert_eq!(median_in_place(&mut even).expect("even median"), 2.5);
+        assert_eq!(even, [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(median(&[3.0, 1.0, 2.0]).expect("odd median"), 2.0);
+
+        assert!(matches!(
+            median_in_place(&mut [1.0, f64::NAN]),
+            Err(StatisticsError::InvalidSample)
+        ));
+        assert!(matches!(
+            median_in_place(&mut []),
+            Err(StatisticsError::MissingSamples)
+        ));
     }
 
     #[test]
