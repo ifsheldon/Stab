@@ -295,30 +295,30 @@
     },
     {
       "id": "m10-error-decomp",
-      "before_report": "target/benchmarks/m10-error-decomp-focused-before/compare.json",
+      "before_report": "target/benchmarks/a9-515e4a04-r2-legacy-primary-beta/compare.json",
       "before_evidence": {
         "gate_status": "fail",
-        "relative_ratio": 1.3559322033898304,
-        "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The focused before report measured the exact disjoint-to-independent pair above the 1.25x beta gate at 1.3559322033898304x and the p10 Newton fallback pair above the gate at 1.2621621621621621x."
+        "relative_ratio": 1.875,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The source-current A9 legacy beta diagnostic measured the per-call Result-black-box runner at 1.875x on the independent conversion and 1.4x on the exact inverse, above the unchanged 1.25x gate."
       },
-      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
+      "after_report": "target/benchmarks/a9-946a5d0c-r2-m10-error-decomp-clean-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
         "relative_ratio": 1.25,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The final clean primary beta report measured every paired error-decomposition filter at or below the active 1.25x beta gate after inlining tiny conversion helpers, splitting the exact closed-form branch out of the generic solver result path, keeping exact-branch validation minimal, and fast-rejecting zero-component disjoint cases that cannot decompose exactly."
+        "evidence_note": "The clean focused report measured all four paired filters at or below 1.25x after the Stab runner adopted pinned Stim's numeric output accumulator and one batch-level compiler fence; no product implementation, waiver, threshold, or paired measurement changed."
       },
-      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where exact closed-form overhead decided the remaining worst pair, while the p10 and p100 filters spent the full Newton fallback on disjoint triples with one zero component and two positive components even though those triples cannot be decomposed exactly.",
-      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, split the exact closed-form branch out of the generic solver result path, kept exact-branch validation to the lower-bound checks needed by the closed-form proof, used a crate-private Probability constructor only for formulas whose output bounds are proven locally, and added a semantic fast reject for impossible zero-component disjoint triples.",
+      "dominant_cost": "The nanosecond-scale Stab runner fenced a full Result on every conversion, while pinned Stim accumulates the three numeric outputs and fences only the completed batch witness. The additional compiler barrier was benchmark overhead, not public error-decomposition work.",
+      "optimization_summary": "Retained all four direct paired measurements and enlarged batches, changed each Stab operation to return the sum of its public numeric outputs, accumulated that witness across the batch, and applied black_box once after the batch. The faithful pinned-Stim Newton implementation and every public API remained unchanged.",
       "semantic_checks": [
         "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
         "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
         "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ",
-        "cargo test -p stab-core error_decomp",
-        "cargo test -p stab-core --test dem_analyzer_pauli_channel_clifford --quiet"
+        "cargo test -p stab-bench",
+        "cargo clippy -p stab-bench --all-targets -- -D warnings"
       ],
-      "follow_up": "Keep all four direct pairs in beta evidence and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the exact, p100, and independent filters remain stable with enough headroom."
+      "follow_up": "Keep all four direct pairs in beta evidence, retain numeric accumulation as the pinned workload witness, and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the exact, p100, and independent filters remain stable with enough headroom."
     }
   ]
 }
