@@ -1,6 +1,6 @@
 # Goal: Qualify And Release Stab 0.2.0
 
-Status: Active. Milestones A0 through A8 are complete. A9 is repairing one externally confirmed legacy benchmark-comparability defect before a replacement rehearsal and final evidence run.
+Status: Active. Milestones A0 through A8 are complete. A9 has repaired the externally confirmed M10 benchmark-comparability defect and completed its replacement rehearsal; the permitted status descendant and final evidence run remain.
 
 ## Objective
 
@@ -8,22 +8,19 @@ Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-na
 
 ## Current State
 
-- Exact revision `66d599b3f6c59ecee512030459729e6fbf0819a8` passed CI, PR 729/729, broad full and soak 962/962, eleven exact prerequisites, both live oracle suites, 46 worker receipts, both DEM probes, 138 controlled reports, 38 replayed rollups, two accepted-maximum memory receipts, and completion replay under soft `RLIMIT_NOFILE=1024`.
-- Its formal medians included 115 speedups and 23 slowdowns; the worst median was `1.1892215838970592x`, the worst confidence upper bound was `1.2006022852625842x`, and all retained host readings were below the checked `100000` millidegree Celsius ceiling.
-- Post-evidence review found that legacy `m10-error-decomp` p10 and p100 timings were not faithful pairs: pinned Stim retains the failed Newton iterate, while Stab's public API returns `None`. The `66d599b3` chain is therefore immutable historical evidence and cannot authorize release.
-- The active repair classifies M10 as `partial-match`, pairs only successful exact and independent conversions, keeps failed Stab calls report-only, removes the invalid p10 threshold, and adds a typed timing-regression waiver that names those exact two pairs and rejects missing, extra, duplicate, renamed, or above-gate evidence.
-- Private rehearsal drafts `374797341`, `374979714`, and `375137275` must never be published. Any new rehearsal draft is also private and must never be published.
+- Exact repair revision `72c5f0cb797467ae123ce14160add9ed38ec4311` passed broad local verification, milestone audit, full code review, and both required jobs in GitHub Actions run [32666451468](https://github.com/ifsheldon/Stab/actions/runs/32666451468).
+- M10 is now `partial-match`: only successful exact and independent conversions pair, failed Stab calls remain report-only, the invalid p10 threshold is gone, and a schema-version-2 waiver names exactly the two faithful pairs under the unchanged `1.25x` gate. Performance inventory schema 4 binds the complete typed waiver policy into its semantic digest.
+- Protected annotated tag `v0.2.0-rehearsal-72c5f0cb797467ae123ce14160add9ed38ec4311` produced exactly one workflow-scoped rehearsal run, [32667536583](https://github.com/ifsheldon/Stab-release-rehearsal/actions/runs/32667536583). Both native builds and private-draft verification passed, and all six retained asset digests match private draft `375331393`.
+- Exact revision `66d599b3f6c59ecee512030459729e6fbf0819a8` remains immutable historical evidence: its 138 reports passed, but its invalid M10 pairing prevents release authorization.
+- Private rehearsal drafts `374797341`, `374979714`, `375137275`, and `375331393` must never be published. Any new rehearsal draft is also private and must never be published.
 - Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`; no qualification process is running.
 
 ## Next Actions
 
-1. Finish the M10 policy, tests, generated qualification contracts, profiler note, historical corrections, and attempt ledger. Run milestone-audit, full-code-review, and broad local verification.
-2. Commit the repair in focused commits, push exact `main`, and require both `Rust` and `Qualification Contracts` CI jobs to pass.
-3. From that exact clean source, run a fresh protected scratch release rehearsal with a commit-derived tag, exactly one workflow run, six digest-matched assets, one private draft, and live read-only verification.
-4. Commit only the permitted three-document rehearsal record, push it, and require exact-head CI. This documentation descendant becomes the measured revision.
-5. Regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, both DEM probes, 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion at entirely new paths.
-6. Preserve legacy beta, timing, and memory diagnostics honestly. Run milestone-audit and full-code-review against completed evidence; any source fix restarts rehearsal and evidence.
-7. Publish the authenticated seven-path status descendant, require exact-head CI, perform the immutable package preflight, publish all ten reviewed crates, create protected annotated `v0.2.0`, verify the private production draft, publish it, and verify the public release without another source commit.
+1. Commit only this permitted three-document rehearsal record, push it, and require exact-head `Rust` and `Qualification Contracts` CI. This documentation descendant becomes the measured revision.
+2. Regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, both DEM probes, 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion at entirely new paths.
+3. Preserve legacy beta, timing, and memory diagnostics honestly. Run milestone-audit and full-code-review against completed evidence; any source fix restarts rehearsal and evidence.
+4. Publish the authenticated seven-path status descendant, require exact-head CI, perform the immutable package preflight, publish all ten reviewed crates, create protected annotated `v0.2.0`, verify the private production draft, publish it, and verify the public release without another source commit.
 
 ## Gates
 

@@ -1604,3 +1604,24 @@ Post-evidence full code review then found one benchmark-comparability defect. Pi
 The repair reclassifies `m10-error-decomp` as `partial-match`; preserves only successful exact and independent conversions as faithful pairs; renames failed Stab calls as report-only public-`None` timings; removes the invalid p10 threshold; and introduces a fail-closed schema-version-2 `unstable-faithful-pairs` timing-regression waiver bound to those exact two pairs. Missing, extra, duplicate, renamed, above-gate, direct-match, CLI-baseline, failed, pending, unpaired, and configured evidence cannot consume that waiver. Performance qualification inventory schema version 4 carries every waiver's source file, typed kind, reason, follow-up, and exact pair set in its semantic digest. The unchanged `1.25x` beta gate still applies to the faithful pairs.
 
 This source change makes every `66d599b3` correctness, worker, timing, memory, rollup, and completion artifact immutable historical evidence for release authorization. No completion checkpoint was published. After the repair is committed, pushed, and accepted by exact-head CI, A9 requires another protected scratch rehearsal and then a complete fresh correctness and performance chain at new paths.
+
+## A9 M10-Repair Replacement Release Rehearsal
+
+Focused commits `98bed297`, `12e0953b`, and `72c5f0cb` bind the release-test synchronization repair, the exact-pair M10 benchmark and qualification policy, and the reviewed historical corrections. Exact pushed revision `72c5f0cb797467ae123ce14160add9ed38ec4311` matched `origin/main`, passed broad local verification, milestone audit, and full code review, and passed both required jobs in GitHub Actions run [32666451468](https://github.com/ifsheldon/Stab/actions/runs/32666451468).
+
+The scratch mirror advanced by non-forced fast-forward from `4882f55b` to `72c5f0cb`. Protected annotated tag `v0.2.0-rehearsal-72c5f0cb797467ae123ce14160add9ed38ec4311`, tag object `2ed9bfd0c063cf07e0819d585c2ec84da24e42d5`, peels to the exact reviewed source revision. The workflow-scoped API returned exactly one dispatch run for that commit: [32667536583](https://github.com/ifsheldon/Stab-release-rehearsal/actions/runs/32667536583), whose workflow name, event, tag branch, head SHA, final status, and conclusion all matched the frozen rehearsal contract. The native Linux AArch64 build passed in 68 seconds, the native macOS AArch64 build passed in 94 seconds, and the verified private-draft job passed.
+
+The fixed destination remains public scratch repository `ifsheldon/Stab-release-rehearsal`, numeric ID `1342241032`. Active ruleset `21169813`, node `RRS_lACqUmVwb3NpdG9yec5QAPkIzgFDBpU`, still targets only `refs/tags/v0.2.0-rehearsal-*`, rejects update and deletion, has an empty bypass list, and reports `current_user_can_bypass=never` under its pinned creation and update identity.
+
+Private draft `375331393` is unpublished, is not a prerelease, targets `72c5f0cb797467ae123ce14160add9ed38ec4311`, and contains exactly the following six uploaded assets. The workflow artifacts were downloaded to unique local path `target/releases/rehearsal-72c5f0cb-r1-workflow-assets`; local hashes matched GitHub's remote digests, and the live read-only `release::verify-rehearsal-draft` operation passed.
+
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `stab-linux-aarch64` | 3,766,536 | `8b4804875805664449472bd8bef5a7fa46934fa54ab8fb3d0272c3e3484e383b` |
+| `stab-linux-aarch64.json` | 1,387 | `b7ac488b1e2730ddb24f95233794ea548acf42718f4256784321dcd0b0fd3b4b` |
+| `stab-linux-aarch64.sha256` | 85 | `3e471ce6f8542c8c2f89e7b308d3332880bf0e5db69747a74f98c88132b15331` |
+| `stab-macos-aarch64` | 3,477,976 | `146fa0ac0ff48439addabfa645ee29271140607a6ea9c5f17cae91de1001c34c` |
+| `stab-macos-aarch64.json` | 1,369 | `dd24289f212c6cccdc7752462696e9c374f390407b66e5a13ef0d1fefa09706d` |
+| `stab-macos-aarch64.sha256` | 85 | `4fc4da452bb947ae98f203d690ab7a3d07f9b18ff6ead254e8c088d4326baf1a` |
+
+Draft `375331393` must never be published. This record is the one permitted three-document rehearsal-record descendant of the exercised source revision; it changes no product, test, workflow, release tool, qualification contract, fixture, policy, or normative procedure. Formal evidence may restart only after this record is committed, pushed, and accepted by exact-head `Rust` and `Qualification Contracts` CI. The active controlled-host ceiling remains exactly `100000` millidegrees Celsius, swap remains restored as `/swap.img` with size `137438949376` bytes and priority `-2`, and no qualification process is running.
