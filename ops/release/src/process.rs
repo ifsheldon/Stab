@@ -721,7 +721,7 @@ mod tests {
         let trigger = cancellation.clone();
         let started_for_trigger = started.clone();
         let canceller = thread::spawn(move || {
-            wait_for_path(&started_for_trigger, Duration::from_secs(5));
+            wait_for_pid(&started_for_trigger, Duration::from_secs(5));
             trigger.cancel();
         });
 
@@ -740,7 +740,8 @@ mod tests {
             result,
             Err(ReleaseError::CommandInterrupted { .. })
         ));
-        assert_process_gone(read_pid(&started)).expect("mock publication process is gone");
+        assert_process_gone(wait_for_pid(&started, Duration::from_secs(5)))
+            .expect("mock publication process is gone");
         assert!(
             !published.exists(),
             "cancelled publication wrote its marker"
@@ -767,7 +768,7 @@ mod tests {
                 .stderr(Stdio::null())
                 .spawn()
                 .expect("spawn signal supervisor");
-            wait_for_path(&started, Duration::from_secs(5));
+            let published_process = wait_for_pid(&started, Duration::from_secs(5));
 
             rustix::process::kill_process(process_id(supervisor.id()), signal)
                 .expect("signal release supervisor");
@@ -775,7 +776,7 @@ mod tests {
                 .expect("signal supervisor completes");
 
             assert!(status.success(), "{name} supervisor failed with {status}");
-            assert_process_gone(read_pid(&started)).expect("mock publication process is gone");
+            assert_process_gone(published_process).expect("mock publication process is gone");
             assert!(
                 !published.exists(),
                 "{name} cancellation allowed mock publication"
@@ -834,8 +835,7 @@ mod tests {
         let child = command.spawn().expect("spawn managed mock publication");
         let mut managed = ManagedChild::new(child, program.to_string_lossy().into_owned());
         managed.start_readers(4096).expect("start bounded readers");
-        wait_for_path(&started, Duration::from_secs(5));
-        let pid = read_pid(&started);
+        let pid = wait_for_pid(&started, Duration::from_secs(5));
 
         let dropped = Instant::now();
         drop(managed);
@@ -861,10 +861,18 @@ mod tests {
         ]
     }
 
-    fn wait_for_path(path: &Path, timeout: Duration) {
+    fn wait_for_pid(path: &Path, timeout: Duration) -> u32 {
         let deadline = Instant::now() + timeout;
-        while !path.exists() {
-            assert!(Instant::now() < deadline, "timed out waiting for {path:?}");
+        loop {
+            if let Ok(marker) = std::fs::read_to_string(path)
+                && let Ok(pid) = marker.parse::<u32>()
+            {
+                return pid;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for numeric process marker at {path:?}"
+            );
             thread::sleep(Duration::from_millis(10));
         }
     }
@@ -885,13 +893,6 @@ mod tests {
             }
             thread::sleep(Duration::from_millis(10));
         }
-    }
-
-    fn read_pid(path: &Path) -> u32 {
-        std::fs::read_to_string(path)
-            .expect("read process marker")
-            .parse::<u32>()
-            .expect("numeric process marker")
     }
 
     #[cfg(unix)]
