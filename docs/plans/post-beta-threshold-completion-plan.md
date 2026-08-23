@@ -10,6 +10,8 @@ This plan is deliberately narrower than `docs/plans/post-beta-timing-hardening-p
 It does not reopen `m5-simd-bits` or `m10-error-decomp`, which already have source-owned schema-version-2 thresholds for their stable direct submeasurements and documented exclusions for tiny unstable surfaces.
 It also does not reopen intentionally deferred Stim parity or ecosystem surfaces such as Python, JS/WASM, Crumble, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, or new public graph/vector simulator APIs.
 
+Post-A9 review correction, 2026-08-24: the statement above about `m10-error-decomp` is historical. Its p10 threshold compared a pinned Stim final-iterate witness with Stab's public `None` result and has been removed. Current policy pairs only successful exact and independent conversions, retains failed calls as report-only measurements, and uses a typed unstable-faithful-pairs timing-regression waiver until the faithful nanosecond pairs have stable threshold headroom.
+
 ## Lessons Applied
 
 Use `docs/plans/lessons-learned.md` as a guardrail while executing this plan.

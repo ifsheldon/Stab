@@ -5,6 +5,8 @@
 This plan tightens the Stab primary beta performance gate from `2.0x` to `1.25x` and then improves the currently slower or fragile rows until the stricter gate is honest, executable, and stable.
 It follows the lessons in `docs/plans/lessons-learned.md`: benchmark comparability must be explicit, tiny measurements need deliberate evidence policy, paired submeasurements must not be hidden behind row medians, final reports must be clean, and waivers must stay source-owned and machine-checked.
 
+Post-A9 review correction, 2026-08-24: this historical plan treated all four `m10-error-decomp` filters as direct pairs, but failed p10 and p100 calls expose different observable results. Pinned Stim retains the final Newton iterate in output parameters, while Stab returns `None`. Current policy classifies the row as `partial-match`, pairs only successful exact and independent conversions, keeps failed Stab calls report-only, and has removed the historical p10 threshold. Ratios and completion claims below remain accurate descriptions of their producing artifacts, not current proof for the rejected pairs.
+
 ## Starting Evidence
 
 The starting clean beta report for this plan is `target/benchmarks/m12-primary-beta/compare.json` generated from Stab commit `5a641b1e21241702cc3ed4d71264a89fb10bcd42` with `local_modifications=false`, using the baseline at `target/benchmarks/beta-125-start-baseline/baseline.json`.

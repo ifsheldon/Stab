@@ -98,15 +98,13 @@ Tests and acceptance:
 
 ### `m10-error-decomp`
 
-The `approx_p10` submeasurement is guarded.
-The `approx_p100`, exact, and independent-to-disjoint filters remain unthresholded until repeated clean reports prove stable headroom.
-The current implementation keeps p10 and p100 visible as direct pairs while fast-rejecting one-zero two-positive disjoint triples that cannot decompose exactly, leaving exact and independent-to-disjoint as the remaining nanosecond-scale threshold-expansion risks.
+Post-A9 review correction, 2026-08-24: this section's original p10 threshold and four-pair assumption were invalid because failed Stim calls retain a final iterate while Stab's public API returns `None`. Current policy pairs only successful exact and independent-to-disjoint calls; p10 and p100 are report-only; no M10 pair currently owns a strict threshold.
 
 Tasks:
 
-- Keep the existing `approx_p10` schema-version-2 threshold.
+- Keep the successful exact and independent-to-disjoint pairs visible under the unchanged `1.25x` beta gate, and keep the exact pair set bound in the typed timing-regression waiver until stable threshold headroom exists.
 - Keep enlarged pinned-case batched evidence for exact and independent-to-disjoint paths, matching the pinned Stim perf filters while reducing timer noise.
-- Report normalized conversions-per-second evidence for exact, approximate, and independent-to-disjoint conversion families.
+- Report normalized conversions-per-second evidence for the faithful exact and independent-to-disjoint families, and label failed public-`None` calls as Stab-only timings.
 - Profile only after batched evidence separates arithmetic cost from timer overhead.
 - If profiling proves real arithmetic overhead, reduce temporary wrappers in internal loops, avoid repeated validation where public `Probability` boundaries have already validated inputs, and keep public validation at external API boundaries.
 - Preserve numerical stability and Stim v1.16.0 parity over speed when the two are in tension.

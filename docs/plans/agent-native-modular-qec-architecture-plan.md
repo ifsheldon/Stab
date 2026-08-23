@@ -942,7 +942,7 @@ Status: Complete. Closure is recorded against measured source revision `c797ebc9
 
 ## Milestone A9: Qualification And Stab 0.2.0
 
-Status: Active. The first complete `515e4a04` evidence chain is historical after post-evidence benchmark review repaired the M10 direct-match workload; replacement rehearsal and formal evidence must restart from the final reviewed source.
+Status: Active. Complete `515e4a04` and `66d599b3` evidence chains are historical. Post-evidence review proved failed M10 p10 and p100 calls had different observable witnesses in Stim and Stab, so the benchmark is being repaired as a partial match before a replacement rehearsal and complete fresh evidence run.
 
 ### Tasks
 

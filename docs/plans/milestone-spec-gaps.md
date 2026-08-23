@@ -19,7 +19,8 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-No open entries.
+- [2026-08-23 - A9: Sealed Swap-Device State](#2026-08-23---a9-sealed-swap-device-state)
+- [2026-08-24 - M12/A9: M10 Threshold Graduation Evidence](#2026-08-24---m12a9-m10-threshold-graduation-evidence)
 
 ## Resolved Entries
 
@@ -1810,3 +1811,21 @@ Current text: A9 requires the operator to disable recorded swap immediately befo
 Gap: `HostEvidence` seals cumulative `pswpin` and `pswpout` counters but not the active swap-device set before and during a timed invocation. The report can therefore prove unchanged counters and the operator can record successful `swapoff` and restoration, but an offline replay cannot independently prove that no swap device was active during the timed interval.
 Proposed amendment: in the next intentional host/report schema revision, retain a bounded typed snapshot of active swap devices before raw timing and after worker completion, require the formal controlled profile to observe an empty active set during timing, and keep the restored post-session configuration in the operator ledger. Do not expand the already large evidence protocol solely to retrofit historical A9 artifacts.
 Current disposition: A9 records the operator-observed swapoff and exact restoration honestly, and makes no claim that schema-version-35 host evidence machine-authenticates the active device set. The existing zero-counter and host-policy checks remain supporting evidence, not a substitute for the missing snapshot.
+
+## 2026-08-24 - M12/A9: M10 Threshold Graduation Evidence
+
+Status: Open, non-blocking while the exact-pair waiver remains active
+Revealed by: milestone audit of the repaired `m10-error-decomp` waiver
+Current text: the M10 waiver says to add source-owned submeasurement thresholds after repeated clean reports prove stable headroom.
+Gap: "repeated" and "stable headroom" do not name a report count, controlled-host requirement, minimum timed batch duration, or graduation margin below `1.25x`. The active waiver is fail-closed and exact-pair-scoped, so this ambiguity cannot weaken the current gate, but it leaves future waiver retirement under-specified.
+Proposed amendment: before retiring the waiver, freeze a reviewed M10 batch-duration floor, number of independent clean controlled-host reports, and maximum allowed median and confidence-bound ratios that provide deliberate headroom below `1.25x`. Commit those criteria before collecting graduation evidence.
+Current disposition: keep the exact-pair waiver. Do not infer graduation criteria from favorable measurements or remove the waiver during A9 release closure.
+
+## 2026-08-24 - M12/A9: Failed-Call Benchmark Witness Equivalence
+
+Status: Resolved
+Revealed by: post-evidence full code review of `m10-error-decomp`
+Current text: direct-match benchmark policy required equivalent operation shape and paired submeasurements, but did not explicitly require failed calls to expose the same output-state witness before they could be paired.
+Gap: pinned Stim's failed p10 and p100 decomposition calls leave the final Newton iterate in output parameters, while Stab's public API returns `None`. Positional pairing therefore compared different observable work even though function inputs, control flow, and success status looked related.
+Proposed amendment: require every Stim-relative pair to match success and failure result semantics, including output state retained on failure. When public contracts differ, retain the Stab timing as report-only and pair only the independently verified common subset.
+Resolution: `m10-error-decomp` is now `partial-match`; successful exact and independent conversions remain paired, failed Stab calls use explicit public-`None` report-only names, and the invalid p10 threshold is removed. The typed regression waiver names the exact two allowed pairs and rejects missing, extra, duplicate, renamed, or above-gate evidence. Performance qualification inventory schema version 4 binds the complete typed waiver policy into its semantic digest, and the comprehensive performance contract states the failed-output witness rule.
