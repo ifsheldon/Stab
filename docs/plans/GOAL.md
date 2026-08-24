@@ -15,7 +15,7 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 - The checked inventories are current; [the generated qualification dashboard](../qualification-status.md) is the sole owner of their counts, digests, and completion checkpoint.
 - The superseded A6 focused-attestation implementation and hidden commands are removed. Its two retained JSON contracts are archived byte-for-byte under `benchmarks/archive/a6/`; active SIMD compare and report commands are unchanged.
 - E5 now has one oracle compatibility-matrix parser, one CLI result-format enum, one private DEM-search mask/index representation, model-owned target text assertions, and corpus-owned malformed CLI cases.
-- Audit fixes restored corpus-owned mixed-layout DETS coverage to measurement-only readers, `m2d`, and replay; documented every public removal; replaced duplicate qualification selectors with distinct semantic tests; retired the stale rehearsal gap; and removed the last speculative benchmark states and rehearsal dispatch seams.
+- Audit fixes restored corpus-owned mixed-layout DETS coverage to measurement-only readers, `m2d`, and replay; documented every public removal; replaced duplicate qualification selectors with distinct semantic tests; retired the stale rehearsal gap; and removed the last speculative benchmark states, rehearsal dispatch seams, and duplicate release command alias.
 - The complete local E7 sequence passes, including the 313-row matrix, live 62-case result-format differential, all implemented oracle fixtures, both qualification contracts, and the two required adapter probes. The probes are diagnostic only and do not satisfy formal A9 timing.
 - No formal timing from an intermediate simplification revision may be promoted.
 

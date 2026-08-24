@@ -34,14 +34,6 @@ publish-reviewed preflight confirm_version: build-operator
 build-binary target out tag:
     cargo run -q --locked -p stab-release -- build-binary --target {{quote(target)}} --out {{quote(out)}} --tag {{quote(tag)}}
 
-# Backward-compatible name for the source-building binary operation.
-[working-directory: '..']
-[arg("target", long)]
-[arg("out", long)]
-[arg("tag", long, pattern="v0\\.2\\.0")]
-package-binary target out tag:
-    cargo run -q --locked -p stab-release -- build-binary --target {{quote(target)}} --out {{quote(out)}} --tag {{quote(tag)}}
-
 # Verify the complete tagged binary asset set before draft publication.
 [working-directory: '..']
 [arg("assets", long)]
