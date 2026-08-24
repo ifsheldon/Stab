@@ -1,6 +1,6 @@
 # Goal: Reclaim Pre-0.2 Code Entropy
 
-Status: Active. The release-oriented A9 sequence is temporarily paused while [the pre-0.2 entropy plan](pre-0.2-code-entropy-reclamation-plan.md) removes proved-unused contracts and duplicate ownership. Formal repaired-contract timing has not started for this revision.
+Status: Active pending exact-head GitHub CI. Local E0 through E7 implementation, entropy verification, milestone audit, full code review, and final checks are complete on `main`; the release-oriented A9 sequence remains paused, and no timing from this simplification revision is promotable.
 
 ## Objective
 
@@ -15,6 +15,8 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 - The checked inventories are current; [the generated qualification dashboard](../qualification-status.md) is the sole owner of their counts, digests, and completion checkpoint.
 - The superseded A6 focused-attestation implementation and hidden commands are removed. Its two retained JSON contracts are archived byte-for-byte under `benchmarks/archive/a6/`; active SIMD compare and report commands are unchanged.
 - E5 now has one oracle compatibility-matrix parser, one CLI result-format enum, one private DEM-search mask/index representation, model-owned target text assertions, and corpus-owned malformed CLI cases.
+- Audit fixes restored corpus-owned mixed-layout DETS coverage to measurement-only readers, `m2d`, and replay; documented every public removal; replaced duplicate qualification selectors with distinct semantic tests; retired the stale rehearsal gap; and removed the last speculative benchmark states and rehearsal dispatch seams.
+- The complete local E7 sequence passes, including the 313-row matrix, live 62-case result-format differential, all implemented oracle fixtures, both qualification contracts, and the two required adapter probes. The probes are diagnostic only and do not satisfy formal A9 timing.
 - No formal timing from an intermediate simplification revision may be promoted.
 
 ## Execution Order
@@ -25,7 +27,7 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 4. E4 is complete: A6 JSON contracts are archived and the superseded executable attestation lifecycle is gone.
 5. E5 is complete: the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests are consolidated without dropping semantic coverage.
 6. E6 is complete: CI checks the canonical contracts, volatile status lives in the generated dashboard, and retired rehearsal and A6 procedures are explicitly historical.
-7. E7 is next: run entropy verification, milestone-audit, full-code-review, complete local verification, and exact-head CI.
+7. E7 is locally complete. Push the focused `main` commits, require GitHub CI to pass that exact commit, then resume A9 from a new immutable evidence path.
 
 ## Non-Negotiable Gates
 
