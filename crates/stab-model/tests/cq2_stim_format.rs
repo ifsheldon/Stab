@@ -202,7 +202,10 @@ fn cq2_stim_format_target_text_round_trip_matches_stim() {
         assert_eq!(target.to_string(), text);
         assert_eq!(Target::from_str(text).unwrap(), target);
     }
+}
 
+#[test]
+fn cq2_stim_format_target_text_source_contract() {
     assert_eq!(Target::from_str("5").unwrap(), q(5));
     assert_eq!(Target::from_str("rec[-3]").unwrap(), record(-3));
     let parsed_zero = Target::from_str("rec[-0]").unwrap();
@@ -229,11 +232,6 @@ fn cq2_stim_format_target_text_round_trip_matches_stim() {
     ] {
         assert!(Target::from_str(rejected).is_err(), "{rejected:?}");
     }
-}
-
-#[test]
-fn cq2_stim_format_target_text_source_contract() {
-    cq2_stim_format_target_text_round_trip_matches_stim();
 }
 
 #[test]
@@ -344,10 +342,38 @@ fn cq2_stim_format_target_classification_matches_stim() {
 
 #[test]
 fn cq2_stim_format_gate_target_fixture_contract() {
-    cq2_stim_format_target_text_round_trip_matches_stim();
-    cq2_stim_format_target_accessors_match_stim();
-    cq2_stim_format_target_inversion_matches_stim();
-    cq2_stim_format_target_classification_matches_stim();
+    let circuit =
+        Circuit::from_stim_str("CX sweep[2] 5\nM !7\nMPP X11*!Y13*Z17\nDETECTOR rec[-1]\n")
+            .expect("parse mixed target fixture");
+    let instructions = circuit
+        .items()
+        .iter()
+        .map(|item| match item {
+            CircuitItem::Instruction(instruction) => instruction,
+            CircuitItem::RepeatBlock(_) => panic!("mixed target fixture has no repeat blocks"),
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(instructions[0].targets(), &[Target::sweep_bit(2), q(5)]);
+    assert_eq!(
+        instructions[1].targets(),
+        &[Target::qubit(QubitId::new(7).unwrap(), true)]
+    );
+    assert_eq!(
+        instructions[2].targets(),
+        &[
+            pauli(Pauli::X, 11),
+            Target::combiner(),
+            Target::pauli(Pauli::Y, QubitId::new(13).unwrap(), true),
+            Target::combiner(),
+            pauli(Pauli::Z, 17),
+        ]
+    );
+    assert_eq!(instructions[3].targets(), &[record(-1)]);
+    assert_eq!(
+        circuit.to_stim_string(),
+        "CX sweep[2] 5\nM !7\nMPP X11*!Y13*Z17\nDETECTOR rec[-1]\n"
+    );
 }
 
 #[test]
