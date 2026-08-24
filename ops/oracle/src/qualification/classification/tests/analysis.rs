@@ -91,12 +91,6 @@ fn extracted_analysis_apis_keep_semantic_feature_ownership() {
         ),
         (
             "stab_analysis",
-            "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-            "stab_analysis::advanced::SparseReverseFrameTracker",
-            FeatureId::FlowUtils,
-        ),
-        (
-            "stab_analysis",
             "crates/stab-analysis/src/circuit_inverse.rs",
             "stab_analysis::InverseQecOptions",
             FeatureId::FlowUtils,

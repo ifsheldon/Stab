@@ -174,7 +174,7 @@ pub fn circuit_has_all_unsigned_stabilizer_flows(circuit: &Circuit, flows: &[Flo
         .all(|has_flow| has_flow)
 }
 
-pub fn check_unsigned_flows_with_sparse_tracker(
+pub(crate) fn check_unsigned_flows_with_sparse_tracker(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> AnalysisResult<Vec<bool>> {

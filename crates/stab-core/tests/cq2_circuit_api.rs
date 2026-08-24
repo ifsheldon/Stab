@@ -488,13 +488,6 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             "invalid repeat count value 0",
         ),
         (
-            CircuitError::ParseLine {
-                line: 3,
-                message: "bad token".to_string(),
-            },
-            "failed to parse line 3: bad token",
-        ),
-        (
             CircuitError::InvalidArgumentCount {
                 gate: "H",
                 expected: "0",
@@ -569,14 +562,6 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             },
             "invalid detector error model: bad target",
         ),
-        (
-            CircuitError::UnterminatedRepeatBlock,
-            "unterminated repeat block",
-        ),
-        (
-            CircuitError::UnexpectedRepeatTerminator,
-            "unexpected repeat block terminator",
-        ),
     ];
     for (error, expected) in cases {
         assert_circuit_error_variant_is_covered(&error);
@@ -590,7 +575,6 @@ fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
         CircuitError::Parse(_)
         | CircuitError::UnknownGate(_)
         | CircuitError::InvalidDomainValue { .. }
-        | CircuitError::ParseLine { .. }
         | CircuitError::InvalidArgumentCount { .. }
         | CircuitError::InvalidArgument { .. }
         | CircuitError::InvalidTarget { .. }
@@ -601,9 +585,7 @@ fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
         | CircuitError::InvalidResultFormat(_)
         | CircuitError::ResourceLimit(_)
         | CircuitError::CircuitIo { .. }
-        | CircuitError::InvalidDetectorErrorModel { .. }
-        | CircuitError::UnterminatedRepeatBlock
-        | CircuitError::UnexpectedRepeatTerminator => {}
+        | CircuitError::InvalidDetectorErrorModel { .. } => {}
     }
 }
 

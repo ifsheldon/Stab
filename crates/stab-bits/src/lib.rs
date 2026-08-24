@@ -33,14 +33,6 @@ pub enum BitError {
     #[error("row index {row} is outside row count {rows}")]
     RowIndexOutOfRange { row: usize, rows: usize },
 
-    #[error("matrix shape mismatch: left={left_rows}x{left_cols} right={right_rows}x{right_cols}")]
-    MatrixShapeMismatch {
-        left_rows: usize,
-        left_cols: usize,
-        right_rows: usize,
-        right_cols: usize,
-    },
-
     #[error("matrix operation requires a square matrix, got {rows}x{cols}")]
     NotSquareMatrix { rows: usize, cols: usize },
 

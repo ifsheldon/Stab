@@ -389,7 +389,6 @@ fn circuit_error_code(error: &CircuitError) -> &'static str {
         CircuitError::Parse(error) => error.code().as_str(),
         CircuitError::UnknownGate(_) => "unknown-gate",
         CircuitError::InvalidDomainValue { .. } => "invalid-domain-value",
-        CircuitError::ParseLine { .. } => "circuit-parse-line",
         CircuitError::InvalidArgumentCount { .. } => "invalid-gate-argument-count",
         CircuitError::InvalidArgument { .. } => "invalid-gate-argument",
         CircuitError::InvalidTarget { .. } => "invalid-gate-target",
@@ -401,8 +400,6 @@ fn circuit_error_code(error: &CircuitError) -> &'static str {
         CircuitError::ResourceLimit(error) => error.code(),
         CircuitError::CircuitIo { .. } => "circuit-io-failed",
         CircuitError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
-        CircuitError::UnterminatedRepeatBlock => "unterminated-repeat-block",
-        CircuitError::UnexpectedRepeatTerminator => "unexpected-repeat-terminator",
     }
 }
 
@@ -562,9 +559,6 @@ fn circuit_error_context(error: &CircuitError) -> Value {
             "domain": kind,
             "value": value,
         }),
-        CircuitError::ParseLine { line, .. } => json!({
-            "line": line,
-        }),
         CircuitError::InvalidArgumentCount {
             gate,
             expected,
@@ -589,9 +583,7 @@ fn circuit_error_context(error: &CircuitError) -> Value {
         CircuitError::InvalidTableauConversion { .. }
         | CircuitError::InvalidCircuitSimplification { .. }
         | CircuitError::InvalidSamplerCompilation { .. }
-        | CircuitError::InvalidDetectorErrorModel { .. }
-        | CircuitError::UnterminatedRepeatBlock
-        | CircuitError::UnexpectedRepeatTerminator => json!({}),
+        | CircuitError::InvalidDetectorErrorModel { .. } => json!({}),
         CircuitError::InvalidResultFormat(error) => format_error_context(error),
         CircuitError::ResourceLimit(error) => resource_error_context(error),
         CircuitError::CircuitIo {

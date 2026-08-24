@@ -51,10 +51,8 @@ pub(super) fn undo_loop_with_gauge_output(
         )
     })?;
     let recurrence = match search {
-        ShiftedRecurrenceSearch::Found { recurrence, .. } => recurrence,
-        ShiftedRecurrenceSearch::Exhausted {
-            state, iterations, ..
-        } => {
+        ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
+        ShiftedRecurrenceSearch::Exhausted { state, iterations } => {
             *tracker = state;
             return undo_loop_by_unrolling_with_gauge_output(
                 tracker,

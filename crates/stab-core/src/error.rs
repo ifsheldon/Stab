@@ -15,9 +15,6 @@ pub enum CircuitError {
     #[error("invalid {kind} value {value}")]
     InvalidDomainValue { kind: &'static str, value: String },
 
-    #[error("failed to parse line {line}: {message}")]
-    ParseLine { line: usize, message: String },
-
     #[error("gate {gate} expected {expected} argument(s), got {actual}")]
     InvalidArgumentCount {
         gate: &'static str,
@@ -61,12 +58,6 @@ pub enum CircuitError {
 
     #[error("invalid detector error model: {message}")]
     InvalidDetectorErrorModel { message: String },
-
-    #[error("unterminated repeat block")]
-    UnterminatedRepeatBlock,
-
-    #[error("unexpected repeat block terminator")]
-    UnexpectedRepeatTerminator,
 }
 
 impl From<stab_model::ModelError> for CircuitError {

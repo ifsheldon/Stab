@@ -798,7 +798,7 @@ impl ReverseFoldAnalyzer {
             |probe| probe.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget),
         )?;
         let recurrence = match search {
-            ShiftedRecurrenceSearch::Found { recurrence, .. } => recurrence,
+            ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
             ShiftedRecurrenceSearch::Exhausted { .. } => {
                 if iterations > MAX_BOUNDED_REPEAT_UNROLL {
                     return Err(AnalysisError::invalid_detector_error_model(format!(

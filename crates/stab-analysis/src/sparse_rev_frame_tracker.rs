@@ -15,28 +15,22 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::{AnalysisError, AnalysisResult, gate_tableau, single_qubit_clifford_for_gate};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
-pub use shifted_recurrence::{
-    ShiftedRecurrence, ShiftedRecurrenceSearch, search_shifted_recurrence,
-};
+pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
 
 static EMPTY_TARGETS: LazyLock<BTreeSet<DemTarget>> = LazyLock::new(BTreeSet::new);
 
 #[derive(Debug)]
-pub struct AnalyzerProbeBudget {
+pub(crate) struct AnalyzerProbeBudget {
     consumed_steps: u64,
     max_steps: u64,
 }
 
 impl AnalyzerProbeBudget {
-    pub fn new(max_steps: u64) -> Self {
+    pub(crate) fn new(max_steps: u64) -> Self {
         Self {
             consumed_steps: 0,
             max_steps,
         }
-    }
-
-    pub fn consumed_steps(&self) -> u64 {
-        self.consumed_steps
     }
 
     fn consume_work_unit(&mut self) -> AnalysisResult<()> {
@@ -65,7 +59,7 @@ fn tracker_basis(basis: PauliBasis) -> AnalysisResult<TrackerBasis> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SparseReverseFrameTracker {
+pub(crate) struct SparseReverseFrameTracker {
     xs: BTreeMap<QubitId, BTreeSet<DemTarget>>,
     zs: BTreeMap<QubitId, BTreeSet<DemTarget>>,
     qubit_count: usize,
@@ -81,7 +75,7 @@ pub struct SparseReverseFrameTracker {
 }
 
 impl SparseReverseFrameTracker {
-    pub fn new(
+    pub(crate) fn new(
         qubit_count: usize,
         measurement_count: usize,
         detector_count: u64,
@@ -103,19 +97,19 @@ impl SparseReverseFrameTracker {
         }
     }
 
-    pub fn measurement_count(&self) -> usize {
+    pub(crate) fn measurement_count(&self) -> usize {
         self.measurement_count
     }
 
-    pub fn detector_count(&self) -> u64 {
+    pub(crate) fn detector_count(&self) -> u64 {
         self.detector_count
     }
 
-    pub fn is_shifted_copy(&self, other: &Self) -> bool {
+    pub(crate) fn is_shifted_copy(&self, other: &Self) -> bool {
         shifted_repeat::is_shifted_copy(self, other)
     }
 
-    pub fn shift_counts(
+    pub(crate) fn shift_counts(
         &mut self,
         measurement_offset: i128,
         detector_offset: i128,
@@ -123,11 +117,11 @@ impl SparseReverseFrameTracker {
         shifted_repeat::shift(self, measurement_offset, detector_offset)
     }
 
-    pub fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
+    pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
         self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve, None)
     }
 
-    pub fn undo_circuit_for_analyzer_probe(
+    pub(crate) fn undo_circuit_for_analyzer_probe(
         &mut self,
         circuit: &Circuit,
         budget: &mut AnalyzerProbeBudget,
@@ -172,7 +166,7 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    pub fn toggle_pauli_target(
+    pub(crate) fn toggle_pauli_target(
         &mut self,
         qubit: QubitId,
         basis: PauliBasis,
@@ -184,7 +178,7 @@ impl SparseReverseFrameTracker {
         self.toggle_product_sensitivity(&[(qubit, basis)], &BTreeSet::from([target]))
     }
 
-    pub fn toggle_record_target_absolute(
+    pub(crate) fn toggle_record_target_absolute(
         &mut self,
         index: usize,
         target: DemTarget,
@@ -198,7 +192,7 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    pub fn toggle_observable_effect(&mut self, observable: u32, target: DemTarget) {
+    pub(crate) fn toggle_observable_effect(&mut self, observable: u32, target: DemTarget) {
         let effects = self
             .observable_effects
             .entry(u64::from(observable))
@@ -206,7 +200,7 @@ impl SparseReverseFrameTracker {
         toggle_target(effects, target);
     }
 
-    pub fn pauli_targets_at(&self, qubit: QubitId) -> AnalysisResult<BTreeSet<DemTarget>> {
+    pub(crate) fn pauli_targets_at(&self, qubit: QubitId) -> AnalysisResult<BTreeSet<DemTarget>> {
         Ok(self
             .xs_for(qubit)?
             .union(self.zs_for(qubit)?)
@@ -214,7 +208,7 @@ impl SparseReverseFrameTracker {
             .collect())
     }
 
-    pub fn record_targets_at(&self, index: usize) -> AnalysisResult<BTreeSet<DemTarget>> {
+    pub(crate) fn record_targets_at(&self, index: usize) -> AnalysisResult<BTreeSet<DemTarget>> {
         if index >= self.measurement_count {
             return Err(AnalysisError::invalid_detector_error_model(format!(
                 "measurement record index {index} is outside the sparse reverse tracker history"
@@ -223,7 +217,7 @@ impl SparseReverseFrameTracker {
         Ok(self.rec_bits.get(&index).cloned().unwrap_or_default())
     }
 
-    pub fn active_targets(&self) -> BTreeSet<DemTarget> {
+    pub(crate) fn active_targets(&self) -> BTreeSet<DemTarget> {
         let mut result = BTreeSet::new();
         for targets in self.xs.values().chain(self.zs.values()) {
             result.extend(targets);
@@ -234,25 +228,16 @@ impl SparseReverseFrameTracker {
         result
     }
 
-    pub fn boundary_entry_count(&self) -> usize {
-        self.xs
-            .values()
-            .chain(self.zs.values())
-            .chain(self.rec_bits.values())
-            .chain(self.observable_effects.values())
-            .chain(self.gauge_errors.iter())
-            .fold(self.anticommutations.len(), |count, targets| {
-                count.saturating_add(targets.len())
-            })
-    }
-
-    pub fn target_anticommuted(&self, target: DemTarget) -> bool {
+    pub(crate) fn target_anticommuted(&self, target: DemTarget) -> bool {
         self.anticommutations
             .iter()
             .any(|anticommutation| anticommutation.target == target)
     }
 
-    pub fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+    pub(crate) fn undo_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> AnalysisResult<()> {
         match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(basis) => {
                 self.undo_measurements(instruction, tracker_basis(basis)?)
@@ -314,7 +299,7 @@ impl SparseReverseFrameTracker {
         }
     }
 
-    pub fn feedback_sensitivity(
+    pub(crate) fn feedback_sensitivity(
         &self,
         qubit: QubitId,
         feedback: Pauli,
@@ -322,15 +307,18 @@ impl SparseReverseFrameTracker {
         self.anticommuting_sensitivity(qubit, TrackerBasis::from_pauli(feedback))
     }
 
-    pub fn absolute_record_index_from_offset(&self, offset: i32) -> AnalysisResult<usize> {
+    pub(crate) fn absolute_record_index_from_offset(&self, offset: i32) -> AnalysisResult<usize> {
         self.record_index_from_offset(offset)
     }
 
-    pub fn region_for_target(&self, target: DemTarget) -> AnalysisResult<FlexPauliString> {
+    pub(crate) fn region_for_target(&self, target: DemTarget) -> AnalysisResult<FlexPauliString> {
         self.region_for_target_with_len(target, self.qubit_count)
     }
 
-    pub fn compact_region_for_target(&self, target: DemTarget) -> AnalysisResult<FlexPauliString> {
+    pub(crate) fn compact_region_for_target(
+        &self,
+        target: DemTarget,
+    ) -> AnalysisResult<FlexPauliString> {
         let len = self
             .xs
             .iter()
@@ -389,7 +377,7 @@ impl SparseReverseFrameTracker {
         })
     }
 
-    pub fn undo_implicit_rz_at_start_of_circuit(&mut self) -> AnalysisResult<()> {
+    pub(crate) fn undo_implicit_rz_at_start_of_circuit(&mut self) -> AnalysisResult<()> {
         let active_qubits = self
             .xs
             .keys()

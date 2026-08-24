@@ -4,7 +4,7 @@ use stab_model::{CircuitInstruction, GateCategory};
 use crate::gate_has_tableau;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ReverseFlowTransition {
+pub(crate) enum ReverseFlowTransition {
     Measurement(PauliBasis),
     Reset(PauliBasis),
     MeasureReset(PauliBasis),
@@ -23,7 +23,7 @@ pub enum ReverseFlowTransition {
 }
 
 impl ReverseFlowTransition {
-    pub fn is_measurement_rich(self) -> bool {
+    pub(crate) fn is_measurement_rich(self) -> bool {
         matches!(
             self,
             Self::Measurement(_)
@@ -38,7 +38,7 @@ impl ReverseFlowTransition {
     }
 }
 
-pub fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowTransition {
+pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowTransition {
     use ReverseFlowTransition as Transition;
 
     match instruction.gate().canonical_name() {

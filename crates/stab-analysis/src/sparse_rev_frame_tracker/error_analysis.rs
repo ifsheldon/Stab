@@ -9,7 +9,7 @@ use super::{
 };
 
 impl SparseReverseFrameTracker {
-    pub fn new_for_error_analysis(
+    pub(crate) fn new_for_error_analysis(
         qubit_count: usize,
         measurement_count: usize,
         detector_count: u64,
@@ -26,11 +26,11 @@ impl SparseReverseFrameTracker {
         tracker
     }
 
-    pub fn take_gauge_errors(&mut self) -> Vec<BTreeSet<DemTarget>> {
+    pub(crate) fn take_gauge_errors(&mut self) -> Vec<BTreeSet<DemTarget>> {
         std::mem::take(&mut self.gauge_errors)
     }
 
-    pub fn error_sensitivity(
+    pub(crate) fn error_sensitivity(
         &self,
         qubit: QubitId,
         pauli: Pauli,

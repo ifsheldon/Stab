@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "7da57fbdd90f10624115ca33cf0dcfcd9d47bd97fbe1a04e95a1441fb0343b20",
+  "semantic_digest": "ed8195bb9a9fd29e9509e68b3289e8feafbd0e34fbfc13d338312c8112a3989f",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -69379,58 +69379,6 @@
       ]
     },
     {
-      "id": "cq-api-item-4b5d2f29ef913fd8",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::AnalyzerProbeBudget",
-      "kind": "struct",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 25,
-      "owner_case_id": "cq-evidence-api-9e56c03a876e203c",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-73bd42b72baf4e35",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::AnalyzerProbeBudget as Debug for@6295ff2ddb40",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 24,
-      "owner_case_id": "cq-evidence-api-9e56c03a876e203c",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a1bbb56436f50c8b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::AnalyzerProbeBudget::consumed_steps",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 38,
-      "owner_case_id": "cq-evidence-api-f6511bd7ad0f68a3",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-9c42f2c8ffd5cba9",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::AnalyzerProbeBudget::new",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 31,
-      "owner_case_id": "cq-evidence-api-d76584015a31b82c",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
       "id": "cq-api-item-a9795ccca70e6563",
       "feature_id": "CQ-ANALYZER",
       "crate_name": "stab_analysis",
@@ -69678,1007 +69626,6 @@
       ]
     },
     {
-      "id": "cq-api-item-eba69e4ca374c047",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition",
-      "kind": "enum",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 7,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ea947ce1716852ac",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as Clone for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a27a3f8534cf5728",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as Copy for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-5d05dfe1b8c50e90",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as Debug for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-6e4f441c13429659",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as Eq for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-9c7f46cde4c94a5a",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as PartialEq for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e3b84e9f3ffea14f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition as StructuralPartialEq for@75cdac25b4a8",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-0ad9229bb1f74ffa",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::ControlledPauli",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 16,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-815cb2325fda9136",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::ControlledPauli::0",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 16,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-735cad99fe354bb0",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Detector",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 18,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-372c9dff3fd01c91",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::HeraldedMeasurement",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 14,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-18554035e462fb7f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Ignored",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 21,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-7bad04b06c5140e3",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::MeasureReset",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 10,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-20888629ae270bbd",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::MeasureReset::0",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 10,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-246045e4cc502149",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Measurement",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-0ea3fdfe6a666681",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Measurement::0",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fb0de0dcf0cc3320",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::MeasurementPad",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 13,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-4be51570c1c21879",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Observable",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 19,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fbe0dad7096710b0",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::PairMeasurement",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 11,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-295ddfa9bb735513",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::PairMeasurement::0",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 11,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-71eacf77cfa6a97e",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::PauliProductMeasurement",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 12,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b02afc29b0c75fe1",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::PauliProductUnitary",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 15,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-dec8d6a89badbaa7",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Reset",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 9,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-af562419b8fc3b1d",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Reset::0",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 9,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-fa60e87ff5b256a4",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::SweepControlledPauliNoop",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 17,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ac9e37ba6b287e5d",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Tableau",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 20,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-201f8086f792e452",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::Unsupported",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 22,
-      "owner_case_id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a0e24612f1ecbe00",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ReverseFlowTransition::is_measurement_rich",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 26,
-      "owner_case_id": "cq-evidence-api-9c4a22793865946b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-37183668b9bd1725",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence",
-      "kind": "struct",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 6,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e0308bb673c7255b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence as Clone for@111205be32a9",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 5,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-9f3b0521e65071a3",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence as Debug for@111205be32a9",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 5,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-d6a6964e5028f0b7",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence::cycle_end_iterations",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 10,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-7155f76bd143577a",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence::cycle_end_state",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-5a3ce5fad2ae3759",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence::cycle_start_state",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 7,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-87d44007be0efb3f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence::period",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 11,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-6616f7c9466972ed",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrence::transient_iterations",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 9,
-      "owner_case_id": "cq-evidence-api-f80e2ab4f62d0333",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-2fc459d278ee065f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch",
-      "kind": "enum",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 15,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-0c132f50a8693068",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch as Clone for@9a0b7ddf2528",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 14,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b85bc191c082195e",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch as Debug for@9a0b7ddf2528",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 14,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ef96bf9cd83a2ee5",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Exhausted",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 20,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e4ab45fddab3aee7",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Exhausted::iterations",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 22,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e36a899c5f648138",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Exhausted::max_boundary_entries",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 23,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ffac8cbbc19b18bd",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Exhausted::state",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 21,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-f5219d52bcd5dda0",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Found",
-      "kind": "variant",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 16,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-68fbaf1ab8dcc24c",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Found::max_boundary_entries",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 18,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ac6f1547ba5bcb37",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::ShiftedRecurrenceSearch::Found::recurrence",
-      "kind": "field",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 17,
-      "owner_case_id": "cq-evidence-api-535938b42c31119b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-cdcb33529918b108",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker",
-      "kind": "struct",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 68,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-dad8ab57503c6830",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker as Clone for@6ff444f621d1",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 67,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-1d4461f1f73962a4",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker as Debug for@6ff444f621d1",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 67,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-f65fe6b4d7282f28",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker as Eq for@6ff444f621d1",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 67,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-7951430b3819c91e",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker as PartialEq for@6ff444f621d1",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 67,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ae33f14b6ed740e0",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker as StructuralPartialEq for@6ff444f621d1",
-      "kind": "trait-impl",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 67,
-      "owner_case_id": "cq-evidence-api-5c536fd35e0251a5",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-90a59c2aac68573f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::absolute_record_index_from_offset",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 325,
-      "owner_case_id": "cq-evidence-api-c7c2f7d316d16501",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-bd5459f0a004f857",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::active_targets",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 226,
-      "owner_case_id": "cq-evidence-api-b58feb87ca4907d0",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-a471092385ae91f4",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::boundary_entry_count",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 237,
-      "owner_case_id": "cq-evidence-api-04f735c550b7c9f8",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-91952131f0b86321",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::compact_region_for_target",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 333,
-      "owner_case_id": "cq-evidence-api-3c5247abcef3a0b8",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-8c6b2ecdb4fb5c22",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::detector_count",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 110,
-      "owner_case_id": "cq-evidence-api-7c853becb284a17a",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-7fe3435158162aad",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::error_sensitivity",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/error_analysis.rs",
-      "source_line": 33,
-      "owner_case_id": "cq-evidence-api-b670d54563cbc698",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-89416f6e643a97b9",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::feedback_sensitivity",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 317,
-      "owner_case_id": "cq-evidence-api-de5a0ce52ae89018",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-d652797ecc280980",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::is_shifted_copy",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 114,
-      "owner_case_id": "cq-evidence-api-96185015f210baad",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-3463216299af28a2",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::measurement_count",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 106,
-      "owner_case_id": "cq-evidence-api-dac9e74e1065b24b",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-8628496461347b73",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::new",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 84,
-      "owner_case_id": "cq-evidence-api-554a7184511a63d4",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-e774764ded49f1ec",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::new_for_error_analysis",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/error_analysis.rs",
-      "source_line": 12,
-      "owner_case_id": "cq-evidence-api-3b8c1aaf64a85bc6",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-0c51dbc32fe9f99b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::pauli_targets_at",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 209,
-      "owner_case_id": "cq-evidence-api-5e986ce0286a277f",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ca32e9a6476b5aed",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::record_targets_at",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 217,
-      "owner_case_id": "cq-evidence-api-0b1d26a8c9f0eb35",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-50cba499cd8e7733",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::region_for_target",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 329,
-      "owner_case_id": "cq-evidence-api-2af33b3f2262945a",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-887c89b086151cca",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::shift_counts",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 118,
-      "owner_case_id": "cq-evidence-api-a8e5ac792a57c642",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-ae7e419c92829027",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::take_gauge_errors",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/error_analysis.rs",
-      "source_line": 29,
-      "owner_case_id": "cq-evidence-api-9968ef7d38c63382",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-6b3cec91a7011764",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::target_anticommuted",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 249,
-      "owner_case_id": "cq-evidence-api-c66ba2109c336703",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b498f1162a5d4346",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_observable_effect",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 201,
-      "owner_case_id": "cq-evidence-api-00c5fc975c0ac7ea",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-b7cbf4ffe9f923dc",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_pauli_target",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 175,
-      "owner_case_id": "cq-evidence-api-387d25d5bf20e35c",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-f9a69515d46c2a0e",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_record_target_absolute",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 187,
-      "owner_case_id": "cq-evidence-api-13762e643fad9b10",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-9a88f2724c6171db",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::undo_circuit",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 126,
-      "owner_case_id": "cq-evidence-api-0d0164ff4a8b7a7f",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-526dd0ef85737575",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::undo_circuit_for_analyzer_probe",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 130,
-      "owner_case_id": "cq-evidence-api-9f7598504e04de1a",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-3f275942b1ca28ac",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::undo_implicit_rz_at_start_of_circuit",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 392,
-      "owner_case_id": "cq-evidence-api-5882ed8a4fb04363",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-865ae6911e676644",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::SparseReverseFrameTracker::undo_instruction",
-      "kind": "method",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker.rs",
-      "source_line": 255,
-      "owner_case_id": "cq-evidence-api-95fa1fce21bb2434",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-155b4768c9a4fd80",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::check_unsigned_flows_with_sparse_tracker",
-      "kind": "function",
-      "source_path": "crates/stab-analysis/src/circuit_flow/checker.rs",
-      "source_line": 177,
-      "owner_case_id": "cq-evidence-api-10d30148660628d2",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
       "id": "cq-api-item-4ef4acfdb7b87a59",
       "feature_id": "CQ-FLOW-UTILS",
       "crate_name": "stab_analysis",
@@ -70687,32 +69634,6 @@
       "source_path": "crates/stab-analysis/src/circuit_flow/checker.rs",
       "source_line": 300,
       "owner_case_id": "cq-evidence-api-0551e070878eb4ce",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-3b767149b7d049d7",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::reverse_flow_transition",
-      "kind": "function",
-      "source_path": "crates/stab-analysis/src/circuit_flow/transitions.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-api-d1f2001fe1387e26",
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-5d03a26794002595",
-      "feature_id": "CQ-FLOW-UTILS",
-      "crate_name": "stab_analysis",
-      "path": "stab_analysis::advanced::search_shifted_recurrence",
-      "kind": "function",
-      "source_path": "crates/stab-analysis/src/sparse_rev_frame_tracker/shifted_recurrence.rs",
-      "source_line": 27,
-      "owner_case_id": "cq-evidence-api-a21c86f2ed5f1f84",
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ]
@@ -71947,7 +70868,7 @@
       "path": "stab_bits::BitBlock",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 108,
+      "source_line": 100,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71960,7 +70881,7 @@
       "path": "stab_bits::BitBlock as Clone for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71973,7 +70894,7 @@
       "path": "stab_bits::BitBlock as Copy for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71986,7 +70907,7 @@
       "path": "stab_bits::BitBlock as Debug for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -71999,7 +70920,7 @@
       "path": "stab_bits::BitBlock as Eq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72012,7 +70933,7 @@
       "path": "stab_bits::BitBlock as PartialEq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72025,7 +70946,7 @@
       "path": "stab_bits::BitBlock as StructuralPartialEq for@dadfc7988dd4",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 107,
+      "source_line": 99,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72038,7 +70959,7 @@
       "path": "stab_bits::BitBlock::and",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 131,
+      "source_line": 123,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72051,7 +70972,7 @@
       "path": "stab_bits::BitBlock::from_words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 119,
+      "source_line": 111,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72064,7 +70985,7 @@
       "path": "stab_bits::BitBlock::or",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 135,
+      "source_line": 127,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72077,7 +70998,7 @@
       "path": "stab_bits::BitBlock::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 139,
+      "source_line": 131,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72090,7 +71011,7 @@
       "path": "stab_bits::BitBlock::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 123,
+      "source_line": 115,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72103,7 +71024,7 @@
       "path": "stab_bits::BitBlock::xor",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 127,
+      "source_line": 119,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72116,7 +71037,7 @@
       "path": "stab_bits::BitBlock::zero",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 113,
+      "source_line": 105,
       "owner_case_id": "cq-evidence-qualification-5118006702599a45",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72272,7 +71193,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 54,
+      "source_line": 46,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72285,7 +71206,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::end",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 56,
+      "source_line": 48,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72298,7 +71219,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::len",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 57,
+      "source_line": 49,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72311,7 +71232,7 @@
       "path": "stab_bits::BitError::BitRangeOutOfRange::start",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 55,
+      "source_line": 47,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72357,78 +71278,13 @@
       ]
     },
     {
-      "id": "cq-api-item-02efa164c2c87c8f",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_bits",
-      "path": "stab_bits::BitError::MatrixShapeMismatch",
-      "kind": "variant",
-      "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 37,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-d3b9ffd594693b8b",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_bits",
-      "path": "stab_bits::BitError::MatrixShapeMismatch::left_cols",
-      "kind": "field",
-      "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 39,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-7f27e10f9522516d",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_bits",
-      "path": "stab_bits::BitError::MatrixShapeMismatch::left_rows",
-      "kind": "field",
-      "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 38,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-fe0b3a753f6c3ac2",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_bits",
-      "path": "stab_bits::BitError::MatrixShapeMismatch::right_cols",
-      "kind": "field",
-      "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 41,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-52059c0d8d40719e",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_bits",
-      "path": "stab_bits::BitError::MatrixShapeMismatch::right_rows",
-      "kind": "field",
-      "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 40,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
       "id": "cq-api-item-911a3da1fd08707e",
       "feature_id": "CQ-BIT-KERNELS",
       "crate_name": "stab_bits",
       "path": "stab_bits::BitError::MatrixSizeOverflow",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 48,
+      "source_line": 40,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72441,7 +71297,7 @@
       "path": "stab_bits::BitError::MatrixSizeOverflow::cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 48,
+      "source_line": 40,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72454,7 +71310,7 @@
       "path": "stab_bits::BitError::MatrixSizeOverflow::rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 48,
+      "source_line": 40,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72467,7 +71323,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 45,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72480,7 +71336,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix::cols",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 45,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72493,7 +71349,7 @@
       "path": "stab_bits::BitError::NotSquareMatrix::rows",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 45,
+      "source_line": 37,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72545,7 +71401,7 @@
       "path": "stab_bits::BitError::StorageAllocationFailed",
       "kind": "variant",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 51,
+      "source_line": 43,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72558,7 +71414,7 @@
       "path": "stab_bits::BitError::StorageAllocationFailed::words",
       "kind": "field",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 51,
+      "source_line": 43,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72571,7 +71427,7 @@
       "path": "stab_bits::BitLen",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 62,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72584,7 +71440,7 @@
       "path": "stab_bits::BitLen as Clone for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72597,7 +71453,7 @@
       "path": "stab_bits::BitLen as Copy for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72610,7 +71466,7 @@
       "path": "stab_bits::BitLen as Debug for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72623,7 +71479,7 @@
       "path": "stab_bits::BitLen as Default for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72636,7 +71492,7 @@
       "path": "stab_bits::BitLen as Eq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72649,7 +71505,7 @@
       "path": "stab_bits::BitLen as From@fd379cf58020 for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 101,
+      "source_line": 93,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72662,7 +71518,7 @@
       "path": "stab_bits::BitLen as Ord for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72675,7 +71531,7 @@
       "path": "stab_bits::BitLen as PartialEq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72688,7 +71544,7 @@
       "path": "stab_bits::BitLen as PartialOrd for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72701,7 +71557,7 @@
       "path": "stab_bits::BitLen as StructuralPartialEq for@e5e94c91886f",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 61,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72714,7 +71570,7 @@
       "path": "stab_bits::BitLen::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 69,
+      "source_line": 61,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72727,7 +71583,7 @@
       "path": "stab_bits::BitLen::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 65,
+      "source_line": 57,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72740,7 +71596,7 @@
       "path": "stab_bits::BitLen::word_count",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 73,
+      "source_line": 65,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72753,7 +71609,7 @@
       "path": "stab_bits::BitMatrix",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 387,
+      "source_line": 379,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72766,7 +71622,7 @@
       "path": "stab_bits::BitMatrix as Clone for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 386,
+      "source_line": 378,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72779,7 +71635,7 @@
       "path": "stab_bits::BitMatrix as Debug for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 386,
+      "source_line": 378,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72792,7 +71648,7 @@
       "path": "stab_bits::BitMatrix as Eq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 386,
+      "source_line": 378,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72805,7 +71661,7 @@
       "path": "stab_bits::BitMatrix as PartialEq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 386,
+      "source_line": 378,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72818,7 +71674,7 @@
       "path": "stab_bits::BitMatrix as StructuralPartialEq for@11557b23c5ad",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 386,
+      "source_line": 378,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72831,7 +71687,7 @@
       "path": "stab_bits::BitMatrix::cols",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 429,
+      "source_line": 421,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72844,7 +71700,7 @@
       "path": "stab_bits::BitMatrix::copy_row_from_bools",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 457,
+      "source_line": 449,
       "owner_case_id": "cq-evidence-qualification-45d7bf3342de43a6",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72857,7 +71713,7 @@
       "path": "stab_bits::BitMatrix::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 433,
+      "source_line": 425,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72870,7 +71726,7 @@
       "path": "stab_bits::BitMatrix::identity",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 417,
+      "source_line": 409,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72883,7 +71739,7 @@
       "path": "stab_bits::BitMatrix::masked_xor_row_into",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 509,
+      "source_line": 501,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72896,7 +71752,7 @@
       "path": "stab_bits::BitMatrix::row",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 481,
+      "source_line": 473,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72909,7 +71765,7 @@
       "path": "stab_bits::BitMatrix::rows",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 425,
+      "source_line": 417,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72922,7 +71778,7 @@
       "path": "stab_bits::BitMatrix::set",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 441,
+      "source_line": 433,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72935,7 +71791,7 @@
       "path": "stab_bits::BitMatrix::swap_rows",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 528,
+      "source_line": 520,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72948,7 +71804,7 @@
       "path": "stab_bits::BitMatrix::transpose",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 539,
+      "source_line": 531,
       "owner_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72961,7 +71817,7 @@
       "path": "stab_bits::BitMatrix::transpose_square_in_place",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 545,
+      "source_line": 537,
       "owner_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72974,7 +71830,7 @@
       "path": "stab_bits::BitMatrix::xor_row_into",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 497,
+      "source_line": 489,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -72987,7 +71843,7 @@
       "path": "stab_bits::BitMatrix::zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 395,
+      "source_line": 387,
       "owner_case_id": "cq-evidence-qualification-66e29faafe5f2856",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73013,7 +71869,7 @@
       "path": "stab_bits::BitSlice",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 145,
+      "source_line": 137,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73026,7 +71882,7 @@
       "path": "stab_bits::BitSlice as Clone for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73039,7 +71895,7 @@
       "path": "stab_bits::BitSlice as Copy for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73052,7 +71908,7 @@
       "path": "stab_bits::BitSlice as Debug for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73065,7 +71921,7 @@
       "path": "stab_bits::BitSlice as Eq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73078,7 +71934,7 @@
       "path": "stab_bits::BitSlice as PartialEq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73091,7 +71947,7 @@
       "path": "stab_bits::BitSlice as StructuralPartialEq for@f57b262b9720",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 144,
+      "source_line": 136,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73104,7 +71960,7 @@
       "path": "stab_bits::BitSlice::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 181,
+      "source_line": 173,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73117,7 +71973,7 @@
       "path": "stab_bits::BitSlice::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 168,
+      "source_line": 160,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73130,7 +71986,7 @@
       "path": "stab_bits::BitSlice::len",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 164,
+      "source_line": 156,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73143,7 +71999,7 @@
       "path": "stab_bits::BitSlice::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 152,
+      "source_line": 144,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73156,7 +72012,7 @@
       "path": "stab_bits::BitSlice::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 185,
+      "source_line": 177,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73169,7 +72025,7 @@
       "path": "stab_bits::BitSlice::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 177,
+      "source_line": 169,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73182,7 +72038,7 @@
       "path": "stab_bits::BitVec",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 217,
+      "source_line": 209,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73195,7 +72051,7 @@
       "path": "stab_bits::BitVec as Clone for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73208,7 +72064,7 @@
       "path": "stab_bits::BitVec as Debug for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73221,7 +72077,7 @@
       "path": "stab_bits::BitVec as Eq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73234,7 +72090,7 @@
       "path": "stab_bits::BitVec as PartialEq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73247,7 +72103,7 @@
       "path": "stab_bits::BitVec as StructuralPartialEq for@129f60a0d330",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 216,
+      "source_line": 208,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73260,7 +72116,7 @@
       "path": "stab_bits::BitVec::and_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 308,
+      "source_line": 300,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73273,7 +72129,7 @@
       "path": "stab_bits::BitVec::as_bitslice",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 282,
+      "source_line": 274,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73286,7 +72142,7 @@
       "path": "stab_bits::BitVec::clear",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 297,
+      "source_line": 289,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73299,7 +72155,7 @@
       "path": "stab_bits::BitVec::copy_from_bitslice",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 330,
+      "source_line": 322,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73312,7 +72168,7 @@
       "path": "stab_bits::BitVec::from_bits",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 238,
+      "source_line": 230,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73325,7 +72181,7 @@
       "path": "stab_bits::BitVec::from_words_truncated",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 231,
+      "source_line": 223,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73338,7 +72194,7 @@
       "path": "stab_bits::BitVec::get",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 289,
+      "source_line": 281,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73351,7 +72207,7 @@
       "path": "stab_bits::BitVec::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 256,
+      "source_line": 248,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73364,7 +72220,7 @@
       "path": "stab_bits::BitVec::len",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 252,
+      "source_line": 244,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73377,7 +72233,7 @@
       "path": "stab_bits::BitVec::masked_xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 322,
+      "source_line": 314,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73390,7 +72246,7 @@
       "path": "stab_bits::BitVec::not_zero",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 377,
+      "source_line": 369,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73403,7 +72259,7 @@
       "path": "stab_bits::BitVec::or_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 315,
+      "source_line": 307,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73416,7 +72272,7 @@
       "path": "stab_bits::BitVec::popcount",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 373,
+      "source_line": 365,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73429,7 +72285,7 @@
       "path": "stab_bits::BitVec::resize_zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 275,
+      "source_line": 267,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73442,7 +72298,7 @@
       "path": "stab_bits::BitVec::set",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 293,
+      "source_line": 285,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73455,7 +72311,7 @@
       "path": "stab_bits::BitVec::word_count",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 260,
+      "source_line": 252,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73468,7 +72324,7 @@
       "path": "stab_bits::BitVec::words",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 264,
+      "source_line": 256,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73481,7 +72337,7 @@
       "path": "stab_bits::BitVec::words_mut",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 268,
+      "source_line": 260,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73494,7 +72350,7 @@
       "path": "stab_bits::BitVec::xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 301,
+      "source_line": 293,
       "owner_case_id": "cq-evidence-qualification-b1530dc4e48e942d",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73507,7 +72363,7 @@
       "path": "stab_bits::BitVec::xor_range_from",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 337,
+      "source_line": 329,
       "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73520,7 +72376,7 @@
       "path": "stab_bits::BitVec::zeros",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 223,
+      "source_line": 215,
       "owner_case_id": "cq-evidence-qualification-ba252d42660a41ce",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73533,7 +72389,7 @@
       "path": "stab_bits::BitWordsMut",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 191,
+      "source_line": 183,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73546,7 +72402,7 @@
       "path": "stab_bits::BitWordsMut as Debug for@5e174bd88b12",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 190,
+      "source_line": 182,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73559,7 +72415,7 @@
       "path": "stab_bits::BitWordsMut as Deref for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 196,
+      "source_line": 188,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73572,7 +72428,7 @@
       "path": "stab_bits::BitWordsMut as DerefMut for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 204,
+      "source_line": 196,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73585,7 +72441,7 @@
       "path": "stab_bits::BitWordsMut as Drop for@0a6e1e52ba81",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 210,
+      "source_line": 202,
       "owner_case_id": "cq-evidence-qualification-94c225de75cf2584",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73598,7 +72454,7 @@
       "path": "stab_bits::SparseXorVec",
       "kind": "struct",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 640,
+      "source_line": 632,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73611,7 +72467,7 @@
       "path": "stab_bits::SparseXorVec as Clone for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73624,7 +72480,7 @@
       "path": "stab_bits::SparseXorVec as Debug for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73637,7 +72493,7 @@
       "path": "stab_bits::SparseXorVec as Default for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73650,7 +72506,7 @@
       "path": "stab_bits::SparseXorVec as Display for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 740,
+      "source_line": 732,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73663,7 +72519,7 @@
       "path": "stab_bits::SparseXorVec as Eq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73676,7 +72532,7 @@
       "path": "stab_bits::SparseXorVec as Ord for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73689,7 +72545,7 @@
       "path": "stab_bits::SparseXorVec as PartialEq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73702,7 +72558,7 @@
       "path": "stab_bits::SparseXorVec as PartialOrd for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73715,7 +72571,7 @@
       "path": "stab_bits::SparseXorVec as StructuralPartialEq for@b1426559099a",
       "kind": "trait-impl",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 639,
+      "source_line": 631,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73728,7 +72584,7 @@
       "path": "stab_bits::SparseXorVec::contains",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 667,
+      "source_line": 659,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73741,7 +72597,7 @@
       "path": "stab_bits::SparseXorVec::from_sorted_items",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 650,
+      "source_line": 642,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73754,7 +72610,7 @@
       "path": "stab_bits::SparseXorVec::is_empty",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 662,
+      "source_line": 654,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73767,7 +72623,7 @@
       "path": "stab_bits::SparseXorVec::is_superset_of",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 735,
+      "source_line": 727,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73780,7 +72636,7 @@
       "path": "stab_bits::SparseXorVec::items",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 657,
+      "source_line": 649,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73793,7 +72649,7 @@
       "path": "stab_bits::SparseXorVec::new",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 645,
+      "source_line": 637,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73806,7 +72662,7 @@
       "path": "stab_bits::SparseXorVec::xor_assign",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 730,
+      "source_line": 722,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73819,7 +72675,7 @@
       "path": "stab_bits::SparseXorVec::xor_item",
       "kind": "method",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 672,
+      "source_line": 664,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73832,7 +72688,7 @@
       "path": "stab_bits::first_set_bit",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 794,
+      "source_line": 786,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73845,7 +72701,7 @@
       "path": "stab_bits::floor_lg2",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 790,
+      "source_line": 782,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73858,7 +72714,7 @@
       "path": "stab_bits::inplace_xor_sort",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 773,
+      "source_line": 765,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73871,7 +72727,7 @@
       "path": "stab_bits::is_power_of_2",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 786,
+      "source_line": 778,
       "owner_case_id": "cq-evidence-qualification-51a14ea048f42743",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -73884,7 +72740,7 @@
       "path": "stab_bits::is_subset_of_sorted",
       "kind": "function",
       "source_path": "crates/stab-bits/src/lib.rs",
-      "source_line": 753,
+      "source_line": 745,
       "owner_case_id": "cq-evidence-qualification-bea77c19e9ae0b24",
       "performance_groups": [
         "PERF-BIT-KERNELS"
@@ -75665,7 +74521,7 @@
       "path": "stab_core::CircuitError as From@0b60e43bb843 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 243,
+      "source_line": 234,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75679,7 +74535,7 @@
       "path": "stab_core::CircuitError as From@2de935421934 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 329,
+      "source_line": 320,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75693,7 +74549,7 @@
       "path": "stab_core::CircuitError as From@3685b840fc47 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 190,
+      "source_line": 181,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75707,7 +74563,7 @@
       "path": "stab_core::CircuitError as From@37729f8a61f8 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 126,
+      "source_line": 117,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75721,7 +74577,7 @@
       "path": "stab_core::CircuitError as From@405fede196bf for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 181,
+      "source_line": 172,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75735,7 +74591,7 @@
       "path": "stab_core::CircuitError as From@48886be26354 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 84,
+      "source_line": 75,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75763,7 +74619,7 @@
       "path": "stab_core::CircuitError as From@4f575007c5ec for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 168,
+      "source_line": 159,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75777,7 +74633,7 @@
       "path": "stab_core::CircuitError as From@7084a157ecca for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 53,
+      "source_line": 50,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75791,7 +74647,7 @@
       "path": "stab_core::CircuitError as From@95eea727fa3d for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 208,
+      "source_line": 199,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75805,7 +74661,7 @@
       "path": "stab_core::CircuitError as From@aea7c8640e83 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 216,
+      "source_line": 207,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75819,7 +74675,7 @@
       "path": "stab_core::CircuitError as From@b890aa25209e for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 252,
+      "source_line": 243,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75833,7 +74689,7 @@
       "path": "stab_core::CircuitError as From@b8ce7950ddda for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 150,
+      "source_line": 141,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75847,7 +74703,7 @@
       "path": "stab_core::CircuitError as From@b9f8e17a8734 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 266,
+      "source_line": 257,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75861,7 +74717,7 @@
       "path": "stab_core::CircuitError as From@de5d41e1ff68 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 72,
+      "source_line": 63,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75875,7 +74731,7 @@
       "path": "stab_core::CircuitError as From@ed6b9be3e5ee for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 335,
+      "source_line": 326,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75889,7 +74745,7 @@
       "path": "stab_core::CircuitError as From@fa328c89dee3 for@d79af8854017",
       "kind": "trait-impl",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 226,
+      "source_line": 217,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75931,7 +74787,7 @@
       "path": "stab_core::CircuitError::CircuitIo",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 56,
+      "source_line": 53,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75945,7 +74801,7 @@
       "path": "stab_core::CircuitError::CircuitIo::kind",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 58,
+      "source_line": 55,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75959,7 +74815,7 @@
       "path": "stab_core::CircuitError::CircuitIo::message",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 59,
+      "source_line": 56,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75973,7 +74829,7 @@
       "path": "stab_core::CircuitError::CircuitIo::operation",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 57,
+      "source_line": 54,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -75987,7 +74843,7 @@
       "path": "stab_core::CircuitError::InvalidArgument",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 29,
+      "source_line": 26,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76001,7 +74857,7 @@
       "path": "stab_core::CircuitError::InvalidArgument::argument",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 31,
+      "source_line": 28,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76015,7 +74871,7 @@
       "path": "stab_core::CircuitError::InvalidArgument::gate",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 30,
+      "source_line": 27,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76029,7 +74885,7 @@
       "path": "stab_core::CircuitError::InvalidArgumentCount",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 22,
+      "source_line": 19,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76043,7 +74899,7 @@
       "path": "stab_core::CircuitError::InvalidArgumentCount::actual",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 25,
+      "source_line": 22,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76057,7 +74913,7 @@
       "path": "stab_core::CircuitError::InvalidArgumentCount::expected",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 24,
+      "source_line": 21,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76071,7 +74927,7 @@
       "path": "stab_core::CircuitError::InvalidArgumentCount::gate",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 23,
+      "source_line": 20,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76085,7 +74941,7 @@
       "path": "stab_core::CircuitError::InvalidCircuitSimplification",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 44,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76099,7 +74955,7 @@
       "path": "stab_core::CircuitError::InvalidCircuitSimplification::message",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 44,
+      "source_line": 41,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76113,7 +74969,7 @@
       "path": "stab_core::CircuitError::InvalidDetectorErrorModel",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 63,
+      "source_line": 60,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76127,7 +74983,7 @@
       "path": "stab_core::CircuitError::InvalidDetectorErrorModel::message",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 63,
+      "source_line": 60,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76183,7 +75039,7 @@
       "path": "stab_core::CircuitError::InvalidResultFormat",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 50,
+      "source_line": 47,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76197,7 +75053,7 @@
       "path": "stab_core::CircuitError::InvalidResultFormat::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 50,
+      "source_line": 47,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76211,7 +75067,7 @@
       "path": "stab_core::CircuitError::InvalidSamplerCompilation",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 47,
+      "source_line": 44,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76225,7 +75081,7 @@
       "path": "stab_core::CircuitError::InvalidSamplerCompilation::message",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 47,
+      "source_line": 44,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76239,7 +75095,7 @@
       "path": "stab_core::CircuitError::InvalidTableauConversion",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 41,
+      "source_line": 38,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76253,7 +75109,7 @@
       "path": "stab_core::CircuitError::InvalidTableauConversion::message",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 41,
+      "source_line": 38,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76267,7 +75123,7 @@
       "path": "stab_core::CircuitError::InvalidTarget",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 35,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76281,7 +75137,7 @@
       "path": "stab_core::CircuitError::InvalidTarget::gate",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 35,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76295,7 +75151,7 @@
       "path": "stab_core::CircuitError::InvalidTarget::target",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 35,
+      "source_line": 32,
       "owner_case_id": "cq-evidence-api-67a17e738c3674a3",
       "performance_groups": [
         "PERF-GATE-CONTRACT",
@@ -76311,7 +75167,7 @@
       "path": "stab_core::CircuitError::InvalidTargetCount",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 38,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76325,7 +75181,7 @@
       "path": "stab_core::CircuitError::InvalidTargetCount::count",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 38,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76339,7 +75195,7 @@
       "path": "stab_core::CircuitError::InvalidTargetCount::gate",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 38,
+      "source_line": 35,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76375,55 +75231,13 @@
       ]
     },
     {
-      "id": "cq-api-item-4622053d26b59345",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::CircuitError::ParseLine",
-      "kind": "variant",
-      "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 19,
-      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-55c6a809930b2d85",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::CircuitError::ParseLine::line",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 19,
-      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-4db86c26092139d9",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::CircuitError::ParseLine::message",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 19,
-      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
       "id": "cq-api-item-d4637690a7148115",
       "feature_id": "CQ-CIRCUIT-API",
       "crate_name": "stab_core",
       "path": "stab_core::CircuitError::ResourceLimit",
       "kind": "variant",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 53,
+      "source_line": 50,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76437,21 +75251,7 @@
       "path": "stab_core::CircuitError::ResourceLimit::0",
       "kind": "field",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 53,
-      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
-      "id": "cq-api-item-bbc92b55c9b7c453",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::CircuitError::UnexpectedRepeatTerminator",
-      "kind": "variant",
-      "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 69,
+      "source_line": 50,
       "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
@@ -76487,27 +75287,13 @@
       ]
     },
     {
-      "id": "cq-api-item-69e16d4828fec84d",
-      "feature_id": "CQ-CIRCUIT-API",
-      "crate_name": "stab_core",
-      "path": "stab_core::CircuitError::UnterminatedRepeatBlock",
-      "kind": "variant",
-      "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 66,
-      "owner_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
-      "performance_groups": [
-        "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ]
-    },
-    {
       "id": "cq-api-item-54d7f45b06ee36ce",
       "feature_id": "CQ-RESULT-FORMATS",
       "crate_name": "stab_core",
       "path": "stab_core::CircuitError::format_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 293,
+      "source_line": 284,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -76521,7 +75307,7 @@
       "path": "stab_core::CircuitError::invalid_result_format",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 289,
+      "source_line": 280,
       "owner_case_id": "cq-evidence-qualification-9266cc5440c62101",
       "performance_groups": [
         "PERF-RESULT-IO",
@@ -76535,7 +75321,7 @@
       "path": "stab_core::CircuitError::parse_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 300,
+      "source_line": 291,
       "owner_case_id": "cq-evidence-qualification-bb06be3e4b51cd2c",
       "performance_groups": [
         "PERF-CIRCUIT-MODEL"
@@ -76548,7 +75334,7 @@
       "path": "stab_core::CircuitError::resource_limit_error",
       "kind": "method",
       "source_path": "crates/stab-core/src/error.rs",
-      "source_line": 307,
+      "source_line": 298,
       "owner_case_id": "cq-evidence-qualification-788487db67496535",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -112686,71 +111472,6 @@
       "feature_id": "CQ-BIT-KERNELS",
       "crate_name": "stab_core",
       "path": "stab_core::advanced::storage::BitError::LengthMismatch::right",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-db40636fe3f036e9",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::storage::BitError::MatrixShapeMismatch",
-      "kind": "variant",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-553f83d80b486e5f",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::storage::BitError::MatrixShapeMismatch::left_cols",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-836223197f6e317e",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::storage::BitError::MatrixShapeMismatch::left_rows",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-dedeb1a7da088ab6",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::storage::BitError::MatrixShapeMismatch::right_cols",
-      "kind": "field",
-      "source_path": "crates/stab-core/src/advanced.rs",
-      "source_line": 8,
-      "owner_case_id": "cq-evidence-qualification-1e1f30bac217eee5",
-      "performance_groups": [
-        "PERF-BIT-KERNELS"
-      ]
-    },
-    {
-      "id": "cq-api-item-454d50c82daadb5a",
-      "feature_id": "CQ-BIT-KERNELS",
-      "crate_name": "stab_core",
-      "path": "stab_core::advanced::storage::BitError::MatrixShapeMismatch::right_rows",
       "kind": "field",
       "source_path": "crates/stab-core/src/advanced.rs",
       "source_line": 8,
@@ -161555,50 +160276,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-00c5fc975c0ac7ea",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_observable_effect",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_00c5fc975c0ac7ea",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-01d64d7164ab56b5",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "rust-api",
@@ -161771,50 +160448,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-04f735c550b7c9f8",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::boundary_entry_count",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_04f735c550b7c9f8",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -162131,50 +160764,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-0b1d26a8c9f0eb35",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::record_targets_at",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_0b1d26a8c9f0eb35",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-0b611bb854be34a1",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -162353,50 +160942,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-0d0164ff4a8b7a7f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::undo_circuit",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_0d0164ff4a8b7a7f",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -162599,50 +161144,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-10d30148660628d2",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::check_unsigned_flows_with_sparse_tracker",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_10d30148660628d2",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-12ed696bea345f58",
       "feature_id": "CQ-CLI",
       "behavioral_surface": "rust-api",
@@ -162683,50 +161184,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-13762e643fad9b10",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_record_target_absolute",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_13762e643fad9b10",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -164077,50 +162534,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-2af33b3f2262945a",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::region_for_target",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_2af33b3f2262945a",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-2b76941d0acc9c60",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -164850,50 +163263,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-387d25d5bf20e35c",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::toggle_pauli_target",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_387d25d5bf20e35c",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-38af8cc40a9b1ef6",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "rust-api",
@@ -165080,94 +163449,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-3b8c1aaf64a85bc6",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::new_for_error_analysis",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_3b8c1aaf64a85bc6",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-3c5247abcef3a0b8",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::compact_region_for_target",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_3c5247abcef3a0b8",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
@@ -166000,50 +164281,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-535938b42c31119b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::ShiftedRecurrenceSearch",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_535938b42c31119b",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-5426b124b2cbd58e",
       "feature_id": "CQ-CIRCUIT-API",
       "behavioral_surface": "rust-api",
@@ -166187,50 +164424,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-554a7184511a63d4",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::new",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_554a7184511a63d4",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -166470,50 +164663,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-5882ed8a4fb04363",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::undo_implicit_rz_at_start_of_circuit",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_5882ed8a4fb04363",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-5a1800941548f862",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -166598,50 +164747,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-5c536fd35e0251a5",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_5c536fd35e0251a5",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -166877,50 +164982,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-5e986ce0286a277f",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::pauli_targets_at",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_5e986ce0286a277f",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -167933,50 +165994,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-7c853becb284a17a",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::detector_count",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_7c853becb284a17a",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -169217,94 +167234,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-95fa1fce21bb2434",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::undo_instruction",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_95fa1fce21bb2434",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-96185015f210baad",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::is_shifted_copy",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_96185015f210baad",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-969d7d75c7168fdf",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "rust-api",
@@ -169485,50 +167414,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-9968ef7d38c63382",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::take_gauge_errors",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_9968ef7d38c63382",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-9b9704a22f23e649",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "rust-api",
@@ -169601,50 +167486,6 @@
           "-p",
           "stab-core",
           "cq_evidence_api_9ba377987fcadb07",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-9c4a22793865946b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::ReverseFlowTransition::is_measurement_rich",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_9c4a22793865946b",
           "--quiet",
           "--exact"
         ]
@@ -169843,50 +167684,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-9e56c03a876e203c",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::AnalyzerProbeBudget",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_9e56c03a876e203c",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-9e7e7d002fa3c577",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "rust-api",
@@ -169931,50 +167728,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-9f7598504e04de1a",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::undo_circuit_for_analyzer_probe",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_9f7598504e04de1a",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -170155,50 +167908,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-a21c86f2ed5f1f84",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::search_shifted_recurrence",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_a21c86f2ed5f1f84",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -170507,50 +168216,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-a8e5ac792a57c642",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::shift_counts",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_a8e5ac792a57c642",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -171195,50 +168860,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-b58feb87ca4907d0",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::active_targets",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_b58feb87ca4907d0",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-b5f3cb1dc98966cd",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "rust-api",
@@ -171327,50 +168948,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-b670d54563cbc698",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::error_sensitivity",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_b670d54563cbc698",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -172045,50 +169622,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-c66ba2109c336703",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::target_anticommuted",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_c66ba2109c336703",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-c673bbe23f390484",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -172129,50 +169662,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-c7c2f7d316d16501",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::absolute_record_index_from_offset",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_c7c2f7d316d16501",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -172543,50 +170032,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-d1f2001fe1387e26",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::reverse_flow_transition",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_d1f2001fe1387e26",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-d4a59626059aaccf",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "rust-api",
@@ -172676,50 +170121,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-STABILIZER-ALGEBRA"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-d76584015a31b82c",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::AnalyzerProbeBudget::new",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_d76584015a31b82c",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -172819,94 +170220,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CIRCUIT-MODEL",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-d93e02eb1a7cdcea",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::ReverseFlowTransition",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_d93e02eb1a7cdcea",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-dac9e74e1065b24b",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::measurement_count",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_dac9e74e1065b24b",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
@@ -173132,50 +170445,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-de5a0ce52ae89018",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::SparseReverseFrameTracker::feedback_sensitivity",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_de5a0ce52ae89018",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -174177,50 +171446,6 @@
       "status": "planned"
     },
     {
-      "id": "cq-evidence-api-f6511bd7ad0f68a3",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::AnalyzerProbeBudget::consumed_steps",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_f6511bd7ad0f68a3",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
-      ],
-      "status": "planned"
-    },
-    {
       "id": "cq-evidence-api-f74aab250558b400",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -174309,50 +171534,6 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DEM-SAMPLING"
-      ],
-      "status": "planned"
-    },
-    {
-      "id": "cq-evidence-api-f80e2ab4f62d0333",
-      "feature_id": "CQ-FLOW-UTILS",
-      "behavioral_surface": "rust-api",
-      "provenance": "public-rust-api",
-      "source_id": "stab_analysis::advanced::ShiftedRecurrence",
-      "comparator": "semantic-invariant",
-      "execution": {
-        "tiers": [
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "planned",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-analysis",
-          "cq_evidence_api_f80e2ab4f62d0333",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-      },
-      "negative_axes": [],
-      "performance_groups": [
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
       "status": "planned"
     },
@@ -214021,7 +211202,7 @@
           "seeds": [],
           "case_count": 4,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "bebef9a466abcf21c15a8142a291a7e4105e2d0a21f17f100f213478dfbf13c6",
+          "corpus_sha256": "03c2eebb164c786ca4856847e15c5a802fedd26130c6d78815981785cc4b6f7a",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
@@ -227829,7 +225010,7 @@
           "seeds": [],
           "case_count": 15,
           "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs",
-          "corpus_sha256": "bebef9a466abcf21c15a8142a291a7e4105e2d0a21f17f100f213478dfbf13c6",
+          "corpus_sha256": "03c2eebb164c786ca4856847e15c5a802fedd26130c6d78815981785cc4b6f7a",
           "persistence_policy": "existing-focused-regression",
           "execution_mode": "cargo-subprocess"
         }
